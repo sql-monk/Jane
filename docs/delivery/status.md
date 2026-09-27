@@ -12,12 +12,12 @@
 | 05 | Репозиторій обробників | 1 | review | `wp/05-registry` | агент / wp-reviewer | |
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
-| 08 | Адаптери збереження | 1 | active | `wp/08-storage-adapters` | агент | слот 3 |
+| 08 | Адаптери збереження | 1 | review | `wp/08-storage-adapters` | агент / wp-reviewer | відхилення від порядку запису для об'єктних сховищ — оцінює рев'ю |
 | 09 | Оркестратор | 1 | active | `wp/09-orchestrator` | агент / wp-reviewer | виправлення після рев'ю 1 (cancelling, retries, overlap) |
 | 10 | LLM-шлюз і LLM-обробник | 1 | active | `wp/10-llm` | агент / wp-reviewer | виправлення після рев'ю 1 (ін'єкція в retry_hint, secret_refs) |
 | 11 | Асистент джерел | 1 | active | `wp/11-assistant` | агент / wp-reviewer | виправлення після рев'ю 1 (кілька екземплярів) |
 | 12 | Адмінка | 1 | active | `wp/12-admin` | агент | слот 3 |
-| 13 | Інтеграція й приймання | 2 | — | | | |
+| 13 | Інтеграція й приймання | 2 | active | `wp/13-acceptance` | агент | фаза 1: матриця, сценарії, каркас e2e |
 | 14 | Профілі лімітів і експлуатація | 2 | — | | | після M1 |
 
 ## Віхи
@@ -81,3 +81,7 @@
 | WP-05 | WP-06 | `build_archive` SDK → `ZIP_STORED` (канонічний архів registry/storage), опис `JANE_REGISTRY_RUNTIME_PROFILES` | доручення-доповнення WP-06 після M1 |
 | WP-05 | WP-00 | канонічний алгоритм архіву в `handler-packages.md`; дайджести прикладів — ілюстративні; код «профіль недоступний»; `jane-package.json` у diff лише в `manifest_changes` | зміна контракту через contract-guardian |
 - 2026-09-27 — WP-05 на рев'ю. WP-02: рев'ю 2 знайшло хибний термінальний `succeeded` при «завислому» власнику — фінальне виправлення, перевіряє координатор (20× прогонів).
+| WP-08 | WP-00 | розділ «Об'єктні сховища» в storage-adapter.md під схему «подія в знімку (`pending`)»; порядок `list_entities` залежить від адаптера | після рев'ю WP-08, через contract-guardian |
+| WP-08 | WP-07 | `chunk_bytes`, `retry_max_attempts` у `ServiceLimits.adapters` | необов'язково |
+| WP-08 | координатор / WP-01 | CI: сервіси `sqlserver mongodb minio s3` для інтеграційних тестів адаптерів | відкрито |
+- 2026-09-27 — WP-08 на рев'ю; запущено WP-13 (фаза 1).

@@ -180,12 +180,8 @@ class CollectorClient(_Base):
         return dict(await self.c.get_json(f"/v1/collections/{collection_id}/materials", params=params))
 
     async def cancel(self, collection_id: str) -> None:
-        try:
-            await self.c.request(
-                "POST", f"/v1/jobs/{collection_id}/cancel", json={"reason": "sample complete"}
-            )
-        except RemoteError:
-            pass  # already finished or expired
+        with contextlib.suppress(RemoteError):  # already finished or expired
+            await self.c.request("POST", f"/v1/jobs/{collection_id}/cancel", json={"reason": "sample complete"})
 
     async def validate_rules(self, rules: Mapping[str, Any]) -> dict[str, Any]:
         return dict(await self.c.post_json("/v1/rules/validations", dict(rules)))

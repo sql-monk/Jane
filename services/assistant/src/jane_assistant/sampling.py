@@ -69,6 +69,20 @@ class SampleResult:
         return out
 
 
+def pick_diverse(reserve: list[Sample], seen: Counter[str], size: int) -> list[Sample]:
+    """Round-robin over URL shapes: always take a material of the least represented shape
+    (already classified + already picked), keeping the collector's order within a shape."""
+    picked: Counter[str] = Counter()
+    left = list(reserve)
+    batch: list[Sample] = []
+    while left and len(batch) < size:
+        best = min(range(len(left)), key=lambda i: (seen[left[i].shape] + picked[left[i].shape], i))
+        s = left.pop(best)
+        picked[s.shape] += 1
+        batch.append(s)
+    return batch
+
+
 def coverage(counts: Counter[str], min_examples: int) -> float:
     n = sum(counts.values())
     if n == 0:
@@ -208,11 +222,8 @@ async def sample_source(
                 )
                 break
             room = max_samples - len(samples)
-            reserve.sort(key=lambda s: shapes[s.shape])  # least represented shapes first (diversity)
-            batch, reserve = (
-                reserve[: min(ob.sample_batch_size, room)],
-                reserve[min(ob.sample_batch_size, room) :],
-            )
+            batch = pick_diverse(reserve, shapes, min(ob.sample_batch_size, room))
+            reserve = [s for s in reserve if not any(s is b for b in batch)]
             try:
                 await _classify(llm, batch, limits, model)
             except BudgetExhausted:

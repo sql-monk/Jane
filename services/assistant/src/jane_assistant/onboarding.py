@@ -925,6 +925,7 @@ class OnboardingService:
             job_key, rules_draft, "collector-rules", f"{cand.title} collection rules"
         )
         extractors: list[dict[str, Any]] = []
+        entity_types: list[str] = []
         all_passed = True
         for i, plan_wire in enumerate(proposal["extractors"]):
             plan = session.plans[plan_wire["entity_type"]]
@@ -937,7 +938,7 @@ class OnboardingService:
             elif plan.action == "fork":
                 assert plan.draft is not None
                 assert plan.fork_from is not None
-                new_id = plan.draft.manifest["package_id"]
+                new_id = slug(f"{source_id}.{plan.entity_type}-extractor")
                 fork = await self.nb.registry.fork(
                     plan.fork_from["package_id"],
                     {
@@ -949,6 +950,7 @@ class OnboardingService:
                     idem_key(job_key, "fork", new_id),
                 )
                 draft = plan.draft.copy()
+                draft.manifest["package_id"] = new_id
                 if fork.get("fork_of"):
                     draft.manifest["fork_of"] = fork["fork_of"]
                 draft.manifest["provenance"]["based_on"] = {
@@ -961,8 +963,14 @@ class OnboardingService:
                     raise JaneError(
                         f"no extractor could be generated for {plan.entity_type}", code="conflict"
                     )
-                ref = await self._publish(job_key, plan.draft, "extractor", plan.draft.manifest["title"])
+                draft = plan.draft.copy()
+                new_id = slug(f"{source_id}.{plan.entity_type}-extractor")
+                if new_id != draft.manifest["package_id"]:  # the user chose another source_id
+                    draft.manifest["package_id"] = new_id
+                    draft.manifest["version"] = await self._next_version(new_id)
+                ref = await self._publish(job_key, draft, "extractor", draft.manifest["title"])
             entry: dict[str, Any] = {"action": plan.action, "package": ref}
+            entity_types.append(plan.entity_type)
             if plan.outcome is not None:
                 report = {**plan.outcome.report, "package": ref}
                 entry["test_report"] = report
@@ -975,7 +983,9 @@ class OnboardingService:
                     )
             extractors.append(entry)
         source_draft = self._source_draft(session, cand, source_id, rules_ref)
-        task_draft = self._task_draft(session, cand, source_id, rules_ref, proposal, extractors)
+        task_draft = self._task_draft(
+            session, cand, source_id, rules_ref, proposal, list(zip(entity_types, extractors, strict=True))
+        )
         activated = False
         if (
             activate
@@ -1071,7 +1081,7 @@ class OnboardingService:
         source_id: str,
         rules_ref: dict[str, Any],
         proposal: dict[str, Any],
-        extractors: list[dict[str, Any]],
+        extractors: list[tuple[str, dict[str, Any]]],
     ) -> dict[str, Any]:
         rules = proposal["collector_rules"]
         stages: list[dict[str, Any]] = [
@@ -1082,16 +1092,8 @@ class OnboardingService:
             }
         ]
         sections = {s["section_id"]: s for s in rules.get("sections") or []}
-        for e in extractors:
-            etype = next(
-                (
-                    p.entity_type
-                    for p in session.plans.values()
-                    if p.package and p.package.get("package_id") == e["package"]["package_id"]
-                ),
-                None,
-            )
-            plan = session.plans.get(etype or "") or next(iter(session.plans.values()))
+        for etype, e in extractors:
+            plan = session.plans[etype]
             section = sections.get(plan.entity_type) or sections.get(plan.material_type)
             if section:
                 binding: dict[str, Any] = {"url_patterns": section["patterns"]}

@@ -352,7 +352,7 @@ class Executor:
                 "timeout",
                 f"wall time limit {sandbox.wall_time_ms} ms exceeded; sandbox killed",
                 wall_time_ms=sandbox.wall_time_ms,
-                **outcome.details,
+                sandbox=dict(outcome.details),
             )
         if outcome.oom_killed:
             return fail(
@@ -470,10 +470,11 @@ class Executor:
         if validation_errors:
             diagnostics["validation_errors"] = validation_errors[:100]
             result["output"] = {"entities": []} if manifest["kind"] == "extractor" else {}
-            return fail(
+            failed: dict[str, Any] = fail(
                 "schema_mismatch",
                 f"{len(validation_errors)} validation error(s) in the output of {manifest['package_id']}",
             )
+            return failed
         statuses = [str(r.get("status")) for r in results]
         output: dict[str, Any] = {}
         if manifest["kind"] == "extractor" or entities:

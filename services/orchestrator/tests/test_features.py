@@ -342,3 +342,27 @@ def test_invalid_task_rejected(make_client: Any) -> None:
     assert v["valid"] is False and any(e["code"] == "cycle" for e in v["errors"])
     typo = {**catalog_task(), "stagez": []}
     assert post(client, "/v1/tasks", typo).status_code == 422
+
+
+def test_async_handler_job_is_polled(make_client: Any, neighbours: Neighbours, db_dsn: str) -> None:
+    neighbours.runtime.async_jobs = True  # extractor answers 202 + Job (handler.v1 async / slow sync)
+    client = make_client()
+    setup(client)
+    run = wait_run(client, start(client))
+    assert run["status"] == "succeeded"
+    items = items_by_stage(db_dsn, run["run_id"])
+    assert len(items["store-products"]) == 5
+    assert all(i["executor_job"] for i in items["extract-products"])
+    assert neighbours.all_violations() == []
+
+
+def test_overlap_queue_waits_for_previous_run(make_client: Any, neighbours: Neighbours) -> None:
+    neighbours.runtime.delay_s = 0.1
+    client = make_client()
+    setup(client, task=catalog_task(schedule={"type": "manual", "overlap": "queue"}))
+    first, second = start(client), start(client)
+    time.sleep(0.3)
+    assert client.get(f"/v1/runs/{second}").json()["status"] == "queued"
+    r1, r2 = wait_run(client, first), wait_run(client, second)
+    assert r1["status"] == r2["status"] == "succeeded"
+    assert r2["started_at"] >= r1["finished_at"]

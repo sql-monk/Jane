@@ -514,6 +514,9 @@ class FakeHandler(ContractFake):
         """package_id → how many more calls should fail with a retryable failure."""
         self.concurrent = 0
         self.max_concurrent = 0
+        self.async_jobs = False
+        """Answer invocations with 202 + Job; the result is read from GET /v1/jobs/{id}."""
+        self.jobs: dict[str, dict[str, Any]] = {}
         self.stored_objects: dict[str, dict[str, Any]] = {}
         self.object_order: list[str] = []
 
@@ -552,17 +555,37 @@ class FakeHandler(ContractFake):
             if hang is not None and not self.hung.is_set():
                 self.hung.set()
                 await asyncio.to_thread(hang.wait, 60)
+            if self.async_jobs:
+                job_id = "job_" + uuid.uuid4().hex[:20]
+                with self.lock:
+                    self.jobs[job_id] = result
+                job = {"job_id": job_id, "kind": "invocation", "status": "running", "created_at": _now()}
+                return self.respond(request, 202, job, {"Location": f"/v1/jobs/{job_id}"})
             return self.respond(request, 200, result)
         finally:
             with self.lock:
                 self.in_flight.discard(key)
                 self.concurrent -= 1
 
+    async def job(self, request: Request) -> Response:
+        result = self.jobs.get(request.path_params["job_id"])
+        if result is None:
+            return problem(404, "not_found")
+        job = {
+            "job_id": request.path_params["job_id"],
+            "kind": "invocation",
+            "status": "succeeded",
+            "created_at": _now(),
+            "result": result,
+        }
+        return self.respond(request, 200, job)
+
     def app(self) -> Starlette:
         return Starlette(
             routes=[
                 Route("/v1/health", self.health),
                 Route("/v1/invocations", self.invoke, methods=["POST"]),
+                Route("/v1/jobs/{job_id}", self.job),
                 *self.connection_routes(),
             ]
         )

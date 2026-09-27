@@ -334,3 +334,28 @@ def test_ids_etags_time_keys() -> None:
         canonical_key({"key": {"scope": "shop", "natural": {"sku": "A-1", "b": 2}}})
         == 'shop|{"b":2,"sku":"A-1"}'
     )
+
+
+def test_api_key_auth_and_scopes() -> None:
+    import hashlib
+
+    from starlette.requests import Request
+
+    from jane_kit.errors import Forbidden, Unauthenticated
+    from jane_orchestrator.auth import authenticate
+
+    def req(token: str | None) -> Request:
+        headers = [(b"authorization", f"Bearer {token}".encode())] if token else []
+        return Request({"type": "http", "headers": headers})
+
+    keys = [{"name": "viewer", "sha256": hashlib.sha256(b"k1").hexdigest(), "scopes": ["orchestrator:read"]}]
+    assert authenticate(req(None), "none", []).name == "anonymous"
+    p = authenticate(req("k1"), "api_key", keys)
+    assert p.name == "viewer"
+    p.require("orchestrator:read")
+    with pytest.raises(Forbidden):
+        p.require("orchestrator:write")
+    with pytest.raises(Unauthenticated):
+        authenticate(req("wrong"), "api_key", keys)
+    with pytest.raises(Unauthenticated):
+        authenticate(req(None), "api_key", keys)

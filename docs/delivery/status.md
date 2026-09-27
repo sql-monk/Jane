@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|---|
 | 00 | Архітектура й контракти | 0 | accepted | `wp/00-architecture-contracts` | агент / wp-reviewer (2 раунди) | злито `e2714ec` |
 | 01 | Каркас, CI, dev-стек | 0 | accepted | `wp/01-scaffold-ci` | агент / wp-reviewer (2 раунди + інтеграційне виправлення) | злито `4468cee` |
-| 02 | Web Collector: ядро | 1 | active | `wp/02-web-collector-core` | агент / wp-reviewer | виправлення після рев'ю 1 (lease, тайм-аути) |
+| 02 | Web Collector: ядро | 1 | review | `wp/02-web-collector-core` | агент / wp-reviewer | рев'ю 2 |
 | 03 | Web Collector: стратегії пошуку | 1 | — | | | після M0 |
 | 04 | Telegram Collector | 1 | — | | | після M0 |
 | 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент | слот 2 |
@@ -61,6 +61,6 @@
 | WP-09 | WP-00 | форма входу `select: problems` і виходу етапу збереження; `ProblemGroup.note`; чи застосовуються активації до `collector.rules` | зміна контракту через contract-guardian |
 | WP-09 | WP-00 / WP-07 | фільтр `storage.v1 /v1/objects` за кількома `material_id` | зміна контракту через contract-guardian |
 | WP-09 | WP-01 | перевірка JWT у jane-kit | відкрито |
-| WP-09 | WP-02 / WP-04 | ідемпотентний `POST /v1/collections`; `limits.queue.max_unacked_materials` із запиту; `rules_ref` без registry для M1 | передати WP-02 (рев'ю 2), WP-04 |
+| WP-09 | WP-02 / WP-04 | ідемпотентний `POST /v1/collections`; `limits.queue.max_unacked_materials` із запиту; `rules_ref` без registry для M1 | WP-02 виконав; передати WP-04 |
 | WP-09 | WP-05 | registry віддає `kind`, `auto_changes_allowed`, `status`, `test_status`, `digest` | передати WP-05 |
 | WP-09 | WP-14 | профіль `PlatformLimits` для `JANE_ORCHESTRATOR_LIMITS_FILE` | після M1 |

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "message",
+    "title"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "starts_at": {
+      "type": "string",
+      "description": "RFC 3339 with time zone, if known"
+    },
+    "venue": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "price": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "message": {
+      "type": "string",
+      "description": "material_id of the message (key)"
+    }
+  }
+}

@@ -170,7 +170,7 @@ class LlmHandler:
                     if kf in fields and isinstance(fields[kf], str | int | float | bool):
                         natural[kf] = fields[kf]
                     elif kf in _KEY_FROM_MATERIAL:
-                        natural[kf] = material["material_id"]
+                        natural[kf] = fields[kf] = material["material_id"]
                 if len(natural) != len(d["key_fields"]):
                     errors.append(
                         {"pointer": f"/{etype}s/{i}", "message": f"missing key fields {d['key_fields']}"}

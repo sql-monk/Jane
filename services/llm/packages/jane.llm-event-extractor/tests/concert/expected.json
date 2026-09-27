@@ -1,0 +1,17 @@
+{
+  "entities": [
+    {
+      "entity_type": "event",
+      "key": {
+        "scope": "news-tg",
+        "natural": {
+          "message": "tg:-1001234567890:4521"
+        }
+      },
+      "fields": {
+        "title": "Концерт",
+        "venue": "Філармонія"
+      }
+    }
+  ]
+}

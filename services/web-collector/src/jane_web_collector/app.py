@@ -1,81 +1,327 @@
-"""HTTP API of the service.
+"""HTTP API ``collector.v1`` of the Web Collector (``contracts/openapi/collector.v1.yaml``).
 
-``/v1/health``, ``/v1/info``, ``/metrics`` and ``/v1/jobs/*`` come from jane-kit. The
-``/v1/examples/*`` endpoint shows the patterns (Idempotency-Key, 202 + Job, progress, cancellation):
-replace it with the API from ``contracts/openapi/<service>.v1.yaml`` and delete it.
+``/v1/health``, ``/v1/info``, ``/metrics`` and ``/v1/jobs/*`` come from jane-kit; the rest is here. The
+service is autonomous: rules inline, from a local package or from the registry; materials are pulled with
+a cursor; no call to the orchestrator exists.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import re
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import FastAPI, Request, Response
-from pydantic import BaseModel, Field
+from fastapi import FastAPI, Header, Query, Request, Response
+from fastapi.responses import JSONResponse
 
-from jane_kit.idempotency import IDEMPOTENCY_HEADER, InMemoryIdempotencyStore, StoredResponse, idempotent
-from jane_kit.jobs import JobContext, JobRunner, jobs_router
+from jane_kit.errors import FieldError, JaneError, NotFound, ValidationFailed
+from jane_kit.idempotency import StoredResponse, idempotent
+from jane_kit.jobs import JobRunner, jobs_router
+from jane_kit.pagination import clamp_limit, decode_cursor, encode_cursor
 from jane_kit.service import create_app
 
 from . import __version__
+from .connections import check_params, connection_etag, resolve_secret
+from .discovery.registry import Registry
+from .engine import Engine
+from .materials import rfc3339
+from .rules import ContractSchemas, validate_rules
 from .settings import Settings, resolve_service_limits
+from .state import StateStore
+from .stores import SqliteIdempotencyStore, SqliteJobStore
 
 log = logging.getLogger(__name__)
 
+CURSOR_RE = re.compile(r"^c_(\d{1,18})$")
+TERMINAL = {"succeeded", "failed", "cancelled"}
 
-class ExampleJobRequest(BaseModel):
-    """EXAMPLE - delete together with the /v1/examples endpoint.
 
-    The bounds below validate the demo payload only; they are not operational limits of the service
-    (those live in ``ServiceLimits`` and come from configuration).
-    """
+def _cursor(seq: int) -> str:
+    return f"c_{seq:016d}"
 
-    steps: int = Field(default=3, ge=1, le=1000)
-    step_delay_ms: int = Field(default=10, ge=0, le=60_000)
+
+def _parse_after(after: str | None) -> int | None:
+    if after is None:
+        return None
+    m = CURSOR_RE.match(after)
+    if not m:
+        raise ValidationFailed(
+            "invalid cursor", errors=[FieldError(parameter="after", message="invalid cursor")]
+        )
+    return int(m.group(1))
 
 
 def build_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     resolved = resolve_service_limits(settings)
     limits = resolved.limits
-    runner = JobRunner(limits=limits.jobs)
-    idem_store = InMemoryIdempotencyStore(limits.idempotency)
+    state = StateStore(settings.state_dir / "state.db")
+    registry = Registry.default(settings.discovery_path)
+    schemas = ContractSchemas.locate(settings.contracts_dir)
+    runner = JobRunner(store=SqliteJobStore(state), limits=limits.jobs)
+    idem_store = SqliteIdempotencyStore(state)
+    engine = Engine(settings, resolved, state, registry, schemas, runner)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        log.info("configured limits", extra={"limits": resolved.effective()})
+        log.info(
+            "configured limits",
+            extra={
+                "limits": resolved.effective(),
+                "strategies": list(registry.types()),
+                "state": str(state.path),
+            },
+        )
+        await engine.resume_pending()
+        await engine.start()
         yield
-        await runner.shutdown()
+        await engine.stop()
+        state.close()
 
     app = create_app(
         settings,
-        title="Web Collector",
+        title="Jane Web Collector",
         version=__version__,
         lifespan=lifespan,
-        capabilities={"examples": ["jobs"]},
-        limits=resolved,  # published in /v1/info as PlatformLimits (WP-00 ServiceInfo.limits)
+        capabilities=engine.capabilities,
+        limits=resolved,
     )
     app.state.limits = resolved
+    app.state.engine = engine
+    app.state.store = state
+
+    async def state_check() -> tuple[str, str | None]:
+        state.ping()
+        return "ok", None
+
+    app.state.health.add("state_store", state_check)
     app.include_router(jobs_router(runner))
 
-    @app.post("/v1/examples/jobs", status_code=202, tags=["examples"])
-    async def start_example_job(body: ExampleJobRequest, request: Request) -> Response:  # EXAMPLE
-        async def handler() -> StoredResponse:
-            async def work(ctx: JobContext) -> dict[str, Any]:
-                for i in range(body.steps):
-                    await ctx.check_cancelled()
-                    await asyncio.sleep(body.step_delay_ms / 1000)
-                    await ctx.progress(i + 1, body.steps, unit="steps")
-                return {"steps_done": body.steps}
+    async def json_body(request: Request) -> Any:
+        raw = await request.body()
+        try:
+            return json.loads(raw) if raw else None
+        except ValueError as exc:
+            raise JaneError("request body is not valid JSON", code="bad_request") from exc
 
-            job = await runner.submit(
-                "example", work, idempotency_key=request.headers.get(IDEMPOTENCY_HEADER)
-            )
+    # ------------------------------------------------------------------ fetch
+    @app.post("/v1/fetches", tags=["fetch"], response_model=None)
+    async def fetch_material(request: Request) -> JSONResponse:
+        payload = await json_body(request)
+        return JSONResponse(
+            await engine.fetch_one(payload)
+        )
+
+    # ------------------------------------------------------------------ collections
+    @app.post("/v1/collections", status_code=202, tags=["collections"], response_model=None)
+    async def start_collection(request: Request) -> Response:
+        payload = await json_body(request)
+
+        async def handler() -> StoredResponse:
+            job = await engine.start_collection(payload)
             return StoredResponse(202, job.wire(), {"Location": runner.location(job.job_id)})
 
         return await idempotent(request, idem_store, handler, limits=limits.idempotency)
 
+    def _record(collection_id: str) -> dict[str, Any]:
+        record = state.get_collection(collection_id)
+        if record is None:
+            raise NotFound(f"collection {collection_id} not found")
+        if record.get("expired"):
+            raise JaneError(
+                "collection expired after job_retention_seconds",
+                code="not_found",
+                status=410,
+                title="Collection expired",
+            )
+        return record
+
+    @app.get("/v1/collections/{collection_id}", tags=["collections"], response_model=None)
+    async def get_collection(collection_id: str) -> JSONResponse:
+        _record(collection_id)
+        return JSONResponse(engine.collection_view(collection_id))
+
+    @app.get("/v1/collections/{collection_id}/materials", tags=["collections"], response_model=None)
+    async def list_materials(
+        collection_id: str,
+        after: str | None = Query(default=None, max_length=2048),
+        limit: int | None = Query(default=None, ge=1),
+        wait_ms: int | None = Query(default=None, ge=0),
+    ) -> JSONResponse:
+        record = _record(collection_id)
+        page_size = clamp_limit(limit, limits.page)
+        after_seq = _parse_after(after)
+        if after_seq is not None and after_seq > int(record["acked_seq"]):
+            state.ack(collection_id, after_seq)
+            engine.acked(collection_id)
+        start = max(after_seq or 0, int(record["acked_seq"]))
+        deadline = time.monotonic() + min(wait_ms or 0, limits.collector.max_wait_ms) / 1000
+        while True:
+            items = state.materials_after(collection_id, start, page_size + 1)
+            status = engine.collection_view(collection_id)["status"]
+            if items or status in TERMINAL or time.monotonic() >= deadline:
+                break
+            await asyncio.sleep(0.1)
+        more = len(items) > page_size
+        items = items[:page_size]
+        if items:
+            next_cursor: str | None = _cursor(items[-1][0])
+        elif after is not None:
+            next_cursor = after
+        else:
+            next_cursor = _cursor(start) if start else None
+        if status not in TERMINAL:  # re-read after listing: the run may have finished meanwhile
+            status = engine.collection_view(collection_id)["status"]
+            more = more or bool(state.materials_after(collection_id, items[-1][0] if items else start, 1))
+        body = {
+            "items": [m for _, m in items],
+            "next_cursor": next_cursor,
+            "end_of_stream": status in TERMINAL and not more,
+            "collection_status": status,
+        }
+        return JSONResponse(body)
+
+    @app.get("/v1/collections/{collection_id}/errors", tags=["collections"], response_model=None)
+    async def list_errors(
+        collection_id: str,
+        cursor: str | None = Query(default=None, max_length=2048),
+        limit: int | None = Query(default=None, ge=1),
+    ) -> JSONResponse:
+        _record(collection_id)
+        page_size = clamp_limit(limit, limits.page)
+        after = int(decode_cursor(cursor)) if cursor else 0
+        rows = state.errors_after(collection_id, after, page_size + 1)
+        more = len(rows) > page_size
+        rows = rows[:page_size]
+        return JSONResponse(
+            {
+                "items": [e for _, e in rows],
+                "next_cursor": encode_cursor(rows[-1][0]) if more and rows else None,
+            }
+        )
+
+    # ------------------------------------------------------------------ rules
+    @app.post("/v1/rules/validations", tags=["rules"], response_model=None)
+    async def validate(request: Request) -> JSONResponse:
+        payload = await json_body(request)
+        return JSONResponse(validate_rules(schemas, registry, payload).wire())
+
+    # ------------------------------------------------------------------ state
+    @app.get("/v1/states/{state_key}", tags=["state"], response_model=None)
+    async def get_state(state_key: str) -> JSONResponse:
+        summary = state.state_summary(state_key)
+        if summary is None:
+            raise NotFound(f"no state for {state_key}")
+        ts = summary.get("last_fetch_ts")
+        updated = (
+            rfc3339_ts(ts) if ts else (summary.get("cursor_updated_at") or summary.get("last_collection_at"))
+        )
+        return JSONResponse(
+            {
+                "state_key": state_key,
+                "collector": "web",
+                "updated_at": updated,
+                "known_urls": summary["known_urls"],
+                "frontier_size": state.frontier_size_for_state_key(state_key),
+                "cursors": summary["cursors"],
+            }
+        )
+
+    @app.delete("/v1/states/{state_key}", status_code=204, tags=["state"], response_model=None)
+    async def reset_state(state_key: str) -> Response:
+        if state.active_for_state_key(state_key):
+            raise JaneError(f"state {state_key} is used by a running collection", code="conflict")
+        state.delete_state(state_key)
+        return Response(status_code=204)
+
+    # ------------------------------------------------------------------ connections
+    @app.get("/v1/connections", tags=["connections"], response_model=None)
+    async def list_connections(
+        cursor: str | None = Query(default=None, max_length=2048),
+        limit: int | None = Query(default=None, ge=1),
+    ) -> JSONResponse:
+        page_size = clamp_limit(limit, limits.page)
+        after = str(decode_cursor(cursor)) if cursor else None
+        items = state.list_connections(after, page_size + 1)
+        more = len(items) > page_size
+        items = items[:page_size]
+        return JSONResponse(
+            {
+                "items": items,
+                "next_cursor": encode_cursor(items[-1]["connection_id"]) if more and items else None,
+            }
+        )
+
+    @app.get("/v1/connections/{connection_id}", tags=["connections"], response_model=None)
+    async def get_connection(connection_id: str) -> JSONResponse:
+        found = state.get_connection(connection_id)
+        if found is None:
+            raise NotFound(f"connection {connection_id} not found")
+        return JSONResponse(found[0], headers={"ETag": found[1]})
+
+    @app.put("/v1/connections/{connection_id}", tags=["connections"], response_model=None)
+    async def put_connection(
+        connection_id: str,
+        request: Request,
+        if_match: str | None = Header(default=None, alias="If-Match"),
+    ) -> JSONResponse:
+        payload = await json_body(request)
+        errors = schemas.errors(
+            f"{schemas.root.resolve().as_uri()}/schemas/common/connection.schema.json", payload
+        )
+        if errors:
+            raise ValidationFailed("connection does not match the contract", errors=errors)
+        if payload["connection_id"] != connection_id:
+            raise ValidationFailed(
+                "connection_id in the body differs from the path",
+                errors=[FieldError(pointer="/connection_id", message="must equal the path parameter")],
+            )
+        check_params(payload)
+        current = state.get_connection(connection_id)
+        if if_match is not None and (current is None or current[1] != if_match):
+            raise JaneError("If-Match does not match the current ETag", code="precondition_failed")
+        etag = connection_etag(payload)
+        created = state.put_connection(connection_id, payload, etag)
+        return JSONResponse(payload, status_code=201 if created else 200, headers={"ETag": etag})
+
+    @app.delete("/v1/connections/{connection_id}", status_code=204, tags=["connections"], response_model=None)
+    async def delete_connection(connection_id: str) -> Response:
+        if not state.delete_connection(connection_id):
+            raise NotFound(f"connection {connection_id} not found")
+        return Response(status_code=204)
+
+    @app.post("/v1/connections/{connection_id}/test", tags=["connections"], response_model=None)
+    async def test_connection(connection_id: str) -> JSONResponse:
+        found = state.get_connection(connection_id)
+        if found is None:
+            raise NotFound(f"connection {connection_id} not found")
+        started = time.perf_counter()
+        refs = found[0].get("secret_refs") or {}
+        resolved_map = {name: resolve_secret(ref) is not None for name, ref in refs.items()}
+        ok = all(resolved_map.values())
+        body: dict[str, Any] = {
+            "ok": ok,
+            "checked_at": rfc3339_now(),
+            "latency_ms": int((time.perf_counter() - started) * 1000),
+            "secrets_resolved": resolved_map,
+        }
+        if not ok:
+            body["message"] = "some secret_refs are not resolvable in this collector's environment"
+        return JSONResponse(body)
+
     return app
+
+
+
+def rfc3339_ts(ts: float) -> str:
+    return rfc3339(datetime.fromtimestamp(ts, UTC))
+
+
+def rfc3339_now() -> str:
+    return rfc3339(datetime.now(UTC))

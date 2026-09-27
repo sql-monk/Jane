@@ -11,7 +11,7 @@
 | 04 | Telegram Collector | 1 | — | | | після M0 |
 | 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент | слот 2 |
 | 06 | Runtime обробників і SDK | 1 | active | `wp/06-handler-runtime` | агент / wp-reviewer | виправлення після рев'ю 1 (кілька екземплярів, connections) |
-| 07 | Збереження: ядро + files + PostgreSQL | 1 | review | `wp/07-storage-core` | агент / wp-reviewer | рев'ю 2 |
+| 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
 | 08 | Адаптери збереження | 1 | — | | | після M0 |
 | 09 | Оркестратор | 1 | active | `wp/09-orchestrator` | агент | слот 1 |
 | 10 | LLM-шлюз і LLM-обробник | 1 | active | `wp/10-llm` | агент | слот 2 |
@@ -44,7 +44,7 @@
 ## Відкриті запити між власниками
 | Від | Кому | Запит | Стан |
 |---|---|---|---|
-| WP-07 | координатор / WP-01 | `scripts/dev.py` `members()`: додати `services/storage/adapters/*`, щоб `just types` перевіряв адаптери | після злиття WP-07 |
+| WP-07 | координатор / WP-01 | `scripts/dev.py` `members()`: додати `services/storage/adapters/*`, щоб `just types` перевіряв адаптери | зроблено координатором |
 | WP-07 | WP-01 | спільний помічник `ContentRef` у jane-kit (ADR-0004) | відкрито |
 | WP-07 | WP-05 | канонічний архів і дайджест пакета (zip stored, відсортовано, дата 1980, 0644); дайджести в прикладах WP-00 не реальні | передати WP-05 |
 | WP-07 | WP-00 | задокументувати `DeliveryRecord.acks`; простір імен етапу в storage.v1; приклад `storage-files.json` `format.raw: html` vs `original` | зміна контракту через contract-guardian |
@@ -56,3 +56,4 @@
 | WP-02 | WP-01 | `contracts/python` у uv workspace (зараз path-залежність) | необов'язково |
 | WP-07 рев'ю | WP-00 | `default` формату в `package-manifest.schema.json` узгодити з описом і ТЗ §5 | зміна контракту через contract-guardian |
 - 2026-09-27 — WP-06 і WP-02 повернуто після рев'ю 1 (кілька екземплярів, контракт connections, lease/fencing, тайм-аути з рівнів лімітів). WP-07 — рев'ю 2.
+- 2026-09-27 — WP-07 прийнято (2 раунди) і злито; на main `just check` зелений, gitleaks 0. Адаптери додано в `just types`.

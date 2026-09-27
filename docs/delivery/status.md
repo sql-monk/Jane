@@ -10,12 +10,12 @@
 | 03 | Web Collector: стратегії пошуку | 1 | — | | | після M0 |
 | 04 | Telegram Collector | 1 | — | | | після M0 |
 | 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент | слот 2 |
-| 06 | Runtime обробників і SDK | 1 | review | `wp/06-handler-runtime` | агент / wp-reviewer | рев'ю 2 (гілку перебазовано на `3af51c4`) |
+| 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
 | 08 | Адаптери збереження | 1 | active | `wp/08-storage-adapters` | агент | слот 3 |
 | 09 | Оркестратор | 1 | review | `wp/09-orchestrator` | агент / wp-reviewer | M1-base `c6ba650` |
-| 10 | LLM-шлюз і LLM-обробник | 1 | active | `wp/10-llm` | агент | слот 2 |
-| 11 | Асистент джерел | 1 | active | `wp/11-assistant` | агент | слот 2 |
+| 10 | LLM-шлюз і LLM-обробник | 1 | review | `wp/10-llm` | агент / wp-reviewer | |
+| 11 | Асистент джерел | 1 | review | `wp/11-assistant` | агент / wp-reviewer | |
 | 12 | Адмінка | 1 | — | | | після M0 |
 | 13 | Інтеграція й приймання | 2 | — | | | |
 | 14 | Профілі лімітів і експлуатація | 2 | — | | | після M1 |
@@ -64,3 +64,9 @@
 | WP-09 | WP-02 / WP-04 | ідемпотентний `POST /v1/collections`; `limits.queue.max_unacked_materials` із запиту; `rules_ref` без registry для M1 | WP-02 виконав; передати WP-04 |
 | WP-09 | WP-05 | registry віддає `kind`, `auto_changes_allowed`, `status`, `test_status`, `digest` | передати WP-05 |
 | WP-09 | WP-14 | профіль `PlatformLimits` для `JANE_ORCHESTRATOR_LIMITS_FILE` | після M1 |
+| WP-10 | WP-00 | контракт перетворення виходу LLM на EntityRecord; семантика `BudgetStatus.exhausted` і рівень бюджету із запиту | зміна контракту через contract-guardian |
+| WP-10 | WP-09 | синхронізувати бюджети й підключення `llm_provider` (`PUT /v1/budgets`, `PUT /v1/connections`); `context.trace` у викликах | передати WP-09 (рев'ю) |
+| WP-10 | координатор / WP-01 | не додавати до workspace залежностей, що тягнуть `httpx2` (ламає TestClient і mypy) | правило |
+| WP-11 | WP-00 | поле пропозиції в `ImprovementResult` при `proposal_only`; `llm.min_onboarding_confidence`; де клієнт бере `session_id` з 202 Job | зміна контракту через contract-guardian |
+| WP-11 | WP-01 / координатор | асистент (і нові сервіси) у compose і proxy | відкрито |
+- 2026-09-27 — другий ліміт сесії перервав WP-05, WP-08 і рев'ю WP-02/WP-09; відновлено. WP-06 прийнято (2 раунди) і злито; main зелений, gitleaks 0. WP-10 і WP-11 на рев'ю.

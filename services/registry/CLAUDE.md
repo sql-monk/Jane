@@ -1,0 +1,3 @@
+- Запуск: `uv run --package jane-registry python -m jane_registry` (або Docker, див. README.md).
+- Тести: `just test registry` (інтеграційні: `-m integration` після `just up`).
+- Контракт: `contracts/openapi/registry.v1.yaml` (+ `contracts/openapi/common.yaml`); конвенції — скіл `jane-contracts`.

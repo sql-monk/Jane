@@ -113,7 +113,8 @@ def test_worker_killed_mid_chain_completes_without_double_effects(
     replayed = [k for k, n in neighbours.storage.duplicates.items() if n]
     assert replayed, "the killed delivery was not re-delivered"
     retried = [i for s in items.values() for i in s if i["delivery_key"] in replayed]
-    assert retried and all(i["attempts"] >= 2 for i in retried)
+    # taken over after the lease expired: counted as a lease take-over, not as a retry attempt
+    assert retried and all(i["lease_reclaims"] >= 1 and i["attempts"] == 1 for i in retried)
     assert neighbours.all_violations() == []
 
 

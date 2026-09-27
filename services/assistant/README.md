@@ -88,19 +88,38 @@ docker build -f services/assistant/Dockerfile -t jane-assistant .
 docker run --rm -p 8000:8000 -e JANE_ASSISTANT_LLM_URL=http://llm:8000 jane-assistant
 ```
 
-Кілька екземплярів: запускаються як звичайні процеси чи контейнери. Сесії підключення, job і ключі
-ідемпотентності зараз зберігаються в пам'яті екземпляра (`InMemorySessionStore`, `InMemoryJobStore`,
-`InMemoryIdempotencyStore`), тож без спільного сховища запит про сесію має потрапити на той екземпляр,
-що її створив (sticky routing за `session_id`/`job_id`). Для справжнього горизонтального масштабування
-треба реалізувати протоколи `SessionStore` / `JobStore` / `IdempotencyStore` на власній БД сервісу
-(див. «Відомі обмеження» у звіті WP-11).
+### Кілька екземплярів
+
+Задайте `JANE_ASSISTANT_STATE_DSN` (PostgreSQL, власна схема `JANE_ASSISTANT_STATE_SCHEMA`, типово
+`jane_assistant`; таблиці створюються самі) і унікальний `JANE_ASSISTANT_INSTANCE_ID` кожному екземпляру
+(типово — `hostname-pid`). Тоді сесії підключення, job і ключі ідемпотентності спільні
+(`state.py`: `PostgresState`):
+
+- будь-який екземпляр читає й продовжує сесію чи job іншого (`selectCandidate`, `acceptProposal`, `GET /v1/jobs`);
+  повтор `Idempotency-Key` на іншому екземплярі повертає збережену відповідь;
+- переходи стану сесії з API — з оптимістичною версією (`UPDATE … WHERE version = …`): з двох одночасних
+  виборів кандидата чи прийнять виграє один, інший отримує 409;
+- job належить екземпляру, що його виконує, і тримає оренду (`limits.state.job_lease_ms`), яку той поновлює
+  кожні `heartbeat_interval_ms`. Екземпляр убито → після закінчення оренди будь-який інший позначає job
+  `failed` (`service_unavailable`, «instance … stopped …»), сесію — теж; завершений job більше не змінюється.
+  Штатна зупинка → job `cancelled` з `cancellation.reason` «instance … shut down», сесія — `cancelled` з причиною;
+- `/v1/health` перевіряє `state`, `/v1/info` → `capabilities.state` = `postgresql`.
+
+Без `STATE_DSN` стан у пам'яті (`InMemoryState`) — лише для одиночного запуску й тестів; після рестарту
+сесії й job зникають.
 
 ## Тести
 
 ```
 just test assistant                  # unit + наскрізні сценарії + контрактні (одна команда)
 just test assistant -m contract      # лише контрактні
+just up --project jane-wp11 postgres # спільний стан: кілька екземплярів на одній БД
+JANE_STACK_FILE=.jane/stack-jane-wp11.json just test assistant -m integration   # або JANE_WP11_STATE_DSN=<dsn>
+just down -v --project jane-wp11
 ```
+
+`tests/test_state.py` (інтеграційні): сесію з A продовжує B, повтор ключа на B, одночасний вибір на двох
+екземплярах, штатний рестарт (job `cancelled` з причиною), «убитий» екземпляр (job `failed` іншим екземпляром).
 
 Сценарії (`tests/test_onboarding.py`, `test_improvement.py`, `test_unknown.py`) запускають справжній
 застосунок асистента; сусіди — фейки, прив'язані до контрактів (`tests/assistant_fakes`): кожен запит
@@ -129,6 +148,9 @@ just test assistant -m contract      # лише контрактні
 | `GENERATED_CODE_ALLOWED_MODULES` | `re, html, json, math, datetime, decimal, string, unicodedata, itertools, functools, collections, typing, dataclasses` | політика імпортів згенерованого коду (JSON-список) |
 | `ONBOARDING_ALLOW_ACTIVATION` | `true` | чи може прийняття з `activate: true` створювати джерело й завдання |
 | `DEFAULT_STORAGE_PACKAGE` / `DEFAULT_STORAGE_CONNECTION` | — | `package_id@version` і `connection_id` етапу збереження в чернетці завдання |
+| `STATE_DSN` | — | PostgreSQL для спільного стану кількох екземплярів (секрет; без нього — пам'ять, один екземпляр) |
+| `STATE_SCHEMA` | `jane_assistant` | схема таблиць стану |
+| `INSTANCE_ID` | `hostname-pid` | власник job і оренд (унікальний для кожного екземпляра) |
 | `LIMITS_FILE` | — | файл `PlatformLimits` (TOML/JSON/YAML) |
 | `LIMITS__<ГРУПА>__<ПАРАМЕТР>` / `LIMITS__HARD_CAPS__…` | — | перевизначення й жорсткі стелі |
 
@@ -155,6 +177,12 @@ just test assistant -m contract      # лише контрактні
 | `onboarding.max_generation_attempts` | 2 | спроби згенерувати пакет, що проходить тести |
 | `onboarding.max_proposals` | 4 | варіантів збору |
 | `onboarding.collection_poll_wait_ms`, `max_empty_polls` | 1000, 30 | long-poll матеріалів вибірки |
+| `onboarding.poll_page_factor` | 3 | матеріалів за одне опитування = `sample_batch_size × poll_page_factor` (запас для вибору різноманітних) |
+| `onboarding.max_negative_examples` | 1 | матеріалів інших типів як `empty`-випадки для тестів екстрактора |
+| `state.job_lease_ms` / `heartbeat_interval_ms` | 60000 / 15000 | оренда job і як часто екземпляр її поновлює |
+| `state.in_progress_lease_ms` | 900000 | коли незавершений `Idempotency-Key` убитого екземпляра можна перехопити |
+| `state.session_retention_seconds` | 2592000 | сесії без змін довше — видаляються |
+| `state.pool_max_size` / `connect_timeout_ms` | 10 / 10000 | з'єднання з PostgreSQL |
 | `onboarding.requests_overhead_ratio` | 0.05 | запас запитів понад оцінку матеріалів |
 | `improvement.max_problem_samples`, `max_successful_examples`, `max_sample_chars`, `max_file_chars` | 10, 5, 6000, 20000 | обсяг даних для моделі |
 | `unknown.min_confidence`, `max_sample_chars` | 0.6, 6000 | нижче — пропозиція `none` |

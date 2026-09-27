@@ -1,3 +1,3 @@
-- Запуск: `uv run --package jane-web-collector python -m jane_web_collector` (або Docker, див. README.md).
-- Тести: `just test web-collector` (інтеграційні: `-m integration` після `just up`).
-- Контракт: `contracts/openapi/web-collector.v1.yaml` (+ `contracts/openapi/common.yaml`); конвенції — скіл `jane-contracts`.
+- Запуск: `uv run --package jane-web-collector python -m jane_web_collector` (порт 8101; або Docker, див. README.md).
+- Тести: `just test web-collector` (усе проти справжнього testsite; інтеграційних із dev-стеком немає).
+- Контракт: `contracts/openapi/collector.v1.yaml` (+ `common.yaml`, `collector-rules.schema.json`, `jane_contracts.discovery`); стратегії WP-03 — `strategies/discovery/` (README, розділ «Підключення стратегій»).

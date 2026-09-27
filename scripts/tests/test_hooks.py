@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -98,27 +99,23 @@ def test_hooks_never_fail_on_bad_input() -> None:
         assert r.returncode == 0, (name, r.stderr)
 
 
-def test_format_hook_formats_python_and_reports_leftovers(tmp_path: Path) -> None:
-    ruff = (
-        ROOT
-        / ".venv"
-        / ("Scripts" if sys.platform == "win32" else "bin")
-        / ("ruff.exe" if sys.platform == "win32" else "ruff")
-    )
-    if not ruff.is_file():
-        pytest.skip("workspace venv with ruff not found (uv sync)")
-    target = ROOT / "scripts" / "_format_hook_probe.py"
-    target.write_text("import os\nx=[1,\n2]\ndef f( a ):\n    return eval(a)\n", encoding="utf-8")
-    try:
-        r = run_hook("format.py", {"tool_input": {"file_path": str(target)}, "cwd": str(ROOT)})
-        assert r.returncode == 0
-        text = target.read_text(encoding="utf-8")
-        assert "import os" not in text  # unused import removed by ruff --fix
-        assert "x = [1, 2]" in text
-        out = json.loads(r.stdout)
-        assert "S307" in out["hookSpecificOutput"]["additionalContext"]
-    finally:
-        target.unlink(missing_ok=True)
+def test_format_hook_formats_python_and_reports_leftovers(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ruff = shutil.which("ruff") or shutil.which("ruff", path=str(Path(sys.executable).parent))
+    if ruff is None:
+        pytest.skip("ruff not found (uv sync)")
+    # The hook falls back to `ruff` on PATH when the checkout has no .venv (the temp repo has none).
+    monkeypatch.setenv("PATH", str(Path(ruff).parent) + os.pathsep + os.environ.get("PATH", ""))
+    target = repo / "probe.py"
+    target.write_text("import os\nx=[1,\n2]\ndef f( a ):\n    return undefined_name\n", encoding="utf-8")
+    r = run_hook("format.py", {"tool_input": {"file_path": str(target)}, "cwd": str(repo)})
+    assert r.returncode == 0, r.stderr
+    text = target.read_text(encoding="utf-8")
+    assert "import os" not in text  # unused import removed by ruff --fix
+    assert "x = [1, 2]" in text  # ruff format
+    out = json.loads(r.stdout)
+    assert "F821" in out["hookSpecificOutput"]["additionalContext"]  # not auto-fixable -> reported
 
 
 def test_format_hook_skips_missing_and_non_python(tmp_path: Path) -> None:

@@ -397,8 +397,14 @@ class _Store:
             path.parent.mkdir(parents=True, exist_ok=True)
 
             def append() -> None:
-                with open(path, "ab") as fh:
-                    fh.write(dumps(doc) + b"\n")
+                with open(path, "ab+") as fh:
+                    fh.seek(0, os.SEEK_END)
+                    torn = False
+                    if fh.tell() > 0:  # a crash may have left a line without its newline
+                        fh.seek(-1, os.SEEK_END)
+                        torn = fh.read(1) != b"\n"
+                        fh.seek(0, os.SEEK_END)
+                    fh.write((b"\n" if torn else b"") + dumps(doc) + b"\n")
                     fh.flush()
                     os.fsync(fh.fileno())
 

@@ -10,8 +10,8 @@
 | 03 | Web Collector: стратегії пошуку | 1 | — | | | після M0 |
 | 04 | Telegram Collector | 1 | — | | | після M0 |
 | 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент | слот 2 |
-| 06 | Runtime обробників і SDK | 1 | review | `wp/06-handler-runtime` | агент / wp-reviewer | |
-| 07 | Збереження: ядро + files + PostgreSQL | 1 | active | `wp/07-storage-core` | агент / wp-reviewer | виправлення після рев'ю 1 (формат RAW) |
+| 06 | Runtime обробників і SDK | 1 | active | `wp/06-handler-runtime` | агент / wp-reviewer | виправлення після рев'ю 1 (кілька екземплярів, connections) |
+| 07 | Збереження: ядро + files + PostgreSQL | 1 | review | `wp/07-storage-core` | агент / wp-reviewer | рев'ю 2 |
 | 08 | Адаптери збереження | 1 | — | | | після M0 |
 | 09 | Оркестратор | 1 | active | `wp/09-orchestrator` | агент | слот 1 |
 | 10 | LLM-шлюз і LLM-обробник | 1 | active | `wp/10-llm` | агент | слот 2 |

@@ -19,8 +19,13 @@ RUN uv sync --frozen --no-dev --no-editable --package jane-orchestrator
 FROM ${PYTHON_IMAGE}
 RUN useradd --system --uid 10001 --no-create-home jane
 COPY --from=build /app/.venv /app/.venv
+# Request validation uses the contract schemas (source of truth), not copies of them.
+COPY contracts/openapi/ /app/contracts/openapi/
+COPY contracts/schemas/ /app/contracts/schemas/
+COPY contracts/examples/ /app/contracts/examples/
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
+    JANE_CONTRACTS_DIR=/app/contracts \
     JANE_ORCHESTRATOR_HOST=0.0.0.0 \
     JANE_ORCHESTRATOR_PORT=8000
 USER jane

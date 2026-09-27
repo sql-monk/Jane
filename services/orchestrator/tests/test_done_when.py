@@ -119,7 +119,7 @@ def test_worker_killed_mid_chain_completes_without_double_effects(
 
 def test_several_workers_do_not_duplicate_work(make_client: Any, neighbours: Neighbours, db_dsn: str) -> None:
     neighbours.collector.site = default_site(40, 0)
-    neighbours.runtime.delay_s = 0.03
+    neighbours.runtime.delay_s = 0.2  # long enough that idle workers must pick up other items meanwhile
     neighbours.storage.delay_s = 0.01
     # two orchestrator instances on the same DB, each with 3 worker threads
     a = make_client()

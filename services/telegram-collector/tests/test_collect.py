@@ -7,6 +7,7 @@ by a recording.
 from __future__ import annotations
 
 import time
+from typing import Any
 from datetime import timedelta
 
 from fastapi.testclient import TestClient
@@ -27,8 +28,8 @@ from jane_telegram_collector.testing import (
 
 def collect(
     client: TestClient, mode: str = "full", **extra: object
-) -> tuple[dict[str, object], list[dict[str, object]]]:
-    body: dict[str, object] = {
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    body: dict[str, Any] = {
         "source_kind": "telegram",
         "source_id": "news-tg",
         "rules": telegram_rules(USERNAME),
@@ -46,19 +47,19 @@ def test_history_is_collected_as_valid_materials(
 ) -> None:
     view, items = collect(client)
     assert view["status"] == "succeeded"
-    assert [m["locator"]["telegram"]["message_id"] for m in items] == list(range(1, 26))  # type: ignore[index]
+    assert [m["locator"]["telegram"]["message_id"] for m in items] == list(range(1, 26))
     for m in items:
         errors = sorted(material_validator.iter_errors(m), key=str)
         assert not errors, errors[0].message
     first = items[0]
     assert first["material_id"] == f"tg:{CHANNEL_ID}:1"
     assert first["source"] == {"kind": "telegram", "source_id": "news-tg", "name": "City events"}
-    assert first["locator"]["url"] == f"https://t.me/{USERNAME}/1"  # type: ignore[index]
+    assert first["locator"]["url"] == f"https://t.me/{USERNAME}/1"
     assert first["published_at"] == "2026-09-01T10:00:00Z"
-    assert first["content"]["kind"] == "inline"  # type: ignore[index]
-    assert first["content"]["data"] == "Event 1: concert at 19:00"  # type: ignore[index]
-    assert first["revision"] == {  # type: ignore[comparison-overlap]
-        "content_sha256": first["content"]["sha256"],  # type: ignore[index]
+    assert first["content"]["kind"] == "inline"
+    assert first["content"]["data"] == "Event 1: concert at 19:00"
+    assert first["revision"] == {
+        "content_sha256": first["content"]["sha256"],
         "source_revision": str(int(T0.timestamp())),
         "sequence": int(T0.timestamp()),
         "is_edit": False,
@@ -67,8 +68,8 @@ def test_history_is_collected_as_valid_materials(
     assert first["metadata"] == {"views": 0}
     assert len({m["observation_id"] for m in items}) == 25
     stats = view["stats"]
-    assert stats["emitted"] == 25 and stats["acknowledged"] == 25 and stats["unacked"] == 0  # type: ignore[index]
-    assert stats["by_strategy"] == {"telegram_history": 25}  # type: ignore[index]
+    assert stats["emitted"] == 25 and stats["acknowledged"] == 25 and stats["unacked"] == 0
+    assert stats["by_strategy"] == {"telegram_history": 25}
     state = client.get("/v1/states/news-tg").json()
     assert state["collector"] == "telegram"
     assert state["cursors"][CHANNEL_ID]["last_message_id"] == 25
@@ -80,10 +81,10 @@ def test_history_since_and_from_message_id(client: TestClient, channel: Recordin
         USERNAME, history={"since": (T0 + timedelta(minutes=20)).isoformat().replace("+00:00", "Z")}
     )
     _, items = collect(client, rules=rules)
-    assert [m["locator"]["telegram"]["message_id"] for m in items] == [21, 22, 23, 24, 25]  # type: ignore[index]
+    assert [m["locator"]["telegram"]["message_id"] for m in items] == [21, 22, 23, 24, 25]
     rules = telegram_rules(USERNAME, history={"from_message_id": 23})
     _, items = collect(client, rules=rules, state_key="other")
-    assert [m["locator"]["telegram"]["message_id"] for m in items] == [23, 24, 25]  # type: ignore[index]
+    assert [m["locator"]["telegram"]["message_id"] for m in items] == [23, 24, 25]
 
 
 def test_incremental_collects_only_new_messages(client: TestClient, channel: Recording) -> None:
@@ -91,9 +92,9 @@ def test_incremental_collects_only_new_messages(client: TestClient, channel: Rec
     for i in range(3):
         channel.post(f"New {i}", date=T0 + timedelta(hours=1, minutes=i))
     view, items = collect(client, mode="incremental")
-    assert [m["locator"]["telegram"]["message_id"] for m in items] == [26, 27, 28]  # type: ignore[index]
-    assert {m["discovery"]["strategy"] for m in items} == {"telegram_updates"}  # type: ignore[index]
-    assert view["stats"]["by_strategy"] == {"telegram_updates": 3}  # type: ignore[index]
+    assert [m["locator"]["telegram"]["message_id"] for m in items] == [26, 27, 28]
+    assert {m["discovery"]["strategy"] for m in items} == {"telegram_updates"}
+    assert view["stats"]["by_strategy"] == {"telegram_updates": 3}
     view, items = collect(client, mode="incremental")
     assert items == [] and view["status"] == "succeeded"
 
@@ -101,18 +102,18 @@ def test_incremental_collects_only_new_messages(client: TestClient, channel: Rec
 def test_first_incremental_without_cursor_reads_history(client: TestClient, channel: Recording) -> None:
     view, items = collect(client, mode="incremental")
     assert len(items) == 25
-    assert view["stats"]["by_strategy"] == {"telegram_history": 25}  # type: ignore[index]
+    assert view["stats"]["by_strategy"] == {"telegram_history": 25}
 
 
 def test_edit_is_a_new_revision_and_repeated_delivery_is_not(client: TestClient, channel: Recording) -> None:
     _, first = collect(client)
-    original = next(m for m in first if m["locator"]["telegram"]["message_id"] == 7)  # type: ignore[index]
+    original = next(m for m in first if m["locator"]["telegram"]["message_id"] == 7)
 
     # the source delivers the same revision of message 7 again (an update replayed by Telegram)
     channel.redeliver(7)
     view, items = collect(client, mode="incremental")
     assert items == []
-    assert view["stats"]["duplicates"] == 1  # type: ignore[index]
+    assert view["stats"]["duplicates"] == 1
 
     # an edit: same material_id, new observation, larger sequence, is_edit, new content
     edit_date = T0 + timedelta(days=1)
@@ -122,13 +123,13 @@ def test_edit_is_a_new_revision_and_repeated_delivery_is_not(client: TestClient,
     edited = items[0]
     assert edited["material_id"] == original["material_id"]
     assert edited["observation_id"] != original["observation_id"]
-    assert edited["revision"]["is_edit"] is True  # type: ignore[index]
-    assert edited["revision"]["sequence"] == int(edit_date.timestamp())  # type: ignore[index]
-    assert edited["revision"]["sequence"] > original["revision"]["sequence"]  # type: ignore[index,operator]
-    assert edited["revision"]["content_sha256"] != original["revision"]["content_sha256"]  # type: ignore[index]
+    assert edited["revision"]["is_edit"] is True
+    assert edited["revision"]["sequence"] == int(edit_date.timestamp())
+    assert edited["revision"]["sequence"] > original["revision"]["sequence"]
+    assert edited["revision"]["content_sha256"] != original["revision"]["content_sha256"]
     assert edited["edited_at"] == "2026-09-02T10:00:00Z"
     assert edited["published_at"] == original["published_at"]
-    assert edited["content"]["data"] == "Event 7: moved to 20:00"  # type: ignore[index]
+    assert edited["content"]["data"] == "Event 7: moved to 20:00"
     assert edited["discovery"] == {"strategy": "telegram_updates"}
     assert (
         client.get("/v1/states/news-tg").json()["cursors"][CHANNEL_ID]["last_edit_date"]
@@ -138,12 +139,12 @@ def test_edit_is_a_new_revision_and_repeated_delivery_is_not(client: TestClient,
     # the edit delivered once more is again a repeated delivery, not a new revision
     channel.redeliver(7)
     view, items = collect(client, mode="incremental")
-    assert items == [] and view["stats"]["duplicates"] == 1  # type: ignore[index]
+    assert items == [] and view["stats"]["duplicates"] == 1
 
     # a second edit within the same second but with other text is still a new revision
     channel.edit(7, "Event 7: moved to 21:00", edit_date=edit_date)
     view, items = collect(client, mode="incremental")
-    assert [m["content"]["data"] for m in items] == ["Event 7: moved to 21:00"]  # type: ignore[index]
+    assert [m["content"]["data"] for m in items] == ["Event 7: moved to 21:00"]
 
 
 def test_technical_redelivery_keeps_the_observation(client: TestClient, channel: Recording) -> None:
@@ -177,12 +178,12 @@ def test_edits_and_new_messages_can_be_switched_off(client: TestClient, channel:
     _, items = collect(client, mode="incremental", rules=rules)
     assert [(m["locator"]["telegram"]["message_id"], m["revision"]["is_edit"]) for m in items] == [
         (26, False)
-    ]  # type: ignore[index]
+    ]
     channel.post("Newer", date=T0 + timedelta(hours=4))
     channel.edit(4, "Edited 4", edit_date=T0 + timedelta(hours=4))
     rules = telegram_rules(USERNAME, updates={"new_messages": False, "edits": True})
     _, items = collect(client, mode="incremental", rules=rules)
-    assert [(m["locator"]["telegram"]["message_id"], m["revision"]["is_edit"]) for m in items] == [(4, True)]  # type: ignore[index]
+    assert [(m["locator"]["telegram"]["message_id"], m["revision"]["is_edit"]) for m in items] == [(4, True)]
 
 
 def test_difference_too_long_falls_back_to_history(client: TestClient, channel: Recording) -> None:
@@ -200,7 +201,7 @@ def test_difference_too_long_falls_back_to_history(client: TestClient, channel: 
         },
     )
     items = drain(client, cid)
-    assert [m["locator"]["telegram"]["message_id"] for m in items] == [26]  # type: ignore[index]
+    assert [m["locator"]["telegram"]["message_id"] for m in items] == [26]
     errs = client.get(f"/v1/collections/{cid}/errors").json()["items"]
     assert [e["code"] for e in errs] == ["source_unavailable"]
     assert "too long" in errs[0]["message"]

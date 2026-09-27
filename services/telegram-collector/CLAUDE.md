@@ -1,3 +1,3 @@
-- Запуск: `uv run --package jane-telegram-collector python -m jane_telegram_collector` (або Docker, див. README.md).
-- Тести: `just test telegram-collector` (інтеграційні: `-m integration` після `just up`).
-- Контракт: `contracts/openapi/telegram-collector.v1.yaml` (+ `contracts/openapi/common.yaml`); конвенції — скіл `jane-contracts`.
+- Запуск: `uv run --package jane-telegram-collector python -m jane_telegram_collector` (записи каналів — `JANE_TELEGRAM_COLLECTOR_RECORDINGS_DIR`; Docker і Telethon — README.md).
+- Тести: `just test telegram-collector` (усе на справжньому сервісі й записаних каналах; dev-стек не потрібен).
+- Контракт: `contracts/openapi/collector.v1.yaml` (+ `common.yaml`, `schemas/material.schema.json`, `collector-rules.schema.json`); конвенції — скіл `jane-contracts`.

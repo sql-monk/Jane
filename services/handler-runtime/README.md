@@ -103,10 +103,29 @@ docker run -d -p 8106:8000 -v /var/run/docker.sock:/var/run/docker.sock --group-
 Робоча тека передається в пісочницю через Docker API (`put_archive`), не через bind-mount, тож сервіс однаково
 працює з локальним, віддаленим (`DOCKER_HOST`) чи контейнеризованим рушієм.
 
-Кілька екземплярів: процеси/контейнери з різними портами; кожен виклик — окремий контейнер. Ключі
-ідемпотентності, job і результати `GET /v1/invocations/{id}` зберігаються в пам'яті екземпляра (jane-kit
-`InMemory*`): для балансування між екземплярами потрібна прив'язка клієнта або спільні `IdempotencyStore`/`JobStore`
-(див. «Відомі обмеження» у звіті WP-06).
+### Кілька екземплярів
+
+Кожен виклик — окремий контейнер, тож екземпляри незалежні у виконанні. Спільний стан — ключі ідемпотентності
+(`Idempotency-Key` = `delivery_key`), job і результати `GET /v1/invocations/{id}` — зберігається у **власній БД
+сервісу** (PostgreSQL, схема `jane_handler_runtime`, `contracts/docs/data-ownership.md`):
+
+```
+JANE_HANDLER_RUNTIME_STATE_DSN=postgresql://user:pass@host:5432/jane_handler_runtime   # з середовища, не в коді
+JANE_HANDLER_RUNTIME_STATE_SCHEMA=jane_handler_runtime                                   # типово; таблиці створюються самі
+```
+
+Тоді повтор доставки на будь-якому екземплярі (і після рестарту) повертає збережений результат (`duplicate: true`,
+`Idempotency-Replayed: true`) без повторного запуску пісочниці; job і результати читаються з будь-якого
+екземпляра; виклик, що ще виконується на іншому екземплярі, — 409 `idempotency_in_progress` (`retryable: true`);
+незавершене «захоплення» ключа впалим екземпляром звільняється через `state.in_progress_lease_ms`. Ключі
+пам'ятаються `transfer.idempotency_ttl_seconds`, job — `transfer.job_retention_seconds`.
+
+Без `STATE_DSN` стан у пам'яті процесу (`InMemory*` jane-kit) — **лише для одного автономного екземпляра й CLI**:
+після рестарту ключі втрачаються, між екземплярами не видно. `GET /v1/info` → `capabilities.state`
+(`memory` | `postgresql`), `GET /v1/health` → `checks.state`.
+
+`POST /v1/jobs/{id}/cancel` з будь-якого екземпляра переводить job у `cancelling` і вбиває контейнер пісочниці
+за міткою `io.jane.invocation-id` (на тому ж рушії); екземпляр-власник завершує job як `cancelled`.
 
 ## API
 
@@ -115,10 +134,12 @@ docker run -d -p 8106:8000 -v /var/run/docker.sock:/var/run/docker.sock --group-
 | `POST /v1/invocations` | `Idempotency-Key` обов'язковий і дорівнює `delivery.delivery_key`. `mode: sync` — 200 з `HandlerResult` або 202 + Job, якщо не вклалося в `timeouts.sync_response_max_ms`; `mode: async` — 202 + Job. Повтор із тим самим ключем і тілом — збережений результат з `duplicate: true` і `Idempotency-Replayed: true`, без повторного запуску; інше тіло — 422 `idempotency_key_reused` |
 | `GET /v1/invocations/{id}` | збережений результат (у межах `packages.max_stored_results`) |
 | `POST /v1/test-runs` | 202 + Job; `Job.result` — `TestReport`. Тести маніфесту (`all` / `none` / імена) + `extra_cases`, кожен випадок — окремий запуск у `test_mode` (жодного запису: runtime нічого не зберігає) |
-| `GET /v1/jobs/{id}`, `POST /v1/jobs/{id}/cancel` | jane-kit |
-| `GET /v1/health`, `/v1/info`, `/metrics` | `checks.sandbox` — пінг рушія; `capabilities` — типи, профілі, backend |
-
-`/v1/connections*` не реалізовано: екстрактори не отримують підключень і секретів (`capabilities.connections: false`).
+| `GET /v1/jobs/{id}` | jane-kit (зі спільного сховища, якщо задано `STATE_DSN`) |
+| `POST /v1/jobs/{id}/cancel` | 202 — скасування прийнято, контейнер пісочниці вбито; 200 — job уже завершено |
+| `GET /v1/connections` | 200 `{"items": [], "next_cursor": null}` — виконавець без підключень (`capabilities.connections: false`) |
+| `PUT /v1/connections/{id}` | 501 `not_implemented` (екстрактори не отримують облікових даних) |
+| `GET`/`DELETE /v1/connections/{id}`, `POST …/test` | 404 `not_found` |
+| `GET /v1/health`, `/v1/info`, `/metrics` | `checks.sandbox` — пінг рушія, `checks.state` — сховище стану; `capabilities` — типи, профілі, backend, state |
 
 ## Тести
 
@@ -126,7 +147,14 @@ docker run -d -p 8106:8000 -v /var/run/docker.sock:/var/run/docker.sock --group-
 just test handler-runtime                                   # unit + contract (backend subprocess, без Docker)
 uv run pytest services/handler-runtime -m isolation         # ізоляція на справжньому Docker (Windows/Linux)
 just isolation                                              # те саме в CI (Linux)
+just up --project jane-wp06-state postgres                  # кілька екземплярів на спільному PostgreSQL:
+just integration --project jane-wp06-state services/handler-runtime
+just down -v --project jane-wp06-state
 ```
+
+`tests/test_state.py` (`integration`): два екземпляри на спільній схемі — повтор на іншому дає `duplicate: true`
+і той самий `invocation_id` без другого запуску пісочниці; job/invocation читаються з іншого екземпляра й після
+«рестарту» (новий застосунок); виконання на іншому екземплярі — 409; скасування з іншого екземпляра.
 
 Тести ізоляції (`tests/test_isolation.py`, без моків пісочниці): зависання вбивається за `wall_time_ms`;
 сервер, досяжний зі звичайного контейнера, недосяжний з пісочниці (ENETUNREACH, лише `lo`); OOM за `memory_mb`;
@@ -151,6 +179,8 @@ FS лише для читання, користувач 65534, відсутні�
 | `REGISTRY_URL` / `REGISTRY_TOKEN` | — | репозиторій пакетів і bearer-токен (лише з середовища) |
 | `PACKAGE_CACHE_DIR` | тимчасова тека | кеш перевірених пакетів за дайджестом |
 | `BLOB_ROOTS` | `[]` | теки, з яких дозволено читати `file://` (JSON-масив); порожньо — `file://` заборонено |
+| `STATE_DSN` | — (стан у пам'яті) | PostgreSQL для спільного стану кількох екземплярів (секрет — лише з середовища) |
+| `STATE_SCHEMA` | `jane_handler_runtime` | схема таблиць стану |
 | `CONTRACTS_DIR` | пошук угору від пакета (`JANE_CONTRACTS_DIR`) | `contracts/` зі схемами; в образі — `/app/contracts` |
 
 ## Ліміти
@@ -180,12 +210,18 @@ FS лише для читання, користувач 65534, відсутні�
 | `packages.max_stored_results` | 10000 | — | результати для `GET /v1/invocations/{id}` |
 | `packages.docker_api_timeout_ms` | 60000 | — | виклики Docker API |
 | `packages.kill_grace_ms` | 2000 | — | `timeout -s KILL` у контейнері спрацьовує через `wall_time_ms` + це (якщо сам runtime упав) |
+| `packages.max_stderr_in_result_bytes` | 16000 | — | хвіст stderr у `diagnostics.logs_ref` (0 — не додавати) |
+| `packages.unavailable_retry_after_seconds` | 5 | — | `Retry-After` відповіді 503, коли рушій недоступний |
+| `state.pool_max_size` | 10 | — | з'єднань до PostgreSQL стану на екземпляр |
+| `state.connect_timeout_ms` | 10000 | — | підключення до PostgreSQL стану |
+| `state.in_progress_lease_ms` | 900000 | — | після цього «захоплення» ключа впалим екземпляром можна перехопити |
 | `jobs.*`, `idempotency.*` | як у jane-kit | — | див. `libs/jane-kit/README.md` |
 
 ## Приклад виклику зі стороннього застосунку
 
 ```python
 import base64, hashlib, httpx
+from pathlib import Path
 from jane_extractor_sdk.package import build_archive, material_from_file
 
 archive = build_archive(Path("my-package"))

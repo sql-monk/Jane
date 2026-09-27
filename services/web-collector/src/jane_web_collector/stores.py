@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import time
 from datetime import UTC, datetime
 
 from jane_kit.idempotency import IdempotencyRecord, StoredResponse
@@ -23,8 +22,9 @@ class SqliteJobStore:
         self.instance_id = instance_id
 
     def _foreign(self, job: Job) -> bool:
-        owner, lease_until = self.state.lease(job.job_id)
-        return owner is not None and owner != self.instance_id and lease_until > time.time()
+        # the owner column changes only by claiming the lease, so any other writer is a run that lost it
+        owner, _ = self.state.lease(job.job_id)
+        return owner is not None and owner != self.instance_id
 
     async def create(self, job: Job) -> None:
         existing = self.state.get_job(job.job_id)

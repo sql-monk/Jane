@@ -6,6 +6,7 @@ Clients may be ``httpx.Client`` or FastAPI ``TestClient`` (a subclass of it).
 
 from __future__ import annotations
 
+import contextlib
 import os
 import socket
 import subprocess
@@ -195,10 +196,23 @@ class ServiceProcess:
         raise AssertionError("service did not become healthy")
 
     def kill(self) -> None:
-        """Hard kill (SIGKILL on Linux, TerminateProcess on Windows): no graceful shutdown at all."""
-        if self.proc is not None:
-            self.proc.kill()
-            self.proc.wait(timeout=10)
+        """Hard kill (SIGKILL on Linux, TerminateProcess on Windows): no graceful shutdown at all.
+
+        The whole process tree is killed: on Windows a venv's ``python.exe`` is a launcher whose child is
+        the real interpreter (psutil, a dev dependency, is used when available)."""
+        if self.proc is None:
+            return
+        try:
+            import psutil  # type: ignore[import-untyped]
+
+            children = psutil.Process(self.proc.pid).children(recursive=True)
+        except Exception:
+            children = []
+        for child in children:
+            with contextlib.suppress(Exception):
+                child.kill()
+        self.proc.kill()
+        self.proc.wait(timeout=10)
 
     def stop(self) -> None:
         if self.proc is not None and self.proc.poll() is None:
@@ -211,5 +225,6 @@ class ServiceProcess:
             "JANE_WEB_COLLECTOR_PORT": str(port),
             "JANE_WEB_COLLECTOR_STATE_DIR": str(state_dir),
             "JANE_WEB_COLLECTOR_LOG_FORMAT": "json",
+            "PYTHONUNBUFFERED": "1",  # logs reach the file even if the process is killed
             **overrides,
         }

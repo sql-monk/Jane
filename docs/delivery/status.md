@@ -6,10 +6,10 @@
 |---|---|---|---|---|---|---|
 | 00 | Архітектура й контракти | 0 | accepted | `wp/00-architecture-contracts` | агент / wp-reviewer (2 раунди) | злито `e2714ec` |
 | 01 | Каркас, CI, dev-стек | 0 | accepted | `wp/01-scaffold-ci` | агент / wp-reviewer (2 раунди + інтеграційне виправлення) | злито `4468cee` |
-| 02 | Web Collector: ядро | 1 | review | `wp/02-web-collector-core` | агент / wp-reviewer | рев'ю 2 |
+| 02 | Web Collector: ядро | 1 | active | `wp/02-web-collector-core` | агент / wp-reviewer | фінальне виправлення після рев'ю 2 (хибний succeeded), перевірка координатором |
 | 03 | Web Collector: стратегії пошуку | 1 | — | | | після M0 |
 | 04 | Telegram Collector | 1 | active | `wp/04-telegram-collector` | агент | слот 3 |
-| 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент | слот 2 |
+| 05 | Репозиторій обробників | 1 | review | `wp/05-registry` | агент / wp-reviewer | |
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
 | 08 | Адаптери збереження | 1 | active | `wp/08-storage-adapters` | агент | слот 3 |
@@ -78,3 +78,6 @@
 | Без автентифікації `PUT /v1/connections` з довільним `api_base`/хостом і `secret_refs: env:<будь-яка змінна>` дозволяє вивести значення змінних середовища на чужий хост | рев'ю WP-10 | `env:` — лише змінні з налаштовуваним префіксом (типово `JANE_SECRET_`), `file:` — лише з налаштовуваного каталогу, хости підключень — з allowlist; оновити ADR-0006 і застосувати в усіх виконавцях із підключеннями (WP-02, 04, 07, 08, 09, 10) | WP-10 — у виправленнях; решта — окремим дорученням після M1 |
 - 2026-09-27 — WP-11 і WP-10 повернуто після рев'ю 1. Знайдено наскрізну вразливість `secret_refs` (див. «Наскрізні питання»).
 - 2026-09-27 — WP-09 повернуто після рев'ю 1: зависання в `cancelling`, kill витрачає retries, гонка `overlap: queue`. Рішення: оркестратор синхронізує бюджети LLM рівнів source/task у шлюз.
+| WP-05 | WP-06 | `build_archive` SDK → `ZIP_STORED` (канонічний архів registry/storage), опис `JANE_REGISTRY_RUNTIME_PROFILES` | доручення-доповнення WP-06 після M1 |
+| WP-05 | WP-00 | канонічний алгоритм архіву в `handler-packages.md`; дайджести прикладів — ілюстративні; код «профіль недоступний»; `jane-package.json` у diff лише в `manifest_changes` | зміна контракту через contract-guardian |
+- 2026-09-27 — WP-05 на рев'ю. WP-02: рев'ю 2 знайшло хибний термінальний `succeeded` при «завислому» власнику — фінальне виправлення, перевіряє координатор (20× прогонів).

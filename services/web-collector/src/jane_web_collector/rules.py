@@ -282,6 +282,23 @@ class RulesLoader:
         return None
 
     # ------------------------------------------------------------------ registry.v1
+    @staticmethod
+    def _check_file_digest(ref: Mapping[str, Any], version: Mapping[str, Any], name: str, raw: bytes) -> None:
+        """The rules file must match ``PackageVersion.files[].sha256`` (the version is immutable)."""
+        files = version.get("files")
+        if files is None:
+            log.warning(
+                "registry version has no file list; rules file not verified", extra={"ref": dict(ref)}
+            )
+            return
+        expected = next((f.get("sha256") for f in files if f.get("path") == name), None)
+        actual = hashlib.sha256(raw).hexdigest()
+        if expected != actual:
+            raise JaneError(
+                f"rules file {name}: sha256 {actual} does not match the registry file list ({expected})",
+                code="digest_mismatch",
+            )
+
     async def _load_registry(self, ref: Mapping[str, Any]) -> dict[str, Any]:
         headers = {}
         if self.registry_token_env and (token := os.environ.get(self.registry_token_env)):
@@ -313,7 +330,9 @@ class RulesLoader:
                         "rules file not found", errors=_package_errors(ref, f"{name} not in package")
                     )
                 file_resp.raise_for_status()
-                text = file_resp.text
+                raw = file_resp.content
+                self._check_file_digest(ref, version, name, raw)
+                text = raw.decode("utf-8")
         except httpx.HTTPError as exc:
             raise ServiceUnavailable(
                 f"registry unavailable: {exc}", code="upstream_unavailable", retryable=True

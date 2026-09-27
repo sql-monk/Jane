@@ -57,6 +57,7 @@ class FakeRegistry:
     def __init__(self, rules: dict[str, Any]) -> None:
         self.rules = rules
         self.calls: list[str] = []
+        self.tampered = False  # serve a rules file that differs from the version's file list
         base = "/v1/packages/{package_id}/versions/{version}"
         self.app = Starlette(routes=[Route(base, self.version), Route(base + "/file", self.file)])
 
@@ -90,7 +91,8 @@ class FakeRegistry:
     async def file(self, request: Request) -> Response:
         self.calls.append(f"{request.url.path}?path={request.query_params['path']}")
         assert request.query_params["path"] == "rules.json"
-        return PlainTextResponse(json.dumps(self.rules))
+        rules = {**self.rules, "strategies": [{"type": "recursive"}]} if self.tampered else self.rules
+        return PlainTextResponse(json.dumps(rules))
 
 
 @pytest.fixture
@@ -137,6 +139,15 @@ def test_rules_from_registry(tmp_path: Path, site: Site, registry: tuple[str, Fa
         assert missing.status_code == 422
         assert missing.json()["errors"][0]["pointer"] == "/rules_ref"
     assert f"/v1/packages/{REF['package_id']}/versions/{REF['version']}/file?path=rules.json" in fake.calls
+
+
+def test_tampered_rules_file_is_rejected(tmp_path: Path, registry: tuple[str, FakeRegistry]) -> None:
+    url, fake = registry
+    fake.tampered = True
+    with TestClient(build_app(make_settings(tmp_path, registry_url=url))) as client:
+        r = _post(client, {"source_kind": "web", "rules_ref": REF})
+    assert r.status_code == 422
+    assert r.json()["code"] == "digest_mismatch"
 
 
 def test_registry_unavailable_is_retryable(tmp_path: Path) -> None:

@@ -155,6 +155,12 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         record = _record(collection_id)
         page_size = clamp_limit(limit, limits.page)
         after_seq = _parse_after(after)
+        if after_seq is not None and after_seq > state.emitted_count(collection_id):
+            # a cursor that was never issued would silently acknowledge materials nobody has seen
+            raise ValidationFailed(
+                "cursor is ahead of the last delivered material",
+                errors=[FieldError(parameter="after", message="unknown cursor")],
+            )
         if after_seq is not None and after_seq > int(record["acked_seq"]):
             state.ack(collection_id, after_seq)
             engine.acked(collection_id)

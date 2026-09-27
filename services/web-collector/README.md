@@ -29,6 +29,10 @@ docker build -f services/web-collector/Dockerfile -t jane-web-collector .
 docker run --rm -p 8101:8101 -v jane-wc-state:/var/lib/jane-web-collector jane-web-collector
 ```
 
+Правило конфігурації (перевіряється на старті, інакше сервіс не запускається):
+`HEARTBEAT_INTERVAL_MS + STATE_BUSY_TIMEOUT_MS < LEASE_SECONDS × 1000` — живий власник завжди встигає продовжити
+lease, навіть якщо один запис чекав на блокування весь busy timeout.
+
 Кілька екземплярів: кожен процес має власний `JANE_WEB_COLLECTOR_PORT`. Екземпляри з **одним** каталогом стану на
 одному вузлі ділять SQLite-файл: збір виконує той, хто тримає lease (`JANE_WEB_COLLECTOR_LEASE_SECONDS`), решта
 віддає матеріали, стан і помилки з того самого сховища й підхоплює збір, якщо власник зник. Екземпляри з різними
@@ -63,6 +67,8 @@ just test web-collector -m contract     # лише контрактні
 | `DISCOVERY_PATH` | `services/web-collector/strategies/discovery` | пакет стратегій WP-03 |
 | `USER_AGENT` | `JaneBot/0.1 (+https://github.com/jane)` | типовий User-Agent; перше слово — токен для `robots.txt` |
 | `LEASE_SECONDS` | `30` | lease збору; після нього інший екземпляр підхоплює збір |
+| `HEARTBEAT_INTERVAL_MS` | `5000` | як часто власник продовжує lease (окрема задача, працює й під час seeds і повільних запитів) і перевіряє скасування |
+| `STATE_BUSY_TIMEOUT_MS` | `10000` | скільки запис чекає на блокування SQLite іншим процесом |
 | `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | журнали |
 | `METRICS_ENABLED` | `true` | `/metrics` |
 | `AUTH_MODE` | `none` | значення для `/v1/info` |
@@ -98,15 +104,17 @@ just test web-collector -m contract     # лише контрактні
 | `queue.max_unacked_materials` | 500 | буфер непідтверджених матеріалів; понад — пауза (backpressure) |
 | `transfer.inline_max_bytes` | 262144 | більше — blob (або `limit_exceeded` без blob-сховища) |
 | `transfer.transit_ttl_seconds` | 604800 | час життя транзитних файлів |
-| `transfer.job_retention_seconds` | 86400 | після цього збір видаляється (далі 410) |
-| `transfer.idempotency_ttl_seconds` | 86400 | пам'ять `Idempotency-Key` |
+| `jobs.job_retention_seconds` (у контракті, файлі й запиті — `transfer.job_retention_seconds`) | 86400 | після цього збір видаляється (далі 410) |
+| `idempotency.idempotency_ttl_seconds` (у контракті — `transfer.idempotency_ttl_seconds`) | 86400 | пам'ять `Idempotency-Key` |
 | `jobs.max_concurrent_jobs` / `max_queued_jobs` | 4 / 1000 | зборів одночасно / у черзі на екземпляр |
 | `jobs.job_timeout_ms` | 3600000 | максимальна тривалість збору |
 | `page.default_page_size` / `max_page_size` | 50 / 500 | сторінки `/materials`, `/errors`, `/connections` |
 | `collector.max_wait_ms` | 30000 | стеля long-poll `wait_ms` |
 | `collector.robots_cache_ttl_seconds` / `robots_max_bytes` | 3600 / 512000 | кеш і розмір `robots.txt` |
 | `collector.max_retry_after_seconds` | 300 | довше очікування (Retry-After, Crawl-delay) → `rate_limited` |
-| `collector.heartbeat_interval_ms` | 5000 | продовження lease і перевірка скасування |
+| `collector.backpressure_poll_ms` | 1000 | як часто перевіряється буфер під час паузи backpressure |
+| `collector.long_poll_interval_ms` | 100 | як часто `/materials?wait_ms=` шукає нові матеріали |
+| `collector.gc_interval_seconds` | 3600 | прибирання прострочених зборів і транзитних файлів (не рідше `job_retention_seconds / 10`) |
 
 ## Поведінка
 
@@ -124,11 +132,18 @@ just test web-collector -m contract     # лише контрактні
   спостереження); `mode=incremental` + `revisit.mode=never` — відомі успішні URL не завантажуються (їхні збережені
   посилання продовжують обхід), `interval` — лише старші за `revisit_interval_seconds`, `if_changed` — умовні
   запити (ETag / If-Modified-Since), 304 не видається. URL, що минулого разу впали (4xx/5xx), пробуються знову.
-- **Видача**: `GET /v1/collections/{id}/materials?after=<cursor>` підтверджує все до курсора включно;
+- **Тайм-аути** `timeouts.connect_timeout_ms` / `request_timeout_ms` застосовуються до кожного запиту з ефективних
+  лімітів збору (з урахуванням `rules.limits`, `limits` запиту і `limits` стратегії), а не з платформних типових.
+- **Видача**: `GET /v1/collections/{id}/materials?after=<cursor>` підтверджує все до курсора включно
+  (курсор, якого сервіс не видавав, — 422);
   непідтверджене видається повторно з тим самим `observation_id`. Коли непідтверджених ≥ `max_unacked_materials`,
   обхід стає на паузу (`paused_by_backpressure: true`).
 - **Відновлення**: кожна сторінка фіксується однією транзакцією (нові URL, статус, матеріал, історія, стан стратегій,
-  статистика). Після kill новий процес (або інший екземпляр після lease) повертає незавершені URL у чергу й продовжує;
+  статистика) і перевіряє, що цей прогін досі тримає lease (fencing): прогін, у якого lease перехопили (процес
+«завис» довше за lease), не може записати нічого й зупиняється, а його Job не перезаписує Job нового власника.
+Після kill новий процес (або інший екземпляр після lease) повертає незавершені URL у чергу й продовжує; перед
+завершенням `inflight`, що лишились від чужого прогону, теж повертаються в чергу — `succeeded` неможливий, поки є
+`pending`/`inflight`;
   повторно завантажуються лише URL, що були в польоті.
 - **`llm_explore`**: валідна за схемою, але колектор її не виконує (ADR-0010): `supported: false`, збір — `validation_failed`.
 - **Підключення** (`/v1/connections`, лише `kind=http`): `params.auth_scheme` = `bearer` (`secret_refs.token`),

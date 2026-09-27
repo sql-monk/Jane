@@ -151,6 +151,30 @@ def test_network_access_is_blocked(client: TestClient, engine: DockerSandbox, h:
         api.remove_container(server, force=True, v=True)
 
 
+def test_cancel_kills_the_sandbox_container(client: TestClient, engine: DockerSandbox, h: Any) -> None:
+    key = f"cancel-{SESSION}"
+    body = h.invocation(h.probe, h.product_material(), key=key, params={"mode": "sleep"}, mode="async")
+    body["limits"] = {"sandbox": {"wall_time_ms": 120_000}}
+    accepted = client.post("/v1/invocations", json=body, headers={"Idempotency-Key": key})
+    assert accepted.status_code == 202
+    job_id = accepted.json()["job_id"]
+    invocation_id = accepted.json()["labels"]["invocation_id"]
+    deadline = time.monotonic() + 60
+    while not [c for c in running_sandboxes(engine, invocation_id) if c["State"] == "running"]:
+        assert time.monotonic() < deadline, "sandbox container did not start"
+        time.sleep(0.1)
+    started = time.monotonic()
+    assert client.post(f"/v1/jobs/{job_id}/cancel", json={"reason": "isolation test"}).status_code == 202
+    while client.get(f"/v1/jobs/{job_id}").json()["status"] not in {"cancelled", "succeeded", "failed"}:
+        assert time.monotonic() - started < 30
+        time.sleep(0.1)
+    assert client.get(f"/v1/jobs/{job_id}").json()["status"] == "cancelled"
+    while running_sandboxes(engine, invocation_id):
+        assert time.monotonic() - started < 30, "sandbox container still exists after cancel"
+        time.sleep(0.1)
+    assert time.monotonic() - started < 30  # far below wall_time_ms = 120 s
+
+
 def test_memory_limit_kills_the_sandbox(client: TestClient, h: Any) -> None:
     result = invoke(
         client, h, f"mem-{SESSION}", {"mode": "memory", "mb": 512}, {"sandbox": {"memory_mb": 64}}

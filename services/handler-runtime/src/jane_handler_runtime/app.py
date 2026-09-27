@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections import OrderedDict
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import cached_property
@@ -30,38 +29,21 @@ from jane_kit.errors import (
 from jane_kit.idempotency import (
     IDEMPOTENCY_HEADER,
     REPLAY_HEADER,
-    InMemoryIdempotencyStore,
     StoredResponse,
     fingerprint,
     run_idempotent,
 )
-from jane_kit.jobs import Job, JobContext, JobRunner, JobStatus, jobs_router
+from jane_kit.jobs import TERMINAL_STATUSES, Job, JobContext, JobRunner, JobStatus, jobs_router
 from jane_kit.service import create_app
 
 from . import __version__
 from .profiles import load_profiles
 from .runtime import Runtime, build_runtime
 from .settings import Settings, request_layer, resolve_service_limits
+from .state import InMemoryState, PostgresState, ServiceState
 from .testrun import run_tests, select_cases
 
 log = logging.getLogger(__name__)
-
-
-class ResultStore:
-    """Results for ``GET /v1/invocations/{id}``: bounded, in memory, per instance."""
-
-    def __init__(self, max_entries: int) -> None:
-        self.max_entries = max_entries
-        self._items: OrderedDict[str, dict[str, Any]] = OrderedDict()
-
-    def put(self, result: dict[str, Any]) -> None:
-        self._items[result["invocation_id"]] = result
-        self._items.move_to_end(result["invocation_id"])
-        while len(self._items) > self.max_entries:
-            self._items.popitem(last=False)
-
-    def get(self, invocation_id: str) -> dict[str, Any] | None:
-        return self._items.get(invocation_id)
 
 
 class _Contracts:
@@ -94,17 +76,30 @@ def _problem_error(job: Job) -> JaneError:
         retryable=problem.retryable,
         title=problem.title,
         details=problem.details,
+        retry_after_seconds=problem.retry_after_seconds,
     )
 
 
-def build_app(settings: Settings | None = None, runtime: Runtime | None = None) -> FastAPI:
+def build_state(settings: Settings, runtime: Runtime) -> ServiceState:
+    """PostgreSQL state when ``state_dsn`` is set (several instances), else in-memory (one instance)."""
+    if settings.state_dsn is not None:
+        return PostgresState(
+            settings.state_dsn.get_secret_value(), settings.state_schema, runtime.limits.limits
+        )
+    return InMemoryState(runtime.limits.limits)
+
+
+def build_app(
+    settings: Settings | None = None, runtime: Runtime | None = None, state: ServiceState | None = None
+) -> FastAPI:
     settings = settings or Settings()
     runtime = runtime or build_runtime(settings)
     resolved = runtime.limits
     limits = resolved.limits
-    runner = JobRunner(limits=limits.jobs)
-    idem_store = InMemoryIdempotencyStore(limits.idempotency)
-    results = ResultStore(limits.packages.max_stored_results)
+    state = state or build_state(settings, runtime)
+    runner = JobRunner(store=state.jobs, limits=limits.jobs)
+    idem_store = state.idempotency
+    results = state.results
     contracts = _Contracts(runtime)
 
     @asynccontextmanager
@@ -115,11 +110,16 @@ def build_app(settings: Settings | None = None, runtime: Runtime | None = None) 
                 "limits": resolved.effective(),
                 "backend": runtime.backend.name,
                 "images": settings.profile_images,
+                "state": state.name,
             },
         )
-        yield
-        await runner.shutdown()
-        runtime.close()
+        await state.open()
+        try:
+            yield
+        finally:
+            await runner.shutdown()
+            await state.close()
+            runtime.close()
 
     def capabilities() -> dict[str, Any]:
         return {
@@ -131,6 +131,7 @@ def build_app(settings: Settings | None = None, runtime: Runtime | None = None) 
             if settings.registry_url
             else ["package_archive"],
             "connections": False,
+            "state": state.name,
             "test_runs": True,
         }
 
@@ -145,13 +146,61 @@ def build_app(settings: Settings | None = None, runtime: Runtime | None = None) 
     app.state.limits = resolved
     app.state.runtime = runtime
     app.state.results = results
+    app.state.service_state = state
+    app.state.runner = runner
+
+    @app.post("/v1/jobs/{job_id}/cancel", tags=["jobs"], operation_id="cancelJob", response_model=None)
+    async def cancel_job(job_id: str, request: Request) -> JSONResponse:
+        """jane-kit cancel + stop the sandbox container of the invocation (by label, on this engine)."""
+        before = await runner.get(job_id)
+        if before.status in TERMINAL_STATUSES:
+            return JSONResponse(before.wire(), status_code=200)
+        raw = await request.body()
+        reason = None
+        if raw:
+            payload = json.loads(raw)
+            reason = payload.get("reason") if isinstance(payload, dict) else None
+        job = await runner.cancel(job_id, reason=reason)
+        invocation_id = (before.labels or {}).get("invocation_id")
+        if invocation_id:
+            killed = await asyncio.to_thread(runtime.backend.kill, invocation_id)
+            log.info(
+                "job cancelled", extra={"job_id": job_id, "invocation_id": invocation_id, "killed": killed}
+            )
+        return JSONResponse(job.wire(), status_code=202)
+
     app.include_router(jobs_router(runner))
+
+    @app.get("/v1/connections", tags=["connections"], operation_id="listConnections")
+    async def list_connections() -> JSONResponse:
+        """handler-runtime holds no connections: extractors get no credentials (TZ §7, §11)."""
+        return JSONResponse({"items": [], "next_cursor": None})
+
+    @app.put("/v1/connections/{connection_id}", tags=["connections"], operation_id="putConnection")
+    async def put_connection(connection_id: str) -> JSONResponse:
+        raise JaneError(
+            "handler-runtime does not use managed connections (extractors run without credentials)",
+            code="not_implemented",
+        )
+
+    @app.get("/v1/connections/{connection_id}", tags=["connections"], operation_id="getConnection")
+    async def get_connection(connection_id: str) -> JSONResponse:
+        raise NotFound(f"connection {connection_id} not found")
+
+    @app.delete("/v1/connections/{connection_id}", tags=["connections"], operation_id="deleteConnection")
+    async def delete_connection(connection_id: str) -> JSONResponse:
+        raise NotFound(f"connection {connection_id} not found")
+
+    @app.post("/v1/connections/{connection_id}/test", tags=["connections"], operation_id="testConnection")
+    async def test_connection(connection_id: str) -> JSONResponse:
+        raise NotFound(f"connection {connection_id} not found")
 
     async def sandbox_check() -> bool:
         await asyncio.to_thread(runtime.backend.ping)
         return True
 
     app.state.health.add("sandbox", sandbox_check)
+    app.state.health.add("state", state.ping)
 
     async def idempotent_call(request: Request, handler: Any) -> tuple[StoredResponse, bool]:
         key = request.headers.get(IDEMPOTENCY_HEADER)
@@ -186,7 +235,8 @@ def build_app(settings: Settings | None = None, runtime: Runtime | None = None) 
 
             async def work(ctx: JobContext) -> dict[str, Any]:
                 result = await runtime.executor.run(prep)
-                results.put(result)
+                await ctx.check_cancelled()  # cancelled meanwhile (possibly from another instance)
+                await results.put(result)
                 return result
 
             job = await runner.submit(
@@ -220,7 +270,7 @@ def build_app(settings: Settings | None = None, runtime: Runtime | None = None) 
 
     @app.get("/v1/invocations/{invocation_id}", tags=["invocations"], operation_id="getInvocation")
     async def get_invocation(invocation_id: str) -> JSONResponse:
-        result = results.get(invocation_id)
+        result = await results.get(invocation_id)
         if result is None:
             raise NotFound(f"invocation {invocation_id} not found")
         return JSONResponse(result)

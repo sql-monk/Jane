@@ -24,6 +24,7 @@ from typing import Protocol
 from .settings import SandboxLimits
 
 __all__ = [
+    "INVOCATION_LABEL",
     "Bundle",
     "SandboxBackend",
     "SandboxOutcome",
@@ -33,6 +34,9 @@ __all__ = [
 ]
 
 log = logging.getLogger(__name__)
+
+INVOCATION_LABEL = "io.jane.invocation-id"
+"""Label (and subprocess key) that identifies the sandbox of an invocation, used to stop it on cancel."""
 
 
 class SandboxUnavailable(RuntimeError):
@@ -106,6 +110,10 @@ class SandboxBackend(Protocol):
         """Raise :class:`SandboxUnavailable` if runs are impossible."""
         ...
 
+    def kill(self, invocation_id: str) -> int:
+        """Force-stop the sandbox(es) of ``invocation_id``; returns how many were stopped."""
+        ...
+
 
 def read_limited(stream: io.BufferedIOBase | None, limit: int) -> tuple[bytes, bool]:
     if stream is None:
@@ -123,6 +131,16 @@ class SubprocessSandbox:
     def __init__(self, allowed: bool, kill_grace_ms: int = 0) -> None:
         self.allowed = allowed
         self.kill_grace_ms = kill_grace_ms
+        self._running: dict[str, subprocess.Popen[bytes]] = {}
+        self._killed: set[str] = set()
+
+    def kill(self, invocation_id: str) -> int:
+        proc = self._running.get(invocation_id)
+        if proc is None or proc.poll() is not None:
+            return 0
+        self._killed.add(invocation_id)
+        proc.kill()
+        return 1
 
     def ping(self) -> None:
         if not self.allowed:
@@ -154,6 +172,8 @@ class SubprocessSandbox:
                     cwd=workdir,
                 ) as proc,
             ):
+                key = labels.get(INVOCATION_LABEL, "")
+                self._running[key] = proc
                 timed_out = False
                 try:
                     proc.wait(timeout=limits.wall_time_ms / 1000)
@@ -161,6 +181,10 @@ class SubprocessSandbox:
                     timed_out = True
                     proc.kill()
                     proc.wait()
+                finally:
+                    self._running.pop(key, None)
+                killed = key in self._killed
+                self._killed.discard(key)
                 out.seek(0)
                 err.seek(0)
                 stdout, out_trunc = read_limited(out, limits.max_output_bytes)  # type: ignore[arg-type]
@@ -174,6 +198,7 @@ class SubprocessSandbox:
                     stdout_truncated=out_trunc,
                     stderr_truncated=err_trunc,
                     backend=self.name,
+                    details={"killed": True} if killed else {},
                 )
         finally:
             shutil.rmtree(workdir, ignore_errors=True)

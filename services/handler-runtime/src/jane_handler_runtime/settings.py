@@ -55,6 +55,11 @@ class Settings(JaneSettings):
     blob_roots: list[Path] = Field(default_factory=list)
     """Directories from which ``file://`` blobs (package archives, material content) may be read.
     Empty = ``file://`` blobs are refused (the service must not read arbitrary host files)."""
+    state_dsn: SecretStr | None = None
+    """PostgreSQL DSN of the service's own state (idempotency keys, jobs, results) shared by instances.
+    Unset: in-memory state - only for a single standalone instance and the CLI (lost on restart)."""
+    state_schema: str = Field(default="jane_handler_runtime", pattern=r"^[a-z_][a-z0-9_]{0,62}$")
+    """Schema of the state tables (created if missing)."""
     contracts_dir: Path | None = None
     """``contracts/`` with the JSON Schemas; default: found upwards from the package (repo checkout)."""
 
@@ -94,8 +99,21 @@ class PackageLimits(Limits):
     max_stored_results: int = Field(default=10_000, ge=1)
     """``GET /v1/invocations/{id}`` keeps at most this many results (in memory, per instance)."""
     docker_api_timeout_ms: int = Field(default=60_000, ge=1)
+    max_stderr_in_result_bytes: int = Field(default=16_000, ge=0)
+    """Tail of the sandbox stderr put into ``diagnostics.logs_ref`` (inline)."""
+    unavailable_retry_after_seconds: int = Field(default=5, ge=0)
+    """``Retry-After`` of 503 when the container engine is not reachable."""
     kill_grace_ms: int = Field(default=2_000, ge=0)
     """In-container ``timeout -s KILL`` fires at wall_time_ms + this (safety net if the runtime dies)."""
+
+
+class StateLimits(Limits):
+    """Shared PostgreSQL state (``state_dsn``)."""
+
+    pool_max_size: int = Field(default=10, ge=1)
+    connect_timeout_ms: int = Field(default=10_000, ge=1)
+    in_progress_lease_ms: int = Field(default=900_000, ge=1)
+    """An in-progress idempotency claim of a crashed instance can be taken over after this."""
 
 
 class ServiceLimits(Limits):
@@ -105,6 +123,7 @@ class ServiceLimits(Limits):
     timeouts: TimeoutLimits = TimeoutLimits()
     concurrency: ConcurrencyLimits = ConcurrencyLimits()
     packages: PackageLimits = PackageLimits()
+    state: StateLimits = StateLimits()
     jobs: JobLimits = JobLimits()
     idempotency: IdempotencyLimits = IdempotencyLimits()
 

@@ -25,10 +25,11 @@ from typing import Any
 
 import docker  # type: ignore[import-untyped]
 from docker.errors import APIError, DockerException, ImageNotFound, NotFound  # type: ignore[import-untyped]
+from docker.types import LogConfig  # type: ignore[import-untyped]
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import ReadTimeout
 
-from .sandbox import Bundle, SandboxOutcome, SandboxUnavailable
+from .sandbox import INVOCATION_LABEL, Bundle, SandboxOutcome, SandboxUnavailable
 from .settings import SandboxLimits
 
 __all__ = ["SANDBOX_LABEL", "DockerSandbox"]
@@ -122,6 +123,11 @@ class DockerSandbox:
             ipc_mode="none",
             runtime=self.runtime,
             init=False,
+            # Bounded engine-side log: both streams fit (reading stops at max_output_bytes each).
+            log_config=LogConfig(
+                type="json-file",
+                config={"max-size": f"{(2 * limits.max_output_bytes + 2**20) // 1024 + 1}k", "max-file": "2"},
+            ),
         )
         all_labels = {SANDBOX_LABEL: "1", **self.extra_labels, **dict(labels)}
         name = f"jane-sbx-{uuid.uuid4().hex[:16]}"
@@ -194,6 +200,16 @@ class DockerSandbox:
                 log.warning(
                     "could not remove sandbox container", extra={"container": name, "error": str(exc)}
                 )
+
+    def kill(self, invocation_id: str) -> int:
+        """Stop the sandbox of an invocation (job cancel), on this engine, by label."""
+        filters = {"label": [f"{INVOCATION_LABEL}={invocation_id}"]}
+        killed = 0
+        for c in self.api.containers(filters=filters):
+            with contextlib.suppress(NotFound, APIError):
+                self.api.kill(c["Id"])
+                killed += 1
+        return killed
 
     def cleanup(self, label_selector: Mapping[str, str]) -> int:
         """Remove sandbox containers matching labels (stale ones after a crash; tests)."""

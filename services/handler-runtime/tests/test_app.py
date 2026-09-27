@@ -321,3 +321,63 @@ def test_subprocess_backend_is_refused_unless_allowed(tmp_path: Path, h: Any) ->
         r = post(c, h.invocation(h.example, h.product_material(), key="refused"))
         assert r.status_code == 503
         assert r.json()["code"] == "service_unavailable"
+        assert r.headers["Retry-After"] == "5"  # packages.unavailable_retry_after_seconds
+
+
+def test_network_allowlist_is_refused(client: TestClient, h: Any, tmp_path: Path) -> None:
+    import json
+    import shutil
+
+    pkg = tmp_path / "pkg"
+    shutil.copytree(h.example, pkg)
+    manifest = json.loads((pkg / "jane-package.json").read_text(encoding="utf-8"))
+    manifest["access"] = {"network": "allowlist", "hosts": ["shop.example.test"]}
+    (pkg / "jane-package.json").write_text(json.dumps(manifest), encoding="utf-8")
+    r = post(client, h.invocation(pkg, h.product_material(), key="allowlist"))
+    assert r.status_code == 422
+    assert r.json()["code"] == "validation_failed"
+    assert "allowlist" in r.json()["detail"]
+
+
+def test_cancel_stops_the_running_sandbox(client: TestClient, h: Any) -> None:
+    body = h.invocation(
+        h.probe, h.product_material(), key="cancel", params={"mode": "sleep"}, mode="async",
+        limits={"sandbox": {"wall_time_ms": 120_000}},
+    )  # fmt: skip
+    job_id = post(client, body).json()["job_id"]
+    deadline = time.monotonic() + 30
+    while client.get(f"/v1/jobs/{job_id}").json()["status"] != "running" and time.monotonic() < deadline:
+        time.sleep(0.05)
+    time.sleep(1.0)  # the runner process has started
+    started = time.monotonic()
+    cancel = client.post(f"/v1/jobs/{job_id}/cancel", json={"reason": "test"})
+    assert cancel.status_code == 202
+    job = wait_job(client, job_id, timeout=30)
+    assert job["status"] == "cancelled"
+    assert time.monotonic() - started < 15  # far below wall_time_ms: the process was killed
+    backend = client.app.state.runtime.backend  # type: ignore[attr-defined]
+    deadline = time.monotonic() + 10
+    while backend._running and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert backend._running == {}  # no sandbox process left
+
+
+def test_registry_archive_is_read_with_a_size_limit(
+    subprocess_settings: Settings, h: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    archive = build_archive(h.example)
+    fake = FastAPI()
+
+    @fake.get("/v1/packages/{package_id}/versions/{version}/archive")
+    def download(package_id: str, version: str) -> Response:
+        return Response(archive, media_type="application/zip")
+
+    monkeypatch.setenv("JANE_HANDLER_RUNTIME_LIMITS__PACKAGES__MAX_ARCHIVE_BYTES", str(len(archive) - 1))
+    settings = subprocess_settings.model_copy(update={"registry_url": "http://registry.test"})
+    runtime = build_runtime(settings, registry_transport=httpx.ASGITransport(app=fake))
+    with TestClient(build_app(settings, runtime)) as c:
+        body = h.invocation(h.example, h.product_material(), key="big")
+        del body["package_archive"]
+        r = post(c, body)
+    assert r.status_code == 422
+    assert "max_archive_bytes" in r.json()["detail"]

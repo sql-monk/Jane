@@ -244,21 +244,30 @@ class PackageStore:
             headers["Authorization"] = f"Bearer {self.settings.registry_token.get_secret_value()}"
         url = f"/v1/packages/{pid}/versions/{version}/archive"
         try:
-            async with httpx.AsyncClient(
-                base_url=self.settings.registry_url.rstrip("/"),
-                timeout=self._timeout,
-                transport=self._registry_transport,
-            ) as client:
-                response = await client.get(url, headers=headers)
+            async with (
+                httpx.AsyncClient(
+                    base_url=self.settings.registry_url.rstrip("/"),
+                    timeout=self._timeout,
+                    transport=self._registry_transport,
+                ) as client,
+                client.stream("GET", url, headers=headers) as response,
+            ):
+                if response.status_code == 404:
+                    raise NotFound(f"{pid}@{version}", title="Package version not found")
+                if response.status_code >= 400:
+                    raise UpstreamUnavailable(f"registry returned HTTP {response.status_code}")
+                limit = self.limits.max_archive_bytes
+                declared = response.headers.get("content-length")
+                if declared and declared.isdigit() and int(declared) > limit:
+                    raise ValidationFailed(f"archive exceeds max_archive_bytes={limit}")
+                buf = bytearray()
+                async for chunk in response.aiter_bytes():
+                    buf.extend(chunk)
+                    if len(buf) > limit:
+                        raise ValidationFailed(f"archive exceeds max_archive_bytes={limit}")
+                archive = bytes(buf)
         except httpx.HTTPError as exc:
             raise UpstreamUnavailable(f"registry did not respond: {exc}") from exc
-        if response.status_code == 404:
-            raise NotFound(f"{pid}@{version}", title="Package version not found")
-        if response.status_code >= 400:
-            raise UpstreamUnavailable(f"registry returned HTTP {response.status_code}")
-        archive = response.content
-        if len(archive) > self.limits.max_archive_bytes:
-            raise ValidationFailed(f"archive exceeds max_archive_bytes={self.limits.max_archive_bytes}")
         etag = response.headers.get("etag", "").strip('"').removeprefix("W/").strip('"')
         actual = digest_of(archive)
         if etag and etag != actual:

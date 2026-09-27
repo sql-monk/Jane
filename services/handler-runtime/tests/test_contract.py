@@ -73,5 +73,15 @@ def test_handler_protocol_matches_contract(api: ContractClient, h: Any) -> None:
     )
     assert run.status_code == 202
     assert api.post("/v1/jobs/job_missing/cancel").status_code == 404
-    uncovered = [op for op in api.uncovered() if "connection" not in op.lower()]
-    assert uncovered == [], uncovered
+    listed = api.get("/v1/connections")
+    assert listed.json() == {"items": [], "next_cursor": None}
+    put = api.put(
+        "/v1/connections/results-pg",
+        json={"connection_id": "results-pg", "kind": "postgresql", "params": {"host": "db"}},
+        headers={"Idempotency-Key": "c-7"},
+    )
+    assert put.status_code == 501 and put.json()["code"] == "not_implemented"
+    assert api.get("/v1/connections/results-pg").status_code == 404
+    assert api.delete("/v1/connections/results-pg").status_code == 404
+    assert api.post("/v1/connections/results-pg/test").status_code == 404
+    assert api.uncovered() == []

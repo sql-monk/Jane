@@ -25,7 +25,7 @@ from jane_kit.errors import FieldError, JaneError, ServiceUnavailable, Validatio
 
 from .packages import ContentFetcher, LoadedPackage, PackageStore
 from .profiles import check_dependencies, load_profiles
-from .sandbox import Bundle, SandboxBackend, SandboxOutcome, SandboxUnavailable
+from .sandbox import INVOCATION_LABEL, Bundle, SandboxBackend, SandboxOutcome, SandboxUnavailable
 from .schemas import ContractSchemas, validate_instance
 from .settings import DEFAULT_PROFILE, ServiceLimits, Settings, request_layer, resolve_service_limits
 
@@ -34,7 +34,6 @@ __all__ = ["Executor", "PreparedInvocation", "new_invocation_id", "now_rfc3339"]
 log = logging.getLogger(__name__)
 
 SUPPORTED_KINDS = ("extractor", "transform")
-MAX_STDERR_IN_RESULT = 16_000
 
 
 def now_rfc3339() -> str:
@@ -251,7 +250,7 @@ class Executor:
 
     def labels(self, prep: PreparedInvocation) -> dict[str, str]:
         return {
-            "io.jane.invocation-id": prep.invocation_id,
+            INVOCATION_LABEL: prep.invocation_id,
             "io.jane.package": f"{prep.package.manifest['package_id']}@{prep.package.manifest['version']}",
         }
 
@@ -268,7 +267,9 @@ class Executor:
                     timeout=timeout_s,
                 )
             except SandboxUnavailable as exc:
-                raise ServiceUnavailable(str(exc), retry_after_seconds=5) from exc
+                raise ServiceUnavailable(
+                    str(exc), retry_after_seconds=prep.limits.packages.unavailable_retry_after_seconds
+                ) from exc
             except TimeoutError:
                 outcome = SandboxOutcome(
                     exit_code=None,
@@ -329,8 +330,9 @@ class Executor:
             result["delivery_key"] = prep.delivery_key
         metrics: dict[str, Any] = {"duration_ms": outcome.duration_ms, "output_bytes": len(outcome.stdout)}
         diagnostics: dict[str, Any] = {"messages": [], "metrics": metrics}
-        if outcome.stderr:
-            text = outcome.stderr.decode("utf-8", errors="replace")[-MAX_STDERR_IN_RESULT:]
+        stderr_tail = prep.limits.packages.max_stderr_in_result_bytes
+        if outcome.stderr and stderr_tail:
+            text = outcome.stderr[-stderr_tail:].decode("utf-8", errors="replace")
             diagnostics["logs_ref"] = {
                 "kind": "inline",
                 "media_type": "text/plain",

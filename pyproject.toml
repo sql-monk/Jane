@@ -44,6 +44,10 @@ extend-exclude = [
     "node_modules",
     # WP-00 owns contracts/; its linter (contracts/tools/check_contracts.py, run by `just contract`) is authoritative.
     "contracts",
+    # Skills, agents and docs of other owners (ruff also formats Python blocks inside Markdown).
+    ".claude/skills",
+    ".claude/agents",
+    "docs",
     # Coordinator-owned hooks are not formatted/linted by WP tooling.
     ".claude/hooks/jane_wp.py",
     ".claude/hooks/guard_paths.py",

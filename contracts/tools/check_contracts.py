@@ -20,6 +20,7 @@ Checks:
      validates against its schema; every contracts/examples/invalid/** example is rejected;
   5. Python interfaces in contracts/python compile and import;
   6. tools/mock.py can serve a success example for every operation of every API;
+     autonomous APIs (collector, handler, storage, registry, llm) do not $ref orchestrator/assistant;
   7. Redocly lint (npx @redocly/cli) if Node is available (required with --require-redocly).
 """
 
@@ -362,6 +363,41 @@ def check_mock_routes(report: Report) -> None:
                 report.error(f"mock {api}: {route.method} {route.template}: no success response")
 
 
+# 6b. Autonomy -----------------------------------------------------------------------------------
+
+AUTONOMOUS_APIS = ("collector", "handler", "storage", "registry", "llm")
+INTEGRATION_APIS = ("orchestrator.v1.yaml", "assistant.v1.yaml")
+
+
+def referenced_files(start: Path) -> set[str]:
+    """All files transitively reachable through $ref from a document."""
+    from urllib.parse import urldefrag, urljoin
+
+    from _common import load_uri
+
+    seen: set[str] = set()
+    todo = [start.as_uri()]
+    while todo:
+        uri = todo.pop()
+        if uri in seen:
+            continue
+        seen.add(uri)
+        for ref in walk_refs(load_uri(uri)):
+            target = urldefrag(urljoin(uri, ref))[0]
+            if target and target not in seen:
+                todo.append(target)
+    return seen
+
+
+def check_autonomy(report: Report) -> None:
+    """ТЗ §4 / ADR-0009: autonomous services' contracts never depend on orchestrator/assistant contracts."""
+    for api in AUTONOMOUS_APIS:
+        report.count("autonomy_checked_apis")
+        for uri in referenced_files(OPENAPI_DIR / f"{api}.v1.yaml"):
+            if uri.endswith(INTEGRATION_APIS):
+                report.error(f"{api}.v1.yaml depends on integration contract {uri.rsplit('/', 1)[-1]}")
+
+
 # 7. Redocly ------------------------------------------------------------------------------------
 
 def run_redocly(report: Report, required: bool) -> str:
@@ -401,6 +437,7 @@ def main() -> int:
         ("Standalone schema examples", lambda: check_schema_examples(report, registry)),
         ("Python interfaces compile", lambda: check_python(report)),
         ("Mock server can serve every operation", lambda: check_mock_routes(report)),
+        ("Autonomous APIs do not reference orchestrator/assistant contracts", lambda: check_autonomy(report)),
     ]
     for title, fn in steps:
         before = len(report.errors)

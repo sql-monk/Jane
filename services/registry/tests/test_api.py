@@ -203,6 +203,8 @@ def test_manifest_validation(client: TestClient, uid: Any) -> None:
         headers={"Content-Type": "application/zip", **key(f"trav-{pid}")},
     )
     assert traversal.status_code == 422
+    bad_path = publish(client, pid, files=extractor_files(extra={"a/../../etc/passwd": b"x"}))
+    assert bad_path.status_code == 422 and bad_path.json()["errors"][0]["code"] == "invalid_path"
     unknown_pkg = publish(client, uid("missing"))
     assert unknown_pkg.status_code == 404
 

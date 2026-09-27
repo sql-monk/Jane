@@ -31,6 +31,7 @@ from .archive import (
     ArchiveError,
     ArchiveLimits,
     canonical_archive,
+    check_package_path,
     digest_of,
     manifest_bytes,
     read_archive,
@@ -255,6 +256,11 @@ class RegistryService:
         errors: list[FieldError] = []
         for path, entry in (body.get("files") or {}).items():
             pointer = "/files/" + path.replace("~", "~0").replace("/", "~1")
+            try:
+                check_package_path(path)
+            except ArchiveError as exc:
+                errors.append(FieldError(pointer=pointer, code="invalid_path", message=str(exc)))
+                continue
             if path == MANIFEST_NAME:
                 errors.append(
                     FieldError(

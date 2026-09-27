@@ -1,90 +1,243 @@
-# Registry
+# registry — репозиторій обробників Jane
 
-<!-- Шаблон README за DoD plan.md §4. Після `just new-service` замініть опис і приклади на свої. -->
+Сервіс зберігання й розповсюдження пакетів обробників **усіх типів** (екстрактор, збереження, LLM,
+перетворення) і **правил колекторів** (ТЗ §7, §13.2; рішення — [ADR-0002](../../docs/adr/0002-package-registry.md)).
+Контракт — [`contracts/openapi/registry.v1.yaml`](../../contracts/openapi/registry.v1.yaml).
 
-Призначення сервісу в одному-двох реченнях. Контракт: `contracts/openapi/registry.v1.yaml`
-(конвенції — скіл `jane-contracts`).
+Що вміє:
 
-## Незалежний запуск
+- незмінні версії з дайджестом `sha256:` канонічного архіву (повтор версії — `409 version_exists`);
+- валідація маніфесту за контрактною схемою, відповідність `kind ↔ entry`, наявність файлів, на які
+  посилається маніфест, схеми сутностей, правила колектора (`collector-rules.schema.json`), обов'язкові
+  тести для extractor/llm;
+- залежності: `dependencies.python` — за описом профілю runtime (WP-06), `dependencies.packages` — лише
+  наявні версії з тим самим дайджестом;
+- відхилення секретів (`422 secret_detected`), походження (`provenance`), статуси версій з історією,
+  звіти тестів, заборона автозмін пакета (`auto_changes_allowed=false` → LLM-версії `403 forbidden`);
+- пошук (тип, текст, тег, тип сутності, медіатип, домен, форки пакета);
+- форк (незалежна копія з `fork_of`), diff між версіями й від батька, стан відносно батька,
+  **явне** перенесення змін батька новою версією (`upstream-ports`, трьохстороннє злиття, job);
+- архів версії для автономного використання, CLI `export` / `verify` / `archive`.
 
-Без Docker (з кореня репозиторію):
+Сам registry не залежить від інших сервісів Jane: лише власна БД PostgreSQL і blob-сховище (ADR-0009).
 
+## Запуск
+
+```text
+# локально, без збереження між запусками (експерименти)
+JANE_REGISTRY_DB=memory JANE_REGISTRY_BLOB=filesystem JANE_REGISTRY_BLOB_ROOT=./.registry-blobs \
+  uv run --package jane-registry python -m jane_registry
+
+# проти dev-стеку (PostgreSQL + MinIO): адреси й паролі — `just env --project <ім'я>`
+just up --project jane-wp05 postgres minio
+JANE_REGISTRY_DB_URL=postgresql://jane:<пароль>@127.0.0.1:<порт>/jane_registry \
+JANE_REGISTRY_S3_ENDPOINT_URL=http://127.0.0.1:<порт minio> \
+JANE_REGISTRY_S3_ACCESS_KEY=<ключ> JANE_REGISTRY_S3_SECRET_KEY=<секрет> \
+JANE_REGISTRY_RUNTIME_PROFILES='["<шлях>/python-extractor-1.json"]' \
+  uv run --package jane-registry python -m jane_registry
 ```
-uv sync --all-packages
-uv run --package jane-registry python -m jane_registry
-curl http://127.0.0.1:8000/v1/health
-```
 
-У Docker (контекст збірки — корінь репозиторію):
+Базу `jane_registry` (окрема база й роль сервісу — [карта власності даних](../../contracts/docs/data-ownership.md))
+створює оператор; таблиці й схема створюються сервісом під час старту (ідемпотентно, під advisory lock —
+кілька екземплярів можуть стартувати одночасно). Бакет `jane-registry` створюється, якщо його немає
+(`JANE_REGISTRY_S3_CREATE_BUCKET=true`).
 
-```
+Docker (контекст — корінь репозиторію; в образ копіюються контрактні схеми `contracts/schemas`):
+
+```text
 docker build -f services/registry/Dockerfile -t jane-registry .
-docker run --rm -p 8000:8000 jane-registry
+docker run -d -p 127.0.0.1:8105:8000 --network <мережа стеку> \
+  -e JANE_REGISTRY_DB_URL -e JANE_REGISTRY_S3_ENDPOINT_URL -e JANE_REGISTRY_S3_ACCESS_KEY \
+  -e JANE_REGISTRY_S3_SECRET_KEY jane-registry
 ```
 
-Кілька екземплярів: запустіть кілька процесів або контейнерів з різними портами
-(`JANE_REGISTRY_PORT`). Стан, який має бути спільним (job, ключі ідемпотентності), зберігайте у
-власній БД сервісу через протоколи `JobStore` / `IdempotencyStore` з jane-kit.
-
-## Тести
-
-```
-just test registry                  # unit + contract
-just test registry -m integration   # потребує `just up`
-```
-
-Контрактні тести (`tests/test_contract.py`) перевіряють `/v1/health`, `/v1/info`, `/v1/jobs` і помилки
-за `contracts/openapi/common.yaml`, а API сервісу — за його `*.v1.yaml` через `ContractClient`.
+`/v1/health` перевіряє БД і blob-сховище (503, якщо недоступні — використовує `HEALTHCHECK` образу),
+`/v1/info` — можливості й ліміти, `/metrics` — Prometheus (HTTP-метрики jane-kit і
+`jane_registry_publications_total{result}`), журнали — JSON у stdout з `trace_id`.
+Кілька екземплярів працюють на одній БД і одному бакеті: ключі ідемпотентності й job зберігаються в
+PostgreSQL, публікації одного пакета серіалізуються блокуванням рядка пакета.
 
 ## Конфігурація
 
-Змінні середовища з префіксом `JANE_REGISTRY_`:
+Змінні середовища з префіксом `JANE_REGISTRY_` (поля [`settings.py`](src/jane_registry/settings.py)).
 
-| Змінна | Типово | Опис |
+| Змінна | Типово | Що |
 |---|---|---|
-| `JANE_REGISTRY_HOST` | `127.0.0.1` (у контейнері `0.0.0.0`) | адреса прослуховування |
-| `JANE_REGISTRY_PORT` | `8000` | порт |
-| `JANE_REGISTRY_LOG_LEVEL` | `INFO` | рівень журналу |
-| `JANE_REGISTRY_LOG_FORMAT` | `json` | `json` або `console` |
-| `JANE_REGISTRY_METRICS_ENABLED` | `true` | ендпоінт `/metrics` |
-| `JANE_REGISTRY_HEALTH_CHECK_TIMEOUT_MS` | `2000` | тайм-аут кожної перевірки `/v1/health` |
-| `JANE_REGISTRY_AUTH_MODE` | `none` | значення для `/v1/info` (`none`, `api_key`, `jwt`) |
-| `JANE_REGISTRY_LIMITS_FILE` | — | файл `PlatformLimits` (`profile`, `defaults`, `hard_caps`; TOML/JSON/YAML) |
-| `JANE_REGISTRY_LIMITS__<ГРУПА>__<ПАРАМЕТР>` | — | перевизначення, напр. `..._LIMITS__JOBS__MAX_CONCURRENT_JOBS=8` |
-| `JANE_REGISTRY_LIMITS__HARD_CAPS__<ГРУПА>__<ПАРАМЕТР>` | — | жорстка стеля платформи |
+| `PORT` / `HOST` | `8105` / `127.0.0.1` | адреса HTTP (в образі `0.0.0.0:8000`) |
+| `DB` | `postgres` | `postgres` або `memory` (один процес, без збереження) |
+| `DB_URL` | — | DSN власної БД `jane_registry` (секрет: лише середовище або secrets-файл) |
+| `DB_SCHEMA` | `public` | схема таблиць |
+| `BLOB` | `s3` | `s3` (MinIO/S3) або `filesystem` |
+| `BLOB_BUCKET` / `BLOB_PREFIX` | `jane-registry` / `sha256/` | об'єкт архіву: `<bucket>/<prefix><hex дайджесту>` |
+| `BLOB_ROOT` | — | для `filesystem`: тека, що грає роль бакета |
+| `S3_ENDPOINT_URL`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_CREATE_BUCKET` | —, `us-east-1`, —, —, `true` | підключення до MinIO/S3 |
+| `RUNTIME_PROFILES` | `[]` | JSON-список файлів або URL з описом профілів runtime (див. нижче) |
+| `CONTRACTS_DIR` | `contracts/` checkout або `/app/contracts` | де лежать контрактні схеми |
+| `REQUIRE_TESTS` | `true` | extractor/llm мають щонайменше один тест `success` і один `empty`/`unrecognized` |
+| `AUTH_MODE` | `none` | `none` (лише локально) або `api_key`; `jwt` у цій версії не реалізовано (сервіс не стартує) |
+| `API_KEYS_FILE` | — | для `api_key`: `[{"name", "sha256": "<hex ключа>", "scopes": [...]}]` |
+| `LIMITS_FILE`, `LIMITS__<група>__<поле>` | — | ліміти (файл `PlatformLimits` або змінні) |
 
-## Ліміти
+Scopes (ADR-0005): `registry:read` — усі GET і `/v1/jobs`; `registry:write` — створення пакета, публікація,
+PATCH, форк, звіти тестів, upstream-ports; `registry:approve` — `POST …/status`.
 
-Рівні: типові значення сервісу → платформа (файл, потім змінні середовища) → джерело → завдання → етап
-(→ запит в автономному режимі); `hard_caps` обмежують результат. `GET /v1/info` повертає `limits` —
-налаштовані типові значення й `hard_caps` сервісу у формі `PlatformLimits` (лише поля з `limits.schema.json`;
-специфічні для сервісу ліміти, як-от `jobs.max_concurrent_jobs`, у контракті відсутні й видно їх лише в журналі
-старту). Ефективні ліміти для джерела/завдання/етапу рахує оркестратор (`GET /v1/limits/effective`).
+### Профілі runtime
 
-| Параметр | Типово | Опис |
+`dependencies.python` екстрактора перевіряється проти профілю `dependencies.runtime_profile`
+(ADR-0002 §4) тими самими правилами, що й у handler-runtime (WP-06): вимога PEP 508, без прямих URL;
+вимога з маркером, хибним для пісочниці (Linux, Python профілю), пропускається; інакше бібліотека має
+бути в профілі, а її точна версія — задовольняти специфікатор. Профілі **не зашиті**: джерела —
+`JANE_REGISTRY_RUNTIME_PROFILES` (файли або URL; документ профілю, їх список, `{"runtime_profiles": {...}}`
+або `ServiceInfo` — тобто можна вказати `http://<handler-runtime>/v1/info`). Прочитані профілі
+кешуються на `profiles.refresh_seconds`; якщо джерело недоступне й профілю немає — `502 upstream_unavailable`
+(retryable); невідомий профіль — `422 dependency_not_allowed`.
+
+## Ліміти й типові значення
+
+Усі — з конфігурації (`JANE_REGISTRY_LIMITS__PACKAGES__MAX_FILES=500` тощо), `/v1/info` показує поля,
+що є в контракті лімітів.
+
+| Параметр | Типово | Що |
 |---|---|---|
-| `jobs.max_concurrent_jobs` | 4 | job, що виконуються одночасно в одному екземплярі |
-| `jobs.max_queued_jobs` | 1000 | понад це — `503 service_unavailable` (backpressure) |
-| `jobs.job_timeout_ms` | 3600000 | максимальна тривалість job (`failed`, код `timeout`) |
-| `jobs.job_retention_seconds` | 86400 | скільки зберігається завершений job (контракт: `transfer.job_retention_seconds`) |
-| `jobs.queue_full_retry_after_seconds` | 1 | `Retry-After` у відповіді 503, коли черга job заповнена |
-| `idempotency.idempotency_ttl_seconds` | 86400 | скільки пам'ятається `Idempotency-Key` (контракт: `transfer.idempotency_ttl_seconds`) |
-| `idempotency.in_memory_max_entries` | 10000 | розмір сховища ключів у пам'яті |
+| `packages.max_archive_bytes` | 20 MiB | розмір архіву (завантаженого чи канонічного) |
+| `packages.max_unpacked_bytes` | 50 MiB | сума розмірів файлів пакета |
+| `packages.max_files` | 2000 | файлів у пакеті |
+| `packages.max_versions_per_package` | 1000 | версій одного пакета (`422 limit_exceeded`) |
+| `packages.archive_cache_bytes` | 64 MiB | LRU архівів у пам'яті екземпляра |
+| `requests.max_request_body_bytes` (= `transfer.max_request_body_bytes`) | 30 MiB | тіло запиту (`413 payload_too_large`) |
+| `secrets.max_scan_bytes_per_file` / `min_entropy_token_length` / `entropy_threshold` | 2 MiB / 32 / 4.3 | сканування секретів |
+| `diff.max_context_lines` / `max_diff_file_bytes` / `max_merge_file_bytes` | 50 / 1 MiB / 1 MiB | diff і злиття |
+| `profiles.fetch_timeout_ms` / `refresh_seconds` | 5000 / 300 | читання профілів runtime |
+| `db.pool_min_size` / `pool_max_size` / `connect_timeout_ms` / `statement_timeout_ms` | 1 / 10 / 5000 / 30000 | PostgreSQL |
+| `blob.connect_timeout_ms` / `read_timeout_ms` / `max_attempts` | 5000 / 60000 / 3 | MinIO/S3 |
+| `jobs.*`, `idempotency.*`, `pages.*` | як у jane-kit | job (upstream-ports), `Idempotency-Key`, сторінки |
 
-## Приклад виклику зі стороннього застосунку
+## Канонічний архів і дайджест
+
+Єдиний алгоритм для registry, storage (WP-07) і SDK (WP-06) — [`archive.py`](src/jane_registry/archive.py):
+
+1. один запис на **звичайний файл**, без записів тек і симлінків;
+2. імена — шляхи пакета (`PackagePath`: ASCII `[A-Za-z0-9._/-]`, `/`, без `..` і початкового `/`), унікальні,
+   **відсортовані за зростанням байтів**;
+3. метод **0 (stored, без стиснення)** — байти не залежать від збірки zlib;
+4. час `1980-01-01 00:00:00`, `external_attr = 0o100644 << 16`, `create_system = 3` (Unix), без extra-полів,
+   коментарів і шифрування (Python `zipfile`: локальні заголовки + центральний каталог);
+5. `digest = "sha256:" + sha256(байти архіву)`.
+
+Завантажений zip може бути зібраний будь-як (deflate, теки, інший час): registry розпаковує його з
+лімітами й перепаковує канонічно, тому дайджест залежить лише від шляхів і вмісту файлів. Для JSON-публікації
+`jane-package.json` формується з `manifest` так: UTF-8, відступ 2 пробіли, порядок ключів як у запиті,
+не-ASCII без екранування, `\n` у кінці (`json.dumps(m, ensure_ascii=False, indent=2) + "\n"`). Так само
+registry записує маніфест форку й версії upstream-port. `GET …/archive` віддає рівно ці байти, `ETag` =
+`"sha256:…"`; споживач перевіряє `sha256(тіло) == ETag == digest`. Незмінність алгоритму закріплює тест
+`test_canonical_archive_golden_digest`.
+
+Локально: `uv run --package jane-registry jane-registry archive <тека пакета> --out pkg.zip` друкує дайджест,
+який видасть registry для того самого вмісту (кеші `__pycache__`, `.pyc`, `.git` тощо не пакуються).
+
+## Публікація й перевірки
+
+`POST /v1/packages/{id}/versions` — `application/zip` (у корені `jane-package.json`) або `application/json`
+`{manifest, files}` (`jane-package.json` у `files` заборонено — його формує registry). Порядок перевірок:
+
+| Крок | Помилка |
+|---|---|
+| пакет існує | `404 not_found` |
+| розмір тіла / архіву / файлів | `413 payload_too_large`, `422 limit_exceeded` (`details.path`) |
+| zip і шляхи (траверс, симлінки, дублікати, шифрування) | `422 validation_failed` |
+| маніфест за схемою; `package_id`/`kind` = пакет; `fork_of` лише від registry і без змін; `kind ↔ entry`; файли з маніфесту; модуль `src/<module>.py`; JSON Schema сутностей (і `key_fields` у `required`); правила колектора за схемою; тести | `422 validation_failed` (`errors[].pointer`: `/manifest/...` або `/files/<шлях>`) |
+| `provenance.created_by = llm` і `auto_changes_allowed = false` | `403 forbidden` |
+| версія вже є | `409 version_exists` |
+| секрети | `422 secret_detected` (`errors[].code`: `aws_access_key`, `private_key`, `secret_file`, `high_entropy_string`…; значення не повертається) |
+| профіль runtime і `dependencies.python`; `dependencies.packages` | `422 dependency_not_allowed`; `422 validation_failed` |
+
+Нова версія — `status: draft`, `test_status: unknown`, `created_by` з маніфесту, `published_by` — хто публікував.
+Ідентичний вміст зберігається один раз (content-addressed). Секрети шукаються за: іменами файлів (`.env`,
+`*.pem`, `id_rsa`, `.netrc`…), відомими форматами ключів і токенів, паролями в URL, присвоєннями
+секретоподібним іменам, високоентропійними рядками в коді/конфігурації (не в HTML-входах тестів).
+
+**Статуси:** `draft → approved | rejected | deprecated | yanked`; `approved → deprecated | yanked`;
+`deprecated → approved | yanked`; `rejected`, `yanked` — кінцеві. Інший перехід — `409 conflict`. Кожна
+зміна пишеться в `status_history` (хто, коли, причина). `latest_version` — найбільша SemVer серед версій
+не в `rejected`/`yanked`; `yanked` архів лишається доступним. Активація в етапах — справа оркестратора.
+
+**Звіти тестів:** `POST …/test-results` (`TestReport` з handler-result.schema; `report.package` має
+збігатися з версією, `digest` — з дайджестом, інакше `422`). `test_status` = `failed`, якщо `failed > 0`,
+`passed`, якщо `passed > 0`.
+
+## Форк, diff, перенесення змін
+
+- `POST /v1/packages/{id}/forks` — новий пакет із копією файлів версії; у маніфесті registry змінює лише
+  `package_id`, `version` (`initial_version` або `from_version`), `fork_of` (батько, версія, дайджест) і
+  `provenance` (`based_on` = батько). Форк — окремий архів і окремий дайджест; батько не має посилань на форк,
+  тож **жодна зміна батька (нові версії, статуси, налаштування) не змінює форк** (тест
+  `test_parent_update_does_not_change_fork`). `auto_changes_allowed` форку типово `false`.
+- `GET /v1/packages/{id}/diff?from=&to=` — `from`/`to`: версія цього пакета або `parent:<версія>`; без `from` —
+  попередня версія (для першої версії форку — вихідна версія батька). `manifest_changes` (JSON Pointer) і
+  файли (`added|removed|modified|unchanged`, unified diff для тексту, `binary` для решти; `jane-package.json`
+  описано лише в `manifest_changes`).
+- `GET /v1/packages/{id}/upstream` — `last_ported_version`, `parent_latest_version`, `newer_parent_versions`
+  (без `rejected`/`yanked`); не форк — `409 conflict`.
+- `POST /v1/packages/{id}/upstream-ports` — **лише явна команда**; `202` + job `upstream_port`. Трьохстороннє
+  злиття: база — версія батька, востаннє перенесена в `base_version` форку, «їхні» — `parent_version`,
+  «наші» — `base_version` (типово остання). Маніфест зливається як JSON (ключі `package_id`, `version`,
+  `fork_of`, `provenance` — від форку), текстові файли — порядково. Конфлікт — job `failed` з кодом
+  `upstream_conflict` і `error.details.conflicts[] = {path, reason, pointer?}`; нічого не застосовується.
+  Успіх — нова версія форку (`draft`) з `provenance.upstream_port = {parent_version, requested_by}`.
+
+## Автономне використання й експорт
+
+```text
+uv run --package jane-registry jane-registry export shop.product-extractor@1.2.0 --registry http://localhost:8105 --out ./export
+uv run --package jane-registry jane-registry verify ./export/shop.product-extractor-1.2.0.zip
+```
+
+`export` завантажує архів версії та, рекурсивно, `dependencies.packages`, перевіряє `ETag` і `digest`,
+пише архіви й індекс `jane-export.json`. `verify` працює **без registry**: дайджест (з індексу або
+`--digest`), канонічна форма, маніфест за контрактною схемою (якщо доступна тека `contracts/`), наявність
+файлів, секрети. Експортований архів виконує handler-runtime (`jane-handler-runtime test <zip>` або
+`HandlerInvocation.package_archive`). Тест `test_exported_package_runs_without_registry` зупиняє сервер
+після експорту, перевіряє архів і запускає екстрактор з архіву в ізольованому інтерпретаторі (`python -I`).
+
+## Виклик зі стороннього застосунку
 
 ```python
 import httpx
 
-with httpx.Client(base_url="http://127.0.0.1:8000") as client:
-    r = client.post("/v1/examples/jobs", json={"steps": 3}, headers={"Idempotency-Key": "demo-1"})
-    job_url = r.headers["Location"]  # 202 Accepted
-    print(client.get(job_url).json()["status"])  # queued | running | succeeded ...
+with httpx.Client(base_url="http://localhost:8105", headers={"Authorization": "Bearer <ключ>"}) as c:
+    c.post("/v1/packages", json={"package_id": "acme.rules", "kind": "collector-rules", "title": "ACME"},
+           headers={"Idempotency-Key": "create-acme.rules"})
+    with open("acme-rules.zip", "rb") as f:
+        v = c.post("/v1/packages/acme.rules/versions", content=f.read(),
+                   headers={"Content-Type": "application/zip", "Idempotency-Key": "acme.rules@1.0.0"}).json()
+    archive = c.get(f"/v1/packages/acme.rules/versions/{v['version']}/archive")
+    assert archive.headers["etag"].strip('"') == v["digest"]
 ```
 
-## Спостережуваність
+```text
+curl -X POST http://localhost:8105/v1/packages -H "Content-Type: application/json" \
+  -H "Idempotency-Key: create-1" -d '{"package_id":"shop.rules","kind":"collector-rules","title":"Shop rules"}'
+curl "http://localhost:8105/v1/packages?kind=extractor&entity_type=product&domain=shop.example.test"
+```
 
-- `GET /v1/health` (`ok`/`degraded`/`down`; перевірки залежностей — `app.state.health.add`), `GET /v1/info`.
-- `GET /metrics` — Prometheus (`jane_http_requests_total`, `jane_http_request_duration_seconds`, ...).
-- Журнали — JSON-рядки в stdout із `trace_id` (з `traceparent`), `request_id`, `job_id`, `service`, `instance`.
-- Помилки — `application/problem+json` зі стабільним `code` (каталог — `contracts/docs/errors.md`).
+## Тести
+
+```text
+just test registry                                   # unit + contract (memory-бекенд, без сервісів)
+just up --project jane-wp05 postgres minio
+just integration --project jane-wp05 services/registry   # ті самі API-тести на PostgreSQL + MinIO
+just down -v --project jane-wp05
+```
+
+API-тести параметризовано бекендом (`memory` / `real`): `real` створює окрему базу
+`jane_registry_test_<hex>` на сесію, окрему схему на тест і окремий бакет і прибирає їх.
+`test_contract.py` викликає кожну операцію `registry.v1` і перевіряє відповіді за контрактом.
+
+## Відомі обмеження
+
+- `auth_mode=jwt` не реалізовано (сервіс відмовляється стартувати в цьому режимі).
+- Прогін тестів пакета при публікації через handler-runtime не робиться: звіти приходять через
+  `POST …/test-results` (ADR-0002 §8 — опційно).
+- Архіви без посилань (після невдалої вставки версії) лишаються в blob-сховищі; вони content-addressed і
+  нешкідливі, прибирання — окремою операцією (не реалізовано).
+- `memory`-бекенд — лише для одного процесу й тестів.

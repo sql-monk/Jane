@@ -1,0 +1,3 @@
+- Запуск: `uv run --package jane-orchestrator python -m jane_orchestrator` (або Docker, див. README.md).
+- Тести: `just test orchestrator` (інтеграційні: `-m integration` після `just up`).
+- Контракт: `contracts/openapi/orchestrator.v1.yaml` (+ `contracts/openapi/common.yaml`); конвенції — скіл `jane-contracts`.

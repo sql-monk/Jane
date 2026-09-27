@@ -12,7 +12,11 @@ members = [
     "jane-kit",
     "jane-storage",
     "jane-storage-files",
+    "jane-storage-minio",
+    "jane-storage-mongodb",
     "jane-storage-postgres",
+    "jane-storage-s3",
+    "jane-storage-sqlserver",
     "jane-template-service",
     "jane-testsite",
 ]
@@ -583,6 +587,40 @@ requires-dist = [
 ]
 
 [[package]]
+name = "jane-storage-minio"
+version = "0.1.0"
+source = { editable = "services/storage/adapters/minio" }
+dependencies = [
+    { name = "jane-contracts" },
+    { name = "jane-storage" },
+    { name = "jane-storage-s3" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jane-contracts", editable = "contracts/python" },
+    { name = "jane-storage", editable = "services/storage" },
+    { name = "jane-storage-s3", editable = "services/storage/adapters/s3" },
+]
+
+[[package]]
+name = "jane-storage-mongodb"
+version = "0.1.0"
+source = { editable = "services/storage/adapters/mongodb" }
+dependencies = [
+    { name = "jane-contracts" },
+    { name = "jane-storage" },
+    { name = "pymongo" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jane-contracts", editable = "contracts/python" },
+    { name = "jane-storage", editable = "services/storage" },
+    { name = "pymongo", specifier = ">=4.13" },
+]
+
+[[package]]
 name = "jane-storage-postgres"
 version = "0.1.0"
 source = { editable = "services/storage/adapters/postgres" }
@@ -597,6 +635,40 @@ requires-dist = [
     { name = "asyncpg", specifier = ">=0.30" },
     { name = "jane-contracts", editable = "contracts/python" },
     { name = "jane-storage", editable = "services/storage" },
+]
+
+[[package]]
+name = "jane-storage-s3"
+version = "0.1.0"
+source = { editable = "services/storage/adapters/s3" }
+dependencies = [
+    { name = "boto3" },
+    { name = "jane-contracts" },
+    { name = "jane-storage" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "boto3", specifier = ">=1.35.66" },
+    { name = "jane-contracts", editable = "contracts/python" },
+    { name = "jane-storage", editable = "services/storage" },
+]
+
+[[package]]
+name = "jane-storage-sqlserver"
+version = "0.1.0"
+source = { editable = "services/storage/adapters/sqlserver" }
+dependencies = [
+    { name = "jane-contracts" },
+    { name = "jane-storage" },
+    { name = "pymssql" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jane-contracts", editable = "contracts/python" },
+    { name = "jane-storage", editable = "services/storage" },
+    { name = "pymssql", specifier = ">=2.3" },
 ]
 
 [[package]]

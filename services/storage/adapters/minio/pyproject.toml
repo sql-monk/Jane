@@ -1,0 +1,32 @@
+[project]
+name = "jane-storage-minio"
+version = "0.1.0"
+description = "MinIO adapter of the Jane storage handler (the S3 protocol of jane-storage-s3 with the MinIO profile)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "jane-storage",
+    "jane-contracts",
+    "jane-storage-s3",
+]
+
+# Registration in the storage core (see services/storage/README.md, "Адаптери").
+[project.entry-points."jane.storage.adapters"]
+minio = "jane_storage_minio:MinioAdapter"
+
+[project.entry-points."jane.storage.packages"]
+"jane.storage-minio" = "jane_storage_minio:package_dir"
+
+[tool.uv.sources]
+# Path (not workspace) sources: uv does not treat a project nested in another member as a workspace
+# member when building it, see services/storage/README.md.
+jane-storage = { path = "../..", editable = true }
+jane-storage-s3 = { path = "../s3", editable = true }
+jane-contracts = { path = "../../../../contracts/python", editable = true }
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jane_storage_minio"]

@@ -11,11 +11,11 @@
 | 04 | Telegram Collector | 1 | — | | | після M0 |
 | 05 | Репозиторій обробників | 1 | — | | | після M0 |
 | 06 | Runtime обробників і SDK | 1 | active | `wp/06-handler-runtime` | агент | слот 1 |
-| 07 | Збереження: ядро + files + PostgreSQL | 1 | active | `wp/07-storage-core` | агент | слот 1 |
+| 07 | Збереження: ядро + files + PostgreSQL | 1 | review | `wp/07-storage-core` | агент / wp-reviewer | compat-suite `f97527d` |
 | 08 | Адаптери збереження | 1 | — | | | після M0 |
 | 09 | Оркестратор | 1 | active | `wp/09-orchestrator` | агент | слот 1 |
 | 10 | LLM-шлюз і LLM-обробник | 1 | — | | | після M0 |
-| 11 | Асистент джерел | 1 | — | | | після M0 |
+| 11 | Асистент джерел | 1 | active | `wp/11-assistant` | агент | слот 2 |
 | 12 | Адмінка | 1 | — | | | після M0 |
 | 13 | Інтеграція й приймання | 2 | — | | | |
 | 14 | Профілі лімітів і експлуатація | 2 | — | | | після M1 |
@@ -36,3 +36,14 @@
 - 2026-09-27 — WP-00 прийнято (рев'ю 2 раунди) і злито в main; контракти на main зелені. WP-01 — виправлення після рев'ю 1; guard_bash посилено (refs між worktree).
 - 2026-09-27 — WP-01 прийнято і злито; на main `just check` зелений, gitleaks 0. **M0 досягнуто.** Встановлено git pre-commit (gitleaks). guard_bash дозволяє read-only `git merge-tree`/`merge-base`.
 - 2026-09-27 — хвиля 1, слот 1: запущено WP-09, WP-02, WP-06, WP-07 (база `39de0b4`).
+- 2026-09-27 — ліміт сесії перервав слот 1; агентів відновлено з тих самих worktree. CI на main зелений (`ef5a879`).
+- 2026-09-27 — WP-07 на рев'ю; запущено WP-11.
+
+## Відкриті запити між власниками
+| Від | Кому | Запит | Стан |
+|---|---|---|---|
+| WP-07 | координатор / WP-01 | `scripts/dev.py` `members()`: додати `services/storage/adapters/*`, щоб `just types` перевіряв адаптери | після злиття WP-07 |
+| WP-07 | WP-01 | спільний помічник `ContentRef` у jane-kit (ADR-0004) | відкрито |
+| WP-07 | WP-05 | канонічний архів і дайджест пакета (zip stored, відсортовано, дата 1980, 0644); дайджести в прикладах WP-00 не реальні | передати WP-05 |
+| WP-07 | WP-00 | задокументувати `DeliveryRecord.acks`; простір імен етапу в storage.v1; приклад `storage-files.json` `format.raw: html` vs `original` | зміна контракту через contract-guardian |
+| WP-07 | WP-09 | `Idempotency-Key` = `delivery_key`; `handler.digest` з registry або `/v1/info` | передати WP-09 |

@@ -295,8 +295,18 @@ def test_test_results(client: TestClient, uid: Any) -> None:
     r = client.post(url, json=report, headers=key(f"t-{pid}"))
     assert r.status_code == 200, r.text
     assert r.json()["test_status"] == "passed" and r.json()["test_reports"][0]["recorded_at"]
-    failed = {**report, "report": {**report["report"], "passed": 1, "failed": 1}}
-    assert client.post(url, json=failed, headers=key(f"t2-{pid}")).json()["test_status"] == "failed"
+    # one report per binding (context); every report is kept, test_status follows the latest one
+    failed = {
+        **report,
+        "context": "bindings:shop-catalog/extract-products",
+        "report": {**report["report"], "passed": 1, "failed": 1},
+    }
+    after = client.post(url, json=failed, headers=key(f"t2-{pid}")).json()
+    assert after["test_status"] == "failed"
+    assert [r.get("context") for r in after["test_reports"]] == [
+        None,
+        "bindings:shop-catalog/extract-products",
+    ]
     wrong = {**report, "report": {**report["report"], "package": {"package_id": pid, "version": "9.9.9"}}}
     assert client.post(url, json=wrong, headers=key(f"t3-{pid}")).status_code == 422
 

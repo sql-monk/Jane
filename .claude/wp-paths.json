@@ -1,0 +1,104 @@
+{
+  "_comment": "Власність шляхів за plan.md §5. Змінює лише координатор. Шаблони відносно кореня checkout, '/' як роздільник; '**' — будь-яка глибина, '*' — у межах сегмента. deny має пріоритет над allow.",
+  "common_allow": [
+    "docs/delivery/WP-{wp}.md",
+    "docs/delivery/WP-{wp}/**",
+    "uv.lock"
+  ],
+  "packages": {
+    "00": {
+      "name": "architecture-contracts",
+      "allow": [
+        "contracts/**",
+        "docs/adr/**",
+        ".claude/skills/jane-contracts/**",
+        ".claude/skills/jane-handler-package/**",
+        ".claude/agents/contract-guardian.md"
+      ]
+    },
+    "01": {
+      "name": "scaffold-ci",
+      "allow": [
+        "*",
+        ".github/**",
+        ".gitlab/**",
+        "infra/**",
+        "libs/jane-kit/**",
+        "templates/service/**",
+        "tests/fixtures/**",
+        "scripts/**",
+        ".claude/settings.json",
+        ".claude/hooks/format.py"
+      ],
+      "deny": [
+        "TECHNICAL_SPECIFICATION.md",
+        "plan.md",
+        "recomendations.md"
+      ]
+    },
+    "02": {
+      "name": "web-collector-core",
+      "allow": ["services/web-collector/**"],
+      "deny": ["services/web-collector/strategies/discovery/**"]
+    },
+    "03": {
+      "name": "web-collector-discovery",
+      "allow": ["services/web-collector/strategies/discovery/**"]
+    },
+    "04": {
+      "name": "telegram-collector",
+      "allow": ["services/telegram-collector/**"]
+    },
+    "05": {
+      "name": "registry",
+      "allow": ["services/registry/**", ".claude/skills/jane-handler-package/**"]
+    },
+    "06": {
+      "name": "handler-runtime",
+      "allow": ["services/handler-runtime/**", "libs/extractor-sdk/**"]
+    },
+    "07": {
+      "name": "storage-core",
+      "allow": ["services/storage/**"],
+      "deny": [
+        "services/storage/adapters/sqlserver/**",
+        "services/storage/adapters/mongodb/**",
+        "services/storage/adapters/minio/**",
+        "services/storage/adapters/s3/**"
+      ]
+    },
+    "08": {
+      "name": "storage-adapters",
+      "allow": [
+        "services/storage/adapters/sqlserver/**",
+        "services/storage/adapters/mongodb/**",
+        "services/storage/adapters/minio/**",
+        "services/storage/adapters/s3/**"
+      ]
+    },
+    "09": {
+      "name": "orchestrator",
+      "allow": ["services/orchestrator/**"]
+    },
+    "10": {
+      "name": "llm",
+      "allow": ["services/llm/**"]
+    },
+    "11": {
+      "name": "assistant",
+      "allow": ["services/assistant/**"]
+    },
+    "12": {
+      "name": "admin",
+      "allow": ["web/admin/**"]
+    },
+    "13": {
+      "name": "integration-acceptance",
+      "allow": ["tests/e2e/**", "docs/acceptance/**"]
+    },
+    "14": {
+      "name": "limit-profiles-ops",
+      "allow": ["deploy/profiles/**", "docs/operations/**", "examples/**"]
+    }
+  }
+}

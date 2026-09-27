@@ -1,0 +1,27 @@
+# Маркер WP конкретного checkout (plan.md §3.1)
+.jane-wp
+
+# Worktree агентів і локальні налаштування Claude Code
+.claude/worktrees/
+.claude/settings.local.json
+
+# Секрети
+.env
+.env.*
+!.env.example
+**/secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/

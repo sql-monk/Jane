@@ -1,0 +1,44 @@
+{
+  "summary": "Звіт тестів пакета",
+  "value": {
+    "package": {
+      "package_id": "shop-example.product-extractor",
+      "version": "1.2.0",
+      "digest": "sha256:4f6440c6a17b54edef02166e12a3bffd2364cbf790484d1f076b5d2e5ef78a35"
+    },
+    "passed": 2,
+    "failed": 1,
+    "cases": [
+      {
+        "name": "product-a100",
+        "passed": true,
+        "expected_status": "success",
+        "actual_status": "success"
+      },
+      {
+        "name": "category-page-empty",
+        "passed": true,
+        "expected_status": "empty",
+        "actual_status": "empty"
+      },
+      {
+        "name": "problem-sample-2026-09-26",
+        "passed": false,
+        "expected_status": "success",
+        "actual_status": "unrecognized",
+        "differences": [
+          {
+            "pointer": "/entities/0/fields/price",
+            "expected": {
+              "amount": 899.0,
+              "currency": "UAH"
+            },
+            "actual": null
+          }
+        ]
+      }
+    ],
+    "started_at": "2026-09-27T10:10:00Z",
+    "finished_at": "2026-09-27T10:10:03Z"
+  }
+}

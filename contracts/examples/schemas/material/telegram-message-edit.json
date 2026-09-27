@@ -1,0 +1,49 @@
+{
+  "material_id": "tg:-1001234567890:4521",
+  "observation_id": "obs_01J9ZT0C0000000000000004",
+  "source": {
+    "source_id": "news-tg",
+    "kind": "telegram",
+    "name": "City events"
+  },
+  "locator": {
+    "telegram": {
+      "channel_id": "-1001234567890",
+      "channel_username": "city_events_example",
+      "message_id": 4521
+    }
+  },
+  "fetched_at": "2026-09-27T12:30:00Z",
+  "published_at": "2026-09-27T09:00:00Z",
+  "edited_at": "2026-09-27T12:10:00Z",
+  "format": {
+    "media_type": "text/plain",
+    "charset": "utf-8",
+    "language": "uk",
+    "content_kind": "message"
+  },
+  "revision": {
+    "content_sha256": "39f16d19ae01f13cceb68b1822579074b18f9bb848a8c4bf5288c088daad8a5d",
+    "source_revision": "1790503800",
+    "sequence": 1790503800,
+    "is_edit": true
+  },
+  "content": {
+    "kind": "inline",
+    "media_type": "text/plain",
+    "encoding": "utf-8",
+    "data": "Концерт 12 жовтня о 19:00, Філармонія. Вхід вільний.",
+    "size_bytes": 87,
+    "sha256": "39f16d19ae01f13cceb68b1822579074b18f9bb848a8c4bf5288c088daad8a5d"
+  },
+  "discovery": {
+    "strategy": "telegram_updates"
+  },
+  "collector": {
+    "name": "telegram-collector",
+    "version": "0.1.0"
+  },
+  "metadata": {
+    "views": 1520
+  }
+}

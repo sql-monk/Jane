@@ -1,0 +1,703 @@
+openapi: 3.1.0
+info:
+  title: Jane Collector API
+  version: 1.0.0
+  description: |
+    Спільний контракт колекторів (Web Collector — WP-02/03, Telegram Collector — WP-04).
+    Колектор працює автономно: сторонній застосунок може отримати матеріали без оркестратора,
+    екстрактора чи сервісу збереження (ТЗ §4, критерій 1).
+
+    Потік матеріалів — **pull із курсором і backpressure**: `POST /v1/collections` запускає збір
+    (202 + Job), споживач читає `GET /v1/collections/{id}/materials?after=<cursor>`. Запит з
+    `after=C` підтверджує всі матеріали до C включно; непідтверджені матеріали видаються повторно
+    (at-least-once, споживач дедуплікує за `observation_id`). Якщо непідтверджених більше за
+    `limits.queue.max_unacked_materials`, колектор призупиняє обхід. Стан обходу (черга,
+    дедуплікація, курсори Telegram) зберігається в сховищі колектора, тож після рестарту збір
+    продовжується.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Jane
+servers:
+  - url: http://localhost:8101
+    description: web-collector (dev)
+  - url: http://localhost:8102
+    description: telegram-collector (dev)
+security:
+  - bearerAuth: []
+tags:
+  - name: system
+  - name: fetch
+  - name: collections
+  - name: rules
+  - name: state
+  - name: jobs
+paths:
+  /v1/health:
+    $ref: 'common.yaml#/components/pathItems/Health'
+  /v1/info:
+    $ref: 'common.yaml#/components/pathItems/Info'
+  /v1/fetches:
+    post:
+      operationId: fetchMaterial
+      summary: Синхронно отримати один матеріал
+      description: |
+        Коротка операція: один URL або одне повідомлення. Перевіряє scope й robots, якщо передано
+        правила. Кожен виклик — нове спостереження (новий `observation_id`), тому ключ
+        ідемпотентності не потрібен.
+      tags: [fetch]
+      x-jane-no-idempotency-key: read-only for Jane state; every call is a new observation by design
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FetchRequest'
+            examples:
+              web:
+                value:
+                  source_kind: web
+                  source_id: shop-example
+                  url: https://shop.example.test/product/a-100
+                  rules_ref:
+                    package_id: shop-example.web-rules
+                    version: 1.0.0
+                  content_delivery: auto
+              telegram:
+                value:
+                  source_kind: telegram
+                  telegram:
+                    channel_username: city_events_example
+                    message_id: 4521
+      responses:
+        '200':
+          description: Матеріал із метаданими.
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/material.schema.json'
+              examples:
+                web:
+                  $ref: '../examples/openapi/material-web.json'
+                blob:
+                  $ref: '../examples/openapi/material-web-blob.json'
+                telegram:
+                  $ref: '../examples/openapi/material-telegram.json'
+        '400':
+          $ref: 'common.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '403':
+          description: Заборонено robots.txt або політикою доступу (`access_denied_by_policy`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                robots:
+                  value:
+                    type: urn:jane:problem:access_denied_by_policy
+                    title: Access denied by policy
+                    status: 403
+                    code: access_denied_by_policy
+                    detail: disallowed by robots.txt for user-agent JaneBot
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: 'common.yaml#/components/responses/TooManyRequests'
+        '502':
+          description: Джерело недоступне або повернуло помилку (`source_unavailable`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                upstream:
+                  value:
+                    type: urn:jane:problem:source_unavailable
+                    title: Source unavailable
+                    status: 502
+                    code: source_unavailable
+                    retryable: true
+                    details:
+                      http_status: 503
+  /v1/collections:
+    post:
+      operationId: startCollection
+      summary: Запустити збір (асинхронно)
+      tags: [collections]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CollectionRequest'
+            examples:
+              webFull:
+                value:
+                  source_kind: web
+                  source_id: shop-example
+                  rules_ref:
+                    package_id: shop-example.web-rules
+                    version: 1.0.0
+                  mode: full
+                  limits:
+                    crawl:
+                      max_pages_per_run: 20000
+                    queue:
+                      max_unacked_materials: 500
+              webExplicitUrls:
+                value:
+                  source_kind: web
+                  source_id: shop-example
+                  rules_ref:
+                    package_id: shop-example.web-rules
+                    version: 1.0.0
+                  urls:
+                    - https://shop.example.test/product/a-100
+                    - https://shop.example.test/product/b-200
+              telegramIncremental:
+                value:
+                  source_kind: telegram
+                  source_id: news-tg
+                  rules:
+                    collector: telegram
+                    channels:
+                      - username: city_events_example
+                    updates:
+                      new_messages: true
+                      edits: true
+                    account_connection_id: tg-main
+                  mode: incremental
+                  state_key: news-tg
+      responses:
+        '202':
+          $ref: 'common.yaml#/components/responses/JobAccepted'
+        '400':
+          $ref: 'common.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
+  /v1/collections/{collection_id}:
+    parameters:
+      - $ref: '#/components/parameters/CollectionId'
+    get:
+      operationId: getCollection
+      summary: Стан і статистика збору
+      tags: [collections]
+      responses:
+        '200':
+          description: Стан збору.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collection'
+              examples:
+                running:
+                  $ref: '#/components/examples/CollectionRunning'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/collections/{collection_id}/materials:
+    parameters:
+      - $ref: '#/components/parameters/CollectionId'
+    get:
+      operationId: listCollectionMaterials
+      summary: Забрати матеріали після курсора (і підтвердити попередні)
+      description: |
+        `after` — курсор останнього обробленого матеріалу; усі матеріали до нього включно
+        вважаються підтвердженими й більше не видаються. Без `after` — від першого
+        непідтвердженого. `wait_ms` — long-poll: чекати нові матеріали до вказаного часу.
+        `end_of_stream: true` — збір завершено й усі матеріали видано.
+      tags: [collections]
+      parameters:
+        - name: after
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 2048
+        - $ref: 'common.yaml#/components/parameters/Limit'
+        - name: wait_ms
+          in: query
+          required: false
+          description: Long-poll до цього часу (обрізається до максимуму сервісу).
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Сторінка матеріалів.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialPage'
+              examples:
+                page:
+                  $ref: '#/components/examples/MaterialPage'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '410':
+          description: Збір видалено після `job_retention_seconds`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                gone:
+                  value:
+                    type: urn:jane:problem:not_found
+                    title: Collection expired
+                    status: 410
+                    code: not_found
+  /v1/collections/{collection_id}/errors:
+    parameters:
+      - $ref: '#/components/parameters/CollectionId'
+    get:
+      operationId: listCollectionErrors
+      summary: Помилки й пропуски окремих URL/повідомлень
+      tags: [collections]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка помилок.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FetchErrorPage'
+              examples:
+                errors:
+                  value:
+                    items:
+                      - url: https://shop.example.test/private/x
+                        code: access_denied_by_policy
+                        message: disallowed by robots.txt
+                        at: '2026-09-27T10:00:07Z'
+                      - url: https://shop.example.test/product/z-9
+                        code: source_unavailable
+                        http_status: 500
+                        attempts: 3
+                        message: HTTP 500
+                        at: '2026-09-27T10:01:10Z'
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/rules/validations:
+    post:
+      operationId: validateRules
+      summary: Перевірити правила колектора без запуску
+      tags: [rules]
+      x-jane-no-idempotency-key: pure validation without side effects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/collector-rules.schema.json'
+            examples:
+              shop:
+                $ref: '../examples/openapi/rules-web-shop.json'
+              news:
+                $ref: '../examples/openapi/rules-web-news.json'
+              telegram:
+                $ref: '../examples/openapi/rules-telegram.json'
+      responses:
+        '200':
+          description: Результат перевірки (невалідні правила — теж 200 з valid=false).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RulesValidation'
+              examples:
+                ok:
+                  value:
+                    valid: true
+                    errors: []
+                    warnings:
+                      - pointer: /strategies/1
+                        message: recursive strategy without max_depth inherits limits.crawl.max_depth
+                    supported: true
+        '400':
+          $ref: 'common.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+  /v1/states/{state_key}:
+    parameters:
+      - name: state_key
+        in: path
+        required: true
+        schema:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+    get:
+      operationId: getCollectorState
+      summary: Стан обходу/курсори, збережені колектором
+      tags: [state]
+      responses:
+        '200':
+          description: Підсумок збереженого стану.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectorState'
+              examples:
+                web:
+                  value:
+                    state_key: shop-example
+                    collector: web
+                    updated_at: '2026-09-27T12:00:00Z'
+                    known_urls: 18234
+                    frontier_size: 0
+                    cursors: {}
+                telegram:
+                  value:
+                    state_key: news-tg
+                    collector: telegram
+                    updated_at: '2026-09-27T12:30:00Z'
+                    cursors:
+                      '-1001234567890':
+                        last_message_id: 4530
+                        last_edit_date: '2026-09-27T12:10:00Z'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+    delete:
+      operationId: resetCollectorState
+      summary: Скинути збережений стан (наступний збір — з нуля)
+      tags: [state]
+      responses:
+        '204':
+          description: Стан видалено.
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+  /v1/jobs/{job_id}:
+    $ref: 'common.yaml#/components/pathItems/Job'
+  /v1/jobs/{job_id}/cancel:
+    $ref: 'common.yaml#/components/pathItems/JobCancel'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    CollectionId:
+      name: collection_id
+      in: path
+      required: true
+      description: Дорівнює job_id, повернутому POST /v1/collections.
+      schema:
+        $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+  schemas:
+    ContentDelivery:
+      type: string
+      enum: [auto, inline, blob]
+      default: auto
+      description: auto — inline до limits.transfer.inline_max_bytes, інакше blob.
+    FetchRequest:
+      type: object
+      additionalProperties: false
+      required: [source_kind]
+      properties:
+        source_kind:
+          $ref: '../schemas/common/defs.schema.json#/$defs/SourceKind'
+        source_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+        url:
+          type: string
+          format: uri
+        telegram:
+          type: object
+          additionalProperties: false
+          required: [message_id]
+          properties:
+            channel_username:
+              type: string
+            channel_id:
+              type: string
+            message_id:
+              type: integer
+        rules:
+          $ref: '../schemas/collector-rules.schema.json'
+        rules_ref:
+          $ref: '../schemas/common/package-ref.schema.json'
+        content_delivery:
+          $ref: '#/components/schemas/ContentDelivery'
+        limits:
+          $ref: '../schemas/common/limits.schema.json'
+    CollectionRequest:
+      type: object
+      additionalProperties: false
+      required: [source_kind]
+      description: Потрібні rules (inline, автономний режим) або rules_ref (версія з репозиторію).
+      properties:
+        source_kind:
+          $ref: '../schemas/common/defs.schema.json#/$defs/SourceKind'
+        source_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+        rules:
+          $ref: '../schemas/collector-rules.schema.json'
+        rules_ref:
+          $ref: '../schemas/common/package-ref.schema.json'
+        urls:
+          type: array
+          description: Явний перелік — лише ці URL, без рекурсії (у межах scope правил).
+          items:
+            type: string
+            format: uri
+        mode:
+          type: string
+          enum: [full, incremental]
+          default: full
+        state_key:
+          description: Простір збереженого стану (черга, дедуплікація, курсори). За замовчуванням source_id.
+          $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+        content_delivery:
+          $ref: '#/components/schemas/ContentDelivery'
+        limits:
+          $ref: '../schemas/common/limits.schema.json'
+        trace:
+          $ref: '../schemas/common/defs.schema.json#/$defs/TraceContext'
+        labels:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Labels'
+      anyOf:
+        - required: [rules]
+        - required: [rules_ref]
+    CollectionStats:
+      type: object
+      properties:
+        discovered:
+          type: integer
+          minimum: 0
+        fetched:
+          type: integer
+          minimum: 0
+        emitted:
+          type: integer
+          minimum: 0
+        acknowledged:
+          type: integer
+          minimum: 0
+        unacked:
+          type: integer
+          minimum: 0
+        duplicates:
+          type: integer
+          minimum: 0
+        skipped_out_of_scope:
+          type: integer
+          minimum: 0
+        skipped_robots:
+          type: integer
+          minimum: 0
+        not_modified:
+          type: integer
+          minimum: 0
+        errors:
+          type: integer
+          minimum: 0
+        frontier_size:
+          type: integer
+          minimum: 0
+        bytes_fetched:
+          type: integer
+          minimum: 0
+        by_strategy:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+    Collection:
+      type: object
+      required: [collection_id, status, source_kind, created_at, stats]
+      properties:
+        collection_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+        status:
+          $ref: '../schemas/common/job.schema.json#/$defs/JobStatus'
+        paused_by_backpressure:
+          type: boolean
+        source_kind:
+          $ref: '../schemas/common/defs.schema.json#/$defs/SourceKind'
+        source_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+        rules:
+          $ref: '../schemas/common/package-ref.schema.json'
+        mode:
+          type: string
+          enum: [full, incremental]
+        state_key:
+          type: string
+        created_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        finished_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        stats:
+          $ref: '#/components/schemas/CollectionStats'
+        effective_limits:
+          $ref: '../schemas/common/limits.schema.json'
+    MaterialPage:
+      type: object
+      required: [items, next_cursor, end_of_stream, collection_status]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '../schemas/material.schema.json'
+        next_cursor:
+          description: Курсор останнього елемента сторінки; передайте як after у наступному запиті.
+          $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+        end_of_stream:
+          type: boolean
+        collection_status:
+          $ref: '../schemas/common/job.schema.json#/$defs/JobStatus'
+    FetchError:
+      type: object
+      required: [code, message, at]
+      properties:
+        url:
+          type: string
+        telegram_message:
+          type: string
+        code:
+          type: string
+        http_status:
+          type: integer
+        attempts:
+          type: integer
+          minimum: 1
+        message:
+          type: string
+        at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+    FetchErrorPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/FetchError'
+        next_cursor:
+          $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+    RulesValidation:
+      type: object
+      required: [valid, errors]
+      properties:
+        valid:
+          type: boolean
+        supported:
+          type: boolean
+          description: false — правила валідні за схемою, але ця реалізація колектора не підтримує якусь стратегію.
+        errors:
+          type: array
+          items:
+            $ref: '../schemas/common/problem.schema.json#/$defs/FieldError'
+        warnings:
+          type: array
+          items:
+            $ref: '../schemas/common/problem.schema.json#/$defs/FieldError'
+    CollectorState:
+      type: object
+      required: [state_key, collector, updated_at]
+      properties:
+        state_key:
+          type: string
+        collector:
+          type: string
+        updated_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        known_urls:
+          type: integer
+          minimum: 0
+        frontier_size:
+          type: integer
+          minimum: 0
+        cursors:
+          type: object
+          description: Курсори за каналами (Telegram) або стратегіями (web, наприклад lastmod sitemap).
+          additionalProperties:
+            type: object
+  examples:
+    CollectionRunning:
+      summary: Збір іде, пригальмовано backpressure
+      value:
+        collection_id: job_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+        status: running
+        paused_by_backpressure: true
+        source_kind: web
+        source_id: shop-example
+        rules:
+          package_id: shop-example.web-rules
+          version: 1.0.0
+        mode: full
+        state_key: shop-example
+        created_at: '2026-09-27T10:00:00Z'
+        stats:
+          discovered: 1840
+          fetched: 620
+          emitted: 598
+          acknowledged: 98
+          unacked: 500
+          duplicates: 211
+          skipped_out_of_scope: 305
+          skipped_robots: 4
+          not_modified: 0
+          errors: 2
+          frontier_size: 1220
+          bytes_fetched: 48211002
+          by_strategy:
+            sitemap: 1500
+            recursive: 290
+            listing: 50
+    MaterialPage:
+      summary: Сторінка матеріалів
+      value:
+        items:
+          - material_id: web:9b1f0c1d2e3f40516273849a0b1c2d3e
+            observation_id: obs_01J9ZQ4A0000000000000001
+            source:
+              source_id: shop-example
+              kind: web
+            locator:
+              url: https://shop.example.test/product/a-100
+              canonical_url: https://shop.example.test/product/a-100
+            fetched_at: '2026-09-27T10:00:05Z'
+            format:
+              media_type: text/html
+              charset: utf-8
+              content_kind: page
+            revision:
+              content_sha256: 5d41402abc4b2a76b9719d911017c592ae2f1a7d9e6a3b8c4f5e6d7c8b9a0f1e
+            content:
+              kind: blob
+              uri: s3://jane-transit/web-collector/2026/09/27/obs_01J9ZQ4A0000000000000001.html
+              media_type: text/html
+              size_bytes: 482113
+              sha256: 5d41402abc4b2a76b9719d911017c592ae2f1a7d9e6a3b8c4f5e6d7c8b9a0f1e
+              store: transit
+              expires_at: '2026-10-04T10:00:05Z'
+            discovery:
+              strategy: sitemap
+              depth: 0
+              section: products
+            collector:
+              name: web-collector
+              version: 0.1.0
+        next_cursor: c_0000000000000599
+        end_of_stream: false
+        collection_status: running

@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PackageManifest",
+  "description": "Маніфест пакета обробника або правил колектора (ТЗ §7) — файл 'jane-package.json' у корені архіву пакета. Пакет незмінний після публікації; дайджест архіву обчислює репозиторій. Що є пакетом для кожного типу — contracts/docs/handler-packages.md. Секрети в пакеті заборонені (репозиторій відхиляє з secret_detected).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "package_id", "version", "kind", "title", "entry", "provenance"],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "package_id": { "$ref": "common/defs.schema.json#/$defs/Slug" },
+    "version": { "$ref": "common/defs.schema.json#/$defs/SemVer" },
+    "kind": { "$ref": "common/defs.schema.json#/$defs/HandlerKind" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "description": { "type": "string", "maxLength": 10000 },
+    "tags": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,40}$" }, "uniqueItems": true },
+    "entry": {
+      "description": "Спосіб виконання; форма залежить від kind.",
+      "type": "object"
+    },
+    "input": { "$ref": "#/$defs/InputContract" },
+    "params_schema": {
+      "description": "Шлях у пакеті до JSON Schema параметрів етапу.",
+      "$ref": "#/$defs/PackagePath"
+    },
+    "output": { "$ref": "#/$defs/OutputContract" },
+    "dependencies": { "$ref": "#/$defs/Dependencies" },
+    "required_connections": {
+      "type": "array",
+      "items": { "$ref": "common/connection.schema.json#/$defs/ConnectionRequirement" }
+    },
+    "access": {
+      "description": "Потрібні доступи під час виконання. За замовчуванням мережі немає.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "network": { "type": "string", "enum": ["none", "allowlist"], "default": "none" },
+        "hosts": { "type": "array", "items": { "type": "string" }, "description": "Для network=allowlist: дозволені хости (runtime може відмовити, якщо політика платформи забороняє)." }
+      }
+    },
+    "tests": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/TestCase" }
+    },
+    "provenance": { "$ref": "#/$defs/Provenance" },
+    "fork_of": {
+      "description": "Батьківський пакет і вихідна версія форку (ТЗ §7). Встановлює репозиторій під час форку; далі переноситься в кожну версію форку без змін.",
+      "$ref": "common/package-ref.schema.json"
+    },
+    "bindings_hint": {
+      "description": "Підказка, до яких матеріалів пакет доречно застосовувати. Не є прив'язкою: реальні прив'язки задаються в TaskConfig.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source_kinds": { "type": "array", "items": { "$ref": "common/defs.schema.json#/$defs/SourceKind" } },
+        "domains": { "type": "array", "items": { "type": "string" } },
+        "url_patterns": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "allOf": [
+    { "if": { "properties": { "kind": { "const": "extractor" } } }, "then": { "properties": { "entry": { "$ref": "#/$defs/PythonEntry" } }, "required": ["output", "dependencies"] } },
+    { "if": { "properties": { "kind": { "const": "transform" } } }, "then": { "properties": { "entry": { "anyOf": [ { "$ref": "#/$defs/PythonEntry" }, { "$ref": "#/$defs/ExecutorEntry" } ] } } } },
+    { "if": { "properties": { "kind": { "const": "storage" } } }, "then": { "properties": { "entry": { "$ref": "#/$defs/StorageEntry" } } } },
+    { "if": { "properties": { "kind": { "const": "llm" } } }, "then": { "properties": { "entry": { "$ref": "#/$defs/LlmEntry" } } } },
+    { "if": { "properties": { "kind": { "const": "collector-rules" } } }, "then": { "properties": { "entry": { "$ref": "#/$defs/CollectorRulesEntry" } } } }
+  ],
+  "$defs": {
+    "PackagePath": {
+      "description": "Відносний шлях усередині пакета, роздільник '/', без '..' і абсолютних шляхів.",
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._/-]{1,300}$"
+    },
+    "PythonEntry": {
+      "description": "Python-код, що виконує handler-runtime у пісочниці. callable приймає (material, params, ctx) і повертає результат SDK екстракторів (WP-06).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime", "module", "callable"],
+      "properties": {
+        "runtime": { "const": "python" },
+        "module": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$", "description": "Імпортований модуль відносно каталогу src/ пакета." },
+        "callable": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }
+      }
+    },
+    "ExecutorEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executor"],
+      "properties": {
+        "executor": { "type": "string", "description": "Ім'я сервісу-виконавця, що реалізує handler.v1 (наприклад 'storage', 'llm')." },
+        "operation": { "type": "string" }
+      }
+    },
+    "StorageEntry": {
+      "description": "Пакет збереження — маніфест і конфігурація для сервісу storage; коду немає.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executor", "adapter", "writes"],
+      "properties": {
+        "executor": { "const": "storage" },
+        "adapter": { "type": "string", "examples": ["filesystem", "postgresql", "sqlserver", "mongodb", "minio", "s3"], "description": "Тип адаптера; конкретне підключення задає етап через connections." },
+        "writes": { "type": "string", "enum": ["raw", "entities", "raw_and_entities", "data"] },
+        "format": {
+          "description": "Формат збереження, якщо адаптер його підтримує. За замовчуванням: RAW вебсторінок — html, інші — json (ТЗ §5).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "raw": { "type": "string", "enum": ["original", "html", "json"], "default": "original" },
+            "entities": { "type": "string", "enum": ["json", "jsonl"], "default": "json" }
+          }
+        },
+        "history": { "type": "boolean", "default": true, "description": "Зберігати історію оновлень сутностей." }
+      }
+    },
+    "LlmEntry": {
+      "description": "Пакет LLM — промпти, схема виходу й параметри моделі для сервісу llm; коду немає.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executor", "instructions", "output_schema"],
+      "properties": {
+        "executor": { "const": "llm" },
+        "instructions": { "$ref": "#/$defs/PackagePath", "description": "Файл довірених інструкцій (системний промпт)." },
+        "input_template": { "$ref": "#/$defs/PackagePath", "description": "Шаблон, що описує, які частини вхідних даних передати моделі як недовірені дані." },
+        "output_schema": { "$ref": "#/$defs/PackagePath" },
+        "model": { "type": "string", "description": "Псевдонім моделі з конфігурації LLM-сервісу (наприклад 'default', 'cheap', 'strong'), не конкретний провайдер." },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+        "max_output_tokens": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "CollectorRulesEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["collector", "rules"],
+      "properties": {
+        "collector": { "type": "string", "examples": ["web", "telegram"] },
+        "rules": { "$ref": "#/$defs/PackagePath", "description": "Файл правил за collector-rules.schema.json." }
+      }
+    },
+    "InputContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "accepts": { "type": "array", "items": { "type": "string", "enum": ["material", "entities", "data"] }, "minItems": 1 },
+        "media_types": { "type": "array", "items": { "type": "string" }, "description": "Підтримувані медіатипи матеріалу (можна з '*': 'text/*')." },
+        "content_kinds": { "type": "array", "items": { "type": "string" } },
+        "entity_types": { "type": "array", "items": { "type": "string" }, "description": "Для accepts=entities: які типи сутностей приймає." },
+        "data_schema": { "$ref": "#/$defs/PackagePath" }
+      }
+    },
+    "OutputContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["entity_type", "schema", "key_fields"],
+            "properties": {
+              "entity_type": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+              "schema": { "$ref": "#/$defs/PackagePath", "description": "JSON Schema 2020-12 полів сутності (EntityRecord.fields)." },
+              "key_fields": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "data_schema": { "$ref": "#/$defs/PackagePath", "description": "Схема довільного виходу (llm, transform)." }
+      }
+    },
+    "Dependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runtime_profile": {
+          "description": "Профіль образу виконання handler-runtime, наприклад 'python-extractor@1'. Профіль визначає версію Python і набір дозволених бібліотек (docs/adr/0003-python-sandbox.md).",
+          "type": "string",
+          "pattern": "^[a-z0-9-]+@[0-9]+$"
+        },
+        "python": {
+          "description": "Вимоги PEP 508 з точною або обмеженою версією; мають бути задоволені профілем (інакше dependency_not_allowed). Встановлення з мережі під час виконання немає.",
+          "type": "array",
+          "items": { "type": "string", "maxLength": 200 }
+        },
+        "packages": {
+          "description": "Інші пакети репозиторію, від яких залежить цей (зафіксовані версії).",
+          "type": "array",
+          "items": { "$ref": "common/package-ref.schema.json" }
+        }
+      }
+    },
+    "TestCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "input", "expected_status"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,100}$" },
+        "input": {
+          "description": "Вхід тесту: material — JSON Material (вміст inline або файл через content_file); file — сирий файл + мінімальні метадані; entities/data — JSON-файл.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "material": { "$ref": "#/$defs/PackagePath" },
+            "file": { "$ref": "#/$defs/PackagePath" },
+            "media_type": { "type": "string" },
+            "url": { "type": "string", "format": "uri" },
+            "entities": { "$ref": "#/$defs/PackagePath" },
+            "data": { "$ref": "#/$defs/PackagePath" }
+          },
+          "minProperties": 1
+        },
+        "params": { "type": "object" },
+        "expected_status": { "$ref": "handler-result.schema.json#/$defs/HandlerStatus" },
+        "expected": { "$ref": "#/$defs/PackagePath", "description": "JSON з очікуваним output (наприклад {\"entities\": [...]}); порівняння ігнорує provenance й observation." },
+        "compare": {
+          "type": "string",
+          "enum": ["exact", "subset"],
+          "default": "exact",
+          "description": "subset — кожне очікуване поле має збігтися, зайві поля допустимі."
+        },
+        "origin": { "type": "string", "enum": ["human", "llm", "problem_sample"], "description": "Звідки тест: написаний людиною, згенерований LLM або доданий із проблемного прикладу." }
+      }
+    },
+    "Provenance": {
+      "description": "Походження версії (ТЗ §7): хто і як її створив.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["created_by"],
+      "properties": {
+        "created_by": { "type": "string", "enum": ["human", "llm", "import"] },
+        "authors": { "type": "array", "items": { "type": "string" } },
+        "created_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp" },
+        "based_on": { "$ref": "common/package-ref.schema.json", "description": "Попередня версія, з якої зроблено цю." },
+        "change_summary": { "type": "string", "maxLength": 4000 },
+        "llm": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "provider": { "type": "string" },
+            "model": { "type": "string" },
+            "assistant_job_id": { "$ref": "common/defs.schema.json#/$defs/Id" },
+            "reason": { "type": "string", "enum": ["onboarding", "improvement", "unknown_material", "upstream_port"] }
+          }
+        },
+        "upstream_port": {
+          "description": "Для версії форку, створеної явним перенесенням змін батька.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["parent_version"],
+          "properties": {
+            "parent_version": { "$ref": "common/defs.schema.json#/$defs/SemVer" },
+            "requested_by": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "entity_type": "product",
+  "schema": "shop-example.price-extractor@1.0.0#product",
+  "key": {
+    "scope": "shop-example",
+    "natural": {
+      "sku": "A-100"
+    }
+  },
+  "fields": {
+    "price": {
+      "amount": 1199.0,
+      "currency": "UAH"
+    },
+    "availability": "in_stock"
+  },
+  "completeness": "partial",
+  "observation": {
+    "observation_id": "obs_01J9ZR8B0000000000000002",
+    "observed_at": "2026-09-28T06:00:03Z",
+    "material_id": "web:3704326c60776c53169680099e2eed31"
+  },
+  "provenance": {
+    "package": {
+      "package_id": "shop-example.price-extractor",
+      "version": "1.0.0",
+      "digest": "sha256:55f972cafc0beee0d782c163642b812894d67ac114efac6c9ebdf5bbba999b14"
+    },
+    "invocation_id": "inv_01J9ZR8C00000000000000B2",
+    "run_id": "run_01J9ZR8A0000000000000000B0",
+    "stage_id": "extract-price"
+  }
+}

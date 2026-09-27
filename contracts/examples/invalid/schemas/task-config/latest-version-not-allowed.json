@@ -1,0 +1,29 @@
+{
+  "task_id": "bad",
+  "title": "bad",
+  "input": {
+    "source_id": "shop-example"
+  },
+  "stages": [
+    {
+      "stage_id": "collect",
+      "kind": "collect",
+      "collector": {
+        "collector": "web"
+      }
+    },
+    {
+      "stage_id": "x",
+      "kind": "handler",
+      "handler": {
+        "package_id": "a.b",
+        "version": "latest"
+      },
+      "inputs": [
+        {
+          "from": "collect"
+        }
+      ]
+    }
+  ]
+}

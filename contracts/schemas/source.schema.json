@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Source",
+  "description": "Джерело в оркестраторі: сайт, Telegram-канал тощо. Джерело задає правила колектора за замовчуванням, ліміти рівня source і прапорець «Передавати в LLM невідомі сторінки». Завдання посилаються на джерело й можуть перевизначати його налаштування.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source_id", "kind", "title", "locator"],
+  "properties": {
+    "source_id": { "$ref": "common/defs.schema.json#/$defs/Slug" },
+    "kind": { "$ref": "common/defs.schema.json#/$defs/SourceKind" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "description": { "type": "string", "maxLength": 4000 },
+    "locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "telegram_username": { "type": "string" },
+        "telegram_channel_id": { "type": "string" }
+      },
+      "minProperties": 1
+    },
+    "collector_rules": {
+      "description": "Версія правил колектора за замовчуванням (пакет kind=collector-rules). Може бути відсутня до завершення підключення джерела.",
+      "$ref": "common/package-ref.schema.json"
+    },
+    "limits": { "$ref": "common/limits.schema.json" },
+    "forward_unknown_to_llm": {
+      "description": "«Передавати в LLM невідомі сторінки» (ТЗ §8, критерій 11). За замовчуванням вимкнено: матеріал без відповідного обробника лише реєструється як невідомий.",
+      "type": "boolean",
+      "default": false
+    },
+    "expected_entity_types": {
+      "description": "Очікувані типи даних джерела (наприклад product, price, event). Розширення пропонує асистент, приймає користувач.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+      "uniqueItems": true
+    },
+    "change_policy": {
+      "description": "Як активуються версії правил і екстракторів, створені LLM для цього джерела.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "llm_versions": { "type": "string", "enum": ["manual_approval", "auto_after_checks", "forbidden"], "default": "manual_approval" }
+      }
+    },
+    "connections": {
+      "description": "Логічне ім'я → connection_id (наприклад http-автентифікація сайту або обліковий запис Telegram).",
+      "type": "object",
+      "additionalProperties": { "$ref": "common/defs.schema.json#/$defs/Slug" }
+    },
+    "labels": { "$ref": "common/defs.schema.json#/$defs/Labels" },
+    "created_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp", "readOnly": true },
+    "updated_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp", "readOnly": true }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "summary": "Велика сторінка (вміст у blob-сховищі)",
+  "value": {
+    "material_id": "web:3704326c60776c53169680099e2eed31",
+    "observation_id": "obs_01J9ZQ4A0000000000000003",
+    "source": {
+      "source_id": "shop-example",
+      "kind": "web",
+      "name": "Shop Example"
+    },
+    "locator": {
+      "url": "https://shop.example.test/product/a-100",
+      "final_url": "https://shop.example.test/product/a-100",
+      "canonical_url": "https://shop.example.test/product/a-100"
+    },
+    "fetched_at": "2026-09-27T10:00:05Z",
+    "format": {
+      "media_type": "text/html",
+      "charset": "utf-8",
+      "language": "uk",
+      "content_kind": "page"
+    },
+    "revision": {
+      "content_sha256": "265a5a56e9b12039179290438ba92ce1acdeae16e6d51075973c6210fb1247c6"
+    },
+    "content": {
+      "kind": "blob",
+      "uri": "s3://jane-transit/web-collector/2026/09/27/obs_01J9ZQ4A0000000000000003.html",
+      "download_url": "http://minio.localhost:9000/jane-transit/web-collector/2026/09/27/obs_01J9ZQ4A0000000000000003.html?X-Amz-Signature=redacted",
+      "download_url_expires_at": "2026-09-27T11:00:05Z",
+      "media_type": "text/html",
+      "charset": "utf-8",
+      "size_bytes": 1843201,
+      "sha256": "265a5a56e9b12039179290438ba92ce1acdeae16e6d51075973c6210fb1247c6",
+      "store": "transit",
+      "expires_at": "2026-10-04T10:00:05Z"
+    },
+    "http": {
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "etag": "\"etag-a100-v3\""
+      }
+    },
+    "discovery": {
+      "strategy": "sitemap",
+      "depth": 0,
+      "section": "products",
+      "priority": 10
+    },
+    "collector": {
+      "name": "web-collector",
+      "version": "0.1.0",
+      "rules": {
+        "package_id": "shop-example.web-rules",
+        "version": "1.0.0",
+        "digest": "sha256:bd33d6b0fb860947abb60fbf898610d7ad28e279daf21106399995dcd911674a"
+      },
+      "collection_id": "job_01J9ZQ3F8W2N4K7T5B6C1D0E9F"
+    },
+    "metadata": {
+      "title": "Kettle A-100"
+    }
+  }
+}

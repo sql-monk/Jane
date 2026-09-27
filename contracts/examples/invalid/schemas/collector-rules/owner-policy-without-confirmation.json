@@ -1,0 +1,16 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "x.example.test"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "recursive"
+    }
+  ],
+  "robots": {
+    "mode": "owner_policy"
+  }
+}

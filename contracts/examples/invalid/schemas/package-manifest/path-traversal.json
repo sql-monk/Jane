@@ -1,0 +1,15 @@
+{
+  "schema_version": "1",
+  "package_id": "x.bad",
+  "version": "1.0.0",
+  "kind": "llm",
+  "title": "bad",
+  "entry": {
+    "executor": "llm",
+    "instructions": "../../etc/passwd",
+    "output_schema": "schemas/o.json"
+  },
+  "provenance": {
+    "created_by": "human"
+  }
+}

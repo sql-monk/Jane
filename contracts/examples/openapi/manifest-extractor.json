@@ -1,0 +1,102 @@
+{
+  "summary": "Маніфест екстрактора",
+  "value": {
+    "schema_version": "1",
+    "package_id": "shop-example.product-extractor",
+    "version": "1.2.0",
+    "kind": "extractor",
+    "title": "Shop Example product cards",
+    "description": "Витягує повні картки товарів зі сторінок shop.example.test.",
+    "tags": [
+      "products",
+      "html"
+    ],
+    "entry": {
+      "runtime": "python",
+      "module": "product_extractor.main",
+      "callable": "extract"
+    },
+    "input": {
+      "accepts": [
+        "material"
+      ],
+      "media_types": [
+        "text/html"
+      ],
+      "content_kinds": [
+        "page"
+      ]
+    },
+    "params_schema": "schemas/params.schema.json",
+    "output": {
+      "entities": [
+        {
+          "entity_type": "product",
+          "schema": "schemas/product.schema.json",
+          "key_fields": [
+            "sku"
+          ]
+        }
+      ]
+    },
+    "dependencies": {
+      "runtime_profile": "python-extractor@1",
+      "python": [
+        "selectolax>=0.3,<0.4"
+      ]
+    },
+    "access": {
+      "network": "none"
+    },
+    "tests": [
+      {
+        "name": "product-a100",
+        "input": {
+          "file": "tests/product-a100/page.html",
+          "media_type": "text/html",
+          "url": "https://shop.example.test/product/a-100"
+        },
+        "expected_status": "success",
+        "expected": "tests/product-a100/expected.json",
+        "origin": "human"
+      },
+      {
+        "name": "category-page-empty",
+        "input": {
+          "material": "tests/category/material.json"
+        },
+        "expected_status": "empty",
+        "origin": "human"
+      }
+    ],
+    "provenance": {
+      "created_by": "llm",
+      "authors": [
+        "assistant"
+      ],
+      "created_at": "2026-09-27T09:40:00Z",
+      "based_on": {
+        "package_id": "shop-example.product-extractor",
+        "version": "1.1.0"
+      },
+      "change_summary": "Fallback to og:title when h1 is missing.",
+      "llm": {
+        "provider": "fake",
+        "model": "fake-deterministic-1",
+        "assistant_job_id": "job_01J9ZP0000000000000000AS",
+        "reason": "improvement"
+      }
+    },
+    "bindings_hint": {
+      "source_kinds": [
+        "web"
+      ],
+      "domains": [
+        "shop.example.test"
+      ],
+      "url_patterns": [
+        "shop.example.test/product/**"
+      ]
+    }
+  }
+}

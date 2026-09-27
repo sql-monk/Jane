@@ -1,0 +1,23 @@
+{
+  "summary": "Маніфест правил колектора",
+  "value": {
+    "schema_version": "1",
+    "package_id": "shop-example.web-rules",
+    "version": "1.0.0",
+    "kind": "collector-rules",
+    "title": "Shop Example crawl rules",
+    "entry": {
+      "collector": "web",
+      "rules": "rules.json"
+    },
+    "tests": [],
+    "provenance": {
+      "created_by": "llm",
+      "llm": {
+        "provider": "fake",
+        "model": "fake-deterministic-1",
+        "reason": "onboarding"
+      }
+    }
+  }
+}

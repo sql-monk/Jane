@@ -1,0 +1,372 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CollectorRules",
+  "description": "Правила колектора (ТЗ §6, §13.1 п.1): версіонуються як пакет kind=collector-rules або передаються колектору inline/з локального файла в автономному режимі. Web: комбінація стратегій пошуку в спільних межах обходу; Telegram: канали, історія, редагування. Числові обмеження — лише через limits (успадкування platform → source → task).",
+  "oneOf": [
+    { "$ref": "#/$defs/WebRules" },
+    { "$ref": "#/$defs/TelegramRules" }
+  ],
+  "discriminator": { "propertyName": "collector" },
+  "$defs": {
+    "WebRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["collector", "scope", "strategies"],
+      "properties": {
+        "collector": { "const": "web" },
+        "scope": { "$ref": "#/$defs/WebScope" },
+        "strategies": {
+          "description": "Одна або кілька стратегій; їхні результати зливаються в одну чергу з дедуплікацією. Кожен знайдений URL проходить перевірку scope, exclude і robots.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/Strategy" }
+        },
+        "robots": { "$ref": "#/$defs/RobotsPolicy" },
+        "normalization": { "$ref": "#/$defs/UrlNormalization" },
+        "dedup": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "key": { "type": "string", "enum": ["canonical_url", "canonical_url_and_content"], "default": "canonical_url", "description": "canonical_url_and_content — URL повторно видається як новий матеріал лише за зміни вмісту." },
+            "use_link_rel_canonical": { "type": "boolean", "default": true }
+          }
+        },
+        "priorities": {
+          "description": "Пріоритет URL за шаблоном (вищий — раніше). Перший збіг виграє.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pattern", "priority"],
+            "properties": {
+              "pattern": { "$ref": "#/$defs/UrlPattern" },
+              "priority": { "type": "integer", "minimum": -100, "maximum": 100 }
+            }
+          }
+        },
+        "sections": {
+          "description": "Іменовані розділи сайту за шаблонами URL. Прив'язки екстракторів у TaskConfig можуть посилатися на section_id; колектор ставить Material.discovery.section.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["section_id", "patterns"],
+            "properties": {
+              "section_id": { "$ref": "common/defs.schema.json#/$defs/Slug" },
+              "title": { "type": "string" },
+              "patterns": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/UrlPattern" } }
+            }
+          }
+        },
+        "fetch": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "user_agent": { "type": "string", "maxLength": 300 },
+            "headers": {
+              "description": "Додаткові несекретні заголовки. Автентифікація до сайту — лише через connection_id.",
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            },
+            "connection_id": { "$ref": "common/defs.schema.json#/$defs/Slug", "description": "Кероване підключення (kind=http) для сайтів, що вимагають автентифікації." },
+            "accept_media_types": { "type": "array", "items": { "type": "string" } },
+            "render_js": { "type": "boolean", "default": false, "description": "Зарезервовано; v1 не рендерить JavaScript." }
+          }
+        },
+        "revisit": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "type": "string", "enum": ["never", "interval", "if_changed"], "default": "never", "description": "if_changed — умовні запити (ETag/If-Modified-Since); інтервал — limits.crawl.revisit_interval_seconds." }
+          }
+        },
+        "limits": { "$ref": "common/limits.schema.json", "description": "Рекомендовані ліміти для цього сайту (рівень source, якщо джерело не перевизначило)." }
+      }
+    },
+    "WebScope": {
+      "description": "Межі обходу. URL поза межами не завантажується (out_of_scope), але може бути записаний у діагностику.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed_domains"],
+      "properties": {
+        "allowed_domains": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[a-z0-9.-]+$" } },
+        "include_subdomains": { "type": "boolean", "default": false },
+        "allowed_schemes": { "type": "array", "items": { "type": "string", "enum": ["http", "https"] }, "default": ["https", "http"] },
+        "path_prefixes": { "type": "array", "items": { "type": "string", "pattern": "^/" }, "description": "Порожньо — увесь домен." },
+        "include": { "type": "array", "items": { "$ref": "#/$defs/UrlPattern" }, "description": "Якщо задано — URL має відповідати хоча б одному." },
+        "exclude": { "type": "array", "items": { "$ref": "#/$defs/UrlPattern" }, "description": "Виключення мають пріоритет над include." }
+      }
+    },
+    "UrlPattern": {
+      "description": "Шаблон URL. glob: '*' — у межах сегмента шляху, '**' — будь-яка частина, '?' — один символ; порівнюється з канонічним URL без схеми ('shop.example.test/product/**'). regex: Python/ECMAScript-сумісний регулярний вираз по всьому канонічному URL.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value"],
+      "properties": {
+        "type": { "type": "string", "enum": ["glob", "regex"], "default": "glob" },
+        "value": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    },
+    "RobotsPolicy": {
+      "description": "За замовчуванням robots.txt дотримується. Інша політика допустима лише для ресурсу, який контролює користувач (ТЗ §6), і вимагає явного підтвердження та обґрунтування.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "type": "string", "enum": ["respect", "owner_policy"], "default": "respect" },
+        "user_agent_token": { "type": "string", "description": "Токен для пошуку секції в robots.txt." },
+        "owner_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["confirmed_owner", "justification"],
+          "properties": {
+            "confirmed_owner": { "const": true },
+            "justification": { "type": "string", "minLength": 10 },
+            "confirmed_by": { "type": "string" },
+            "confirmed_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp" }
+          }
+        }
+      },
+      "if": { "properties": { "mode": { "const": "owner_policy" } }, "required": ["mode"] },
+      "then": { "required": ["owner_policy"] }
+    },
+    "UrlNormalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "remove_fragment": { "type": "boolean", "default": true },
+        "lowercase_host": { "type": "boolean", "default": true },
+        "sort_query": { "type": "boolean", "default": true },
+        "strip_query_params": { "type": "array", "items": { "type": "string" }, "description": "Імена або glob-шаблони параметрів, що видаляються (utm_*, sessionid)." },
+        "trailing_slash": { "type": "string", "enum": ["keep", "add", "remove"], "default": "keep" }
+      }
+    },
+    "Strategy": {
+      "oneOf": [
+        { "$ref": "#/$defs/SeedListStrategy" },
+        { "$ref": "#/$defs/RecursiveStrategy" },
+        { "$ref": "#/$defs/SitemapStrategy" },
+        { "$ref": "#/$defs/FeedStrategy" },
+        { "$ref": "#/$defs/ListingStrategy" },
+        { "$ref": "#/$defs/UrlTemplateStrategy" },
+        { "$ref": "#/$defs/ApiFeedStrategy" },
+        { "$ref": "#/$defs/LlmExploreStrategy" }
+      ],
+      "discriminator": { "propertyName": "type" }
+    },
+    "StrategyCommon": {
+      "type": "object",
+      "properties": {
+        "strategy_id": { "$ref": "common/defs.schema.json#/$defs/Slug", "description": "Необов'язкове ім'я для діагностики й стану." },
+        "priority": { "type": "integer", "minimum": -100, "maximum": 100, "default": 0 },
+        "section": { "$ref": "common/defs.schema.json#/$defs/Slug", "description": "Примусово позначати знайдені URL цим розділом." },
+        "limits": { "$ref": "common/limits.schema.json", "description": "Перевизначення лімітів для цієї стратегії (наприклад max_depth)." }
+      }
+    },
+    "SeedListStrategy": {
+      "description": "Явний перелік URL або головна сторінка.",
+      "allOf": [ { "$ref": "#/$defs/StrategyCommon" } ],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["type", "urls"],
+      "properties": {
+        "type": { "const": "seed_list" },
+        "urls": { "type": "array", "minItems": 1, "items": { "type": "string", "format": "uri" } }
+      }
+    },
+    "RecursiveStrategy": {
+      "description": "Рекурсивний перехід за посиланнями зі сторінок, отриманих будь-якою стратегією (або від seeds).",
+      "allOf": [ { "$ref": "#/$defs/StrategyCommon" } ],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "recursive" },
+        "seeds": { "type": "array", "items": { "type": "string", "format": "uri" }, "description": "Якщо порожньо — стартує з URL, знайдених іншими стратегіями." },
+        "follow": { "type": "array", "items": { "$ref": "#/$defs/UrlPattern" }, "description": "Переходити лише за посиланнями, що відповідають шаблонам (додатково до scope)." },
+        "link_sources": { "type": "array", "items": { "type": "string", "enum": ["a_href", "link_rel", "canonical", "pagination_rel"] }, "default": ["a_href"] }
+      }
+    },
+    "SitemapStrategy": {
+      "description": "Sitemap і Sitemap Index (включно з .gz). Якщо urls не задано — з robots.txt і /sitemap.xml.",
+      "allOf": [ { "$ref": "#/$defs/StrategyCommon" } ],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "sitemap" },
+        "urls": { "type": "array", "items": { "type": "string", "format": "uri" } },
+        "use_robots_txt": { "type": "boolean", "default": true },
+        "lastmod_since": { "$ref": "common/defs.schema.json#/$defs/Timestamp", "description": "Пропускати записи з lastmod раніше за цю дату." },
+        "use_lastmod_for_revisit": { "type": "boolean", "default": true }
+      }
+    },
+    "FeedStrategy": {
+      "description": "RSS/Atom-стрічки.",
+      "allOf": [ { "$ref": "#/$defs/StrategyCommon" } ],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "feed" },
+        "urls": { "type": "array", "items": { "type": "string", "format": "uri" } },
+        "autodiscover": { "type": "boolean", "default": true, "description": "Шукати <link rel=alternate type=application/rss+xml|atom+xml> на seed-сторінках." }
+      }
+    },
+    "ListingStrategy": {
+      "description": "Сторінки категорій, пагінації або пошуку: із кожної сторінки списку беруться посилання на матеріали та посилання на наступну сторінку.",
+      "allOf": [ { "$ref": "#/$defs/StrategyCommon" } ],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["type", "start_urls"],
+      "properties": {
+        "type": { "const": "listing" },
+        "start_urls": { "type": "array", "minItems": 1, "items": { "type": "string", "format": "uri" } },
+        "item_links": { "$ref": "#/$defs/Selector", "description": "Посилання на матеріали на сторінці списку." },
+        "next_page": { "$ref": "#/$defs/Selector", "description": "Посилання на наступну сторінку; за замовчуванням rel=next." },
+        "page_param": {
+          "description": "Альтернатива next_page: пагінація параметром запиту.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string" },
+            "start": { "type": "integer", "default": 1 },
+            "step": { "type": "integer", "default": 1 },
+            "stop_when_empty": { "type": "boolean", "default": true }
+          }
+        },
+        "search": {
+          "description": "Сторінки пошуку: шаблон URL із {query} і перелік запитів.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["url_template", "queries"],
+          "properties": {
+            "url_template": { "type": "string", "pattern": "\\{query\\}" },
+            "queries": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "UrlTemplateStrategy": {
+      "description": "URL за шаблоном RFC 6570 (рівень 1) з діапазонами або переліками значень, наприклад https://shop.example.test/product/{id}.",
+      "allOf": [ { "$ref": "#/$defs/StrategyCommon" } ],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["type", "template", "variables"],
+      "properties": {
+        "type": { "const": "url_template" },
+        "template": { "type": "string", "pattern": "\\{[a-z_][a-z0-9_]*\\}" },
+        "variables": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "object", "additionalProperties": false, "required": ["range"], "properties": { "range": { "type": "object", "additionalProperties": false, "required": ["start", "end"], "properties": { "start": { "type": "integer" }, "end": { "type": "integer" }, "step": { "type": "integer", "minimum": 1, "default": 1 } } } } },
+              { "type": "object", "additionalProperties": false, "required": ["values"], "properties": { "values": { "type": "array", "minItems": 1, "items": { "type": ["string", "integer"] } } } }
+            ]
+          }
+        },
+        "stop_after_consecutive_misses": { "type": "integer", "minimum": 1, "description": "Зупинити перебір після N поспіль 404." }
+      }
+    },
+    "ApiFeedStrategy": {
+      "description": "Перелік матеріалів із документованого API або JSON-каналу сайту.",
+      "allOf": [ { "$ref": "#/$defs/StrategyCommon" } ],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["type", "url", "items_path", "url_path"],
+      "properties": {
+        "type": { "const": "api_feed" },
+        "url": { "type": "string", "format": "uri" },
+        "method": { "type": "string", "enum": ["GET", "POST"], "default": "GET" },
+        "body": { "description": "Тіло для POST (JSON)." },
+        "items_path": { "type": "string", "description": "JSONPath до масиву елементів, наприклад '$.items'." },
+        "url_path": { "type": "string", "description": "JSONPath до URL матеріалу в елементі, наприклад '$.url'." },
+        "lastmod_path": { "type": "string" },
+        "emit_items_as_materials": { "type": "boolean", "default": false, "description": "true — кожен елемент JSON також видається як окремий матеріал (application/json)." },
+        "pagination": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["none", "next_url", "cursor", "page"], "default": "none" },
+            "next_url_path": { "type": "string" },
+            "cursor_path": { "type": "string" },
+            "cursor_param": { "type": "string" },
+            "page_param": { "type": "string" }
+          }
+        }
+      }
+    },
+    "LlmExploreStrategy": {
+      "description": "Автоматичне дослідження джерела за допомогою LLM (через асистент джерел). Лише пропонує URL/стратегії; кожен URL проходить ті самі перевірки scope/robots. Витрати — у межах limits.llm.",
+      "allOf": [ { "$ref": "#/$defs/StrategyCommon" } ],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "llm_explore" },
+        "goal": { "type": "string", "maxLength": 2000, "description": "Що шукати (наприклад 'сторінки товарів')." },
+        "expected_entity_types": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "Selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value"],
+      "properties": {
+        "type": { "type": "string", "enum": ["css", "xpath", "rel"], "default": "css" },
+        "value": { "type": "string", "minLength": 1 },
+        "attribute": { "type": "string", "default": "href" }
+      }
+    },
+    "TelegramRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["collector", "channels"],
+      "properties": {
+        "collector": { "const": "telegram" },
+        "channels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "username": { "type": "string", "pattern": "^[A-Za-z0-9_]{4,64}$" },
+              "channel_id": { "type": "string", "pattern": "^-?[0-9]+$" }
+            },
+            "anyOf": [ { "required": ["username"] }, { "required": ["channel_id"] } ]
+          }
+        },
+        "history": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "since": { "$ref": "common/defs.schema.json#/$defs/Timestamp" },
+            "from_message_id": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "updates": {
+          "description": "Нові повідомлення й редагування після курсора (інкрементальний режим).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "new_messages": { "type": "boolean", "default": true },
+            "edits": { "type": "boolean", "default": true, "description": "Редагування видаються як нове спостереження того самого material_id з новою ревізією." }
+          }
+        },
+        "media": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "download": { "type": "boolean", "default": false },
+            "kinds": { "type": "array", "items": { "type": "string", "enum": ["photo", "document", "video", "audio"] } }
+          }
+        },
+        "account_connection_id": { "$ref": "common/defs.schema.json#/$defs/Slug", "description": "Кероване підключення kind=telegram_account." },
+        "limits": { "$ref": "common/limits.schema.json" }
+      }
+    }
+  }
+}

@@ -411,6 +411,7 @@ components:
         summary: Стан сервісу (liveness/readiness)
         tags: [system]
         security: []
+        x-jane-health: true
         responses:
           '200':
             description: Сервіс працює (ok або degraded).
@@ -490,6 +491,7 @@ components:
       post:
         operationId: cancelJob
         summary: Запит на скасування job (ідемпотентний)
+        x-jane-no-idempotency-key: cancellation is idempotent by nature
         description: |
           202 — скасування прийнято, job переходить у `cancelling`, далі в `cancelled`.
           200 — job уже в термінальному стані; повертається як є, без змін.

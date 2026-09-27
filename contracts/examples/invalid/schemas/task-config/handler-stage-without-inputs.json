@@ -1,0 +1,18 @@
+{
+  "task_id": "bad",
+  "title": "bad",
+  "input": {
+    "source_id": "shop-example"
+  },
+  "stages": [
+    {
+      "stage_id": "x",
+      "kind": "handler",
+      "handler": {
+        "package_id": "jane.storage-files",
+        "version": "1.0.0",
+        "digest": "sha256:b2d691abc92053497acfe8f61d6cd32488b126a4aeb6e080c63d966ecd096a94"
+      }
+    }
+  ]
+}

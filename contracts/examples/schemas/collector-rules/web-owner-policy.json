@@ -1,0 +1,28 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "intranet.example.test"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "seed_list",
+      "urls": [
+        "https://intranet.example.test/"
+      ]
+    },
+    {
+      "type": "recursive"
+    }
+  ],
+  "robots": {
+    "mode": "owner_policy",
+    "owner_policy": {
+      "confirmed_owner": true,
+      "justification": "Внутрішній ресурс компанії; власник дозволив повний обхід.",
+      "confirmed_by": "admin@example.org",
+      "confirmed_at": "2026-09-27T08:00:00Z"
+    }
+  }
+}

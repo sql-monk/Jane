@@ -1,0 +1,22 @@
+{
+  "limits": {
+    "rate": {
+      "requests_per_second_per_host": 2
+    },
+    "sandbox": {
+      "memory_mb": 512,
+      "wall_time_ms": 20000,
+      "cpu_cores": 1
+    },
+    "crawl": {
+      "max_depth": 3
+    }
+  },
+  "provenance": {
+    "rate.requests_per_second_per_host": "source",
+    "sandbox.memory_mb": "stage",
+    "sandbox.wall_time_ms": "stage",
+    "sandbox.cpu_cores": "platform",
+    "crawl.max_depth": "stage"
+  }
+}

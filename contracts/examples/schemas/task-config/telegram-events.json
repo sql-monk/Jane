@@ -1,0 +1,93 @@
+{
+  "task_id": "news-tg-events",
+  "title": "Події з Telegram-каналу",
+  "input": {
+    "source_id": "news-tg"
+  },
+  "stages": [
+    {
+      "stage_id": "collect",
+      "kind": "collect",
+      "collector": {
+        "collector": "telegram",
+        "mode": "incremental"
+      }
+    },
+    {
+      "stage_id": "store-raw",
+      "kind": "handler",
+      "handler": {
+        "package_id": "jane.storage-files",
+        "version": "1.0.0",
+        "digest": "sha256:b2d691abc92053497acfe8f61d6cd32488b126a4aeb6e080c63d966ecd096a94"
+      },
+      "connections": {
+        "target": "raw-files"
+      },
+      "inputs": [
+        {
+          "from": "collect"
+        }
+      ]
+    },
+    {
+      "stage_id": "extract-events",
+      "kind": "handler",
+      "handler": {
+        "package_id": "jane.llm-event-extractor",
+        "version": "1.0.0",
+        "digest": "sha256:3dcc2f9a7203d535c892df2884b4dbd27d3d159daba59d293bcf4bafbe603bb2"
+      },
+      "inputs": [
+        {
+          "from": "collect"
+        }
+      ]
+    },
+    {
+      "stage_id": "store-events",
+      "kind": "handler",
+      "handler": {
+        "package_id": "jane.storage-postgresql",
+        "version": "1.0.0",
+        "digest": "sha256:8751adf49b3d26c9a59f6ecc83f52feccc0edade6db1a98c1a0155b0380a045b"
+      },
+      "connections": {
+        "target": "results-pg"
+      },
+      "inputs": [
+        {
+          "from": "extract-events",
+          "when": {
+            "all": [
+              {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              },
+              {
+                "not": {
+                  "field": "entity.fields.starts_at",
+                  "op": "not_exists"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "schedule": {
+    "type": "interval",
+    "interval_seconds": 300
+  },
+  "limits": {
+    "llm": {
+      "budget": {
+        "amount": 5,
+        "currency": "USD",
+        "period": "day"
+      }
+    }
+  }
+}

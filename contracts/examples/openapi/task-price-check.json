@@ -1,0 +1,76 @@
+{
+  "summary": "Завдання перевірки цін",
+  "value": {
+    "task_id": "shop-price-check",
+    "title": "Щоденна перевірка цін",
+    "input": {
+      "source_id": "shop-example",
+      "urls": [
+        "https://shop.example.test/product/a-100",
+        "https://shop.example.test/product/b-200"
+      ]
+    },
+    "stages": [
+      {
+        "stage_id": "collect",
+        "kind": "collect",
+        "collector": {
+          "collector": "web"
+        }
+      },
+      {
+        "stage_id": "extract-price",
+        "kind": "handler",
+        "handler": {
+          "package_id": "shop-example.price-extractor",
+          "version": "1.0.0",
+          "digest": "sha256:55f972cafc0beee0d782c163642b812894d67ac114efac6c9ebdf5bbba999b14"
+        },
+        "inputs": [
+          {
+            "from": "collect"
+          }
+        ],
+        "bindings": [
+          {
+            "sections": [
+              "products"
+            ]
+          }
+        ]
+      },
+      {
+        "stage_id": "store-price",
+        "kind": "handler",
+        "handler": {
+          "package_id": "jane.storage-postgresql",
+          "version": "1.0.0",
+          "digest": "sha256:8751adf49b3d26c9a59f6ecc83f52feccc0edade6db1a98c1a0155b0380a045b"
+        },
+        "connections": {
+          "target": "results-pg"
+        },
+        "inputs": [
+          {
+            "from": "extract-price",
+            "when": {
+              "field": "result.status",
+              "op": "eq",
+              "value": "success"
+            }
+          }
+        ]
+      }
+    ],
+    "schedule": {
+      "type": "interval",
+      "interval_seconds": 86400,
+      "overlap": "skip"
+    },
+    "limits": {
+      "rate": {
+        "requests_per_second_per_host": 0.5
+      }
+    }
+  }
+}

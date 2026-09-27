@@ -1,0 +1,14 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "x.example.test"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "sitemap",
+      "max_depth": 3
+    }
+  ]
+}

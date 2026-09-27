@@ -1,90 +1,208 @@
 # Handler Runtime
 
-<!-- Шаблон README за DoD plan.md §4. Після `just new-service` замініть опис і приклади на свої. -->
+Виконує Python-пакети обробників (`kind: extractor` і `transform` з `entry.runtime: python`) за спільним
+протоколом обробника в пісочниці ([ADR-0003](../../docs/adr/0003-python-sandbox.md)): **окремий контейнер на
+кожен виклик**, мережа вимкнена, root FS лише для читання, ліміти часу/пам'яті/CPU/процесів, без секретів,
+примусова зупинка при зависанні. Повертає `HandlerResult` з чотирма станами ТЗ §9.
 
-Призначення сервісу в одному-двох реченнях. Контракт: `contracts/openapi/handler-runtime.v1.yaml`
-(конвенції — скіл `jane-contracts`).
+Контракт: [`contracts/openapi/handler.v1.yaml`](../../contracts/openapi/handler.v1.yaml) (схеми
+`handler-invocation`, `handler-result`, `package-manifest`). SDK для авторів екстракторів —
+[`libs/extractor-sdk`](../../libs/extractor-sdk/README.md). Працює без оркестратора, репозиторію й сховищ.
 
-## Незалежний запуск
+## Як це працює
 
-Без Docker (з кореня репозиторію):
+1. **Пакет**: `package_archive` (ContentRef: inline base64 zip, `file://` у дозволених теках або `download_url`)
+   або репозиторій (`GET /v1/packages/{id}/versions/{v}/archive`, якщо задано `JANE_HANDLER_RUNTIME_REGISTRY_URL`).
+   Перевіряються `handler.digest` (`sha256:` байтів архіву), `ContentRef.sha256`/`size_bytes`, `ETag` репозиторію;
+   архів розпаковується з перевіркою шляхів (`..`, абсолютні, симлінки), кількості файлів і розміру; кеш — за дайджестом.
+2. **Перевірки до запуску** (HTTP-помилки, виклик не відбувся): маніфест за схемою, `kind`/`entry`, `access.network`
+   (дозволено лише `none`), профіль runtime і `dependencies.python` (422 `dependency_not_allowed`), `params` за
+   `params_schema` (типові значення застосовуються), `input.accepts`/`media_types`, вміст входів (sha256, розмір).
+3. **Пісочниця**: робоча тека (`request.json`, `package/…`, `inputs/<n>`) копіюється в анонімний том `/work`
+   (власник root, права лише читання), запускається `python -I -m jane_extractor_sdk.runner /work` у образі профілю.
+4. **Результат**: вихід раннера перевіряється — сутності мають бути оголошені в `output.entities`, `fields` — за
+   схемою сутності пакета, без `null`, з ключем (`key` будується з `key_fields`, scope — `source.source_id` або
+   `local`); додаються `observation`, `provenance`, `schema`; увесь запис — за `entity.schema.json`.
+
+| Ситуація | Результат |
+|---|---|
+| екстрактор повернув `success` / `empty` / `unrecognized` | той самий `status` |
+| виняток у коді, невалідний результат | `failed`, `failure.kind = execution_error` (traceback у `failure.details`) |
+| поля не відповідають схемі, `null`, неоголошений тип | `failed`, `schema_mismatch`, `diagnostics.validation_errors` |
+| перевищено `wall_time_ms` | контейнер убито (`docker kill`), `failed`, `timeout` |
+| перевищено `memory_mb` (OOM) або `max_output_bytes` | `failed`, `resource_exceeded` |
+| спроба мережі / запуску процесу (аудит-хук раннера) | `failed`, `sandbox_violation`, повідомлення `sandbox.network_blocked` |
+
+Мережу блокує не хук, а сама пісочниця (`network_mode=none`: у контейнері лише `lo`); хук лише фіксує спробу для
+діагностики. stdout/stderr коду (обрізані до `max_output_bytes`) — у `diagnostics.logs_ref` (inline).
+
+## Профіль runtime `python-extractor@1`
+
+Образ: [`sandbox/python-extractor-1/Dockerfile`](sandbox/python-extractor-1/Dockerfile) (база
+`python:3.12.12-slim-bookworm`), точні версії — [`requirements.txt`](sandbox/python-extractor-1/requirements.txt),
+машиночитний опис — [`src/jane_handler_runtime/profiles/python-extractor-1.json`](src/jane_handler_runtime/profiles/python-extractor-1.json)
+(його ж віддають `GET /v1/info` → `capabilities.runtime_profiles` і `jane-handler-runtime profile --json`).
+Встановлення пакетів під час виконання немає. Цей перелік має використовувати репозиторій (WP-05) для
+перевірки `dependencies.python` (`dependency_not_allowed`): вимога PEP 508 задоволена, якщо бібліотека є в
+профілі й її версія входить у специфікатор; маркери оцінюються для Linux/CPython 3.12; URL-вимоги заборонені.
+
+| Бібліотека | Версія | | Бібліотека | Версія |
+|---|---|---|---|---|
+| beautifulsoup4 | 4.15.0 | | python-dateutil | 2.9.0.post0 |
+| cssselect | 1.5.0 | | regex | 2026.9.10 |
+| html5lib | 1.1 | | selectolax | 0.3.34 |
+| jmespath | 1.1.0 | | six | 1.17.0 |
+| jsonpath-ng | 1.8.0 | | soupsieve | 2.10 |
+| lxml | 6.1.3 | | typing-extensions | 4.16.0 |
+| parsel | 1.12.0 | | w3lib | 2.4.1 |
+| jane-extractor-sdk | 0.1.0 | | webencodings | 0.6.1 |
+
+Плюс стандартна бібліотека Python 3.12. Збірка образу (контекст — лише потрібні файли, не весь репозиторій):
+
+```
+uv run --package jane-handler-runtime jane-handler-runtime build-image            # тег jane/python-extractor:1
+uv run --package jane-handler-runtime jane-handler-runtime build-image --tag my/python-extractor:1
+```
+
+У проді закріплюйте образ за дайджестом: `JANE_HANDLER_RUNTIME_PROFILE_IMAGES='{"python-extractor@1":"registry/…@sha256:…"}'`.
+
+## CLI: пакет на локальному файлі без інших сервісів
 
 ```
 uv sync --all-packages
-uv run --package jane-handler-runtime python -m jane_handler_runtime
-curl http://127.0.0.1:8000/v1/health
+uv run --package jane-handler-runtime jane-handler-runtime build-image
+uv run --package jane-handler-runtime jane-handler-runtime test libs/extractor-sdk/examples/testsite-product-extractor
+uv run --package jane-handler-runtime jane-handler-runtime run libs/extractor-sdk/examples/testsite-product-extractor page.html --media-type text/html --url https://shop.test/product/x --params '{"include_url": false}'
+uv run --package jane-handler-runtime jane-handler-runtime profile
 ```
 
-У Docker (контекст збірки — корінь репозиторію):
+`run` друкує `HandlerResult` (код виходу 0 — `success`/`empty`, 1 — `unrecognized`/`failed`, 2 — виклик
+неможливий: невалідний пакет, параметри, немає пісочниці); `test` друкує таблицю (або `--json` — `TestReport`),
+код 0 — усі тести пройшли. `--image` — інший образ, `--backend subprocess --unsafe-no-sandbox` — **без ізоляції**,
+лише для власного довіреного коду. Поза checkout репозиторію задайте `JANE_HANDLER_RUNTIME_CONTRACTS_DIR`
+(теки `contracts/schemas` і `contracts/openapi`).
+
+## Незалежний запуск сервісу
+
+Потрібен контейнерний рушій (Docker Engine / Docker Desktop з Linux-контейнерами / Podman з Docker API).
+
+```
+uv run --package jane-handler-runtime jane-handler-runtime serve        # 127.0.0.1:8000
+curl http://127.0.0.1:8000/v1/health                                     # checks.sandbox = ok, якщо рушій доступний
+```
+
+У Docker (контекст — корінь репозиторію). Сервісу потрібен доступ до Docker API; у проді — через socket-proxy
+з мінімальними правами або rootless Podman / окремий вузол (ADR-0003):
 
 ```
 docker build -f services/handler-runtime/Dockerfile -t jane-handler-runtime .
-docker run --rm -p 8000:8000 jane-handler-runtime
+docker run -d -p 8106:8000 -v /var/run/docker.sock:/var/run/docker.sock --group-add <gid сокета> \
+  -e 'JANE_HANDLER_RUNTIME_PROFILE_IMAGES={"python-extractor@1":"jane/python-extractor:1"}' jane-handler-runtime
 ```
 
-Кілька екземплярів: запустіть кілька процесів або контейнерів з різними портами
-(`JANE_HANDLER_RUNTIME_PORT`). Стан, який має бути спільним (job, ключі ідемпотентності), зберігайте у
-власній БД сервісу через протоколи `JobStore` / `IdempotencyStore` з jane-kit.
+Робоча тека передається в пісочницю через Docker API (`put_archive`), не через bind-mount, тож сервіс однаково
+працює з локальним, віддаленим (`DOCKER_HOST`) чи контейнеризованим рушієм.
+
+Кілька екземплярів: процеси/контейнери з різними портами; кожен виклик — окремий контейнер. Ключі
+ідемпотентності, job і результати `GET /v1/invocations/{id}` зберігаються в пам'яті екземпляра (jane-kit
+`InMemory*`): для балансування між екземплярами потрібна прив'язка клієнта або спільні `IdempotencyStore`/`JobStore`
+(див. «Відомі обмеження» у звіті WP-06).
+
+## API
+
+| Операція | Поведінка |
+|---|---|
+| `POST /v1/invocations` | `Idempotency-Key` обов'язковий і дорівнює `delivery.delivery_key`. `mode: sync` — 200 з `HandlerResult` або 202 + Job, якщо не вклалося в `timeouts.sync_response_max_ms`; `mode: async` — 202 + Job. Повтор із тим самим ключем і тілом — збережений результат з `duplicate: true` і `Idempotency-Replayed: true`, без повторного запуску; інше тіло — 422 `idempotency_key_reused` |
+| `GET /v1/invocations/{id}` | збережений результат (у межах `packages.max_stored_results`) |
+| `POST /v1/test-runs` | 202 + Job; `Job.result` — `TestReport`. Тести маніфесту (`all` / `none` / імена) + `extra_cases`, кожен випадок — окремий запуск у `test_mode` (жодного запису: runtime нічого не зберігає) |
+| `GET /v1/jobs/{id}`, `POST /v1/jobs/{id}/cancel` | jane-kit |
+| `GET /v1/health`, `/v1/info`, `/metrics` | `checks.sandbox` — пінг рушія; `capabilities` — типи, профілі, backend |
+
+`/v1/connections*` не реалізовано: екстрактори не отримують підключень і секретів (`capabilities.connections: false`).
 
 ## Тести
 
 ```
-just test handler-runtime                  # unit + contract
-just test handler-runtime -m integration   # потребує `just up`
+just test handler-runtime                                   # unit + contract (backend subprocess, без Docker)
+uv run pytest services/handler-runtime -m isolation         # ізоляція на справжньому Docker (Windows/Linux)
+just isolation                                              # те саме в CI (Linux)
 ```
 
-Контрактні тести (`tests/test_contract.py`) перевіряють `/v1/health`, `/v1/info`, `/v1/jobs` і помилки
-за `contracts/openapi/common.yaml`, а API сервісу — за його `*.v1.yaml` через `ContractClient`.
+Тести ізоляції (`tests/test_isolation.py`, без моків пісочниці): зависання вбивається за `wall_time_ms`;
+сервер, досяжний зі звичайного контейнера, недосяжний з пісочниці (ENETUNREACH, лише `lo`); OOM за `memory_mb`;
+FS лише для читання, користувач 65534, відсутність змінних `JANE_*`; тести прикладного пакета через CLI;
+версії бібліотек в образі = профіль. Образ тестів — `JANE_WP06_SANDBOX_IMAGE` (типово
+`jane-wp06/python-extractor:1-test`, збирається автоматично); контейнери мають мітку сесії й прибираються.
 
 ## Конфігурація
 
-Змінні середовища з префіксом `JANE_HANDLER_RUNTIME_`:
+Змінні з префіксом `JANE_HANDLER_RUNTIME_` (плюс загальні `HOST`, `PORT`, `LOG_LEVEL`, `LOG_FORMAT`,
+`METRICS_ENABLED`, `HEALTH_CHECK_TIMEOUT_MS`, `AUTH_MODE`, `LIMITS_FILE` з шаблону):
 
 | Змінна | Типово | Опис |
 |---|---|---|
-| `JANE_HANDLER_RUNTIME_HOST` | `127.0.0.1` (у контейнері `0.0.0.0`) | адреса прослуховування |
-| `JANE_HANDLER_RUNTIME_PORT` | `8000` | порт |
-| `JANE_HANDLER_RUNTIME_LOG_LEVEL` | `INFO` | рівень журналу |
-| `JANE_HANDLER_RUNTIME_LOG_FORMAT` | `json` | `json` або `console` |
-| `JANE_HANDLER_RUNTIME_METRICS_ENABLED` | `true` | ендпоінт `/metrics` |
-| `JANE_HANDLER_RUNTIME_HEALTH_CHECK_TIMEOUT_MS` | `2000` | тайм-аут кожної перевірки `/v1/health` |
-| `JANE_HANDLER_RUNTIME_AUTH_MODE` | `none` | значення для `/v1/info` (`none`, `api_key`, `jwt`) |
-| `JANE_HANDLER_RUNTIME_LIMITS_FILE` | — | файл `PlatformLimits` (`profile`, `defaults`, `hard_caps`; TOML/JSON/YAML) |
-| `JANE_HANDLER_RUNTIME_LIMITS__<ГРУПА>__<ПАРАМЕТР>` | — | перевизначення, напр. `..._LIMITS__JOBS__MAX_CONCURRENT_JOBS=8` |
-| `JANE_HANDLER_RUNTIME_LIMITS__HARD_CAPS__<ГРУПА>__<ПАРАМЕТР>` | — | жорстка стеля платформи |
+| `SANDBOX_BACKEND` | `docker` | `docker` або `subprocess` (без ізоляції) |
+| `ALLOW_UNSAFE_SUBPROCESS` | `false` | без `true` backend `subprocess` відмовляє (503) |
+| `DOCKER_HOST` | — | адреса Docker/Podman API (інакше `DOCKER_HOST` середовища / стандартний сокет чи named pipe) |
+| `DOCKER_RUNTIME` | — | OCI runtime пісочниці, напр. `runsc` (gVisor) |
+| `SANDBOX_USER` | `65534:65534` | користувач у контейнері (не root) |
+| `SANDBOX_LABELS` | `{}` | додаткові мітки контейнерів (JSON) |
+| `PROFILE_IMAGES` | `{"python-extractor@1": "jane/python-extractor:1"}` | профіль → образ (JSON) |
+| `REGISTRY_URL` / `REGISTRY_TOKEN` | — | репозиторій пакетів і bearer-токен (лише з середовища) |
+| `PACKAGE_CACHE_DIR` | тимчасова тека | кеш перевірених пакетів за дайджестом |
+| `BLOB_ROOTS` | `[]` | теки, з яких дозволено читати `file://` (JSON-масив); порожньо — `file://` заборонено |
+| `CONTRACTS_DIR` | пошук угору від пакета (`JANE_CONTRACTS_DIR`) | `contracts/` зі схемами; в образі — `/app/contracts` |
 
 ## Ліміти
 
-Рівні: типові значення сервісу → платформа (файл, потім змінні середовища) → джерело → завдання → етап
-(→ запит в автономному режимі); `hard_caps` обмежують результат. `GET /v1/info` повертає `limits` —
-налаштовані типові значення й `hard_caps` сервісу у формі `PlatformLimits` (лише поля з `limits.schema.json`;
-специфічні для сервісу ліміти, як-от `jobs.max_concurrent_jobs`, у контракті відсутні й видно їх лише в журналі
-старту). Ефективні ліміти для джерела/завдання/етапу рахує оркестратор (`GET /v1/limits/effective`).
+Рівні: типові значення → стелі сервісу (`DEFAULT_HARD_CAPS`) → файл платформи (`LIMITS_FILE`, форма
+`PlatformLimits`) → `JANE_HANDLER_RUNTIME_LIMITS__<ГРУПА>__<ПАРАМЕТР>` → `limits` запиту (групи `sandbox`,
+`timeouts`; решта груп ігнорується). Застосовується `min(запит, hard_caps)`; стеля платформи для поля замінює
+стелю сервісу. `GET /v1/info` → `limits` показує типові значення й стелі (лише поля контракту).
 
-| Параметр | Типово | Опис |
-|---|---|---|
-| `jobs.max_concurrent_jobs` | 4 | job, що виконуються одночасно в одному екземплярі |
-| `jobs.max_queued_jobs` | 1000 | понад це — `503 service_unavailable` (backpressure) |
-| `jobs.job_timeout_ms` | 3600000 | максимальна тривалість job (`failed`, код `timeout`) |
-| `jobs.job_retention_seconds` | 86400 | скільки зберігається завершений job (контракт: `transfer.job_retention_seconds`) |
-| `jobs.queue_full_retry_after_seconds` | 1 | `Retry-After` у відповіді 503, коли черга job заповнена |
-| `idempotency.idempotency_ttl_seconds` | 86400 | скільки пам'ятається `Idempotency-Key` (контракт: `transfer.idempotency_ttl_seconds`) |
-| `idempotency.in_memory_max_entries` | 10000 | розмір сховища ключів у пам'яті |
+| Параметр | Типово | Стеля сервісу | Опис |
+|---|---|---|---|
+| `sandbox.cpu_cores` | 1.0 | 4.0 | `nano_cpus` контейнера |
+| `sandbox.memory_mb` | 512 | 4096 | пам'ять (swap вимкнено: memswap = memory) |
+| `sandbox.wall_time_ms` | 30000 | 600000 | після — `docker kill`, `failed`/`timeout` |
+| `sandbox.max_output_bytes` | 4194304 | 67108864 | stdout (результат) і stderr (журнал) |
+| `sandbox.max_processes` | 16 | 256 | `pids_limit` |
+| `sandbox.tmpfs_mb` | 64 | 1024 | `/tmp` (tmpfs, `noexec`); 0 — без `/tmp` |
+| `timeouts.invocation_timeout_ms` | 60000 | 900000 | весь виклик пісочниці |
+| `timeouts.sync_response_max_ms` | 25000 | — | далі sync-виклик стає 202 + Job |
+| `timeouts.request_timeout_ms` | 30000 | — | репозиторій і `download_url` |
+| `concurrency.max_parallel_invocations` | 2 | — | одночасні пісочниці в екземплярі |
+| `packages.max_archive_bytes` | 52428800 | — | розмір zip пакета |
+| `packages.max_unpacked_bytes` | 209715200 | — | розмір після розпакування |
+| `packages.max_files` | 5000 | — | файлів в архіві |
+| `packages.cache_max_entries` | 64 | — | пакетів у кеші |
+| `packages.max_input_bytes` | 67108864 | — | вміст одного матеріалу |
+| `packages.max_stored_results` | 10000 | — | результати для `GET /v1/invocations/{id}` |
+| `packages.docker_api_timeout_ms` | 60000 | — | виклики Docker API |
+| `packages.kill_grace_ms` | 2000 | — | `timeout -s KILL` у контейнері спрацьовує через `wall_time_ms` + це (якщо сам runtime упав) |
+| `jobs.*`, `idempotency.*` | як у jane-kit | — | див. `libs/jane-kit/README.md` |
 
 ## Приклад виклику зі стороннього застосунку
 
 ```python
-import httpx
+import base64, hashlib, httpx
+from jane_extractor_sdk.package import build_archive, material_from_file
 
-with httpx.Client(base_url="http://127.0.0.1:8000") as client:
-    r = client.post("/v1/examples/jobs", json={"steps": 3}, headers={"Idempotency-Key": "demo-1"})
-    job_url = r.headers["Location"]  # 202 Accepted
-    print(client.get(job_url).json()["status"])  # queued | running | succeeded ...
+archive = build_archive(Path("my-package"))
+body = {
+    "handler": {"package_id": "testsite.product-extractor", "version": "1.0.0",
+                "digest": "sha256:" + hashlib.sha256(archive).hexdigest()},
+    "package_archive": {"kind": "inline", "media_type": "application/zip", "encoding": "base64",
+                        "data": base64.b64encode(archive).decode()},
+    "inputs": [{"kind": "material", "material": material_from_file(Path("page.html"), media_type="text/html")}],
+    "delivery": {"delivery_key": "my-app-0001"},
+}
+r = httpx.post("http://127.0.0.1:8106/v1/invocations", json=body, headers={"Idempotency-Key": "my-app-0001"}, timeout=60)
+print(r.json()["status"], r.json()["output"])
 ```
 
 ## Спостережуваність
 
-- `GET /v1/health` (`ok`/`degraded`/`down`; перевірки залежностей — `app.state.health.add`), `GET /v1/info`.
-- `GET /metrics` — Prometheus (`jane_http_requests_total`, `jane_http_request_duration_seconds`, ...).
-- Журнали — JSON-рядки в stdout із `trace_id` (з `traceparent`), `request_id`, `job_id`, `service`, `instance`.
-- Помилки — `application/problem+json` зі стабільним `code` (каталог — `contracts/docs/errors.md`).
+- Журнали — JSON із `trace_id`, `invocation_id`, пакетом, статусом, `failure`, тривалістю, backend.
+- `GET /metrics` — HTTP-метрики jane-kit; `diagnostics.metrics` кожного результату — `duration_ms`, `cpu_ms`,
+  `peak_memory_mb` (cgroup контейнера), `output_bytes`.

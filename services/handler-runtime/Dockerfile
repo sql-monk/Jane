@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
-# Build context: repository root.
+# Build context: repository root. The service needs a container engine for its sandboxes:
+#   docker run -v /var/run/docker.sock:/var/run/docker.sock --group-add <socket gid> ... (see README.md)
 #   docker build -f services/handler-runtime/Dockerfile -t jane-handler-runtime .
 ARG PYTHON_IMAGE=python:3.12-slim
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.12.13
@@ -19,10 +20,14 @@ RUN uv sync --frozen --no-dev --no-editable --package jane-handler-runtime
 FROM ${PYTHON_IMAGE}
 RUN useradd --system --uid 10001 --no-create-home jane
 COPY --from=build /app/.venv /app/.venv
+# JSON Schemas / OpenAPI of the contracts: results and requests are validated against them.
+COPY contracts/schemas /app/contracts/schemas
+COPY contracts/openapi /app/contracts/openapi
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     JANE_HANDLER_RUNTIME_HOST=0.0.0.0 \
-    JANE_HANDLER_RUNTIME_PORT=8000
+    JANE_HANDLER_RUNTIME_PORT=8000 \
+    JANE_HANDLER_RUNTIME_CONTRACTS_DIR=/app/contracts
 USER jane
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \

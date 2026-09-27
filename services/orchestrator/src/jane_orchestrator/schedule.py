@@ -118,7 +118,7 @@ def next_fire(
     elif kind == "interval":
         step = timedelta(seconds=int(schedule["interval_seconds"]))
         if last_fired is None:
-            result = start if start and start > after else after
+            result = start if start and start > after else after + step  # first tick: start_at or one interval from now
         else:
             result = last_fired + step
             if result <= after:  # missed ticks while down: fire once now, then continue the cadence

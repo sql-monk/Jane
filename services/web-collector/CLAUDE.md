@@ -1,0 +1,3 @@
+- Запуск: `uv run --package jane-web-collector python -m jane_web_collector` (або Docker, див. README.md).
+- Тести: `just test web-collector` (інтеграційні: `-m integration` після `just up`).
+- Контракт: `contracts/openapi/web-collector.v1.yaml` (+ `contracts/openapi/common.yaml`); конвенції — скіл `jane-contracts`.

@@ -19,6 +19,7 @@ members = [
     "jane-storage-postgres",
     "jane-template-service",
     "jane-testsite",
+    "jane-web-collector",
 ]
 
 [manifest.dependency-groups]
@@ -833,6 +834,17 @@ requires-dist = [{ name = "jane-kit", editable = "libs/jane-kit" }]
 name = "jane-testsite"
 version = "0.1.0"
 source = { editable = "tests/fixtures/testsite" }
+
+[[package]]
+name = "jane-web-collector"
+version = "0.1.0"
+source = { editable = "services/web-collector" }
+dependencies = [
+    { name = "jane-kit" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "jane-kit", editable = "libs/jane-kit" }]
 
 [[package]]
 name = "jinja2"

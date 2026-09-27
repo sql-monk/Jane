@@ -61,7 +61,9 @@ def test_new_source_by_name_to_proposals_package_and_tests(w: World) -> None:
     assert [c["candidate_id"] for c in first["candidates"]] == ["cand_1", "cand_2"]
     assert w.llm.requests == []  # nothing sampled before the user chose
 
-    missing = w.api.post(f"/v1/onboarding-sessions/{sid}/candidate-selection", json={"candidate_id": "cand_9"})
+    missing = w.api.post(
+        f"/v1/onboarding-sessions/{sid}/candidate-selection", json={"candidate_id": "cand_9"}
+    )
     assert missing.status_code == 404
     r = w.api.post(f"/v1/onboarding-sessions/{sid}/candidate-selection", json={"candidate_id": "cand_1"})
     assert r.status_code == 200 and r.json()["status"] == "sampling"

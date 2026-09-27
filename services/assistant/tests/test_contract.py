@@ -79,8 +79,12 @@ def test_every_operation_is_covered(w: World) -> None:
         json={"package": {"package_id": "x", "version": "1"}, "problem_samples": []},
         headers={"Idempotency-Key": "d"},
     )
-    w.spec.validate_response("POST", "/v1/improvement-runs", bad.status_code, bad.json(), bad.headers["content-type"])
-    mat = w.collector._items({"collector": "web", "scope": {"allowed_domains": ["shop.example.test"]}}, "s")[0]
+    w.spec.validate_response(
+        "POST", "/v1/improvement-runs", bad.status_code, bad.json(), bad.headers["content-type"]
+    )
+    mat = w.collector._items({"collector": "web", "scope": {"allowed_domains": ["shop.example.test"]}}, "s")[
+        0
+    ]
     api.post(
         "/v1/unknown-materials",
         json={"source_id": "s", "forward_unknown_to_llm": False, "material": mat},

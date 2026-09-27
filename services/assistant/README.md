@@ -176,7 +176,11 @@ with httpx.Client(base_url="http://127.0.0.1:8000") as client:
         headers={"Idempotency-Key": "onboard-shop-1"},
     ).json()
     session_id = job["labels"]["session_id"]
-    while client.get(f"/v1/jobs/{job['job_id']}").json()["status"] not in {"succeeded", "failed", "cancelled"}:
+    while client.get(f"/v1/jobs/{job['job_id']}").json()["status"] not in {
+        "succeeded",
+        "failed",
+        "cancelled",
+    }:
         time.sleep(1)
     session = client.get(f"/v1/onboarding-sessions/{session_id}").json()
     best = next(p for p in session.get("proposals", []) if p["recommended"])

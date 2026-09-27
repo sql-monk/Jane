@@ -153,7 +153,10 @@ def request(policy: dict[str, Any] | None = None, **extra: Any) -> dict[str, Any
                                     "title": "Kettle B-200",
                                     "price": {"amount": 1499.0, "currency": "UAH"},
                                 },
-                                "observation": {"observation_id": "obs_b200", "observed_at": "2026-09-27T10:00:00Z"},
+                                "observation": {
+                                    "observation_id": "obs_b200",
+                                    "observed_at": "2026-09-27T10:00:00Z",
+                                },
                             }
                         ]
                     },

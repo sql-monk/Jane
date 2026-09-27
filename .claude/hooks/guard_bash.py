@@ -27,6 +27,17 @@ WP_ONLY = [
      "git merge у checkout виконавця заборонено: зливає лише координатор."),
     (r"\bgit\b[^;&|\n]*\b(checkout|switch)\b\s+(-\S+\s+)*(main|master)\b",
      "перемикання на main заборонено: працюйте у своїй гілці wp/NN-*."),
+    # Worktree мають спільні refs: ці команди змінюють main або чужі гілки в обхід злиття.
+    (r"\bgit\b[^;&|\n]*\bbranch\b[^;&|\n]*\s(-f|--force|-D|-d|--delete|-M|-m|--move|-C|-c|--copy)\b",
+     "примусове переміщення, видалення чи перейменування гілок заборонено: спільні refs між worktree."),
+    (r"\bgit\b[^;&|\n]*\bbranch\b[^;&|\n]*\b(main|master)\b",
+     "операції з гілкою main у checkout виконавця заборонено."),
+    (r"\bgit\b[^;&|\n]*\b(fetch|push)\b[^;&|\n]*\S:\S",
+     "refspec із `:` заборонено: так можна переписати main або чужу гілку."),
+    (r"\bgit\b[^;&|\n]*\b(update-ref|symbolic-ref)\b",
+     "пряма зміна refs заборонена."),
+    (r"\bgit\b[^;&|\n]*\bworktree\b[^;&|\n]*\b(remove|prune|move)\b",
+     "керування worktree — лише координатор."),
     (r"(\.jane-wp|wp-paths\.json)",
      "`.jane-wp` і `.claude/wp-paths.json` змінює лише координатор."),
 ]

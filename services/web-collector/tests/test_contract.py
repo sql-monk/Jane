@@ -8,9 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from jane_kit.contracts import ContractClient, OpenAPISpec
-from jane_web_collector.testing import FAST_LIMITS, Site, web_rules
-
-from .conftest import REPO_ROOT
+from jane_web_collector.testing import FAST_LIMITS, REPO_ROOT, Site, web_rules
 
 pytestmark = pytest.mark.contract
 

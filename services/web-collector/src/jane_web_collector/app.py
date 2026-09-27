@@ -114,9 +114,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/v1/fetches", tags=["fetch"], response_model=None)
     async def fetch_material(request: Request) -> JSONResponse:
         payload = await json_body(request)
-        return JSONResponse(
-            await engine.fetch_one(payload)
-        )
+        return JSONResponse(await engine.fetch_one(payload))
 
     # ------------------------------------------------------------------ collections
     @app.post("/v1/collections", status_code=202, tags=["collections"], response_model=None)
@@ -316,7 +314,6 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         return JSONResponse(body)
 
     return app
-
 
 
 def rfc3339_ts(ts: float) -> str:

@@ -14,9 +14,16 @@ import httpx
 from jsonschema import Draft202012Validator
 
 from jane_kit.contracts import OpenAPISpec
-from jane_web_collector.testing import FAST_LIMITS, Site, drain, start, wait_done, web_rules
-
-from .conftest import REPO_ROOT, ServiceFactory
+from jane_web_collector.testing import (
+    FAST_LIMITS,
+    REPO_ROOT,
+    ServiceFactory,
+    Site,
+    drain,
+    start,
+    wait_done,
+    web_rules,
+)
 
 SPEC = OpenAPISpec.load(REPO_ROOT / "contracts" / "openapi" / "collector.v1.yaml")
 MATERIAL = (REPO_ROOT / "contracts" / "schemas" / "material.schema.json").resolve().as_uri()

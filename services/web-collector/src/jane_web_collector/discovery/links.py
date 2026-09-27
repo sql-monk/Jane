@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import Any
 
-import lxml.html
+import lxml.html  # type: ignore[import-untyped]
 from lxml import etree
 
 __all__ = ["HTML_TYPES", "LINK_SOURCES", "extract_hrefs", "html_meta", "is_html", "parse_html"]

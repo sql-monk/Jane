@@ -22,9 +22,15 @@ from starlette.routing import Route
 
 from jane_kit.contracts import OpenAPISpec
 from jane_web_collector.app import build_app
-from jane_web_collector.testing import FAST_LIMITS, Site, drain, free_port, web_rules
-
-from .conftest import REPO_ROOT, make_settings
+from jane_web_collector.testing import (
+    FAST_LIMITS,
+    REPO_ROOT,
+    Site,
+    drain,
+    free_port,
+    make_settings,
+    web_rules,
+)
 
 REGISTRY = OpenAPISpec.load(REPO_ROOT / "contracts" / "openapi" / "registry.v1.yaml")
 REF = {"package_id": "testsite.web-rules", "version": "1.2.0"}
@@ -105,7 +111,11 @@ def registry(site: Site) -> Iterator[tuple[str, FakeRegistry]]:
 
 
 def _post(client: TestClient, body: dict[str, Any]) -> Any:
-    return client.post("/v1/collections", json=body, headers={"Idempotency-Key": hashlib.sha256(json.dumps(body).encode()).hexdigest()})
+    return client.post(
+        "/v1/collections",
+        json=body,
+        headers={"Idempotency-Key": hashlib.sha256(json.dumps(body).encode()).hexdigest()},
+    )
 
 
 def test_rules_from_registry(tmp_path: Path, site: Site, registry: tuple[str, FakeRegistry]) -> None:

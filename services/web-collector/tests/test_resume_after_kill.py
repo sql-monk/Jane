@@ -11,9 +11,7 @@ from typing import Any
 
 import httpx
 
-from jane_web_collector.testing import Site, drain, start, wait_done, web_rules
-
-from .conftest import ServiceFactory
+from jane_web_collector.testing import ServiceFactory, Site, drain, start, wait_done, web_rules
 
 SLOW_LIMITS: dict[str, Any] = {
     # slow enough that the kill lands in the middle of the crawl (~50 pages at 15 req/s)

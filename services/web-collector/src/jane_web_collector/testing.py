@@ -13,21 +13,26 @@ import sys
 import threading
 import time
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import httpx
 
+from .settings import Settings
 from .urls import Normalizer
 
 __all__ = [
     "FAST_LIMITS",
+    "REPO_ROOT",
+    "ServiceFactory",
     "ServiceProcess",
     "Site",
     "drain",
     "errors",
     "free_port",
+    "make_settings",
     "start",
     "wait_done",
     "web_rules",
@@ -40,6 +45,21 @@ FAST_LIMITS: dict[str, Any] = {
     "crawl": {"max_depth": 20},
 }
 """Politeness limits for a local test site: fast, but still through the per-host limiter."""
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+"""Checkout root (``services/web-collector/src/jane_web_collector`` -> repository), for ``contracts/``."""
+
+
+def make_settings(tmp: Path, **overrides: Any) -> Settings:
+    """Settings for an in-process test app: state in ``tmp``, no WP-03 package unless given."""
+    values: dict[str, Any] = {
+        "state_dir": tmp / "state",
+        "log_format": "console",
+        "lease_seconds": 5,
+        "discovery_path": tmp / "no-discovery-package",
+    }
+    values.update(overrides)
+    return Settings(**values)
 
 
 @dataclass
@@ -130,6 +150,10 @@ def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return int(s.getsockname()[1])
+
+
+ServiceFactory = Callable[..., "ServiceProcess"]
+"""Type of the ``service_factory`` fixture: ``factory(state_dir=None, **env) -> ServiceProcess``."""
 
 
 @dataclass

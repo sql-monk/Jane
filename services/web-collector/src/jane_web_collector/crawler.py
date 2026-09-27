@@ -107,8 +107,8 @@ class StrategyContext:
         self.strategy_id = strategy_id
         self.source_id = run.source_id
         self.collection_id = run.collection_id
-        self.rules = run.rules
-        self.limits = limits
+        self.rules: Mapping[str, Any] = run.rules
+        self.limits: Mapping[str, Any] = limits
         self.log = logging.getLogger(f"jane_web_collector.strategy.{strategy_id}")
 
     async def fetch(
@@ -486,7 +486,11 @@ class CrawlRun:
                 added = self.state.add_urls(
                     db,
                     self.collection_id,
-                    [FrontierRow(canonical, row.priority, row.depth, row.kind, row.strategy_id, url, row.section)],
+                    [
+                        FrontierRow(
+                            canonical, row.priority, row.depth, row.kind, row.strategy_id, url, row.section
+                        )
+                    ],
                     status="inflight",
                 )
             if not added:  # the redirect target is already known: do not fetch it a second time
@@ -504,8 +508,14 @@ class CrawlRun:
                 self.state.mark_url(db, self.collection_id, url, "redirect")
                 # remembered for revisits: an incremental run follows the stored target without refetching
                 self.state.put_url_state(
-                    db, self.state_key, url, status=None, etag=None, last_modified=None,
-                    content_sha256=None, links=[dup.target],
+                    db,
+                    self.state_key,
+                    url,
+                    status=None,
+                    etag=None,
+                    last_modified=None,
+                    content_sha256=None,
+                    links=[dup.target],
                 )
                 self._persist(db)
             log.debug("redirect to a known URL", extra={"url": url, "target": dup.target})
@@ -648,7 +658,9 @@ class CrawlRun:
                 self.stats["duplicates"] += 1
             self.state.add_urls(db, self.collection_id, extra_done, status="done")
             for other in claimed:  # redirect hops and the final URL were claimed while following redirects
-                self.state.mark_url(db, self.collection_id, other, "done" if other == canonical else "redirect")
+                self.state.mark_url(
+                    db, self.collection_id, other, "done" if other == canonical else "redirect"
+                )
             self.insert_rows(db, self.admit(candidates, row.depth))
             if error is not None:
                 self._error(
@@ -854,7 +866,6 @@ class CrawlRun:
                 task.cancel()
             if running:
                 await asyncio.gather(*running, return_exceptions=True)
-
 
 
 def resource_sha(body: bytes) -> str:

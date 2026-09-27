@@ -173,9 +173,11 @@ class Engine:
         self, payload: Mapping[str, Any]
     ) -> tuple[dict[str, Any], dict[str, Any] | None, str]:
         """Rules document, rules_ref and the JSON pointer prefix for error messages."""
-        ref = payload.get("rules_ref")
+        ref: Mapping[str, Any] | None = payload.get("rules_ref")
         if payload.get("rules") is not None:
             return dict(payload["rules"]), dict(ref) if ref else None, "/rules"
+        if ref is None:
+            raise ValidationFailed("rules or rules_ref is required")
         rules = await self.rules_loader.load(ref)
         return rules, dict(ref), "/rules_ref"
 

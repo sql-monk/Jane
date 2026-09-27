@@ -7,26 +7,29 @@ requested (to prove "no cycles", "robots obeyed", "no requests outside the bound
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from http.server import ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
-from jane_testsite import expected
-from jane_testsite.server import TestSiteHandler
+from jane_testsite import expected  # type: ignore[import-untyped]
+from jane_testsite.server import TestSiteHandler  # type: ignore[import-untyped]
 from jane_web_collector.app import build_app
 from jane_web_collector.settings import Settings
-from jane_web_collector.testing import ServiceProcess, Site, free_port
-
-SERVICE_ROOT = Path(__file__).resolve().parents[1]
-REPO_ROOT = SERVICE_ROOT.parents[1]
+from jane_web_collector.testing import (
+    REPO_ROOT,
+    ServiceFactory,
+    ServiceProcess,
+    Site,
+    free_port,
+    make_settings,
+)
 
 
 def _recording_handler(site: Site) -> type[TestSiteHandler]:
-    class Recording(TestSiteHandler):
+    class Recording(TestSiteHandler):  # type: ignore[misc]
         def do_GET(self) -> None:
             with site.lock:
                 site.requests[self.path] += 1
@@ -54,18 +57,8 @@ def site() -> Iterator[Site]:
 
 @pytest.fixture(scope="session")
 def expected_sets() -> dict[str, set[str]]:
-    return expected().sets
-
-
-def make_settings(tmp: Path, **overrides: Any) -> Settings:
-    values: dict[str, Any] = {
-        "state_dir": tmp / "state",
-        "log_format": "console",
-        "lease_seconds": 5,
-        "discovery_path": tmp / "no-discovery-package",
-    }
-    values.update(overrides)
-    return Settings(**values)
+    sets: dict[str, set[str]] = expected().sets
+    return sets
 
 
 @pytest.fixture
@@ -77,9 +70,6 @@ def settings(tmp_path: Path) -> Settings:
 def client(settings: Settings) -> Iterator[TestClient]:
     with TestClient(build_app(settings)) as c:
         yield c
-
-
-ServiceFactory = Callable[..., ServiceProcess]
 
 
 @pytest.fixture

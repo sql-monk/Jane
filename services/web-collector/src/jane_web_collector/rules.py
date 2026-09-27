@@ -106,7 +106,9 @@ class ContractSchemas:
                 branch = "TelegramRules"
             if branch:
                 return self.errors(f"{self.rules_uri}#/$defs/{branch}", err.instance, prefix + path)
-        return [FieldError(pointer=_pointer(prefix + path), code=_snake(str(err.validator)), message=err.message)]
+        return [
+            FieldError(pointer=_pointer(prefix + path), code=_snake(str(err.validator)), message=err.message)
+        ]
 
     def rules_errors(self, rules: Any, prefix: Sequence[Any] = ()) -> list[FieldError]:
         return self.errors(self.rules_uri, rules, prefix)

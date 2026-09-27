@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import textwrap
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -13,9 +14,7 @@ from jane_contracts.discovery import DiscoveryStrategy
 from jane_web_collector.app import build_app
 from jane_web_collector.discovery import RecursiveStrategy, Registry, SeedListStrategy
 from jane_web_collector.discovery.registry import DISCOVERY_MODULE
-from jane_web_collector.testing import FAST_LIMITS, Site, drain, start, web_rules
-
-from .conftest import make_settings
+from jane_web_collector.testing import FAST_LIMITS, Site, drain, make_settings, start, web_rules
 
 # A stand-in for WP-03's services/web-collector/strategies/discovery/ package, written to a temp dir.
 # It only uses the public DiscoveryContext (ctx.fetch for a navigation document, then proposes URLs).
@@ -71,7 +70,7 @@ def parse_urlset(body: bytes) -> list[str]:
 
 
 @pytest.fixture
-def plugin_dir(tmp_path: Path) -> Path:
+def plugin_dir(tmp_path: Path) -> Iterator[Path]:
     path = tmp_path / "strategies" / "discovery"
     path.mkdir(parents=True)
     (path / "__init__.py").write_text(textwrap.dedent(PLUGIN), encoding="utf-8")

@@ -60,7 +60,13 @@ def uv_run(*args: str) -> list[str]:
 def members() -> list[Path]:
     """Workspace members (directories with pyproject.toml) matching the root globs."""
     out: list[Path] = []
-    for pattern in ("libs/*", "services/*", "templates/service", "tests/fixtures/testsite"):
+    for pattern in (
+        "libs/*",
+        "services/*",
+        "services/storage/adapters/*",
+        "templates/service",
+        "tests/fixtures/testsite",
+    ):
         out += [p for p in sorted(ROOT.glob(pattern)) if (p / "pyproject.toml").is_file()]
     return out
 

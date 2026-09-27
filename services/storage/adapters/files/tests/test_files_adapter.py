@@ -173,11 +173,11 @@ def test_fresh_lock_taken_during_stale_break_is_restored(
             lock.write_text("other-host:2 fresh\n", encoding="utf-8")
         real_rename(src, dst)
 
-    monkeypatch.setattr(mod.os, "rename", racing_rename)
+    monkeypatch.setattr(os, "rename", racing_rename)
     store._break_if_stale(lock)
     assert lock.read_text(encoding="utf-8") == "other-host:2 fresh\n"
     assert not list(lock.parent.glob("*.stale"))
-    monkeypatch.setattr(mod.os, "rename", real_rename)
+    monkeypatch.setattr(os, "rename", real_rename)
     os.utime(lock, (old, old))
     store._break_if_stale(lock)  # really stale now: removed
     assert not lock.exists()

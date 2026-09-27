@@ -1,0 +1,3 @@
+- Запуск: `uv run --package jane-template-service python -m jane_template_service` (або Docker, див. README.md).
+- Тести: `just test template-service` (інтеграційні: `-m integration` після `just up`).
+- Контракт: `contracts/openapi/template-service.v1.yaml` (+ `contracts/openapi/common.yaml`); конвенції — скіл `jane-contracts`.

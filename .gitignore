@@ -25,3 +25,14 @@ node_modules/
 # IDE
 .vscode/
 .idea/
+
+# Dev stack state written by `just up` (ports, generated credentials)
+.jane/
+
+# Build / coverage artefacts
+*.egg-info/
+build/
+dist/
+.coverage
+coverage.xml
+htmlcov/

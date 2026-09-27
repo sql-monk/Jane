@@ -1,0 +1,23 @@
+# gitleaks configuration of the Jane repository: the default rule set plus narrow, justified exceptions.
+# Used by the git pre-commit hook (`just hooks`), the Claude Code hook .claude/hooks/scan_secrets.py
+# and CI (gitleaks picks up .gitleaks.toml from the scanned repository root).
+#
+# Every exception must be justified here and reviewed; never allowlist a real credential and never add
+# a blanket exception for a whole path or rule.
+
+title = "Jane gitleaks config"
+
+[extend]
+useDefault = true
+
+# Contract examples (WP-00) carry `delivery_key`: a deterministic idempotency key of a delivery,
+# a sha256 hex digest (64 lowercase hex chars; early drafts in git history used 32) - not a secret,
+# but `generic-api-key` flags it. Only that exact field/value shape, only under contracts/, only for
+# that rule.
+[[allowlists]]
+description = "delivery_key hex idempotency keys in WP-00 contract examples"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "match"
+regexes = ['''^delivery_key"?\s*[:=]\s*"?(?:[0-9a-f]{64}|[0-9a-f]{32})"?\s*$''']
+paths = ['''^contracts/''']

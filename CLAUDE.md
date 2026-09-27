@@ -12,7 +12,11 @@
 лише свої шляхи з `.claude/wp-paths.json`, DoD, звіт із реальним виводом команд.
 
 ## Команди
-_З'являться після WP-01:_ `just check`, `just test <service>`, `docker compose -p <унікальне-ім'я> up`.
+Довідник — [DEVELOPMENT.md](DEVELOPMENT.md). just: `uv tool install rust-just` або `uvx --from rust-just just …`.
+- `just check` — lint + types + unit + contract (те саме, що CI); `just test <сервіс> [аргументи pytest]`.
+- `just up` / `just down -v` — dev-стек з унікальним compose-проєктом і портами; `just env` — адреси й паролі.
+- `just new-service <ім'я>` — сервіс із `templates/service/`; спільне — `libs/jane-kit` (не дублюй).
+- Тестовий сайт і очікувані URL: [tests/fixtures/testsite/README.md](tests/fixtures/testsite/README.md).
 
 ## Мови
 Документація й звіти — українською. Код, ідентифікатори, коміти — англійською.

@@ -1,0 +1,7 @@
+# Prettier formats only web/* sources.
+**/node_modules
+**/dist
+**/coverage
+**/_generated
+**/src/api/generated
+pnpm-lock.yaml

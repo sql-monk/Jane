@@ -1,0 +1,126 @@
+name: ci
+
+on:
+  push:
+    branches: [main, "wp/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.12.13"
+  JUST_VERSION: "1.58.0"
+  GITLEAKS_VERSION: "8.30.1"
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv tool install "rust-just==${JUST_VERSION}"
+      - run: uv sync --all-packages --locked
+      - run: just lint
+      - run: just types
+      - name: Secret scan (gitleaks)
+        run: |
+          docker run --rm -v "$PWD:/repo" \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
+            "ghcr.io/gitleaks/gitleaks:v${GITLEAKS_VERSION}" \
+            git /repo --redact --no-banner --verbose
+
+  unit:
+    needs: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv tool install "rust-just==${JUST_VERSION}"
+      - run: uv sync --all-packages --locked
+      - run: just unit
+
+  contract:
+    needs: unit
+    runs-on: ubuntu-24.04
+    env:
+      JANE_CONTRACTS_REDOCLY: "1" # WP-00 linter runs Redocly via npx
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv tool install "rust-just==${JUST_VERSION}"
+      - run: uv sync --all-packages --locked
+      - run: just contract
+
+  # Admin UI (WP-12). No-op until web/* contains a package.json.
+  web:
+    needs: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: corepack enable
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv run --no-project python scripts/dev.py web
+
+  # Sandbox isolation tests of the handler runtime must run on Linux (plan.md §9).
+  # Placeholder for WP-06: `just isolation` runs tests marked `isolation`; none exist yet.
+  isolation:
+    needs: unit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv tool install "rust-just==${JUST_VERSION}"
+      - run: uv sync --all-packages --locked
+      - run: just isolation
+
+  # Full dev stack + integration tests. Heavier (SQL Server image), so on main, manual runs and PRs.
+  stack:
+    needs: contract
+    if: github.event_name != 'push' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    env:
+      JANE_COMPOSE_PROJECT: jane-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv tool install "rust-just==${JUST_VERSION}"
+      - run: uv sync --all-packages --locked
+      - run: just up
+      - run: just integration
+      - name: Stack logs on failure
+        if: failure()
+        run: just logs
+      - name: Tear down
+        if: always()
+        run: just down -v

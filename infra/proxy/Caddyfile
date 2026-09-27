@@ -1,0 +1,27 @@
+# Jane dev reverse proxy (Caddy). One entry point for the dev stack.
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	handle /_proxy/health {
+		respond "ok" 200
+	}
+
+	# Test site under a prefix; it rewrites its links from X-Forwarded-Prefix.
+	handle_path /testsite/* {
+		reverse_proxy testsite:8080 {
+			header_up X-Forwarded-Prefix /testsite
+		}
+	}
+
+	# Services join here when they get a compose entry, e.g. (WP-13 / service owners):
+	#   handle_path /api/web-collector/* {
+	#   	reverse_proxy web-collector:8000
+	#   }
+
+	handle {
+		respond "Jane dev proxy: unknown route" 404
+	}
+}

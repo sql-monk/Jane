@@ -1,0 +1,17 @@
+# Build context is the repository root for service images; keep it small and secret-free.
+.git
+.jane
+.claude
+.venv
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/node_modules
+**/*.egg-info
+.env
+.env.*
+**/secrets
+docs
+web

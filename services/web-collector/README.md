@@ -178,12 +178,17 @@ rules = {
     "normalization": {"strip_query_params": ["utm_*"]},
 }
 with httpx.Client(base_url="http://127.0.0.1:8101") as api:
-    job = api.post("/v1/collections", json={"source_kind": "web", "source_id": "shop", "rules": rules},
-                   headers={"Idempotency-Key": "shop-crawl-1"}).json()
+    job = api.post(
+        "/v1/collections",
+        json={"source_kind": "web", "source_id": "shop", "rules": rules},
+        headers={"Idempotency-Key": "shop-crawl-1"},
+    ).json()
     after = None
     while True:
-        page = api.get(f"/v1/collections/{job['job_id']}/materials",
-                       params={"wait_ms": 5000, **({"after": after} if after else {})}).json()
+        page = api.get(
+            f"/v1/collections/{job['job_id']}/materials",
+            params={"wait_ms": 5000, **({"after": after} if after else {})},
+        ).json()
         for material in page["items"]:
             print(material["locator"]["canonical_url"], material["content"]["kind"])
         after = page["next_cursor"] or after  # наступний запит підтверджує оброблене

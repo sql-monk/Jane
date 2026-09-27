@@ -27,7 +27,17 @@ from starlette.types import Receive, Scope, Send
 
 from jane_kit.contracts import ContractViolation, OpenAPISpec
 
-__all__ = ["ContractFake", "FakeRequest", "Reply", "problem"]
+__all__ = ["ContractFake", "FakeRequest", "Reply", "load_spec", "problem"]
+
+_SPECS: dict[Path, OpenAPISpec] = {}
+
+
+def load_spec(path: Path) -> OpenAPISpec:
+    """Specs are parsed once per test session (YAML parsing dominates the fakes' start-up)."""
+    key = path.resolve()
+    if key not in _SPECS:
+        _SPECS[key] = OpenAPISpec.load(key)
+    return _SPECS[key]
 
 
 @dataclass
@@ -65,7 +75,7 @@ Handler = Callable[[FakeRequest], Awaitable[Reply] | Reply]
 
 class ContractFake:
     def __init__(self, spec_path: Path, name: str) -> None:
-        self.spec = OpenAPISpec.load(spec_path)
+        self.spec = load_spec(spec_path)
         self.name = name
         self.handlers: dict[str, Handler] = {}
         self.calls: list[tuple[str, FakeRequest, int]] = []

@@ -19,6 +19,8 @@ RUN uv sync --frozen --no-dev --no-editable --package jane-assistant
 FROM ${PYTHON_IMAGE}
 RUN useradd --system --uid 10001 --no-create-home jane
 COPY --from=build /app/.venv /app/.venv
+# JSON Schemas of the contracts: local validation of generated collector rules and manifests.
+COPY contracts/schemas/ /app/contracts/schemas/
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     JANE_ASSISTANT_HOST=0.0.0.0 \

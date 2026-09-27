@@ -297,12 +297,16 @@ async def improve_draft(
         if missing:
             feedback = {"rejected": [f"no expected output for problem sample(s) {missing}"]}
             continue
+        # Successful examples must keep working: same status and, unless the schema changes
+        # incompatibly (then field shapes legitimately differ), the same entities.
         regressions = [
             extra_case(
                 case_name(f"success-{c.name}"),
                 c.material,
                 str((c.result or {}).get("status") or "success"),
-                list(((c.result or {}).get("output") or {}).get("entities") or []) or None,
+                None
+                if schema_change == "breaking"
+                else list(((c.result or {}).get("output") or {}).get("entities") or []) or None,
             )
             for c in successes
         ]

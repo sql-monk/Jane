@@ -10,9 +10,7 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from referencing import Registry
 
-from jane_kit.contracts import OpenAPISpec
-
-from .base import ContractFake, FakeRequest, Reply, problem
+from .base import ContractFake, FakeRequest, Reply, load_spec, problem
 from .registry import NOW, FakeRegistry
 from .runtime import run_package_tests, unzip
 from .site import SITES, TELEGRAM, material, telegram_material
@@ -40,7 +38,7 @@ class FakeCollector:
         self.app = ContractFake(contracts / "openapi" / "collector.v1.yaml", name)
         self.collections: dict[str, dict[str, Any]] = {}
         self.cancelled: list[str] = []
-        spec = OpenAPISpec.load(contracts / "openapi" / "collector.v1.yaml")
+        spec = load_spec(contracts / "openapi" / "collector.v1.yaml")
         self._rules_validator = Draft202012Validator(
             {"$ref": (contracts / "schemas" / "collector-rules.schema.json").resolve().as_uri()},
             registry=spec.registry,

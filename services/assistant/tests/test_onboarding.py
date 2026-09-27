@@ -144,7 +144,7 @@ def test_new_source_by_name_to_proposals_package_and_tests(w: World) -> None:
 
 def test_existing_extractor_is_bound_and_auto_activation_creates_source_and_task(w: World) -> None:
     seed_extractor(w, domains=["shop.example.test"])
-    job_id, sid = start(
+    job_id, _sid = start(
         w,
         {
             "query": "https://shop.example.test/",
@@ -195,7 +195,7 @@ def test_partially_matching_extractor_is_forked_and_adapted(w: World) -> None:
 
 
 def test_insufficient_sample_is_reported_within_budget(w: World) -> None:
-    job_id, sid = start(w, {"query": "https://tiny.example.test/"})
+    job_id, _sid = start(w, {"query": "https://tiny.example.test/"})
     s = w.result(job_id, "OnboardingSession")
     assert s["status"] == "insufficient_sample"
     assert s["sample"]["sufficient"] is False and s["sample"]["materials"] == 4

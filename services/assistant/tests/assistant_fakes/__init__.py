@@ -17,6 +17,7 @@ from jane_assistant.search import Candidate
 from jane_assistant.settings import Settings
 from jane_kit.contracts import ContractClient, OpenAPISpec
 
+from .base import load_spec
 from .llm import FakeLlm
 from .registry import FakeRegistry
 from .services import FakeCollector, FakeHandler, FakeOrchestrator, FakeStorage
@@ -115,7 +116,7 @@ def world(
     }
     settings = settings or Settings(log_format="console", contracts_dir=contracts)
     app = build_app(settings, Dependencies(transports=transports, search=fake_search))
-    spec = OpenAPISpec.load(contracts / "openapi" / "assistant.v1.yaml")
+    spec = load_spec(contracts / "openapi" / "assistant.v1.yaml")
     with TestClient(app) as client:
         yield World(
             contracts,

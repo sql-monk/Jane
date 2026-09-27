@@ -280,7 +280,7 @@ def test_test_results(client: TestClient, uid: Any) -> None:
     pid = uid("tests")
     create(client, pid)
     v = publish(client, pid).json()
-    report = {
+    report: dict[str, Any] = {
         "runner": "handler-runtime@0.1.0",
         "report": {
             "package": {"package_id": pid, "version": "1.0.0", "digest": v["digest"]},

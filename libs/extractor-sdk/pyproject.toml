@@ -1,0 +1,15 @@
+[project]
+name = "jane-extractor-sdk"
+version = "0.1.0"
+description = "SDK for Jane Python extractors: result helpers, context, in-sandbox runner, package and test utilities."
+readme = "README.md"
+requires-python = ">=3.12"
+# Standard library only: the SDK is installed into the sandbox image of runtime profile python-extractor@1.
+dependencies = []
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jane_extractor_sdk"]

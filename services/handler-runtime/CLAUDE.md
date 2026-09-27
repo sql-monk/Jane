@@ -1,0 +1,3 @@
+- Запуск: `uv run --package jane-handler-runtime jane-handler-runtime serve` (сервіс) або `... jane-handler-runtime test <пакет>` (CLI); образ пісочниці — `jane-handler-runtime build-image`.
+- Тести: `just test handler-runtime` (unit + contract, backend `subprocess`); ізоляція на справжньому Docker — `uv run pytest services/handler-runtime -m isolation` (у CI — `just isolation`).
+- Контракт: `contracts/openapi/handler.v1.yaml` (+ `common.yaml`, схеми `handler-invocation`, `handler-result`); конвенції — скіл `jane-contracts`, пакети — `jane-handler-package`.

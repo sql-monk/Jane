@@ -205,7 +205,7 @@ class OnboardingService:
                     f"session is {session.status}; a candidate can be selected only when disambiguation is needed"
                 )
             if candidate_id not in {f"cand_{i + 1}" for i in range(len(session.candidates))}:
-                raise JaneError(f"unknown candidate {candidate_id}", code="validation_failed")
+                raise NotFound(f"candidate {candidate_id} not found in session {session_id}")
             session.selected_candidate_id = candidate_id
             session.status = "sampling"
             await self._submit(session, "onboarding", self._continue_after_selection, None)

@@ -73,7 +73,7 @@ def test_r_05_late_result_does_not_replace_newer_one(
     t0 = datetime.now(UTC).replace(microsecond=0)
 
     def observation(minutes: int, price: float) -> dict[str, Any]:
-        e = copy.deepcopy(base)
+        e: dict[str, Any] = copy.deepcopy(base)
         e["fields"]["price"] = {"amount": price, "currency": "UAH"}
         e["observation"]["observation_id"] = f"obs_e2e_{run_id}_{minutes}"
         e["observation"]["observed_at"] = (t0 + timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")

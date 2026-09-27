@@ -40,7 +40,7 @@ from .fetcher import Fetcher, FetchError, HostLimiter, HttpResult
 from .materials import Delivery, MaterialTooLarge, TransitStore, build_material, new_observation_id, rfc3339
 from .robots import RobotsCache
 from .settings import ServiceLimits, to_contract
-from .state import FrontierRow, StateStore
+from .state import FrontierRow, LeaseLost, StateStore
 from .urls import Normalizer, Scope, UrlPattern, compile_patterns, patterns_match
 
 __all__ = ["CrawlRun", "LeaseLost", "RunDeps", "StrategyContext", "new_stats"]
@@ -67,10 +67,6 @@ def new_stats() -> dict[str, Any]:
     return {**dict.fromkeys(STAT_KEYS, 0), "by_strategy": {}}
 
 
-class LeaseLost(Exception):
-    """Another instance took over this collection (this one stalled longer than the lease)."""
-
-
 class RedirectDuplicate(Exception):
     """A redirect leads to a URL that is already in the frontier: stop before fetching it again."""
 
@@ -90,6 +86,7 @@ class RunDeps:
     transit: TransitStore | None
     instance_id: str
     lease_seconds: float
+    heartbeat_seconds: float
     user_agent: str
     version: str
     ack_events: dict[str, asyncio.Event] = field(default_factory=dict)
@@ -210,9 +207,16 @@ class CrawlRun:
         self.stop_reason: str | None = None
         self.fetched_here: set[str] = set()
         self._job: JobContext | None = None
+        self.fence = (self.collection_id, deps.instance_id)
+        self._stop_exc: BaseException | None = None
+        self.strategy_limits: dict[str, ServiceLimits] = {}
         self._last_progress = 0.0
 
     # ------------------------------------------------------------------ helpers for strategies
+    def _tx(self) -> Any:
+        """Transaction fenced by this run's lease: a run that lost its lease cannot write anything."""
+        return self.state.tx(self.fence)
+
     def scope_reason(self, url: str) -> str | None:
         if self.scope is None:
             return None
@@ -412,7 +416,9 @@ class CrawlRun:
             while self.state.unacked_count(self.collection_id) >= limit and not self.cancelled:
                 event.clear()
                 with contextlib.suppress(TimeoutError):  # an ack may come through another instance
-                    await asyncio.wait_for(event.wait(), timeout=1.0)
+                    await asyncio.wait_for(
+                        event.wait(), timeout=self.limits.collector.backpressure_poll_ms / 1000
+                    )
         finally:
             self.state.set_paused(self.collection_id, False)
 
@@ -443,13 +449,13 @@ class CrawlRun:
     ) -> FetchedResource | None:
         """Fetch and process one admitted URL. Returns the resource (for ``ctx.fetch``) or ``None``."""
         url = row.url
-        with self.state.tx() as db:
+        with self._tx() as db:
             if self.state.known(self.collection_id, url):
                 self.state.mark_url(db, self.collection_id, url, "inflight")
             else:
                 self.state.add_urls(db, self.collection_id, [row], status="inflight")
         if not await self.robots_allowed(url):
-            with self.state.tx() as db:
+            with self._tx() as db:
                 self.stats["skipped_robots"] += 1
                 self._error(db, url, "access_denied_by_policy", "disallowed by robots.txt")
                 self.state.mark_url(db, self.collection_id, url, "skipped")
@@ -460,7 +466,7 @@ class CrawlRun:
         prev = self.state.url_state(self.state_key, url)
         if caller is None and self._revisit_skip(prev):
             assert prev is not None
-            with self.state.tx() as db:
+            with self._tx() as db:
                 self.stats["not_modified"] += 1
                 self.insert_rows(db, self.admit(self._stored_links_candidates(prev["links"], url), row.depth))
                 self.state.mark_url(db, self.collection_id, url, "unchanged")
@@ -482,7 +488,7 @@ class CrawlRun:
             canonical = self.normalizer.normalize(target) or target
             if canonical == url or canonical in claimed:
                 return
-            with self.state.tx() as db:
+            with self._tx() as db:
                 added = self.state.add_urls(
                     db,
                     self.collection_id,
@@ -498,9 +504,10 @@ class CrawlRun:
             claimed.append(canonical)
 
         try:
-            result = await self.fetcher.get(url, check_hop=hop, conditional=cond)
+            timeouts = self.strategy_limits.get(row.strategy_id or "", self.limits).timeouts
+            result = await self.fetcher.get(url, check_hop=hop, conditional=cond, timeouts=timeouts)
         except RedirectDuplicate as dup:
-            with self.state.tx() as db:
+            with self._tx() as db:
                 self.stats["fetched"] += 1
                 self.stats["duplicates"] += 1
                 for other in claimed:
@@ -521,7 +528,7 @@ class CrawlRun:
             log.debug("redirect to a known URL", extra={"url": url, "target": dup.target})
             return None
         except FetchRejected as exc:
-            with self.state.tx() as db:
+            with self._tx() as db:
                 for other in claimed:
                     self.state.mark_url(db, self.collection_id, other, "skipped")
                 if exc.code == "access_denied_by_policy":
@@ -535,7 +542,7 @@ class CrawlRun:
                 raise
             return None
         except FetchError as exc:
-            with self.state.tx() as db:
+            with self._tx() as db:
                 for other in claimed:
                     self.state.mark_url(db, self.collection_id, other, "failed")
                 self.stats["fetched"] += 1
@@ -559,7 +566,7 @@ class CrawlRun:
         self.stats["fetched"] += 1
         self.stats["bytes_fetched"] += len(result.body)
         if result.status == 304:
-            with self.state.tx() as db:
+            with self._tx() as db:
                 self.stats["not_modified"] += 1
                 self.state.put_url_state(
                     db,
@@ -653,7 +660,7 @@ class CrawlRun:
         if duplicate_of is None:
             candidates = await self._on_fetched(resource, exclude=caller)
         links = self.extract_links(resource) if doc is not None else None
-        with self.state.tx() as db:
+        with self._tx() as db:
             if duplicate_of is not None:
                 self.stats["duplicates"] += 1
             self.state.add_urls(db, self.collection_id, extra_done, status="done")
@@ -709,7 +716,7 @@ class CrawlRun:
                         break
             except Exception as exc:
                 log.exception("strategy on_fetched failed", extra={"strategy_id": sid, "url": resource.url})
-                with self.state.tx() as db:
+                with self._tx() as db:
                     self._error(
                         db,
                         resource.url,
@@ -765,6 +772,7 @@ class CrawlRun:
                 strat_limits = resolved.limits
             else:
                 strat_limits = self.limits
+            self.strategy_limits[sid] = strat_limits
             ctx = StrategyContext(self, sid, to_contract(strat_limits))
             self.strategies.append((sid, strategy, ctx, strat_limits.crawl.max_depth))
 
@@ -784,18 +792,19 @@ class CrawlRun:
             self._commit_seeds(batch)
             seeded.append(sid)
             self.meta["seeded"] = seeded
-            with self.state.tx() as db:
+            with self._tx() as db:
                 self._persist(db)
 
     def _commit_seeds(self, batch: Sequence[DiscoveredUrl]) -> None:
         if not batch:
             return
         rows = self.admit(batch, None)
-        with self.state.tx() as db:
+        with self._tx() as db:
             self.insert_rows(db, rows)
             self._persist(db)
 
-    async def _heartbeat(self) -> None:
+    async def _beat(self) -> None:
+        """Renew the lease; detect cancellation requested through another instance; report progress."""
         if not self.state.claim(self.collection_id, self.deps.instance_id, self.deps.lease_seconds):
             raise LeaseLost(self.collection_id)
         job = self.state.get_job(self.collection_id)
@@ -812,33 +821,76 @@ class CrawlRun:
                 counters={k: int(v) for k, v in self.stats.items() if isinstance(v, int)} | self.counters,
             )
 
+    async def _heartbeat_loop(self, main: asyncio.Task[Any]) -> None:
+        """Runs beside the crawl (also during seeding and slow fetches); stops the run when the lease is
+        lost or the job is cancelled elsewhere."""
+        while True:
+            await asyncio.sleep(self.deps.heartbeat_seconds)
+            try:
+                await self._beat()
+            except (LeaseLost, JobCancelledError) as exc:
+                self._stop_exc = exc
+                main.cancel()
+                return
+            except Exception:
+                log.exception("heartbeat failed", extra={"collection_id": self.collection_id})
+
     async def execute(self, job: JobContext | None = None) -> dict[str, Any]:
         self._job = job
-        self.state.reset_inflight(self.collection_id)
+        main = asyncio.current_task()
+        if main is None:
+            raise RuntimeError("execute() must run inside a task")
+        await self._beat()
+        heartbeat = asyncio.create_task(self._heartbeat_loop(main), name=f"heartbeat {self.collection_id}")
+        try:
+            return await self._execute()
+        except asyncio.CancelledError:
+            if self._stop_exc is not None:
+                main.uncancel()
+                raise self._stop_exc from None
+            raise
+        finally:
+            heartbeat.cancel()
+            await asyncio.gather(heartbeat, return_exceptions=True)
+
+    async def _execute(self) -> dict[str, Any]:
+        # URLs left in flight by a previous owner (killed or stalled instance) go back to the queue
+        self.state.reset_inflight(self.collection_id, self.fence)
         self._build_strategies()
-        await self._heartbeat()
         await self._seed()
-        await self._loop()
-        if self.stop_reason:
-            dropped = self.state.drop_pending(self.collection_id)
-            self.counters["dropped_by_budget"] = self.counters.get("dropped_by_budget", 0) + dropped
-        with self.state.tx() as db:
-            self._persist(db)
-        await self._heartbeat()
+        while True:
+            await self._loop()
+            if self.stop_reason:
+                dropped = self.state.drop_pending(self.collection_id, self.fence)
+                self.counters["dropped_by_budget"] = self.counters.get("dropped_by_budget", 0) + dropped
+                break
+            counts = self.state.frontier_counts(self.collection_id)
+            if not counts.get("pending") and not counts.get("inflight"):
+                break
+            # nothing of ours is running: whatever is still in flight is stale -> fetch it again
+            self.state.reset_inflight(self.collection_id, self.fence)
         result: dict[str, Any] = {"collection_id": self.collection_id, "stats": self.stats}
         if self.stop_reason:
             result["stopped_by"] = self.stop_reason
+        with self._tx() as db:
+            open_rows = db.execute(
+                "SELECT COUNT(*) FROM frontier WHERE collection_id = ? AND status IN ('pending', 'inflight')",
+                (self.collection_id,),
+            ).fetchone()[0]
+            if open_rows:  # cannot happen after the loop above; never report success with open URLs
+                raise RuntimeError(f"{open_rows} URLs still open at the end of the run")
+            self._persist(db)
+            self.state.set_status(self.collection_id, "succeeded", finished_at=_now_iso(), db=db)
+            db.execute(
+                "UPDATE collections SET lease_until = 0 WHERE collection_id = ?", (self.collection_id,)
+            )
         return result
 
     async def _loop(self) -> None:
         running: set[asyncio.Task[Any]] = set()
-        interval = self.limits.collector.heartbeat_interval_ms / 1000
-        last_hb = time.monotonic()
+        interval = self.deps.heartbeat_seconds
         try:
             while True:
-                if time.monotonic() - last_hb >= interval:
-                    await self._heartbeat()
-                    last_hb = time.monotonic()
                 if self.stop_reason is None and (reason := self._budget_left()):
                     self.stop_reason = reason
                 if self.stop_reason is None:
@@ -847,7 +899,7 @@ class CrawlRun:
                         free, self.limits.crawl.max_pages_per_run - self.stats["fetched"] - len(running)
                     )
                     if free > 0:
-                        for row in self.state.take_pending(self.collection_id, free):
+                        for row in self.state.take_pending(self.collection_id, free, self.fence):
                             running.add(asyncio.create_task(self.handle(row), name=f"fetch {row.url}"))
                 if not running:
                     if self.stop_reason is not None or not self.state.frontier_counts(self.collection_id).get(

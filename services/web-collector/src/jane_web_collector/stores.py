@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import UTC, datetime
 
 from jane_kit.idempotency import IdempotencyRecord, StoredResponse
-from jane_kit.jobs import Job
+from jane_kit.jobs import Job, JobStatus
 
 from .state import StateStore
 
@@ -14,8 +15,16 @@ __all__ = ["SqliteIdempotencyStore", "SqliteJobStore"]
 
 
 class SqliteJobStore:
-    def __init__(self, state: StateStore) -> None:
+    """Jobs of collections are shared by all instances on the state file. Only the instance holding a
+    collection's lease writes its job; others may only request cancellation (``cancelling``)."""
+
+    def __init__(self, state: StateStore, instance_id: str) -> None:
         self.state = state
+        self.instance_id = instance_id
+
+    def _foreign(self, job: Job) -> bool:
+        owner, lease_until = self.state.lease(job.job_id)
+        return owner is not None and owner != self.instance_id and lease_until > time.time()
 
     async def create(self, job: Job) -> None:
         existing = self.state.get_job(job.job_id)
@@ -37,6 +46,8 @@ class SqliteJobStore:
         return Job.model_validate_json(body) if body else None
 
     async def save(self, job: Job) -> None:
+        if job.status != JobStatus.CANCELLING and self._foreign(job):
+            return  # a run that lost its lease must not overwrite the new owner's job
         job = job.model_copy(update={"updated_at": datetime.now(UTC)})
         self.state.put_job(job.job_id, job.model_dump_json())
 

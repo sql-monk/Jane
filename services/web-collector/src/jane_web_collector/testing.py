@@ -56,6 +56,8 @@ def make_settings(tmp: Path, **overrides: Any) -> Settings:
         "state_dir": tmp / "state",
         "log_format": "console",
         "lease_seconds": 5,
+        "heartbeat_interval_ms": 1000,
+        "state_busy_timeout_ms": 2000,
         "discovery_path": tmp / "no-discovery-package",
     }
     values.update(overrides)

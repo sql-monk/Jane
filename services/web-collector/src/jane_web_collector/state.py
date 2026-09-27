@@ -119,8 +119,12 @@ CREATE TABLE IF NOT EXISTS counters (
 );
 """
 
-# SQLite busy timeout: how long a writer waits for another process holding the lock (seconds).
-BUSY_TIMEOUT_S = 30.0
+Fence = tuple[str, str]
+"""``(collection_id, owner)``: a transaction with a fence commits only while ``owner`` holds a valid lease."""
+
+
+class LeaseLost(Exception):
+    """This instance no longer holds the lease of the collection (another instance took it over)."""
 
 
 @dataclass(frozen=True)
@@ -140,12 +144,14 @@ def _dumps(value: Any) -> str:
 
 
 class StateStore:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, busy_timeout_ms: int = 10_000) -> None:
+        """``busy_timeout_ms``: how long a writer waits for another process holding the SQLite lock
+        (configuration: ``JANE_WEB_COLLECTOR_STATE_BUSY_TIMEOUT_MS``, must stay below the lease)."""
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
         self._lock = threading.RLock()
         self._db = sqlite3.connect(
-            str(path), timeout=BUSY_TIMEOUT_S, isolation_level=None, check_same_thread=False
+            str(path), timeout=busy_timeout_ms / 1000, isolation_level=None, check_same_thread=False
         )
         self._db.row_factory = sqlite3.Row
         self._db.execute("PRAGMA journal_mode=WAL")
@@ -157,10 +163,19 @@ class StateStore:
             self._db.close()
 
     @contextmanager
-    def tx(self) -> Iterator[sqlite3.Connection]:
+    def tx(self, fence: Fence | None = None) -> Iterator[sqlite3.Connection]:
+        """``BEGIN IMMEDIATE`` transaction. With ``fence`` the transaction is rolled back and
+        :class:`LeaseLost` raised unless the owner still holds a valid lease (fencing of a run that
+        another instance has taken over)."""
         with self._lock:
             self._db.execute("BEGIN IMMEDIATE")
             try:
+                if fence is not None:
+                    row = self._db.execute(
+                        "SELECT owner, lease_until FROM collections WHERE collection_id = ?", (fence[0],)
+                    ).fetchone()
+                    if row is None or row[0] != fence[1] or float(row[1]) <= time.time():
+                        raise LeaseLost(fence[0])
                 yield self._db
             except BaseException:
                 self._db.execute("ROLLBACK")
@@ -263,6 +278,24 @@ class StateStore:
     def save_stats(self, db: sqlite3.Connection, collection_id: str, stats: Mapping[str, Any]) -> None:
         db.execute("UPDATE collections SET stats = ? WHERE collection_id = ?", (_dumps(stats), collection_id))
 
+    def lease(self, collection_id: str) -> tuple[str | None, float]:
+        row = self._one(
+            "SELECT owner, lease_until FROM collections WHERE collection_id = ?", (collection_id,)
+        )
+        return (row[0], float(row[1])) if row else (None, 0.0)
+
+    def set_status_if_owner(
+        self, collection_id: str, owner: str, status: str, *, finished_at: str | None
+    ) -> bool:
+        """Terminal status written only by the lease holder (a run that lost its lease must not overwrite it)."""
+        with self.tx() as db:
+            cur = db.execute(
+                "UPDATE collections SET status = ?, finished_at = COALESCE(?, finished_at), finished_ts = ?, "
+                "lease_until = 0 WHERE collection_id = ? AND owner = ?",
+                (status, finished_at, time.time() if finished_at else None, collection_id, owner),
+            )
+            return cur.rowcount == 1
+
     def claim(self, collection_id: str, owner: str, lease_seconds: float) -> bool:
         """Take (or renew) the lease of a non-terminal collection."""
         now = time.time()
@@ -351,8 +384,8 @@ class StateStore:
             is not None
         )
 
-    def take_pending(self, collection_id: str, limit: int) -> list[FrontierRow]:
-        with self.tx() as db:
+    def take_pending(self, collection_id: str, limit: int, fence: Fence | None = None) -> list[FrontierRow]:
+        with self.tx(fence) as db:
             rows = db.execute(
                 "SELECT * FROM frontier WHERE collection_id = ? AND status = 'pending' "
                 "ORDER BY priority DESC, seq LIMIT ?",
@@ -382,8 +415,8 @@ class StateStore:
             "UPDATE frontier SET status = ? WHERE collection_id = ? AND url = ?", (status, collection_id, url)
         )
 
-    def reset_inflight(self, collection_id: str) -> int:
-        with self.tx() as db:
+    def reset_inflight(self, collection_id: str, fence: Fence | None = None) -> int:
+        with self.tx(fence) as db:
             return db.execute(
                 "UPDATE frontier SET status = 'pending' WHERE collection_id = ? AND status = 'inflight'",
                 (collection_id,),
@@ -395,10 +428,11 @@ class StateStore:
         )
         return {str(r[0]): int(r[1]) for r in rows}
 
-    def drop_pending(self, collection_id: str) -> int:
-        with self.tx() as db:
+    def drop_pending(self, collection_id: str, fence: Fence | None = None) -> int:
+        """Budget reached: pending and stale in-flight URLs are dropped (not fetched in this run)."""
+        with self.tx(fence) as db:
             return db.execute(
-                "UPDATE frontier SET status = 'dropped' WHERE collection_id = ? AND status = 'pending'",
+                "UPDATE frontier SET status = 'dropped' WHERE collection_id = ? AND status IN ('pending', 'inflight')",
                 (collection_id,),
             ).rowcount
 

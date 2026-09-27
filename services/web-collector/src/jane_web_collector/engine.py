@@ -72,6 +72,7 @@ class Engine:
             transit=self.transit,
             instance_id=settings.instance_id,
             lease_seconds=settings.lease_seconds,
+            heartbeat_seconds=settings.heartbeat_interval_ms / 1000,
             user_agent=settings.user_agent,
             version=__version__,
         )
@@ -148,7 +149,7 @@ class Engine:
         return resumed
 
     async def _gc_loop(self) -> None:
-        interval = max(1.0, min(3600.0, self.limits.jobs.job_retention_seconds / 10))
+        interval = min(self.limits.collector.gc_interval_seconds, self.limits.jobs.job_retention_seconds / 10)
         while True:
             await asyncio.sleep(interval)
             try:
@@ -263,32 +264,32 @@ class Engine:
         self.local.add(cid)
 
         async def work(ctx: JobContext) -> dict[str, Any]:
+            me = self.settings.instance_id
             record = self.state.get_collection(cid)
             if record is None:
                 raise JaneError(f"collection {cid} disappeared")
-            self.state.set_status(cid, "running")
-            run = CrawlRun(self.deps, record)
             try:
-                result = await run.execute(ctx)
+                with self.state.tx((cid, me)) as db:
+                    self.state.set_status(cid, "running", db=db)
+                run = CrawlRun(self.deps, record)
+                # the run marks the collection succeeded itself, in its last lease-fenced transaction
+                return await run.execute(ctx)
             except LeaseLost:
+                # another instance holds the lease now; this run wrote nothing after losing it, and the job
+                # store ignores this instance's job updates for a collection it does not own
                 log.warning("lease lost, another instance continues", extra={"collection_id": cid})
-                self.local.discard(cid)
                 return {"collection_id": cid, "handed_over": True}
             except (asyncio.CancelledError, JobCancelledError):
                 if self.shutting_down:  # graceful stop: stays resumable
-                    self.state.release(cid, self.settings.instance_id)
+                    self.state.release(cid, me)
                 else:
-                    self.state.set_status(cid, "cancelled", finished_at=_now())
-                self.local.discard(cid)
+                    self.state.set_status_if_owner(cid, me, "cancelled", finished_at=_now())
                 raise
             except BaseException:
-                self.state.set_status(cid, "failed", finished_at=_now())
-                self.local.discard(cid)
+                self.state.set_status_if_owner(cid, me, "failed", finished_at=_now())
                 raise
-            self.state.set_status(cid, "succeeded", finished_at=_now())
-            self.state.release(cid, self.settings.instance_id)
-            self.local.discard(cid)
-            return result
+            finally:
+                self.local.discard(cid)
 
         return await self.runner.submit("collection", work, job_id=cid, labels=labels)
 

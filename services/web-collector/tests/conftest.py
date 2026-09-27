@@ -91,6 +91,8 @@ def service_factory(tmp_path: Path) -> Iterator[ServiceFactory]:
             port,
             state_dir,
             JANE_WEB_COLLECTOR_LEASE_SECONDS="3",
+            JANE_WEB_COLLECTOR_HEARTBEAT_INTERVAL_MS="500",
+            JANE_WEB_COLLECTOR_STATE_BUSY_TIMEOUT_MS="1000",
             JANE_WEB_COLLECTOR_DISCOVERY_PATH=str(tmp_path / "no-discovery-package"),
             JANE_CONTRACTS_DIR=str(REPO_ROOT / "contracts"),
             **env_overrides,

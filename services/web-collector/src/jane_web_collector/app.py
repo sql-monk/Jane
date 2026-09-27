@@ -61,10 +61,10 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     resolved = resolve_service_limits(settings)
     limits = resolved.limits
-    state = StateStore(settings.state_dir / "state.db")
+    state = StateStore(settings.state_dir / "state.db", busy_timeout_ms=settings.state_busy_timeout_ms)
     registry = Registry.default(settings.discovery_path)
     schemas = ContractSchemas.locate(settings.contracts_dir)
-    runner = JobRunner(store=SqliteJobStore(state), limits=limits.jobs)
+    runner = JobRunner(store=SqliteJobStore(state, settings.instance_id), limits=limits.jobs)
     idem_store = SqliteIdempotencyStore(state)
     engine = Engine(settings, resolved, state, registry, schemas, runner)
 
@@ -165,7 +165,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             status = engine.collection_view(collection_id)["status"]
             if items or status in TERMINAL or time.monotonic() >= deadline:
                 break
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(limits.collector.long_poll_interval_ms / 1000)
         more = len(items) > page_size
         items = items[:page_size]
         if items:

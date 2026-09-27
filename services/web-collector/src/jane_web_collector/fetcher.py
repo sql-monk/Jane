@@ -17,7 +17,7 @@ from urllib.parse import urljoin, urlsplit
 
 import httpx
 
-from .settings import ServiceLimits
+from .settings import ServiceLimits, Timeouts
 
 __all__ = ["FetchError", "Fetcher", "HostLimiter", "HttpResult", "build_client"]
 
@@ -167,8 +167,13 @@ class Fetcher:
             delay *= 0.5 + random.random() / 2  # noqa: S311 - jitter, not cryptography
         return delay
 
+    def _timeout(self, timeouts: Timeouts | None) -> httpx.Timeout:
+        """Per-request timeouts from the run's (or strategy's) effective limits, not the client defaults."""
+        t = timeouts or self.limits.timeouts
+        return httpx.Timeout(t.request_timeout_ms / 1000, connect=t.connect_timeout_ms / 1000)
+
     async def _one_request(
-        self, url: str, headers: Mapping[str, str], max_bytes: int
+        self, url: str, headers: Mapping[str, str], max_bytes: int, timeouts: Timeouts | None = None
     ) -> tuple[int, dict[str, str], bytes, bool]:
         host = urlsplit(url).netloc
         delay = await self.crawl_delay_for(url) if self.crawl_delay_for else None
@@ -182,7 +187,9 @@ class Fetcher:
             )
         async with self.limiter.semaphore(host):
             await self.limiter.wait_turn(host, delay)
-            async with self.client.stream("GET", url, headers=headers) as resp:
+            async with self.client.stream(
+                "GET", url, headers=headers, timeout=self._timeout(timeouts)
+            ) as resp:
                 chunks: list[bytes] = []
                 size = 0
                 truncated = False
@@ -204,6 +211,7 @@ class Fetcher:
         check_hop: HopCheck | None = None,
         conditional: Mapping[str, str] | None = None,
         max_bytes: int | None = None,
+        timeouts: Timeouts | None = None,
     ) -> HttpResult:
         """GET with retries and redirects. Raises :class:`FetchError`; policy callbacks may raise their own."""
         max_bytes = max_bytes if max_bytes is not None else self.limits.crawl.max_material_bytes
@@ -212,7 +220,9 @@ class Fetcher:
         total_attempts = 0
         while True:
             headers = {**self.headers, **self.auth_headers_for(current, url), **dict(conditional or {})}
-            status, hdrs, body, truncated, attempts = await self._with_retries(current, headers, max_bytes)
+            status, hdrs, body, truncated, attempts = await self._with_retries(
+                current, headers, max_bytes, timeouts
+            )
             total_attempts += attempts
             if status in REDIRECT_STATUSES and "location" in hdrs:
                 if len(redirects) >= self.limits.crawl.max_redirects:
@@ -248,14 +258,14 @@ class Fetcher:
         return {}
 
     async def _with_retries(
-        self, url: str, headers: Mapping[str, str], max_bytes: int
+        self, url: str, headers: Mapping[str, str], max_bytes: int, timeouts: Timeouts | None = None
     ) -> tuple[int, dict[str, str], bytes, bool, int]:
         max_attempts = self.limits.retries.max_attempts
         last_error = ""
         last_status: int | None = None
         for attempt in range(1, max_attempts + 1):
             try:
-                status, hdrs, body, truncated = await self._one_request(url, headers, max_bytes)
+                status, hdrs, body, truncated = await self._one_request(url, headers, max_bytes, timeouts)
             except httpx.TransportError as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
                 last_status = None

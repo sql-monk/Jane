@@ -59,6 +59,22 @@ class Settings(JaneSettings):
     """Default User-Agent; ``rules.fetch.user_agent`` overrides it. The robots token is its first word."""
     lease_seconds: int = Field(default=30, ge=2)
     """A running collection is owned by one instance; after this long without a heartbeat another takes it."""
+    heartbeat_interval_ms: int = Field(default=5_000, ge=50)
+    """How often the owner renews the lease and checks for cancellation from other instances."""
+    state_busy_timeout_ms: int = Field(default=10_000, ge=1)
+    """How long a write waits for another process holding the SQLite lock."""
+
+    @model_validator(mode="after")
+    def _lease_rules(self) -> Settings:
+        # The owner must renew its lease before it expires even if one write waited the full busy timeout;
+        # otherwise a live instance would lose the collection to another one (duplicates, lost URLs).
+        lease_ms = self.lease_seconds * 1000
+        if self.heartbeat_interval_ms + self.state_busy_timeout_ms >= lease_ms:
+            raise ValueError(
+                f"heartbeat_interval_ms ({self.heartbeat_interval_ms}) + state_busy_timeout_ms "
+                f"({self.state_busy_timeout_ms}) must be less than lease_seconds*1000 ({lease_ms})"
+            )
+        return self
 
 
 class Concurrency(Limits):
@@ -116,8 +132,12 @@ class Collector(Limits):
     """robots.txt larger than this is truncated (RFC 9309 allows >= 500 KiB)."""
     max_retry_after_seconds: int = Field(default=300, ge=0)
     """A source asking to wait longer (Retry-After, Crawl-delay) makes the URL fail with ``rate_limited``."""
-    heartbeat_interval_ms: int = Field(default=5_000, ge=100)
-    """How often a running collection renews its lease and checks for cancellation from other instances."""
+    backpressure_poll_ms: int = Field(default=1_000, ge=10)
+    """While paused by backpressure: how often the buffer is re-checked (acks may arrive via another instance)."""
+    long_poll_interval_ms: int = Field(default=100, ge=10)
+    """``/materials?wait_ms=``: how often new materials are looked for while waiting."""
+    gc_interval_seconds: int = Field(default=3_600, ge=1)
+    """How often expired collections and transit files are cleaned up."""
 
 
 class ServiceLimits(Limits):

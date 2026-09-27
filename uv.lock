@@ -23,6 +23,7 @@ members = [
     "jane-storage-postgres",
     "jane-storage-s3",
     "jane-storage-sqlserver",
+    "jane-telegram-collector",
     "jane-template-service",
     "jane-testsite",
     "jane-web-collector",
@@ -949,6 +950,17 @@ requires-dist = [
     { name = "jane-storage", editable = "services/storage" },
     { name = "pymssql", specifier = ">=2.3" },
 ]
+
+[[package]]
+name = "jane-telegram-collector"
+version = "0.1.0"
+source = { editable = "services/telegram-collector" }
+dependencies = [
+    { name = "jane-kit" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "jane-kit", editable = "libs/jane-kit" }]
 
 [[package]]
 name = "jane-template-service"

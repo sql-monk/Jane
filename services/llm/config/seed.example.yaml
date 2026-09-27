@@ -1,0 +1,42 @@
+# Example seed for the LLM service (JANE_LLM_SEED_FILE). Applied at startup; only entries that do not
+# exist yet are created, later changes go through the API (PUT /v1/providers, /v1/model-aliases, ...).
+# No secret values here: the API key is a reference resolved in the service's environment.
+connections:
+  - connection_id: anthropic-main
+    kind: llm_provider
+    title: Anthropic Messages API
+    params:
+      api_base: https://api.anthropic.com
+    secret_refs:
+      api_key: env:JANE_SECRET_ANTHROPIC_API_KEY
+
+providers:
+  - provider_id: anthropic
+    kind: anthropic
+    connection_id: anthropic-main
+    enabled: true
+    models:
+      - model_id: claude-opus-5
+        max_context_tokens: 1000000
+        supports_structured_output: true
+        pricing: {input_per_mtok: 5, output_per_mtok: 25, currency: USD}
+      - model_id: claude-haiku-4-5
+        max_context_tokens: 200000
+        supports_structured_output: true
+        pricing: {input_per_mtok: 1, output_per_mtok: 5, currency: USD}
+    limits:
+      max_requests_per_minute: 30
+
+# Packages refer to aliases, never to providers. With JANE_LLM_FAKE_PROVIDER_ENABLED=false the
+# "default" alias below is used; otherwise the built-in "default" -> fake is created only if absent,
+# so seeding "default" here makes the real model the default.
+model_aliases:
+  - {alias: default, provider_id: anthropic, model_id: claude-opus-5}
+  - {alias: strong, provider_id: anthropic, model_id: claude-opus-5}
+  - {alias: cheap, provider_id: anthropic, model_id: claude-haiku-4-5}
+
+budgets:
+  - scope_type: platform
+    scope_id: platform
+    budget: {amount: 10, currency: USD, period: day}
+    max_requests_per_minute: 60

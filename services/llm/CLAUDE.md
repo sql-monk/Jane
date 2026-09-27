@@ -1,0 +1,3 @@
+- Запуск: `uv run --package jane-llm python -m jane_llm` (PostgreSQL: `JANE_LLM_DATABASE_URL`; без БД — `JANE_LLM_STORE=memory`), Docker — README.md.
+- Тести: `just test llm`; з PostgreSQL і кількома екземплярами: `just up --project jane-wp10 postgres` → `just integration --project jane-wp10 services/llm`.
+- Контракт: `contracts/openapi/llm.v1.yaml` + `handler.v1.yaml` (+ `common.yaml`); конвенції — скіл `jane-contracts`, пакети — `jane-handler-package`.

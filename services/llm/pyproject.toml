@@ -1,0 +1,27 @@
+[project]
+name = "jane-llm"
+version = "0.1.0"
+description = "LLM gateway and LLM handler of the Jane platform."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "jane-kit",
+    "httpx>=0.27",
+    "PyYAML>=6.0",
+    "jsonschema>=4.23",
+    "psycopg[binary]>=3.2",
+    "psycopg-pool>=3.2",
+]
+
+[project.scripts]
+jane-llm = "jane_llm.__main__:main"
+
+[tool.uv.sources]
+jane-kit = { workspace = true }
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jane_llm"]

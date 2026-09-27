@@ -12,6 +12,7 @@ members = [
     "jane-extractor-sdk",
     "jane-handler-runtime",
     "jane-kit",
+    "jane-llm",
     "jane-storage",
     "jane-storage-files",
     "jane-storage-postgres",
@@ -718,6 +719,29 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.35" },
     { name = "uvicorn", specifier = ">=0.32" },
+]
+
+[[package]]
+name = "jane-llm"
+version = "0.1.0"
+source = { editable = "services/llm" }
+dependencies = [
+    { name = "httpx" },
+    { name = "jane-kit" },
+    { name = "jsonschema" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "psycopg-pool" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "jane-kit", editable = "libs/jane-kit" },
+    { name = "jsonschema", specifier = ">=4.23" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
+    { name = "psycopg-pool", specifier = ">=3.2" },
+    { name = "pyyaml", specifier = ">=6.0" },
 ]
 
 [[package]]

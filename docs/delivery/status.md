@@ -9,8 +9,8 @@
 | 02 | Web Collector: ядро | 1 | active | `wp/02-web-collector-core` | агент | слот 1 |
 | 03 | Web Collector: стратегії пошуку | 1 | — | | | після M0 |
 | 04 | Telegram Collector | 1 | — | | | після M0 |
-| 05 | Репозиторій обробників | 1 | — | | | після M0 |
-| 06 | Runtime обробників і SDK | 1 | active | `wp/06-handler-runtime` | агент | слот 1 |
+| 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент | слот 2 |
+| 06 | Runtime обробників і SDK | 1 | review | `wp/06-handler-runtime` | агент / wp-reviewer | |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | review | `wp/07-storage-core` | агент / wp-reviewer | compat-suite `f97527d` |
 | 08 | Адаптери збереження | 1 | — | | | після M0 |
 | 09 | Оркестратор | 1 | active | `wp/09-orchestrator` | агент | слот 1 |
@@ -38,6 +38,7 @@
 - 2026-09-27 — хвиля 1, слот 1: запущено WP-09, WP-02, WP-06, WP-07 (база `39de0b4`).
 - 2026-09-27 — ліміт сесії перервав слот 1; агентів відновлено з тих самих worktree. CI на main зелений (`ef5a879`).
 - 2026-09-27 — WP-07 на рев'ю; запущено WP-11.
+- 2026-09-27 — WP-06 на рев'ю; запущено WP-05 (узгодити канонічний архів з WP-06/07).
 
 ## Відкриті запити між власниками
 | Від | Кому | Запит | Стан |
@@ -47,3 +48,6 @@
 | WP-07 | WP-05 | канонічний архів і дайджест пакета (zip stored, відсортовано, дата 1980, 0644); дайджести в прикладах WP-00 не реальні | передати WP-05 |
 | WP-07 | WP-00 | задокументувати `DeliveryRecord.acks`; простір імен етапу в storage.v1; приклад `storage-files.json` `format.raw: html` vs `original` | зміна контракту через contract-guardian |
 | WP-07 | WP-09 | `Idempotency-Key` = `delivery_key`; `handler.digest` з registry або `/v1/info` | передати WP-09 |
+| WP-06 | WP-05 | перевірка `dependencies.python` за профілем `python-extractor@1`; канонічний архів (`build_archive` у SDK) | передано WP-05 |
+| WP-06 | WP-00 | `/v1/connections*` у handler.v1 необов'язкові для виконавців без підключень | зміна контракту через contract-guardian |
+| WP-06 | WP-01 | застарілий коментар job `isolation` у `ci.yml`; Docker на runner | відкрито |

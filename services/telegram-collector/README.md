@@ -176,21 +176,30 @@ just test telegram-collector          # усе: unit, сценарії на сп
 import uuid
 import httpx
 
-rules = {"collector": "telegram", "channels": [{"username": "city_events_example"}],
-         "updates": {"new_messages": True, "edits": True}}
+rules = {
+    "collector": "telegram",
+    "channels": [{"username": "city_events_example"}],
+    "updates": {"new_messages": True, "edits": True},
+}
 with httpx.Client(base_url="http://127.0.0.1:8102") as api:
-    job = api.post("/v1/collections", headers={"Idempotency-Key": str(uuid.uuid4())},
-                   json={"source_kind": "telegram", "rules": rules, "mode": "incremental",
-                         "state_key": "city-events"}).json()
+    job = api.post(
+        "/v1/collections",
+        headers={"Idempotency-Key": str(uuid.uuid4())},
+        json={"source_kind": "telegram", "rules": rules, "mode": "incremental", "state_key": "city-events"},
+    ).json()
     after = None
     while True:
-        page = api.get(f"/v1/collections/{job['job_id']}/materials",
-                       params={"wait_ms": 5000, **({"after": after} if after else {})}).json()
+        page = api.get(
+            f"/v1/collections/{job['job_id']}/materials",
+            params={"wait_ms": 5000, **({"after": after} if after else {})},
+        ).json()
         for m in page["items"]:
             print(m["material_id"], m["revision"]["is_edit"], m["content"]["data"])
         after = page["next_cursor"] or after
         if page["end_of_stream"]:
-            api.get(f"/v1/collections/{job['job_id']}/materials", params={"after": after})  # підтвердити останню сторінку
+            api.get(
+                f"/v1/collections/{job['job_id']}/materials", params={"after": after}
+            )  # підтвердити останню сторінку
             break
 ```
 

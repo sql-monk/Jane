@@ -7,8 +7,8 @@ by a recording.
 from __future__ import annotations
 
 import time
-from typing import Any
 from datetime import timedelta
+from typing import Any
 
 from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator

@@ -8,17 +8,18 @@ so a concurrent duplicate publish fails with ``version_exists``.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from psycopg import AsyncConnection, errors, sql
+from psycopg import Connection, errors, sql
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
-from psycopg_pool import AsyncConnectionPool
+from psycopg_pool import ConnectionPool
 
 from jane_kit.idempotency import IdempotencyRecord, StoredResponse
 from jane_kit.jobs import Job, JobLimits
@@ -177,26 +178,26 @@ def _like(text: str) -> str:
     return "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
-class PostgresStore:
+class _SyncStore:
     name = "postgres"
 
     def __init__(self, dsn: str, schema: str, limits: DbLimits) -> None:
         self.dsn = dsn
         self.schema = schema
         self.limits = limits
-        self.pool: AsyncConnectionPool[AsyncConnection[dict[str, Any]]] | None = None
+        self.pool: ConnectionPool[Connection[dict[str, Any]]] | None = None
 
-    async def _configure(self, conn: AsyncConnection[dict[str, Any]]) -> None:
-        await conn.execute(
+    def _configure(self, conn: Connection[dict[str, Any]]) -> None:
+        conn.execute(
             sql.SQL("SET search_path TO {}").format(sql.Identifier(self.schema)),
         )
-        await conn.execute(
+        conn.execute(
             sql.SQL("SET statement_timeout = {}").format(sql.Literal(self.limits.statement_timeout_ms))
         )
-        await conn.commit()
+        conn.commit()
 
-    async def open(self) -> None:
-        self.pool = AsyncConnectionPool(
+    def open(self) -> None:
+        self.pool = ConnectionPool(
             self.dsn,
             min_size=self.limits.pool_min_size,
             max_size=self.limits.pool_max_size,
@@ -208,40 +209,40 @@ class PostgresStore:
             configure=self._configure,
             open=False,
         )
-        await self.pool.open(wait=True, timeout=self.limits.connect_timeout_ms / 1000)
-        await self.migrate()
+        self.pool.open(wait=True, timeout=self.limits.connect_timeout_ms / 1000)
+        self.migrate()
 
-    async def close(self) -> None:
+    def close(self) -> None:
         if self.pool is not None:
-            await self.pool.close()
+            self.pool.close()
 
-    @asynccontextmanager
-    async def tx(self) -> AsyncIterator[AsyncConnection[dict[str, Any]]]:
+    @contextmanager
+    def tx(self) -> Iterator[Connection[dict[str, Any]]]:
         assert self.pool is not None, "store is not open"
-        async with self.pool.connection() as conn, conn.transaction():
+        with self.pool.connection() as conn, conn.transaction():
             yield conn
 
-    async def migrate(self) -> None:
-        async with self.tx() as conn:
-            await conn.execute("SELECT pg_advisory_xact_lock(hashtext('jane_registry_schema'))")
-            await conn.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(sql.Identifier(self.schema)))
-            await conn.execute(_DDL.encode())
-            await conn.execute(
+    def migrate(self) -> None:
+        with self.tx() as conn:
+            conn.execute("SELECT pg_advisory_xact_lock(hashtext('jane_registry_schema'))")
+            conn.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(sql.Identifier(self.schema)))
+            conn.execute(_DDL.encode())
+            conn.execute(
                 "INSERT INTO registry_schema_version (version, applied_at) VALUES (%s, now()) "
                 "ON CONFLICT (version) DO NOTHING",
                 (SCHEMA_VERSION,),
             )
 
-    async def check(self) -> bool:
-        async with self.tx() as conn:
-            await conn.execute("SELECT 1")
+    def check(self) -> bool:
+        with self.tx() as conn:
+            conn.execute("SELECT 1")
         return True
 
     # ------------------------------------------------------------------ packages
-    async def create_package(self, pkg: PackageRecord) -> PackageRecord:
+    def create_package(self, pkg: PackageRecord) -> PackageRecord:
         try:
-            async with self.tx() as conn:
-                cur = await conn.execute(
+            with self.tx() as conn:
+                cur = conn.execute(
                     f"INSERT INTO registry_packages ({_PKG_COLS}) VALUES "  # noqa: S608
                     "(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
                     (
@@ -264,28 +265,28 @@ class PostgresStore:
                         pkg.updated_at,
                     ),
                 )
-                row = await cur.fetchone()
+                row = cur.fetchone()
         except errors.UniqueViolation as exc:
             raise AlreadyExists(pkg.package_id) from exc
         assert row is not None
         return _pkg(row)
 
-    async def get_package(self, package_id: str) -> PackageRecord | None:
-        async with self.tx() as conn:
-            cur = await conn.execute("SELECT * FROM registry_packages WHERE package_id = %s", (package_id,))
-            row = await cur.fetchone()
+    def get_package(self, package_id: str) -> PackageRecord | None:
+        with self.tx() as conn:
+            cur = conn.execute("SELECT * FROM registry_packages WHERE package_id = %s", (package_id,))
+            row = cur.fetchone()
         return _pkg(row) if row else None
 
-    async def update_package(
+    def update_package(
         self, package_id: str, changes: dict[str, Any], expected_revision: int | None
     ) -> PackageRecord:
         allowed = {"title", "description", "auto_changes_allowed", "deprecated", "labels"}
         assert set(changes) <= allowed, changes
-        async with self.tx() as conn:
-            cur = await conn.execute(
+        with self.tx() as conn:
+            cur = conn.execute(
                 "SELECT revision FROM registry_packages WHERE package_id = %s FOR UPDATE", (package_id,)
             )
-            row = await cur.fetchone()
+            row = cur.fetchone()
             if row is None:
                 raise KeyError(package_id)
             if expected_revision is not None and row["revision"] != expected_revision:
@@ -296,12 +297,12 @@ class PostgresStore:
                 "UPDATE registry_packages SET {}, revision = revision + 1, updated_at = %s "
                 "WHERE package_id = %s RETURNING *"
             ).format(sql.SQL(", ").join(sets))
-            cur = await conn.execute(query, (*values, now(), package_id))
-            updated = await cur.fetchone()
+            cur = conn.execute(query, (*values, now(), package_id))
+            updated = cur.fetchone()
         assert updated is not None
         return _pkg(updated)
 
-    async def list_packages(self, flt: PackageFilter, after: str | None, limit: int) -> list[PackageRecord]:
+    def list_packages(self, flt: PackageFilter, after: str | None, limit: int) -> list[PackageRecord]:
         where: list[str] = []
         args: list[Any] = []
         if after is not None:
@@ -334,41 +335,39 @@ class PostgresStore:
             )
             args.append(_like(flt.q.lower()))
         clause = ("WHERE " + " AND ".join(where)) if where else ""
-        async with self.tx() as conn:
-            cur = await conn.execute(
+        with self.tx() as conn:
+            cur = conn.execute(
                 f"SELECT * FROM registry_packages {clause} ORDER BY package_id LIMIT %s",  # noqa: S608
                 (*args, limit),
             )
-            rows = await cur.fetchall()
+            rows = cur.fetchall()
         return [_pkg(r) for r in rows]
 
-    async def count_forks(self, package_id: str) -> int:
-        async with self.tx() as conn:
-            cur = await conn.execute(
+    def count_forks(self, package_id: str) -> int:
+        with self.tx() as conn:
+            cur = conn.execute(
                 "SELECT count(*) AS n FROM registry_packages WHERE fork_parent = %s", (package_id,)
             )
-            row = await cur.fetchone()
+            row = cur.fetchone()
         return int(row["n"]) if row else 0
 
-    async def delete_package_if_empty(self, package_id: str) -> None:
-        async with self.tx() as conn:
-            await conn.execute(
+    def delete_package_if_empty(self, package_id: str) -> None:
+        with self.tx() as conn:
+            conn.execute(
                 "DELETE FROM registry_packages p WHERE package_id = %s "
                 "AND NOT EXISTS (SELECT 1 FROM registry_versions v WHERE v.package_id = p.package_id)",
                 (package_id,),
             )
 
     # ------------------------------------------------------------------ versions
-    async def _refresh(
-        self, conn: AsyncConnection[dict[str, Any]], package_id: str, touched: datetime
-    ) -> None:
-        cur = await conn.execute(
+    def _refresh(self, conn: Connection[dict[str, Any]], package_id: str, touched: datetime) -> None:
+        cur = conn.execute(
             "SELECT version, status, search FROM registry_versions WHERE package_id = %s", (package_id,)
         )
-        rows = await cur.fetchall()
+        rows = cur.fetchall()
         latest = pick_latest([(r["version"], r["status"]) for r in rows])
         fields: dict[str, list[str]] = next((r["search"] for r in rows if r["version"] == latest), {})
-        await conn.execute(
+        conn.execute(
             "UPDATE registry_packages SET latest_version = %s, tags = %s, entity_types = %s, media_types = %s, "
             "domains = %s, revision = revision + 1, updated_at = %s WHERE package_id = %s",
             (
@@ -382,39 +381,39 @@ class PostgresStore:
             ),
         )
 
-    async def _history(self, conn: AsyncConnection[dict[str, Any]], v: VersionRecord) -> VersionRecord:
-        cur = await conn.execute(
+    def _history(self, conn: Connection[dict[str, Any]], v: VersionRecord) -> VersionRecord:
+        cur = conn.execute(
             "SELECT entry FROM registry_status_history WHERE package_id = %s AND version = %s ORDER BY id",
             (v.package_id, v.version),
         )
-        v.status_history = [r["entry"] for r in await cur.fetchall()]
-        cur = await conn.execute(
+        v.status_history = [r["entry"] for r in cur.fetchall()]
+        cur = conn.execute(
             "SELECT record FROM registry_test_reports WHERE package_id = %s AND version = %s ORDER BY id",
             (v.package_id, v.version),
         )
-        v.test_reports = [r["record"] for r in await cur.fetchall()]
+        v.test_reports = [r["record"] for r in cur.fetchall()]
         return v
 
-    async def insert_version(self, version: VersionRecord, max_versions: int) -> VersionRecord:
+    def insert_version(self, version: VersionRecord, max_versions: int) -> VersionRecord:
         try:
-            async with self.tx() as conn:
-                cur = await conn.execute(
+            with self.tx() as conn:
+                cur = conn.execute(
                     "SELECT package_id FROM registry_packages WHERE package_id = %s FOR UPDATE",
                     (version.package_id,),
                 )
-                if await cur.fetchone() is None:
+                if cur.fetchone() is None:
                     raise KeyError(version.package_id)
-                cur = await conn.execute(
+                cur = conn.execute(
                     "SELECT count(*) AS n, bool_or(version = %s) AS taken FROM registry_versions WHERE package_id = %s",
                     (version.version, version.package_id),
                 )
-                row = await cur.fetchone()
+                row = cur.fetchone()
                 assert row is not None
                 if row["taken"]:
                     raise VersionExists(version.version)
                 if int(row["n"]) >= max_versions:
                     raise LimitReached(int(row["n"]))
-                cur = await conn.execute(
+                cur = conn.execute(
                     _INSERT_VERSION,
                     (
                         version.package_id,
@@ -432,28 +431,28 @@ class PostgresStore:
                         Jsonb(version.search_fields),
                     ),
                 )
-                inserted = await cur.fetchone()
+                inserted = cur.fetchone()
                 assert inserted is not None
                 for entry in version.status_history:
-                    await conn.execute(
+                    conn.execute(
                         "INSERT INTO registry_status_history (package_id, version, entry) VALUES (%s, %s, %s)",
                         (version.package_id, version.version, Jsonb(entry)),
                     )
-                await self._refresh(conn, version.package_id, version.created_at)
-                return await self._history(conn, _ver(inserted))
+                self._refresh(conn, version.package_id, version.created_at)
+                return self._history(conn, _ver(inserted))
         except errors.UniqueViolation as exc:
             raise VersionExists(version.version) from exc
 
-    async def get_version(self, package_id: str, version: str) -> VersionRecord | None:
-        async with self.tx() as conn:
-            cur = await conn.execute(
+    def get_version(self, package_id: str, version: str) -> VersionRecord | None:
+        with self.tx() as conn:
+            cur = conn.execute(
                 f"SELECT {_VER_COLS} FROM registry_versions WHERE package_id = %s AND version = %s",  # noqa: S608
                 (package_id, version),
             )
-            row = await cur.fetchone()
-            return await self._history(conn, _ver(row)) if row else None
+            row = cur.fetchone()
+            return self._history(conn, _ver(row)) if row else None
 
-    async def list_versions(
+    def list_versions(
         self, package_id: str, status: str | None, before_seq: int | None, limit: int
     ) -> list[VersionRecord]:
         where = ["package_id = %s"]
@@ -464,97 +463,93 @@ class PostgresStore:
         if before_seq is not None:
             where.append("seq < %s")
             args.append(before_seq)
-        async with self.tx() as conn:
-            cur = await conn.execute(
+        with self.tx() as conn:
+            cur = conn.execute(
                 f"SELECT {_VER_COLS} FROM registry_versions WHERE {' AND '.join(where)} "  # noqa: S608
                 "ORDER BY seq DESC LIMIT %s",
                 (*args, limit),
             )
-            rows = await cur.fetchall()
-            return [await self._history(conn, _ver(r)) for r in rows]
+            rows = cur.fetchall()
+            return [self._history(conn, _ver(r)) for r in rows]
 
-    async def version_numbers(self, package_id: str) -> list[tuple[str, str]]:
-        async with self.tx() as conn:
-            cur = await conn.execute(
+    def version_numbers(self, package_id: str) -> list[tuple[str, str]]:
+        with self.tx() as conn:
+            cur = conn.execute(
                 "SELECT version, status FROM registry_versions WHERE package_id = %s", (package_id,)
             )
-            return [(r["version"], r["status"]) for r in await cur.fetchall()]
+            return [(r["version"], r["status"]) for r in cur.fetchall()]
 
-    async def count_versions(self, package_id: str) -> int:
-        async with self.tx() as conn:
-            cur = await conn.execute(
+    def count_versions(self, package_id: str) -> int:
+        with self.tx() as conn:
+            cur = conn.execute(
                 "SELECT count(*) AS n FROM registry_versions WHERE package_id = %s", (package_id,)
             )
-            row = await cur.fetchone()
+            row = cur.fetchone()
         return int(row["n"]) if row else 0
 
-    async def set_status(
+    def set_status(
         self, package_id: str, version: str, expected: str, entry: dict[str, Any]
     ) -> VersionRecord:
-        async with self.tx() as conn:
-            await conn.execute(
-                "SELECT 1 FROM registry_packages WHERE package_id = %s FOR UPDATE", (package_id,)
-            )
-            cur = await conn.execute(
+        with self.tx() as conn:
+            conn.execute("SELECT 1 FROM registry_packages WHERE package_id = %s FOR UPDATE", (package_id,))
+            cur = conn.execute(
                 f"UPDATE registry_versions SET status = %s WHERE package_id = %s AND version = %s AND status = %s "  # noqa: S608
                 f"RETURNING {_VER_COLS}",
                 (entry["status"], package_id, version, expected),
             )
-            row = await cur.fetchone()
+            row = cur.fetchone()
             if row is None:
-                cur = await conn.execute(
+                cur = conn.execute(
                     "SELECT status FROM registry_versions WHERE package_id = %s AND version = %s",
                     (package_id, version),
                 )
-                current = await cur.fetchone()
+                current = cur.fetchone()
                 raise StatusMismatch(current["status"] if current else "missing")
-            await conn.execute(
+            conn.execute(
                 "INSERT INTO registry_status_history (package_id, version, entry) VALUES (%s, %s, %s)",
                 (package_id, version, Jsonb(entry)),
             )
-            await self._refresh(conn, package_id, now())
-            return await self._history(conn, _ver(row))
+            self._refresh(conn, package_id, now())
+            return self._history(conn, _ver(row))
 
-    async def add_test_report(
+    def add_test_report(
         self, package_id: str, version: str, record: dict[str, Any], test_status: str
     ) -> VersionRecord:
-        async with self.tx() as conn:
-            cur = await conn.execute(
+        with self.tx() as conn:
+            cur = conn.execute(
                 f"UPDATE registry_versions SET test_status = %s WHERE package_id = %s AND version = %s "  # noqa: S608
                 f"RETURNING {_VER_COLS}",
                 (test_status, package_id, version),
             )
-            row = await cur.fetchone()
+            row = cur.fetchone()
             if row is None:
                 raise KeyError(version)
-            await conn.execute(
+            conn.execute(
                 "INSERT INTO registry_test_reports (package_id, version, record) VALUES (%s, %s, %s)",
                 (package_id, version, Jsonb(record)),
             )
-            return await self._history(conn, _ver(row))
+            return self._history(conn, _ver(row))
 
 
-class PostgresIdempotencyStore:
+class _SyncIdempotency:
     """``IdempotencyStore`` on ``registry_idempotency`` (``INSERT ... ON CONFLICT DO NOTHING``)."""
 
-    def __init__(self, store: PostgresStore) -> None:
+    def __init__(self, store: _SyncStore) -> None:
         self.store = store
 
-    async def begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
+    def begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
         expires = datetime.now(UTC) + timedelta(seconds=ttl_s)
-        async with self.store.tx() as conn:
-            await conn.execute(
-                "DELETE FROM registry_idempotency WHERE key = %s AND expires_at <= now()", (key,)
-            )
-            cur = await conn.execute(
+        with self.store.tx() as conn:
+            conn.execute("DELETE FROM registry_idempotency WHERE key = %s AND expires_at <= now()", (key,))
+            cur = conn.execute(
                 "INSERT INTO registry_idempotency (key, fingerprint, state, expires_at) VALUES (%s, %s, 'in_progress', %s) "
                 "ON CONFLICT (key) DO NOTHING RETURNING key",
                 (key, fingerprint, expires),
             )
-            if await cur.fetchone() is not None:
+            if cur.fetchone() is not None:
                 return None
-            cur = await conn.execute("SELECT * FROM registry_idempotency WHERE key = %s", (key,))
-            row = await cur.fetchone()
+            cur = conn.execute("SELECT * FROM registry_idempotency WHERE key = %s", (key,))
+            row = cur.fetchone()
         if row is None:  # expired and deleted concurrently: let the client retry
             return IdempotencyRecord(key, fingerprint, "in_progress", time.time() + ttl_s)
         response = None
@@ -565,49 +560,148 @@ class PostgresIdempotencyStore:
             key, row["fingerprint"], row["state"], row["expires_at"].timestamp(), response
         )
 
-    async def complete(self, key: str, response: StoredResponse) -> None:
+    def complete(self, key: str, response: StoredResponse) -> None:
         doc = {"status_code": response.status_code, "body": response.body, "headers": dict(response.headers)}
-        async with self.store.tx() as conn:
-            await conn.execute(
+        with self.store.tx() as conn:
+            conn.execute(
                 "UPDATE registry_idempotency SET state = 'completed', response = %s WHERE key = %s",
                 (Jsonb(json.loads(json.dumps(doc, default=str))), key),
             )
 
-    async def release(self, key: str) -> None:
-        async with self.store.tx() as conn:
-            await conn.execute(
-                "DELETE FROM registry_idempotency WHERE key = %s AND state = 'in_progress'", (key,)
+    def release(self, key: str) -> None:
+        with self.store.tx() as conn:
+            conn.execute("DELETE FROM registry_idempotency WHERE key = %s AND state = 'in_progress'", (key,))
+
+
+class _SyncJobs:
+    """``JobStore`` on ``registry_jobs``; finished jobs older than ``job_retention_seconds`` are purged."""
+
+    def __init__(self, store: _SyncStore, limits: JobLimits) -> None:
+        self.store = store
+        self.limits = limits
+
+    def create(self, job: Job) -> None:
+        with self.store.tx() as conn:
+            conn.execute(
+                "DELETE FROM registry_jobs WHERE finished_at IS NOT NULL AND finished_at < now() - make_interval(secs => %s)",
+                (self.limits.job_retention_seconds,),
             )
+            conn.execute(
+                "INSERT INTO registry_jobs (job_id, doc, finished_at, updated_at) VALUES (%s, %s, %s, now())",
+                (job.job_id, Jsonb(job.model_dump(mode="json")), job.finished_at),
+            )
+
+    def get(self, job_id: str) -> Job | None:
+        with self.store.tx() as conn:
+            cur = conn.execute("SELECT doc FROM registry_jobs WHERE job_id = %s", (job_id,))
+            row = cur.fetchone()
+        return Job.model_validate(row["doc"]) if row else None
+
+    def save(self, job: Job) -> None:
+        job = job.model_copy(update={"updated_at": datetime.now(UTC)})
+        with self.store.tx() as conn:
+            conn.execute(
+                "UPDATE registry_jobs SET doc = %s, finished_at = %s, updated_at = now() WHERE job_id = %s",
+                (Jsonb(job.model_dump(mode="json")), job.finished_at, job.job_id),
+            )
+
+
+class PostgresStore:
+    """Async facade (``MetadataStore``) over the synchronous store: every call runs in a worker thread.
+
+    psycopg's asyncio driver needs a selector event loop, which is not the default on Windows; the
+    synchronous driver behaves the same on Windows and Linux.
+    """
+
+    name = "postgres"
+
+    def __init__(self, dsn: str, schema: str, limits: DbLimits) -> None:
+        self.sync = _SyncStore(dsn, schema, limits)
+
+    async def open(self) -> None:
+        await asyncio.to_thread(self.sync.open)
+
+    async def close(self) -> None:
+        await asyncio.to_thread(self.sync.close)
+
+    async def check(self) -> bool:
+        return await asyncio.to_thread(self.sync.check)
+
+    async def create_package(self, pkg: PackageRecord) -> PackageRecord:
+        return await asyncio.to_thread(self.sync.create_package, pkg)
+
+    async def get_package(self, package_id: str) -> PackageRecord | None:
+        return await asyncio.to_thread(self.sync.get_package, package_id)
+
+    async def update_package(
+        self, package_id: str, changes: dict[str, Any], expected_revision: int | None
+    ) -> PackageRecord:
+        return await asyncio.to_thread(self.sync.update_package, package_id, changes, expected_revision)
+
+    async def list_packages(self, flt: PackageFilter, after: str | None, limit: int) -> list[PackageRecord]:
+        return await asyncio.to_thread(self.sync.list_packages, flt, after, limit)
+
+    async def count_forks(self, package_id: str) -> int:
+        return await asyncio.to_thread(self.sync.count_forks, package_id)
+
+    async def delete_package_if_empty(self, package_id: str) -> None:
+        await asyncio.to_thread(self.sync.delete_package_if_empty, package_id)
+
+    async def insert_version(self, version: VersionRecord, max_versions: int) -> VersionRecord:
+        return await asyncio.to_thread(self.sync.insert_version, version, max_versions)
+
+    async def get_version(self, package_id: str, version: str) -> VersionRecord | None:
+        return await asyncio.to_thread(self.sync.get_version, package_id, version)
+
+    async def list_versions(
+        self, package_id: str, status: str | None, before_seq: int | None, limit: int
+    ) -> list[VersionRecord]:
+        return await asyncio.to_thread(self.sync.list_versions, package_id, status, before_seq, limit)
+
+    async def version_numbers(self, package_id: str) -> list[tuple[str, str]]:
+        return await asyncio.to_thread(self.sync.version_numbers, package_id)
+
+    async def count_versions(self, package_id: str) -> int:
+        return await asyncio.to_thread(self.sync.count_versions, package_id)
+
+    async def set_status(
+        self, package_id: str, version: str, expected: str, entry: dict[str, Any]
+    ) -> VersionRecord:
+        return await asyncio.to_thread(self.sync.set_status, package_id, version, expected, entry)
+
+    async def add_test_report(
+        self, package_id: str, version: str, record: dict[str, Any], test_status: str
+    ) -> VersionRecord:
+        return await asyncio.to_thread(self.sync.add_test_report, package_id, version, record, test_status)
+
+
+class PostgresIdempotencyStore:
+    """``IdempotencyStore`` on ``registry_idempotency`` (``INSERT ... ON CONFLICT DO NOTHING``)."""
+
+    def __init__(self, store: PostgresStore) -> None:
+        self.sync = _SyncIdempotency(store.sync)
+
+    async def begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
+        return await asyncio.to_thread(self.sync.begin, key, fingerprint, ttl_s)
+
+    async def complete(self, key: str, response: StoredResponse) -> None:
+        await asyncio.to_thread(self.sync.complete, key, response)
+
+    async def release(self, key: str) -> None:
+        await asyncio.to_thread(self.sync.release, key)
 
 
 class PostgresJobStore:
     """``JobStore`` on ``registry_jobs``; finished jobs older than ``job_retention_seconds`` are purged."""
 
     def __init__(self, store: PostgresStore, limits: JobLimits) -> None:
-        self.store = store
-        self.limits = limits
+        self.sync = _SyncJobs(store.sync, limits)
 
     async def create(self, job: Job) -> None:
-        async with self.store.tx() as conn:
-            await conn.execute(
-                "DELETE FROM registry_jobs WHERE finished_at IS NOT NULL AND finished_at < now() - make_interval(secs => %s)",
-                (self.limits.job_retention_seconds,),
-            )
-            await conn.execute(
-                "INSERT INTO registry_jobs (job_id, doc, finished_at, updated_at) VALUES (%s, %s, %s, now())",
-                (job.job_id, Jsonb(job.model_dump(mode="json")), job.finished_at),
-            )
+        await asyncio.to_thread(self.sync.create, job)
 
     async def get(self, job_id: str) -> Job | None:
-        async with self.store.tx() as conn:
-            cur = await conn.execute("SELECT doc FROM registry_jobs WHERE job_id = %s", (job_id,))
-            row = await cur.fetchone()
-        return Job.model_validate(row["doc"]) if row else None
+        return await asyncio.to_thread(self.sync.get, job_id)
 
     async def save(self, job: Job) -> None:
-        job = job.model_copy(update={"updated_at": datetime.now(UTC)})
-        async with self.store.tx() as conn:
-            await conn.execute(
-                "UPDATE registry_jobs SET doc = %s, finished_at = %s, updated_at = now() WHERE job_id = %s",
-                (Jsonb(job.model_dump(mode="json")), job.finished_at, job.job_id),
-            )
+        await asyncio.to_thread(self.sync.save, job)

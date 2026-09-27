@@ -24,10 +24,12 @@ import hashlib
 import json
 import math
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from jane_llm.providers.base import ProviderError, ProviderRequest, ProviderResponse, ResolvedConnection
-from jane_llm.settings import ServiceLimits
+
+if TYPE_CHECKING:
+    from jane_llm.settings import ServiceLimits
 
 FAKE_PROVIDER_ID = "fake"
 FAKE_MODEL_ID = "fake-deterministic-1"

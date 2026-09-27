@@ -416,7 +416,7 @@ CREATE TABLE IF NOT EXISTS {s}.jobs (
 class PostgresStore:
     """Store in the service's own PostgreSQL schema; safe for several instances."""
 
-    def __init__(self, dsn: str, schema: str = "llm", *, min_size: int = 1, max_size: int = 10) -> None:
+    def __init__(self, dsn: str, schema: str, *, min_size: int, max_size: int) -> None:
         from psycopg_pool import ConnectionPool  # local import: memory mode needs no driver
 
         self.schema = schema
@@ -482,20 +482,20 @@ class PostgresStore:
             return bool(cur.rowcount)
 
     # -- accounting
-    def _expire(self, cur: Any, now: datetime, stale_after: timedelta) -> None:
+    def _expired(self, cur: Any, now: datetime, stale_after: timedelta) -> dict[tuple[str, str, str], float]:
+        """Delete stale reservations; return the amount to move from ``reserved`` to ``spent`` per counter."""
         cur.execute(
             f"DELETE FROM {self._t('reservations')} WHERE reservation_id IN ("
             f"  SELECT reservation_id FROM {self._t('reservations')} WHERE created_at < %s "
             "  FOR UPDATE SKIP LOCKED) RETURNING amount, keys",
             (now - stale_after,),
         )
+        moved: dict[tuple[str, str, str], float] = {}
         for amount, keys in cur.fetchall():
-            for st, sid, win in sorted(tuple(k) for k in keys):
-                cur.execute(
-                    f"UPDATE {self._t('counters')} SET reserved = reserved - %s, spent = spent + %s, "
-                    "updated_at = now() WHERE scope_type=%s AND scope_id=%s AND window_key=%s",
-                    (amount, amount, st, sid, win),
-                )
+            for k in keys:
+                key = (str(k[0]), str(k[1]), str(k[2]))
+                moved[key] = moved.get(key, 0.0) + float(amount)
+        return moved
 
     def reserve(
         self,
@@ -506,9 +506,12 @@ class PostgresStore:
         now: datetime,
         stale_after: timedelta,
     ) -> None:
-        keys = sorted({b.key.as_tuple() for b in budgets} | {r.key.as_tuple() for r in rates})
+        check_keys = {b.key.as_tuple() for b in budgets} | {r.key.as_tuple() for r in rates}
         with self._tx() as cur:
-            self._expire(cur, now, stale_after)
+            moved = self._expired(cur, now, stale_after)
+            # Every counter row touched by this transaction is locked in one global order (sorted keys),
+            # so concurrent transactions on several instances cannot deadlock.
+            keys = sorted(check_keys | set(moved))
             for st, sid, win in keys:
                 cur.execute(
                     f"INSERT INTO {self._t('counters')} (scope_type, scope_id, window_key) VALUES (%s,%s,%s) "
@@ -516,14 +519,23 @@ class PostgresStore:
                     (st, sid, win),
                 )
             state: dict[tuple[str, str, str], tuple[float, float, int]] = {}
-            for st, sid, win in keys:  # lock in a fixed order: no deadlocks between instances
+            for st, sid, win in keys:
                 cur.execute(
                     f"SELECT spent, reserved, requests FROM {self._t('counters')} "
                     "WHERE scope_type=%s AND scope_id=%s AND window_key=%s FOR UPDATE",
                     (st, sid, win),
                 )
                 row = cur.fetchone()
-                state[(st, sid, win)] = (float(row[0]), float(row[1]), int(row[2]))
+                spent, reserved, requests = float(row[0]), float(row[1]), int(row[2])
+                if (st, sid, win) in moved:
+                    delta = moved[(st, sid, win)]
+                    cur.execute(
+                        f"UPDATE {self._t('counters')} SET reserved = reserved - %s, spent = spent + %s, "
+                        "updated_at = now() WHERE scope_type=%s AND scope_id=%s AND window_key=%s",
+                        (delta, delta, st, sid, win),
+                    )
+                    spent, reserved = spent + delta, reserved - delta
+                state[(st, sid, win)] = (spent, reserved, requests)
             for b in budgets:
                 spent, reserved, _ = state[b.key.as_tuple()]
                 if spent + reserved + amount > b.limit or spent >= b.limit:

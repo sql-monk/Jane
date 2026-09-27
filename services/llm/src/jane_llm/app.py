@@ -82,7 +82,12 @@ def make_store(settings: Settings) -> Store:
         raise RuntimeError(
             "JANE_LLM_DATABASE_URL is required for store=postgres (or set JANE_LLM_STORE=memory)"
         )
-    return PostgresStore(settings.database_url, settings.db_schema)
+    return PostgresStore(
+        settings.database_url,
+        settings.db_schema,
+        min_size=settings.db_pool_min_size,
+        max_size=settings.db_pool_max_size,
+    )
 
 
 def etag(doc: dict[str, Any]) -> str:
@@ -106,6 +111,10 @@ def seed(store: Store, settings: Settings) -> None:
         data = yaml.safe_load(text) or {}
         for c in data.get("connections") or []:
             conn = _parse(Connection, c)
+            if bad := settings.connection_policy().violations(conn.model_dump(exclude_none=True)):
+                raise RuntimeError(
+                    f"seed connection {conn.connection_id}: {bad[0].pointer}: {bad[0].message}"
+                )
             if leaks := find_secret_like(conn.params or {}):
                 raise RuntimeError(
                     f"seed connection {conn.connection_id}: secret-like params {leaks[0].pointer}"
@@ -145,6 +154,7 @@ def build_app(
     resolved = resolve_service_limits(settings)
     limits = resolved.limits
     store = store or make_store(settings)
+    policy = settings.connection_policy()
     idem_store = StoreIdempotency(store)
     runner = JobRunner(store=StoreJobs(store), limits=limits.jobs)
     adapters = adapters or ADAPTERS
@@ -154,7 +164,7 @@ def build_app(
         settings.registry_url,
         limits.registry.client_limits(),
         settings.registry_token,
-        max_bytes=limits.gateway.max_data_part_bytes,
+        limits=limits.gateway,
     )
 
     @asynccontextmanager
@@ -510,8 +520,14 @@ def build_app(
             raise JaneError(
                 "params contain secret-like values; use secret_refs", code="secret_detected", errors=leaks
             )
-        await _check_if_match("connection", connection_id, if_match)
         doc = conn.model_dump(exclude_none=True)
+        if violations := policy.violations(doc):
+            raise ValidationFailed(
+                "connection violates the secret policy of this service (allowed env prefix, secrets "
+                "directory, provider api_base allowlist)",
+                errors=violations,
+            )
+        await _check_if_match("connection", connection_id, if_match)
         created = await call(store.put_doc, "connection", connection_id, doc)
         return JSONResponse(doc, status_code=201 if created else 200, headers={"ETag": etag(doc)})
 
@@ -527,7 +543,7 @@ def build_app(
         if doc is None:
             raise NotFound(f"connection {connection_id} not found")
         started = datetime.now(UTC)
-        _, resolved_refs = resolve_connection(doc)
+        _, resolved_refs = resolve_connection(doc, policy)
         missing = [k for k, ok in resolved_refs.items() if not ok]
         result: dict[str, Any] = {
             "ok": not missing,

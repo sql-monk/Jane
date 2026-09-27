@@ -88,8 +88,13 @@ def build_prompt(
 
 
 def retry_hint(errors: Sequence[tuple[str, str]]) -> str:
-    """Trusted feedback for a schema retry: JSON pointers and violated keywords only (no data values)."""
-    listed = "; ".join(f"{pointer or '/'}: {keyword}" for pointer, keyword in errors[:20])
+    """Trusted feedback for a schema retry: locations **in the schema** and violated keywords only.
+
+    Never pass instance paths or values here: they come from the model output and may carry data.
+    """
+    listed = "; ".join(
+        f"schema {neutralise(pointer)}: {neutralise(keyword)}" for pointer, keyword in errors[:20]
+    )
     return (
         "\n# Correction\nYour previous reply did not match the output schema "
         f"({listed}). Reply again with JSON that matches the schema exactly.\n"

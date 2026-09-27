@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from jane_llm.connections import find_secret_like, resolve_connection, resolve_ref
+from jane_llm.connections import ConnectionPolicy, find_secret_like, resolve_connection, resolve_ref
 from jane_llm.gateway import validate_output, window
 from jane_llm.prompt import DataBlock, build_prompt, neutralise
 from jane_llm.providers import FakeProvider, ProviderError, ProviderRequest, ResolvedConnection
@@ -90,7 +90,7 @@ def test_validate_output_reports_pointers() -> None:
     schema = {"type": "object", "required": ["n"], "properties": {"n": {"type": "integer"}}}
     out, errors, hints = validate_output(schema, '```json\n{"n": "x"}\n```')
     assert out == {"n": "x"}
-    assert errors[0]["pointer"] == "/n" and hints == [("/n", "type")]
+    assert errors[0]["pointer"] == "/n" and hints == [("#/properties/n", "type")]
     _, errors, hints = validate_output(schema, "not json")
     assert hints == [("", "json")]
 
@@ -108,20 +108,32 @@ def test_budget_windows() -> None:
 def test_secret_detection_and_resolution(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     leaks = find_secret_like({"api_base": "http://x", "password": "p", "nested": {"note": "sk-" + "a" * 20}})
     assert sorted(e.pointer for e in leaks) == ["/params/nested/note", "/params/password"]  # type: ignore[type-var]
-    assert find_secret_like({"responses": [{"output_text": "password: x"}]}) == []
-    monkeypatch.setenv("JANE_TEST_REF", "value-1")
-    secret_file = tmp_path / "key"
+    fake_scripts = {"provider": "fake", "responses": [{"output_text": "password: x"}]}
+    assert find_secret_like(fake_scripts) == []
+    assert find_secret_like({"responses": [{"password": "x"}]}) != []  # exemption only for fake
+    monkeypatch.setenv("JANE_SECRET_TEST_REF", "value-1")
+    monkeypatch.setenv("HOME_OR_OTHER_VAR", "not-for-connections")
+    secrets_dir = tmp_path / "secrets"
+    secrets_dir.mkdir()
+    secret_file = secrets_dir / "key"
     secret_file.write_text("value-2\n", encoding="utf-8")
-    assert resolve_ref("env:JANE_TEST_REF") == "value-1"
-    assert resolve_ref(f"file:{secret_file}") == "value-2"
-    assert resolve_ref("env:JANE_TEST_MISSING") is None
-    assert resolve_ref("vault:kv/x#k") is None
+    outside = tmp_path / "outside"
+    outside.write_text("x", encoding="utf-8")
+    policy = ConnectionPolicy(files_dir=secrets_dir)
+    assert resolve_ref("env:JANE_SECRET_TEST_REF", policy) == "value-1"
+    assert resolve_ref(f"file:{secret_file}", policy) == "value-2"
+    assert resolve_ref("env:JANE_SECRET_TEST_MISSING", policy) is None
+    assert resolve_ref("env:HOME_OR_OTHER_VAR", policy) is None  # outside the allowed prefix
+    assert resolve_ref(f"file:{outside}", policy) is None  # outside the secrets directory
+    assert resolve_ref(f"file:{secrets_dir}/../outside", policy) is None
+    assert resolve_ref("vault:kv/x#k", policy) is None
     conn, resolved = resolve_connection(
         {
             "connection_id": "c",
             "kind": "llm_provider",
-            "secret_refs": {"a": "env:JANE_TEST_REF", "b": "env:NOPE_X"},
-        }
+            "secret_refs": {"a": "env:JANE_SECRET_TEST_REF", "b": "env:NOPE_X"},
+        },
+        policy,
     )
     assert resolved == {"a": True, "b": False}
     assert "value-1" not in repr(conn)  # never printed

@@ -15,12 +15,14 @@ from __future__ import annotations
 
 import asyncio
 import random
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from jane_llm.providers.base import ProviderError, ProviderRequest, ProviderResponse, ResolvedConnection
-from jane_llm.settings import ServiceLimits
+
+if TYPE_CHECKING:
+    from jane_llm.settings import ServiceLimits
 
 DEFAULT_API_BASE = "https://api.anthropic.com"
 DEFAULT_VERSION = "2023-06-01"

@@ -8,7 +8,7 @@ connections:
     params:
       api_base: https://api.anthropic.com
     secret_refs:
-      api_key: env:ANTHROPIC_API_KEY
+      api_key: env:JANE_SECRET_ANTHROPIC_API_KEY
 
 providers:
   - provider_id: anthropic

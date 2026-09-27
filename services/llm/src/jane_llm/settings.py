@@ -12,6 +12,7 @@ from jane_kit.clients import ClientLimits, RetryPolicy
 from jane_kit.config import JaneSettings, LimitLayer, Limits, ResolvedLimits, contract_field, resolve_limits
 from jane_kit.idempotency import IdempotencyLimits
 from jane_kit.jobs import JobLimits
+from jane_llm.connections import ConnectionPolicy
 
 ENV_PREFIX = "JANE_LLM_"
 
@@ -43,6 +44,23 @@ class Settings(JaneSettings):
     """Base URL of the handler registry (``registry.v1``) for packages referenced by ``handler``."""
     registry_token: str | None = None
     """Bearer token for the registry (give it through the environment)."""
+    db_pool_min_size: int = Field(default=1, ge=0)
+    """Minimum PostgreSQL connections per instance."""
+    db_pool_max_size: int = Field(default=10, ge=1)
+    """Maximum PostgreSQL connections per instance (size it with ``jobs.max_concurrent_jobs`` and traffic)."""
+    secret_env_prefix: str = "JANE_SECRET_"  # noqa: S105 - a variable-name prefix, not a secret
+    """``env:`` secret references may only name variables with this prefix."""
+    secret_files_dir: Path | None = Path("/run/secrets")
+    """``file:`` secret references may only point inside this directory (unset: ``file:`` disabled)."""
+    provider_api_base_allowlist: list[str] = Field(default_factory=lambda: ["https://api.anthropic.com"])
+    """Origins a connection's ``params.api_base`` may point to (JSON list in the environment)."""
+
+    def connection_policy(self) -> ConnectionPolicy:
+        return ConnectionPolicy(
+            env_prefix=self.secret_env_prefix,
+            files_dir=self.secret_files_dir,
+            api_base_allowlist=tuple(self.provider_api_base_allowlist),
+        )
 
 
 class LlmBudget(Limits):
@@ -68,12 +86,18 @@ class GatewayLimits(Limits):
     """Used when neither the request nor the package gives ``max_output_tokens``."""
     max_schema_retries: int = Field(default=1, ge=0)
     """Default and upper bound of ``max_schema_retries`` (extra calls on output invalid for the schema)."""
-    chars_per_token_estimate: float = Field(default=3.0, gt=0)
+    chars_per_token_estimate: float = Field(default=2.0, gt=0)
     """Conservative input-token estimate (characters per token) used to reserve budget before a call."""
     reservation_ttl_seconds: int = Field(default=900, ge=1)
     """A reservation older than this (instance crashed mid-call) is charged at its estimate."""
     max_data_part_bytes: int = Field(default=2_000_000, ge=1)
     """Largest single data part (material content) accepted from inline or blob content."""
+    content_fetch_timeout_ms: int = Field(default=30_000, ge=1)
+    """Timeout of downloading blob content (``download_url``) of materials and package archives."""
+    max_package_bytes: int = Field(default=20_000_000, ge=1)
+    """Largest package archive (compressed, and total uncompressed size) from a request or the registry."""
+    max_package_files: int = Field(default=1_000, ge=1)
+    """Most files in a package archive."""
 
 
 class RegistryLimits(Limits):

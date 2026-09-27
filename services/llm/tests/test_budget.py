@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-def _setup(client: TestClient, h: Any, *, task_budget: float | None = 0.5) -> None:
+def _setup(client: TestClient, h: Any, *, task_budget: float | None = 1.5) -> None:
     assert client.put("/v1/providers/fake", json=h.priced_fake).status_code == 200
     if task_budget is not None:
         r = client.put(
@@ -55,10 +55,10 @@ def test_exhausted_task_budget_stops_provider_calls(client: TestClient, fake: An
 
     usage = client.get("/v1/usage", params={"scope_type": "task", "scope_id": "shop-catalog"}).json()
     assert usage["totals"]["requests"] == ok
-    assert usage["totals"]["cost"]["amount"] <= 0.5  # never overspent
+    assert usage["totals"]["cost"]["amount"] <= 1.5  # never overspent
     budgets = {(b["scope_type"], b["scope_id"]): b for b in client.get("/v1/budgets").json()["items"]}
     status = budgets[("task", "shop-catalog")]["status"]
-    assert status["spent"]["amount"] <= 0.5
+    assert status["spent"]["amount"] <= 1.5
     assert status["spent"]["amount"] == pytest.approx(usage["totals"]["cost"]["amount"])
 
     # Another task without its own budget is limited only by the platform budget and still works.
@@ -102,7 +102,7 @@ def test_request_budget_only_narrows(client: TestClient, fake: Any, h: Any) -> N
     tight = {"budget": {"amount": 0.6, "currency": "USD", "period": "day"}}
     first = _task_call(client, h, limits=tight)
     assert first.status_code == 200
-    # 0.6 USD fits one call only (estimate ~0.41, actual ~0.27)
+    # 0.6 USD fits one call only (estimate ~0.58, actual ~0.27)
     assert _task_call(client, h, limits=tight).status_code == 429
     loose = {"budget": {"amount": 1000, "currency": "USD", "period": "day"}}
     assert _task_call(client, h, limits=loose).status_code == 200  # stored 5 USD still applies (min)
@@ -141,6 +141,56 @@ def test_handler_budget_failure_is_not_replayed_after_budget_increase(
     assert second.json()["status"] in {"success", "empty"}
     assert "Idempotency-Replayed" not in second.headers
     assert len(fake.calls) == 1
+
+
+def test_source_budget_stops_handler_calls(client: TestClient, fake: Any, h: Any) -> None:
+    """A money budget on the ``source`` level applies to invocations whose ``context.trace.source_id`` matches."""
+    assert client.put("/v1/providers/fake", json=h.priced_fake).status_code == 200
+    budget = {
+        "scope_type": "source",
+        "scope_id": "news-tg",
+        "budget": {"amount": 2, "currency": "USD", "period": "day"},
+    }
+    assert client.put("/v1/budgets/source/news-tg", json=budget).status_code == 200
+    statuses = []
+    for i in range(30):
+        inv = {
+            "handler": {"package_id": "jane.llm-event-extractor", "version": "1.0.0"},
+            "inputs": [{"kind": "material", "material": _material(f"Концерт {i}")}],
+            "context": {"trace": {"source_id": "news-tg", "task_id": f"task-{i}"}},
+            "delivery": {"delivery_key": f"src-{i}"},
+        }
+        res = client.post("/v1/invocations", json=inv, headers={"Idempotency-Key": f"src-{i}"}).json()
+        statuses.append(res["status"])
+        if res["status"] == "failed":
+            assert res["failure"]["kind"] == "budget_exhausted"
+            assert res["failure"]["details"]["scope_type"] == "source"
+            assert res["failure"]["details"]["scope_id"] == "news-tg"
+            break
+    assert statuses[-1] == "failed" and len(statuses) > 1
+    calls = len(fake.calls)
+    assert calls == len(statuses) - 1  # the stopped invocation made no provider call
+    # Smaller completions for the same source still fit until the rest of the budget is used, then 429;
+    # another source is not affected.
+    for _ in range(10):
+        same = client.post(
+            "/v1/completions",
+            json=h.completion(scope={"purpose": "other", "source_id": "news-tg"}),
+            headers=h.idem(),
+        )
+        if same.status_code != 200:
+            break
+    assert same.status_code == 429 and same.json()["details"]["scope_type"] == "source"
+    calls = len(fake.calls)
+    other = client.post(
+        "/v1/completions",
+        json=h.completion(scope={"purpose": "other", "source_id": "shop"}),
+        headers=h.idem(),
+    )
+    assert other.status_code == 200
+    assert len(fake.calls) == calls + 1
+    usage = client.get("/v1/usage", params={"scope_type": "source", "scope_id": "news-tg"}).json()
+    assert usage["totals"]["cost"]["amount"] <= 2
 
 
 def _material(text: str) -> dict[str, Any]:

@@ -117,8 +117,8 @@ def test_handler_api_matches_contract(client: TestClient, h: Any) -> None:
     conn = {
         "connection_id": "llm-main",
         "kind": "llm_provider",
-        "params": {"api_base": "http://llm.test"},
-        "secret_refs": {"api_key": "env:JANE_TEST_UNSET_KEY"},
+        "params": {"api_base": "https://api.anthropic.com"},
+        "secret_refs": {"api_key": "env:JANE_SECRET_TEST_UNSET_KEY"},
     }
     assert api.put("/v1/connections/llm-main", json=conn).status_code == 201
     assert api.put("/v1/connections/llm-main", json=conn).status_code == 200

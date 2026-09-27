@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
-from jane_llm.settings import ServiceLimits
+if TYPE_CHECKING:
+    from jane_llm.settings import ServiceLimits
 
 
 @dataclass(frozen=True)

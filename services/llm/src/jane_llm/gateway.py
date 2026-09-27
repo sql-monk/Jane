@@ -115,7 +115,13 @@ def _strip_fences(text: str) -> str:
 def validate_output(
     schema: dict[str, Any], text: str
 ) -> tuple[Any, list[dict[str, str]], list[tuple[str, str]]]:
-    """Parse and validate model output. Returns ``(output, errors for the caller, (pointer, keyword) hints)``."""
+    """Parse and validate model output.
+
+    Returns ``(output, errors for the caller, hints)``. Errors for the caller carry instance pointers; the
+    hints for a schema retry go to the trusted channel, so they are built **only from the schema**
+    (``schema_path`` and the violated keyword) — instance paths may contain keys chosen by the model or
+    the data (``additionalProperties``, ``patternProperties``) and must never reach the system prompt.
+    """
     try:
         output = json.loads(_strip_fences(text))
     except json.JSONDecodeError as exc:
@@ -123,7 +129,9 @@ def validate_output(
     errors = sorted(Draft202012Validator(schema).iter_errors(output), key=lambda e: list(e.absolute_path))
     pointer = ["/" + "/".join(str(p) for p in e.absolute_path) if e.absolute_path else "" for e in errors]
     report = [{"pointer": p, "message": e.message[:500]} for p, e in zip(pointer, errors, strict=True)]
-    hints = [(p, str(e.validator)) for p, e in zip(pointer, errors, strict=True)]
+    hints = [
+        ("#/" + "/".join(str(seg) for seg in list(e.schema_path)[:-1]), str(e.validator)) for e in errors
+    ]
     return output, report, hints
 
 
@@ -183,7 +191,9 @@ class Gateway:
                 raise ValidationFailed(
                     f"connection {provider.connection_id!r} of provider {provider_id!r} is unknown"
                 )
-            connection, _ = resolve_connection(cdoc)
+            connection, _ = resolve_connection(cdoc, self.settings.connection_policy())
+            if err := self.settings.connection_policy().api_base_error(connection.params.get("api_base")):
+                raise ValidationFailed(f"connection {provider.connection_id!r}: {err}")
         return ResolvedModel(provider, model, adapter, connection)
 
     async def budget_definitions(self, scope: Scope) -> list[tuple[str, str, BudgetDefinition | None]]:

@@ -24,7 +24,8 @@ ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     JANE_LLM_HOST=0.0.0.0 \
     JANE_LLM_PORT=8110 \
-    JANE_LLM_PACKAGES_DIR=/app/packages
+    JANE_LLM_PACKAGES_DIR=/app/packages \
+    JANE_LLM_FAKE_PROVIDER_ENABLED=false
 USER jane
 EXPOSE 8110
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \

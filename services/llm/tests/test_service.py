@@ -23,14 +23,18 @@ from jane_kit.clients import ClientLimits
 from jane_kit.contracts import OpenAPISpec, build_mock_app, contracts_dir
 from jane_llm.packages import PackageLoader, build_archive, digest_of, publish, publish_request, read_dir
 from jane_llm.providers import AnthropicProvider, ProviderError, ProviderRequest, ResolvedConnection
-from jane_llm.settings import ServiceLimits
+from jane_llm.settings import GatewayLimits, ServiceLimits
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1] / "packages" / "jane.llm-event-extractor"
 EVENT = {"title": "Концерт", "starts_at": "2026-10-12T19:00:00+03:00", "venue": "Філармонія", "price": "free"}
 
 
 def _scripted(client: TestClient, responses: list[dict[str, Any]], pricing: float = 0) -> None:
-    conn = {"connection_id": "fake-scripts", "kind": "llm_provider", "params": {"responses": responses}}
+    conn = {
+        "connection_id": "fake-scripts",
+        "kind": "llm_provider",
+        "params": {"provider": "fake", "responses": responses},
+    }
     assert client.put("/v1/connections/fake-scripts", json=conn).status_code in {200, 201}
     provider = {
         "provider_id": "fake",
@@ -201,8 +205,7 @@ def test_seed_file(make_client: Callable[..., TestClient], tmp_path: Path) -> No
 connections:
   - connection_id: anthropic-main
     kind: llm_provider
-    params: {api_base: "http://127.0.0.1:9"}
-    secret_refs: {api_key: "env:JANE_TEST_ANTHROPIC_KEY"}
+    secret_refs: {api_key: "env:JANE_SECRET_TEST_ANTHROPIC_KEY"}
 providers:
   - provider_id: anthropic
     kind: anthropic
@@ -231,6 +234,106 @@ def test_example_seed_is_valid(make_client: Callable[..., TestClient]) -> None:
     example = Path(__file__).resolve().parents[1] / "config" / "seed.example.yaml"
     client = make_client(settings={"seed_file": example})
     assert {p["provider_id"] for p in client.get("/v1/providers").json()["items"]} >= {"anthropic", "fake"}
+
+
+# ---------------------------------------------------------------- connection secret policy (review 1)
+def test_connection_policy_rejects_exfiltration(
+    make_client: Callable[..., TestClient], tmp_path: Path, fake: Any, h: Any
+) -> None:
+    secrets_dir = tmp_path / "secrets"
+    secrets_dir.mkdir()
+    client = make_client(settings={"secret_files_dir": secrets_dir})
+
+    def put(params: dict[str, Any] | None, refs: dict[str, str]) -> Any:
+        conn: dict[str, Any] = {"connection_id": "evil", "kind": "llm_provider", "secret_refs": refs}
+        if params is not None:
+            conn["params"] = params
+        return client.put("/v1/connections/evil", json=conn)
+
+    cases = {
+        "env outside prefix": put(None, {"api_key": "env:PATH"}),
+        "file outside dir": put(None, {"api_key": f"file:{tmp_path / 'other.txt'}"}),
+        "file traversal": put(None, {"api_key": f"file:{secrets_dir}/../other.txt"}),
+        "vault": put(None, {"api_key": "vault:kv/llm#key"}),
+        "foreign api_base": put({"api_base": "https://attacker.example"}, {"api_key": "env:JANE_SECRET_X"}),
+        "look-alike api_base": put(
+            {"api_base": "https://api.anthropic.com.attacker.example"}, {"api_key": "env:JANE_SECRET_X"}
+        ),
+    }
+    for name, r in cases.items():
+        assert r.status_code == 422, name
+        assert r.json()["errors"][0]["code"] in {"secret_ref_not_allowed", "api_base_not_allowed"}, name
+    assert client.get("/v1/connections").json()["items"] == []
+    ok = put(
+        {"api_base": "https://api.anthropic.com/"},
+        {"api_key": "env:JANE_SECRET_X", "b": f"file:{secrets_dir / 'k'}"},
+    )
+    assert ok.status_code == 201
+
+    # A connection stored behind the API's back (old data, direct DB edit) is still refused at call time.
+    store = client.app.state.store  # type: ignore[attr-defined]
+    store.put_doc(
+        "connection",
+        "legacy",
+        {
+            "connection_id": "legacy",
+            "kind": "llm_provider",
+            "params": {"api_base": "https://attacker.example"},
+            "secret_refs": {"api_key": "env:JANE_SECRET_X"},
+        },
+    )
+    provider = {
+        "provider_id": "anthropic",
+        "kind": "anthropic",
+        "connection_id": "legacy",
+        "enabled": True,
+        "models": [
+            {
+                "model_id": "claude-opus-5",
+                "pricing": {"input_per_mtok": 5, "output_per_mtok": 25, "currency": "USD"},
+            }
+        ],
+    }
+    assert client.put("/v1/providers/anthropic", json=provider).status_code == 200
+    r = client.post("/v1/completions", json=h.completion(model="anthropic/claude-opus-5"), headers=h.idem())
+    assert r.status_code == 422 and "api_base" in r.json()["detail"]
+    tested = client.post("/v1/connections/legacy/test").json()
+    assert tested["ok"] is False and tested["secrets_resolved"] == {"api_key": False}
+
+
+def test_package_archive_limits(make_client: Callable[..., TestClient], h: Any) -> None:
+    import base64
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("jane-package.json", "{}")
+        zf.writestr("big.txt", b"0" * 5_000_000)  # compresses to a few KB
+    client = make_client()
+    archive = {
+        "kind": "inline",
+        "media_type": "application/zip",
+        "encoding": "base64",
+        "data": base64.b64encode(buf.getvalue()).decode(),
+    }
+    inv = {
+        "handler": {"package_id": "x.y", "version": "1.0.0"},
+        "package_archive": archive,
+        "inputs": [{"kind": "data", "data": {}}],
+        "delivery": {"delivery_key": "zip-1"},
+    }
+    import os
+
+    os.environ["JANE_LLM_LIMITS__GATEWAY__MAX_PACKAGE_BYTES"] = "1000000"
+    try:
+        small = make_client()
+    finally:
+        del os.environ["JANE_LLM_LIMITS__GATEWAY__MAX_PACKAGE_BYTES"]
+    r = small.post("/v1/invocations", json=inv, headers={"Idempotency-Key": "zip-1"})
+    assert r.status_code == 422 and "max_package_bytes" in r.json()["detail"]
+    r = client.post("/v1/invocations", json=inv, headers={"Idempotency-Key": "zip-2"})
+    assert r.status_code == 422 and "max_package_bytes" not in r.json()["detail"]  # passes the size limit
 
 
 # ---------------------------------------------------------------- registry (neighbour)
@@ -265,7 +368,11 @@ def test_loader_fetches_from_registry_and_checks_digest(tmp_path: Path) -> None:
 
     registry = Starlette(routes=[Route("/v1/packages/{pid}/versions/{v}/archive", archive_endpoint)])
     loader = PackageLoader(
-        None, "http://registry", ClientLimits(), transport=httpx.ASGITransport(app=registry)
+        None,
+        "http://registry",
+        ClientLimits(),
+        limits=GatewayLimits(),
+        transport=httpx.ASGITransport(app=registry),
     )
     ref = {"package_id": "jane.llm-event-extractor", "version": "1.0.0", "digest": digest_of(archive)}
     pkg = asyncio.run(loader.load(ref, None))
@@ -274,7 +381,11 @@ def test_loader_fetches_from_registry_and_checks_digest(tmp_path: Path) -> None:
     with pytest.raises(Exception, match="digest"):
         asyncio.run(
             PackageLoader(
-                None, "http://registry", ClientLimits(), transport=httpx.ASGITransport(app=registry)
+                None,
+                "http://registry",
+                ClientLimits(),
+                limits=GatewayLimits(),
+                transport=httpx.ASGITransport(app=registry),
             ).load({**ref, "digest": "sha256:" + "1" * 64}, None)
         )
 
@@ -352,18 +463,19 @@ def test_anthropic_adapter_request_shape(messages_server: tuple[str, list[dict[s
 
 
 def test_gateway_with_anthropic_provider(
-    client: TestClient,
+    make_client: Callable[..., TestClient],
     h: Any,
     messages_server: tuple[str, list[dict[str, Any]]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     url, received = messages_server
-    monkeypatch.setenv("JANE_TEST_ANTHROPIC_KEY", "test-key-not-secret")
+    client = make_client(settings={"provider_api_base_allowlist": [url]})
+    monkeypatch.setenv("JANE_SECRET_TEST_ANTHROPIC_KEY", "test-key-not-secret")
     conn = {
         "connection_id": "anthropic-main",
         "kind": "llm_provider",
         "params": {"api_base": url},
-        "secret_refs": {"api_key": "env:JANE_TEST_ANTHROPIC_KEY"},
+        "secret_refs": {"api_key": "env:JANE_SECRET_TEST_ANTHROPIC_KEY"},
     }
     assert client.put("/v1/connections/anthropic-main", json=conn).status_code == 201
     assert client.post("/v1/connections/anthropic-main/test").json()["ok"] is True

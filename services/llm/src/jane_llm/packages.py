@@ -23,6 +23,7 @@ import httpx
 
 from jane_kit.clients import ClientLimits, RemoteError, ServiceClient
 from jane_kit.errors import JaneError, NotFound, UpstreamUnavailable, ValidationFailed
+from jane_llm.settings import GatewayLimits
 
 MANIFEST = "jane-package.json"
 _FIXED_TIME = (1980, 1, 1, 0, 0, 0)
@@ -87,11 +88,22 @@ def digest_of(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
-def unpack(archive: bytes) -> dict[str, bytes]:
+def unpack(archive: bytes, max_total_bytes: int, max_files: int) -> dict[str, bytes]:
+    """Files of a package zip; rejects archives above ``max_files`` or ``max_total_bytes`` uncompressed."""
     try:
         with zipfile.ZipFile(io.BytesIO(archive)) as zf:
+            infos = [i for i in zf.infolist() if not i.is_dir()]
+            if len(infos) > max_files:
+                raise ValidationFailed(
+                    f"package archive has {len(infos)} files; gateway.max_package_files={max_files}"
+                )
+            total = sum(i.file_size for i in infos)
+            if total > max_total_bytes:
+                raise ValidationFailed(
+                    f"package archive unpacks to {total} bytes; gateway.max_package_bytes={max_total_bytes}"
+                )
             files = {}
-            for info in zf.infolist():
+            for info in infos:
                 if info.is_dir():
                     continue
                 if not _safe(info.filename):
@@ -120,25 +132,38 @@ def check_llm_manifest(manifest: dict[str, Any], ref: dict[str, Any] | None = No
         )
 
 
-async def read_content(ref: dict[str, Any], max_bytes: int, timeout_s: float = 30.0) -> bytes:
-    """Bytes of a ``ContentRef``: inline (utf-8/base64) or blob (``file://`` or ``download_url``)."""
+async def read_content(ref: dict[str, Any], max_bytes: int, timeout_s: float) -> bytes:
+    """Bytes of a ``ContentRef``: inline (utf-8/base64) or blob (``file://`` or ``download_url``).
+
+    ``max_bytes`` and ``timeout_s`` come from ``limits.gateway`` (``max_data_part_bytes`` /
+    ``max_package_bytes``, ``content_fetch_timeout_ms``); downloads stop as soon as ``max_bytes`` is passed.
+    """
     if ref.get("kind") == "inline":
         data = ref.get("data", "")
         raw = base64.b64decode(data) if ref.get("encoding") == "base64" else str(data).encode("utf-8")
     elif ref.get("kind") == "blob":
         uri = str(ref.get("uri", ""))
         if ref.get("download_url"):
-            async with httpx.AsyncClient(timeout=timeout_s) as client:
-                resp = await client.get(str(ref["download_url"]))
+            async with (
+                httpx.AsyncClient(timeout=timeout_s) as client,
+                client.stream("GET", str(ref["download_url"])) as resp,
+            ):
                 if resp.status_code >= 400:
                     raise UpstreamUnavailable(
                         f"blob download failed: HTTP {resp.status_code}", retryable=True
                     )
-                raw = resp.content
+                buf = bytearray()
+                async for chunk in resp.aiter_bytes():
+                    buf.extend(chunk)
+                    if len(buf) > max_bytes:
+                        raise ValidationFailed(f"blob content exceeds {max_bytes} bytes")
+                raw = bytes(buf)
         elif uri.startswith("file://"):
             parsed = urlparse(uri)
             path = Path(url2pathname(unquote(parsed.path)))
             try:
+                if (await asyncio.to_thread(path.stat)).st_size > max_bytes:
+                    raise ValidationFailed(f"blob {uri} exceeds {max_bytes} bytes")
                 raw = await asyncio.to_thread(path.read_bytes)
             except OSError as exc:
                 raise NotFound(f"blob {uri} is not readable") from exc
@@ -147,7 +172,7 @@ async def read_content(ref: dict[str, Any], max_bytes: int, timeout_s: float = 3
     else:
         raise ValidationFailed(f"unknown content kind {ref.get('kind')!r}")
     if len(raw) > max_bytes:
-        raise ValidationFailed(f"content of {len(raw)} bytes exceeds gateway.max_data_part_bytes={max_bytes}")
+        raise ValidationFailed(f"content of {len(raw)} bytes exceeds the limit of {max_bytes} bytes")
     if (sha := ref.get("sha256")) and hashlib.sha256(raw).hexdigest() != sha:
         raise ValidationFailed("content sha256 does not match the content reference")
     return raw
@@ -162,15 +187,16 @@ class PackageLoader:
         registry_url: str | None,
         registry_limits: ClientLimits,
         registry_token: str | None = None,
-        max_bytes: int = 20_000_000,
+        *,
+        limits: GatewayLimits,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.transport = transport
+        self.limits = limits
         self.packages_dir = packages_dir
         self.registry_url = registry_url
         self.registry_limits = registry_limits
         self.registry_token = registry_token
-        self.max_bytes = max_bytes
         self._cache: dict[str, LoadedPackage] = {}
 
     def _local(self, package_id: str, version: str) -> LoadedPackage | None:
@@ -205,6 +231,11 @@ class PackageLoader:
                 raise UpstreamUnavailable(
                     f"registry unavailable: {type(exc).__name__}", retryable=True
                 ) from exc
+            declared = int(resp.headers.get("content-length") or 0)
+            if declared > self.limits.max_package_bytes or len(resp.content) > self.limits.max_package_bytes:
+                raise ValidationFailed(
+                    f"registry archive exceeds gateway.max_package_bytes={self.limits.max_package_bytes}"
+                )
             return resp.content
 
     async def load(self, ref: dict[str, Any], archive_ref: dict[str, Any] | None) -> LoadedPackage:
@@ -214,7 +245,7 @@ class PackageLoader:
         pkg: LoadedPackage | None = None
         if archive_ref is not None:
             data = await read_content(
-                archive_ref, self.max_bytes, self.registry_limits.request_timeout_ms / 1000
+                archive_ref, self.limits.max_package_bytes, self.limits.content_fetch_timeout_ms / 1000
             )
             pkg = self._from_archive(data)
         if pkg is None:
@@ -231,9 +262,12 @@ class PackageLoader:
         self._cache[pkg.digest] = pkg
         return pkg
 
-    @staticmethod
-    def _from_archive(data: bytes) -> LoadedPackage:
-        files = unpack(data)
+    def _from_archive(self, data: bytes) -> LoadedPackage:
+        if len(data) > self.limits.max_package_bytes:
+            raise ValidationFailed(
+                f"package archive exceeds gateway.max_package_bytes={self.limits.max_package_bytes}"
+            )
+        files = unpack(data, self.limits.max_package_bytes, self.limits.max_package_files)
         if MANIFEST not in files:
             raise ValidationFailed(f"package archive has no {MANIFEST}")
         try:

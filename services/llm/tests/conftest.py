@@ -71,7 +71,10 @@ def make_store(store_kind: str) -> Iterator[Callable[[], tuple[Store, dict[str, 
         if store_kind == "memory":
             return memory, {"store": "memory"}
         assert dsn is not None
-        store = PostgresStore(dsn, schema)
+        defaults = Settings()
+        store = PostgresStore(
+            dsn, schema, min_size=defaults.db_pool_min_size, max_size=defaults.db_pool_max_size
+        )
         created.append(store)
         return store, {"store": "postgres", "database_url": dsn, "db_schema": schema}
 

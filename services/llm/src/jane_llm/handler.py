@@ -79,11 +79,12 @@ class LlmHandler:
     ) -> tuple[list[DataBlock], dict[str, Any]]:
         """Data blocks for one input and the template context (``content`` = decoded text)."""
         max_bytes = self.gateway.limits.gateway.max_data_part_bytes
+        timeout_s = self.gateway.limits.gateway.content_fetch_timeout_ms / 1000
         kind = inp.get("kind")
         ctx: dict[str, Any] = {"input": inp, "index": index}
         if kind == "material":
             material = inp["material"]
-            raw = await read_content(material["content"], max_bytes)
+            raw = await read_content(material["content"], max_bytes, timeout_s)
             charset = material["content"].get("charset") or "utf-8"
             text = raw.decode(charset if charset.lower() != "binary" else "utf-8", errors="replace")
             ctx.update(material=material, content=text)
@@ -110,13 +111,13 @@ class LlmHandler:
         elif kind == "entities":
             entities = inp.get("entities")
             if entities is None and inp.get("entities_ref"):
-                entities = json.loads(await read_content(inp["entities_ref"], max_bytes))
+                entities = json.loads(await read_content(inp["entities_ref"], max_bytes, timeout_s))
             ctx.update(entities=entities, content=json.dumps(entities, ensure_ascii=False))
             blocks = [DataBlock(f"entities[{index}]", "application/json", ctx["content"])]
         elif kind == "data":
             data = inp.get("data")
             if data is None and inp.get("data_ref"):
-                data = json.loads(await read_content(inp["data_ref"], max_bytes))
+                data = json.loads(await read_content(inp["data_ref"], max_bytes, timeout_s))
             ctx.update(
                 data=data, content=data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)
             )

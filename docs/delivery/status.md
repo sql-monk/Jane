@@ -6,15 +6,15 @@
 |---|---|---|---|---|---|---|
 | 00 | Архітектура й контракти | 0 | accepted | `wp/00-architecture-contracts` | агент / wp-reviewer (2 раунди) | злито `e2714ec` |
 | 01 | Каркас, CI, dev-стек | 0 | accepted | `wp/01-scaffold-ci` | агент / wp-reviewer (2 раунди + інтеграційне виправлення) | злито `4468cee` |
-| 02 | Web Collector: ядро | 1 | active | `wp/02-web-collector-core` | агент | слот 1 |
+| 02 | Web Collector: ядро | 1 | review | `wp/02-web-collector-core` | агент / wp-reviewer | |
 | 03 | Web Collector: стратегії пошуку | 1 | — | | | після M0 |
 | 04 | Telegram Collector | 1 | — | | | після M0 |
 | 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент | слот 2 |
 | 06 | Runtime обробників і SDK | 1 | review | `wp/06-handler-runtime` | агент / wp-reviewer | |
-| 07 | Збереження: ядро + files + PostgreSQL | 1 | review | `wp/07-storage-core` | агент / wp-reviewer | compat-suite `f97527d` |
+| 07 | Збереження: ядро + files + PostgreSQL | 1 | active | `wp/07-storage-core` | агент / wp-reviewer | виправлення після рев'ю 1 (формат RAW) |
 | 08 | Адаптери збереження | 1 | — | | | після M0 |
 | 09 | Оркестратор | 1 | active | `wp/09-orchestrator` | агент | слот 1 |
-| 10 | LLM-шлюз і LLM-обробник | 1 | — | | | після M0 |
+| 10 | LLM-шлюз і LLM-обробник | 1 | active | `wp/10-llm` | агент | слот 2 |
 | 11 | Асистент джерел | 1 | active | `wp/11-assistant` | агент | слот 2 |
 | 12 | Адмінка | 1 | — | | | після M0 |
 | 13 | Інтеграція й приймання | 2 | — | | | |
@@ -39,6 +39,7 @@
 - 2026-09-27 — ліміт сесії перервав слот 1; агентів відновлено з тих самих worktree. CI на main зелений (`ef5a879`).
 - 2026-09-27 — WP-07 на рев'ю; запущено WP-11.
 - 2026-09-27 — WP-06 на рев'ю; запущено WP-05 (узгодити канонічний архів з WP-06/07).
+- 2026-09-27 — WP-02 на рев'ю; запущено WP-10. WP-07 повернуто: типовий формат RAW не за ТЗ §5.
 
 ## Відкриті запити між власниками
 | Від | Кому | Запит | Стан |
@@ -51,3 +52,6 @@
 | WP-06 | WP-05 | перевірка `dependencies.python` за профілем `python-extractor@1`; канонічний архів (`build_archive` у SDK) | передано WP-05 |
 | WP-06 | WP-00 | `/v1/connections*` у handler.v1 необов'язкові для виконавців без підключень | зміна контракту через contract-guardian |
 | WP-06 | WP-01 | застарілий коментар job `isolation` у `ci.yml`; Docker на runner | відкрито |
+| WP-02 | WP-00 | чи викликає ядро `on_fetched` для не-2xx і чи ділиться ресурсом `ctx.fetch`; конвенція `params` для підключень `kind=http` | зміна контракту через contract-guardian |
+| WP-02 | WP-01 | `contracts/python` у uv workspace (зараз path-залежність) | необов'язково |
+| WP-07 рев'ю | WP-00 | `default` формату в `package-manifest.schema.json` узгодити з описом і ТЗ §5 | зміна контракту через contract-guardian |

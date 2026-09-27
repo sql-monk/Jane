@@ -28,6 +28,18 @@ class RuntimeProfile:
     libraries: Mapping[str, str]
     document: Mapping[str, Any]
 
+    def marker_environment(self) -> dict[str, str]:
+        """PEP 508 marker values of the sandbox (Linux container), not of the host running the runtime."""
+        return {
+            "python_version": self.python,
+            "python_full_version": f"{self.python}.0",
+            "sys_platform": "linux",
+            "platform_system": "Linux",
+            "os_name": "posix",
+            "implementation_name": "cpython",
+            "platform_python_implementation": "CPython",
+        }
+
     def version_of(self, distribution: str) -> str | None:
         wanted = canonicalize_name(distribution)
         for name, version in self.libraries.items():
@@ -64,7 +76,7 @@ def check_dependencies(profile: RuntimeProfile, requirements: Sequence[str]) -> 
         if req.url:
             problems.append(DependencyProblem(raw, "direct URL requirements are not allowed"))
             continue
-        if req.marker is not None and not req.marker.evaluate({"python_version": profile.python}):
+        if req.marker is not None and not req.marker.evaluate(profile.marker_environment()):
             continue
         version = profile.version_of(req.name)
         if version is None:

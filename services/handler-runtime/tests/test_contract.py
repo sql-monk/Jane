@@ -1,15 +1,11 @@
-"""Contract tests: responses of the real app against WP-00 contracts (skipped until contracts/ exists).
-
-* common resources (``/v1/health``, ``/v1/info``, ``/v1/jobs``) against ``contracts/openapi/common.yaml``;
-* the service API against ``contracts/openapi/handler-runtime.v1.yaml`` via ``ContractClient``
-  (add calls for every operation; ``client.uncovered()`` lists the ones not exercised yet).
-"""
+"""Contract tests: responses of the real app against ``contracts/openapi/handler.v1.yaml`` (+ common.yaml)."""
 
 from __future__ import annotations
 
 import time
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -21,44 +17,61 @@ from jane_kit.contracts import ContractClient, OpenAPISpec, contracts_dir
 pytestmark = pytest.mark.contract
 
 CONTRACTS = contracts_dir(Path(__file__).parent)
-SERVICE_SPEC = CONTRACTS / "openapi" / "handler-runtime.v1.yaml" if CONTRACTS else None
 
 
 @pytest.fixture
-def client() -> Iterator[TestClient]:
-    with TestClient(build_app(Settings(log_format="console"))) as c:
-        yield c
+def api(subprocess_settings: Settings) -> Iterator[ContractClient]:
+    if CONTRACTS is None:
+        pytest.skip("contracts/ not available")
+    with TestClient(build_app(subprocess_settings)) as c:
+        yield ContractClient(OpenAPISpec.load(CONTRACTS / "openapi" / "handler.v1.yaml"), c)
 
 
-@pytest.fixture(scope="module")
-def common() -> OpenAPISpec:
-    if CONTRACTS is None or not (CONTRACTS / "openapi" / "common.yaml").is_file():
-        pytest.skip("contracts/openapi/common.yaml not available (WP-00 not merged yet)")
-    return OpenAPISpec.load(CONTRACTS / "openapi" / "common.yaml")
-
-
-def test_common_resources_match_contract(client: TestClient, common: OpenAPISpec) -> None:
-    common.validate_component("Health", client.get("/v1/health").json())
-    common.validate_component("ServiceInfo", client.get("/v1/info").json())
-    r = client.post("/v1/examples/jobs", json={"steps": 1}, headers={"Idempotency-Key": "c-1"})
-    common.validate_component("Job", r.json())
-    job_id = r.json()["job_id"]
-    for _ in range(100):
-        body = client.get(f"/v1/jobs/{job_id}").json()
-        common.validate_component("Job", body)
-        if body["status"] == "succeeded":
-            break
-        time.sleep(0.02)
-    common.validate_component("Problem", client.get("/v1/jobs/unknown").json())
-    common.validate_component(
-        "Problem",
-        client.post("/v1/examples/jobs", json={"steps": 0}, headers={"Idempotency-Key": "c-2"}).json(),
-    )
-
-
-def test_service_api_matches_contract(client: TestClient) -> None:
-    if SERVICE_SPEC is None or not SERVICE_SPEC.is_file():
-        pytest.skip("service contract not in contracts/openapi yet")
-    api = ContractClient(OpenAPISpec.load(SERVICE_SPEC), client)
+def test_handler_protocol_matches_contract(api: ContractClient, h: Any) -> None:
     api.get("/v1/health")
     api.get("/v1/info")
+    body = h.invocation(h.example, h.product_material(), key="c-1")
+    ok = api.post("/v1/invocations", json=body, headers={"Idempotency-Key": "c-1"})
+    assert ok.status_code == 200
+    replay = api.post("/v1/invocations", json=body, headers={"Idempotency-Key": "c-1"})
+    assert replay.json()["duplicate"] is True
+    api.get(f"/v1/invocations/{ok.json()['invocation_id']}")
+    assert api.get("/v1/invocations/inv_missing").status_code == 404
+    failed = h.invocation(h.probe, h.product_material(), key="c-2", params={"mode": "bad_entity"})
+    assert (
+        api.post("/v1/invocations", json=failed, headers={"Idempotency-Key": "c-2"}).json()["status"]
+        == "failed"
+    )
+    bad = {**body, "params": {"default_currency": 5}, "delivery": {"delivery_key": "c-3"}}
+    assert api.post("/v1/invocations", json=bad, headers={"Idempotency-Key": "c-3"}).status_code == 422
+    digest = {
+        **body,
+        "handler": {**body["handler"], "digest": "sha256:" + "1" * 64},
+        "delivery": {"delivery_key": "c-4"},
+    }
+    assert api.post("/v1/invocations", json=digest, headers={"Idempotency-Key": "c-4"}).status_code == 422
+    job = api.post(
+        "/v1/invocations",
+        json={**body, "mode": "async", "delivery": {"delivery_key": "c-5"}},
+        headers={"Idempotency-Key": "c-5"},
+    )
+    assert job.status_code == 202
+    for _ in range(600):
+        state = api.get(f"/v1/jobs/{job.json()['job_id']}").json()
+        if state["status"] == "succeeded":
+            break
+        time.sleep(0.05)
+    assert state["status"] == "succeeded"
+    run = api.post(
+        "/v1/test-runs",
+        json={
+            "handler": body["handler"],
+            "package_archive": body["package_archive"],
+            "tests": ["product-phone-alpha"],
+        },
+        headers={"Idempotency-Key": "c-6"},
+    )
+    assert run.status_code == 202
+    assert api.post("/v1/jobs/job_missing/cancel").status_code == 404
+    uncovered = [op for op in api.uncovered() if "connection" not in op.lower()]
+    assert uncovered == [], uncovered

@@ -19,12 +19,14 @@ RUN uv sync --frozen --no-dev --no-editable --package jane-llm
 FROM ${PYTHON_IMAGE}
 RUN useradd --system --uid 10001 --no-create-home jane
 COPY --from=build /app/.venv /app/.venv
+COPY services/llm/packages/ /app/packages/
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     JANE_LLM_HOST=0.0.0.0 \
-    JANE_LLM_PORT=8000
+    JANE_LLM_PORT=8110 \
+    JANE_LLM_PACKAGES_DIR=/app/packages
 USER jane
-EXPOSE 8000
+EXPOSE 8110
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \
   CMD ["python", "-c", "import os, urllib.request; urllib.request.urlopen(f\"http://127.0.0.1:{os.environ['JANE_LLM_PORT']}/v1/health\", timeout=2)"]
 CMD ["python", "-m", "jane_llm"]

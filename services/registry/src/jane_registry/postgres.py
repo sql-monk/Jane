@@ -18,7 +18,7 @@ from typing import Any
 
 from psycopg import Connection, errors, sql
 from psycopg.rows import dict_row
-from psycopg.types.json import Jsonb
+from psycopg.types.json import Json, Jsonb
 from psycopg_pool import ConnectionPool
 
 from jane_kit.idempotency import IdempotencyRecord, StoredResponse
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS registry_versions (
     digest text NOT NULL,
     status text NOT NULL,
     test_status text NOT NULL,
-    manifest jsonb NOT NULL,
+    manifest json NOT NULL,  -- json keeps the key order of jane-package.json
     files jsonb NOT NULL,
     size_bytes bigint NOT NULL,
     created_at timestamptz NOT NULL,
@@ -421,7 +421,7 @@ class _SyncStore:
                         version.digest,
                         version.status,
                         version.test_status,
-                        Jsonb(version.manifest),
+                        Json(version.manifest),
                         Jsonb(version.files),
                         version.size_bytes,
                         version.created_at,

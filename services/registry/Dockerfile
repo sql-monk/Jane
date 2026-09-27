@@ -19,8 +19,11 @@ RUN uv sync --frozen --no-dev --no-editable --package jane-registry
 FROM ${PYTHON_IMAGE}
 RUN useradd --system --uid 10001 --no-create-home jane
 COPY --from=build /app/.venv /app/.venv
+# Contract schemas used to validate manifests and collector rules (the registry keeps no private copy).
+COPY contracts/schemas/ /app/contracts/schemas/
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
+    JANE_REGISTRY_CONTRACTS_DIR=/app/contracts \
     JANE_REGISTRY_HOST=0.0.0.0 \
     JANE_REGISTRY_PORT=8000
 USER jane

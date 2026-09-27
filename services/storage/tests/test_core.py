@@ -143,6 +143,10 @@ def test_raw_formats() -> None:
     assert as_json.object_key.endswith(".json")
     assert as_json.media_type == "application/json"
     assert b'"data": "<html/>"' in as_json.content
+    auto_html = build_raw_object(material("text/html", b"<html/>"), b"<html/>", "auto")
+    assert (auto_html.object_key.endswith(".html"), auto_html.content) == (True, b"<html/>")
+    auto_feed = build_raw_object(material("application/rss+xml", b"<rss/>"), b"<rss/>", "auto")
+    assert (auto_feed.object_key.endswith(".json"), auto_feed.media_type) == (True, "application/json")
     feed = build_raw_object(material("application/rss+xml", b"<rss/>"), b"<rss/>", "original")
     assert feed.object_key.endswith(".xml")
     with pytest.raises(InvalidFormat):

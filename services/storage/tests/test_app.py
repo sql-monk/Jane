@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from jane_kit.contracts import OpenAPISpec
 from jane_storage.app import build_app
 from jane_storage.packages import PackageCatalog, canonical_archive
 from jane_storage.settings import Settings
@@ -351,3 +352,60 @@ def test_metrics_count_writes(client: TestClient, h: SimpleNamespace) -> None:
     h.post(client, h.invocation([{"kind": "entities", "entities": [h.entity()]}], "dk-m"))
     body = client.get("/metrics").text
     assert 'jane_storage_writes_total{adapter="filesystem",status="written"} 1.0' in body
+
+
+def test_default_raw_format_non_html_is_json_material(
+    client: TestClient, h: SimpleNamespace, storage_dir: Path
+) -> None:
+    """TZ §5: without format.raw, RAW that is not a web page is stored as a JSON document of the Material."""
+    contracts = Path(__file__).resolve().parents[3] / "contracts"
+    material = json.loads(
+        (contracts / "examples" / "schemas" / "material" / "telegram-message-edit.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    result = h.post(client, h.invocation([{"kind": "material", "material": material}], "dk-tg")).json()
+    assert result["status"] == "success", result
+    obj = result["output"]["writes"][0]["object"]
+    assert obj["media_type"] == "application/json"
+    path = storage_dir / obj["locator"]["path"]
+    assert path.suffix == ".json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    assert doc["content"]["data"] == material["content"]["data"]
+    assert doc["content"]["encoding"] == "utf-8"
+    assert {k: v for k, v in doc.items() if k != "content"} == {
+        k: v for k, v in material.items() if k != "content"
+    }
+    spec = OpenAPISpec.load(contracts / "openapi" / "handler.v1.yaml")
+    spec.validate_at((contracts / "schemas" / "material.schema.json").resolve().as_uri(), doc, "Material")
+    # an explicit override still wins
+    body = h.invocation(
+        [{"kind": "material", "material": material}], "dk-tg-orig", params={"format": {"raw": "original"}}
+    )
+    raw = h.post(client, body).json()["output"]["writes"][0]["object"]
+    assert raw["locator"]["path"].endswith(".txt")
+
+
+def test_history_false_package_is_rejected(client: TestClient, h: SimpleNamespace) -> None:
+    files_pkg = next(p for p in PackageCatalog.discover().all() if p.package_id == "jane.storage-files")
+    manifest = {
+        **files_pkg.manifest,
+        "package_id": "local.no-history",
+        "entry": {**files_pkg.entry, "history": False},
+    }
+    files = [(p, d) for p, d in files_pkg.files if p != "jane-package.json"]
+    archive = canonical_archive([*files, ("jane-package.json", json.dumps(manifest).encode())])
+    body = h.invocation(
+        [{"kind": "entities", "entities": [h.entity()]}],
+        "dk-nohist",
+        package="local.no-history",
+        package_archive={
+            "kind": "inline",
+            "media_type": "application/zip",
+            "encoding": "base64",
+            "data": base64.b64encode(archive).decode(),
+        },
+    )
+    r = h.post(client, body)
+    assert r.status_code == 422
+    assert "history" in r.text

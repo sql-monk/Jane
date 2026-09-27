@@ -4,20 +4,25 @@
   "version": "1.0.0",
   "kind": "storage",
   "title": "File system storage",
-  "description": "Зберігає RAW-матеріали як файли (вебсторінки — HTML: формат original зберігає text/html як .html) і сутності як JSON-документи з актуальним станом та історією (ТЗ §5). Формат перевизначається параметрами етапу: format.raw = original | html | json, format.entities = json | jsonl.",
-  "tags": ["storage", "filesystem"],
+  "description": "Зберігає RAW-матеріали як файли і сутності як JSON-документи з актуальним станом та історією (ТЗ §5). Без format.raw: вебсторінка (HTML/XHTML) — байт-у-байт у .html, будь-який інший RAW — JSON-документ Material із вбудованим вмістом. Перевизначення параметрами етапу: format.raw = original | html | json, format.entities = json | jsonl.",
+  "tags": [
+    "storage",
+    "filesystem"
+  ],
   "entry": {
     "executor": "storage",
     "adapter": "filesystem",
     "writes": "raw_and_entities",
     "format": {
-      "raw": "original",
       "entities": "json"
     },
     "history": true
   },
   "input": {
-    "accepts": ["material", "entities"]
+    "accepts": [
+      "material",
+      "entities"
+    ]
   },
   "params_schema": "schemas/params.schema.json",
   "required_connections": [
@@ -47,10 +52,15 @@
   ],
   "provenance": {
     "created_by": "human",
-    "authors": ["WP-07"],
+    "authors": [
+      "WP-07"
+    ],
     "created_at": "2026-09-27T08:00:00Z"
   },
   "bindings_hint": {
-    "source_kinds": ["web", "telegram"]
+    "source_kinds": [
+      "web",
+      "telegram"
+    ]
   }
 }

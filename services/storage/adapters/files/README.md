@@ -11,7 +11,7 @@
 ```
 
 Параметри етапу (`schemas/params.schema.json` пакета `jane.storage-files`): `prefix` — підкаталог усередині
-`base_path`; `format.raw` = `original | html | json` (типово `original`: вебсторінка `text/html` → `.html`);
+`base_path`; `format.raw` = `original | html | json` (без нього: вебсторінка → `.html` байт-у-байт, інший RAW → JSON-документ Material);
 `format.entities` = `json | jsonl` (історія сутностей — файл на версію або JSON Lines).
 
 ## Розкладка й атомарність

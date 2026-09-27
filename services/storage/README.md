@@ -18,7 +18,7 @@
 | Явне очищення | Лише `cleared: [...]` (`null` у `fields` → 422) → поле зникає з `fields`, потрапляє в `cleared_fields` |
 | Захист від запізнілих даних | Кожне поле пам'ятає порядок свого значення (`observed_at` → `sequence` → `observation_id`); старіше значення потрапляє лише в історію (`stale`, `partially_stale`) |
 | Актуальний стан та історія | `EntitySnapshot` з `version` + `HistoryEvent` на кожне прийняте оновлення (включно із запізнілими) |
-| Формати | RAW: `params.format.raw` → `entry.format.raw` → `original`; `original` зберігає вебсторінку як `text/html` з розширенням `.html`, `json` — Material із вмістом, `html` — лише для HTML. Сутності й інші результати — JSON; `format.entities: jsonl` (файловий адаптер — історія як JSON Lines) |
+| Формати | RAW: `params.format.raw` → `entry.format.raw` → типова поведінка (ТЗ §5): вебсторінка HTML/XHTML — байт-у-байт у `.html`, будь-який інший RAW (Telegram, JSON API, стрічки) — JSON-документ Material із вбудованим вмістом (`.json`). Явні перевизначення: `original` (байти як є, розширення за медіатипом), `html` (лише для HTML), `json`. Сутності й інші результати — JSON; `format.entities: jsonl` (файловий адаптер — історія як JSON Lines) |
 | Конкурентні записи | Адаптер робить compare-and-swap за `version`; ядро повторює при `CONFLICT` за `limits.retries` |
 | Режим тестування | `context.test_mode: true` — валідація без виклику адаптера, `WriteAck.status = simulated` |
 

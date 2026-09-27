@@ -4,20 +4,25 @@
   "version": "1.0.0",
   "kind": "storage",
   "title": "PostgreSQL storage",
-  "description": "Зберігає сутності (актуальний стан і історію) та RAW у PostgreSQL. RAW — у стовпці bytea з оригінальним медіатипом (вебсторінка — text/html), сутності — jsonb.",
-  "tags": ["storage", "postgresql"],
+  "description": "Зберігає сутності (актуальний стан і історію) та RAW у PostgreSQL (bytea). Без format.raw: вебсторінка — text/html байт-у-байт, інший RAW — JSON-документ Material із вбудованим вмістом; перевизначення — params.format.raw = original | html | json.",
+  "tags": [
+    "storage",
+    "postgresql"
+  ],
   "entry": {
     "executor": "storage",
     "adapter": "postgresql",
     "writes": "raw_and_entities",
     "format": {
-      "raw": "original",
       "entities": "json"
     },
     "history": true
   },
   "input": {
-    "accepts": ["material", "entities"]
+    "accepts": [
+      "material",
+      "entities"
+    ]
   },
   "params_schema": "schemas/params.schema.json",
   "required_connections": [
@@ -38,7 +43,9 @@
   ],
   "provenance": {
     "created_by": "human",
-    "authors": ["WP-07"],
+    "authors": [
+      "WP-07"
+    ],
     "created_at": "2026-09-27T08:00:00Z"
   }
 }

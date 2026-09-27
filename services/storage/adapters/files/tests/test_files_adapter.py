@@ -151,3 +151,33 @@ async def test_prefix_and_invalid_options(tmp_path: Path) -> None:
     adapter = await open_adapter(tmp_path, prefix="tenant/a")
     await StorageEngine(adapter).store_entity(rec("price", 1, 0, "o0"), "dk#0")
     assert (tmp_path / "tenant" / "a" / "entities" / "product" / f"{key_digest(KEY)}.json").is_file()
+
+
+def test_fresh_lock_taken_during_stale_break_is_restored(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Race: another process breaks the same stale lock and takes a fresh one before our rename."""
+    import jane_storage_files as mod
+
+    store = mod._Store(tmp_path, None, {**mod.DEFAULT_OPTIONS, "lock_stale_ms": 60_000})
+    lock = tmp_path / "locks" / "x.lock"
+    lock.parent.mkdir(parents=True)
+    lock.write_text("crashed:1 0\n", encoding="utf-8")
+    old = time.time() - 3600
+    os.utime(lock, (old, old))
+    real_rename = os.rename
+
+    def racing_rename(src: str, dst: str) -> None:
+        if Path(src) == lock:  # the other process wins just before our rename
+            lock.unlink()
+            lock.write_text("other-host:2 fresh\n", encoding="utf-8")
+        real_rename(src, dst)
+
+    monkeypatch.setattr(mod.os, "rename", racing_rename)
+    store._break_if_stale(lock)
+    assert lock.read_text(encoding="utf-8") == "other-host:2 fresh\n"
+    assert not list(lock.parent.glob("*.stale"))
+    monkeypatch.setattr(mod.os, "rename", real_rename)
+    os.utime(lock, (old, old))
+    store._break_if_stale(lock)  # really stale now: removed
+    assert not lock.exists()

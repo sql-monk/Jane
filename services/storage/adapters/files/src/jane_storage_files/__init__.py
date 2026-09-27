@@ -254,15 +254,43 @@ class _Store:
         finally:
             self.unlink(path)
 
-    def _break_if_stale(self, path: Path) -> None:
+    def _lock_identity(self, path: Path) -> tuple[bytes, float] | None:
         try:
-            age = time.time() - path.stat().st_mtime
-        except FileNotFoundError:
+            return path.read_bytes(), path.stat().st_mtime
+        except (FileNotFoundError, PermissionError):
+            return None
+
+    def _break_if_stale(self, path: Path) -> None:
+        """Remove a lock left by a crashed writer.
+
+        Between our check and the rename another process may already have broken the same stale lock
+        and taken a fresh one; so the renamed file is checked again (same owner line and mtime, still
+        older than ``lock_stale_ms``) and put back if it is not the stale lock we saw.
+        """
+        seen = self._lock_identity(path)
+        if seen is None or time.time() - seen[1] <= self.lock_stale:
             return
-        if age > self.lock_stale:
-            stale = path.with_name(f"{path.name}.{uuid.uuid4().hex}.stale")
+        stale = path.with_name(f"{path.name}.{uuid.uuid4().hex}.stale")
+        try:
+            os.rename(path, stale)
+        except (FileNotFoundError, PermissionError):
+            return
+        taken = self._lock_identity(stale)
+        if taken is not None and taken == seen and time.time() - taken[1] > self.lock_stale:
             with contextlib.suppress(FileNotFoundError, PermissionError):
-                os.rename(path, stale)
+                stale.unlink()
+            return
+        # We moved somebody's fresh lock: restore it unless the path was taken again meanwhile.
+        try:
+            os.link(stale, path)
+        except FileExistsError:
+            pass
+        except OSError:  # no hard links on this filesystem
+            if not path.exists():
+                with contextlib.suppress(OSError):
+                    os.rename(stale, path)
+        finally:
+            with contextlib.suppress(FileNotFoundError, PermissionError):
                 stale.unlink()
 
     # ------------------------------------------------------------------ schema / health

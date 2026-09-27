@@ -1,9 +1,11 @@
 """Storage formats (TZ §5): RAW web pages as HTML by default, other results as JSON; overridable.
 
-Format of a RAW material = ``params.format.raw`` → ``manifest.entry.format.raw`` → ``original``:
+Format of a RAW material = ``params.format.raw`` → ``manifest.entry.format.raw`` → default (``auto``):
 
-* ``original`` — bytes as received; the extension follows the media type (``text/html`` → ``.html``),
-  so a web page is stored as HTML by default;
+* default, no ``format.raw`` anywhere (``auto``): an HTML/XHTML web page is stored byte for byte as
+  ``text/html`` (``.html``); any other RAW (Telegram message, JSON API, feed…) — as a JSON document of
+  the Material with its content embedded (``.json``). This is TZ §5 / §13.1 item 4.
+* ``original`` — bytes as received; the extension follows the media type;
 * ``html`` — the page as ``text/html`` (only for HTML materials);
 * ``json`` — the Material document with its content embedded (``content.encoding`` utf-8/base64).
 
@@ -36,7 +38,9 @@ __all__ = [
 ]
 
 HTML_TYPES = frozenset({"text/html", "application/xhtml+xml"})
-RAW_FORMATS: frozenset[str] = frozenset({"original", "html", "json"})
+RAW_FORMATS: frozenset[str] = frozenset({"auto", "original", "html", "json"})
+DEFAULT_RAW_FORMAT = "auto"
+"""Used when neither stage params nor the manifest set ``format.raw`` (not a value of the contract enum)."""
 _EXTENSIONS = {
     "text/html": "html",
     "application/xhtml+xml": "html",
@@ -78,7 +82,11 @@ def extension_for(media_type: str) -> str:
 
 
 def raw_format(params: Mapping[str, Any], entry: Mapping[str, Any]) -> str:
-    fmt = (params.get("format") or {}).get("raw") or (entry.get("format") or {}).get("raw") or "original"
+    fmt = (
+        (params.get("format") or {}).get("raw")
+        or (entry.get("format") or {}).get("raw")
+        or DEFAULT_RAW_FORMAT
+    )
     return str(fmt)
 
 
@@ -100,6 +108,8 @@ def material_metadata(material: Mapping[str, Any]) -> dict[str, Any]:
 
 def build_raw_object(material: Mapping[str, Any], content: bytes, fmt: str) -> RawObject:
     media_type = _bare(str(material["format"]["media_type"]))
+    if fmt == "auto":
+        fmt = "html" if media_type in HTML_TYPES else "json"
     stored_format: RawFormat
     if fmt == "original":
         stored_type, data, stored_format = media_type, content, "original"

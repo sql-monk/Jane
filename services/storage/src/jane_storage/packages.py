@@ -122,6 +122,11 @@ def _from_files(files: Sequence[tuple[str, bytes]]) -> StoragePackage:
     manifest = json.loads(table[MANIFEST])
     if manifest.get("kind") != "storage" or (manifest.get("entry") or {}).get("executor") != "storage":
         raise ValueError(f"{manifest.get('package_id')}: not a storage package")
+    if manifest["entry"].get("history", True) is not True:
+        # History is part of the delivery-completeness check of every adapter; it cannot be switched off.
+        raise ValueError(
+            f"{manifest.get('package_id')}: entry.history=false is not supported by this executor"
+        )
     params_path = manifest.get("params_schema")
     params_schema = json.loads(table[params_path]) if params_path else None
     ordered = tuple(sorted(files))

@@ -8,7 +8,7 @@ just up                     # увесь стек, чекає health-checks
 just up postgres minio      # лише потрібні сервіси
 just env                    # адреси й облікові дані (dotenv); just env --format json
 just integration            # інтеграційні тести, зокрема infra/tests (smoke усього стеку)
-just down -v                # зупинити й видалити томи та файл стеку
+just down -v                # зупинити й видалити томи, зібрані образи (<проєкт>-testsite) і файл стеку
 ```
 
 ## Сервіси

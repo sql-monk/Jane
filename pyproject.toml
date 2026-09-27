@@ -42,6 +42,8 @@ extend-exclude = [
     "**/_generated/**",
     "web/**",
     "node_modules",
+    # WP-00 owns contracts/; its linter (contracts/tools/check_contracts.py, run by `just contract`) is authoritative.
+    "contracts",
     # Coordinator-owned hooks are not formatted/linted by WP tooling.
     ".claude/hooks/jane_wp.py",
     ".claude/hooks/guard_paths.py",
@@ -72,7 +74,7 @@ python_version = "3.12"
 strict = true
 warn_unreachable = true
 plugins = ["pydantic.mypy"]
-exclude = ["/_generated/"]
+exclude = ["/_generated/", "^contracts/"]  # contracts/ is linted by WP-00 tooling
 
 [[tool.mypy.overrides]]
 module = ["prometheus_client.*", "openapi_spec_validator.*"]

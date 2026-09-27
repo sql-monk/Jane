@@ -372,7 +372,8 @@ def cmd_down(ns: argparse.Namespace) -> int:
         "JANE_S3_SECRET_KEY",
     ):
         env.setdefault(var, "unused")
-    args = ["down", "--remove-orphans"] + (["-v"] if ns.volumes else [])
+    # -v also removes locally built images (<project>-testsite) so they do not pile up.
+    args = ["down", "--remove-orphans"] + (["-v", "--rmi", "local"] if ns.volumes else [])
     code = compose(project, env, *args).returncode
     if ns.volumes and code == 0 and path.is_file():
         path.unlink()

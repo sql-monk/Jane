@@ -1,15 +1,27 @@
 [project]
 name = "jane-telegram-collector"
 version = "0.1.0"
-description = "Telegram Collector of the Jane platform."
+description = "Telegram Collector of the Jane platform: history, new messages and edits of channels over the collector.v1 API."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "jane-kit",
+    "httpx>=0.27",
+    "jsonschema>=4.23",
+]
+
+[project.optional-dependencies]
+telethon = [
+    "telethon>=1.36,<2",
 ]
 
 [project.scripts]
 jane-telegram-collector = "jane_telegram_collector.__main__:main"
+
+[dependency-groups]
+dev = [
+    "psutil>=6.0",
+]
 
 [tool.uv.sources]
 jane-kit = { workspace = true }

@@ -13,7 +13,7 @@ entities/data are passed as returned (``entities_ref``/``data_ref`` stay referen
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -56,7 +56,7 @@ def collect_stage_id(config: Mapping[str, Any]) -> str:
     return str(next(s["stage_id"] for s in config["stages"] if s["kind"] == "collect"))
 
 
-def material_of(inputs: list[Mapping[str, Any]] | None) -> dict[str, Any] | None:
+def material_of(inputs: Sequence[Mapping[str, Any]] | None) -> dict[str, Any] | None:
     """The material an item is about (MaterialInput, or the material attached to EntitiesInput)."""
     for inp in inputs or []:
         if inp.get("kind") in {"material", "entities"} and inp.get("material"):
@@ -153,7 +153,7 @@ def route_result(
     source_id: str,
     stage_id: str,
     upstream_item_id: str,
-    inputs: list[Mapping[str, Any]] | None,
+    inputs: Sequence[Mapping[str, Any]] | None,
     result: Mapping[str, Any],
 ) -> list[NewItem]:
     """Items created by a completed handler item with ``result`` (HandlerResult)."""

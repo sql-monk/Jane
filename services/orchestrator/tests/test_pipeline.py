@@ -27,7 +27,7 @@ def setup_catalog(client: TestClient, **task_extra: Any) -> None:
 
 def run_and_wait(
     client: TestClient, task_id: str = "shop-catalog", body: Any = None, timeout: float = 30
-) -> dict[str, Any]:
+) -> Any:
     r = post(client, f"/v1/tasks/{task_id}/runs", body or {})
     assert r.status_code == 202, r.text
     run_id = r.json()["job_id"]

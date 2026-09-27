@@ -26,7 +26,7 @@ def start(client: TestClient, task_id: str = "shop-catalog", body: Any = None) -
     return str(r.json()["job_id"])
 
 
-def wait_run(client: TestClient, run_id: str, timeout: float = 60) -> dict[str, Any]:
+def wait_run(client: TestClient, run_id: str, timeout: float = 60) -> Any:
     return wait_until(
         lambda: (
             (r := client.get(f"/v1/runs/{run_id}").json())["status"] in {"succeeded", "failed", "cancelled"}
@@ -52,7 +52,12 @@ def test_cancel_stops_collection_and_pending_items(
     neighbours.collector.site = default_site(30, 0)
     neighbours.runtime.delay_s = 0.2
     client = make_client()
-    setup(client, task=catalog_task(limits={"concurrency": {"max_parallel_stage_items": 1}, "queue": {"max_inflight_materials": 2}}))
+    setup(
+        client,
+        task=catalog_task(
+            limits={"concurrency": {"max_parallel_stage_items": 1}, "queue": {"max_inflight_materials": 2}}
+        ),
+    )
     run_id = start(client)
     wait_until(lambda: sum(neighbours.runtime.calls.values()) >= 1)
     r = client.post(f"/v1/jobs/{run_id}/cancel", json={"reason": "wrong limits"})

@@ -47,7 +47,7 @@ def start(client: TestClient, task_id: str, body: Any = None) -> str:
     return str(r.json()["job_id"])
 
 
-def wait_run(client: TestClient, run_id: str, timeout: float = 60) -> dict[str, Any]:
+def wait_run(client: TestClient, run_id: str, timeout: float = 60) -> Any:
     return wait_until(
         lambda: (
             (r := client.get(f"/v1/runs/{run_id}").json())["status"] in {"succeeded", "failed", "cancelled"}

@@ -19,6 +19,7 @@ import io
 import json
 import logging
 import os
+import re
 import zipfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -49,6 +50,11 @@ STRATEGY_DEFS = {
     "api_feed": "ApiFeedStrategy",
     "llm_explore": "LlmExploreStrategy",
 }
+
+
+def _snake(name: str) -> str:
+    """JSON Schema keyword -> Problem FieldError code (``minItems`` -> ``min_items``)."""
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower().lstrip("$") or "invalid"
 
 
 def _pointer(path: Sequence[Any]) -> str:
@@ -100,7 +106,7 @@ class ContractSchemas:
                 branch = "TelegramRules"
             if branch:
                 return self.errors(f"{self.rules_uri}#/$defs/{branch}", err.instance, prefix + path)
-        return [FieldError(pointer=_pointer(prefix + path), code=str(err.validator), message=err.message)]
+        return [FieldError(pointer=_pointer(prefix + path), code=_snake(str(err.validator)), message=err.message)]
 
     def rules_errors(self, rules: Any, prefix: Sequence[Any] = ()) -> list[FieldError]:
         return self.errors(self.rules_uri, rules, prefix)

@@ -23,7 +23,7 @@ from .fetcher import Fetcher, FetchError, HostLimiter, build_client
 from .materials import Delivery, MaterialTooLarge, TransitStore, build_material, new_observation_id, rfc3339
 from .robots import RobotsCache
 from .rules import ContractSchemas, RulesLoader, validate_rules
-from .settings import ServiceLimits, Settings, platform_layers, translate_layer
+from .settings import ServiceLimits, Settings, platform_layers, to_contract, translate_layer
 from .state import StateStore
 from .urls import Normalizer, Scope
 
@@ -252,7 +252,7 @@ class Engine:
             rules=rules,
             rules_ref=rules_ref,
             created_at=_now(),
-            effective_limits=resolved.effective()["limits"],
+            effective_limits=to_contract(resolved.limits),
         )
         self.state.claim(cid, self.settings.instance_id, self.settings.lease_seconds)
         return await self._submit(cid, labels=payload.get("labels"))

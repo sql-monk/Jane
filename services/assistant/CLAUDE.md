@@ -1,0 +1,3 @@
+- Запуск: `uv run --package jane-assistant python -m jane_assistant` (або Docker, див. README.md).
+- Тести: `just test assistant` (інтеграційні: `-m integration` після `just up`).
+- Контракт: `contracts/openapi/assistant.v1.yaml` (+ `contracts/openapi/common.yaml`); конвенції — скіл `jane-contracts`.

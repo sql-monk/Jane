@@ -9,6 +9,7 @@ resolution-markers = [
 
 [manifest]
 members = [
+    "jane-assistant",
     "jane-extractor-sdk",
     "jane-handler-runtime",
     "jane-kit",
@@ -653,6 +654,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/ef/7c/ec4ab396d31b3b395
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3e/95/c7c34aa53c16353c56d0b802fba48d5f5caa2cdee7958acbcb795c830416/isort-8.0.1-py3-none-any.whl", hash = "sha256:28b89bc70f751b559aeca209e6120393d43fbe2490de0559662be7a9787e3d75", size = 89733, upload-time = "2026-02-28T10:08:19.466Z" },
 ]
+
+[[package]]
+name = "jane-assistant"
+version = "0.1.0"
+source = { editable = "services/assistant" }
+dependencies = [
+    { name = "jane-kit" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "jane-kit", editable = "libs/jane-kit" }]
 
 [[package]]
 name = "jane-contracts"

@@ -1,0 +1,357 @@
+openapi: 3.1.0
+info:
+  title: Jane Storage Read API
+  version: 1.0.0
+  description: |
+    Читання даних, записаних обробником збереження (WP-07/08). Запис іде лише через спільний
+    протокол обробника (`handler.v1.yaml`, `POST /v1/invocations` сервісу storage). Цей API
+    потрібен адмінці (перегляд матеріалів і результатів, ТЗ §10), оркестратору (повторна обробка
+    збережених RAW) і стороннім застосункам. Кожен запит указує `connection_id` — конкретне
+    підключення до сховища; сервіс storage читає лише через власні адаптери.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Jane
+servers:
+  - url: http://localhost:8107
+    description: storage (dev)
+security:
+  - bearerAuth: []
+tags:
+  - name: system
+  - name: entities
+  - name: objects
+paths:
+  /v1/health:
+    $ref: 'common.yaml#/components/pathItems/Health'
+  /v1/info:
+    $ref: 'common.yaml#/components/pathItems/Info'
+  /v1/entities:
+    get:
+      operationId: listEntities
+      summary: Актуальний стан сутностей
+      tags: [entities]
+      parameters:
+        - $ref: '#/components/parameters/ConnectionIdQuery'
+        - name: entity_type
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: key
+          in: query
+          required: false
+          description: Канонічний ключ (EntityState.canonical_key); тоді сторінка містить 0 або 1 елемент.
+          schema:
+            type: string
+        - name: updated_since
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка актуальних станів.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '../schemas/entity.schema.json#/$defs/EntityState'
+                  next_cursor:
+                    $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+              examples:
+                one:
+                  value:
+                    items:
+                      - entity_type: product
+                        key:
+                          scope: shop-example
+                          natural:
+                            sku: A-100
+                        canonical_key: 'shop-example|{"sku":"A-100"}'
+                        fields:
+                          sku: A-100
+                          title: Kettle A-100
+                          price:
+                            amount: 1199.0
+                            currency: UAH
+                        version: 2
+                        updated_at: '2026-09-28T06:00:09Z'
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+  /v1/entity-history:
+    get:
+      operationId: listEntityHistory
+      summary: Історія оновлень однієї сутності (включно із запізнілими)
+      tags: [entities]
+      parameters:
+        - $ref: '#/components/parameters/ConnectionIdQuery'
+        - name: entity_type
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: key
+          in: query
+          required: true
+          schema:
+            type: string
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка історії, від новіших до старіших за received_at.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '../schemas/entity.schema.json#/$defs/EntityHistoryEntry'
+                  next_cursor:
+                    $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+              examples:
+                history:
+                  value:
+                    items:
+                      - record:
+                          entity_type: product
+                          key:
+                            scope: shop-example
+                            natural:
+                              sku: A-100
+                          fields:
+                            price:
+                              amount: 1399.0
+                              currency: UAH
+                          observation:
+                            observation_id: obs_01J9ZQ0000000000000000LATE
+                            observed_at: '2026-09-26T08:00:00Z'
+                        received_at: '2026-09-28T07:00:00Z'
+                        delivery_key: 7e1c0b9f1e4d4a8a9c0d2e1f3a4b5c6d
+                        applied_fields: []
+                        stale_fields: [price]
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/objects:
+    get:
+      operationId: listObjects
+      summary: Збережені об'єкти (RAW, документи результатів) — для перегляду й повторної обробки
+      tags: [objects]
+      parameters:
+        - $ref: '#/components/parameters/ConnectionIdQuery'
+        - name: source_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: material_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: until
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка збережених об'єктів.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StoredObject'
+                  next_cursor:
+                    $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+              examples:
+                raw:
+                  value:
+                    items:
+                      - object:
+                          object_id: obj_01J9ZQ4C00000000000000D1
+                          adapter: filesystem
+                          connection_id: raw-files
+                          locator:
+                            path: raw/shop-example/2026/09/27/web_9b1f0c1d/obs_01J9ZQ4A0000000000000001.html
+                          media_type: text/html
+                          size_bytes: 151
+                        material:
+                          material_id: web:9b1f0c1d2e3f40516273849a0b1c2d3e
+                          observation_id: obs_01J9ZQ4A0000000000000001
+                          source_id: shop-example
+                          url: https://shop.example.test/product/a-100
+                          fetched_at: '2026-09-27T10:00:05Z'
+                        stored_at: '2026-09-27T10:00:07Z'
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+  /v1/objects/{object_id}:
+    parameters:
+      - name: object_id
+        in: path
+        required: true
+        schema:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+      - $ref: '#/components/parameters/ConnectionIdQuery'
+    get:
+      operationId: getObject
+      summary: Метадані збереженого об'єкта і відновлений Material для повторної обробки
+      tags: [objects]
+      responses:
+        '200':
+          description: Об'єкт і, для RAW, Material із постійним посиланням на вміст.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoredObjectDetail'
+              examples:
+                raw:
+                  value:
+                    object:
+                      object_id: obj_01J9ZQ4C00000000000000D1
+                      adapter: filesystem
+                      connection_id: raw-files
+                      media_type: text/html
+                      size_bytes: 151
+                    stored_at: '2026-09-27T10:00:07Z'
+                    material:
+                      material_id: web:9b1f0c1d2e3f40516273849a0b1c2d3e
+                      observation_id: obs_01J9ZQ4A0000000000000001
+                      source:
+                        source_id: shop-example
+                        kind: web
+                      locator:
+                        url: https://shop.example.test/product/a-100
+                      fetched_at: '2026-09-27T10:00:05Z'
+                      format:
+                        media_type: text/html
+                      revision:
+                        content_sha256: 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
+                      content:
+                        kind: blob
+                        uri: file:///var/lib/jane/raw/shop-example/2026/09/27/web_9b1f0c1d/obs_01J9ZQ4A0000000000000001.html
+                        media_type: text/html
+                        size_bytes: 151
+                        sha256: 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
+                        store: persistent
+                        expires_at: null
+                      collector:
+                        name: web-collector
+                        version: 0.1.0
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/objects/{object_id}/content:
+    parameters:
+      - name: object_id
+        in: path
+        required: true
+        schema:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+      - $ref: '#/components/parameters/ConnectionIdQuery'
+    get:
+      operationId: getObjectContent
+      summary: Вміст збереженого об'єкта (байти в оригінальному медіатипі)
+      tags: [objects]
+      responses:
+        '200':
+          description: Вміст; Content-Type — медіатип об'єкта; підтримується Range.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                contentMediaType: application/octet-stream
+            text/html:
+              schema:
+                type: string
+              example: '<html><head><title>Kettle A-100</title></head></html>'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    ConnectionIdQuery:
+      name: connection_id
+      in: query
+      required: true
+      schema:
+        $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+  schemas:
+    StoredObject:
+      type: object
+      required: [object, stored_at]
+      properties:
+        object:
+          $ref: '../schemas/handler-result.schema.json#/$defs/StoredObjectRef'
+        material:
+          type: object
+          description: Короткі метадані матеріалу, з якого збережено об'єкт.
+          properties:
+            material_id:
+              type: string
+            observation_id:
+              type: string
+            source_id:
+              type: string
+            url:
+              type: string
+            fetched_at:
+              type: string
+              format: date-time
+        stored_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+    StoredObjectDetail:
+      type: object
+      required: [object, stored_at]
+      properties:
+        object:
+          $ref: '../schemas/handler-result.schema.json#/$defs/StoredObjectRef'
+        stored_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        material:
+          $ref: '../schemas/material.schema.json'

@@ -1,0 +1,809 @@
+openapi: 3.1.0
+info:
+  title: Jane Source Assistant API
+  version: 1.0.0
+  description: |
+    Асистент джерел (WP-11): підключення нового джерела за назвою чи посиланням, вдосконалення
+    екстракторів на проблемних прикладах, обробка невідомих матеріалів (лише коли оркестратор
+    передав їх за увімкненим прапорцем «Передавати в LLM невідомі сторінки»).
+
+    Асистент використовує API інших сервісів: collector (вибірка), registry (пошук, форк,
+    публікація пакетів), handler-runtime (тести), llm (запити й бюджет), orchestrator (лише щоб
+    застосувати обраний варіант, якщо користувач дозволив автоактивацію). Усі тривалі операції —
+    202 + Job. Вміст джерел — дані, не інструкції. Створені версії проходять тести й політику
+    погодження; користувач обирає варіант, якщо не дозволив автоактивацію.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Jane
+servers:
+  - url: http://localhost:8111
+    description: assistant (dev)
+security:
+  - bearerAuth: []
+tags:
+  - name: system
+  - name: onboarding
+  - name: improvement
+  - name: unknown
+  - name: jobs
+paths:
+  /v1/health:
+    $ref: 'common.yaml#/components/pathItems/Health'
+  /v1/info:
+    $ref: 'common.yaml#/components/pathItems/Info'
+  /v1/onboarding-sessions:
+    post:
+      operationId: startOnboarding
+      summary: Почати підключення джерела (назва сайту/каналу або точне посилання)
+      tags: [onboarding]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnboardingRequest'
+            examples:
+              byName:
+                value:
+                  query: Shop Example kettles
+                  expected_entity_types: [product]
+                  limits:
+                    budget:
+                      amount: 2
+                      currency: USD
+                      period: total
+                    max_onboarding_samples: 60
+                  auto_activation: false
+              byUrl:
+                value:
+                  query: https://news.example.test/
+                  source_kind: web
+                  expected_entity_types: [event]
+                  crawl_hints:
+                    scope:
+                      allowed_domains: [news.example.test]
+      responses:
+        '202':
+          $ref: 'common.yaml#/components/responses/JobAccepted'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: 'common.yaml#/components/responses/TooManyRequests'
+  /v1/onboarding-sessions/{session_id}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      operationId: getOnboardingSession
+      summary: Стан підключення — кандидати, вибірка, аналіз, варіанти
+      tags: [onboarding]
+      responses:
+        '200':
+          description: Сесія.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingSession'
+              examples:
+                ambiguous:
+                  $ref: '#/components/examples/SessionAmbiguous'
+                proposals:
+                  $ref: '#/components/examples/SessionProposals'
+                insufficient:
+                  $ref: '#/components/examples/SessionInsufficient'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/onboarding-sessions/{session_id}/candidate-selection:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      operationId: selectCandidate
+      summary: Уточнити неоднозначність — обрати джерело з кандидатів
+      tags: [onboarding]
+      x-jane-no-idempotency-key: selecting the same candidate again yields the same state
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [candidate_id]
+              properties:
+                candidate_id:
+                  type: string
+            examples:
+              select:
+                value:
+                  candidate_id: cand_1
+      responses:
+        '200':
+          description: Вибір прийнято; сесія продовжується (sampling).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingSession'
+              examples:
+                sampling:
+                  value:
+                    session_id: onb_01J9ZY0000000000000000001
+                    status: sampling
+                    query: Shop Example kettles
+                    selected_candidate_id: cand_1
+                    job_id: job_01J9ZY0000000000000000JOB
+                    created_at: '2026-09-27T09:00:00Z'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+  /v1/onboarding-sessions/{session_id}/proposals/{proposal_id}/acceptance:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+      - name: proposal_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: acceptProposal
+      summary: Прийняти варіант — опублікувати правила й пакети, прогнати тести, підготувати джерело й завдання
+      description: |
+        Результат job — AcceptanceResult: опубліковані версії (draft або approved за політикою),
+        звіти тестів, чернетки Source і TaskConfig. Якщо `activate: true` і політика дозволяє —
+        асистент створює джерело й завдання в оркестраторі; інакше їх створює користувач з адмінки.
+      tags: [onboarding]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                activate:
+                  type: boolean
+                  default: false
+                source_id:
+                  $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+            examples:
+              accept:
+                value:
+                  activate: false
+                  source_id: shop-example
+      responses:
+        '202':
+          $ref: 'common.yaml#/components/responses/JobAccepted'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+  /v1/improvement-runs:
+    post:
+      operationId: startImprovement
+      summary: Вдосконалити екстрактор на проблемних прикладах (нова версія або форк)
+      description: |
+        LLM отримує вибірку проблем, поточний код, діагностику й успішні приклади. Нова версія
+        проходить нові й попередні тести й перевіряється на всіх прив'язках спільного пакета
+        (або оформлюється форком). Кількість спроб і витрати обмежені `limits.llm`. Якщо пакет
+        заборонено змінювати автоматично — лише пропозиція без публікації. Результат —
+        `Job.result` = ImprovementResult.
+      tags: [improvement]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImprovementRequest'
+            examples:
+              improve:
+                value:
+                  package:
+                    package_id: shop-example.product-extractor
+                    version: 1.2.0
+                  source_id: shop-example
+                  problem_group_id: pg_01J9ZW0000000000000000001
+                  problem_samples:
+                    - material_ref:
+                        storage_connection_id: raw-files
+                        object_id: obj_01J9ZQ4C00000000000000D9
+                      diagnostics:
+                        - level: warning
+                          code: extract.missing_selector
+                          message: selector .price matched 0 elements
+                  successful_examples:
+                    - material_ref:
+                        storage_connection_id: raw-files
+                        object_id: obj_01J9ZQ4C00000000000000D1
+                  bindings:
+                    - task_id: shop-catalog
+                      stage_id: extract-products
+                    - task_id: shop-price-check
+                      stage_id: extract-price
+                  policy:
+                    approval: manual
+                    allow_fork: true
+                  limits:
+                    max_improvement_attempts: 3
+                    budget:
+                      amount: 1
+                      currency: USD
+                      period: run
+      responses:
+        '202':
+          $ref: 'common.yaml#/components/responses/JobAccepted'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: 'common.yaml#/components/responses/TooManyRequests'
+  /v1/unknown-materials:
+    post:
+      operationId: analyzeUnknownMaterial
+      summary: Проаналізувати невідомий матеріал (викликає оркестратор лише за увімкненим прапорцем)
+      tags: [unknown]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnknownMaterialRequest'
+            examples:
+              unknown:
+                value:
+                  source_id: shop-example
+                  task_id: shop-catalog
+                  forward_unknown_to_llm: true
+                  material:
+                    material_id: web:0a1b2c3d4e5f60718293a4b5c6d7e8f9
+                    observation_id: obs_01J9ZQ5A0000000000000007
+                    source:
+                      source_id: shop-example
+                      kind: web
+                    locator:
+                      url: https://shop.example.test/gift-cards
+                    fetched_at: '2026-09-27T10:05:00Z'
+                    format:
+                      media_type: text/html
+                    revision:
+                      content_sha256: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+                    content:
+                      kind: inline
+                      media_type: text/html
+                      encoding: utf-8
+                      data: '<html><h1>Gift cards</h1></html>'
+                    collector:
+                      name: web-collector
+                      version: 0.1.0
+      responses:
+        '202':
+          $ref: 'common.yaml#/components/responses/JobAccepted'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '403':
+          description: forward_unknown_to_llm не увімкнено — асистент не викликає LLM (`access_denied_by_policy`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                flagOff:
+                  value:
+                    type: urn:jane:problem:access_denied_by_policy
+                    title: Forwarding unknown pages to LLM is disabled
+                    status: 403
+                    code: access_denied_by_policy
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: 'common.yaml#/components/responses/TooManyRequests'
+  /v1/jobs/{job_id}:
+    $ref: 'common.yaml#/components/pathItems/Job'
+  /v1/jobs/{job_id}/cancel:
+    $ref: 'common.yaml#/components/pathItems/JobCancel'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+  schemas:
+    OnboardingRequest:
+      type: object
+      additionalProperties: false
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Назва сайту чи каналу або точне посилання.
+        source_kind:
+          $ref: '../schemas/common/defs.schema.json#/$defs/SourceKind'
+        expected_entity_types:
+          type: array
+          items:
+            type: string
+        crawl_hints:
+          type: object
+          description: Часткові правила обходу від користувача (фрагмент CollectorRules), які асистент має врахувати.
+        limits:
+          $ref: '../schemas/common/limits.schema.json#/properties/llm'
+        auto_activation:
+          type: boolean
+          default: false
+    SourceCandidate:
+      type: object
+      required: [candidate_id, title]
+      properties:
+        candidate_id:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+        telegram_username:
+          type: string
+        description:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+    FieldInfo:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        examples:
+          type: array
+          items: {}
+        coverage:
+          type: number
+          minimum: 0
+          maximum: 1
+    SourceAnalysis:
+      type: object
+      properties:
+        source_kind:
+          type: string
+        discovery_methods:
+          type: array
+          items:
+            type: string
+          description: Доступні способи обходу (sitemap, feed, listing, api_feed, recursive…).
+        material_types:
+          type: array
+          items:
+            type: object
+            required: [type, count]
+            properties:
+              type:
+                type: string
+              count:
+                type: integer
+              example_urls:
+                type: array
+                items:
+                  type: string
+        entities:
+          type: array
+          items:
+            type: object
+            required: [entity_type, fields]
+            properties:
+              entity_type:
+                type: string
+              fields:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FieldInfo'
+    ExtractorPlan:
+      type: object
+      required: [entity_type, action]
+      properties:
+        entity_type:
+          type: string
+        action:
+          type: string
+          enum: [bind_existing, fork, create]
+        package:
+          $ref: '../schemas/common/package-ref.schema.json'
+        match_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        tested_on_samples:
+          type: object
+          properties:
+            passed:
+              type: integer
+            failed:
+              type: integer
+    Proposal:
+      type: object
+      required: [proposal_id, title, collector_rules, extractors]
+      properties:
+        proposal_id:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        recommended:
+          type: boolean
+        collector_rules:
+          $ref: '../schemas/collector-rules.schema.json'
+        extractors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExtractorPlan'
+        coverage:
+          type: object
+          properties:
+            estimated_materials:
+              type: integer
+            entity_types:
+              type: array
+              items:
+                type: string
+            notes:
+              type: string
+        cost:
+          type: object
+          properties:
+            requests_per_run_estimate:
+              type: integer
+            llm_setup_cost:
+              $ref: '../schemas/handler-result.schema.json#/$defs/Money'
+            llm_cost_per_run:
+              $ref: '../schemas/handler-result.schema.json#/$defs/Money'
+        risks:
+          type: array
+          items:
+            type: string
+    OnboardingSession:
+      type: object
+      required: [session_id, status, query, created_at]
+      properties:
+        session_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+        status:
+          type: string
+          enum: [resolving, needs_disambiguation, sampling, analyzing, proposals_ready, insufficient_sample, applying, completed, failed, cancelled]
+        query:
+          type: string
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceCandidate'
+        selected_candidate_id:
+          type: string
+        sample:
+          type: object
+          properties:
+            materials:
+              type: integer
+            distinct_types:
+              type: integer
+            confidence:
+              type: number
+            sufficient:
+              type: boolean
+            message:
+              type: string
+        analysis:
+          $ref: '#/components/schemas/SourceAnalysis'
+        proposals:
+          type: array
+          items:
+            $ref: '#/components/schemas/Proposal'
+        costs:
+          $ref: '../schemas/handler-result.schema.json#/$defs/Money'
+        job_id:
+          type: string
+        created_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        error:
+          $ref: '../schemas/common/problem.schema.json'
+    AcceptanceResult:
+      type: object
+      description: Job.result для acceptProposal.
+      required: [collector_rules, extractors]
+      properties:
+        collector_rules:
+          $ref: '../schemas/common/package-ref.schema.json'
+        extractors:
+          type: array
+          items:
+            type: object
+            required: [action, package]
+            properties:
+              action:
+                type: string
+                enum: [bind_existing, fork, create]
+              package:
+                $ref: '../schemas/common/package-ref.schema.json'
+              test_report:
+                $ref: '../schemas/handler-result.schema.json#/$defs/TestReport'
+        source_draft:
+          $ref: '../schemas/source.schema.json'
+        task_drafts:
+          type: array
+          items:
+            $ref: '../schemas/task-config.schema.json'
+        activated:
+          type: boolean
+    MaterialRef:
+      type: object
+      description: Посилання на збережений матеріал (storage API) — асистент сам читає вміст.
+      additionalProperties: false
+      required: [storage_connection_id, object_id]
+      properties:
+        storage_connection_id:
+          type: string
+        object_id:
+          type: string
+    ProblemSample:
+      type: object
+      additionalProperties: false
+      properties:
+        material:
+          $ref: '../schemas/material.schema.json'
+        material_ref:
+          $ref: '#/components/schemas/MaterialRef'
+        result:
+          $ref: '../schemas/handler-result.schema.json'
+        diagnostics:
+          type: array
+          items:
+            $ref: '../schemas/handler-result.schema.json#/$defs/DiagnosticMessage'
+      anyOf:
+        - required: [material]
+        - required: [material_ref]
+    ImprovementRequest:
+      type: object
+      additionalProperties: false
+      required: [package, problem_samples]
+      properties:
+        package:
+          $ref: '../schemas/common/package-ref.schema.json'
+        source_id:
+          type: string
+        problem_group_id:
+          type: string
+        problem_samples:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ProblemSample'
+        successful_examples:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProblemSample'
+        bindings:
+          type: array
+          description: Усі прив'язки спільного пакета, на яких нова версія має пройти перевірку.
+          items:
+            type: object
+            additionalProperties: false
+            required: [task_id, stage_id]
+            properties:
+              task_id:
+                type: string
+              stage_id:
+                type: string
+        policy:
+          type: object
+          additionalProperties: false
+          properties:
+            approval:
+              type: string
+              enum: [manual, auto_after_checks]
+              default: manual
+            allow_fork:
+              type: boolean
+              default: true
+        limits:
+          $ref: '../schemas/common/limits.schema.json#/properties/llm'
+    ImprovementResult:
+      type: object
+      description: Job.result для startImprovement.
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          enum: [new_version, fork_created, proposal_only, unresolved]
+        version:
+          $ref: '../schemas/common/package-ref.schema.json'
+        attempts:
+          type: integer
+        test_reports:
+          type: array
+          items:
+            type: object
+            properties:
+              context:
+                type: string
+              report:
+                $ref: '../schemas/handler-result.schema.json#/$defs/TestReport'
+        activated:
+          type: boolean
+        unresolved_reason:
+          type: string
+        suggested_entity_types:
+          type: array
+          items:
+            type: string
+          description: Пропозиція розширити очікувані типи даних джерела (приймає користувач).
+        costs:
+          $ref: '../schemas/handler-result.schema.json#/$defs/Money'
+    UnknownMaterialRequest:
+      type: object
+      additionalProperties: false
+      required: [source_id, material, forward_unknown_to_llm]
+      properties:
+        source_id:
+          type: string
+        task_id:
+          type: string
+        forward_unknown_to_llm:
+          type: boolean
+          description: Ефективне значення прапорця на момент маршрутизації; false — асистент відмовляє (403).
+        material:
+          $ref: '../schemas/material.schema.json'
+        limits:
+          $ref: '../schemas/common/limits.schema.json#/properties/llm'
+    UnknownMaterialResult:
+      type: object
+      description: Job.result для analyzeUnknownMaterial.
+      required: [classification, suggestion]
+      properties:
+        classification:
+          type: object
+          properties:
+            material_type:
+              type: string
+            confidence:
+              type: number
+        suggestion:
+          type: object
+          required: [action]
+          properties:
+            action:
+              type: string
+              enum: [none, new_extractor, extend_rules, expand_entity_types]
+            details:
+              type: string
+            onboarding_session_id:
+              type: string
+  examples:
+    SessionAmbiguous:
+      summary: Потрібне уточнення
+      value:
+        session_id: onb_01J9ZY0000000000000000001
+        status: needs_disambiguation
+        query: Shop Example kettles
+        candidates:
+          - candidate_id: cand_1
+            title: Shop Example
+            url: https://shop.example.test/
+            confidence: 0.62
+          - candidate_id: cand_2
+            title: Shop Example Outlet
+            url: https://outlet.shop.example.test/
+            confidence: 0.35
+        job_id: job_01J9ZY0000000000000000JOB
+        created_at: '2026-09-27T09:00:00Z'
+    SessionInsufficient:
+      summary: Вибірки недостатньо в межах бюджету
+      value:
+        session_id: onb_01J9ZY0000000000000000002
+        status: insufficient_sample
+        query: https://tiny.example.test/
+        sample:
+          materials: 4
+          distinct_types: 1
+          confidence: 0.3
+          sufficient: false
+          message: site has only 4 reachable pages; cannot distinguish material types
+        costs:
+          amount: 0.05
+          currency: USD
+        created_at: '2026-09-27T09:00:00Z'
+    SessionProposals:
+      summary: Варіанти готові
+      value:
+        session_id: onb_01J9ZY0000000000000000001
+        status: proposals_ready
+        query: Shop Example kettles
+        selected_candidate_id: cand_1
+        sample:
+          materials: 38
+          distinct_types: 4
+          confidence: 0.86
+          sufficient: true
+        analysis:
+          source_kind: web
+          discovery_methods: [sitemap, listing, recursive]
+          material_types:
+            - type: product
+              count: 24
+              example_urls: [https://shop.example.test/product/a-100]
+            - type: category
+              count: 9
+          entities:
+            - entity_type: product
+              fields:
+                - name: sku
+                  type: string
+                  coverage: 1
+                - name: price
+                  type: money
+                  coverage: 0.96
+        proposals:
+          - proposal_id: p1
+            title: Sitemap + product extractor
+            summary: Повний каталог через sitemap; наявний екстрактор з репозиторію.
+            recommended: true
+            collector_rules:
+              collector: web
+              scope:
+                allowed_domains: [shop.example.test]
+              strategies:
+                - type: sitemap
+            extractors:
+              - entity_type: product
+                action: bind_existing
+                package:
+                  package_id: shop-example.product-extractor
+                  version: 1.2.0
+                match_score: 0.93
+                tested_on_samples:
+                  passed: 23
+                  failed: 1
+            coverage:
+              estimated_materials: 18000
+              entity_types: [product]
+            cost:
+              requests_per_run_estimate: 18500
+              llm_setup_cost:
+                amount: 0.31
+                currency: USD
+              llm_cost_per_run:
+                amount: 0
+                currency: USD
+            risks:
+              - sitemap may omit discontinued products
+        costs:
+          amount: 0.31
+          currency: USD
+        job_id: job_01J9ZY0000000000000000JOB
+        created_at: '2026-09-27T09:00:00Z'

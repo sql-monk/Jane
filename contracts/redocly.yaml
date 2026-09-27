@@ -1,0 +1,15 @@
+# Redocly CLI lint config for Jane contracts (used by tools/check_contracts.py).
+extends:
+  - recommended
+rules:
+  no-server-example.com: off
+  operation-4xx-response: off  # replaced by check_contracts.py: secured operations must declare 401
+  no-required-schema-properties-undefined: off  # conditional 'required' in if/then is idiomatic 2020-12
+  operation-operationId: error
+  operation-summary: error
+  security-defined: error
+  no-unused-components: off
+  no-invalid-media-type-examples: error
+  no-ambiguous-paths: error
+  path-segment-plural: off
+  tag-description: off

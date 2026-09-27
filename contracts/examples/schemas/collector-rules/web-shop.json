@@ -1,0 +1,111 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "shop.example.test"
+    ],
+    "include_subdomains": false,
+    "path_prefixes": [
+      "/"
+    ],
+    "exclude": [
+      {
+        "value": "shop.example.test/cart/**"
+      },
+      {
+        "type": "regex",
+        "value": ".*[?&]sort=.*"
+      }
+    ]
+  },
+  "strategies": [
+    {
+      "type": "sitemap",
+      "strategy_id": "sitemap",
+      "use_robots_txt": true,
+      "priority": 10
+    },
+    {
+      "type": "recursive",
+      "strategy_id": "links",
+      "follow": [
+        {
+          "value": "shop.example.test/catalog/**"
+        },
+        {
+          "value": "shop.example.test/product/**"
+        }
+      ],
+      "limits": {
+        "crawl": {
+          "max_depth": 3
+        }
+      }
+    },
+    {
+      "type": "listing",
+      "strategy_id": "categories",
+      "start_urls": [
+        "https://shop.example.test/catalog/kettles"
+      ],
+      "item_links": {
+        "value": "a.product-card"
+      },
+      "next_page": {
+        "type": "rel",
+        "value": "next"
+      }
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "normalization": {
+    "strip_query_params": [
+      "utm_*",
+      "sessionid"
+    ],
+    "trailing_slash": "remove"
+  },
+  "dedup": {
+    "key": "canonical_url"
+  },
+  "priorities": [
+    {
+      "pattern": {
+        "value": "shop.example.test/product/**"
+      },
+      "priority": 20
+    }
+  ],
+  "sections": [
+    {
+      "section_id": "products",
+      "patterns": [
+        {
+          "value": "shop.example.test/product/**"
+        }
+      ]
+    },
+    {
+      "section_id": "catalog",
+      "patterns": [
+        {
+          "value": "shop.example.test/catalog/**"
+        }
+      ]
+    }
+  ],
+  "fetch": {
+    "user_agent": "JaneBot/0.1 (+https://jane.invalid/bot)"
+  },
+  "revisit": {
+    "mode": "if_changed"
+  },
+  "limits": {
+    "rate": {
+      "requests_per_second_per_host": 1,
+      "respect_crawl_delay": true
+    }
+  }
+}

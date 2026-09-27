@@ -1,0 +1,327 @@
+openapi: 3.1.0
+info:
+  title: Jane Handler Protocol
+  version: 1.0.0
+  description: |
+    Спільний протокол обробника. Реалізують: handler-runtime (екстрактори й Python-перетворення,
+    WP-06), storage (обробник збереження, WP-07/08), llm (LLM-обробник, WP-10). Оркестратор
+    (WP-09) викликає будь-який тип однаково; сторонній застосунок — так само, без оркестратора.
+
+    Семантика доставки — **at-least-once з ідемпотентністю**: заголовок `Idempotency-Key`
+    дорівнює `delivery.delivery_key`. Повтор із тим самим ключем повертає збережений
+    `HandlerResult` (`duplicate: true`) без повторного ефекту (без повторного запису, без повторного
+    витрачання бюджету LLM). Виконавець пам'ятає ключі щонайменше `limits.transfer.idempotency_ttl_seconds`;
+    обробник збереження додатково зберігає delivery_key разом із записом безстроково.
+
+    Помилка виконання обробника — `200` зі `status: failed`; HTTP-помилка означає, що виклик не відбувся.
+    Можливості конкретного виконавця (типи обробників, профілі runtime, адаптери, підтримка
+    підключень) — `GET /v1/info` → `capabilities`.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Jane
+servers:
+  - url: http://localhost:8106
+    description: handler-runtime (dev)
+  - url: http://localhost:8107
+    description: storage (dev)
+  - url: http://localhost:8110
+    description: llm (dev)
+security:
+  - bearerAuth: []
+tags:
+  - name: system
+  - name: invocations
+  - name: tests
+  - name: connections
+  - name: jobs
+paths:
+  /v1/health:
+    $ref: 'common.yaml#/components/pathItems/Health'
+  /v1/info:
+    $ref: 'common.yaml#/components/pathItems/Info'
+  /v1/invocations:
+    post:
+      operationId: invokeHandler
+      summary: Виконати обробник над вхідними даними
+      description: |
+        `mode: sync` — 200 з HandlerResult (або 202, якщо не вклалося в
+        `limits.timeouts.sync_response_max_ms`); `mode: async` — одразу 202, результат —
+        `Job.result` (HandlerResult) за `GET /v1/jobs/{job_id}`.
+        Виконавець бере пакет із `package_archive` або з репозиторію за `handler` і перевіряє
+        дайджест, якщо його задано.
+      tags: [invocations]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+        - $ref: 'common.yaml#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/handler-invocation.schema.json'
+            examples:
+              extract:
+                $ref: '../examples/openapi/invocation-extract.json'
+              store:
+                $ref: '../examples/openapi/invocation-store.json'
+              localTest:
+                $ref: '../examples/openapi/invocation-local-test.json'
+      responses:
+        '200':
+          description: Обробник виконано (будь-який із чотирьох станів).
+          headers:
+            Idempotency-Replayed:
+              $ref: 'common.yaml#/components/headers/IdempotencyReplayed'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/handler-result.schema.json'
+              examples:
+                success:
+                  $ref: '../examples/openapi/result-extractor-success.json'
+                empty:
+                  $ref: '../examples/openapi/result-extractor-empty.json'
+                unrecognized:
+                  $ref: '../examples/openapi/result-extractor-unrecognized.json'
+                failedSchema:
+                  $ref: '../examples/openapi/result-extractor-failed.json'
+                failedTimeout:
+                  $ref: '../examples/openapi/result-extractor-timeout.json'
+                storageWritten:
+                  $ref: '../examples/openapi/result-storage-written.json'
+                storageDuplicate:
+                  $ref: '../examples/openapi/result-storage-duplicate.json'
+                storageStale:
+                  $ref: '../examples/openapi/result-storage-stale.json'
+                storageRaw:
+                  $ref: '../examples/openapi/result-storage-raw.json'
+                llm:
+                  $ref: '../examples/openapi/result-llm-success.json'
+        '202':
+          $ref: 'common.yaml#/components/responses/JobAccepted'
+        '400':
+          $ref: 'common.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          description: Пакет або підключення не знайдено (`not_found`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                package:
+                  value:
+                    type: urn:jane:problem:not_found
+                    title: Package version not found
+                    status: 404
+                    code: not_found
+                    detail: shop-example.product-extractor@9.9.9
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+        '413':
+          $ref: 'common.yaml#/components/responses/PayloadTooLarge'
+        '422':
+          description: Невалідний запит, параметри не відповідають params_schema, `digest_mismatch`, `dependency_not_allowed`, `idempotency_key_reused`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                digest:
+                  value:
+                    type: urn:jane:problem:digest_mismatch
+                    title: Package digest mismatch
+                    status: 422
+                    code: digest_mismatch
+                    retryable: false
+                validation:
+                  $ref: 'common.yaml#/components/examples/ProblemValidation'
+        '429':
+          $ref: 'common.yaml#/components/responses/TooManyRequests'
+        '502':
+          description: Недоступний репозиторій, сховище чи провайдер LLM (`upstream_unavailable`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                upstream:
+                  value:
+                    type: urn:jane:problem:upstream_unavailable
+                    title: Upstream unavailable
+                    status: 502
+                    code: upstream_unavailable
+                    retryable: true
+                    detail: registry did not respond
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
+  /v1/invocations/{invocation_id}:
+    parameters:
+      - name: invocation_id
+        in: path
+        required: true
+        schema:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+    get:
+      operationId: getInvocation
+      summary: Прочитати збережений результат виклику
+      tags: [invocations]
+      responses:
+        '200':
+          description: Результат виклику.
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/handler-result.schema.json'
+              examples:
+                success:
+                  $ref: '../examples/openapi/result-extractor-success.json'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/test-runs:
+    post:
+      operationId: startTestRun
+      summary: Прогнати тести пакета без запису в робочі дані
+      description: |
+        Завжди `test_mode`. Запускає тести з маніфесту (`tests: all` або перелік імен) і додаткові
+        випадки (наприклад проблемні приклади). Результат — `Job.result` = TestReport
+        (`handler-result.schema.json#/$defs/TestReport`).
+      tags: [tests]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestRunRequest'
+            examples:
+              allTests:
+                value:
+                  handler:
+                    package_id: shop-example.product-extractor
+                    version: 1.2.0
+                  tests: all
+              withProblemSample:
+                value:
+                  handler:
+                    package_id: shop-example.product-extractor
+                    version: 1.3.0-draft.1
+                  package_archive:
+                    kind: blob
+                    uri: s3://jane-drafts/assistant/product-extractor-1.3.0-draft.1.zip
+                    media_type: application/zip
+                    size_bytes: 18422
+                    sha256: 3b8f0e5b1c1d0e7f9a2b4c6d8e0f1a3b5c7d9e1f2a4b6c8d0e2f4a6b8c0d2e4f
+                  tests: all
+                  extra_cases:
+                    - name: problem-sample-2026-09-26
+                      input:
+                        kind: material
+                        material:
+                          material_id: web:9b1f0c1d2e3f40516273849a0b1c2d3e
+                          observation_id: obs_01J9ZQ4A0000000000000009
+                          source:
+                            kind: web
+                          locator:
+                            url: https://shop.example.test/product/c-300
+                          fetched_at: '2026-09-26T10:00:00Z'
+                          format:
+                            media_type: text/html
+                          revision:
+                            content_sha256: 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
+                          content:
+                            kind: inline
+                            media_type: text/html
+                            encoding: utf-8
+                            data: '<html><h1>C-300</h1><div class="price-new">899 UAH</div></html>'
+                          collector:
+                            name: web-collector
+                            version: 0.1.0
+                      expected_status: success
+                      expected:
+                        entities:
+                          - entity_type: product
+                            key:
+                              scope: shop-example
+                              natural:
+                                sku: C-300
+                            fields:
+                              price:
+                                amount: 899
+                                currency: UAH
+                            observation:
+                              observation_id: obs_01J9ZQ4A0000000000000009
+                              observed_at: '2026-09-26T10:00:00Z'
+                      compare: subset
+      responses:
+        '202':
+          $ref: 'common.yaml#/components/responses/JobAccepted'
+        '400':
+          $ref: 'common.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+  /v1/connections:
+    $ref: 'common.yaml#/components/pathItems/Connections'
+  /v1/connections/{connection_id}:
+    $ref: 'common.yaml#/components/pathItems/Connection'
+  /v1/connections/{connection_id}/test:
+    $ref: 'common.yaml#/components/pathItems/ConnectionTest'
+  /v1/jobs/{job_id}:
+    $ref: 'common.yaml#/components/pathItems/Job'
+  /v1/jobs/{job_id}/cancel:
+    $ref: 'common.yaml#/components/pathItems/JobCancel'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    TestRunRequest:
+      type: object
+      additionalProperties: false
+      required: [handler]
+      properties:
+        handler:
+          $ref: '../schemas/common/package-ref.schema.json'
+        package_archive:
+          $ref: '../schemas/common/content-ref.schema.json'
+        tests:
+          description: all — усі тести маніфесту; масив — лише названі; none — лише extra_cases.
+          oneOf:
+            - type: string
+              enum: [all, none]
+            - type: array
+              items:
+                type: string
+        extra_cases:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, input, expected_status]
+            properties:
+              name:
+                type: string
+              input:
+                $ref: '../schemas/handler-invocation.schema.json#/$defs/HandlerInput'
+              params:
+                type: object
+              expected_status:
+                $ref: '../schemas/handler-result.schema.json#/$defs/HandlerStatus'
+              expected:
+                $ref: '../schemas/handler-result.schema.json#/$defs/HandlerOutput'
+              compare:
+                type: string
+                enum: [exact, subset]
+        params:
+          type: object
+        limits:
+          $ref: '../schemas/common/limits.schema.json'

@@ -1,0 +1,18 @@
+{
+  "summary": "Telegram-джерело з увімкненим прапорцем",
+  "value": {
+    "source_id": "news-tg",
+    "kind": "telegram",
+    "title": "City events",
+    "locator": {
+      "telegram_username": "city_events_example"
+    },
+    "forward_unknown_to_llm": true,
+    "expected_entity_types": [
+      "event"
+    ],
+    "connections": {
+      "account": "tg-main"
+    }
+  }
+}

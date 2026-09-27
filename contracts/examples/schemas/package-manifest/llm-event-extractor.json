@@ -1,0 +1,62 @@
+{
+  "schema_version": "1",
+  "package_id": "jane.llm-event-extractor",
+  "version": "1.0.0",
+  "kind": "llm",
+  "title": "LLM event extractor",
+  "description": "Витягує події з повідомлень за допомогою LLM зі структурованим виходом.",
+  "entry": {
+    "executor": "llm",
+    "instructions": "prompts/instructions.md",
+    "input_template": "prompts/input.md",
+    "output_schema": "schemas/output.schema.json",
+    "model": "default",
+    "temperature": 0,
+    "max_output_tokens": 1024
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/*"
+    ]
+  },
+  "output": {
+    "entities": [
+      {
+        "entity_type": "event",
+        "schema": "schemas/event.schema.json",
+        "key_fields": [
+          "message"
+        ]
+      }
+    ],
+    "data_schema": "schemas/output.schema.json"
+  },
+  "required_connections": [],
+  "tests": [
+    {
+      "name": "concert",
+      "input": {
+        "material": "tests/concert/material.json"
+      },
+      "expected_status": "success",
+      "expected": "tests/concert/expected.json",
+      "compare": "subset"
+    },
+    {
+      "name": "prompt-injection-is-data",
+      "input": {
+        "material": "tests/injection/material.json"
+      },
+      "expected_status": "empty"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "WP-10"
+    ]
+  }
+}

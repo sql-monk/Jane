@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HandlerResult",
+  "description": "Результат виконання обробника з діагностикою (ТЗ §5, §9). Пов'язаний із вхідними даними (inputs) і точною версією пакета (handler). Чотири стани ТЗ §9: success — успішна обробка; empty — коректна відсутність потрібних сутностей; unrecognized — невідомий або частково розібраний формат; failed — помилка виконання чи невідповідність результату схемі. Помилка обробника — це відповідь 200 зі status=failed; HTTP-помилка означає, що виклик не відбувся.",
+  "type": "object",
+  "required": ["invocation_id", "handler", "handler_kind", "status", "inputs", "started_at", "finished_at"],
+  "properties": {
+    "invocation_id": { "$ref": "common/defs.schema.json#/$defs/Id" },
+    "handler": { "$ref": "common/package-ref.schema.json", "description": "Фактично виконана версія (digest заповнено завжди)." },
+    "handler_kind": { "$ref": "common/defs.schema.json#/$defs/HandlerKind" },
+    "status": { "$ref": "#/$defs/HandlerStatus" },
+    "inputs": {
+      "description": "Посилання на вхідні дані в порядку запиту.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/InputRef" }
+    },
+    "output": { "$ref": "#/$defs/HandlerOutput" },
+    "unrecognized": {
+      "description": "Заповнюється, коли status = unrecognized.",
+      "type": "object",
+      "required": ["partial"],
+      "properties": {
+        "partial": { "type": "boolean", "description": "true — частину даних розібрано (вони в output), false — формат не розпізнано взагалі." },
+        "reason": { "type": "string" },
+        "signature": { "type": "string", "description": "Короткий відбиток характеру проблеми для групування (наприклад 'missing-selector:.price')." }
+      }
+    },
+    "failure": {
+      "description": "Заповнюється, коли status = failed.",
+      "type": "object",
+      "required": ["kind", "message"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["execution_error", "schema_mismatch", "timeout", "resource_exceeded", "sandbox_violation", "dependency_error", "connection_error", "budget_exhausted", "invalid_params"]
+        },
+        "message": { "type": "string" },
+        "retryable": { "type": "boolean" },
+        "details": { "type": "object" }
+      }
+    },
+    "diagnostics": { "$ref": "#/$defs/Diagnostics" },
+    "usage": { "$ref": "#/$defs/Usage" },
+    "delivery_key": { "type": "string" },
+    "duplicate": { "type": "boolean", "description": "true — цей delivery_key уже виконано; повернуто збережений результат без повторного ефекту." },
+    "test_mode": { "type": "boolean" },
+    "started_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp" },
+    "finished_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp" }
+  },
+  "allOf": [
+    { "if": { "properties": { "status": { "const": "failed" } } }, "then": { "required": ["failure"] } },
+    { "if": { "properties": { "status": { "const": "unrecognized" } } }, "then": { "required": ["unrecognized"] } }
+  ],
+  "$defs": {
+    "HandlerStatus": {
+      "type": "string",
+      "enum": ["success", "empty", "unrecognized", "failed"]
+    },
+    "InputRef": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["material", "entities", "data"] },
+        "material_id": { "$ref": "common/defs.schema.json#/$defs/Id" },
+        "observation_id": { "$ref": "common/defs.schema.json#/$defs/Id" },
+        "content_sha256": { "$ref": "common/defs.schema.json#/$defs/Sha256Hex" },
+        "from_invocation_id": { "$ref": "common/defs.schema.json#/$defs/Id" }
+      }
+    },
+    "HandlerOutput": {
+      "description": "Вихід за типом обробника: extractor — entities; llm — data (+ usage); storage — writes; transform — data або entities. Великий вихід — через *_ref.",
+      "type": "object",
+      "properties": {
+        "entities": { "type": "array", "items": { "$ref": "entity.schema.json" } },
+        "entities_ref": { "$ref": "common/content-ref.schema.json" },
+        "data": {},
+        "data_ref": { "$ref": "common/content-ref.schema.json" },
+        "writes": { "type": "array", "items": { "$ref": "#/$defs/WriteAck" } }
+      }
+    },
+    "WriteAck": {
+      "description": "Підтвердження запису обробником збереження.",
+      "type": "object",
+      "required": ["status", "target"],
+      "properties": {
+        "status": {
+          "description": "written — записано; duplicate — цей delivery_key уже записано, повтор без ефекту; stale — запізніле спостереження, лише в історії; partially_stale — частину полів застосовано, частину ні; simulated — test_mode, запису не було.",
+          "type": "string",
+          "enum": ["written", "duplicate", "stale", "partially_stale", "simulated"]
+        },
+        "target": {
+          "type": "object",
+          "required": ["adapter"],
+          "properties": {
+            "adapter": { "type": "string", "examples": ["filesystem", "postgresql", "sqlserver", "mongodb", "minio", "s3"] },
+            "connection_id": { "$ref": "common/defs.schema.json#/$defs/Slug" }
+          }
+        },
+        "object": { "$ref": "#/$defs/StoredObjectRef" },
+        "entity": {
+          "type": "object",
+          "properties": {
+            "entity_type": { "type": "string" },
+            "canonical_key": { "type": "string" },
+            "version": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "applied_fields": { "type": "array", "items": { "type": "string" } },
+        "stale_fields": { "type": "array", "items": { "type": "string" } },
+        "delivery_key": { "type": "string" }
+      }
+    },
+    "StoredObjectRef": {
+      "description": "Посилання на збережений об'єкт (RAW або документ результатів), за яким його можна прочитати через storage API або повторно обробити.",
+      "type": "object",
+      "required": ["object_id", "adapter"],
+      "properties": {
+        "object_id": { "$ref": "common/defs.schema.json#/$defs/Id" },
+        "adapter": { "type": "string" },
+        "connection_id": { "$ref": "common/defs.schema.json#/$defs/Slug" },
+        "locator": {
+          "description": "Адреса в термінах адаптера: path (files), table+id (SQL), collection+_id (MongoDB), bucket+key (S3/MinIO).",
+          "type": "object",
+          "additionalProperties": { "type": ["string", "integer"] }
+        },
+        "media_type": { "$ref": "common/defs.schema.json#/$defs/MediaType" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "common/defs.schema.json#/$defs/Sha256Hex" },
+        "content": { "$ref": "common/content-ref.schema.json", "description": "Постійне посилання на вміст (store=persistent), якщо адаптер його надає." }
+      }
+    },
+    "DiagnosticMessage": {
+      "type": "object",
+      "required": ["level", "message"],
+      "properties": {
+        "level": { "type": "string", "enum": ["debug", "info", "warning", "error"] },
+        "code": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,127}$" },
+        "message": { "type": "string", "maxLength": 4000 },
+        "pointer": { "type": "string", "description": "JSON Pointer у вихідних даних (наприклад '/entities/3/fields/price')." },
+        "material_id": { "$ref": "common/defs.schema.json#/$defs/Id" },
+        "selector": { "type": "string", "description": "CSS/XPath/JSONPath, з яким пов'язано повідомлення (для екстракторів)." }
+      }
+    },
+    "Diagnostics": {
+      "type": "object",
+      "properties": {
+        "messages": { "type": "array", "items": { "$ref": "#/$defs/DiagnosticMessage" } },
+        "validation_errors": {
+          "description": "Невідповідності виходу схемі пакета (для failure.kind = schema_mismatch).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["pointer", "message"],
+            "properties": {
+              "pointer": { "type": "string" },
+              "message": { "type": "string" },
+              "schema_pointer": { "type": "string" }
+            }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "duration_ms": { "type": "integer", "minimum": 0 },
+            "cpu_ms": { "type": "integer", "minimum": 0 },
+            "peak_memory_mb": { "type": "number", "minimum": 0 },
+            "output_bytes": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "logs_ref": { "$ref": "common/content-ref.schema.json", "description": "stdout/stderr виконання (обрізані до limits.sandbox.max_output_bytes)." }
+      }
+    },
+    "Usage": {
+      "type": "object",
+      "properties": {
+        "llm": {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string" },
+            "model": { "type": "string" },
+            "input_tokens": { "type": "integer", "minimum": 0 },
+            "output_tokens": { "type": "integer", "minimum": 0 },
+            "cost": { "$ref": "#/$defs/Money" }
+          }
+        }
+      }
+    },
+    "Money": {
+      "type": "object",
+      "required": ["amount", "currency"],
+      "properties": {
+        "amount": { "type": "number", "minimum": 0 },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+      }
+    },
+    "TestCaseResult": {
+      "type": "object",
+      "required": ["name", "passed"],
+      "properties": {
+        "name": { "type": "string" },
+        "passed": { "type": "boolean" },
+        "expected_status": { "$ref": "#/$defs/HandlerStatus" },
+        "actual_status": { "$ref": "#/$defs/HandlerStatus" },
+        "differences": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["pointer"],
+            "properties": {
+              "pointer": { "type": "string" },
+              "expected": {},
+              "actual": {}
+            }
+          }
+        },
+        "result": { "$ref": "handler-result.schema.json" }
+      }
+    },
+    "TestReport": {
+      "description": "Звіт прогону тестів пакета (без запису в робочі дані).",
+      "type": "object",
+      "required": ["package", "passed", "failed", "cases"],
+      "properties": {
+        "package": { "$ref": "common/package-ref.schema.json" },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "cases": { "type": "array", "items": { "$ref": "#/$defs/TestCaseResult" } },
+        "started_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp" },
+        "finished_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp" }
+      }
+    }
+  }
+}

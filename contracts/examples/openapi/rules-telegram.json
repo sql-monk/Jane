@@ -1,0 +1,32 @@
+{
+  "summary": "Правила Telegram-каналу",
+  "value": {
+    "collector": "telegram",
+    "channels": [
+      {
+        "username": "city_events_example"
+      },
+      {
+        "channel_id": "-1001234567890"
+      }
+    ],
+    "history": {
+      "enabled": true,
+      "since": "2026-09-01T00:00:00Z"
+    },
+    "updates": {
+      "new_messages": true,
+      "edits": true
+    },
+    "media": {
+      "download": false
+    },
+    "account_connection_id": "tg-main",
+    "limits": {
+      "telegram": {
+        "max_messages_per_run": 5000,
+        "max_flood_wait_seconds": 300
+      }
+    }
+  }
+}

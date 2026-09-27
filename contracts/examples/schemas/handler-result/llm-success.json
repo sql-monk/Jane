@@ -1,0 +1,66 @@
+{
+  "invocation_id": "inv_01J9ZT0D00000000000000E1",
+  "handler": {
+    "package_id": "jane.llm-event-extractor",
+    "version": "1.0.0",
+    "digest": "sha256:3dcc2f9a7203d535c892df2884b4dbd27d3d159daba59d293bcf4bafbe603bb2"
+  },
+  "handler_kind": "llm",
+  "status": "success",
+  "inputs": [
+    {
+      "kind": "material",
+      "material_id": "tg:-1001234567890:4521",
+      "observation_id": "obs_01J9ZT0C0000000000000004"
+    }
+  ],
+  "output": {
+    "entities": [
+      {
+        "entity_type": "event",
+        "key": {
+          "scope": "news-tg",
+          "natural": {
+            "message": "tg:-1001234567890:4521"
+          }
+        },
+        "fields": {
+          "title": "Концерт",
+          "starts_at": "2026-10-12T19:00:00+03:00",
+          "venue": "Філармонія",
+          "price": "free"
+        },
+        "observation": {
+          "observation_id": "obs_01J9ZT0C0000000000000004",
+          "observed_at": "2026-09-27T12:30:00Z",
+          "sequence": 1790503800,
+          "material_id": "tg:-1001234567890:4521"
+        }
+      }
+    ],
+    "data": {
+      "events": [
+        {
+          "title": "Концерт",
+          "starts_at": "2026-10-12T19:00:00+03:00",
+          "venue": "Філармонія",
+          "price": "free"
+        }
+      ]
+    }
+  },
+  "usage": {
+    "llm": {
+      "provider": "fake",
+      "model": "fake-deterministic-1",
+      "input_tokens": 412,
+      "output_tokens": 96,
+      "cost": {
+        "amount": 0.0,
+        "currency": "USD"
+      }
+    }
+  },
+  "started_at": "2026-09-27T12:30:01Z",
+  "finished_at": "2026-09-27T12:30:02Z"
+}

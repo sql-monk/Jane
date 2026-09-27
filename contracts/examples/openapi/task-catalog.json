@@ -1,0 +1,163 @@
+{
+  "summary": "Завдання повного збору каталогу",
+  "value": {
+    "task_id": "shop-catalog",
+    "title": "Повний збір каталогу Shop Example",
+    "input": {
+      "source_id": "shop-example"
+    },
+    "stages": [
+      {
+        "stage_id": "collect",
+        "kind": "collect",
+        "collector": {
+          "collector": "web",
+          "rules": {
+            "package_id": "shop-example.web-rules",
+            "version": "1.0.0",
+            "digest": "sha256:bd33d6b0fb860947abb60fbf898610d7ad28e279daf21106399995dcd911674a"
+          },
+          "mode": "full"
+        }
+      },
+      {
+        "stage_id": "store-raw",
+        "kind": "handler",
+        "handler": {
+          "package_id": "jane.storage-files",
+          "version": "1.0.0",
+          "digest": "sha256:b2d691abc92053497acfe8f61d6cd32488b126a4aeb6e080c63d966ecd096a94"
+        },
+        "connections": {
+          "target": "raw-files"
+        },
+        "inputs": [
+          {
+            "from": "collect"
+          }
+        ]
+      },
+      {
+        "stage_id": "extract-products",
+        "kind": "handler",
+        "handler": {
+          "package_id": "shop-example.product-extractor",
+          "version": "1.2.0",
+          "digest": "sha256:4f6440c6a17b54edef02166e12a3bffd2364cbf790484d1f076b5d2e5ef78a35"
+        },
+        "inputs": [
+          {
+            "from": "collect",
+            "when": {
+              "field": "material.format.media_type",
+              "op": "eq",
+              "value": "text/html"
+            }
+          }
+        ],
+        "bindings": [
+          {
+            "sections": [
+              "products"
+            ]
+          },
+          {
+            "url_patterns": [
+              {
+                "value": "shop.example.test/p/**"
+              }
+            ]
+          }
+        ],
+        "limits": {
+          "sandbox": {
+            "memory_mb": 512,
+            "wall_time_ms": 20000
+          }
+        }
+      },
+      {
+        "stage_id": "store-products",
+        "kind": "handler",
+        "handler": {
+          "package_id": "jane.storage-postgresql",
+          "version": "1.0.0",
+          "digest": "sha256:8751adf49b3d26c9a59f6ecc83f52feccc0edade6db1a98c1a0155b0380a045b"
+        },
+        "connections": {
+          "target": "results-pg"
+        },
+        "inputs": [
+          {
+            "from": "extract-products",
+            "select": "output",
+            "when": {
+              "field": "result.status",
+              "op": "in",
+              "value": [
+                "success",
+                "unrecognized"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "stage_id": "analyze-problems",
+        "kind": "handler",
+        "handler": {
+          "package_id": "jane.llm-page-triage",
+          "version": "1.0.0",
+          "digest": "sha256:4041159bcbdce2491ed21066225c584e70c2d5ad8783ba979f3df4adad98d77b"
+        },
+        "inputs": [
+          {
+            "from": "extract-products",
+            "select": "problems"
+          }
+        ],
+        "on_failure": "continue"
+      },
+      {
+        "stage_id": "unknown-pages",
+        "kind": "handler",
+        "handler": {
+          "package_id": "jane.llm-page-triage",
+          "version": "1.0.0",
+          "digest": "sha256:4041159bcbdce2491ed21066225c584e70c2d5ad8783ba979f3df4adad98d77b"
+        },
+        "inputs": [
+          {
+            "from": "collect",
+            "select": "unmatched_materials"
+          }
+        ]
+      }
+    ],
+    "schedule": {
+      "type": "cron",
+      "cron": "0 2 * * 0",
+      "timezone": "Europe/Kyiv",
+      "overlap": "skip"
+    },
+    "retries": {
+      "max_attempts": 5,
+      "initial_backoff_ms": 1000,
+      "max_backoff_ms": 60000,
+      "backoff_multiplier": 2,
+      "jitter": true
+    },
+    "limits": {
+      "crawl": {
+        "max_depth": 5
+      },
+      "queue": {
+        "max_inflight_materials": 200
+      }
+    },
+    "forward_unknown_to_llm": false,
+    "labels": {
+      "kind": "catalog"
+    }
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Job",
+  "description": "Стан тривалої операції. Будь-який API, що повертає 202 Accepted, повертає Job і заголовок Location: /v1/jobs/{job_id}. Стан читається GET /v1/jobs/{job_id}, скасування — POST /v1/jobs/{job_id}/cancel. Переходи: queued → running → (succeeded | failed); queued|running → cancelling → cancelled (або succeeded/failed, якщо операція завершилась раніше, ніж скасування набрало сили). Термінальні стани: succeeded, failed, cancelled — більше не змінюються. Job живе в сервісі, який його створив; зберігається щонайменше limits.transfer.job_retention_seconds після завершення.",
+  "type": "object",
+  "required": ["job_id", "kind", "status", "created_at"],
+  "properties": {
+    "job_id": { "$ref": "defs.schema.json#/$defs/Id" },
+    "kind": {
+      "description": "Вид операції в межах сервісу, наприклад 'collection', 'invocation', 'test_run', 'run', 'onboarding', 'improvement', 'upstream_port'.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,63}$"
+    },
+    "status": { "$ref": "#/$defs/JobStatus" },
+    "created_at": { "$ref": "defs.schema.json#/$defs/Timestamp" },
+    "updated_at": { "$ref": "defs.schema.json#/$defs/Timestamp" },
+    "started_at": { "$ref": "defs.schema.json#/$defs/Timestamp" },
+    "finished_at": { "$ref": "defs.schema.json#/$defs/Timestamp" },
+    "progress": { "$ref": "#/$defs/JobProgress" },
+    "result": {
+      "description": "Результат, коли status = succeeded. Форма залежить від 'kind' і описана в API відповідної операції. Великий результат передається як result_ref.",
+      "type": "object"
+    },
+    "result_ref": { "$ref": "content-ref.schema.json" },
+    "error": {
+      "description": "Причина, коли status = failed. Для cancelled причина — у cancellation.",
+      "$ref": "problem.schema.json"
+    },
+    "cancellation": { "$ref": "#/$defs/JobCancellation" },
+    "idempotency_key": { "type": "string", "maxLength": 255 },
+    "links": {
+      "description": "Пов'язані ресурси: self, cancel, result, run, collection тощо.",
+      "type": "object",
+      "additionalProperties": { "type": "string", "format": "uri-reference" }
+    },
+    "labels": { "$ref": "defs.schema.json#/$defs/Labels" }
+  },
+  "$defs": {
+    "JobStatus": {
+      "type": "string",
+      "enum": ["queued", "running", "cancelling", "succeeded", "failed", "cancelled"]
+    },
+    "JobProgress": {
+      "type": "object",
+      "properties": {
+        "completed": { "type": "integer", "minimum": 0 },
+        "total": {
+          "description": "Відома загальна кількість одиниць; null — невідома (наприклад під час рекурсивного обходу).",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "unit": { "type": "string", "examples": ["materials", "pages", "tests", "stages"] },
+        "message": { "type": "string" },
+        "counters": {
+          "description": "Довільні лічильники, наприклад {\"fetched\": 10, \"skipped_robots\": 2}.",
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "updated_at": { "$ref": "defs.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "JobCancellation": {
+      "type": "object",
+      "required": ["requested_at"],
+      "properties": {
+        "requested_at": { "$ref": "defs.schema.json#/$defs/Timestamp" },
+        "requested_by": { "type": "string" },
+        "reason": { "type": "string", "maxLength": 1000 }
+      }
+    },
+    "JobCancelRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reason": { "type": "string", "maxLength": 1000 }
+      }
+    },
+    "JobList": {
+      "type": "object",
+      "required": ["items", "next_cursor"],
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "job.schema.json" } },
+        "next_cursor": { "$ref": "page.schema.json#/$defs/NextCursor" }
+      }
+    }
+  }
+}

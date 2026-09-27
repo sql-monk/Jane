@@ -1,0 +1,14 @@
+{
+  "type": "urn:jane:problem:limit_exceeded",
+  "title": "Limit exceeded",
+  "status": 422,
+  "code": "limit_exceeded",
+  "retryable": false,
+  "detail": "crawl.max_depth=12 exceeds hard cap 8",
+  "details": {
+    "path": "crawl.max_depth",
+    "limit": 8,
+    "actual": 12,
+    "level": "hard_cap"
+  }
+}

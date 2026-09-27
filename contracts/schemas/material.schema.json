@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Material",
+  "description": "Матеріал, отриманий колектором (ТЗ §5): вміст (RAW) і метадані. Кожне отримання — нове спостереження з новим observation_id (ТЗ §11); material_id стабільний для того самого об'єкта джерела; revision описує версію вмісту. Повторна технічна доставка того самого спостереження має той самий observation_id і не створює нових записів.",
+  "type": "object",
+  "required": ["material_id", "observation_id", "source", "locator", "fetched_at", "format", "revision", "content", "collector"],
+  "properties": {
+    "material_id": {
+      "description": "Стабільний ідентифікатор об'єкта в джерелі. Web: 'web:' + sha256(канонічний URL)[:32]; Telegram: 'tg:<channel_id>:<message_id>'. Однаковий для всіх спостережень того самого об'єкта.",
+      "$ref": "common/defs.schema.json#/$defs/Id"
+    },
+    "observation_id": {
+      "description": "Унікальний ідентифікатор цього отримання (ULID/UUIDv7 — монотонний у межах колектора).",
+      "$ref": "common/defs.schema.json#/$defs/Id"
+    },
+    "source": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "source_id": { "$ref": "common/defs.schema.json#/$defs/Slug", "description": "Ідентифікатор джерела в оркестраторі; в автономному режимі може бути відсутній." },
+        "kind": { "$ref": "common/defs.schema.json#/$defs/SourceKind" },
+        "name": { "type": "string" }
+      }
+    },
+    "locator": {
+      "description": "Посилання на першоджерело.",
+      "type": "object",
+      "properties": {
+        "url": { "type": "string", "format": "uri", "description": "Запитаний URL." },
+        "final_url": { "type": "string", "format": "uri", "description": "URL після переадресацій." },
+        "canonical_url": { "type": "string", "format": "uri", "description": "Нормалізований URL, від якого обчислено material_id (web)." },
+        "telegram": {
+          "type": "object",
+          "required": ["channel_id", "message_id"],
+          "properties": {
+            "channel_id": { "type": "string" },
+            "channel_username": { "type": "string" },
+            "message_id": { "type": "integer" },
+            "grouped_id": { "type": "string", "description": "Ідентифікатор альбому, якщо повідомлення в групі." }
+          }
+        }
+      }
+    },
+    "fetched_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp" },
+    "published_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp", "description": "Час публікації, якщо його надає джерело." },
+    "edited_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp", "description": "Час редагування, якщо його надає джерело." },
+    "format": {
+      "type": "object",
+      "required": ["media_type"],
+      "properties": {
+        "media_type": { "$ref": "common/defs.schema.json#/$defs/MediaType" },
+        "charset": { "type": "string" },
+        "language": { "type": "string", "description": "BCP 47, якщо відомо." },
+        "content_kind": {
+          "description": "Грубий вид вмісту для маршрутизації: page (HTML-сторінка), feed, sitemap, json, message (Telegram), file.",
+          "type": "string",
+          "examples": ["page", "feed", "sitemap", "json", "message", "file"]
+        }
+      }
+    },
+    "revision": {
+      "description": "Версія вмісту. Однаковий content_sha256 у двох спостереженнях означає незмінений вміст.",
+      "type": "object",
+      "required": ["content_sha256"],
+      "properties": {
+        "content_sha256": { "$ref": "common/defs.schema.json#/$defs/Sha256Hex" },
+        "source_revision": { "type": "string", "description": "Версія, яку надає джерело: ETag, Last-Modified, Telegram edit_date." },
+        "sequence": {
+          "description": "Монотонний номер ревізії для порядку спостережень, якщо його надає джерело (Telegram: edit_date як epoch seconds; web: відсутній).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "is_edit": { "type": "boolean", "description": "Джерело позначило матеріал як відредагований (Telegram edit)." }
+      }
+    },
+    "content": { "$ref": "common/content-ref.schema.json" },
+    "attachments": {
+      "description": "Додаткові файли (медіа Telegram, PDF за посиланням), кожен як ContentRef з описом.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "content"],
+        "properties": {
+          "name": { "type": "string" },
+          "role": { "type": "string", "examples": ["photo", "document", "video"] },
+          "content": { "$ref": "common/content-ref.schema.json" }
+        }
+      }
+    },
+    "http": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "headers": {
+          "description": "Підмножина заголовків відповіді (content-type, etag, last-modified, cache-control). Без Set-Cookie та інших чутливих.",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "redirects": { "type": "array", "items": { "type": "string", "format": "uri" } }
+      }
+    },
+    "discovery": {
+      "description": "Як матеріал було знайдено.",
+      "type": "object",
+      "properties": {
+        "strategy": { "type": "string", "examples": ["seed_list", "recursive", "sitemap", "feed", "listing", "url_template", "api_feed", "llm_explore", "telegram_history", "telegram_updates"] },
+        "parent_url": { "type": "string", "format": "uri" },
+        "depth": { "type": "integer", "minimum": 0 },
+        "section": { "type": "string", "description": "Ідентифікатор розділу з правил колектора (sections[].section_id), якщо URL йому відповідає." },
+        "priority": { "type": "integer" }
+      }
+    },
+    "collector": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "examples": ["web-collector", "telegram-collector"] },
+        "version": { "type": "string" },
+        "rules": { "$ref": "common/package-ref.schema.json", "description": "Версія правил колектора, за якими отримано матеріал." },
+        "collection_id": { "$ref": "common/defs.schema.json#/$defs/Id" }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "handler-result.schema.json#/$defs/DiagnosticMessage" }
+    },
+    "metadata": {
+      "description": "Додаткові метадані джерела (наприклад title, автор повідомлення, кількість переглядів). Відкритий об'єкт.",
+      "type": "object"
+    }
+  }
+}

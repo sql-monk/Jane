@@ -1,0 +1,11 @@
+{
+  "connection_id": "llm-main",
+  "kind": "llm_provider",
+  "params": {
+    "provider": "openai-compatible",
+    "api_base": "http://llm-proxy.localhost:8080/v1"
+  },
+  "secret_refs": {
+    "api_key": "file:/run/secrets/llm_api_key"
+  }
+}

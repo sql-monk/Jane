@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Connection",
+  "description": "Кероване підключення (ТЗ §11): іменоване підключення до сховища, провайдера LLM, облікового запису Telegram тощо. Містить лише несекретні параметри та посилання на секрети (secret_refs). Значення секретів ніколи не передаються через API, не зберігаються в пакетах і не копіюються під час форку. Сервіс-виконавець розв'язує secret_refs у власному середовищі. Див. docs/adr/0006-secrets-and-connections.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["connection_id", "kind"],
+  "properties": {
+    "connection_id": { "$ref": "defs.schema.json#/$defs/Slug" },
+    "kind": { "$ref": "#/$defs/ConnectionKind" },
+    "title": { "type": "string", "maxLength": 200 },
+    "params": {
+      "description": "Несекретні параметри: host, port, database, schema, bucket, endpoint, region, base_path, api_base, model_aliases тощо. Сервіс відхиляє params, схожі на секрети (secret_detected).",
+      "type": "object",
+      "additionalProperties": {
+        "type": ["string", "number", "integer", "boolean", "array", "object"]
+      }
+    },
+    "secret_refs": {
+      "description": "Ім'я секрету → посилання на нього. Схеми: env:<VAR>, file:<шлях у контейнері>, vault:<шлях>#<ключ> (опційний провайдер).",
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+      "additionalProperties": { "$ref": "#/$defs/SecretRef" }
+    },
+    "labels": { "$ref": "defs.schema.json#/$defs/Labels" }
+  },
+  "$defs": {
+    "ConnectionKind": {
+      "type": "string",
+      "examples": ["postgresql", "sqlserver", "mongodb", "s3", "minio", "filesystem", "llm_provider", "telegram_account", "search_provider", "http"],
+      "pattern": "^[a-z][a-z0-9_]{1,31}$"
+    },
+    "SecretRef": {
+      "type": "string",
+      "pattern": "^(env:[A-Z_][A-Z0-9_]{0,127}|file:.{1,512}|vault:[^#]{1,512}#[A-Za-z0-9_.-]{1,128})$"
+    },
+    "ConnectionRequirement": {
+      "description": "Вимога пакета до підключення (у маніфесті). Секретів не містить.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$", "description": "Логічне ім'я, яке етап завдання зв'язує з connection_id." },
+        "kind": { "$ref": "#/$defs/ConnectionKind" },
+        "purpose": { "type": "string", "maxLength": 500 },
+        "optional": { "type": "boolean", "default": false }
+      }
+    },
+    "ConnectionTestResult": {
+      "type": "object",
+      "required": ["ok", "checked_at"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "checked_at": { "$ref": "defs.schema.json#/$defs/Timestamp" },
+        "latency_ms": { "type": "integer", "minimum": 0 },
+        "secrets_resolved": {
+          "description": "Для кожного secret_ref — чи вдалося його розв'язати в середовищі виконавця (без значень).",
+          "type": "object",
+          "additionalProperties": { "type": "boolean" }
+        },
+        "message": { "type": "string" }
+      }
+    },
+    "ConnectionList": {
+      "type": "object",
+      "required": ["items", "next_cursor"],
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "connection.schema.json" } },
+        "next_cursor": { "$ref": "page.schema.json#/$defs/NextCursor" }
+      }
+    }
+  }
+}

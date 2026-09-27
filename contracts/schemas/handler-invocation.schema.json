@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HandlerInvocation",
+  "description": "Запит на виконання обробника за спільним протоколом (handler.v1.yaml, POST /v1/invocations). Однаковий для всіх типів: екстрактор (handler-runtime), збереження (storage), LLM (llm), перетворення. Сервіс-виконавець працює без оркестратора: усе потрібне — у запиті (пакет, параметри, вхідні дані, ліміти, імена підключень).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["handler", "inputs", "delivery"],
+  "properties": {
+    "handler": { "$ref": "common/package-ref.schema.json" },
+    "package_archive": {
+      "description": "Необов'язковий архів пакета (автономний режим або тест чернетки без репозиторію). Якщо handler.digest заданий — виконавець перевіряє збіг дайджесту архіву.",
+      "$ref": "common/content-ref.schema.json"
+    },
+    "params": {
+      "description": "Параметри етапу; валідуються за params_schema маніфесту пакета.",
+      "type": "object"
+    },
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/HandlerInput" }
+    },
+    "connections": {
+      "description": "Логічне ім'я з required_connections маніфесту → connection_id, відомий виконавцю. Значення секретів сюди не передаються.",
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+      "additionalProperties": { "$ref": "common/defs.schema.json#/$defs/Slug" }
+    },
+    "context": { "$ref": "#/$defs/InvocationContext" },
+    "delivery": { "$ref": "#/$defs/Delivery" },
+    "limits": {
+      "description": "Ефективні ліміти етапу. Виконавець застосовує min(ці значення, власні hard_caps).",
+      "$ref": "common/limits.schema.json"
+    },
+    "mode": {
+      "description": "sync — чекати результат (200); async — одразу 202 + Job. Навіть для sync сервіс може повернути 202, якщо не вкладається в limits.timeouts.sync_response_max_ms.",
+      "type": "string",
+      "enum": ["sync", "async"],
+      "default": "sync"
+    }
+  },
+  "$defs": {
+    "HandlerInput": {
+      "oneOf": [
+        { "$ref": "#/$defs/MaterialInput" },
+        { "$ref": "#/$defs/EntitiesInput" },
+        { "$ref": "#/$defs/DataInput" }
+      ],
+      "discriminator": { "propertyName": "kind" }
+    },
+    "MaterialInput": {
+      "type": "object",
+      "required": ["kind", "material"],
+      "properties": {
+        "kind": { "const": "material" },
+        "material": { "$ref": "material.schema.json" }
+      }
+    },
+    "EntitiesInput": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "const": "entities" },
+        "entities": { "type": "array", "items": { "$ref": "entity.schema.json" } },
+        "entities_ref": { "$ref": "common/content-ref.schema.json", "description": "JSON-масив EntityRecord, якщо inline завеликий." },
+        "from_invocation_id": { "$ref": "common/defs.schema.json#/$defs/Id" },
+        "material": { "$ref": "material.schema.json", "description": "Матеріал, з якого витягнуто сутності (для простежуваності й збереження разом)." }
+      },
+      "anyOf": [
+        { "required": ["entities"] },
+        { "required": ["entities_ref"] }
+      ]
+    },
+    "DataInput": {
+      "description": "Довільний JSON-результат попереднього етапу (наприклад, вихід LLM).",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "const": "data" },
+        "data": {},
+        "data_ref": { "$ref": "common/content-ref.schema.json" },
+        "from_invocation_id": { "$ref": "common/defs.schema.json#/$defs/Id" }
+      },
+      "anyOf": [
+        { "required": ["data"] },
+        { "required": ["data_ref"] }
+      ]
+    },
+    "InvocationContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "trace": { "$ref": "common/defs.schema.json#/$defs/TraceContext" },
+        "attempt": { "type": "integer", "minimum": 1, "description": "Номер спроби (1 — перша)." },
+        "test_mode": {
+          "description": "Режим тестування без запису в робочі дані (ТЗ §10): збереження виконує валідацію й повертає очікувані підтвердження без запису; LLM використовує той самий бюджет, але позначає витрати як тестові.",
+          "type": "boolean",
+          "default": false
+        },
+        "requested_by": { "type": "string" }
+      }
+    },
+    "Delivery": {
+      "description": "Ідентичність доставки для ідемпотентності (ТЗ §11). delivery_key детермінований: повтор тієї самої доставки (після збою, повторної спроби) має той самий ключ, нове спостереження — новий. Рекомендоване правило оркестратора: sha256(run_id | stage_id | item_key), де item_key — observation_id вхідного матеріалу або '<upstream invocation_id>/<index>'. HTTP-заголовок Idempotency-Key дорівнює delivery_key.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["delivery_key"],
+      "properties": {
+        "delivery_key": { "type": "string", "minLength": 1, "maxLength": 255 }
+      }
+    }
+  }
+}

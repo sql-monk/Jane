@@ -1,0 +1,1852 @@
+openapi: 3.1.0
+info:
+  title: Jane Orchestrator API
+  version: 1.0.0
+  description: |
+    Керування оркестратором (WP-09) — споживач: адмінка (WP-12), асистент (WP-11), сторонні
+    застосунки. Оркестратор поєднує автономні сервіси через їхні API (collector, handler, storage,
+    registry, llm) і нічого не читає з їхніх БД. Автономні компоненти від оркестратора не залежать.
+
+    - Джерела, завдання (TaskConfig), розклади — ресурси з ETag; зміни — PUT з If-Match.
+    - Запуск завдання — 202 + Job (`kind: run`), деталі — `/v1/runs/{run_id}` (run_id = job_id).
+    - Простежуваність: матеріал → етап → результат → версія пакета (`/v1/materials/{id}/trace`).
+    - Реєстр підключень зберігає лише посилання на секрети й синхронізує підключення з
+      виконавцями (`PUT /v1/connections/{id}` handler.v1).
+    - Активація й відкат версії пакета в етапі — окремі операції з аудитом.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Jane
+servers:
+  - url: http://localhost:8109
+    description: orchestrator (dev)
+security:
+  - bearerAuth: []
+tags:
+  - name: system
+  - name: sources
+  - name: tasks
+  - name: runs
+  - name: traces
+  - name: problems
+  - name: connections
+  - name: limits
+  - name: audit
+  - name: jobs
+paths:
+  /v1/health:
+    $ref: 'common.yaml#/components/pathItems/Health'
+  /v1/info:
+    $ref: 'common.yaml#/components/pathItems/Info'
+  /v1/sources:
+    get:
+      operationId: listSources
+      summary: Джерела
+      tags: [sources]
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          schema:
+            type: string
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка джерел.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '../schemas/source.schema.json'
+                  next_cursor:
+                    $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+              examples:
+                list:
+                  value:
+                    items:
+                      - source_id: shop-example
+                        kind: web
+                        title: Shop Example
+                        locator:
+                          url: https://shop.example.test/
+                        forward_unknown_to_llm: false
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+    post:
+      operationId: createSource
+      summary: Створити джерело
+      tags: [sources]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/source.schema.json'
+            examples:
+              shop:
+                $ref: '../examples/openapi/source-shop.json'
+              telegram:
+                $ref: '../examples/openapi/source-telegram.json'
+      responses:
+        '201':
+          description: Джерело створено.
+          headers:
+            Location:
+              $ref: 'common.yaml#/components/headers/Location'
+            ETag:
+              $ref: 'common.yaml#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/source.schema.json'
+              examples:
+                shop:
+                  $ref: '../examples/openapi/source-shop.json'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+  /v1/sources/{source_id}:
+    parameters:
+      - $ref: '#/components/parameters/SourceId'
+    get:
+      operationId: getSource
+      summary: Джерело
+      tags: [sources]
+      responses:
+        '200':
+          description: Джерело.
+          headers:
+            ETag:
+              $ref: 'common.yaml#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/source.schema.json'
+              examples:
+                shop:
+                  $ref: '../examples/openapi/source-shop.json'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+    put:
+      operationId: replaceSource
+      summary: Замінити джерело (включно з прапорцем «Передавати в LLM невідомі сторінки»)
+      tags: [sources]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/source.schema.json'
+            examples:
+              telegram:
+                $ref: '../examples/openapi/source-telegram.json'
+      responses:
+        '200':
+          description: Джерело оновлено.
+          headers:
+            ETag:
+              $ref: 'common.yaml#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/source.schema.json'
+              examples:
+                telegram:
+                  $ref: '../examples/openapi/source-telegram.json'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '412':
+          $ref: 'common.yaml#/components/responses/PreconditionFailed'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+    delete:
+      operationId: deleteSource
+      summary: Видалити джерело (заборонено, якщо є завдання)
+      tags: [sources]
+      responses:
+        '204':
+          description: Видалено.
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+  /v1/tasks:
+    get:
+      operationId: listTasks
+      summary: Завдання (з фільтром за джерелом або пакетом, що використовується в етапах)
+      description: |
+        `package_id` — лише завдання, у яких хоча б один етап (або правила колектора) посилається на
+        цей пакет; разом із `package_version` — на цю точну версію. Так адмінка й асистент знаходять
+        усі прив'язки спільного пакета (ТЗ §9: перевірка на всіх прив'язках). У відповіді
+        `package_stages` перелічує такі етапи.
+      tags: [tasks]
+      parameters:
+        - name: source_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: package_id
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+        - name: package_version
+          in: query
+          required: false
+          description: Лише разом із package_id.
+          schema:
+            $ref: '../schemas/common/defs.schema.json#/$defs/SemVer'
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка завдань.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TaskSummary'
+                  next_cursor:
+                    $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+              examples:
+                byPackage:
+                  summary: ?package_id=shop-example.product-extractor
+                  value:
+                    items:
+                      - task_id: shop-catalog
+                        title: Повний збір каталогу Shop Example
+                        source_id: shop-example
+                        enabled: true
+                        package_stages:
+                          - stage_id: extract-products
+                            package:
+                              package_id: shop-example.product-extractor
+                              version: 1.2.0
+                    next_cursor: null
+                list:
+                  value:
+                    items:
+                      - task_id: shop-catalog
+                        title: Повний збір каталогу Shop Example
+                        source_id: shop-example
+                        enabled: true
+                        schedule:
+                          type: cron
+                          cron: 0 2 * * 0
+                          timezone: Europe/Kyiv
+                        next_run_at: '2026-10-04T02:00:00+03:00'
+                        last_run:
+                          run_id: run_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+                          status: succeeded
+                          finished_at: '2026-09-27T11:40:00Z'
+                      - task_id: shop-price-check
+                        title: Щоденна перевірка цін
+                        source_id: shop-example
+                        enabled: true
+                        schedule:
+                          type: interval
+                          interval_seconds: 86400
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+    post:
+      operationId: createTask
+      summary: Створити завдання
+      tags: [tasks]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/task-config.schema.json'
+            examples:
+              catalog:
+                $ref: '../examples/openapi/task-catalog.json'
+              priceCheck:
+                $ref: '../examples/openapi/task-price-check.json'
+              telegram:
+                $ref: '../examples/openapi/task-telegram.json'
+      responses:
+        '201':
+          description: Завдання створено.
+          headers:
+            Location:
+              $ref: 'common.yaml#/components/headers/Location'
+            ETag:
+              $ref: 'common.yaml#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/task-config.schema.json'
+              examples:
+                catalog:
+                  $ref: '../examples/openapi/task-catalog.json'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+  /v1/tasks/{task_id}:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      operationId: getTask
+      summary: Конфігурація завдання
+      tags: [tasks]
+      responses:
+        '200':
+          description: Завдання.
+          headers:
+            ETag:
+              $ref: 'common.yaml#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/task-config.schema.json'
+              examples:
+                catalog:
+                  $ref: '../examples/openapi/task-catalog.json'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+    put:
+      operationId: replaceTask
+      summary: Замінити конфігурацію завдання (ліміти, розклад, етапи) без зміни коду
+      tags: [tasks]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/task-config.schema.json'
+            examples:
+              priceCheck:
+                $ref: '../examples/openapi/task-price-check.json'
+      responses:
+        '200':
+          description: Завдання оновлено; поточні запуски продовжуються зі старою конфігурацією.
+          headers:
+            ETag:
+              $ref: 'common.yaml#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/task-config.schema.json'
+              examples:
+                priceCheck:
+                  $ref: '../examples/openapi/task-price-check.json'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '412':
+          $ref: 'common.yaml#/components/responses/PreconditionFailed'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+    delete:
+      operationId: deleteTask
+      summary: Видалити завдання (історія запусків зберігається)
+      tags: [tasks]
+      responses:
+        '204':
+          description: Видалено.
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+  /v1/task-validations:
+    post:
+      operationId: validateTask
+      summary: Перевірити конфігурацію завдання без збереження (DAG, версії, прив'язки, ліміти)
+      tags: [tasks]
+      x-jane-no-idempotency-key: pure validation without side effects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/task-config.schema.json'
+            examples:
+              catalog:
+                $ref: '../examples/openapi/task-catalog.json'
+      responses:
+        '200':
+          description: Результат перевірки (невалідна конфігурація — теж 200 з valid=false).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskValidation'
+              examples:
+                warnings:
+                  value:
+                    valid: true
+                    errors: []
+                    warnings:
+                      - pointer: /stages/5
+                        code: unknown_flag_off
+                        message: stage 'unknown-pages' consumes unmatched_materials but forward_unknown_to_llm is false; materials will only be registered
+                    effective_forward_unknown_to_llm: false
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+  /v1/tasks/{task_id}/runs:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      operationId: startRun
+      summary: Запустити завдання зараз
+      tags: [runs]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunRequest'
+            examples:
+              manual:
+                value:
+                  reason: manual check after rules update
+              testMode:
+                value:
+                  reason: dry run of new extractor version
+                  test_mode: true
+                  input_override:
+                    urls:
+                      - https://shop.example.test/product/a-100
+      responses:
+        '202':
+          $ref: 'common.yaml#/components/responses/JobAccepted'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '409':
+          description: Запуск уже йде, а schedule.overlap = skip (`conflict`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                overlap:
+                  value:
+                    type: urn:jane:problem:conflict
+                    title: A run of this task is already in progress
+                    status: 409
+                    code: conflict
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+  /v1/tasks/{task_id}/stages/{stage_id}/activations:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+      - name: stage_id
+        in: path
+        required: true
+        schema:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+    get:
+      operationId: listStageActivations
+      summary: Історія версій пакета в етапі (активації й відкати)
+      tags: [tasks, audit]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка активацій (від новіших).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Activation'
+                  next_cursor:
+                    $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+              examples:
+                history:
+                  value:
+                    items:
+                      - activation_id: act_01J9ZV0000000000000000002
+                        task_id: shop-catalog
+                        stage_id: extract-products
+                        package:
+                          package_id: shop-example.product-extractor
+                          version: 1.1.0
+                        previous:
+                          package_id: shop-example.product-extractor
+                          version: 1.2.0
+                        kind: rollback
+                        reason: regression on category pages
+                        activated_by: admin@example.org
+                        activated_at: '2026-09-27T12:00:00Z'
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+    post:
+      operationId: activateStageVersion
+      summary: Активувати версію пакета в етапі (або відкотити до попередньої)
+      description: |
+        Змінює `stages[].handler` завдання з аудитом.
+        - `activate` — людина активує версію; версія має бути `approved` у репозиторії.
+        - `rollback` — повернення до попередньої активації (або до вказаної версії).
+        - `auto_activate` — автоматична активація (асистент після перевірок). Приймається лише якщо
+          політика дозволяє: `Source.change_policy.llm_versions = auto_after_checks` **і** пакет
+          має `auto_changes_allowed = true` **і** версія пройшла тести (`test_status = passed`) на
+          всіх прив'язках. Інакше — 403 `access_denied_by_policy` (у `details.reason`:
+          `source_policy`, `package_auto_changes_forbidden` або `tests_not_passed`), активація не
+          виконується.
+      tags: [tasks]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivationRequest'
+            examples:
+              activate:
+                value:
+                  kind: activate
+                  package:
+                    package_id: shop-example.product-extractor
+                    version: 1.2.0
+                    digest: sha256:0f4c1c8f3e0f6a7d9b2c4e6f8a0b2c4d6e8f0a1b3c5d7e9f1a3b5c7d9e1f3a5b
+                  reason: tests passed on all bindings
+              rollback:
+                value:
+                  kind: rollback
+                  reason: regression on category pages
+              autoActivate:
+                value:
+                  kind: auto_activate
+                  package:
+                    package_id: shop-example.product-extractor
+                    version: 1.3.0
+                  reason: assistant improvement job_01J9ZX0000000000000000IMP passed tests on 2 bindings
+      responses:
+        '200':
+          description: Активацію виконано.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activation'
+              examples:
+                activated:
+                  value:
+                    activation_id: act_01J9ZV0000000000000000001
+                    task_id: shop-catalog
+                    stage_id: extract-products
+                    package:
+                      package_id: shop-example.product-extractor
+                      version: 1.2.0
+                    previous:
+                      package_id: shop-example.product-extractor
+                      version: 1.1.0
+                    kind: activate
+                    reason: tests passed on all bindings
+                    activated_by: admin@example.org
+                    activated_at: '2026-09-27T10:20:00Z'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '403':
+          description: Автоактивацію заборонено політикою (`access_denied_by_policy`) або бракує scope (`forbidden`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                policy:
+                  value:
+                    type: urn:jane:problem:access_denied_by_policy
+                    title: Automatic activation is not allowed
+                    status: 403
+                    code: access_denied_by_policy
+                    retryable: false
+                    details:
+                      reason: package_auto_changes_forbidden
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+  /v1/runs:
+    get:
+      operationId: listRuns
+      summary: Запуски
+      tags: [runs]
+      parameters:
+        - name: task_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/common/job.schema.json#/$defs/JobStatus'
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка запусків.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Run'
+                  next_cursor:
+                    $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+              examples:
+                list:
+                  value:
+                    items:
+                      - run_id: run_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+                        task_id: shop-catalog
+                        status: running
+                        trigger: schedule
+                        created_at: '2026-09-27T10:00:00Z'
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+  /v1/runs/{run_id}:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      operationId: getRun
+      summary: Стан запуску, прогрес етапів, витрати
+      tags: [runs]
+      responses:
+        '200':
+          description: Запуск.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+              examples:
+                running:
+                  $ref: '#/components/examples/RunRunning'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/runs/{run_id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      operationId: cancelRun
+      summary: Скасувати запуск (те саме, що /v1/jobs/{run_id}/cancel)
+      tags: [runs]
+      x-jane-no-idempotency-key: cancellation is idempotent by nature
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common/job.schema.json#/$defs/JobCancelRequest'
+            examples:
+              reason:
+                value:
+                  reason: wrong limits
+      responses:
+        '200':
+          description: Запуск уже завершено; стан не змінено.
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/common/job.schema.json'
+              examples:
+                done:
+                  value:
+                    job_id: run_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+                    kind: run
+                    status: succeeded
+                    created_at: '2026-09-27T10:00:00Z'
+                    finished_at: '2026-09-27T11:40:00Z'
+                    links:
+                      run: /v1/runs/run_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+        '202':
+          description: Скасування прийнято; колектор і етапи зупиняються, уже записане не відкочується.
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/common/job.schema.json'
+              examples:
+                cancelling:
+                  value:
+                    job_id: run_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+                    kind: run
+                    status: cancelling
+                    created_at: '2026-09-27T10:00:00Z'
+                    cancellation:
+                      requested_at: '2026-09-27T10:30:00Z'
+                      requested_by: admin@example.org
+                      reason: wrong limits
+                    links:
+                      run: /v1/runs/run_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/runs/{run_id}/items:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      operationId: listRunItems
+      summary: Елементи запуску — матеріал на етапі, спроби, результат, помилка
+      tags: [runs, traces]
+      parameters:
+        - name: stage_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ItemStatus'
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка елементів.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StageItem'
+                  next_cursor:
+                    $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+              examples:
+                items:
+                  value:
+                    items:
+                      - item_id: itm_01J9ZQ4B0000000000000001
+                        stage_id: extract-products
+                        material_id: web:9b1f0c1d2e3f40516273849a0b1c2d3e
+                        observation_id: obs_01J9ZQ4A0000000000000001
+                        status: completed
+                        result_status: unrecognized
+                        attempts: 1
+                        handler:
+                          package_id: shop-example.product-extractor
+                          version: 1.2.0
+                        invocation_id: inv_01J9ZQ4B00000000000000A3
+                        delivery_key: 1d7c2a9e5b0f4c3e8a6d2b1f0e9c8d7a
+                        started_at: '2026-09-27T10:00:06Z'
+                        finished_at: '2026-09-27T10:00:06Z'
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/materials/{material_id}/trace:
+    parameters:
+      - name: material_id
+        in: path
+        required: true
+        schema:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+    get:
+      operationId: getMaterialTrace
+      summary: Простежуваність матеріалу — спостереження → етапи → результати → версії пакетів
+      tags: [traces]
+      responses:
+        '200':
+          description: Слід матеріалу.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialTrace'
+              examples:
+                trace:
+                  value:
+                    material_id: web:9b1f0c1d2e3f40516273849a0b1c2d3e
+                    source_id: shop-example
+                    url: https://shop.example.test/product/a-100
+                    observations:
+                      - observation_id: obs_01J9ZQ4A0000000000000001
+                        run_id: run_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+                        task_id: shop-catalog
+                        fetched_at: '2026-09-27T10:00:05Z'
+                        content_sha256: 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
+                        stages:
+                          - stage_id: store-raw
+                            handler:
+                              package_id: jane.storage-files
+                              version: 1.0.0
+                            invocation_id: inv_01J9ZQ4C00000000000000C2
+                            result_status: success
+                            outputs:
+                              - kind: stored_object
+                                object_id: obj_01J9ZQ4C00000000000000D1
+                                connection_id: raw-files
+                          - stage_id: extract-products
+                            handler:
+                              package_id: shop-example.product-extractor
+                              version: 1.2.0
+                            invocation_id: inv_01J9ZQ4B00000000000000A1
+                            result_status: success
+                            outputs:
+                              - kind: entity
+                                entity_type: product
+                                canonical_key: 'shop-example|{"sku":"A-100"}'
+                          - stage_id: store-products
+                            handler:
+                              package_id: jane.storage-postgresql
+                              version: 1.0.0
+                            invocation_id: inv_01J9ZQ4C00000000000000C1
+                            result_status: success
+                            outputs:
+                              - kind: entity
+                                entity_type: product
+                                canonical_key: 'shop-example|{"sku":"A-100"}'
+                                connection_id: results-pg
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/unknown-materials:
+    get:
+      operationId: listUnknownMaterials
+      summary: Матеріали без відповідного обробника (і чи були передані в LLM)
+      tags: [problems]
+      parameters:
+        - name: source_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: forwarded
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка невідомих матеріалів.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UnknownMaterial'
+                  next_cursor:
+                    $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+              examples:
+                list:
+                  value:
+                    items:
+                      - material_id: web:0a1b2c3d4e5f60718293a4b5c6d7e8f9
+                        observation_id: obs_01J9ZQ5A0000000000000007
+                        source_id: shop-example
+                        run_id: run_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+                        url: https://shop.example.test/gift-cards
+                        registered_at: '2026-09-27T10:05:00Z'
+                        forwarded_to_llm: false
+                        reason: no binding matched and forward_unknown_to_llm=false
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+  /v1/problem-groups:
+    get:
+      operationId: listProblemGroups
+      summary: Проблемні матеріали, згруповані за джерелом і характером проблеми
+      tags: [problems]
+      parameters:
+        - name: source_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProblemGroupStatus'
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка груп.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProblemGroup'
+                  next_cursor:
+                    $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+              examples:
+                groups:
+                  value:
+                    items:
+                      - group_id: pg_01J9ZW0000000000000000001
+                        source_id: shop-example
+                        package:
+                          package_id: shop-example.product-extractor
+                          version: 1.2.0
+                        problem: unrecognized
+                        signature: missing-selector:.price
+                        count: 37
+                        first_seen_at: '2026-09-26T10:00:00Z'
+                        last_seen_at: '2026-09-27T10:00:06Z'
+                        status: open
+                        samples:
+                          - material_id: web:9b1f0c1d2e3f40516273849a0b1c2d3e
+                            observation_id: obs_01J9ZQ4A0000000000000001
+                            invocation_id: inv_01J9ZQ4B00000000000000A3
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+  /v1/problem-groups/{group_id}:
+    parameters:
+      - name: group_id
+        in: path
+        required: true
+        schema:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+    patch:
+      operationId: updateProblemGroup
+      summary: Змінити статус групи (ignored, resolved) або прив'язати job вдосконалення
+      tags: [problems]
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                status:
+                  $ref: '#/components/schemas/ProblemGroupStatus'
+                assistant_job_id:
+                  $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+                note:
+                  type: string
+            examples:
+              inProgress:
+                value:
+                  status: in_progress
+                  assistant_job_id: job_01J9ZX0000000000000000IMP
+      responses:
+        '200':
+          description: Оновлена група.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemGroup'
+              examples:
+                group:
+                  value:
+                    group_id: pg_01J9ZW0000000000000000001
+                    source_id: shop-example
+                    package:
+                      package_id: shop-example.product-extractor
+                      version: 1.2.0
+                    problem: unrecognized
+                    signature: missing-selector:.price
+                    count: 37
+                    status: in_progress
+                    assistant_job_id: job_01J9ZX0000000000000000IMP
+                    first_seen_at: '2026-09-26T10:00:00Z'
+                    last_seen_at: '2026-09-27T10:00:06Z'
+                    samples: []
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/reprocessing:
+    post:
+      operationId: startReprocessing
+      summary: Повторно обробити збережені RAW етапами завдання
+      tags: [runs]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReprocessRequest'
+            examples:
+              reprocess:
+                value:
+                  task_id: shop-catalog
+                  stored_materials:
+                    storage_connection_id: raw-files
+                    since: '2026-09-20T00:00:00Z'
+                  from_stage: extract-products
+                  reason: extractor 1.2.0 fixes price parsing
+      responses:
+        '202':
+          $ref: 'common.yaml#/components/responses/JobAccepted'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+  /v1/connections:
+    get:
+      operationId: listPlatformConnections
+      summary: Реєстр підключень платформи (без значень секретів)
+      tags: [connections]
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          schema:
+            type: string
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка підключень.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlatformConnection'
+                  next_cursor:
+                    $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+              examples:
+                list:
+                  value:
+                    items:
+                      - connection:
+                          connection_id: results-pg
+                          kind: postgresql
+                          params:
+                            host: postgres
+                            port: 5432
+                            database: jane_results
+                          secret_refs:
+                            username: env:RESULTS_PG_USER
+                            password: env:RESULTS_PG_PASSWORD
+                        executors:
+                          - executor: storage
+                            synced_at: '2026-09-27T09:00:00Z'
+                            sync_status: synced
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+  /v1/connections/{connection_id}:
+    parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+    get:
+      operationId: getPlatformConnection
+      summary: Підключення і стан синхронізації з виконавцями
+      tags: [connections]
+      responses:
+        '200':
+          description: Підключення.
+          headers:
+            ETag:
+              $ref: 'common.yaml#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformConnection'
+              examples:
+                pg:
+                  value:
+                    connection:
+                      connection_id: results-pg
+                      kind: postgresql
+                      secret_refs:
+                        password: env:RESULTS_PG_PASSWORD
+                    executors:
+                      - executor: storage
+                        sync_status: synced
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+    put:
+      operationId: putPlatformConnection
+      summary: Створити або замінити підключення й синхронізувати з виконавцями
+      tags: [connections]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common/connection.schema.json'
+            examples:
+              pg:
+                $ref: '../examples/openapi/connection-pg.json'
+      responses:
+        '200':
+          description: Збережено; синхронізація з виконавцями — асинхронна, стан у executors.
+          headers:
+            ETag:
+              $ref: 'common.yaml#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformConnection'
+              examples:
+                pg:
+                  value:
+                    connection:
+                      connection_id: results-pg
+                      kind: postgresql
+                      secret_refs:
+                        password: env:RESULTS_PG_PASSWORD
+                    executors:
+                      - executor: storage
+                        sync_status: pending
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '412':
+          $ref: 'common.yaml#/components/responses/PreconditionFailed'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+    delete:
+      operationId: deletePlatformConnection
+      summary: Видалити підключення (заборонено, якщо на нього посилаються етапи)
+      tags: [connections]
+      responses:
+        '204':
+          description: Видалено.
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+  /v1/limits/platform:
+    get:
+      operationId: getPlatformLimits
+      summary: Ліміти рівня платформи (типові значення й жорсткі стелі)
+      tags: [limits]
+      responses:
+        '200':
+          description: Ліміти платформи.
+          headers:
+            ETag:
+              $ref: 'common.yaml#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/common/limits.schema.json#/$defs/PlatformLimits'
+              examples:
+                dev:
+                  $ref: '../examples/openapi/platform-limits-dev.json'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+    put:
+      operationId: putPlatformLimits
+      summary: Змінити ліміти платформи без зміни коду
+      tags: [limits]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common/limits.schema.json#/$defs/PlatformLimits'
+            examples:
+              dev:
+                $ref: '../examples/openapi/platform-limits-dev.json'
+      responses:
+        '200':
+          description: Збережено; нові запуски використовують нові значення.
+          headers:
+            ETag:
+              $ref: 'common.yaml#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/common/limits.schema.json#/$defs/PlatformLimits'
+              examples:
+                dev:
+                  $ref: '../examples/openapi/platform-limits-dev.json'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '403':
+          $ref: 'common.yaml#/components/responses/Forbidden'
+        '412':
+          $ref: 'common.yaml#/components/responses/PreconditionFailed'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+  /v1/limits/effective:
+    get:
+      operationId: getEffectiveLimits
+      summary: Ефективні ліміти для контексту з походженням кожного значення
+      tags: [limits]
+      parameters:
+        - name: source_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: task_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: stage_id
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ефективні ліміти.
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/common/limits.schema.json#/$defs/EffectiveLimits'
+              examples:
+                stage:
+                  $ref: '../examples/openapi/effective-limits.json'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/executors:
+    get:
+      operationId: listExecutors
+      summary: Сервіси-виконавці, відомі оркестратору (з конфігурації), і їхній стан
+      tags: [system]
+      responses:
+        '200':
+          description: Виконавці.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Executor'
+              examples:
+                list:
+                  value:
+                    items:
+                      - executor: web-collector
+                        role: collector
+                        base_url: http://web-collector:8000
+                        status: ok
+                        capabilities:
+                          collector: web
+                      - executor: handler-runtime
+                        role: handler
+                        base_url: http://handler-runtime:8000
+                        status: ok
+                        capabilities:
+                          handler_kinds: [extractor, transform]
+                      - executor: storage
+                        role: handler
+                        base_url: http://storage:8000
+                        status: degraded
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+  /v1/audit-events:
+    get:
+      operationId: listAuditEvents
+      summary: Журнал аудиту (активації, відкати, зміни конфігурацій, підключень і лімітів)
+      tags: [audit]
+      parameters:
+        - name: subject_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [source, task, stage, connection, limits, problem_group]
+        - name: subject_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка подій.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditEvent'
+                  next_cursor:
+                    $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+              examples:
+                events:
+                  value:
+                    items:
+                      - event_id: aud_01J9ZV0000000000000000001
+                        at: '2026-09-27T10:20:00Z'
+                        actor: admin@example.org
+                        action: stage.activate
+                        subject_type: stage
+                        subject_id: shop-catalog/extract-products
+                        details:
+                          version: 1.2.0
+                          previous: 1.1.0
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+  /v1/jobs/{job_id}:
+    $ref: 'common.yaml#/components/pathItems/Job'
+  /v1/jobs/{job_id}/cancel:
+    $ref: 'common.yaml#/components/pathItems/JobCancel'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    SourceId:
+      name: source_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+    TaskId:
+      name: task_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+    RunId:
+      name: run_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+  schemas:
+    TaskSummary:
+      type: object
+      required: [task_id, title, source_id, enabled]
+      properties:
+        task_id:
+          type: string
+        title:
+          type: string
+        source_id:
+          type: string
+        enabled:
+          type: boolean
+        schedule:
+          $ref: '../schemas/task-config.schema.json#/$defs/Schedule'
+        next_run_at:
+          type: string
+          format: date-time
+        package_stages:
+          type: array
+          description: Етапи, що посилаються на пакет із фільтра package_id (лише коли фільтр задано).
+          items:
+            type: object
+            required: [stage_id, package]
+            properties:
+              stage_id:
+                type: string
+              package:
+                $ref: '../schemas/common/package-ref.schema.json'
+        last_run:
+          type: object
+          properties:
+            run_id:
+              type: string
+            status:
+              $ref: '../schemas/common/job.schema.json#/$defs/JobStatus'
+            finished_at:
+              type: string
+              format: date-time
+    TaskValidation:
+      type: object
+      required: [valid, errors]
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            $ref: '../schemas/common/problem.schema.json#/$defs/FieldError'
+        warnings:
+          type: array
+          items:
+            $ref: '../schemas/common/problem.schema.json#/$defs/FieldError'
+        effective_forward_unknown_to_llm:
+          type: boolean
+    RunRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          type: string
+          maxLength: 1000
+        test_mode:
+          type: boolean
+          default: false
+          description: Етапи збереження не пишуть у робочі дані (ТЗ §10).
+        input_override:
+          type: object
+          additionalProperties: false
+          description: Перевизначення входу для цього запуску (джерело не змінюється).
+          properties:
+            urls:
+              type: array
+              items:
+                type: string
+                format: uri
+            stored_materials:
+              $ref: '../schemas/task-config.schema.json#/$defs/TaskInput/properties/stored_materials'
+        limits:
+          $ref: '../schemas/common/limits.schema.json'
+    ItemStatus:
+      type: string
+      enum: [queued, leased, running, completed, retrying, failed, skipped, cancelled]
+    StageProgress:
+      type: object
+      required: [stage_id]
+      properties:
+        stage_id:
+          type: string
+        handler:
+          $ref: '../schemas/common/package-ref.schema.json'
+        counts:
+          type: object
+          description: Кількість елементів за станом виконання (ItemStatus) і за станом результату (success, empty, unrecognized, failed).
+          additionalProperties:
+            type: integer
+            minimum: 0
+    Run:
+      type: object
+      required: [run_id, task_id, status, trigger, created_at]
+      properties:
+        run_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+        task_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+        task_etag:
+          type: string
+          description: Версія конфігурації завдання, з якою виконується запуск.
+        status:
+          $ref: '../schemas/common/job.schema.json#/$defs/JobStatus'
+        trigger:
+          type: string
+          enum: [manual, schedule, reprocess, assistant, api]
+        test_mode:
+          type: boolean
+        created_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        started_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        finished_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        collection_id:
+          type: string
+          description: job_id збору в колекторі.
+        stages:
+          type: array
+          items:
+            $ref: '#/components/schemas/StageProgress'
+        counters:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        backpressure:
+          type: boolean
+          description: Збір пригальмовано через заповнену чергу.
+        costs:
+          type: object
+          properties:
+            llm:
+              $ref: '../schemas/handler-result.schema.json#/$defs/Money'
+        error:
+          $ref: '../schemas/common/problem.schema.json'
+    StageItem:
+      type: object
+      required: [item_id, stage_id, status, attempts]
+      properties:
+        item_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+        stage_id:
+          type: string
+        material_id:
+          type: string
+        observation_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/ItemStatus'
+        result_status:
+          $ref: '../schemas/handler-result.schema.json#/$defs/HandlerStatus'
+        attempts:
+          type: integer
+          minimum: 0
+        handler:
+          $ref: '../schemas/common/package-ref.schema.json'
+        invocation_id:
+          type: string
+        delivery_key:
+          type: string
+        error:
+          $ref: '../schemas/common/problem.schema.json'
+        started_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        finished_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+    MaterialTrace:
+      type: object
+      required: [material_id, observations]
+      properties:
+        material_id:
+          type: string
+        source_id:
+          type: string
+        url:
+          type: string
+        observations:
+          type: array
+          items:
+            type: object
+            required: [observation_id, stages]
+            properties:
+              observation_id:
+                type: string
+              run_id:
+                type: string
+              task_id:
+                type: string
+              fetched_at:
+                $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+              content_sha256:
+                type: string
+              stages:
+                type: array
+                items:
+                  type: object
+                  required: [stage_id]
+                  properties:
+                    stage_id:
+                      type: string
+                    handler:
+                      $ref: '../schemas/common/package-ref.schema.json'
+                    invocation_id:
+                      type: string
+                    result_status:
+                      $ref: '../schemas/handler-result.schema.json#/$defs/HandlerStatus'
+                    outputs:
+                      type: array
+                      items:
+                        type: object
+                        required: [kind]
+                        properties:
+                          kind:
+                            type: string
+                            enum: [entity, stored_object, data]
+                          entity_type:
+                            type: string
+                          canonical_key:
+                            type: string
+                          object_id:
+                            type: string
+                          connection_id:
+                            type: string
+    UnknownMaterial:
+      type: object
+      required: [material_id, observation_id, source_id, registered_at, forwarded_to_llm]
+      properties:
+        material_id:
+          type: string
+        observation_id:
+          type: string
+        source_id:
+          type: string
+        run_id:
+          type: string
+        url:
+          type: string
+        registered_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        forwarded_to_llm:
+          type: boolean
+        reason:
+          type: string
+        stored_object_id:
+          type: string
+    ProblemGroupStatus:
+      type: string
+      enum: [open, in_progress, resolved, ignored, unresolved]
+    ProblemGroup:
+      type: object
+      required: [group_id, source_id, problem, signature, count, status]
+      properties:
+        group_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+        source_id:
+          type: string
+        package:
+          $ref: '../schemas/common/package-ref.schema.json'
+        problem:
+          type: string
+          enum: [unrecognized, failed]
+        failure_kind:
+          type: string
+        signature:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+        first_seen_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        last_seen_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        status:
+          $ref: '#/components/schemas/ProblemGroupStatus'
+        assistant_job_id:
+          type: string
+        samples:
+          type: array
+          items:
+            type: object
+            properties:
+              material_id:
+                type: string
+              observation_id:
+                type: string
+              invocation_id:
+                type: string
+              stored_object_id:
+                type: string
+    ReprocessRequest:
+      type: object
+      additionalProperties: false
+      required: [task_id, stored_materials]
+      properties:
+        task_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+        stored_materials:
+          $ref: '../schemas/task-config.schema.json#/$defs/TaskInput/properties/stored_materials'
+        from_stage:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+        test_mode:
+          type: boolean
+        reason:
+          type: string
+    PlatformConnection:
+      type: object
+      required: [connection]
+      properties:
+        connection:
+          $ref: '../schemas/common/connection.schema.json'
+        executors:
+          type: array
+          items:
+            type: object
+            required: [executor, sync_status]
+            properties:
+              executor:
+                type: string
+              sync_status:
+                type: string
+                enum: [pending, synced, failed]
+              synced_at:
+                $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+              message:
+                type: string
+    ActivationRequest:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [activate, rollback, auto_activate]
+          description: auto_activate приймається лише за дозволу політики джерела й пакета (інакше 403 access_denied_by_policy).
+        package:
+          $ref: '../schemas/common/package-ref.schema.json'
+        reason:
+          type: string
+          maxLength: 2000
+    Activation:
+      type: object
+      required: [activation_id, task_id, stage_id, package, kind, activated_at]
+      properties:
+        activation_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+        task_id:
+          type: string
+        stage_id:
+          type: string
+        package:
+          $ref: '../schemas/common/package-ref.schema.json'
+        previous:
+          $ref: '../schemas/common/package-ref.schema.json'
+        kind:
+          type: string
+          enum: [activate, rollback, auto_activate]
+        reason:
+          type: string
+        activated_by:
+          type: string
+        activated_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+    Executor:
+      type: object
+      required: [executor, role, base_url, status]
+      properties:
+        executor:
+          type: string
+        role:
+          type: string
+          enum: [collector, handler, storage_read, registry, llm, assistant]
+        base_url:
+          type: string
+          format: uri
+        status:
+          type: string
+          enum: [ok, degraded, down, unknown]
+        capabilities:
+          type: object
+    AuditEvent:
+      type: object
+      required: [event_id, at, actor, action, subject_type, subject_id]
+      properties:
+        event_id:
+          type: string
+        at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        actor:
+          type: string
+        action:
+          type: string
+          examples: [stage.activate, stage.rollback, task.update, source.update, connection.update, limits.update]
+        subject_type:
+          type: string
+        subject_id:
+          type: string
+        details:
+          type: object
+  examples:
+    RunRunning:
+      summary: Запуск повного збору в процесі
+      value:
+        run_id: run_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+        task_id: shop-catalog
+        task_etag: '"v7"'
+        status: running
+        trigger: schedule
+        test_mode: false
+        created_at: '2026-09-27T10:00:00Z'
+        started_at: '2026-09-27T10:00:01Z'
+        collection_id: job_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+        backpressure: false
+        stages:
+          - stage_id: collect
+            counts:
+              completed: 620
+          - stage_id: store-raw
+            handler:
+              package_id: jane.storage-files
+              version: 1.0.0
+            counts:
+              completed: 598
+              success: 598
+          - stage_id: extract-products
+            handler:
+              package_id: shop-example.product-extractor
+              version: 1.2.0
+            counts:
+              completed: 540
+              running: 8
+              success: 480
+              empty: 21
+              unrecognized: 37
+              failed: 2
+        counters:
+          unknown_materials: 12
+        costs:
+          llm:
+            amount: 0.42
+            currency: USD

@@ -1,0 +1,38 @@
+{
+  "summary": "Коректна відсутність сутностей",
+  "value": {
+    "invocation_id": "inv_01J9ZQ4B00000000000000A2",
+    "handler": {
+      "package_id": "shop-example.product-extractor",
+      "version": "1.2.0",
+      "digest": "sha256:4f6440c6a17b54edef02166e12a3bffd2364cbf790484d1f076b5d2e5ef78a35"
+    },
+    "handler_kind": "extractor",
+    "status": "empty",
+    "inputs": [
+      {
+        "kind": "material",
+        "material_id": "web:3704326c60776c53169680099e2eed31",
+        "observation_id": "obs_01J9ZQ4A0000000000000001",
+        "content_sha256": "e33249025b65cfa300d506c2c201202d7e96d0115ec85a33681f71370e7d4c07"
+      }
+    ],
+    "output": {
+      "entities": []
+    },
+    "diagnostics": {
+      "messages": [
+        {
+          "level": "info",
+          "code": "extract.no_products",
+          "message": "category page without product cards"
+        }
+      ]
+    },
+    "delivery_key": "4e0f59b654487ead879d66581cc35e08fa0e764526255ce939f572a8844b2699",
+    "duplicate": false,
+    "test_mode": false,
+    "started_at": "2026-09-27T10:00:06Z",
+    "finished_at": "2026-09-27T10:00:06.412Z"
+  }
+}

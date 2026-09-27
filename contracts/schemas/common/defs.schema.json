@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Common definitions",
+  "description": "Спільні примітиви контрактів Jane: ідентифікатори, час, версії, дайджести, мітки, контекст трасування. Використовуються через $ref: 'common/defs.schema.json#/$defs/<Name>'.",
+  "$defs": {
+    "Id": {
+      "description": "Непрозорий ідентифікатор, згенерований сервісом-власником (наприклад 'mat_01J9Z...'). Клієнти не розбирають його структуру.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+    },
+    "Slug": {
+      "description": "Ідентифікатор, який обирає користувач (source_id, task_id, package_id, connection_id). Нижній регістр, цифри, '.', '_', '-'.",
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]{0,98}[a-z0-9])?$"
+    },
+    "Timestamp": {
+      "description": "Момент часу RFC 3339 з часовою зоною; сервіси повертають UTC із суфіксом 'Z'.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "SemVer": {
+      "description": "Точна версія Semantic Versioning 2.0.0. Діапазони версій у посиланнях на пакети заборонені.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "Digest": {
+      "description": "Дайджест вмісту: 'sha256:' і 64 шістнадцяткові символи в нижньому регістрі.",
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "MediaType": {
+      "description": "Медіатип RFC 6838, наприклад 'text/html' або 'application/json'. Параметри (charset) передаються окремо.",
+      "type": "string",
+      "pattern": "^[a-z0-9!#$&^_.+-]+/[a-z0-9!#$&^_.+-]+$"
+    },
+    "Labels": {
+      "description": "Довільні мітки ключ-значення для фільтрації й пошуку. Не для секретів.",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z0-9][a-z0-9._/-]{0,62}$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 256
+      },
+      "maxProperties": 64
+    },
+    "Uri": {
+      "type": "string",
+      "format": "uri"
+    },
+    "UriReference": {
+      "type": "string",
+      "format": "uri-reference"
+    },
+    "SourceKind": {
+      "description": "Тип джерела. Розширюється додаванням нових значень (клієнти мають терпіти невідомі значення).",
+      "type": "string",
+      "examples": ["web", "telegram"],
+      "pattern": "^[a-z][a-z0-9_-]{1,31}$"
+    },
+    "HandlerKind": {
+      "description": "Тип обробника (і пакета). 'collector-rules' — правила колектора, що версіонуються в тому самому репозиторії.",
+      "type": "string",
+      "enum": ["extractor", "storage", "llm", "transform", "collector-rules"]
+    },
+    "TraceContext": {
+      "description": "Контекст простежуваності, що передається між етапами. Поля HTTP-заголовків W3C 'traceparent'/'tracestate' мають пріоритет, якщо є.",
+      "type": "object",
+      "properties": {
+        "trace_id": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "run_id": { "$ref": "#/$defs/Id" },
+        "task_id": { "$ref": "#/$defs/Slug" },
+        "stage_id": { "$ref": "#/$defs/Slug" },
+        "source_id": { "$ref": "#/$defs/Slug" }
+      }
+    }
+  }
+}

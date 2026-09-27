@@ -1,0 +1,15 @@
+{
+  "schema_version": "1",
+  "package_id": "x.bad",
+  "version": "^1.0",
+  "kind": "extractor",
+  "title": "bad",
+  "entry": {
+    "runtime": "python",
+    "module": "m",
+    "callable": "f"
+  },
+  "provenance": {
+    "created_by": "human"
+  }
+}

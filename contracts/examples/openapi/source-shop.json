@@ -1,0 +1,34 @@
+{
+  "summary": "Вебджерело",
+  "value": {
+    "source_id": "shop-example",
+    "kind": "web",
+    "title": "Shop Example",
+    "locator": {
+      "url": "https://shop.example.test/"
+    },
+    "collector_rules": {
+      "package_id": "shop-example.web-rules",
+      "version": "1.0.0",
+      "digest": "sha256:bd33d6b0fb860947abb60fbf898610d7ad28e279daf21106399995dcd911674a"
+    },
+    "limits": {
+      "rate": {
+        "requests_per_second_per_host": 2
+      },
+      "crawl": {
+        "max_pages_per_run": 20000
+      }
+    },
+    "forward_unknown_to_llm": false,
+    "expected_entity_types": [
+      "product"
+    ],
+    "change_policy": {
+      "llm_versions": "manual_approval"
+    },
+    "labels": {
+      "team": "catalog"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "summary": "Актуальний стан товару",
+  "value": {
+    "entity_type": "product",
+    "key": {
+      "scope": "shop-example",
+      "natural": {
+        "sku": "A-100"
+      }
+    },
+    "canonical_key": "shop-example|{\"sku\":\"A-100\"}",
+    "fields": {
+      "sku": "A-100",
+      "title": "Kettle A-100",
+      "price": {
+        "amount": 1199.0,
+        "currency": "UAH"
+      },
+      "availability": "in_stock",
+      "url": "https://shop.example.test/product/a-100"
+    },
+    "field_orders": {
+      "sku": {
+        "observation_id": "obs_01J9ZQ4A0000000000000001",
+        "observed_at": "2026-09-27T10:00:05Z",
+        "material_id": "web:3704326c60776c53169680099e2eed31",
+        "content_sha256": "e33249025b65cfa300d506c2c201202d7e96d0115ec85a33681f71370e7d4c07"
+      },
+      "title": {
+        "observation_id": "obs_01J9ZQ4A0000000000000001",
+        "observed_at": "2026-09-27T10:00:05Z",
+        "material_id": "web:3704326c60776c53169680099e2eed31",
+        "content_sha256": "e33249025b65cfa300d506c2c201202d7e96d0115ec85a33681f71370e7d4c07"
+      },
+      "url": {
+        "observation_id": "obs_01J9ZQ4A0000000000000001",
+        "observed_at": "2026-09-27T10:00:05Z",
+        "material_id": "web:3704326c60776c53169680099e2eed31",
+        "content_sha256": "e33249025b65cfa300d506c2c201202d7e96d0115ec85a33681f71370e7d4c07"
+      },
+      "price": {
+        "observation_id": "obs_01J9ZR8B0000000000000002",
+        "observed_at": "2026-09-28T06:00:03Z"
+      },
+      "availability": {
+        "observation_id": "obs_01J9ZR8B0000000000000002",
+        "observed_at": "2026-09-28T06:00:03Z"
+      }
+    },
+    "version": 2,
+    "updated_at": "2026-09-28T06:00:09Z"
+  }
+}

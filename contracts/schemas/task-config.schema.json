@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TaskConfig",
+  "description": "Конфігурація завдання (ТЗ §6): вхід (джерело або перелік матеріалів), DAG етапів з умовами й розгалуженням, зафіксовані версії пакетів, прив'язки екстракторів, розклад, повтори, ліміти, прапорець «Передавати в LLM невідомі сторінки». Завдання самостійні: первинний збір і перевірка цін — окремі завдання. Валідація оркестратором понад схему: рівно один етап kind=collect; граф ациклічний; усі from посилаються на існуючі етапи; кожен handler-етап має хоча б один вхід.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "title", "input", "stages"],
+  "properties": {
+    "task_id": { "$ref": "common/defs.schema.json#/$defs/Slug" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "description": { "type": "string", "maxLength": 4000 },
+    "enabled": { "type": "boolean", "default": true },
+    "input": { "$ref": "#/$defs/TaskInput" },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Stage" }
+    },
+    "schedule": { "$ref": "#/$defs/Schedule" },
+    "retries": { "$ref": "common/limits.schema.json#/$defs/RetryPolicy", "description": "Повтори етапів за замовчуванням (перекриває limits.retries)." },
+    "limits": { "$ref": "common/limits.schema.json", "description": "Ліміти рівня task." },
+    "forward_unknown_to_llm": {
+      "description": "«Передавати в LLM невідомі сторінки» на рівні завдання. Відсутнє — успадковується від джерела (за замовчуванням false).",
+      "type": "boolean"
+    },
+    "labels": { "$ref": "common/defs.schema.json#/$defs/Labels" }
+  },
+  "$defs": {
+    "TaskInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id"],
+      "properties": {
+        "source_id": { "$ref": "common/defs.schema.json#/$defs/Slug" },
+        "urls": {
+          "description": "Явний перелік матеріалів. Якщо задано — колектор отримує лише ці URL (стратегія seed_list без рекурсії) у межах scope джерела. Типово для завдань перевірки цін. Кількість обмежує limits.crawl.max_seed_urls (ефективне значення; перевищення — limit_exceeded), а не схема.",
+          "type": "array",
+          "items": { "type": "string", "format": "uri" }
+        },
+        "stored_materials": {
+          "description": "Повторна обробка збережених RAW (ТЗ §10): фільтр збережених об'єктів замість нового збору.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "storage_connection_id": { "$ref": "common/defs.schema.json#/$defs/Slug" },
+            "since": { "$ref": "common/defs.schema.json#/$defs/Timestamp" },
+            "until": { "$ref": "common/defs.schema.json#/$defs/Timestamp" },
+            "material_ids": { "type": "array", "items": { "$ref": "common/defs.schema.json#/$defs/Id" } }
+          }
+        }
+      }
+    },
+    "Stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage_id", "kind"],
+      "properties": {
+        "stage_id": { "$ref": "common/defs.schema.json#/$defs/Slug" },
+        "kind": { "type": "string", "enum": ["collect", "handler"] },
+        "title": { "type": "string", "maxLength": 200 },
+        "collector": { "$ref": "#/$defs/CollectorStage", "description": "Лише для kind=collect." },
+        "handler": { "$ref": "common/package-ref.schema.json", "description": "Лише для kind=handler: точна версія пакета." },
+        "params": { "type": "object", "description": "Параметри пакета (валідуються за params_schema маніфесту)." },
+        "connections": {
+          "description": "Логічне ім'я з required_connections пакета → connection_id.",
+          "type": "object",
+          "additionalProperties": { "$ref": "common/defs.schema.json#/$defs/Slug" }
+        },
+        "inputs": {
+          "description": "Вхідні ребра DAG. Кілька ребер — етап отримує елементи з кількох етапів. Відсутні для kind=collect.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/StageInput" }
+        },
+        "bindings": {
+          "description": "Прив'язки екстрактора (ТЗ §7): до яких матеріалів застосовувати етап. Матеріал потрапляє на етап, якщо відповідає хоча б одній прив'язці. Етап без bindings отримує всі елементи своїх входів. Матеріал, що не відповідає жодній прив'язці жодного етапу з bindings, вважається невідомим (select=unmatched_materials).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/Binding" }
+        },
+        "limits": { "$ref": "common/limits.schema.json", "description": "Ліміти рівня stage." },
+        "retries": { "$ref": "common/limits.schema.json#/$defs/RetryPolicy" },
+        "on_failure": {
+          "description": "Що робити, коли елемент на етапі остаточно failed після повторів: continue — записати проблему й продовжити інші елементи; fail_run — завершити запуск помилкою.",
+          "type": "string",
+          "enum": ["continue", "fail_run"],
+          "default": "continue"
+        }
+      },
+      "allOf": [
+        { "if": { "properties": { "kind": { "const": "collect" } } }, "then": { "required": ["collector"], "not": { "anyOf": [ { "required": ["handler"] }, { "required": ["inputs"] } ] } } },
+        { "if": { "properties": { "kind": { "const": "handler" } } }, "then": { "required": ["handler", "inputs"], "not": { "required": ["collector"] } } }
+      ]
+    },
+    "CollectorStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["collector"],
+      "properties": {
+        "collector": { "type": "string", "examples": ["web", "telegram"] },
+        "rules": { "$ref": "common/package-ref.schema.json", "description": "Версія правил; відсутня — правила джерела." },
+        "mode": {
+          "type": "string",
+          "enum": ["full", "incremental"],
+          "default": "full",
+          "description": "incremental — продовжити від збереженого курсора/стану колектора (Telegram — нові повідомлення й редагування; web — повторне відвідування)."
+        }
+      }
+    },
+    "StageInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from"],
+      "properties": {
+        "from": { "$ref": "common/defs.schema.json#/$defs/Slug" },
+        "select": {
+          "description": "Що брати з етапу-джерела: output — вихід (collect: матеріали; extractor: сутності разом із матеріалом; llm: data); input_material — вхідний матеріал етапу-джерела (наприклад зберегти RAW лише успішно розібраних); problems — елементи зі статусом unrecognized або failed разом із матеріалом і діагностикою; unmatched_materials — матеріали collect-етапу, яким не відповідає жодна прив'язка (доставляються лише за ефективного forward_unknown_to_llm=true, інакше лише реєструються).",
+          "type": "string",
+          "enum": ["output", "input_material", "problems", "unmatched_materials"],
+          "default": "output"
+        },
+        "when": { "$ref": "#/$defs/Condition" }
+      }
+    },
+    "Binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source_ids": { "type": "array", "items": { "$ref": "common/defs.schema.json#/$defs/Slug" }, "description": "Порожньо — джерело завдання." },
+        "sections": { "type": "array", "items": { "$ref": "common/defs.schema.json#/$defs/Slug" }, "description": "section_id з правил колектора." },
+        "url_patterns": { "type": "array", "items": { "$ref": "collector-rules.schema.json#/$defs/UrlPattern" } },
+        "media_types": { "type": "array", "items": { "type": "string" } },
+        "content_kinds": { "type": "array", "items": { "type": "string" } }
+      },
+      "minProperties": 1
+    },
+    "Condition": {
+      "description": "Умова переходу. Поля: material.* (метадані Material, напр. material.format.media_type, material.discovery.section, material.locator.url), result.status, result.failure.kind, result.entities_count, entity.entity_type, entity.fields.<name>.",
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false, "required": ["all"],
+          "properties": { "all": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Condition" } } }
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["any"],
+          "properties": { "any": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Condition" } } }
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["not"],
+          "properties": { "not": { "$ref": "#/$defs/Condition" } }
+        },
+        { "$ref": "#/$defs/Predicate" }
+      ]
+    },
+    "Predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "op"],
+      "properties": {
+        "field": { "type": "string", "pattern": "^(material|result|entity)(\\.[A-Za-z0-9_]+)+$" },
+        "op": { "type": "string", "enum": ["eq", "ne", "in", "not_in", "exists", "not_exists", "gt", "gte", "lt", "lte", "matches_glob", "matches_regex"] },
+        "value": {}
+      }
+    },
+    "Schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["manual", "once", "cron", "interval"] },
+        "at": { "$ref": "common/defs.schema.json#/$defs/Timestamp", "description": "Для once." },
+        "cron": { "type": "string", "description": "П'ять полів cron (хв год день міс день_тижня) для type=cron.", "pattern": "^\\S+( \\S+){4}$" },
+        "interval_seconds": { "type": "integer", "minimum": 1, "description": "Для type=interval." },
+        "timezone": { "type": "string", "default": "UTC", "description": "IANA, наприклад Europe/Kyiv." },
+        "start_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp" },
+        "end_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp" },
+        "enabled": { "type": "boolean", "default": true },
+        "overlap": { "type": "string", "enum": ["skip", "queue", "allow"], "default": "skip", "description": "Що робити, якщо попередній запуск ще триває (allow обмежується limits.concurrency.max_parallel_runs_per_task)." }
+      },
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "once" } } }, "then": { "required": ["at"] } },
+        { "if": { "properties": { "type": { "const": "cron" } } }, "then": { "required": ["cron"] } },
+        { "if": { "properties": { "type": { "const": "interval" } } }, "then": { "required": ["interval_seconds"] } }
+      ]
+    }
+  }
+}

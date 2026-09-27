@@ -1,0 +1,71 @@
+{
+  "handler": {
+    "package_id": "jane.storage-postgresql",
+    "version": "1.0.0",
+    "digest": "sha256:8751adf49b3d26c9a59f6ecc83f52feccc0edade6db1a98c1a0155b0380a045b"
+  },
+  "params": {
+    "table_prefix": "shop_"
+  },
+  "inputs": [
+    {
+      "kind": "entities",
+      "entities": [
+        {
+          "entity_type": "product",
+          "schema": "shop-example.product-extractor@1.2.0#product",
+          "key": {
+            "scope": "shop-example",
+            "natural": {
+              "sku": "A-100"
+            }
+          },
+          "fields": {
+            "sku": "A-100",
+            "title": "Kettle A-100",
+            "price": {
+              "amount": 1299.0,
+              "currency": "UAH"
+            },
+            "availability": "in_stock",
+            "url": "https://shop.example.test/product/a-100"
+          },
+          "completeness": "full",
+          "observation": {
+            "observation_id": "obs_01J9ZQ4A0000000000000001",
+            "observed_at": "2026-09-27T10:00:05Z",
+            "material_id": "web:3704326c60776c53169680099e2eed31",
+            "content_sha256": "e33249025b65cfa300d506c2c201202d7e96d0115ec85a33681f71370e7d4c07"
+          },
+          "provenance": {
+            "package": {
+              "package_id": "shop-example.product-extractor",
+              "version": "1.2.0",
+              "digest": "sha256:4f6440c6a17b54edef02166e12a3bffd2364cbf790484d1f076b5d2e5ef78a35"
+            },
+            "invocation_id": "inv_01J9ZQ4B00000000000000A1",
+            "run_id": "run_01J9ZQ3F8W2N4K7T5B6C1D0E9F",
+            "stage_id": "extract-products"
+          },
+          "confidence": 0.98
+        }
+      ],
+      "from_invocation_id": "inv_01J9ZQ4B00000000000000A1"
+    }
+  ],
+  "connections": {
+    "target": "results-pg"
+  },
+  "context": {
+    "trace": {
+      "run_id": "run_01J9ZQ3F8W2N4K7T5B6C1D0E9F",
+      "task_id": "shop-catalog",
+      "stage_id": "store-products",
+      "source_id": "shop-example"
+    },
+    "attempt": 2
+  },
+  "delivery": {
+    "delivery_key": "f3ce262f5fc6e6c0e84e0f993688161677dfee6ff663a4b60cbd5d6a12ff03bf"
+  }
+}

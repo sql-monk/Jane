@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pagination",
+  "description": "Курсорна пагінація. Запит: ?limit=<n>&cursor=<непрозорий рядок>. Відповідь: {\"items\": [...], \"next_cursor\": \"...\" | null}. null означає, що сторінок більше немає. Курсор непрозорий, дійсний щонайменше 1 годину; limit понад максимум сервісу обрізається до максимуму (не помилка).",
+  "type": "object",
+  "required": ["items", "next_cursor"],
+  "properties": {
+    "items": { "type": "array" },
+    "next_cursor": { "$ref": "#/$defs/NextCursor" }
+  },
+  "$defs": {
+    "NextCursor": {
+      "type": ["string", "null"],
+      "maxLength": 2048
+    }
+  }
+}

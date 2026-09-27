@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EntityRecord",
+  "description": "Сутність, витягнута обробником, і водночас часткове оновлення ідентифікованого об'єкта (ТЗ §6, §11). Семантика застосування (реалізує обробник збереження, перевіряє набір сумісності): (1) поле з 'fields' встановлює значення; (2) поле, відсутнє в 'fields', НЕ змінюється — пропуск не означає видалення; (3) явне очищення — лише через 'cleared' (null у 'fields' заборонено); (4) порядок спостережень: кожне поле поточного стану пам'ятає order свого останнього значення; оновлення поля застосовується, лише якщо order запису новіший (див. $defs/ObservationOrder), інакше запис потрапляє лише в історію, а підтвердження містить stale_fields; (5) той самий delivery_key вдруге — дубль, без нових записів.",
+  "type": "object",
+  "required": ["entity_type", "key", "fields", "observation"],
+  "properties": {
+    "entity_type": {
+      "description": "Тип сутності зі схеми результату пакета (наприклад 'product', 'price', 'event').",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "schema": {
+      "description": "Посилання на схему сутності всередині пакета: '<package_id>@<version>#<entity_type>'.",
+      "type": "string"
+    },
+    "key": { "$ref": "#/$defs/EntityKey" },
+    "fields": {
+      "description": "Значення полів. Відсутнє поле — без змін; null заборонено (для очищення — 'cleared').",
+      "type": "object",
+      "additionalProperties": { "not": { "type": "null" } }
+    },
+    "cleared": {
+      "description": "Поля, які треба явно очистити в поточному стані.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "completeness": {
+      "description": "full — обробник заявляє, що передав усі поля, які знайшов у матеріалі (інформативно; семантику злиття не змінює); partial — лише частину полів (наприклад, завдання перевірки ціни).",
+      "type": "string",
+      "enum": ["full", "partial"],
+      "default": "partial"
+    },
+    "observation": { "$ref": "#/$defs/ObservationOrder" },
+    "provenance": { "$ref": "#/$defs/Provenance" },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+  },
+  "$defs": {
+    "EntityKey": {
+      "description": "Ідентичність об'єкта. natural — значення ключових полів схеми (наприклад {\"sku\": \"A-1\"}); scope — простір імен (зазвичай source_id), щоб однакові SKU різних джерел не злилися. Сховище будує канонічний рядок ключа: scope + '|' + пари natural, відсортовані за іменем, серіалізовані як JSON без пробілів.",
+      "type": "object",
+      "required": ["scope", "natural"],
+      "properties": {
+        "scope": { "type": "string", "minLength": 1 },
+        "natural": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": ["string", "integer", "number", "boolean"] }
+        }
+      }
+    },
+    "ObservationOrder": {
+      "description": "Порядок спостережень. Порівняння: спочатку observed_at (час отримання матеріалу колектором), потім sequence (ревізія джерела, якщо є), потім observation_id лексикографічно. Більше — новіше. Час обробки чи доставки в порівнянні не бере участі.",
+      "type": "object",
+      "required": ["observation_id", "observed_at"],
+      "properties": {
+        "observation_id": { "$ref": "common/defs.schema.json#/$defs/Id" },
+        "observed_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "material_id": { "$ref": "common/defs.schema.json#/$defs/Id" },
+        "content_sha256": { "$ref": "common/defs.schema.json#/$defs/Sha256Hex" }
+      }
+    },
+    "Provenance": {
+      "type": "object",
+      "properties": {
+        "package": { "$ref": "common/package-ref.schema.json" },
+        "invocation_id": { "$ref": "common/defs.schema.json#/$defs/Id" },
+        "run_id": { "$ref": "common/defs.schema.json#/$defs/Id" },
+        "stage_id": { "$ref": "common/defs.schema.json#/$defs/Slug" }
+      }
+    },
+    "EntityState": {
+      "description": "Актуальний стан об'єкта в сховищі (читання через storage API).",
+      "type": "object",
+      "required": ["entity_type", "key", "fields", "updated_at"],
+      "properties": {
+        "entity_type": { "type": "string" },
+        "key": { "$ref": "#/$defs/EntityKey" },
+        "canonical_key": { "type": "string" },
+        "fields": { "type": "object" },
+        "field_orders": {
+          "description": "Для кожного поля — порядок спостереження, з якого взято значення; для очищених полів — порядок очищення.",
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/ObservationOrder" }
+        },
+        "cleared_fields": { "type": "array", "items": { "type": "string" } },
+        "version": { "type": "integer", "minimum": 1, "description": "Лічильник змін актуального стану." },
+        "updated_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "EntityHistoryEntry": {
+      "description": "Запис історії: кожне прийняте оновлення (включно із запізнілими) з позначкою, що саме воно змінило.",
+      "type": "object",
+      "required": ["record", "received_at", "applied_fields", "stale_fields"],
+      "properties": {
+        "record": { "$ref": "entity.schema.json" },
+        "received_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp" },
+        "delivery_key": { "type": "string" },
+        "applied_fields": { "type": "array", "items": { "type": "string" } },
+        "stale_fields": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

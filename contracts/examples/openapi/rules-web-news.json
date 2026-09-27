@@ -1,0 +1,82 @@
+{
+  "summary": "Правила: RSS, шаблони URL, API, пошук, LLM",
+  "value": {
+    "collector": "web",
+    "scope": {
+      "allowed_domains": [
+        "news.example.test"
+      ],
+      "include_subdomains": true
+    },
+    "strategies": [
+      {
+        "type": "feed",
+        "urls": [
+          "https://news.example.test/rss.xml"
+        ],
+        "autodiscover": true
+      },
+      {
+        "type": "url_template",
+        "template": "https://news.example.test/archive/{year}/{page}",
+        "variables": {
+          "year": {
+            "values": [
+              2025,
+              2026
+            ]
+          },
+          "page": {
+            "range": {
+              "start": 1,
+              "end": 50
+            }
+          }
+        },
+        "stop_after_consecutive_misses": 3
+      },
+      {
+        "type": "api_feed",
+        "url": "https://news.example.test/api/articles?limit=50",
+        "items_path": "$.items",
+        "url_path": "$.url",
+        "lastmod_path": "$.updated_at",
+        "pagination": {
+          "type": "next_url",
+          "next_url_path": "$.next"
+        }
+      },
+      {
+        "type": "listing",
+        "start_urls": [
+          "https://news.example.test/search"
+        ],
+        "search": {
+          "url_template": "https://news.example.test/search?q={query}",
+          "queries": [
+            "концерт",
+            "виставка"
+          ]
+        }
+      },
+      {
+        "type": "llm_explore",
+        "goal": "знайти сторінки анонсів подій",
+        "expected_entity_types": [
+          "event"
+        ]
+      }
+    ],
+    "sections": [
+      {
+        "section_id": "articles",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "^news\\.example\\.test/\\d{4}/\\d{2}/.+"
+          }
+        ]
+      }
+    ]
+  }
+}

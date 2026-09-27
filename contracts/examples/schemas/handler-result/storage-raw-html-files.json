@@ -1,0 +1,43 @@
+{
+  "invocation_id": "inv_01J9ZQ4C00000000000000C2",
+  "handler": {
+    "package_id": "jane.storage-files",
+    "version": "1.0.0",
+    "digest": "sha256:b2d691abc92053497acfe8f61d6cd32488b126a4aeb6e080c63d966ecd096a94"
+  },
+  "handler_kind": "storage",
+  "status": "success",
+  "inputs": [
+    {
+      "kind": "material",
+      "material_id": "web:3704326c60776c53169680099e2eed31",
+      "observation_id": "obs_01J9ZQ4A0000000000000001",
+      "content_sha256": "e33249025b65cfa300d506c2c201202d7e96d0115ec85a33681f71370e7d4c07"
+    }
+  ],
+  "output": {
+    "writes": [
+      {
+        "status": "written",
+        "target": {
+          "adapter": "filesystem",
+          "connection_id": "raw-files"
+        },
+        "object": {
+          "object_id": "obj_01J9ZQ4C00000000000000D1",
+          "adapter": "filesystem",
+          "connection_id": "raw-files",
+          "locator": {
+            "path": "raw/shop-example/2026/09/27/web_3704326c60776c53169680099e2eed31/obs_01J9ZQ4A0000000000000001.html"
+          },
+          "media_type": "text/html",
+          "size_bytes": 160,
+          "sha256": "e33249025b65cfa300d506c2c201202d7e96d0115ec85a33681f71370e7d4c07"
+        },
+        "delivery_key": "ad3d9ed239718c9b5beeb8ccb95cc602926cea0cf4ff7548925ef3cb42c72574"
+      }
+    ]
+  },
+  "started_at": "2026-09-27T10:00:07Z",
+  "finished_at": "2026-09-27T10:00:07.020Z"
+}

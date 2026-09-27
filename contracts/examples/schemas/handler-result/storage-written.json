@@ -1,0 +1,46 @@
+{
+  "invocation_id": "inv_01J9ZQ4C00000000000000C1",
+  "handler": {
+    "package_id": "jane.storage-postgresql",
+    "version": "1.0.0",
+    "digest": "sha256:8751adf49b3d26c9a59f6ecc83f52feccc0edade6db1a98c1a0155b0380a045b"
+  },
+  "handler_kind": "storage",
+  "status": "success",
+  "inputs": [
+    {
+      "kind": "entities",
+      "from_invocation_id": "inv_01J9ZQ4B00000000000000A1"
+    }
+  ],
+  "output": {
+    "writes": [
+      {
+        "status": "written",
+        "target": {
+          "adapter": "postgresql",
+          "connection_id": "results-pg"
+        },
+        "entity": {
+          "entity_type": "product",
+          "canonical_key": "shop-example|{\"sku\":\"A-100\"}",
+          "version": 1
+        },
+        "applied_fields": [
+          "availability",
+          "price",
+          "sku",
+          "title",
+          "url"
+        ],
+        "stale_fields": [],
+        "delivery_key": "f3ce262f5fc6e6c0e84e0f993688161677dfee6ff663a4b60cbd5d6a12ff03bf"
+      }
+    ]
+  },
+  "delivery_key": "f3ce262f5fc6e6c0e84e0f993688161677dfee6ff663a4b60cbd5d6a12ff03bf",
+  "duplicate": false,
+  "test_mode": false,
+  "started_at": "2026-09-27T10:00:07Z",
+  "finished_at": "2026-09-27T10:00:07.050Z"
+}

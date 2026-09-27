@@ -19,7 +19,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
 def test_health_and_info(client: TestClient) -> None:
     health = client.get("/v1/health")
     assert health.status_code == 200
-    assert health.json() == {"status": "ok", "checks": {}}
+    assert health.json() == {"status": "ok", "checks": {"state": {"status": "ok"}}}
     info = client.get("/v1/info").json()
     assert info["service"] == "assistant"
     assert info["api_versions"] == ["v1"]
@@ -27,6 +27,7 @@ def test_health_and_info(client: TestClient) -> None:
     assert caps["operations"] == ["onboarding", "improvement", "unknown_materials"]
     assert caps["neighbours"]["llm"] is False  # nothing configured: honest capabilities
     assert info["limits"]["defaults"]["llm"]["max_improvement_attempts"] == 3
+    assert caps["state"] == "memory"  # single standalone instance without JANE_ASSISTANT_STATE_DSN
 
 
 def test_metrics_exposed(client: TestClient) -> None:

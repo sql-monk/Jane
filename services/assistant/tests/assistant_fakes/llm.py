@@ -8,6 +8,7 @@ assistant's guards are exercised. It is independent of WP-10's fake provider on 
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from dataclasses import dataclass, field
@@ -66,6 +67,7 @@ class Knobs:
     improve_suggested: list[str] = field(default_factory=list)
     improve_invalid: bool = False
     cost: float = 0.01
+    delay_s: float = 0.0
 
 
 class FakeLlm:
@@ -80,9 +82,11 @@ class FakeLlm:
     def steps(self) -> list[str]:
         return [str(r["output_schema"]["title"]).split(".")[2] for r in self.requests]
 
-    def complete(self, req: FakeRequest) -> Reply:
+    async def complete(self, req: FakeRequest) -> Reply:
         body = req.json
         self.requests.append(body)
+        if self.knobs.delay_s:
+            await asyncio.sleep(self.knobs.delay_s)
         budget = ((body.get("limits") or {}).get("budget") or {}).get("amount")
         if budget is not None and float(budget) < self.knobs.cost:
             return problem(

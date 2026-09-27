@@ -259,3 +259,50 @@ def test_llm_session_budget_truncation_and_validation() -> None:
     )
     with pytest.raises(BudgetExhausted):
         asyncio.run(gateway.ask("s", "i", [], schema, model="m"))
+
+
+def test_session_document_roundtrip_and_optimistic_version() -> None:
+    from jane_assistant.onboarding import ExtractorPlan, InMemorySessionStore, Session
+    from jane_assistant.sampling import SampleResult
+    from jane_assistant.search import Candidate
+    from jane_assistant.testing import TestOutcome
+
+    draft = PackageDraft(
+        {"package_id": "a.b", "version": "1.0.0", "tests": []}, {"src/m/main.py": b"\x00code"}
+    )
+    sample = SampleResult(
+        [Sample({"material_id": "web:1"}, "text", "t/*", "product", 0.9)], 0.9, True, None, {"k": 1}
+    )
+    plan = ExtractorPlan(
+        "product",
+        "product",
+        "create",
+        {"package_id": "a.b", "version": "1.0.0"},
+        0.4,
+        TestOutcome("ctx", {"passed": 1, "failed": 0}),
+        draft,
+    )
+    s = Session(
+        "onb_1",
+        "q",
+        {"query": "q"},
+        candidates=[Candidate("T", url="https://t.test/", confidence=0.5)],
+        selected_candidate_id="cand_1",
+        sample=sample,
+        plans={"product": plan},
+    )
+    back = Session.from_doc(json.loads(json.dumps(s.to_doc())), 3)
+    assert back.to_doc() == s.to_doc() and back.version == 3
+    assert back.plans["product"].draft is not None and back.plans["product"].draft.files == draft.files
+    assert back.candidate() == s.candidate()
+
+    store = InMemorySessionStore()
+    assert asyncio.run(store.save_if(s, 0)) and s.version == 1
+    stale = asyncio.run(store.get("onb_1"))
+    assert stale is not None
+    s.status = "sampling"
+    assert asyncio.run(store.save_if(s, 1)) and s.version == 2
+    stale.status = "cancelled"
+    assert not asyncio.run(store.save_if(stale, stale.version))  # lost the race: nothing written
+    current = asyncio.run(store.get("onb_1"))
+    assert current is not None and current.status == "sampling"

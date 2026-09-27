@@ -194,7 +194,10 @@ async def sample_source(
         while True:
             if not ended and len(reserve) < ob.sample_batch_size:
                 page = await collector.materials(
-                    collection_id, after, ob.sample_batch_size * 3, ob.collection_poll_wait_ms
+                    collection_id,
+                    after,
+                    ob.sample_batch_size * ob.poll_page_factor,
+                    ob.collection_poll_wait_ms,
                 )
                 after = page.get("next_cursor") or after
                 ended = bool(page.get("end_of_stream"))

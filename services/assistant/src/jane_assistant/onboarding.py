@@ -22,7 +22,9 @@ States (``assistant.v1`` ``OnboardingSession.status``)::
 from __future__ import annotations
 
 import asyncio
+import base64
 import copy
+import dataclasses
 import logging
 import math
 import uuid
@@ -32,7 +34,7 @@ from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from jane_kit.errors import Conflict, JaneError, NotFound
-from jane_kit.jobs import JobContext, JobRunner
+from jane_kit.jobs import JobCancelledError, JobContext, JobRunner
 
 from .clients import Neighbours, RemoteError, idem_key
 from .content import host_of, material_label
@@ -50,6 +52,7 @@ __all__ = ["InMemorySessionStore", "OnboardingService", "Session", "SessionStore
 
 log = logging.getLogger(__name__)
 TERMINAL = {"completed", "failed", "cancelled"}
+RUNNING = {"resolving", "sampling", "analyzing", "applying"}
 DISCOVERY_METHODS = {"seed_list", "sitemap", "feed", "listing", "url_template", "api_feed", "recursive"}
 
 
@@ -104,6 +107,60 @@ class Session:
     job_id: str | None = None
     error: dict[str, Any] | None = None
     acceptance: dict[str, Any] | None = None
+    version: int = 0
+    """Optimistic concurrency version of the stored session (set by the store)."""
+
+    def to_doc(self) -> dict[str, Any]:
+        """JSON document of the whole session (shared state of all instances)."""
+        return {
+            "session_id": self.session_id,
+            "query": self.query,
+            "request": self.request,
+            "status": self.status,
+            "created_at": self.created_at,
+            "candidates": [dataclasses.asdict(c) for c in self.candidates],
+            "selected_candidate_id": self.selected_candidate_id,
+            "sample": dataclasses.asdict(self.sample) if self.sample is not None else None,
+            "analysis": self.analysis,
+            "proposals": self.proposals,
+            "plans": {k: _plan_doc(p) for k, p in self.plans.items()},
+            "spent": self.spent,
+            "currency": self.currency,
+            "job_id": self.job_id,
+            "error": self.error,
+            "acceptance": self.acceptance,
+        }
+
+    @classmethod
+    def from_doc(cls, doc: dict[str, Any], version: int = 0) -> Session:
+        sample = doc.get("sample")
+        return cls(
+            session_id=doc["session_id"],
+            query=doc["query"],
+            request=doc["request"],
+            status=doc["status"],
+            created_at=doc["created_at"],
+            candidates=[Candidate(**c) for c in doc.get("candidates") or []],
+            selected_candidate_id=doc.get("selected_candidate_id"),
+            sample=SampleResult(
+                samples=[Sample(**s) for s in sample["samples"]],
+                confidence=sample["confidence"],
+                sufficient=sample["sufficient"],
+                message=sample.get("message"),
+                hints=sample.get("hints") or {},
+            )
+            if sample
+            else None,
+            analysis=doc.get("analysis"),
+            proposals=doc.get("proposals") or [],
+            plans={k: _plan_from_doc(p) for k, p in (doc.get("plans") or {}).items()},
+            spent=float(doc.get("spent") or 0.0),
+            currency=doc.get("currency") or "USD",
+            job_id=doc.get("job_id"),
+            error=doc.get("error"),
+            acceptance=doc.get("acceptance"),
+            version=version,
+        )
 
     def candidate(self) -> Candidate | None:
         if self.selected_candidate_id is None:
@@ -137,22 +194,72 @@ class Session:
         return out
 
 
+def _plan_doc(p: ExtractorPlan) -> dict[str, Any]:
+    return {
+        "entity_type": p.entity_type,
+        "material_type": p.material_type,
+        "action": p.action,
+        "package": p.package,
+        "match_score": p.match_score,
+        "outcome": {"context": p.outcome.context, "report": p.outcome.report} if p.outcome else None,
+        "draft": {
+            "manifest": p.draft.manifest,
+            "files": {k: base64.b64encode(v).decode() for k, v in p.draft.files.items()},
+        }
+        if p.draft
+        else None,
+        "fork_from": p.fork_from,
+    }
+
+
+def _plan_from_doc(d: dict[str, Any]) -> ExtractorPlan:
+    draft = d.get("draft")
+    outcome = d.get("outcome")
+    return ExtractorPlan(
+        entity_type=d["entity_type"],
+        material_type=d["material_type"],
+        action=d["action"],
+        package=d.get("package"),
+        match_score=d.get("match_score"),
+        outcome=TestOutcome(outcome["context"], outcome["report"]) if outcome else None,
+        draft=PackageDraft(draft["manifest"], {k: base64.b64decode(v) for k, v in draft["files"].items()})
+        if draft
+        else None,
+        fork_from=d.get("fork_from"),
+    )
+
+
 class SessionStore(Protocol):
+    """Sessions shared by instances. ``save`` always writes (the job that owns a running session);
+    ``save_if`` writes only if the stored version is still ``expected`` (API state transitions)."""
+
     async def get(self, session_id: str) -> Session | None: ...
     async def save(self, session: Session) -> None: ...
+    async def save_if(self, session: Session, expected: int) -> bool: ...
 
 
 class InMemorySessionStore:
-    """Single-instance store. Several instances need a shared implementation of :class:`SessionStore`."""
+    """Single standalone instance and tests only (lost on restart). Several instances use
+    :class:`jane_assistant.state.PostgresState` (``JANE_ASSISTANT_STATE_DSN``). Stores serialized
+    documents, so it behaves like the shared store (copies, versions)."""
 
     def __init__(self) -> None:
-        self._items: dict[str, Session] = {}
+        self._items: dict[str, tuple[int, dict[str, Any]]] = {}
 
     async def get(self, session_id: str) -> Session | None:
-        return self._items.get(session_id)
+        item = self._items.get(session_id)
+        return Session.from_doc(copy.deepcopy(item[1]), item[0]) if item else None
 
     async def save(self, session: Session) -> None:
-        self._items[session.session_id] = session
+        version = self._items.get(session.session_id, (0, {}))[0] + 1
+        self._items[session.session_id] = (version, session.to_doc())
+        session.version = version
+
+    async def save_if(self, session: Session, expected: int) -> bool:
+        if self._items.get(session.session_id, (0, {}))[0] != expected:
+            return False
+        await self.save(session)
+        return True
 
 
 Progress = Callable[[int, str], Awaitable[None]]
@@ -175,7 +282,6 @@ class OnboardingService:
         self.runner = runner
         self.store = store
         self.validator = validator
-        self._locks: dict[str, asyncio.Lock] = {}
 
     # ------------------------------------------------------------------ API entry points
     async def start(self, request: dict[str, Any], idempotency_key: str | None) -> tuple[dict[str, Any], str]:
@@ -196,20 +302,25 @@ class OnboardingService:
         return await self._refresh(session)
 
     async def select(self, session_id: str, candidate_id: str) -> Session:
-        async with self._lock(session_id):
-            session = await self.get(session_id)
-            if session.selected_candidate_id == candidate_id and session.status != "needs_disambiguation":
-                return session  # same choice again: same state
-            if session.status != "needs_disambiguation":
-                raise Conflict(
-                    f"session is {session.status}; a candidate can be selected only when disambiguation is needed"
-                )
-            if candidate_id not in {f"cand_{i + 1}" for i in range(len(session.candidates))}:
-                raise NotFound(f"candidate {candidate_id} not found in session {session_id}")
-            session.selected_candidate_id = candidate_id
-            session.status = "sampling"
-            await self._submit(session, "onboarding", self._continue_after_selection, None)
-            return session
+        session = await self.get(session_id)
+        if session.selected_candidate_id == candidate_id and session.status != "needs_disambiguation":
+            return session  # same choice again: same state
+        if session.status != "needs_disambiguation":
+            raise Conflict(
+                f"session is {session.status}; a candidate can be selected only when disambiguation is needed"
+            )
+        if candidate_id not in {f"cand_{i + 1}" for i in range(len(session.candidates))}:
+            raise NotFound(f"candidate {candidate_id} not found in session {session_id}")
+        session.selected_candidate_id = candidate_id
+        session.status = "sampling"
+        if not await self.store.save_if(session, session.version):
+            # another instance (or request) changed the session first: same choice -> its state
+            current = await self.get(session_id)
+            if current.selected_candidate_id == candidate_id and current.status != "needs_disambiguation":
+                return current
+            raise Conflict(f"session {session_id} was changed concurrently (now {current.status})")
+        await self._submit(session, "onboarding", self._continue_after_selection, None)
+        return session
 
     async def accept(
         self,
@@ -219,25 +330,22 @@ class OnboardingService:
         source_id: str | None,
         idempotency_key: str | None,
     ) -> dict[str, Any]:
-        async with self._lock(session_id):
-            session = await self.get(session_id)
-            if session.status != "proposals_ready":
-                raise Conflict(
-                    f"session is {session.status}; proposals can be accepted only when they are ready"
-                )
-            proposal = next((p for p in session.proposals if p["proposal_id"] == proposal_id), None)
-            if proposal is None:
-                raise NotFound(f"proposal {proposal_id} not found in session {session_id}")
-            session.status = "applying"
+        session = await self.get(session_id)
+        if session.status != "proposals_ready":
+            raise Conflict(f"session is {session.status}; proposals can be accepted only when they are ready")
+        proposal = next((p for p in session.proposals if p["proposal_id"] == proposal_id), None)
+        if proposal is None:
+            raise NotFound(f"proposal {proposal_id} not found in session {session_id}")
+        session.status = "applying"
+        if not await self.store.save_if(session, session.version):
+            raise Conflict(f"session {session_id} was changed concurrently; read it again")
 
-            async def work(ctx: JobContext, s: Session) -> dict[str, Any]:
-                return await self._apply(ctx, s, proposal, activate, source_id)
+        async def work(ctx: JobContext, s: Session) -> dict[str, Any]:
+            return await self._apply(ctx, s, proposal, activate, source_id)
 
-            return await self._submit(session, "onboarding_acceptance", work, idempotency_key)
+        return await self._submit(session, "onboarding_acceptance", work, idempotency_key)
 
     # ------------------------------------------------------------------ jobs
-    def _lock(self, session_id: str) -> asyncio.Lock:
-        return self._locks.setdefault(session_id, asyncio.Lock())
 
     def _limits(self, request: dict[str, Any]) -> ServiceLimits:
         return resolve_service_limits(self.settings, *request_layer(request.get("limits"))).limits
@@ -252,8 +360,18 @@ class OnboardingService:
         async def work(ctx: JobContext) -> dict[str, Any]:
             try:
                 return await fn(ctx, session)
-            except asyncio.CancelledError:
+            except (asyncio.CancelledError, JobCancelledError):
                 session.status = "cancelled"
+                job = await self.runner.store.get(ctx.job_id)
+                cancel = job.cancellation if job else None
+                reason = cancel.reason if cancel and cancel.reason else "instance shutdown or restart"
+                session.error = (
+                    JaneError(
+                        f"onboarding job cancelled: {reason}", code="service_unavailable", retryable=True
+                    )
+                    .to_problem()
+                    .model_dump(mode="json", exclude_none=True)
+                )
                 await self.store.save(session)
                 raise
             except JaneError as exc:
@@ -287,12 +405,24 @@ class OnboardingService:
         return job.wire()
 
     async def _refresh(self, session: Session) -> Session:
-        """A job cancelled before it started never runs its handler: mirror that in the session."""
-        if session.job_id and session.status not in TERMINAL:
+        """Mirror a job that ended without its handler updating the session: cancelled before it
+        started, or failed because its instance stopped (lease expired, see ``state.py``)."""
+        if session.job_id and session.status in RUNNING:
             job = await self.runner.store.get(session.job_id)
-            if job is not None and job.status == "cancelled":
-                session.status = "cancelled"
-                await self.store.save(session)
+            if job is not None and job.status in {"cancelled", "failed"}:
+                expected = session.version
+                session.status = str(job.status)
+                if job.error is not None:
+                    session.error = job.error.model_dump(mode="json", exclude_none=True)
+                else:
+                    reason = job.cancellation.reason if job.cancellation else None
+                    session.error = (
+                        JaneError(f"onboarding job cancelled: {reason or 'no reason given'}", code="conflict")
+                        .to_problem()
+                        .model_dump(mode="json", exclude_none=True)
+                    )
+                if not await self.store.save_if(session, expected):
+                    return await self.get(session.session_id)
         return session
 
     async def _resolve_and_continue(self, ctx: JobContext, session: Session) -> dict[str, Any]:
@@ -351,6 +481,7 @@ class OnboardingService:
         async def progress(done: int, message: str) -> None:
             session.spent = llm.spent
             await ctx.progress(done, None, unit="materials", message=message)
+            await ctx.check_cancelled()  # a cancel request may come through another instance
             await self.store.save(session)
 
         rules = sampling_rules(
@@ -465,7 +596,7 @@ class OnboardingService:
         ob = limits.onboarding
         positives = sample.of_type(material_type)[: ob.max_examples_per_type]
         negatives = [s for s in sample.samples if s.material_type != material_type][
-            : max(1, ob.max_examples_per_type // 2)
+            : ob.max_negative_examples
         ]
         return positives, negatives
 

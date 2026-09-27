@@ -661,10 +661,14 @@ version = "0.1.0"
 source = { editable = "services/assistant" }
 dependencies = [
     { name = "jane-kit" },
+    { name = "psycopg", extra = ["binary", "pool"] },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "jane-kit", editable = "libs/jane-kit" }]
+requires-dist = [
+    { name = "jane-kit", editable = "libs/jane-kit" },
+    { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.2" },
+]
 
 [[package]]
 name = "jane-contracts"

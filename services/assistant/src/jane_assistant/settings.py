@@ -15,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import SettingsConfigDict
 
 from jane_kit.clients import ClientLimits
@@ -37,6 +37,12 @@ class Settings(JaneSettings):
     model_config = SettingsConfigDict(env_prefix=ENV_PREFIX, extra="ignore", env_nested_delimiter="__")
 
     service_name: str = "assistant"
+
+    state_dsn: SecretStr | None = None
+    """PostgreSQL DSN of the service's own state (sessions, jobs, idempotency keys) shared by instances.
+    Unset: in-memory state - only for a single standalone instance and tests (lost on restart)."""
+    state_schema: str = Field(default="jane_assistant", pattern=r"^[a-z_][a-z0-9_]{0,62}$")
+    """Schema of the state tables (created if missing)."""
 
     # Neighbour services (contracts/openapi/<api>.v1.yaml). Empty -> the feature that needs the
     # neighbour fails with ``upstream_unavailable`` instead of guessing.
@@ -130,6 +136,11 @@ class OnboardingLimits(Limits):
     """A material type counts as distinguished after this many examples."""
     max_examples_per_type: int = Field(default=3, ge=1)
     """Examples of one type sent to analysis and code generation."""
+    max_negative_examples: int = Field(default=1, ge=1)
+    """Materials of other types used as ``empty`` cases when testing/generating an extractor."""
+    poll_page_factor: int = Field(default=3, ge=1)
+    """Materials pulled per poll of the sampling collection = ``sample_batch_size x poll_page_factor``
+    (the surplus is the pool the diversity selection picks from)."""
     max_candidates: int = Field(default=5, ge=1)
     """Search results kept for disambiguation."""
     auto_select_confidence: float = Field(default=0.8, gt=0, le=1)
@@ -174,7 +185,23 @@ class TransferLimits(Limits):
     """Package archives up to this size are sent to the runtime inline (base64)."""
 
 
+class StateLimits(Limits):
+    """Shared PostgreSQL state (``state_dsn``)."""
+
+    pool_max_size: int = Field(default=10, ge=1)
+    connect_timeout_ms: int = Field(default=10_000, ge=1)
+    in_progress_lease_ms: int = Field(default=900_000, ge=1)
+    """An in-progress idempotency claim of a crashed instance can be taken over after this."""
+    job_lease_ms: int = Field(default=60_000, ge=1)
+    """A running job whose instance did not renew the lease for this long is marked ``failed``."""
+    heartbeat_interval_ms: int = Field(default=15_000, ge=1)
+    """How often an instance renews the leases of its running jobs (keep well below job_lease_ms)."""
+    session_retention_seconds: int = Field(default=2_592_000, ge=60)
+    """Onboarding sessions not updated for this long are deleted (default 30 days)."""
+
+
 class ServiceLimits(Limits):
+    state: StateLimits = StateLimits()
     llm: LlmLimits = contract_field("llm", LlmLimits())
     transfer: TransferLimits = TransferLimits()
     onboarding: OnboardingLimits = OnboardingLimits()

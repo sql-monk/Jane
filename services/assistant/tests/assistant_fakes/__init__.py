@@ -73,6 +73,11 @@ class World:
             self.storage,
         ]
 
+    def instance(self, settings: Settings) -> TestClient:
+        """Another assistant instance wired to the same neighbour fakes (use as a context manager)."""
+        deps = Dependencies(transports=self.extra["transports"], search=self.search)
+        return TestClient(build_app(settings, deps))
+
     def violations(self) -> list[str]:
         return [v for f in self.fakes() for v in f.app.violations]
 
@@ -131,4 +136,5 @@ def world(
             client,
             ContractClient(spec, client),
             spec,
+            extra={"transports": transports},
         )

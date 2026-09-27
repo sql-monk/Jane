@@ -502,6 +502,11 @@ class CrawlRun:
                 for other in claimed:
                     self.state.mark_url(db, self.collection_id, other, "redirect")
                 self.state.mark_url(db, self.collection_id, url, "redirect")
+                # remembered for revisits: an incremental run follows the stored target without refetching
+                self.state.put_url_state(
+                    db, self.state_key, url, status=None, etag=None, last_modified=None,
+                    content_sha256=None, links=[dup.target],
+                )
                 self._persist(db)
             log.debug("redirect to a known URL", extra={"url": url, "target": dup.target})
             return None

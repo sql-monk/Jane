@@ -92,7 +92,10 @@ def test_depth_limit_stops_the_infinite_calendar(client: TestClient, site: Site)
     depths = [m["discovery"]["depth"] for m in materials]
     assert max(depths) <= 4
     calendar = [p for p in site.requests if p.startswith("/calendar/")]
-    assert 0 < len(calendar) <= 4  # "/" -> calendar at depth 1 .. 4
+    # "/" -> current month at depth 1; each month links to the previous and the next one, so depth 4
+    # reaches at most 3 months in each direction: 1 + 2 * 3 = 7 pages, then the crawl stops
+    assert 0 < len(calendar) <= 7
+    assert all(site.requests[p] == 1 for p in calendar)
 
 
 def test_explicit_url_list_fetches_only_those(client: TestClient, site: Site) -> None:
@@ -196,7 +199,9 @@ def test_incremental_revisit_uses_conditional_requests(client: TestClient, site:
     assert state["frontier_size"] == 0
 
 
-def test_incremental_never_skips_known_urls(client: TestClient, site: Site) -> None:
+def test_incremental_never_skips_known_urls(
+    client: TestClient, site: Site, expected_sets: dict[str, set[str]]
+) -> None:
     rules = web_rules(site, revisit={"mode": "never"})
     body = {"source_kind": "web", "state_key": "never", "rules": rules, "limits": FAST_LIMITS}
     first = start(client, body)
@@ -204,7 +209,8 @@ def test_incremental_never_skips_known_urls(client: TestClient, site: Site) -> N
     site.reset()
     second = start(client, {**body, "mode": "incremental"})
     assert drain(client, second) == []
-    assert [p for p in site.requests if p != "/robots.txt"] == []
+    # known pages are not requested again; only URLs that failed last time (404) are retried
+    assert sorted(p for p in site.requests if p != "/robots.txt") == sorted(expected_sets["broken"])
 
 
 def test_full_mode_emits_new_observations(client: TestClient, site: Site) -> None:

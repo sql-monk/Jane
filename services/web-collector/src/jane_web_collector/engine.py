@@ -324,12 +324,17 @@ class Engine:
         return view
 
     def _status(self, cid: str, record: Mapping[str, Any]) -> str:
+        """The collection's own status is the source of truth for "finished"; the job adds only
+        ``queued``/``running``/``cancelling`` detail while the collection is not terminal."""
+        own = str(record["status"])
+        if own in TERMINAL:
+            return own
         job = self.state.get_job(cid)
         if job is not None:
             status = Job.model_validate_json(job).status.value
-            if status in TERMINAL or record["status"] not in TERMINAL:
+            if status not in TERMINAL:
                 return status
-        return str(record["status"])
+        return own
 
     def acked(self, cid: str) -> None:
         event = self.deps.ack_events.get(cid)

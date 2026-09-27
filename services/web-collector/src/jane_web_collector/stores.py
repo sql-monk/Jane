@@ -13,9 +13,21 @@ from .state import StateStore
 __all__ = ["SqliteIdempotencyStore", "SqliteJobStore"]
 
 
+def _now_iso() -> str:
+    return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+TERMINAL = frozenset({JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED})
+
+
 class SqliteJobStore:
-    """Jobs of collections are shared by all instances on the state file. Only the instance holding a
-    collection's lease writes its job; others may only request cancellation (``cancelling``)."""
+    """Jobs of collections are shared by all instances on the state file.
+
+    * Only the instance holding a collection's lease writes its job; others may only request cancellation.
+    * A terminal job status is stored only when the collection itself already has that status (written by
+      the run's final lease-fenced transaction or by the owner on failure/cancellation). A run that stopped
+      without finishing (lease lost, graceful shutdown) therefore never makes the job look finished.
+    """
 
     def __init__(self, state: StateStore, instance_id: str) -> None:
         self.state = state
@@ -46,8 +58,16 @@ class SqliteJobStore:
         return Job.model_validate_json(body) if body else None
 
     async def save(self, job: Job) -> None:
-        if job.status != JobStatus.CANCELLING and self._foreign(job):
-            return  # a run that lost its lease must not overwrite the new owner's job
+        collection = self.state.get_status(job.job_id)
+        if collection is not None:
+            if job.status != JobStatus.CANCELLING and self._foreign(job):
+                return  # a run that lost its lease must not overwrite the new owner's job
+            if job.status in TERMINAL and job.status.value != collection:
+                if job.status == JobStatus.CANCELLED and collection == "queued":
+                    # cancelled before it started: nothing ran, the collection ends here as well
+                    self.state.set_status(job.job_id, "cancelled", finished_at=_now_iso())
+                else:
+                    return  # the collection is not finished: keep the job non-terminal (it will be resumed)
         job = job.model_copy(update={"updated_at": datetime.now(UTC)})
         self.state.put_job(job.job_id, job.model_dump_json())
 

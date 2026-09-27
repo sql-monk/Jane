@@ -879,6 +879,10 @@ class CrawlRun:
             ).fetchone()[0]
             if open_rows:  # cannot happen after the loop above; never report success with open URLs
                 raise RuntimeError(f"{open_rows} URLs still open at the end of the run")
+            job_row = db.execute("SELECT body FROM jobs WHERE job_id = ?", (self.collection_id,)).fetchone()
+            if job_row is not None and json.loads(job_row[0]).get("status") == "cancelling":
+                self.cancelled = True
+                raise JobCancelledError(self.collection_id)  # cancellation never ends as "succeeded"
             self._persist(db)
             self.state.set_status(self.collection_id, "succeeded", finished_at=_now_iso(), db=db)
             db.execute(

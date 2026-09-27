@@ -8,12 +8,15 @@
 
 from __future__ import annotations
 
+import contextlib
+import sqlite3
 import time
 from collections import Counter
 from typing import Any
 
 import httpx
 import psutil  # type: ignore[import-untyped]
+import pytest
 
 from jane_web_collector.testing import FAST_LIMITS, ServiceFactory, Site, drain, start, wait_done, web_rules
 
@@ -75,9 +78,14 @@ def test_two_instances_share_state_and_take_over_after_kill(
     _assert_exact_once(site, expected_sets["recursive"], page["items"] + rest)
 
 
+@pytest.mark.parametrize("hold_db_lock", [False, True], ids=["b-takes-over", "db-locked-no-takeover"])
 def test_stalled_owner_is_fenced_out(
-    service_factory: ServiceFactory, site: Site, expected_sets: dict[str, set[str]]
+    service_factory: ServiceFactory, site: Site, expected_sets: dict[str, set[str]], hold_db_lock: bool
 ) -> None:
+    """A is frozen longer than the lease. ``b-takes-over``: B claims the collection meanwhile.
+    ``db-locked-no-takeover``: the SQLite write lock is held during the freeze (as when A is frozen inside a
+    transaction), so B cannot claim; A wakes up with an expired lease that is still its own.
+    Either way the consumer must never see a finished collection before it really is finished."""
     a = service_factory()
     a.start()
     b = service_factory(state_dir=a.state_dir)
@@ -94,20 +102,34 @@ def test_stalled_owner_is_fenced_out(
             _wait_fetched(api_a, c1, 8)
         for proc in frozen:
             proc.suspend()  # alive but hung: no heartbeat, requests in flight, pending writes
+        lock = None
         try:
-            time.sleep(5)  # > lease (3 s) + resume interval (1 s): B takes the collection over
+            if hold_db_lock:
+                lock = sqlite3.connect(str(a.state_dir / "state.db"), timeout=0.5, isolation_level=None)
+                with contextlib.suppress(sqlite3.OperationalError):  # A may itself hold it, frozen mid-write
+                    lock.execute("BEGIN IMMEDIATE")
+            time.sleep(5)  # > lease (3 s) + resume interval (1 s)
         finally:
+            if lock is not None:
+                with contextlib.suppress(sqlite3.OperationalError):
+                    lock.execute("ROLLBACK")
+                lock.close()
             for proc in frozen:
-                proc.resume()  # A wakes up, finds its lease gone and must not write anything
-        materials = drain(api_b, c1, timeout=90)
+                proc.resume()  # A wakes up; whoever holds the lease continues, the other writes nothing
+        materials = drain(api_b, c1, timeout=90)  # stops at the first end_of_stream
+        at_end = api_b.get(f"/v1/collections/{c1}").json()
         done = wait_done(api_b, c1, timeout=60)
-        time.sleep(2)  # give the woken instance time to try to finish its run
+        time.sleep(3)  # give the woken instance time to try to finish or resume its run
         final = api_b.get(f"/v1/collections/{c1}").json()
         job = api_b.get(f"/v1/jobs/{c1}").json()
+        more = api_b.get(f"/v1/collections/{c1}/materials").json()
+    # end_of_stream only when the collection really finished: nothing open, nothing more to come
+    assert at_end["status"] == "succeeded" and at_end["stats"]["frontier_size"] == 0, at_end
     assert done["status"] == "succeeded", done
-    assert final["status"] == "succeeded" and final["stats"]["frontier_size"] == 0
-    assert job["status"] == "succeeded" and "handed_over" not in (job.get("result") or {})
+    assert final["status"] == "succeeded" and final["stats"]["frontier_size"] == 0, final
+    assert final["stats"]["emitted"] == at_end["stats"]["emitted"] == len(expected_sets["recursive"])
+    # nothing new after end_of_stream (only the last, not yet acknowledged page may be re-delivered as is)
+    assert {m["observation_id"] for m in more["items"]} <= {m["observation_id"] for m in materials}
+    assert more["end_of_stream"] is True
+    assert job["status"] == "succeeded" and "handed_over" not in (job.get("result") or {}), job
     _assert_exact_once(site, expected_sets["recursive"], materials)
-    assert final["stats"]["emitted"] == len(expected_sets["recursive"])
-    assert a.log_path is not None
-    assert "lease lost" in a.log_path.read_text(encoding="utf-8", errors="replace")  # A noticed and stopped

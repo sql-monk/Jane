@@ -40,5 +40,7 @@ just integration --project jane-wp08 services/storage/adapters/minio   # C-01…
 just down -v --project jane-wp08
 ```
 
-`tests/test_minio_profile.py` (профіль, без сервісів) входить у `just check`. Сценарії відновлення після збою
-спільного протоколу — у `adapters/s3/tests/test_recovery.py`.
+`tests/test_minio_profile.py` (профіль, без сервісів) входить у `just check`. Сценарії відновлення після збою,
+неоднозначних відповідей і гонок спільного протоколу — у `adapters/s3/tests/test_recovery.py`, параметризовані
+`s3` (SeaweedFS) і `minio` (MinIO): `just integration --project jane-wp08 services/storage/adapters/s3` з обома сервісами.
+Обмеження умовного видалення на MinIO — див. [s3/README «Обмеження»](../s3/README.md#обмеження).

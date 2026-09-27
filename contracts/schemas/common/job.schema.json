@@ -79,7 +79,7 @@
       "type": "object",
       "required": ["items", "next_cursor"],
       "properties": {
-        "items": { "type": "array", "items": { "$ref": "#" } },
+        "items": { "type": "array", "items": { "$ref": "job.schema.json" } },
         "next_cursor": { "$ref": "page.schema.json#/$defs/NextCursor" }
       }
     }

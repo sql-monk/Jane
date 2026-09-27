@@ -14,8 +14,14 @@
     "description": { "type": "string", "maxLength": 10000 },
     "tags": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,40}$" }, "uniqueItems": true },
     "entry": {
-      "description": "Спосіб виконання; форма залежить від kind.",
-      "type": "object"
+      "description": "Спосіб виконання; форма залежить від kind: extractor — PythonEntry; transform — PythonEntry або ExecutorEntry; storage — StorageEntry; llm — LlmEntry; collector-rules — CollectorRulesEntry. Відповідність kind ↔ entry додатково перевіряє репозиторій (validation_failed).",
+      "oneOf": [
+        { "$ref": "#/$defs/PythonEntry" },
+        { "$ref": "#/$defs/StorageEntry" },
+        { "$ref": "#/$defs/LlmEntry" },
+        { "$ref": "#/$defs/CollectorRulesEntry" },
+        { "$ref": "#/$defs/ExecutorEntry" }
+      ]
     },
     "input": { "$ref": "#/$defs/InputContract" },
     "params_schema": {
@@ -58,11 +64,7 @@
     }
   },
   "allOf": [
-    { "if": { "properties": { "kind": { "const": "extractor" } } }, "then": { "properties": { "entry": { "$ref": "#/$defs/PythonEntry" } }, "required": ["output", "dependencies"] } },
-    { "if": { "properties": { "kind": { "const": "transform" } } }, "then": { "properties": { "entry": { "anyOf": [ { "$ref": "#/$defs/PythonEntry" }, { "$ref": "#/$defs/ExecutorEntry" } ] } } } },
-    { "if": { "properties": { "kind": { "const": "storage" } } }, "then": { "properties": { "entry": { "$ref": "#/$defs/StorageEntry" } } } },
-    { "if": { "properties": { "kind": { "const": "llm" } } }, "then": { "properties": { "entry": { "$ref": "#/$defs/LlmEntry" } } } },
-    { "if": { "properties": { "kind": { "const": "collector-rules" } } }, "then": { "properties": { "entry": { "$ref": "#/$defs/CollectorRulesEntry" } } } }
+    { "if": { "properties": { "kind": { "const": "extractor" } }, "required": ["kind"] }, "then": { "required": ["output", "dependencies"] } }
   ],
   "$defs": {
     "PackagePath": {

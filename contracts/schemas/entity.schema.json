@@ -95,7 +95,7 @@
       "type": "object",
       "required": ["record", "received_at", "applied_fields", "stale_fields"],
       "properties": {
-        "record": { "$ref": "#" },
+        "record": { "$ref": "entity.schema.json" },
         "received_at": { "$ref": "common/defs.schema.json#/$defs/Timestamp" },
         "delivery_key": { "type": "string" },
         "applied_fields": { "type": "array", "items": { "type": "string" } },

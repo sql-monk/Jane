@@ -119,7 +119,7 @@
         "adapter": { "type": "string" },
         "connection_id": { "$ref": "common/defs.schema.json#/$defs/Slug" },
         "locator": {
-          "description": "Адресa в термінах адаптера: path (files), table+id (SQL), collection+_id (MongoDB), bucket+key (S3/MinIO).",
+          "description": "Адреса в термінах адаптера: path (files), table+id (SQL), collection+_id (MongoDB), bucket+key (S3/MinIO).",
           "type": "object",
           "additionalProperties": { "type": ["string", "integer"] }
         },
@@ -213,7 +213,7 @@
             }
           }
         },
-        "result": { "$ref": "#" }
+        "result": { "$ref": "handler-result.schema.json" }
       }
     },
     "TestReport": {

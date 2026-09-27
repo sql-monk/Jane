@@ -143,8 +143,8 @@
       "required": ["defaults"],
       "properties": {
         "profile": { "type": "string", "description": "Ім'я профілю середовища, з якого взято значення (див. docs/adr/0007-target-environments.md)." },
-        "defaults": { "$ref": "#" },
-        "hard_caps": { "$ref": "#" }
+        "defaults": { "$ref": "limits.schema.json" },
+        "hard_caps": { "$ref": "limits.schema.json" }
       }
     },
     "EffectiveLimits": {
@@ -152,7 +152,7 @@
       "type": "object",
       "required": ["limits", "provenance"],
       "properties": {
-        "limits": { "$ref": "#" },
+        "limits": { "$ref": "limits.schema.json" },
         "provenance": {
           "description": "Для кожного листового поля (шлях через крапку, наприклад 'rate.requests_per_second_per_host') — рівень, з якого взято значення.",
           "type": "object",

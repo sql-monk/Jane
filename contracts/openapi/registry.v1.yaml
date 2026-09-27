@@ -1,0 +1,1098 @@
+openapi: 3.1.0
+info:
+  title: Jane Handler Registry API
+  version: 1.0.0
+  description: |
+    Репозиторій пакетів обробників усіх типів і правил колекторів (WP-05, ТЗ §7, §13.2).
+    Технологія — docs/adr/0002-package-registry.md: власний сервіс із метаданими у власній БД і
+    незмінними архівами (content-addressed, sha256) у blob-сховищі.
+
+    - Версія незмінна: повторна публікація тієї самої версії — 409 `version_exists`.
+    - Дайджест архіву (`sha256:`) обчислює репозиторій; споживачі перевіряють його.
+    - Секрети в пакеті відхиляються (`secret_detected`); вимоги до підключень — лише в маніфесті.
+    - Форк — незалежна копія з `fork_of`; зміни батька не впливають на форк. Перенесення змін
+      батька — лише явною командою (`POST /upstream-ports`), результат — нова версія форку.
+    - Архів версії (`GET .../archive`) достатній для автономного використання без репозиторію.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Jane
+servers:
+  - url: http://localhost:8105
+    description: registry (dev)
+security:
+  - bearerAuth: []
+tags:
+  - name: system
+  - name: packages
+  - name: versions
+  - name: forks
+  - name: jobs
+paths:
+  /v1/health:
+    $ref: 'common.yaml#/components/pathItems/Health'
+  /v1/info:
+    $ref: 'common.yaml#/components/pathItems/Info'
+  /v1/packages:
+    get:
+      operationId: listPackages
+      summary: Пошук пакетів
+      tags: [packages]
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/common/defs.schema.json#/$defs/HandlerKind'
+        - name: q
+          in: query
+          required: false
+          description: Повнотекстовий пошук за id, назвою, описом, тегами.
+          schema:
+            type: string
+        - name: tag
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: entity_type
+          in: query
+          required: false
+          description: Пакети, що видають сутності цього типу.
+          schema:
+            type: string
+        - name: media_type
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: domain
+          in: query
+          required: false
+          description: Збіг із bindings_hint.domains.
+          schema:
+            type: string
+        - name: fork_of
+          in: query
+          required: false
+          description: Лише форки вказаного пакета.
+          schema:
+            type: string
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка пакетів.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageList'
+              examples:
+                search:
+                  value:
+                    items:
+                      - package_id: shop-example.product-extractor
+                        kind: extractor
+                        title: Shop Example product cards
+                        latest_version: 1.2.0
+                        auto_changes_allowed: true
+                        deprecated: false
+                        created_at: '2026-09-20T08:00:00Z'
+                        updated_at: '2026-09-27T09:40:00Z'
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+    post:
+      operationId: createPackage
+      summary: Створити пакет (без версій)
+      tags: [packages]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PackageCreate'
+            examples:
+              extractor:
+                value:
+                  package_id: shop-example.product-extractor
+                  kind: extractor
+                  title: Shop Example product cards
+                  auto_changes_allowed: true
+      responses:
+        '201':
+          description: Пакет створено.
+          headers:
+            Location:
+              $ref: 'common.yaml#/components/headers/Location'
+            ETag:
+              $ref: 'common.yaml#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Package'
+              examples:
+                created:
+                  $ref: '#/components/examples/Package'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '403':
+          $ref: 'common.yaml#/components/responses/Forbidden'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+  /v1/packages/{package_id}:
+    parameters:
+      - $ref: '#/components/parameters/PackageId'
+    get:
+      operationId: getPackage
+      summary: Пакет і його налаштування
+      tags: [packages]
+      responses:
+        '200':
+          description: Пакет.
+          headers:
+            ETag:
+              $ref: 'common.yaml#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Package'
+              examples:
+                package:
+                  $ref: '#/components/examples/Package'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+    patch:
+      operationId: updatePackage
+      summary: Змінити налаштування пакета (назва, опис, заборона автозмін, застарілість)
+      tags: [packages]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/PackagePatch'
+            examples:
+              forbidAuto:
+                value:
+                  auto_changes_allowed: false
+      responses:
+        '200':
+          description: Оновлений пакет.
+          headers:
+            ETag:
+              $ref: 'common.yaml#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Package'
+              examples:
+                package:
+                  $ref: '#/components/examples/Package'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '412':
+          $ref: 'common.yaml#/components/responses/PreconditionFailed'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+  /v1/packages/{package_id}/versions:
+    parameters:
+      - $ref: '#/components/parameters/PackageId'
+    get:
+      operationId: listPackageVersions
+      summary: Версії пакета
+      tags: [versions]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/VersionStatus'
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка версій (від новіших).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageVersionList'
+              examples:
+                versions:
+                  value:
+                    items:
+                      - package_id: shop-example.product-extractor
+                        version: 1.2.0
+                        digest: sha256:0f4c1c8f3e0f6a7d9b2c4e6f8a0b2c4d6e8f0a1b3c5d7e9f1a3b5c7d9e1f3a5b
+                        status: approved
+                        test_status: passed
+                        created_at: '2026-09-27T09:40:00Z'
+                        created_by: llm
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+    post:
+      operationId: publishPackageVersion
+      summary: Опублікувати нову незмінну версію
+      description: |
+        Тіло — zip-архів пакета (`application/zip`, у корені `jane-package.json`) або JSON із
+        маніфестом і файлами (зручно для LLM-асистента). Репозиторій валідує маніфест за
+        `package-manifest.schema.json`, перевіряє файли, на які він посилається, залежності
+        (профіль runtime), шукає секрети, обчислює дайджест. Нова версія — `status: draft`.
+      tags: [versions]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/zip:
+            schema:
+              type: string
+              contentMediaType: application/zip
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishRequest'
+            examples:
+              llmGenerated:
+                value:
+                  manifest:
+                    schema_version: '1'
+                    package_id: shop-example.product-extractor
+                    version: 1.3.0
+                    kind: extractor
+                    title: Shop Example product cards
+                    entry:
+                      runtime: python
+                      module: product_extractor.main
+                      callable: extract
+                    output:
+                      entities:
+                        - entity_type: product
+                          schema: schemas/product.schema.json
+                          key_fields: [sku]
+                    dependencies:
+                      runtime_profile: python-extractor@1
+                      python: ['selectolax>=0.3,<0.4']
+                    tests:
+                      - name: product-a100
+                        input:
+                          file: tests/product-a100/page.html
+                          media_type: text/html
+                        expected_status: success
+                        expected: tests/product-a100/expected.json
+                    provenance:
+                      created_by: llm
+                      based_on:
+                        package_id: shop-example.product-extractor
+                        version: 1.2.0
+                      change_summary: Support .price-new selector.
+                  files:
+                    src/product_extractor/__init__.py:
+                      encoding: utf-8
+                      data: ''
+                    src/product_extractor/main.py:
+                      encoding: utf-8
+                      data: "def extract(material, params, ctx):\n    ...\n"
+                    schemas/product.schema.json:
+                      encoding: utf-8
+                      data: '{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["sku"]}'
+                    tests/product-a100/page.html:
+                      encoding: utf-8
+                      data: <html><h1>Kettle A-100</h1></html>
+                    tests/product-a100/expected.json:
+                      encoding: utf-8
+                      data: '{"entities":[]}'
+      responses:
+        '201':
+          description: Версію опубліковано.
+          headers:
+            Location:
+              $ref: 'common.yaml#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageVersion'
+              examples:
+                version:
+                  $ref: '#/components/examples/PackageVersion'
+        '400':
+          $ref: 'common.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '403':
+          description: Пакет заборонено змінювати автоматично (`forbidden`, auto_changes_allowed=false і created_by=llm).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                autoForbidden:
+                  value:
+                    type: urn:jane:problem:forbidden
+                    title: Automatic changes are forbidden for this package
+                    status: 403
+                    code: forbidden
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '409':
+          description: Версія вже існує (`version_exists`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                exists:
+                  value:
+                    type: urn:jane:problem:version_exists
+                    title: Version already exists
+                    status: 409
+                    code: version_exists
+        '413':
+          $ref: 'common.yaml#/components/responses/PayloadTooLarge'
+        '422':
+          description: Невалідний маніфест, `secret_detected`, `dependency_not_allowed`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                secret:
+                  value:
+                    type: urn:jane:problem:secret_detected
+                    title: Secret detected in package
+                    status: 422
+                    code: secret_detected
+                    errors:
+                      - pointer: /files/src~1product_extractor~1main.py
+                        code: aws_access_key
+                        message: value looks like an AWS access key (line 12)
+                deps:
+                  value:
+                    type: urn:jane:problem:dependency_not_allowed
+                    title: Dependency not allowed
+                    status: 422
+                    code: dependency_not_allowed
+                    errors:
+                      - pointer: /manifest/dependencies/python/0
+                        message: requests is not available in runtime profile python-extractor@1
+  /v1/packages/{package_id}/versions/{version}:
+    parameters:
+      - $ref: '#/components/parameters/PackageId'
+      - $ref: '#/components/parameters/Version'
+    get:
+      operationId: getPackageVersion
+      summary: Версія пакета — маніфест, дайджест, файли, статус
+      tags: [versions]
+      responses:
+        '200':
+          description: Версія.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageVersion'
+              examples:
+                version:
+                  $ref: '#/components/examples/PackageVersion'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/packages/{package_id}/versions/{version}/archive:
+    parameters:
+      - $ref: '#/components/parameters/PackageId'
+      - $ref: '#/components/parameters/Version'
+    get:
+      operationId: downloadPackageArchive
+      summary: Архів версії для автономного використання (ETag = дайджест)
+      tags: [versions]
+      responses:
+        '200':
+          description: zip-архів; заголовок `ETag` дорівнює `"sha256:…"`.
+          headers:
+            ETag:
+              $ref: 'common.yaml#/components/headers/ETag'
+          content:
+            application/zip:
+              schema:
+                type: string
+                contentMediaType: application/zip
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/packages/{package_id}/versions/{version}/file:
+    parameters:
+      - $ref: '#/components/parameters/PackageId'
+      - $ref: '#/components/parameters/Version'
+    get:
+      operationId: getPackageFile
+      summary: Один файл версії (для редактора й diff в адмінці)
+      tags: [versions]
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            $ref: '../schemas/package-manifest.schema.json#/$defs/PackagePath'
+      responses:
+        '200':
+          description: Вміст файла.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "def extract(material, params, ctx):\n    ...\n"
+            application/octet-stream:
+              schema:
+                type: string
+                contentMediaType: application/octet-stream
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/packages/{package_id}/versions/{version}/status:
+    parameters:
+      - $ref: '#/components/parameters/PackageId'
+      - $ref: '#/components/parameters/Version'
+    post:
+      operationId: setPackageVersionStatus
+      summary: Змінити статус версії (погодити, відхилити, позначити застарілою) з аудитом
+      tags: [versions]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatusChange'
+            examples:
+              approve:
+                value:
+                  status: approved
+                  reason: all tests passed on 3 bindings
+      responses:
+        '200':
+          description: Оновлена версія.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageVersion'
+              examples:
+                version:
+                  $ref: '#/components/examples/PackageVersion'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+  /v1/packages/{package_id}/versions/{version}/test-results:
+    parameters:
+      - $ref: '#/components/parameters/PackageId'
+      - $ref: '#/components/parameters/Version'
+    post:
+      operationId: recordTestResults
+      summary: Записати звіт прогону тестів версії (від handler-runtime або асистента)
+      tags: [versions]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestResultsRecord'
+            examples:
+              report:
+                value:
+                  runner: handler-runtime@0.1.0
+                  context: bindings:shop-catalog/extract-products
+                  report:
+                    package:
+                      package_id: shop-example.product-extractor
+                      version: 1.2.0
+                    passed: 2
+                    failed: 0
+                    cases:
+                      - name: product-a100
+                        passed: true
+                      - name: category-page-empty
+                        passed: true
+      responses:
+        '200':
+          description: Версія з оновленим test_status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageVersion'
+              examples:
+                version:
+                  $ref: '#/components/examples/PackageVersion'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+  /v1/packages/{package_id}/forks:
+    parameters:
+      - $ref: '#/components/parameters/PackageId'
+    post:
+      operationId: forkPackage
+      summary: Створити незалежний форк від версії
+      description: |
+        Копіює вміст версії `from_version` у новий пакет `new_package_id` з `fork_of`
+        (батько, вихідна версія, дайджест). Підключення й секрети не копіюються (їх у пакеті й
+        немає); налаштування `auto_changes_allowed` — з запиту.
+      tags: [forks]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForkRequest'
+            examples:
+              fork:
+                value:
+                  new_package_id: acme.product-extractor
+                  from_version: 1.2.0
+                  title: ACME fork of Shop Example product cards
+      responses:
+        '201':
+          description: Форк створено; перша версія має fork_of.
+          headers:
+            Location:
+              $ref: 'common.yaml#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Package'
+              examples:
+                fork:
+                  value:
+                    package_id: acme.product-extractor
+                    kind: extractor
+                    title: ACME fork of Shop Example product cards
+                    latest_version: 1.2.0
+                    auto_changes_allowed: false
+                    deprecated: false
+                    fork_of:
+                      package_id: shop-example.product-extractor
+                      version: 1.2.0
+                      digest: sha256:0f4c1c8f3e0f6a7d9b2c4e6f8a0b2c4d6e8f0a1b3c5d7e9f1a3b5c7d9e1f3a5b
+                    created_at: '2026-09-27T11:00:00Z'
+                    updated_at: '2026-09-27T11:00:00Z'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+  /v1/packages/{package_id}/diff:
+    parameters:
+      - $ref: '#/components/parameters/PackageId'
+    get:
+      operationId: diffPackage
+      summary: Відмінності між версіями або від батька (для форку)
+      tags: [versions, forks]
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: Версія цього пакета; або `parent:<version>` — версія батька.
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: context_lines
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 3
+      responses:
+        '200':
+          description: Відмінності.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageDiff'
+              examples:
+                diff:
+                  value:
+                    from:
+                      package_id: shop-example.product-extractor
+                      version: 1.1.0
+                    to:
+                      package_id: shop-example.product-extractor
+                      version: 1.2.0
+                    manifest_changes:
+                      - pointer: /provenance/change_summary
+                        op: replace
+                        old: Initial version.
+                        new: Fallback to og:title when h1 is missing.
+                    files:
+                      - path: src/product_extractor/main.py
+                        status: modified
+                        unified_diff: "@@ -10,3 +10,5 @@\n-    title = h1.text()\n+    title = h1.text() if h1 else og_title(tree)\n"
+                      - path: tests/og-title/page.html
+                        status: added
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+  /v1/packages/{package_id}/upstream:
+    parameters:
+      - $ref: '#/components/parameters/PackageId'
+    get:
+      operationId: getUpstreamStatus
+      summary: Оновлення батьківського пакета для форку
+      tags: [forks]
+      responses:
+        '200':
+          description: Стан відносно батька.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamStatus'
+              examples:
+                behind:
+                  value:
+                    fork_of:
+                      package_id: shop-example.product-extractor
+                      version: 1.2.0
+                    last_ported_version: 1.2.0
+                    parent_latest_version: 1.3.0
+                    newer_parent_versions: [1.3.0]
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '409':
+          description: Пакет не є форком (`conflict`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                notFork:
+                  value:
+                    type: urn:jane:problem:conflict
+                    title: Package is not a fork
+                    status: 409
+                    code: conflict
+  /v1/packages/{package_id}/upstream-ports:
+    parameters:
+      - $ref: '#/components/parameters/PackageId'
+    post:
+      operationId: portUpstreamChanges
+      summary: Явно перенести зміни батька у форк новою версією (асинхронно)
+      description: |
+        Лише за явною командою користувача (ТЗ §7). Трьохстороннє злиття: база — остання
+        перенесена версія батька, «їхні» — `parent_version`, «наші» — `base_version` форку.
+        Успіх — `Job.result` = PackageVersion (draft) з `provenance.upstream_port`. Конфлікти —
+        job `failed` з кодом `upstream_conflict` і переліком файлів у `error.details.conflicts`.
+      tags: [forks]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpstreamPortRequest'
+            examples:
+              port:
+                value:
+                  parent_version: 1.3.0
+                  base_version: 1.2.0
+                  new_version: 1.3.0
+      responses:
+        '202':
+          $ref: 'common.yaml#/components/responses/JobAccepted'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+  /v1/jobs/{job_id}:
+    $ref: 'common.yaml#/components/pathItems/Job'
+  /v1/jobs/{job_id}/cancel:
+    $ref: 'common.yaml#/components/pathItems/JobCancel'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    PackageId:
+      name: package_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+    Version:
+      name: version
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/common/defs.schema.json#/$defs/SemVer'
+  schemas:
+    VersionStatus:
+      type: string
+      enum: [draft, approved, rejected, deprecated, yanked]
+      description: |
+        draft — опубліковано, не погоджено; approved — дозволено активувати в етапах;
+        rejected — відхилено; deprecated — не рекомендується для нових прив'язок; yanked —
+        заборонено для нових прив'язок (наявні прив'язки не ламаються, архів доступний).
+    TestStatus:
+      type: string
+      enum: [unknown, passed, failed]
+    Package:
+      type: object
+      required: [package_id, kind, title, auto_changes_allowed, deprecated, created_at, updated_at]
+      properties:
+        package_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+        kind:
+          $ref: '../schemas/common/defs.schema.json#/$defs/HandlerKind'
+        title:
+          type: string
+        description:
+          type: string
+        latest_version:
+          type: ['string', 'null']
+        auto_changes_allowed:
+          type: boolean
+          description: false — автоматичні зміни (версії від LLM) заборонені для цього пакета (ТЗ §9).
+        deprecated:
+          type: boolean
+        fork_of:
+          $ref: '../schemas/common/package-ref.schema.json'
+        forks_count:
+          type: integer
+          minimum: 0
+        owner:
+          type: string
+        labels:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Labels'
+        created_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        updated_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+    PackageList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Package'
+        next_cursor:
+          $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+    PackageCreate:
+      type: object
+      additionalProperties: false
+      required: [package_id, kind, title]
+      properties:
+        package_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+        kind:
+          $ref: '../schemas/common/defs.schema.json#/$defs/HandlerKind'
+        title:
+          type: string
+        description:
+          type: string
+        auto_changes_allowed:
+          type: boolean
+          default: true
+        labels:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Labels'
+    PackagePatch:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        auto_changes_allowed:
+          type: boolean
+        deprecated:
+          type: boolean
+        labels:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Labels'
+    FileEntry:
+      type: object
+      required: [path, size_bytes, sha256]
+      properties:
+        path:
+          $ref: '../schemas/package-manifest.schema.json#/$defs/PackagePath'
+        size_bytes:
+          type: integer
+          minimum: 0
+        sha256:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Sha256Hex'
+    PackageVersion:
+      type: object
+      required: [package_id, version, digest, status, test_status, created_at]
+      properties:
+        package_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+        version:
+          $ref: '../schemas/common/defs.schema.json#/$defs/SemVer'
+        digest:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Digest'
+        status:
+          $ref: '#/components/schemas/VersionStatus'
+        test_status:
+          $ref: '#/components/schemas/TestStatus'
+        manifest:
+          $ref: '../schemas/package-manifest.schema.json'
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/FileEntry'
+        size_bytes:
+          type: integer
+          minimum: 0
+        created_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        created_by:
+          type: string
+          description: human | llm | import (з маніфесту) або ідентифікатор користувача.
+        published_by:
+          type: string
+        status_history:
+          type: array
+          items:
+            type: object
+            required: [status, at]
+            properties:
+              status:
+                $ref: '#/components/schemas/VersionStatus'
+              at:
+                $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+              by:
+                type: string
+              reason:
+                type: string
+        test_reports:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestResultsRecord'
+    PackageVersionList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PackageVersion'
+        next_cursor:
+          $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+    PublishRequest:
+      type: object
+      additionalProperties: false
+      required: [manifest, files]
+      properties:
+        manifest:
+          $ref: '../schemas/package-manifest.schema.json'
+        files:
+          type: object
+          description: Шлях у пакеті → вміст. jane-package.json формується з manifest.
+          propertyNames:
+            $ref: '../schemas/package-manifest.schema.json#/$defs/PackagePath'
+          additionalProperties:
+            type: object
+            additionalProperties: false
+            required: [encoding, data]
+            properties:
+              encoding:
+                type: string
+                enum: [utf-8, base64]
+              data:
+                type: string
+    StatusChange:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected, deprecated, yanked]
+        reason:
+          type: string
+          maxLength: 2000
+    TestResultsRecord:
+      type: object
+      required: [report]
+      properties:
+        runner:
+          type: string
+        context:
+          type: string
+          description: Де прогнано (наприклад на прив'язках певного етапу завдання).
+        report:
+          $ref: '../schemas/handler-result.schema.json#/$defs/TestReport'
+        recorded_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+    ForkRequest:
+      type: object
+      additionalProperties: false
+      required: [new_package_id, from_version]
+      properties:
+        new_package_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+        from_version:
+          $ref: '../schemas/common/defs.schema.json#/$defs/SemVer'
+        initial_version:
+          description: Версія першої версії форку; за замовчуванням дорівнює from_version.
+          $ref: '../schemas/common/defs.schema.json#/$defs/SemVer'
+        title:
+          type: string
+        auto_changes_allowed:
+          type: boolean
+          default: false
+    PackageDiff:
+      type: object
+      required: [from, to, files]
+      properties:
+        from:
+          $ref: '../schemas/common/package-ref.schema.json'
+        to:
+          $ref: '../schemas/common/package-ref.schema.json'
+        manifest_changes:
+          type: array
+          items:
+            type: object
+            required: [pointer, op]
+            properties:
+              pointer:
+                type: string
+              op:
+                type: string
+                enum: [add, remove, replace]
+              old: {}
+              new: {}
+        files:
+          type: array
+          items:
+            type: object
+            required: [path, status]
+            properties:
+              path:
+                type: string
+              status:
+                type: string
+                enum: [added, removed, modified, unchanged]
+              unified_diff:
+                type: string
+              binary:
+                type: boolean
+    UpstreamStatus:
+      type: object
+      required: [fork_of, parent_latest_version, newer_parent_versions]
+      properties:
+        fork_of:
+          $ref: '../schemas/common/package-ref.schema.json'
+        last_ported_version:
+          $ref: '../schemas/common/defs.schema.json#/$defs/SemVer'
+        parent_latest_version:
+          $ref: '../schemas/common/defs.schema.json#/$defs/SemVer'
+        newer_parent_versions:
+          type: array
+          items:
+            $ref: '../schemas/common/defs.schema.json#/$defs/SemVer'
+    UpstreamPortRequest:
+      type: object
+      additionalProperties: false
+      required: [parent_version, new_version]
+      properties:
+        parent_version:
+          $ref: '../schemas/common/defs.schema.json#/$defs/SemVer'
+        base_version:
+          description: Версія форку, до якої застосувати зміни; за замовчуванням остання.
+          $ref: '../schemas/common/defs.schema.json#/$defs/SemVer'
+        new_version:
+          $ref: '../schemas/common/defs.schema.json#/$defs/SemVer'
+  examples:
+    Package:
+      summary: Пакет екстрактора
+      value:
+        package_id: shop-example.product-extractor
+        kind: extractor
+        title: Shop Example product cards
+        latest_version: 1.2.0
+        auto_changes_allowed: true
+        deprecated: false
+        forks_count: 1
+        created_at: '2026-09-20T08:00:00Z'
+        updated_at: '2026-09-27T09:40:00Z'
+    PackageVersion:
+      summary: Версія з маніфестом
+      value:
+        package_id: shop-example.product-extractor
+        version: 1.2.0
+        digest: sha256:0f4c1c8f3e0f6a7d9b2c4e6f8a0b2c4d6e8f0a1b3c5d7e9f1a3b5c7d9e1f3a5b
+        status: approved
+        test_status: passed
+        manifest:
+          schema_version: '1'
+          package_id: shop-example.product-extractor
+          version: 1.2.0
+          kind: extractor
+          title: Shop Example product cards
+          entry:
+            runtime: python
+            module: product_extractor.main
+            callable: extract
+          output:
+            entities:
+              - entity_type: product
+                schema: schemas/product.schema.json
+                key_fields: [sku]
+          dependencies:
+            runtime_profile: python-extractor@1
+            python: ['selectolax>=0.3,<0.4']
+          provenance:
+            created_by: llm
+        files:
+          - path: jane-package.json
+            size_bytes: 1520
+            sha256: 1f2e3d4c5b6a79880f1e2d3c4b5a69788f9e0d1c2b3a49586f7e8d9c0b1a2f3e
+          - path: src/product_extractor/main.py
+            size_bytes: 2210
+            sha256: 2a3b4c5d6e7f80910a1b2c3d4e5f60718a9b0c1d2e3f40516a7b8c9d0e1f2a3b
+        size_bytes: 18422
+        created_at: '2026-09-27T09:40:00Z'
+        created_by: llm
+        status_history:
+          - status: draft
+            at: '2026-09-27T09:40:00Z'
+            by: assistant
+          - status: approved
+            at: '2026-09-27T10:15:00Z'
+            by: admin@example.org
+            reason: tests passed

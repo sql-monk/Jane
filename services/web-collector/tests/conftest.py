@@ -6,6 +6,7 @@ requested (to prove "no cycles", "robots obeyed", "no requests outside the bound
 
 from __future__ import annotations
 
+import sys
 import threading
 from collections.abc import Iterator
 from http.server import ThreadingHTTPServer
@@ -39,10 +40,17 @@ def _recording_handler(site: Site) -> type[TestSiteHandler]:
     return Recording
 
 
+class _QuietServer(ThreadingHTTPServer):
+    def handle_error(self, request: object, client_address: object) -> None:
+        # a collector process killed by a test drops its connections: not a test failure
+        if not isinstance(sys.exc_info()[1], ConnectionError):
+            super().handle_error(request, client_address)  # type: ignore[arg-type]
+
+
 @pytest.fixture
 def site() -> Iterator[Site]:
     holder = Site(base="")
-    server = ThreadingHTTPServer(("127.0.0.1", 0), _recording_handler(holder))
+    server = _QuietServer(("127.0.0.1", 0), _recording_handler(holder))
     server.daemon_threads = True
     holder.base = f"http://127.0.0.1:{server.server_address[1]}"
     thread = threading.Thread(target=server.serve_forever, daemon=True)

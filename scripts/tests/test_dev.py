@@ -166,3 +166,19 @@ def test_pre_commit_hook_blocks_secret(tmp_path: Path) -> None:
     git("add", "leak.txt")
     blocked = git("commit", "-q", "-m", "leak")
     assert blocked.returncode != 0, blocked.stdout + blocked.stderr
+
+
+def test_from_just_keeps_argument_quoting() -> None:
+    assert dev.from_just(["--just", "unit", "unit", "-v", "-k", "not slow"]) == [
+        "unit",
+        "-v",
+        "-k",
+        "not slow",
+    ]
+    assert dev.from_just(["--just", "test", "test", "jane-kit", "-k", "a b"]) == [
+        "test",
+        "jane-kit",
+        "-k",
+        "a b",
+    ]
+    assert dev.from_just(["check", "-v"]) == ["check", "-v"]

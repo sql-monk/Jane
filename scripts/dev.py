@@ -522,6 +522,19 @@ def cmd_gen_client(ns: argparse.Namespace) -> int:
 
 
 # ----------------------------------------------------------------------------- CLI
+def from_just(argv: list[str]) -> list[str]:
+    """``just`` calls ``dev.py --just <recipe line> <recipe name> <args...>`` (see justfile)."""
+    if argv[:1] != ["--just"]:
+        return argv
+    line, rest = argv[1].split(), argv[3:]
+    if line == ["list"]:
+        just = shutil.which("just") or os.environ.get("JUST_EXECUTABLE")
+        if just is None:
+            sys.exit("run `just --list` to see the recipes")
+        sys.exit(subprocess.run([just, "--list", "--unsorted"], cwd=ROOT, check=False).returncode)
+    return line + rest
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="dev", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -584,7 +597,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("spec")
     p.add_argument("out")
 
-    ns, extra = ap.parse_known_args(argv)
+    ns, extra = ap.parse_known_args(from_just(list(sys.argv[1:] if argv is None else argv)))
     extra = [a for a in extra if a != "--"]
     if extra and not ns.takes_pytest_args:
         ap.error(f"unrecognized arguments: {' '.join(extra)}")

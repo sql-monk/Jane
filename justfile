@@ -1,91 +1,93 @@
-# Jane task runner. Install just: `uv tool install rust-just` (or run any recipe via `uvx --from rust-just just <recipe>`).
-# Every recipe is a single call into scripts/dev.py, so the same commands work on Windows and Linux.
+# Jane task runner. Install just: `uv tool install rust-just` (or `uvx --from rust-just just <recipe>`).
+#
+# No shell is involved: every recipe line is handed to scripts/dev.py (stdlib Python) together with
+# the recipe arguments as separate argv items (positional-arguments). So the same commands work on
+# Windows and Linux, and arguments keep their quoting: `just unit -v -k "not slow"`.
 
-set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-Command"]
-set positional-arguments := false
-
-dev := "uv run --no-project --quiet python scripts/dev.py"
+set positional-arguments := true
+set shell := ["uv", "run", "--no-project", "--quiet", "python", "scripts/dev.py", "--just"]
+set windows-shell := ["uv", "run", "--no-project", "--quiet", "python", "scripts/dev.py", "--just"]
 
 # List recipes
 default:
-    @just --list --unsorted
+    @list
 
 # Install/refresh the workspace environment
 sync:
-    {{dev}} sync
+    @sync
 
-# lint + types + unit + contract (+ web when web/* exists) - what CI runs
+# lint + types + unit + contract (+ web when web/* exists) - what CI runs; extra args go to pytest
 check *args:
-    {{dev}} check {{args}}
+    @check
 
 # ruff check, ruff format --check, contracts lint
 lint:
-    {{dev}} lint
+    @lint
 
 # Auto-fix lint issues and format code
 fmt:
-    {{dev}} fmt
+    @fmt
 
 # mypy for every workspace member
 types:
-    {{dev}} types
+    @types
 
-# Unit tests (everything except contract/integration/isolation markers)
+# Unit tests (everything except contract/integration/isolation markers); extra args go to pytest
 unit *args:
-    {{dev}} unit {{args}}
+    @unit
 
-# Contracts lint + contract tests
+# Contracts lint + contract tests; extra args go to pytest
 contract *args:
-    {{dev}} contract {{args}}
+    @contract
 
 # Tests of one service or library, e.g. `just test web-collector` or `just test jane-kit -k limits`
 test target *args:
-    {{dev}} test {{target}} {{args}}
+    @test
 
-# Integration tests (need `just up`)
+# Integration tests against this checkout's stack (`--project <name>` for another one)
 integration *args:
-    {{dev}} integration {{args}}
+    @integration
 
 # Sandbox isolation tests (Linux only; WP-06)
 isolation *args:
-    {{dev}} isolation {{args}}
+    @isolation
 
 # Admin web checks via pnpm (when web/* exists; WP-12)
 web:
-    {{dev}} web
+    @web
 
 # Start the dev stack with a unique compose project (`just up postgres minio` for a subset)
 up *args:
-    {{dev}} up {{args}}
+    @up
 
 # Stop the dev stack (`just down -v` also removes volumes)
 down *args:
-    {{dev}} down {{args}}
+    @down
 
 # Stack status
 ps *args:
-    {{dev}} ps {{args}}
+    @ps
 
 # Stack logs (`just logs postgres`)
 logs *args:
-    {{dev}} logs {{args}}
+    @logs
 
 # Print endpoints and generated credentials of the running stack
 env *args:
-    {{dev}} env {{args}}
+    @env
 
 # Create services/<name> from templates/service
 new-service name:
-    {{dev}} new-service {{name}}
+    @new-service
 
 # Install the git pre-commit hook (gitleaks)
 hooks:
-    {{dev}} hooks
+    @hooks
 
 # Run the test site on http://127.0.0.1:8080
 testsite *args:
-    {{dev}} testsite {{args}}
+    @testsite
 
 # Generate a client package from an OpenAPI contract
 gen-client spec out:
-    {{dev}} gen-client {{spec}} {{out}}
+    @gen-client

@@ -36,6 +36,7 @@ import base64
 import contextlib
 import json
 import re
+import uuid
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -90,9 +91,11 @@ DEFAULT_OPTIONS: dict[str, int] = {
     "pool_max_size": 10,
     "lock_stale_ms": 120_000,
     "retry_max_attempts": 3,
+    "claim_attempts": 3,
 }
 """Safe defaults; overridden by connection params or adapter options (service config ``adapters.*``).
-``lock_stale_ms`` — age after which a delivery claim without its snapshot is a leftover of a crash."""
+``lock_stale_ms`` — age after which a delivery claim without its snapshot is a leftover of a crash;
+``claim_attempts`` — how many times a dead claim is removed and the delivery key claimed again."""
 
 _BUCKET = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 _PREFIX = re.compile(r"^(?!.*(^|/)\.\.(/|$))[A-Za-z0-9._/-]{1,200}$")
@@ -163,6 +166,7 @@ class S3Adapter:
         self._prefix = ""
         self._create_bucket = False
         self._stale = timedelta(milliseconds=DEFAULT_OPTIONS["lock_stale_ms"])
+        self._claim_attempts = DEFAULT_OPTIONS["claim_attempts"]
         self._put_extra: dict[str, str] = {}
 
     # ------------------------------------------------------------------ lifecycle
@@ -227,6 +231,7 @@ class S3Adapter:
         self._region = str(params.get("region") or "us-east-1")
         self._create_bucket = bool(params.get("create_bucket", self.profile.create_bucket))
         self._stale = timedelta(milliseconds=merged["lock_stale_ms"])
+        self._claim_attempts = max(1, merged["claim_attempts"])
         self._put_extra = put_extra
 
     async def close(self) -> None:
@@ -313,6 +318,28 @@ class S3Adapter:
 
     def _delete(self, key: str) -> None:
         self.client.delete_object(Bucket=self._bucket, Key=key)
+
+    def _delete_if(self, key: str, etag: str) -> None:
+        """Delete ``key`` only while its ETag is ``etag`` (``If-Match`` on DeleteObject). A 412 means the
+        document was replaced by another writer: it is left alone. Servers without conditional deletes
+        either ignore the header (MinIO) or reject it — then the delete is unconditional (a narrow race,
+        see README "Обмеження")."""
+        try:
+            self.client.delete_object(Bucket=self._bucket, Key=key, IfMatch=etag)
+        except ClientError as exc:
+            code, status = _code(exc)
+            if code in _MISSING or status in {404, 412} or code == "PreconditionFailed":
+                return
+            if status in {400, 501} or code in {"NotImplemented", "InvalidArgument", "InvalidRequest"}:
+                self._delete(key)
+                return
+            raise
+
+    def _delete_own_claim(self, key: str, claim_id: str) -> None:
+        """Compensation: remove the delivery claim only if it is still the one this call wrote."""
+        got = self._get_json(key)
+        if got is not None and got[0].get("claim_id") == claim_id:
+            self._delete_if(key, got[1])
 
     def _keys(self, prefix: str, start_after: str | None) -> Iterator[str]:
         kwargs: dict[str, Any] = {"Bucket": self._bucket, "Prefix": prefix}
@@ -533,10 +560,18 @@ class S3Adapter:
 
     def _delivery_state(self, key: str) -> tuple[str, DeliveryRecord | None]:
         """``missing`` | ``complete`` | ``in_flight`` (a commit may still finish) | ``dead`` (never will)."""
+        state, record, _ = self._claim_state(key)
+        return state, record
+
+    def _claim_state(self, key: str) -> tuple[str, DeliveryRecord | None, tuple[dict[str, Any], str] | None]:
+        """:meth:`_delivery_state` plus the claim document and its ETag."""
         got = self._get_json(key)
         if got is None:
-            return "missing", None
-        doc = got[0]
+            return "missing", None, None
+        state, record = self._judge_claim(got[0])
+        return state, record, got
+
+    def _judge_claim(self, doc: Mapping[str, Any]) -> tuple[str, DeliveryRecord | None]:
         try:
             record = delivery_from_json(doc)
         except (KeyError, TypeError, ValueError):
@@ -568,6 +603,34 @@ class S3Adapter:
             return "dead", record
         return "complete", record
 
+    def _applied(self, new: EntitySnapshot, event: HistoryEvent) -> bool:
+        """Whether the snapshot CAS of this very commit already took effect (its response may have been
+        lost and botocore retried the conditional PUT, which then fails with 412 against our own write)."""
+        got = self._get_json(self._snap_key(new.entity_type, new.canonical_key))
+        if got is None or int(got[0]["version"]) < new.version:
+            return False
+        pending = got[0].get("pending")
+        if isinstance(pending, Mapping) and int(pending["version"]) == new.version:
+            return bool(pending.get("delivery_key") == event.delivery_key)
+        hist = self._get_json(self._hist_key(new.entity_type, new.canonical_key, new.version))
+        return hist is not None and hist[0].get("delivery_key") == event.delivery_key
+
+    def _claim(self, dkey: str, claim: dict[str, Any]) -> CommitOutcome | None:
+        """Claim the delivery key; None = claimed by this call, otherwise DUPLICATE / CONFLICT."""
+        for _ in range(self._claim_attempts):
+            if self._put(dkey, dumps(claim), create=True) is not None:
+                return None
+            state, _, got = self._claim_state(dkey)
+            if got is not None and got[0].get("claim_id") == claim["claim_id"]:
+                return None  # our own PUT was applied, its response lost and the request retried
+            if state == "complete":
+                return CommitOutcome.DUPLICATE
+            if state == "in_flight":
+                return CommitOutcome.CONFLICT
+            if state == "dead" and got is not None:
+                self._delete_if(dkey, got[1])
+        return CommitOutcome.CONFLICT
+
     def _commit(self, new: EntitySnapshot, expected: int | None, event: HistoryEvent) -> CommitResult:
         dkey = self._delivery_key(event.delivery_key)
         claim = delivery_to_json(
@@ -576,21 +639,13 @@ class S3Adapter:
             )
         )
         claim["claimed_at"] = format_ts(utcnow())
-        for _ in range(3):
-            if self._put(dkey, dumps(claim), create=True) is not None:
-                break
-            state, _ = self._delivery_state(dkey)
-            if state == "complete":
-                return CommitResult(
-                    CommitOutcome.DUPLICATE, self._read_entity(new.entity_type, new.canonical_key)
-                )
-            if state == "in_flight":
-                return CommitResult(
-                    CommitOutcome.CONFLICT, self._read_entity(new.entity_type, new.canonical_key)
-                )
-            if state == "dead":
-                self._delete(dkey)
-        else:
+        claim["claim_id"] = uuid.uuid4().hex
+        refused = self._claim(dkey, claim)
+        if refused is not None:
+            return CommitResult(refused, self._read_entity(new.entity_type, new.canonical_key))
+
+        def conflict() -> CommitResult:
+            self._delete_own_claim(dkey, claim["claim_id"])  # compensation: nothing else was written
             return CommitResult(CommitOutcome.CONFLICT, self._read_entity(new.entity_type, new.canonical_key))
 
         skey = self._snap_key(new.entity_type, new.canonical_key)
@@ -599,8 +654,7 @@ class S3Adapter:
         if current is not None and int(current[0]["version"]) == expected:
             etag = self._roll_forward(*current)
         if (current is None) != (expected is None) or (current is not None and etag is None):
-            self._delete(dkey)  # compensation: nothing else was written
-            return CommitResult(CommitOutcome.CONFLICT, self._read_entity(new.entity_type, new.canonical_key))
+            return conflict()
         doc = snapshot_to_json(new)
         doc["pending"] = event_to_json(event, new.version)
         body = dumps(doc)
@@ -608,11 +662,15 @@ class S3Adapter:
             self._put(skey, body, if_match=etag) if etag is not None else self._put(skey, body, create=True)
         )
         if written is None:
-            self._delete(dkey)
-            return CommitResult(CommitOutcome.CONFLICT, self._read_entity(new.entity_type, new.canonical_key))
-        with contextlib.suppress(ClientError, BotoCoreError, OSError):
-            # committed; rolling forward now only saves readers the work
-            self._roll_forward(doc, written)
+            if not self._applied(new, event):
+                return conflict()
+            # our CAS took effect (the 412 answered botocore's retry of it): committed, keep the claim
+            got = self._get_json(skey)
+            written = got[1] if got is not None and isinstance(got[0].get("pending"), Mapping) else None
+        if written is not None:
+            with contextlib.suppress(ClientError, BotoCoreError, OSError):
+                # committed; rolling forward now only saves readers the work
+                self._roll_forward(doc, written)
         return CommitResult(CommitOutcome.COMMITTED, new)
 
     async def commit_entity(
@@ -702,14 +760,17 @@ class S3Adapter:
         key = self._delivery_key(record.delivery_key)
         doc = delivery_to_json(record)
         doc["claimed_at"] = format_ts(utcnow())
-        for _ in range(3):
+        doc["claim_id"] = uuid.uuid4().hex
+        for _ in range(self._claim_attempts):
             if self._put(key, dumps(doc), create=True) is not None:
                 return True
-            state, _ = self._delivery_state(key)
+            state, _, got = self._claim_state(key)
+            if got is not None and got[0].get("claim_id") == doc["claim_id"]:
+                return True  # our PUT was applied, the response lost and the request retried
             if state in {"complete", "in_flight"}:
                 return False
-            if state == "dead":
-                self._delete(key)
+            if state == "dead" and got is not None:
+                self._delete_if(key, got[1])
         return False
 
     async def record_delivery(self, record: DeliveryRecord) -> bool:

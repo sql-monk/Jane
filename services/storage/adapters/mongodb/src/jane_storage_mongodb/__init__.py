@@ -13,7 +13,8 @@ Collections in ``params.database`` with ``<prefix>`` (default ``jane_``):
 Multi-document transactions need a replica set; the adapter does not, so a standalone ``mongod`` works.
 Atomicity of ``commit_entity`` comes from single-document operations:
 
-1. ``deliveries`` has the key, or the stored snapshot has it in ``pending`` → ``DUPLICATE``;
+1. the stored snapshot has the key in ``pending``, or ``deliveries`` has it → ``DUPLICATE`` (read in this
+   order: the roll-forward inserts the delivery record before it drops ``pending``);
 2. compare-and-swap of the snapshot document — ``replace_one({_id, version: expected})`` or
    ``insert_one`` for a new entity (duplicate ``_id`` → ``CONFLICT``). The replacement carries the
    history event and the delivery acknowledgement in ``pending``, so the snapshot write is the single
@@ -383,20 +384,29 @@ class MongoAdapter:
             {"$unset": {"pending": ""}},
         )
 
+    async def _delivery_doc(self, delivery_key: str) -> dict[str, Any] | None:
+        doc = await self._col("deliveries").find_one({"_id": key_digest(delivery_key)})
+        return doc if doc is not None and doc.get("delivery_key") == delivery_key else None
+
     async def commit_entity(
         self, *, new: EntitySnapshot, expected_version: int | None, event: HistoryEvent
     ) -> CommitResult:
         entities = self._col("entities")
         eid = self._entity_id(new.entity_type, new.canonical_key)
         with _errors():
-            if await self._col("deliveries").find_one({"_id": key_digest(event.delivery_key)}, {"_id": 1}):
+            # Order matters: the snapshot first, then ``deliveries``. The roll-forward inserts the delivery
+            # record before it drops ``pending``, so a key committed by another instance is always seen in
+            # one of the two reads (the reverse order has a window where it is in neither).
+            current = await entities.find_one({"_id": eid})
+            pending = None if current is None else current.get("pending")
+            if isinstance(pending, Mapping) and pending.get("delivery_key") == event.delivery_key:
+                assert current is not None
+                return CommitResult(CommitOutcome.DUPLICATE, snapshot_from_json(current))
+            if await self._delivery_doc(event.delivery_key) is not None:
                 return CommitResult(
                     CommitOutcome.DUPLICATE, await self.read_entity(new.entity_type, new.canonical_key)
                 )
-            current = await entities.find_one({"_id": eid})
             if current is not None and isinstance(current.get("pending"), Mapping):
-                if current["pending"].get("delivery_key") == event.delivery_key:
-                    return CommitResult(CommitOutcome.DUPLICATE, snapshot_from_json(current))
                 await self._roll_forward(current)
             current_version = None if current is None else int(current["version"])
             if current_version != expected_version:
@@ -485,12 +495,11 @@ class MongoAdapter:
     # ------------------------------------------------------------------ deliveries
     async def get_delivery(self, delivery_key: str) -> DeliveryRecord | None:
         with _errors():
-            doc = await self._col("deliveries").find_one({"_id": key_digest(delivery_key)})
-            if doc is not None and doc.get("delivery_key") == delivery_key:
-                return delivery_from_json(doc)
+            # pending first, then deliveries: see the comment in commit_entity
             pending = await self._col("entities").find_one({"pending.delivery_key": delivery_key})
-        if pending is None:
-            return None
+            if pending is None:
+                doc = await self._delivery_doc(delivery_key)
+                return None if doc is None else delivery_from_json(doc)
         with contextlib.suppress(AdapterError), _errors():
             await self._roll_forward(
                 pending

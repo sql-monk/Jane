@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|---|
 | 00 | Архітектура й контракти | 0 | accepted | `wp/00-architecture-contracts` | агент / wp-reviewer (2 раунди) | злито `e2714ec` |
 | 01 | Каркас, CI, dev-стек | 0 | accepted | `wp/01-scaffold-ci` | агент / wp-reviewer (2 раунди + інтеграційне виправлення) | злито `4468cee` |
-| 02 | Web Collector: ядро | 1 | review | `wp/02-web-collector-core` | агент / wp-reviewer | |
+| 02 | Web Collector: ядро | 1 | active | `wp/02-web-collector-core` | агент / wp-reviewer | виправлення після рев'ю 1 (lease, тайм-аути) |
 | 03 | Web Collector: стратегії пошуку | 1 | — | | | після M0 |
 | 04 | Telegram Collector | 1 | — | | | після M0 |
 | 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент | слот 2 |
@@ -55,3 +55,4 @@
 | WP-02 | WP-00 | чи викликає ядро `on_fetched` для не-2xx і чи ділиться ресурсом `ctx.fetch`; конвенція `params` для підключень `kind=http` | зміна контракту через contract-guardian |
 | WP-02 | WP-01 | `contracts/python` у uv workspace (зараз path-залежність) | необов'язково |
 | WP-07 рев'ю | WP-00 | `default` формату в `package-manifest.schema.json` узгодити з описом і ТЗ §5 | зміна контракту через contract-guardian |
+- 2026-09-27 — WP-06 і WP-02 повернуто після рев'ю 1 (кілька екземплярів, контракт connections, lease/fencing, тайм-аути з рівнів лімітів). WP-07 — рев'ю 2.

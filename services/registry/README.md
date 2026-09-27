@@ -205,11 +205,17 @@ uv run --package jane-registry jane-registry verify ./export/shop.product-extrac
 import httpx
 
 with httpx.Client(base_url="http://localhost:8105", headers={"Authorization": "Bearer <ключ>"}) as c:
-    c.post("/v1/packages", json={"package_id": "acme.rules", "kind": "collector-rules", "title": "ACME"},
-           headers={"Idempotency-Key": "create-acme.rules"})
+    c.post(
+        "/v1/packages",
+        json={"package_id": "acme.rules", "kind": "collector-rules", "title": "ACME"},
+        headers={"Idempotency-Key": "create-acme.rules"},
+    )
     with open("acme-rules.zip", "rb") as f:
-        v = c.post("/v1/packages/acme.rules/versions", content=f.read(),
-                   headers={"Content-Type": "application/zip", "Idempotency-Key": "acme.rules@1.0.0"}).json()
+        v = c.post(
+            "/v1/packages/acme.rules/versions",
+            content=f.read(),
+            headers={"Content-Type": "application/zip", "Idempotency-Key": "acme.rules@1.0.0"},
+        ).json()
     archive = c.get(f"/v1/packages/acme.rules/versions/{v['version']}/archive")
     assert archive.headers["etag"].strip('"') == v["digest"]
 ```

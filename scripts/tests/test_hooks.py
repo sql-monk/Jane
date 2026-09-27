@@ -136,8 +136,10 @@ def test_hooks_never_fail_on_bad_input() -> None:
 
 
 def test_format_hook_formats_python_and_reports_leftovers(
-    repo: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    repo = tmp_path
+    (repo / ".git").mkdir()  # the hook only needs a checkout root marker; no git binary required
     ruff = shutil.which("ruff") or shutil.which("ruff", path=str(Path(sys.executable).parent))
     if ruff is None:
         pytest.skip("ruff not found (uv sync)")

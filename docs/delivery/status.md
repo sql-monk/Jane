@@ -15,7 +15,7 @@
 | 08 | Адаптери збереження | 1 | active | `wp/08-storage-adapters` | агент / wp-reviewer | виправлення після рев'ю 1 (дублі історії: s3 412, mongodb гонка) |
 | 09 | Оркестратор | 1 | active | `wp/09-orchestrator` | агент / wp-reviewer | виправлення після рев'ю 1 (cancelling, retries, overlap) |
 | 10 | LLM-шлюз і LLM-обробник | 1 | review | `wp/10-llm` | агент / wp-reviewer | рев'ю 2 |
-| 11 | Асистент джерел | 1 | active | `wp/11-assistant` | агент / wp-reviewer | виправлення після рев'ю 1 (кілька екземплярів) |
+| 11 | Асистент джерел | 1 | review | `wp/11-assistant` | агент / wp-reviewer | рев'ю 2 |
 | 12 | Адмінка | 1 | active | `wp/12-admin` | агент | слот 3 |
 | 13 | Інтеграція й приймання | 2 | active | `wp/13-acceptance` | агент | фаза 1: матриця, сценарії, каркас e2e |
 | 14 | Профілі лімітів і експлуатація | 2 | — | | | після M1 |
@@ -87,3 +87,4 @@
 - 2026-09-27 — WP-08 на рев'ю; запущено WP-13 (фаза 1).
 - 2026-09-27 — WP-08 повернуто після рев'ю 1: дубль історії в s3/minio (компенсація на 412) і mongodb (гонка двох екземплярів); схему `pending` визнано коректною.
 - 2026-09-27 — WP-05 повернуто після рев'ю 1 (відновлення ключів/job після падіння, прогалини secret_detected); рішення: `registry:approve` для `auto_changes_allowed` false→true. WP-10 — рев'ю 2.
+| WP-11 | WP-01 | перенести PostgreSQL-реалізації `JobStore`/`IdempotencyStore` (з lease) у jane-kit — зараз дубльовані в handler-runtime, assistant, registry, llm | після M2, окреме доручення |

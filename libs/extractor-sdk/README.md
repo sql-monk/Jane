@@ -11,15 +11,17 @@ SDK для авторів Python-екстракторів Jane: типи й по
 ```python
 from jane_extractor_sdk import Context, ExtractResult, Material, empty, entity, success, unrecognized
 
+
 def extract(material: Material, params: dict, ctx: Context) -> ExtractResult:
-    html = ctx.text()                      # вміст (inline чи blob) уже завантажено й перевірено runtime
+    html = ctx.text()  # вміст (inline чи blob) уже завантажено й перевірено runtime
     if "product" not in html:
-        return empty()                     # коректна відсутність сутностей
+        return empty()  # коректна відсутність сутностей
     sku, price = parse(html)
     if price is None:
         ctx.log.warning("price not found", code="extract.missing_selector", selector=".price")
-        return unrecognized("no price", signature="missing-selector:.price",
-                            entities=[entity("product", {"sku": sku})])   # partial = True
+        return unrecognized(
+            "no price", signature="missing-selector:.price", entities=[entity("product", {"sku": sku})]
+        )  # partial = True
     return success([entity("product", {"sku": sku, "price": {"amount": price, "currency": "UAH"}})])
 ```
 
@@ -67,8 +69,10 @@ from jane_extractor_sdk.testing import assert_package_tests_pass, run_local
 
 PKG = Path(__file__).parents[1]
 
+
 def test_manifest_tests():
-    assert_package_tests_pass(PKG)          # tests маніфесту: статус + expected (exact/subset)
+    assert_package_tests_pass(PKG)  # tests маніфесту: статус + expected (exact/subset)
+
 
 def test_one_page():
     assert run_local(PKG, file=PKG / "tests/p/page.html", media_type="text/html")["status"] == "success"

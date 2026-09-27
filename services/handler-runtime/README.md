@@ -190,14 +190,25 @@ from jane_extractor_sdk.package import build_archive, material_from_file
 
 archive = build_archive(Path("my-package"))
 body = {
-    "handler": {"package_id": "testsite.product-extractor", "version": "1.0.0",
-                "digest": "sha256:" + hashlib.sha256(archive).hexdigest()},
-    "package_archive": {"kind": "inline", "media_type": "application/zip", "encoding": "base64",
-                        "data": base64.b64encode(archive).decode()},
-    "inputs": [{"kind": "material", "material": material_from_file(Path("page.html"), media_type="text/html")}],
+    "handler": {
+        "package_id": "testsite.product-extractor",
+        "version": "1.0.0",
+        "digest": "sha256:" + hashlib.sha256(archive).hexdigest(),
+    },
+    "package_archive": {
+        "kind": "inline",
+        "media_type": "application/zip",
+        "encoding": "base64",
+        "data": base64.b64encode(archive).decode(),
+    },
+    "inputs": [
+        {"kind": "material", "material": material_from_file(Path("page.html"), media_type="text/html")}
+    ],
     "delivery": {"delivery_key": "my-app-0001"},
 }
-r = httpx.post("http://127.0.0.1:8106/v1/invocations", json=body, headers={"Idempotency-Key": "my-app-0001"}, timeout=60)
+r = httpx.post(
+    "http://127.0.0.1:8106/v1/invocations", json=body, headers={"Idempotency-Key": "my-app-0001"}, timeout=60
+)
 print(r.json()["status"], r.json()["output"])
 ```
 

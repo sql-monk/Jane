@@ -29,7 +29,8 @@ def client(subprocess_settings: Settings) -> Iterator[TestClient]:
 
 def post(client: TestClient, body: dict[str, Any], key: str | None = None) -> httpx.Response:
     key = key or body["delivery"]["delivery_key"]
-    return client.post("/v1/invocations", json=body, headers={"Idempotency-Key": key})
+    response: httpx.Response = client.post("/v1/invocations", json=body, headers={"Idempotency-Key": key})
+    return response
 
 
 def wait_job(client: TestClient, job_id: str, timeout: float = 60) -> dict[str, Any]:
@@ -165,13 +166,14 @@ def test_timeout_in_subprocess_backend(client: TestClient, h: Any) -> None:
 
 
 def test_async_mode_returns_job(client: TestClient, h: Any) -> None:
-    r = post(client, h.invocation(h.example, h.product_material(), key="a", mode="async"))
+    body = h.invocation(h.example, h.product_material(), key="a", mode="async")
+    r = post(client, body)
     assert r.status_code == 202
     assert r.headers["Location"] == f"/v1/jobs/{r.json()['job_id']}"
     job = wait_job(client, r.json()["job_id"])
     assert job["status"] == "succeeded"
     assert job["result"]["status"] == "success"
-    again = post(client, h.invocation(h.example, h.product_material(), key="a", mode="async"))
+    again = post(client, body)
     assert again.status_code == 200 and again.json()["duplicate"] is True
 
 

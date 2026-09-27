@@ -1,0 +1,3 @@
+- Запуск: `uv run --package jane-llm python -m jane_llm` (або Docker, див. README.md).
+- Тести: `just test llm` (інтеграційні: `-m integration` після `just up`).
+- Контракт: `contracts/openapi/llm.v1.yaml` (+ `contracts/openapi/common.yaml`); конвенції — скіл `jane-contracts`.

@@ -10,6 +10,7 @@ resolution-markers = [
 [manifest]
 members = [
     "jane-kit",
+    "jane-llm",
     "jane-storage",
     "jane-storage-files",
     "jane-storage-postgres",
@@ -540,6 +541,17 @@ requires-dist = [
     { name = "referencing", specifier = ">=0.35" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
+
+[[package]]
+name = "jane-llm"
+version = "0.1.0"
+source = { editable = "services/llm" }
+dependencies = [
+    { name = "jane-kit" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "jane-kit", editable = "libs/jane-kit" }]
 
 [[package]]
 name = "jane-storage"

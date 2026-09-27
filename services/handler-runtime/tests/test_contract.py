@@ -14,9 +14,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from jane_kit.contracts import ContractClient, OpenAPISpec, contracts_dir
 from jane_handler_runtime.app import build_app
 from jane_handler_runtime.settings import Settings
+from jane_kit.contracts import ContractClient, OpenAPISpec, contracts_dir
 
 pytestmark = pytest.mark.contract
 

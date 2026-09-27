@@ -1,0 +1,3 @@
+- Запуск: `uv run --package jane-storage python -m jane_storage` (або Docker, див. README.md).
+- Тести: `just test storage` (інтеграційні: `-m integration` після `just up`).
+- Контракт: `contracts/openapi/storage.v1.yaml` (+ `contracts/openapi/common.yaml`); конвенції — скіл `jane-contracts`.

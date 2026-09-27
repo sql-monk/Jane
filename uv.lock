@@ -10,6 +10,8 @@ resolution-markers = [
 [manifest]
 members = [
     "jane-kit",
+    "jane-storage",
+    "jane-storage-files",
     "jane-template-service",
     "jane-testsite",
 ]
@@ -465,6 +467,11 @@ wheels = [
 ]
 
 [[package]]
+name = "jane-contracts"
+version = "1.0.0"
+source = { editable = "contracts/python" }
+
+[[package]]
 name = "jane-kit"
 version = "0.1.0"
 source = { editable = "libs/jane-kit" }
@@ -491,6 +498,47 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.35" },
     { name = "uvicorn", specifier = ">=0.32" },
+]
+
+[[package]]
+name = "jane-storage"
+version = "0.1.0"
+source = { editable = "services/storage" }
+dependencies = [
+    { name = "boto3" },
+    { name = "jane-contracts" },
+    { name = "jane-kit" },
+]
+
+[package.optional-dependencies]
+compat = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "boto3", specifier = ">=1.35" },
+    { name = "jane-contracts", editable = "contracts/python" },
+    { name = "jane-kit", editable = "libs/jane-kit" },
+    { name = "pytest", marker = "extra == 'compat'", specifier = ">=8.3" },
+    { name = "pytest-asyncio", marker = "extra == 'compat'", specifier = ">=0.24" },
+]
+provides-extras = ["compat"]
+
+[[package]]
+name = "jane-storage-files"
+version = "0.1.0"
+source = { editable = "services/storage/adapters/files" }
+dependencies = [
+    { name = "jane-contracts" },
+    { name = "jane-storage" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jane-contracts", editable = "contracts/python" },
+    { name = "jane-storage", editable = "services/storage" },
 ]
 
 [[package]]

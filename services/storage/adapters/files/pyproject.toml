@@ -1,0 +1,28 @@
+[project]
+name = "jane-storage-files"
+version = "0.1.0"
+description = "Filesystem adapter of the Jane storage handler (RAW as files, entities as JSON documents)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "jane-storage",
+    "jane-contracts",
+]
+
+# Registration in the storage core (see services/storage/README.md, "Адаптери").
+[project.entry-points."jane.storage.adapters"]
+filesystem = "jane_storage_files:FilesystemAdapter"
+
+[project.entry-points."jane.storage.packages"]
+"jane.storage-files" = "jane_storage_files:package_dir"
+
+[tool.uv.sources]
+jane-storage = { path = "../..", editable = true }
+jane-contracts = { path = "../../../../contracts/python", editable = true }
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jane_storage_files"]

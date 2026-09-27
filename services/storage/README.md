@@ -71,11 +71,15 @@ body = {
     "inputs": [{"kind": "material", "material": material}],
     "delivery": {"delivery_key": "my-app:obs_01J9ZQ4A0000000000000001"},
 }
-r = httpx.post("http://localhost:8107/v1/invocations", json=body,
-               headers={"Idempotency-Key": body["delivery"]["delivery_key"]})
-ack = r.json()["output"]["writes"][0]      # status: written | duplicate, object.locator.path = …/obs_….html
-entities = httpx.get("http://localhost:8107/v1/entities",
-                     params={"connection_id": "results-pg", "entity_type": "product"}).json()
+r = httpx.post(
+    "http://localhost:8107/v1/invocations",
+    json=body,
+    headers={"Idempotency-Key": body["delivery"]["delivery_key"]},
+)
+ack = r.json()["output"]["writes"][0]  # status: written | duplicate, object.locator.path = …/obs_….html
+entities = httpx.get(
+    "http://localhost:8107/v1/entities", params={"connection_id": "results-pg", "entity_type": "product"}
+).json()
 ```
 
 Заміна сховища — лише в конфігурації етапу завдання (`handler.package_id` і `connections.target`), наприклад
@@ -148,19 +152,23 @@ jane-contracts = { path = "../../../../contracts/python", editable = true }
 import pytest
 from jane_storage.compat import AdapterCompatSuite, CompatTarget
 
-pytestmark = pytest.mark.integration          # якщо потрібен dev-стек
+pytestmark = pytest.mark.integration  # якщо потрібен dev-стек
+
 
 class MongoTarget(CompatTarget):
     kind = "mongodb"
-    def connection(self): ...                 # ResolvedConnection до порожнього ізольованого простору (база/префікс на тест)
-    def unavailable_connection(self): ...     # той самий kind, сховище недосяжне (C-16)
-    async def cleanup(self): ...              # прибрати простір після тесту
+
+    def connection(self): ...  # ResolvedConnection до порожнього ізольованого простору (база/префікс на тест)
+    def unavailable_connection(self): ...  # той самий kind, сховище недосяжне (C-16)
+    async def cleanup(self): ...  # прибрати простір після тесту
+
 
 class TestMongoCompat(AdapterCompatSuite):
     @pytest.fixture
     def compat_target(self):
-        stack = load_stack()                  # jane_kit.devstack
-        if stack is None: pytest.skip("dev stack is not running")
+        stack = load_stack()  # jane_kit.devstack
+        if stack is None:
+            pytest.skip("dev stack is not running")
         return MongoTarget(stack)
 ```
 

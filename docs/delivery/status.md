@@ -8,7 +8,7 @@
 | 01 | Каркас, CI, dev-стек | 0 | accepted | `wp/01-scaffold-ci` | агент / wp-reviewer (2 раунди + інтеграційне виправлення) | злито `4468cee` |
 | 02 | Web Collector: ядро | 1 | review | `wp/02-web-collector-core` | агент / wp-reviewer | рев'ю 2 |
 | 03 | Web Collector: стратегії пошуку | 1 | — | | | після M0 |
-| 04 | Telegram Collector | 1 | — | | | після M0 |
+| 04 | Telegram Collector | 1 | active | `wp/04-telegram-collector` | агент | слот 3 |
 | 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент | слот 2 |
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
@@ -16,7 +16,7 @@
 | 09 | Оркестратор | 1 | review | `wp/09-orchestrator` | агент / wp-reviewer | M1-base `c6ba650` |
 | 10 | LLM-шлюз і LLM-обробник | 1 | review | `wp/10-llm` | агент / wp-reviewer | |
 | 11 | Асистент джерел | 1 | review | `wp/11-assistant` | агент / wp-reviewer | |
-| 12 | Адмінка | 1 | — | | | після M0 |
+| 12 | Адмінка | 1 | active | `wp/12-admin` | агент | слот 3 |
 | 13 | Інтеграція й приймання | 2 | — | | | |
 | 14 | Профілі лімітів і експлуатація | 2 | — | | | після M1 |
 
@@ -70,3 +70,4 @@
 | WP-11 | WP-00 | поле пропозиції в `ImprovementResult` при `proposal_only`; `llm.min_onboarding_confidence`; де клієнт бере `session_id` з 202 Job | зміна контракту через contract-guardian |
 | WP-11 | WP-01 / координатор | асистент (і нові сервіси) у compose і proxy | відкрито |
 - 2026-09-27 — другий ліміт сесії перервав WP-05, WP-08 і рев'ю WP-02/WP-09; відновлено. WP-06 прийнято (2 раунди) і злито; main зелений, gitleaks 0. WP-10 і WP-11 на рев'ю.
+- 2026-09-27 — запущено WP-04 і WP-12.

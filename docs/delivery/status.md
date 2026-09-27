@@ -12,7 +12,7 @@
 | 05 | Репозиторій обробників | 1 | review | `wp/05-registry` | агент / wp-reviewer | |
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
-| 08 | Адаптери збереження | 1 | review | `wp/08-storage-adapters` | агент / wp-reviewer | відхилення від порядку запису для об'єктних сховищ — оцінює рев'ю |
+| 08 | Адаптери збереження | 1 | active | `wp/08-storage-adapters` | агент / wp-reviewer | виправлення після рев'ю 1 (дублі історії: s3 412, mongodb гонка) |
 | 09 | Оркестратор | 1 | active | `wp/09-orchestrator` | агент / wp-reviewer | виправлення після рев'ю 1 (cancelling, retries, overlap) |
 | 10 | LLM-шлюз і LLM-обробник | 1 | active | `wp/10-llm` | агент / wp-reviewer | виправлення після рев'ю 1 (ін'єкція в retry_hint, secret_refs) |
 | 11 | Асистент джерел | 1 | active | `wp/11-assistant` | агент / wp-reviewer | виправлення після рев'ю 1 (кілька екземплярів) |
@@ -85,3 +85,4 @@
 | WP-08 | WP-07 | `chunk_bytes`, `retry_max_attempts` у `ServiceLimits.adapters` | необов'язково |
 | WP-08 | координатор / WP-01 | CI: сервіси `sqlserver mongodb minio s3` для інтеграційних тестів адаптерів | відкрито |
 - 2026-09-27 — WP-08 на рев'ю; запущено WP-13 (фаза 1).
+- 2026-09-27 — WP-08 повернуто після рев'ю 1: дубль історії в s3/minio (компенсація на 412) і mongodb (гонка двох екземплярів); схему `pending` визнано коректною.

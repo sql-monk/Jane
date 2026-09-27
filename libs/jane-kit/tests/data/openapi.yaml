@@ -1,0 +1,112 @@
+openapi: 3.1.0
+info:
+  title: Sample Service
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+paths:
+  /v1/items:
+    post:
+      operationId: createItem
+      summary: Create an item
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ItemCreate" }
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Item" }
+              example: { id: "i-1", name: "first", tags: [] }
+        "422":
+          $ref: "#/components/responses/Problem"
+    get:
+      operationId: listItems
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Item" }
+  /v1/items/{item_id}:
+    get:
+      operationId: getItem
+      parameters:
+        - name: item_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: item
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Item" }
+              examples:
+                basic: { value: { id: "i-1", name: "first", tags: ["a"] } }
+                other: { value: { id: "i-2", name: "second", tags: [] } }
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/jobs/{job_id}:
+    get:
+      operationId: getJob
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: job
+          content:
+            application/json:
+              schema: { $ref: "schemas/job.yaml" }
+components:
+  responses:
+    Problem:
+      description: error
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+  schemas:
+    ItemCreate:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1 }
+        tags: { type: array, items: { type: string } }
+    Item:
+      type: object
+      required: [id, name, tags]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        tags: { type: array, items: { type: string } }
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string }

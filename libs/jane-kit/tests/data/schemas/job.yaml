@@ -1,0 +1,11 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+required: [job_id, state]
+properties:
+  job_id: { type: string }
+  state:
+    enum: [queued, running, succeeded, failed, cancelled]
+  progress:
+    type: [number, "null"]
+    minimum: 0
+    maximum: 1

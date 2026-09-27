@@ -115,7 +115,7 @@ just down -v --project jane-wp10
 через API вони не проходять і в БД не зберігаються; `params`, схожі на секрети, відхиляються (`secret_detected`).
 `POST /v1/connections/{id}/test` показує `secrets_resolved` без значень.
 
-- **`anthropic`** — Anthropic Messages API через офіційний SDK `anthropic`: `params.api_base` (необов'язково),
+- **`anthropic`** — Anthropic Messages API (`POST {api_base}/v1/messages` через httpx; офіційний SDK 1.x тягне `httpx2`, що в спільному uv workspace перемикає `TestClient` усіх сервісів — тому не використано): `params.api_base` (необов'язково),
   `secret_refs.api_key`; структурований вихід — `output_config.format` (JSON Schema) для моделей з
   `supports_structured_output`. Моделі й ціни за замовчуванням — з конфігурації (seed), приклад:
   `claude-opus-5` ($5/$25 за 1M токенів), `claude-haiku-4-5` ($1/$5). **Не перевірено на реальному сервісі**

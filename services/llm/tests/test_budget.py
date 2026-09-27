@@ -102,7 +102,8 @@ def test_request_budget_only_narrows(client: TestClient, fake: Any, h: Any) -> N
     tight = {"budget": {"amount": 0.6, "currency": "USD", "period": "day"}}
     first = _task_call(client, h, limits=tight)
     assert first.status_code == 200
-    assert _task_call(client, h, limits=tight).status_code == 429  # 0.6 USD fits one call (estimate ~0.41, actual ~0.27)
+    # 0.6 USD fits one call only (estimate ~0.41, actual ~0.27)
+    assert _task_call(client, h, limits=tight).status_code == 429
     loose = {"budget": {"amount": 1000, "currency": "USD", "period": "day"}}
     assert _task_call(client, h, limits=loose).status_code == 200  # stored 5 USD still applies (min)
 

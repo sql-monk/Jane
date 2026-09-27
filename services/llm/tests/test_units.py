@@ -146,7 +146,8 @@ def test_store_reservation_semantics() -> None:
     # A reservation of a crashed instance is charged at its estimate once stale.
     store.reserve("r4", 0.5, [_check(1.0)], [], now - timedelta(hours=1), ttl)
     store.reserve("r5", 0.1, [_check(1.0)], [], now, ttl)
-    assert store.counter(CounterKey("task", "t", "k")) == (pytest.approx(0.7), pytest.approx(0.1))
+    spent, reserved = store.counter(CounterKey("task", "t", "k"))
+    assert (spent, reserved) == pytest.approx((0.7, 0.1))
 
 
 def test_store_rate_limit() -> None:

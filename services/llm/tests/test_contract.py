@@ -133,11 +133,9 @@ def test_handler_api_matches_contract(client: TestClient, h: Any) -> None:
     assert api.get("/v1/connections/nope").status_code == 404
 
     material = PACKAGE_DIR / "tests" / "concert" / "material.json"
-    inv = {
+    inv: dict[str, Any] = {
         "handler": {"package_id": "jane.llm-event-extractor", "version": "1.0.0"},
-        "inputs": [
-            {"kind": "material", "material": json.loads(material.read_text(encoding="utf-8"))}
-        ],
+        "inputs": [{"kind": "material", "material": json.loads(material.read_text(encoding="utf-8"))}],
         "context": {"trace": {"source_id": "news-tg", "task_id": "events"}, "test_mode": True},
         "delivery": {"delivery_key": "c-1"},
     }

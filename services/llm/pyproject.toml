@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "jane-kit",
-    "anthropic>=1.0",
     "jsonschema>=4.23",
     "psycopg[binary]>=3.2",
     "psycopg-pool>=3.2",

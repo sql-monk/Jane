@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContentRef",
+  "description": "Вміст матеріалу або великого результату: або вбудований (kind=inline, до limits.transfer.inline_max_bytes), або посилання на blob-сховище (kind=blob). Кожен споживач зобов'язаний підтримувати обидва варіанти. Див. docs/adr/0004-large-materials.md.",
+  "oneOf": [
+    { "$ref": "#/$defs/InlineContent" },
+    { "$ref": "#/$defs/BlobContent" }
+  ],
+  "discriminator": { "propertyName": "kind" },
+  "$defs": {
+    "InlineContent": {
+      "type": "object",
+      "required": ["kind", "media_type", "encoding", "data"],
+      "properties": {
+        "kind": { "const": "inline" },
+        "media_type": { "$ref": "defs.schema.json#/$defs/MediaType" },
+        "charset": { "type": "string", "description": "Кодування тексту в першоджерелі (після декодування data завжди UTF-8 для encoding=utf-8)." },
+        "encoding": {
+          "description": "utf-8 — текст як є; base64 — двійкові дані (RFC 4648).",
+          "type": "string",
+          "enum": ["utf-8", "base64"]
+        },
+        "data": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 0, "description": "Розмір декодованих байтів." },
+        "sha256": { "$ref": "defs.schema.json#/$defs/Sha256Hex" }
+      }
+    },
+    "BlobContent": {
+      "type": "object",
+      "required": ["kind", "uri", "media_type", "size_bytes", "sha256"],
+      "properties": {
+        "kind": { "const": "blob" },
+        "uri": {
+          "description": "Канонічна адреса об'єкта: 's3://<bucket>/<key>' (MinIO/S3) або 'file:///<abs-path>' (лише для одновузлового розгортання зі спільним томом).",
+          "type": "string",
+          "pattern": "^(s3|file)://.+"
+        },
+        "download_url": {
+          "description": "Необов'язкове попередньо підписане HTTP(S)-посилання для читання без облікових даних сховища. Діє до download_url_expires_at.",
+          "type": "string",
+          "format": "uri"
+        },
+        "download_url_expires_at": { "$ref": "defs.schema.json#/$defs/Timestamp" },
+        "media_type": { "$ref": "defs.schema.json#/$defs/MediaType" },
+        "charset": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "defs.schema.json#/$defs/Sha256Hex" },
+        "store": {
+          "description": "transit — тимчасовий об'єкт для передавання між етапами (видаляється після expires_at); persistent — збережений обробником збереження.",
+          "type": "string",
+          "enum": ["transit", "persistent"]
+        },
+        "expires_at": {
+          "description": "Коли транзитний об'єкт може бути видалено. null для persistent.",
+          "type": ["string", "null"],
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

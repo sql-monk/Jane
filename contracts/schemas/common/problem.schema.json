@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Problem",
+  "description": "Єдина модель помилки всіх API Jane: RFC 9457 (application/problem+json) з розширеннями 'code', 'retryable', 'errors', 'trace_id'. Клієнт приймає рішення за 'code' (стабільний машинний код), а не за 'title'/'detail'. Невідомий 'code' обробляється за HTTP-статусом і 'retryable'.",
+  "type": "object",
+  "required": ["type", "title", "status", "code"],
+  "properties": {
+    "type": {
+      "description": "URI типу проблеми: 'urn:jane:problem:<code>'.",
+      "type": "string",
+      "format": "uri-reference"
+    },
+    "title": { "type": "string", "description": "Короткий людський опис типу проблеми." },
+    "status": { "type": "integer", "minimum": 400, "maximum": 599 },
+    "detail": { "type": "string", "description": "Пояснення конкретного випадку. Без секретів і без вмісту матеріалів." },
+    "instance": { "type": "string", "format": "uri-reference" },
+    "code": {
+      "description": "Стабільний машинний код у snake_case. Відомі коди — $defs/KnownErrorCode. Сервіс може додати власний код лише разом з оновленням каталогу в contracts/.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,63}$"
+    },
+    "retryable": {
+      "description": "true — ту саму операцію (з тим самим Idempotency-Key) можна безпечно повторити пізніше.",
+      "type": "boolean"
+    },
+    "retry_after_seconds": {
+      "description": "Дублює заголовок Retry-After для клієнтів, які читають лише тіло.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "errors": {
+      "description": "Помилки окремих полів або параметрів (для validation_failed).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/FieldError" }
+    },
+    "trace_id": { "type": "string" },
+    "details": {
+      "description": "Додаткові структуровані дані, специфічні для коду (наприклад 'limit', 'actual' для limit_exceeded).",
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "FieldError": {
+      "type": "object",
+      "required": ["message"],
+      "properties": {
+        "pointer": { "type": "string", "description": "JSON Pointer (RFC 6901) до поля тіла запиту, наприклад '/stages/2/handler/version'." },
+        "parameter": { "type": "string", "description": "Ім'я query/path/header параметра." },
+        "code": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+        "message": { "type": "string" }
+      }
+    },
+    "KnownErrorCode": {
+      "description": "Каталог кодів. HTTP-статус і retryable за замовчуванням — у contracts/docs/errors.md.",
+      "type": "string",
+      "enum": [
+        "bad_request",
+        "validation_failed",
+        "unauthenticated",
+        "forbidden",
+        "not_found",
+        "method_not_allowed",
+        "conflict",
+        "version_exists",
+        "precondition_failed",
+        "precondition_required",
+        "idempotency_key_reused",
+        "idempotency_in_progress",
+        "payload_too_large",
+        "unsupported_media_type",
+        "limit_exceeded",
+        "rate_limited",
+        "budget_exhausted",
+        "job_not_cancellable",
+        "secret_detected",
+        "dependency_not_allowed",
+        "digest_mismatch",
+        "schema_mismatch",
+        "out_of_scope",
+        "access_denied_by_policy",
+        "upstream_conflict",
+        "source_unavailable",
+        "upstream_unavailable",
+        "internal_error",
+        "not_implemented",
+        "service_unavailable",
+        "timeout"
+      ]
+    }
+  }
+}

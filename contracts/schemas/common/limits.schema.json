@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Limits",
+  "description": "Модель лімітів з успадкуванням (ТЗ §13.1 п.5, критерій 13). Один і той самий об'єкт Limits задається на рівнях platform → source → task → stage; кожне поле необов'язкове. Ефективне значення: глибоке злиття за рівнями, нижчий рівень перекриває вищий; відсутнє поле успадковується (null заборонено — щоб 'скинути' до успадкованого, поле просто не передають). Після злиття кожне числове поле обмежується platform.hard_caps (min). Під час виконання значення додатково лише звужуються обмеженнями конкретного сайту чи сервісу (robots.txt Crawl-delay, Retry-After, Telegram flood-wait, ліміти провайдера LLM) — вони ніколи не послаблюються конфігурацією. Сервіс, що отримав limits у запиті (автономний режим), застосовує min(ліміти запиту, власні hard_caps). Типові значення — у сервісних конфігураціях і профілях WP-14; довідковий профіль — contracts/examples/schemas/limits/*.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "concurrency": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_parallel_fetches": { "type": "integer", "minimum": 1, "description": "Одночасні завантаження одного колектора (на екземпляр)." },
+        "max_parallel_fetches_per_host": { "type": "integer", "minimum": 1 },
+        "max_parallel_invocations": { "type": "integer", "minimum": 1, "description": "Одночасні виклики обробника (на екземпляр сервісу-виконавця або на етап)." },
+        "max_parallel_runs_per_task": { "type": "integer", "minimum": 1, "description": "Скільки запусків одного завдання можуть іти одночасно." },
+        "max_parallel_stage_items": { "type": "integer", "minimum": 1, "description": "Скільки елементів один етап запуску обробляє одночасно." }
+      }
+    },
+    "rate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requests_per_second_per_host": { "type": "number", "exclusiveMinimum": 0 },
+        "min_delay_ms_per_host": { "type": "integer", "minimum": 0 },
+        "burst_per_host": { "type": "integer", "minimum": 1 },
+        "respect_crawl_delay": { "type": "boolean", "description": "Враховувати Crawl-delay з robots.txt (може лише збільшити затримку)." }
+      }
+    },
+    "crawl": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_depth": { "type": "integer", "minimum": 0 },
+        "max_pages_per_run": { "type": "integer", "minimum": 1 },
+        "max_bytes_per_run": { "type": "integer", "minimum": 1 },
+        "max_material_bytes": { "type": "integer", "minimum": 1, "description": "Більший матеріал обривається з діагностикою 'truncated' або відкидається (за налаштуванням колектора)." },
+        "max_redirects": { "type": "integer", "minimum": 0 },
+        "max_links_per_page": { "type": "integer", "minimum": 0 },
+        "max_frontier_size": { "type": "integer", "minimum": 1, "description": "Максимальна кількість URL у черзі обходу." },
+        "revisit_interval_seconds": { "type": "integer", "minimum": 0, "description": "Мінімальний інтервал повторного відвідування того самого URL." }
+      }
+    },
+    "timeouts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "connect_timeout_ms": { "type": "integer", "minimum": 1 },
+        "request_timeout_ms": { "type": "integer", "minimum": 1 },
+        "invocation_timeout_ms": { "type": "integer", "minimum": 1, "description": "Тайм-аут одного виклику обробника (вкл. пісочницю)." },
+        "stage_timeout_ms": { "type": "integer", "minimum": 1 },
+        "run_timeout_ms": { "type": "integer", "minimum": 1 },
+        "sync_response_max_ms": { "type": "integer", "minimum": 1, "description": "Якщо синхронна операція не встигає — сервіс повертає 202 + Job." }
+      }
+    },
+    "retries": { "$ref": "#/$defs/RetryPolicy" },
+    "queue": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_queue_depth": { "type": "integer", "minimum": 1, "description": "Максимальна кількість задач у черзі оркестратора для завдання; при переповненні збір пригальмовується (backpressure)." },
+        "max_inflight_materials": { "type": "integer", "minimum": 1, "description": "Скільки матеріалів одного запуску можуть одночасно перебувати в обробці." },
+        "max_unacked_materials": { "type": "integer", "minimum": 1, "description": "Розмір буфера колектора: скільки отриманих, але ще не забраних споживачем матеріалів він тримає, перш ніж призупинити обхід." }
+      }
+    },
+    "sandbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu_cores": { "type": "number", "exclusiveMinimum": 0 },
+        "memory_mb": { "type": "integer", "minimum": 16 },
+        "wall_time_ms": { "type": "integer", "minimum": 1 },
+        "max_output_bytes": { "type": "integer", "minimum": 1 },
+        "max_processes": { "type": "integer", "minimum": 1 },
+        "tmpfs_mb": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "llm": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_requests_per_minute": { "type": "integer", "minimum": 1 },
+        "max_input_tokens_per_request": { "type": "integer", "minimum": 1 },
+        "max_output_tokens_per_request": { "type": "integer", "minimum": 1 },
+        "budget": { "$ref": "#/$defs/Budget" },
+        "max_improvement_attempts": { "type": "integer", "minimum": 0, "description": "Скільки спроб вдосконалення екстрактора на одну групу проблем." },
+        "max_onboarding_samples": { "type": "integer", "minimum": 1, "description": "Верхня межа вибірки під час дослідження джерела (фактична кількість адаптивна)." }
+      }
+    },
+    "transfer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "inline_max_bytes": { "type": "integer", "minimum": 0, "description": "Вміст до цього розміру можна передавати inline; більший — лише blob." },
+        "max_request_body_bytes": { "type": "integer", "minimum": 1 },
+        "transit_ttl_seconds": { "type": "integer", "minimum": 60, "description": "Час життя транзитних blob-об'єктів." },
+        "download_url_ttl_seconds": { "type": "integer", "minimum": 1 },
+        "job_retention_seconds": { "type": "integer", "minimum": 60 },
+        "idempotency_ttl_seconds": { "type": "integer", "minimum": 60, "description": "Скільки сервіс пам'ятає Idempotency-Key для повтору відповіді." }
+      }
+    },
+    "telegram": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_messages_per_run": { "type": "integer", "minimum": 1 },
+        "max_media_bytes": { "type": "integer", "minimum": 0 },
+        "max_flood_wait_seconds": { "type": "integer", "minimum": 0, "description": "Якщо Telegram вимагає чекати довше — збір призупиняється з помилкою rate_limited замість блокування воркера." }
+      }
+    }
+  },
+  "$defs": {
+    "RetryPolicy": {
+      "description": "Повтори застосовуються лише до помилок із retryable=true і лише разом з тим самим ключем ідемпотентності.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_attempts": { "type": "integer", "minimum": 1, "description": "Загальна кількість спроб, включно з першою." },
+        "initial_backoff_ms": { "type": "integer", "minimum": 0 },
+        "max_backoff_ms": { "type": "integer", "minimum": 0 },
+        "backoff_multiplier": { "type": "number", "minimum": 1 },
+        "jitter": { "type": "boolean" }
+      }
+    },
+    "Budget": {
+      "description": "Бюджет витрат LLM на рівні (platform/source/task). Перевищення зупиняє нові виклики з кодом budget_exhausted.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amount", "currency", "period"],
+      "properties": {
+        "amount": { "type": "number", "minimum": 0 },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "period": { "type": "string", "enum": ["run", "day", "week", "month", "total"] }
+      }
+    },
+    "LimitLevel": {
+      "type": "string",
+      "enum": ["platform", "source", "task", "stage", "request", "hard_cap", "runtime"]
+    },
+    "PlatformLimits": {
+      "description": "Ліміти рівня платформи: типові значення й жорсткі стелі.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["defaults"],
+      "properties": {
+        "profile": { "type": "string", "description": "Ім'я профілю середовища, з якого взято значення (див. docs/adr/0007-target-environments.md)." },
+        "defaults": { "$ref": "#" },
+        "hard_caps": { "$ref": "#" }
+      }
+    },
+    "EffectiveLimits": {
+      "description": "Результат злиття для конкретного контексту з походженням кожного значення.",
+      "type": "object",
+      "required": ["limits", "provenance"],
+      "properties": {
+        "limits": { "$ref": "#" },
+        "provenance": {
+          "description": "Для кожного листового поля (шлях через крапку, наприклад 'rate.requests_per_second_per_host') — рівень, з якого взято значення.",
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/LimitLevel" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PackageRef",
+  "description": "Посилання на конкретну незмінну версію пакета в репозиторії обробників. Діапазони версій і 'latest' заборонені: етап завдання завжди фіксує точну версію. digest — дайджест архіву версії; якщо заданий, виконавець зобов'язаний перевірити збіг (digest_mismatch).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["package_id", "version"],
+  "properties": {
+    "package_id": { "$ref": "defs.schema.json#/$defs/Slug" },
+    "version": { "$ref": "defs.schema.json#/$defs/SemVer" },
+    "digest": { "$ref": "defs.schema.json#/$defs/Digest" }
+  }
+}

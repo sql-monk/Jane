@@ -1,0 +1,530 @@
+openapi: 3.1.0
+info:
+  title: Jane common API components
+  version: 1.0.0
+  description: |
+    Спільні компоненти всіх API Jane: параметри, заголовки, відповіді з моделлю помилок,
+    ресурси job і health. Не є окремим сервісом — на ці компоненти посилаються файли
+    `*.v1.yaml`. Конвенції — скіл `.claude/skills/jane-contracts/SKILL.md`.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Jane
+paths: {}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        `Authorization: Bearer <token>`. Токен — JWT сервісного облікового запису або ключ API
+        залежно від `auth.mode` сервісу (docs/adr/0005-authentication.md).
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Ключ ідемпотентності (1–255 друкованих ASCII-символів; рекомендовано UUID або детермінований
+        ключ доставки). Повтор із тим самим ключем і тим самим тілом повертає збережену відповідь
+        (заголовок `Idempotency-Replayed: true`) без повторного ефекту. Той самий ключ з іншим тілом —
+        422 `idempotency_key_reused`. Запит ще виконується — 409 `idempotency_in_progress`
+        (retryable). Сервіс пам'ятає ключ щонайменше `limits.transfer.idempotency_ttl_seconds`.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+        pattern: '^[\x21-\x7E]+$'
+      example: 0b7d5c1e-3f7e-4a53-9d0e-5a0f5c0a9b11
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: ETag ресурсу для оптимістичного блокування. Розбіжність — 412 `precondition_failed`.
+      schema:
+        type: string
+      example: '"v7"'
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Непрозорий курсор з `next_cursor` попередньої сторінки.
+      schema:
+        type: string
+        maxLength: 2048
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Розмір сторінки. Значення понад максимум сервісу обрізається до максимуму.
+      schema:
+        type: integer
+        minimum: 1
+        default: 50
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+    Traceparent:
+      name: traceparent
+      in: header
+      required: false
+      description: W3C Trace Context; сервіс продовжує трасу й передає її далі.
+      schema:
+        type: string
+        pattern: '^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$'
+  headers:
+    Location:
+      description: Адреса ресурсу job або створеного ресурсу.
+      schema:
+        type: string
+        format: uri-reference
+    RetryAfter:
+      description: Скільки секунд зачекати перед повтором.
+      schema:
+        type: integer
+        minimum: 0
+    ETag:
+      description: Версія ресурсу для If-Match.
+      schema:
+        type: string
+    IdempotencyReplayed:
+      description: '`true`, якщо відповідь повторена зі збереженого результату для того самого Idempotency-Key.'
+      schema:
+        type: boolean
+  schemas:
+    Problem:
+      $ref: '../schemas/common/problem.schema.json'
+    Job:
+      $ref: '../schemas/common/job.schema.json'
+    JobList:
+      $ref: '../schemas/common/job.schema.json#/$defs/JobList'
+    JobCancelRequest:
+      $ref: '../schemas/common/job.schema.json#/$defs/JobCancelRequest'
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down]
+        checks:
+          type: object
+          additionalProperties:
+            type: object
+            required: [status]
+            properties:
+              status:
+                type: string
+                enum: [ok, degraded, down]
+              message:
+                type: string
+    ServiceInfo:
+      type: object
+      required: [service, version, api_versions]
+      properties:
+        service:
+          type: string
+          description: Ім'я сервісу, наприклад `web-collector`.
+        version:
+          type: string
+          description: Версія збірки сервісу.
+        api_versions:
+          type: array
+          items:
+            type: string
+            pattern: '^v[0-9]+$'
+        capabilities:
+          type: object
+          description: Можливості конкретної реалізації (наприклад підтримувані стратегії, типи обробників, адаптери).
+          additionalProperties: true
+        auth_mode:
+          type: string
+          enum: [none, api_key, jwt]
+  examples:
+    JobQueued:
+      summary: Job щойно створено
+      value:
+        job_id: job_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+        kind: collection
+        status: queued
+        created_at: '2026-09-27T10:00:00Z'
+        links:
+          self: /v1/jobs/job_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+          cancel: /v1/jobs/job_01J9ZQ3F8W2N4K7T5B6C1D0E9F/cancel
+    JobRunning:
+      summary: Job виконується
+      value:
+        job_id: job_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+        kind: collection
+        status: running
+        created_at: '2026-09-27T10:00:00Z'
+        started_at: '2026-09-27T10:00:01Z'
+        updated_at: '2026-09-27T10:02:00Z'
+        progress:
+          completed: 120
+          total: null
+          unit: pages
+          counters:
+            fetched: 120
+            skipped_robots: 3
+            skipped_out_of_scope: 41
+            duplicates: 17
+          updated_at: '2026-09-27T10:02:00Z'
+        links:
+          self: /v1/jobs/job_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+          cancel: /v1/jobs/job_01J9ZQ3F8W2N4K7T5B6C1D0E9F/cancel
+    JobCancelling:
+      summary: Скасування прийнято
+      value:
+        job_id: job_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+        kind: collection
+        status: cancelling
+        created_at: '2026-09-27T10:00:00Z'
+        started_at: '2026-09-27T10:00:01Z'
+        cancellation:
+          requested_at: '2026-09-27T10:05:00Z'
+          requested_by: admin@example.org
+          reason: wrong scope
+    JobFailed:
+      summary: Job завершився помилкою
+      value:
+        job_id: job_01J9ZQ3F8W2N4K7T5B6C1D0E9F
+        kind: collection
+        status: failed
+        created_at: '2026-09-27T10:00:00Z'
+        started_at: '2026-09-27T10:00:01Z'
+        finished_at: '2026-09-27T10:00:09Z'
+        error:
+          type: urn:jane:problem:source_unavailable
+          title: Source unavailable
+          status: 502
+          code: source_unavailable
+          retryable: true
+          detail: 'https://shop.example.test/ returned HTTP 503 for 5 consecutive attempts'
+    ProblemValidation:
+      summary: Помилка валідації
+      value:
+        type: urn:jane:problem:validation_failed
+        title: Validation failed
+        status: 422
+        code: validation_failed
+        retryable: false
+        errors:
+          - pointer: /stages/1/handler/version
+            code: invalid_format
+            message: must be an exact semantic version
+        trace_id: 4bf92f3577b34da6a3ce929d0e0e4736
+    ProblemNotFound:
+      summary: Ресурс не знайдено
+      value:
+        type: urn:jane:problem:not_found
+        title: Not found
+        status: 404
+        code: not_found
+        retryable: false
+    ProblemRateLimited:
+      summary: Перевищено частоту
+      value:
+        type: urn:jane:problem:rate_limited
+        title: Rate limited
+        status: 429
+        code: rate_limited
+        retryable: true
+        retry_after_seconds: 30
+    ProblemIdempotencyReused:
+      summary: Ключ ідемпотентності повторно використано з іншим тілом
+      value:
+        type: urn:jane:problem:idempotency_key_reused
+        title: Idempotency key reused with a different request
+        status: 422
+        code: idempotency_key_reused
+        retryable: false
+  responses:
+    JobAccepted:
+      description: Операцію прийнято до асинхронного виконання.
+      headers:
+        Location:
+          $ref: '#/components/headers/Location'
+        Idempotency-Replayed:
+          $ref: '#/components/headers/IdempotencyReplayed'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Job'
+          examples:
+            queued:
+              $ref: '#/components/examples/JobQueued'
+    BadRequest:
+      description: Некоректний синтаксис запиту (`bad_request`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            bad:
+              value:
+                type: urn:jane:problem:bad_request
+                title: Bad request
+                status: 400
+                code: bad_request
+                detail: request body is not valid JSON
+    Unauthenticated:
+      description: Немає або недійсний токен (`unauthenticated`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            unauthenticated:
+              value:
+                type: urn:jane:problem:unauthenticated
+                title: Unauthenticated
+                status: 401
+                code: unauthenticated
+    Forbidden:
+      description: Бракує прав (`forbidden`) або дію заборонено політикою (`access_denied_by_policy`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            forbidden:
+              value:
+                type: urn:jane:problem:forbidden
+                title: Forbidden
+                status: 403
+                code: forbidden
+                detail: scope registry:write required
+    NotFound:
+      description: Ресурс не знайдено (`not_found`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            notFound:
+              $ref: '#/components/examples/ProblemNotFound'
+    Conflict:
+      description: Конфлікт стану (`conflict`, `version_exists`, `idempotency_in_progress`, `job_not_cancellable`, `upstream_conflict`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            conflict:
+              value:
+                type: urn:jane:problem:conflict
+                title: Conflict
+                status: 409
+                code: conflict
+                detail: resource already exists
+    PreconditionFailed:
+      description: If-Match не збігається з поточним ETag (`precondition_failed`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            precondition:
+              value:
+                type: urn:jane:problem:precondition_failed
+                title: Precondition failed
+                status: 412
+                code: precondition_failed
+    PayloadTooLarge:
+      description: Тіло перевищує `limits.transfer.max_request_body_bytes` — передайте вміст як blob (`payload_too_large`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            tooLarge:
+              value:
+                type: urn:jane:problem:payload_too_large
+                title: Payload too large
+                status: 413
+                code: payload_too_large
+                details:
+                  limit: 10485760
+    UnprocessableEntity:
+      description: Семантична помилка (`validation_failed`, `idempotency_key_reused`, `limit_exceeded`, `secret_detected`, `schema_mismatch` тощо).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation:
+              $ref: '#/components/examples/ProblemValidation'
+            idempotencyReused:
+              $ref: '#/components/examples/ProblemIdempotencyReused'
+    TooManyRequests:
+      description: Перевищено частоту (`rate_limited`) або бюджет (`budget_exhausted`).
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            rateLimited:
+              $ref: '#/components/examples/ProblemRateLimited'
+    InternalError:
+      description: Непередбачена помилка сервісу (`internal_error`, retryable).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            internal:
+              value:
+                type: urn:jane:problem:internal_error
+                title: Internal error
+                status: 500
+                code: internal_error
+                retryable: true
+                trace_id: 4bf92f3577b34da6a3ce929d0e0e4736
+    ServiceUnavailable:
+      description: Сервіс або його залежність тимчасово недоступні (`service_unavailable`, `upstream_unavailable`).
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            unavailable:
+              value:
+                type: urn:jane:problem:service_unavailable
+                title: Service unavailable
+                status: 503
+                code: service_unavailable
+                retryable: true
+                retry_after_seconds: 5
+  pathItems:
+    Health:
+      get:
+        operationId: getHealth
+        summary: Стан сервісу (liveness/readiness)
+        tags: [system]
+        security: []
+        responses:
+          '200':
+            description: Сервіс працює (ok або degraded).
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Health'
+                examples:
+                  ok:
+                    value:
+                      status: ok
+                      checks:
+                        state_store:
+                          status: ok
+          '503':
+            description: Сервіс не готовий.
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Health'
+                examples:
+                  down:
+                    value:
+                      status: down
+                      checks:
+                        state_store:
+                          status: down
+                          message: connection refused
+    Info:
+      get:
+        operationId: getServiceInfo
+        summary: Версія, підтримувані версії API й можливості сервісу
+        tags: [system]
+        responses:
+          '200':
+            description: Опис сервісу.
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/ServiceInfo'
+                examples:
+                  info:
+                    value:
+                      service: example-service
+                      version: 0.1.0
+                      api_versions: [v1]
+                      capabilities: {}
+                      auth_mode: jwt
+          '401':
+            $ref: '#/components/responses/Unauthenticated'
+    Job:
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      get:
+        operationId: getJob
+        summary: Стан, прогрес і результат тривалої операції
+        tags: [jobs]
+        responses:
+          '200':
+            description: Поточний стан job.
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Job'
+                examples:
+                  running:
+                    $ref: '#/components/examples/JobRunning'
+                  failed:
+                    $ref: '#/components/examples/JobFailed'
+          '401':
+            $ref: '#/components/responses/Unauthenticated'
+          '404':
+            $ref: '#/components/responses/NotFound'
+    JobCancel:
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      post:
+        operationId: cancelJob
+        summary: Запит на скасування job (ідемпотентний)
+        description: |
+          202 — скасування прийнято, job переходить у `cancelling`, далі в `cancelled`.
+          200 — job уже в термінальному стані; повертається як є, без змін.
+          Повторний виклик безпечний, тому Idempotency-Key не потрібен.
+        tags: [jobs]
+        requestBody:
+          required: false
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobCancelRequest'
+              examples:
+                reason:
+                  value:
+                    reason: wrong scope
+        responses:
+          '200':
+            description: Job уже завершено; стан не змінено.
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Job'
+                examples:
+                  failed:
+                    $ref: '#/components/examples/JobFailed'
+          '202':
+            description: Скасування прийнято.
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Job'
+                examples:
+                  cancelling:
+                    $ref: '#/components/examples/JobCancelling'
+          '401':
+            $ref: '#/components/responses/Unauthenticated'
+          '404':
+            $ref: '#/components/responses/NotFound'

@@ -160,16 +160,21 @@ def test_several_instances_share_state(real_backend: Any, profile_file: Path, ui
                 )
                 for name, c in (("a", a), ("b", b))
             ]
-            codes = sorted(f.result().status_code for f in futures)
-        assert codes == [201, 409]
+            results = {name: f.result() for name, f in zip(("a", "b"), futures, strict=True)}
+        assert sorted(r.status_code for r in results.values()) == [201, 409]
+        winner = next(name for name, r in results.items() if r.status_code == 201)
+        other = b if winner == "a" else a
         got = b.get(f"/v1/packages/{pid}/versions/1.0.0")
         assert got.status_code == 200
         archive = b.get(f"/v1/packages/{pid}/versions/1.0.0/archive")
         assert archive.headers["etag"] == f'"{got.json()["digest"]}"'
-        replay = b.post(f"/v1/packages/{pid}/versions", json=body, headers={"Idempotency-Key": f"a-{pid}"})
-        first = a.post(f"/v1/packages/{pid}/versions", json=body, headers={"Idempotency-Key": f"a-{pid}"})
-        assert replay.status_code == first.status_code
+        # the winner's key replays its stored 201 on the other instance (keys live in PostgreSQL)
+        replay = other.post(
+            f"/v1/packages/{pid}/versions", json=body, headers={"Idempotency-Key": f"{winner}-{pid}"}
+        )
+        assert replay.status_code == 201
         assert replay.headers.get("Idempotency-Replayed") == "true"
+        assert replay.json()["digest"] == results[winner].json()["digest"]
         # a job started on one instance is visible on the other
         fork = {"new_package_id": f"{pid}-fork", "from_version": "1.0.0"}
         assert (

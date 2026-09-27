@@ -14,6 +14,10 @@ info:
     `limits.queue.max_unacked_materials`, колектор призупиняє обхід. Стан обходу (черга,
     дедуплікація, курсори Telegram) зберігається в сховищі колектора, тож після рестарту збір
     продовжується.
+
+    Керовані підключення (обліковий запис Telegram, HTTP-автентифікація сайту) — ті самі операції
+    `/v1/connections`, що й у спільному протоколі обробника (`common.yaml#/components/pathItems/Connection*`):
+    оркестратор синхронізує визначення без секретів, колектор розв'язує `secret_refs` у своєму середовищі.
   license:
     name: Proprietary
     identifier: LicenseRef-Jane
@@ -30,6 +34,7 @@ tags:
   - name: collections
   - name: rules
   - name: state
+  - name: connections
   - name: jobs
 paths:
   /v1/health:
@@ -385,6 +390,12 @@ paths:
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '409':
           $ref: 'common.yaml#/components/responses/Conflict'
+  /v1/connections:
+    $ref: 'common.yaml#/components/pathItems/Connections'
+  /v1/connections/{connection_id}:
+    $ref: 'common.yaml#/components/pathItems/Connection'
+  /v1/connections/{connection_id}/test:
+    $ref: 'common.yaml#/components/pathItems/ConnectionTest'
   /v1/jobs/{job_id}:
     $ref: 'common.yaml#/components/pathItems/Job'
   /v1/jobs/{job_id}/cancel:

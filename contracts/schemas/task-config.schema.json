@@ -33,10 +33,9 @@
       "properties": {
         "source_id": { "$ref": "common/defs.schema.json#/$defs/Slug" },
         "urls": {
-          "description": "Явний перелік матеріалів. Якщо задано — колектор отримує лише ці URL (стратегія seed_list без рекурсії) у межах scope джерела. Типово для завдань перевірки цін.",
+          "description": "Явний перелік матеріалів. Якщо задано — колектор отримує лише ці URL (стратегія seed_list без рекурсії) у межах scope джерела. Типово для завдань перевірки цін. Кількість обмежує limits.crawl.max_seed_urls (ефективне значення; перевищення — limit_exceeded), а не схема.",
           "type": "array",
-          "items": { "type": "string", "format": "uri" },
-          "maxItems": 100000
+          "items": { "type": "string", "format": "uri" }
         },
         "stored_materials": {
           "description": "Повторна обробка збережених RAW (ТЗ §10): фільтр збережених об'єктів замість нового збору.",

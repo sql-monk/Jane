@@ -36,6 +36,7 @@
         "max_material_bytes": { "type": "integer", "minimum": 1, "description": "Більший матеріал обривається з діагностикою 'truncated' або відкидається (за налаштуванням колектора)." },
         "max_redirects": { "type": "integer", "minimum": 0 },
         "max_links_per_page": { "type": "integer", "minimum": 0 },
+        "max_seed_urls": { "type": "integer", "minimum": 1, "description": "Максимальна кількість URL у явному переліку (TaskInput.urls, CollectionRequest.urls, seed_list)." },
         "max_frontier_size": { "type": "integer", "minimum": 1, "description": "Максимальна кількість URL у черзі обходу." },
         "revisit_interval_seconds": { "type": "integer", "minimum": 0, "description": "Мінімальний інтервал повторного відвідування того самого URL." }
       }

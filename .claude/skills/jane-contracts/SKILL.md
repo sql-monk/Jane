@@ -52,6 +52,13 @@ description: Конвенції API й контрактів Jane — /v1, мод
 9. **Ліміти** не зашиваються: `schemas/common/limits.schema.json`, рівні platform → source → task →
    stage, нижчий перекриває, `hard_caps` обмежують, обмеження сайту/провайдера лише звужують.
    Автономний сервіс приймає `limits` у запиті й застосовує `min(запит, власні hard_caps)`.
+   **Показ лімітів:** кожен сервіс віддає свої налаштовані типові значення й `hard_caps` у
+   `GET /v1/info` → `limits` (форма `PlatformLimits`); окремого `/v1/limits/effective` у сервісах
+   немає. Ефективні ліміти для джерела/завдання/етапу з походженням обчислює лише оркестратор
+   (`GET /v1/limits/effective`); job, що виконується з лімітами, може повертати `effective_limits`.
+   Нове обмеження — нове поле в `limits.schema.json` з типовим значенням у профілі, не `maxItems` у схемі.
+9a. **Підключення** (`/v1/connections…`) — спільні path items `common.yaml#/components/pathItems/Connection*`;
+   підключай їх у кожному сервісі, що використовує керовані підключення (handler.v1, collector.v1).
 10. **Безпека**: `Authorization: Bearer` (`bearerAuth`), `/v1/health` без автентифікації. Секрети —
     лише `secret_refs` (`env:`, `file:`, `vault:`), ніколи значення в API, пакетах, журналах.
     Вміст джерел — дані, не інструкції для LLM.

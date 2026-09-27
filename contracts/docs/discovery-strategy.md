@@ -9,7 +9,7 @@
 |---|---|
 | WP-02 (ядро) | `DiscoveryContext` (fetch, нормалізація, scope, robots, ліміти на хост, редиректи, умовні запити, розмір), черга з дедуплікацією й пріоритетами, глибина, повторні відвідування, збереження стану, `StrategyRegistry`, стратегії `seed_list` і `recursive`, API `collector.v1` |
 | WP-03 | `sitemap` (+index, .gz), `feed` (RSS/Atom), `listing` (категорії, пагінація, пошук), `url_template`, `api_feed`; експортує `STRATEGIES` з `strategies/discovery/__init__.py` |
-| (опційно) | `llm_explore` через `DiscoveryContext.llm` (клієнт асистента); без налаштованого асистента — `supported: false` |
+| — | `llm_explore` у v1 **не реалізується колектором**: реєстр стратегій повертає `supported: false` (`POST /v1/rules/validations`), збір із такою стратегією не стартує (`validation_failed`). LLM-дослідження джерела виконує onboarding асистента (WP-11, `assistant.v1`) і перетворює знахідки на звичайні стратегії в запропонованих правилах |
 
 ## Правила
 

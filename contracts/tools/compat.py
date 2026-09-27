@@ -53,7 +53,7 @@ class Finding:
 class Comparator:
     def __init__(self) -> None:
         self.findings: list[Finding] = []
-        self._seen: set[tuple[str, str, str]] = set()
+        self._seen: set[tuple[int, int, str]] = set()
 
     def add(self, severity: str, where: str, message: str) -> None:
         self.findings.append(Finding(severity, where, message))
@@ -82,7 +82,7 @@ class Comparator:
     def schema(self, old: Any, old_uri: str, new: Any, new_uri: str, where: str, direction: str) -> None:
         old, old_uri = self._resolve(old, old_uri)
         new, new_uri = self._resolve(new, new_uri)
-        key = (old_uri, new_uri, direction)
+        key = (id(old), id(new), direction)  # node identity: load_uri caches documents, so $ref cycles terminate
         if key in self._seen or not isinstance(old, dict) or not isinstance(new, dict):
             return
         self._seen.add(key)
@@ -126,6 +126,8 @@ class Comparator:
             if kw in new and (kw not in old or (new[kw] - old[kw]) * tighter > 0):
                 if req:
                     self.add("BREAKING", where, f"{kw} tightened {old.get(kw)!r} -> {new[kw]!r}")
+            if kw in old and (kw not in new or (new[kw] - old[kw]) * tighter < 0) and resp:
+                self.add("WARNING", where, f"{kw} relaxed {old[kw]!r} -> {new.get(kw)!r} (responses may exceed old bound)")
         if old.get("pattern") != new.get("pattern") and "pattern" in new:
             self.add("BREAKING" if req and "pattern" not in old else "WARNING", where,
                      f"pattern changed {old.get('pattern')!r} -> {new['pattern']!r}")
@@ -301,6 +303,13 @@ def self_test() -> int:
         ({"type": "integer", "maximum": 10}, {"type": "integer", "maximum": 5}, "request", "maximum tightened"),
         ({"type": "object"}, {"type": "object", "additionalProperties": False}, "request", "closed"),
         ({"type": "string"}, {"type": ["string", "null"]}, "response", "type widened"),
+        # nested inline subschemas (regression: they share the parent URI)
+        ({"type": "object", "properties": {"a": {"type": "object", "properties": {"b": {"type": "string"}}}}},
+         {"type": "object", "properties": {"a": {"type": "object", "properties": {"b": {"type": "string", "maxLength": 3}}}}},
+         "request", "maxLength tightened"),
+        ({"$defs": {"X": {"type": "object", "properties": {"u": {"type": "array"}}}}, "$ref": "#/$defs/X"},
+         {"$defs": {"X": {"type": "object", "required": ["u"], "properties": {"u": {"type": "array"}}}}, "$ref": "#/$defs/X"},
+         "request", "became required"),
     ]
     failures = 0
     with tempfile.TemporaryDirectory() as tmp:

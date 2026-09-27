@@ -19,8 +19,12 @@ web-collector для сайтів з автентифікацією) мають 
    `ResolvedConnection`; журнали маскують їх.
 3. **Реєстр платформи** — в оркестраторі (`orchestrator.v1 /v1/connections`): джерело правди
    для адмінки. Оркестратор синхронізує визначення (без секретів) у виконавців через
-   `handler.v1 PUT /v1/connections/{id}` і показує стан синхронізації. Автономний виконавець
-   може мати підключення лише з власного конфігураційного файла.
+   `PUT /v1/connections/{id}` і показує стан синхронізації. Ці операції (`/v1/connections`,
+   `/v1/connections/{id}`, `/v1/connections/{id}/test`) — спільні path items
+   `common.yaml#/components/pathItems/Connection*`, однакові в **`handler.v1`** (runtime, storage,
+   llm) і **`collector.v1`** (обліковий запис Telegram `telegram_account`, HTTP-автентифікація
+   сайту `http`). Автономний виконавець може мати підключення лише з власного конфігураційного файла.
+   *(Оновлено після рев'ю 1: додано колектори.)*
 4. **Перевірка:** `POST /v1/connections/{id}/test` у виконавця повертає `secrets_resolved`
    (так/ні для кожного посилання) без значень.
 5. **Пакет** декларує `required_connections` (логічні імена + kind); етап завдання зв'язує їх

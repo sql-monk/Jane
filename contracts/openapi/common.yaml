@@ -66,6 +66,12 @@ components:
       required: true
       schema:
         $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+    ConnectionId:
+      name: connection_id
+      in: path
+      required: true
+      schema:
+        $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
     Traceparent:
       name: traceparent
       in: header
@@ -142,6 +148,12 @@ components:
         auth_mode:
           type: string
           enum: [none, api_key, jwt]
+        limits:
+          description: |
+            Ліміти, налаштовані в цьому сервісі (типові значення й hard_caps), у формі PlatformLimits.
+            Ефективні ліміти для конкретного джерела/завдання/етапу обчислює лише оркестратор
+            (`GET /v1/limits/effective`); автономний сервіс застосовує min(limits із запиту, свої hard_caps).
+          $ref: '../schemas/common/limits.schema.json#/$defs/PlatformLimits'
   examples:
     JobQueued:
       summary: Job щойно створено
@@ -526,6 +538,172 @@ components:
                 examples:
                   cancelling:
                     $ref: '#/components/examples/JobCancelling'
+          '401':
+            $ref: '#/components/responses/Unauthenticated'
+          '404':
+            $ref: '#/components/responses/NotFound'
+    Connections:
+      get:
+        operationId: listConnections
+        summary: Підключення, відомі цьому виконавцю
+        tags: [connections]
+        parameters:
+          - $ref: '#/components/parameters/Cursor'
+          - $ref: '#/components/parameters/Limit'
+        responses:
+          '200':
+            description: Сторінка підключень (без значень секретів).
+            content:
+              application/json:
+                schema:
+                  $ref: '../schemas/common/connection.schema.json#/$defs/ConnectionList'
+                examples:
+                  list:
+                    value:
+                      items:
+                        - connection_id: results-pg
+                          kind: postgresql
+                          params:
+                            host: postgres
+                            port: 5432
+                            database: jane_results
+                          secret_refs:
+                            username: env:RESULTS_PG_USER
+                            password: env:RESULTS_PG_PASSWORD
+                      next_cursor: null
+          '401':
+            $ref: '#/components/responses/Unauthenticated'
+    Connection:
+      parameters:
+        - $ref: '#/components/parameters/ConnectionId'
+      get:
+        operationId: getConnection
+        summary: Прочитати підключення
+        tags: [connections]
+        responses:
+          '200':
+            description: Підключення.
+            headers:
+              ETag:
+                $ref: '#/components/headers/ETag'
+            content:
+              application/json:
+                schema:
+                  $ref: '../schemas/common/connection.schema.json'
+                examples:
+                  pg:
+                    $ref: '../examples/openapi/connection-pg.json'
+          '401':
+            $ref: '#/components/responses/Unauthenticated'
+          '404':
+            $ref: '#/components/responses/NotFound'
+      put:
+        operationId: putConnection
+        summary: Створити або замінити підключення (секрети — лише посиланнями)
+        description: |
+          Викликає оркестратор, синхронізуючи реєстр підключень, або адміністратор автономного
+          виконавця. Значення, схожі на секрети, у `params` відхиляються (`secret_detected`).
+        tags: [connections]
+        parameters:
+          - $ref: '#/components/parameters/IfMatch'
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/common/connection.schema.json'
+              examples:
+                pg:
+                  $ref: '../examples/openapi/connection-pg.json'
+                llm:
+                  $ref: '../examples/openapi/connection-llm.json'
+        responses:
+          '200':
+            description: Підключення замінено.
+            headers:
+              ETag:
+                $ref: '#/components/headers/ETag'
+            content:
+              application/json:
+                schema:
+                  $ref: '../schemas/common/connection.schema.json'
+                examples:
+                  pg:
+                    $ref: '../examples/openapi/connection-pg.json'
+          '201':
+            description: Підключення створено.
+            headers:
+              ETag:
+                $ref: '#/components/headers/ETag'
+            content:
+              application/json:
+                schema:
+                  $ref: '../schemas/common/connection.schema.json'
+                examples:
+                  pg:
+                    $ref: '../examples/openapi/connection-pg.json'
+          '401':
+            $ref: '#/components/responses/Unauthenticated'
+          '412':
+            $ref: '#/components/responses/PreconditionFailed'
+          '422':
+            $ref: '#/components/responses/UnprocessableEntity'
+          '501':
+            description: Виконавець не використовує підключень (`not_implemented`).
+            content:
+              application/problem+json:
+                schema:
+                  $ref: '../schemas/common/problem.schema.json'
+                examples:
+                  notImplemented:
+                    value:
+                      type: urn:jane:problem:not_implemented
+                      title: Not implemented
+                      status: 501
+                      code: not_implemented
+      delete:
+        operationId: deleteConnection
+        summary: Видалити підключення
+        tags: [connections]
+        responses:
+          '204':
+            description: Видалено.
+          '401':
+            $ref: '#/components/responses/Unauthenticated'
+          '404':
+            $ref: '#/components/responses/NotFound'
+    ConnectionTest:
+      parameters:
+        - $ref: '#/components/parameters/ConnectionId'
+      post:
+        operationId: testConnection
+        summary: Перевірити підключення й розв'язання секретів
+        tags: [connections]
+        x-jane-no-idempotency-key: read-only check without side effects
+        responses:
+          '200':
+            description: Результат перевірки (невдала перевірка — теж 200 з ok=false).
+            content:
+              application/json:
+                schema:
+                  $ref: '../schemas/common/connection.schema.json#/$defs/ConnectionTestResult'
+                examples:
+                  ok:
+                    value:
+                      ok: true
+                      checked_at: '2026-09-27T10:00:00Z'
+                      latency_ms: 12
+                      secrets_resolved:
+                        username: true
+                        password: true
+                  missingSecret:
+                    value:
+                      ok: false
+                      checked_at: '2026-09-27T10:00:00Z'
+                      secrets_resolved:
+                        username: true
+                        password: false
+                      message: environment variable RESULTS_PG_PASSWORD is not set
           '401':
             $ref: '#/components/responses/Unauthenticated'
           '404':

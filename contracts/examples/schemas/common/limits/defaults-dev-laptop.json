@@ -19,6 +19,7 @@
     "max_material_bytes": 10485760,
     "max_redirects": 5,
     "max_links_per_page": 2000,
+    "max_seed_urls": 100000,
     "max_frontier_size": 100000,
     "revisit_interval_seconds": 86400
   },

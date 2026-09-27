@@ -192,7 +192,12 @@ paths:
   /v1/tasks:
     get:
       operationId: listTasks
-      summary: Завдання
+      summary: Завдання (з фільтром за джерелом або пакетом, що використовується в етапах)
+      description: |
+        `package_id` — лише завдання, у яких хоча б один етап (або правила колектора) посилається на
+        цей пакет; разом із `package_version` — на цю точну версію. Так адмінка й асистент знаходять
+        усі прив'язки спільного пакета (ТЗ §9: перевірка на всіх прив'язках). У відповіді
+        `package_stages` перелічує такі етапи.
       tags: [tasks]
       parameters:
         - name: source_id
@@ -200,6 +205,17 @@ paths:
           required: false
           schema:
             type: string
+        - name: package_id
+          in: query
+          required: false
+          schema:
+            $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
+        - name: package_version
+          in: query
+          required: false
+          description: Лише разом із package_id.
+          schema:
+            $ref: '../schemas/common/defs.schema.json#/$defs/SemVer'
         - $ref: 'common.yaml#/components/parameters/Cursor'
         - $ref: 'common.yaml#/components/parameters/Limit'
       responses:
@@ -218,6 +234,20 @@ paths:
                   next_cursor:
                     $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
               examples:
+                byPackage:
+                  summary: ?package_id=shop-example.product-extractor
+                  value:
+                    items:
+                      - task_id: shop-catalog
+                        title: Повний збір каталогу Shop Example
+                        source_id: shop-example
+                        enabled: true
+                        package_stages:
+                          - stage_id: extract-products
+                            package:
+                              package_id: shop-example.product-extractor
+                              version: 1.2.0
+                    next_cursor: null
                 list:
                   value:
                     items:
@@ -495,9 +525,15 @@ paths:
       operationId: activateStageVersion
       summary: Активувати версію пакета в етапі (або відкотити до попередньої)
       description: |
-        Змінює `stages[].handler` завдання з аудитом. Версія має бути `approved` у репозиторії,
-        або політика джерела дозволяє автоактивацію після перевірок. Для `kind: rollback`
-        версія береться з попередньої активації, якщо не вказана.
+        Змінює `stages[].handler` завдання з аудитом.
+        - `activate` — людина активує версію; версія має бути `approved` у репозиторії.
+        - `rollback` — повернення до попередньої активації (або до вказаної версії).
+        - `auto_activate` — автоматична активація (асистент після перевірок). Приймається лише якщо
+          політика дозволяє: `Source.change_policy.llm_versions = auto_after_checks` **і** пакет
+          має `auto_changes_allowed = true` **і** версія пройшла тести (`test_status = passed`) на
+          всіх прив'язках. Інакше — 403 `access_denied_by_policy` (у `details.reason`:
+          `source_policy`, `package_auto_changes_forbidden` або `tests_not_passed`), активація не
+          виконується.
       tags: [tasks]
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -520,6 +556,13 @@ paths:
                 value:
                   kind: rollback
                   reason: regression on category pages
+              autoActivate:
+                value:
+                  kind: auto_activate
+                  package:
+                    package_id: shop-example.product-extractor
+                    version: 1.3.0
+                  reason: assistant improvement job_01J9ZX0000000000000000IMP passed tests on 2 bindings
       responses:
         '200':
           description: Активацію виконано.
@@ -547,6 +590,22 @@ paths:
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
+        '403':
+          description: Автоактивацію заборонено політикою (`access_denied_by_policy`) або бракує scope (`forbidden`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                policy:
+                  value:
+                    type: urn:jane:problem:access_denied_by_policy
+                    title: Automatic activation is not allowed
+                    status: 403
+                    code: access_denied_by_policy
+                    retryable: false
+                    details:
+                      reason: package_auto_changes_forbidden
         '409':
           $ref: 'common.yaml#/components/responses/Conflict'
         '422':
@@ -1361,6 +1420,17 @@ components:
         next_run_at:
           type: string
           format: date-time
+        package_stages:
+          type: array
+          description: Етапи, що посилаються на пакет із фільтра package_id (лише коли фільтр задано).
+          items:
+            type: object
+            required: [stage_id, package]
+            properties:
+              stage_id:
+                type: string
+              package:
+                $ref: '../schemas/common/package-ref.schema.json'
         last_run:
           type: object
           properties:
@@ -1672,7 +1742,8 @@ components:
       properties:
         kind:
           type: string
-          enum: [activate, rollback]
+          enum: [activate, rollback, auto_activate]
+          description: auto_activate приймається лише за дозволу політики джерела й пакета (інакше 403 access_denied_by_policy).
         package:
           $ref: '../schemas/common/package-ref.schema.json'
         reason:

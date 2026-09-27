@@ -298,7 +298,7 @@
       }
     },
     "LlmExploreStrategy": {
-      "description": "Автоматичне дослідження джерела за допомогою LLM (через асистент джерел). Лише пропонує URL/стратегії; кожен URL проходить ті самі перевірки scope/robots. Витрати — у межах limits.llm.",
+      "description": "Автоматичне дослідження джерела за допомогою LLM. Зарезервовано: у v1 колектор цю стратегію не виконує (POST /v1/rules/validations → supported: false, збір із нею відхиляється validation_failed). LLM-дослідження джерела виконує onboarding асистента (assistant.v1, WP-11), який перетворює знахідки на звичайні стратегії (seed_list, sitemap, listing тощо) у запропонованих правилах.",
       "allOf": [ { "$ref": "#/$defs/StrategyCommon" } ],
       "type": "object",
       "unevaluatedProperties": false,

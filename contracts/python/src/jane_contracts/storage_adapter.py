@@ -12,7 +12,8 @@ primitives with two guarantees:
    snapshot ``version`` and the history append succeed or fail together.
 2. :meth:`StorageAdapter.put_object` is idempotent by ``object_key``.
 
-Scenarios every adapter must pass are listed in contracts/docs/storage-adapter.md (C-01…C-16).
+Scenarios every adapter must pass are listed in contracts/docs/storage-adapter.md (C-01…C-16);
+all of them are mandatory for all six initial adapters, including the object stores.
 Adapters never read environment variables or secret stores: the core resolves ``secret_refs`` and
 passes a :class:`ResolvedConnection`.
 """
@@ -144,8 +145,11 @@ class StorageAdapter(Protocol):
     kind: ClassVar[str]
     """``filesystem``, ``postgresql``, ``sqlserver``, ``mongodb``, ``minio``, ``s3``."""
     capabilities: ClassVar[frozenset[str]]
-    """Subset of {"objects", "entities", "history"}. Object stores (minio, s3) may support entities via
-    conditional writes; if not, they declare only {"objects"} and the core rejects entity writes."""
+    """Must equal {"objects", "entities", "history"} for every initial adapter (TZ §12 item 12: each
+    adapter stores both RAW and structured results). Object stores (minio, s3) keep entity snapshots,
+    history events and delivery records as JSON documents and implement :meth:`commit_entity` with
+    conditional writes (If-None-Match: * for create, If-Match: <ETag> for update); see
+    contracts/docs/storage-adapter.md, section "Object stores"."""
 
     async def open(self, connection: ResolvedConnection, options: Mapping[str, Any]) -> None: ...
 

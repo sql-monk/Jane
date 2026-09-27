@@ -3,8 +3,12 @@
 Owners: WP-02 implements the core (fetcher, scope, robots, normalization, frontier with dedup and
 priorities, depth, revisit, per-host limits, state persistence) and the strategy registry plus the
 ``seed_list`` and ``recursive`` strategies. WP-03 implements ``sitemap``, ``feed``, ``listing``,
-``url_template`` and ``api_feed`` against this protocol. ``llm_explore`` is optional and uses an
-injected :class:`LlmExplorer` (backed by the assistant API).
+``url_template`` and ``api_feed`` against this protocol.
+
+``llm_explore`` is NOT implemented by the collector in v1: the strategy registry reports it as unsupported
+(``POST /v1/rules/validations`` answers ``supported: false``; a collection with it fails validation).
+LLM-driven source exploration is done by the assistant's onboarding (WP-11, ``assistant.v1``), which
+turns its findings into ordinary strategies (seed_list, sitemap, listing, …) in the proposed rules.
 
 Division of responsibility (see contracts/docs/discovery-strategy.md):
 
@@ -88,12 +92,6 @@ class FetchRejected(Exception):
         self.code = code
 
 
-class LlmExplorer(Protocol):
-    """Optional helper for ``llm_explore`` (implemented by the collector via the assistant API)."""
-
-    async def suggest(self, *, goal: str, pages: Sequence[FetchedResource], budget_left: float) -> Sequence[DiscoveredUrl]: ...
-
-
 class DiscoveryContext(Protocol):
     """Services the Web Collector core provides to a running strategy."""
 
@@ -123,9 +121,6 @@ class DiscoveryContext(Protocol):
         ...
 
     def is_cancelled(self) -> bool: ...
-
-    @property
-    def llm(self) -> LlmExplorer | None: ...
 
 
 @runtime_checkable

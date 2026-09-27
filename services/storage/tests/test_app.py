@@ -1,111 +1,353 @@
+"""The storage service over HTTP with the real filesystem adapter (no external services)."""
+
 from __future__ import annotations
 
+import base64
+import hashlib
+import io
+import json
 import time
-from collections.abc import Iterator
+import zipfile
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
 from jane_storage.app import build_app
+from jane_storage.packages import PackageCatalog, canonical_archive
 from jane_storage.settings import Settings
 
 
-@pytest.fixture
-def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
-    monkeypatch.setenv("JANE_STORAGE_LIMITS__JOBS__MAX_CONCURRENT_JOBS", "2")
-    with TestClient(build_app(Settings(log_format="console"))) as c:
-        yield c
-
-
-def wait_status(client: TestClient, job_id: str, wanted: str) -> dict[str, object]:
-    deadline = time.monotonic() + 5
-    job: dict[str, object] = {}
+def wait_job(client: TestClient, job_id: str) -> dict[str, Any]:
+    deadline = time.monotonic() + 10
+    job: dict[str, Any] = {}
     while time.monotonic() < deadline:
         job = client.get(f"/v1/jobs/{job_id}").json()
-        if job["status"] == wanted:
-            break
+        if job["status"] in {"succeeded", "failed", "cancelled"}:
+            return job
         time.sleep(0.02)
     return job
 
 
 def test_health_and_info(client: TestClient) -> None:
-    health = client.get("/v1/health")
-    assert health.status_code == 200
-    assert health.json() == {"status": "ok", "checks": {}}
+    assert client.get("/v1/health").json()["status"] == "ok"
     info = client.get("/v1/info").json()
     assert info["service"] == "storage"
-    assert info["api_versions"] == ["v1"]
+    caps = info["capabilities"]
+    assert {"filesystem", "postgresql"} <= set(caps["adapters"])
+    assert {p["package_id"] for p in caps["packages"]} >= {"jane.storage-files", "jane.storage-postgresql"}
+    assert info["limits"]["defaults"]["retries"]["max_attempts"] == 4
+    assert info["limits"]["defaults"]["timeouts"]["sync_response_max_ms"] == 30000
 
 
-def test_metrics_exposed(client: TestClient) -> None:
-    client.get("/v1/info")
-    body = client.get("/metrics").text
-    assert 'jane_http_requests_total{method="GET",route="/v1/info",status="200"}' in body
-
-
-def test_limits_come_from_config(client: TestClient) -> None:
-    resolved = client.app.state.limits  # type: ignore[attr-defined]
-    assert resolved.limits.jobs.max_concurrent_jobs == 2
-    provenance = resolved.provenance()
-    assert provenance["jobs.max_concurrent_jobs"] == "platform"
-    assert resolved.origin["jobs.max_concurrent_jobs"] == "platform:env"
-
-
-def test_info_limits_and_health_timeout_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("JANE_STORAGE_HEALTH_CHECK_TIMEOUT_MS", "150")
-    monkeypatch.setenv("JANE_STORAGE_LIMITS__IDEMPOTENCY__IDEMPOTENCY_TTL_SECONDS", "600")
-    monkeypatch.setenv("JANE_STORAGE_LIMITS__HARD_CAPS__JOBS__JOB_RETENTION_SECONDS", "3600")
-    app = build_app(Settings(log_format="console"))
-    assert app.state.health.check_timeout_s == 0.15
-    with TestClient(app) as c:
-        limits = c.get("/v1/info").json()["limits"]
-    assert limits == {
-        "defaults": {"transfer": {"idempotency_ttl_seconds": 600, "job_retention_seconds": 3600}},
-        "hard_caps": {"transfer": {"job_retention_seconds": 3600}},
-    }
-
-
-def test_unknown_route_is_problem(client: TestClient) -> None:
-    r = client.get(
-        "/v1/nope", headers={"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}
+def test_raw_html_is_stored_as_html_file(client: TestClient, h: SimpleNamespace, storage_dir: Path) -> None:
+    r = h.post(client, h.invocation([{"kind": "material", "material": h.material()}], "dk-raw-1"))
+    assert r.status_code == 200, r.text
+    result = r.json()
+    assert result["status"] == "success"
+    assert result["handler_kind"] == "storage"
+    assert result["handler"]["digest"].startswith("sha256:")
+    assert result["inputs"][0]["material_id"] == "web:3704326c60776c53169680099e2eed31"
+    (ack,) = result["output"]["writes"]
+    assert ack["status"] == "written"
+    assert ack["target"] == {"adapter": "filesystem", "connection_id": "raw-files"}
+    path = storage_dir / ack["object"]["locator"]["path"]
+    assert path.suffix == ".html"
+    assert path.read_bytes() == h.PAGE
+    assert ack["object"]["locator"]["path"] == (
+        "objects/shop-example/2026/09/27/web_3704326c60776c53169680099e2eed31/obs_01J9ZQ4A0000000000000001.html"
     )
-    assert r.status_code == 404
-    assert r.headers["content-type"].startswith("application/problem+json")
-    assert r.json()["code"] == "not_found"
-    assert r.json()["trace_id"] == "4bf92f3577b34da6a3ce929d0e0e4736"
+    assert client.get(f"/v1/invocations/{result['invocation_id']}").json() == result
 
 
-def test_example_job_is_idempotent_and_finishes(client: TestClient) -> None:
-    headers = {"Idempotency-Key": "k-1"}
-    first = client.post("/v1/examples/jobs", json={"steps": 2}, headers=headers)
-    assert first.status_code == 202
-    job_id = first.json()["job_id"]
-    assert first.headers["Location"] == f"/v1/jobs/{job_id}"
-    again = client.post("/v1/examples/jobs", json={"steps": 2}, headers=headers)
-    assert again.json()["job_id"] == job_id
-    assert again.headers["Idempotency-Replayed"] == "true"
-    reused = client.post("/v1/examples/jobs", json={"steps": 3}, headers=headers)
-    assert reused.status_code == 422
-    assert reused.json()["code"] == "idempotency_key_reused"
-    job = wait_status(client, job_id, "succeeded")
-    assert job["status"] == "succeeded"
-    assert job["result"] == {"steps_done": 2}
-    assert job["progress"]["completed"] == 2  # type: ignore[index]
-
-
-def test_example_job_can_be_cancelled(client: TestClient) -> None:
-    r = client.post(
-        "/v1/examples/jobs", json={"steps": 1000, "step_delay_ms": 50}, headers={"Idempotency-Key": "k-2"}
+def test_format_override_json(client: TestClient, h: SimpleNamespace, storage_dir: Path) -> None:
+    body = h.invocation(
+        [{"kind": "material", "material": h.material()}], "dk-raw-json", params={"format": {"raw": "json"}}
     )
-    job_id = r.json()["job_id"]
-    cancel = client.post(f"/v1/jobs/{job_id}/cancel", json={"reason": "test"})
-    assert cancel.status_code == 202
-    assert cancel.json()["status"] in {"cancelling", "cancelled"}
-    assert wait_status(client, job_id, "cancelled")["status"] == "cancelled"
-    assert client.post(f"/v1/jobs/{job_id}/cancel").status_code == 200  # already terminal
+    ack = h.post(client, body).json()["output"]["writes"][0]
+    path = storage_dir / ack["object"]["locator"]["path"]
+    assert path.suffix == ".json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    assert doc["content"]["data"] == h.PAGE.decode()
+    assert doc["material_id"] == "web:3704326c60776c53169680099e2eed31"
 
 
-def test_missing_idempotency_key_rejected(client: TestClient) -> None:
-    r = client.post("/v1/examples/jobs", json={})
+def test_redelivery_is_duplicate_and_attempt_does_not_matter(client: TestClient, h: SimpleNamespace) -> None:
+    body = h.invocation([{"kind": "entities", "entities": [h.entity(), h.entity("B-2")]}], "dk-ent-1")
+    first = h.post(client, body).json()
+    assert [w["status"] for w in first["output"]["writes"]] == ["written", "written"]
+    assert first["duplicate"] is False
+    retry = {**body, "context": {"attempt": 2}}
+    r = h.post(client, retry)
+    assert r.status_code == 200
+    assert r.headers["Idempotency-Replayed"] == "true"
+    again = r.json()
+    assert again["duplicate"] is True
+    assert [w["status"] for w in again["output"]["writes"]] == ["duplicate", "duplicate"]
+    assert again["output"]["writes"][0]["entity"] == first["output"]["writes"][0]["entity"]
+    history = client.get(
+        "/v1/entity-history",
+        params={
+            "connection_id": "raw-files",
+            "entity_type": "product",
+            "key": 'shop-example|{"sku":"A-100"}',
+        },
+    ).json()
+    assert len(history["items"]) == 1
+
+
+def test_redelivery_after_restart_is_duplicate(settings: Settings, h: SimpleNamespace) -> None:
+    body = h.invocation([{"kind": "entities", "entities": [h.entity()]}], "dk-restart")
+    with TestClient(build_app(settings)) as c:
+        assert h.post(c, body).json()["output"]["writes"][0]["status"] == "written"
+    with TestClient(build_app(settings)) as c:  # new process: nothing in memory
+        again = h.post(c, body)
+        assert "Idempotency-Replayed" not in again.headers
+        assert again.json()["duplicate"] is True
+
+
+def test_same_key_other_body_is_rejected(client: TestClient, h: SimpleNamespace) -> None:
+    h.post(client, h.invocation([{"kind": "entities", "entities": [h.entity()]}], "dk-reuse"))
+    r = h.post(client, h.invocation([{"kind": "entities", "entities": [h.entity("Z-9")]}], "dk-reuse"))
     assert r.status_code == 422
-    assert r.json()["errors"][0]["parameter"] == "Idempotency-Key"
+    assert r.json()["code"] == "idempotency_key_reused"
+
+
+def test_new_observation_partial_clear_and_stale(client: TestClient, h: SimpleNamespace) -> None:
+    h.post(
+        client, h.invocation([{"kind": "entities", "entities": [h.entity(at="2026-09-27T10:00:00Z")]}], "o1")
+    )
+    price = h.entity(fields={"price": 999.0}, at="2026-09-27T12:00:00Z", obs="obs_2")
+    assert h.post(client, h.invocation([{"kind": "entities", "entities": [price]}], "o2")).json()["output"][
+        "writes"
+    ][0]["status"] == ("written")
+    clear = {**h.entity(fields={}, at="2026-09-27T13:00:00Z", obs="obs_3"), "cleared": ["title"]}
+    h.post(client, h.invocation([{"kind": "entities", "entities": [clear]}], "o3"))
+    late = h.entity(fields={"price": 1.0, "title": "late"}, at="2026-09-27T11:00:00Z", obs="obs_0")
+    ack = h.post(client, h.invocation([{"kind": "entities", "entities": [late]}], "o4")).json()["output"][
+        "writes"
+    ][0]
+    assert ack["status"] == "stale"
+    state = client.get(
+        "/v1/entities",
+        params={
+            "connection_id": "raw-files",
+            "entity_type": "product",
+            "key": 'shop-example|{"sku":"A-100"}',
+        },
+    ).json()["items"][0]
+    assert state["fields"] == {"sku": "A-100", "price": 999.0}
+    assert state["cleared_fields"] == ["title"]
+    assert state["version"] == 4
+
+
+def test_test_mode_writes_nothing(client: TestClient, h: SimpleNamespace, storage_dir: Path) -> None:
+    body = h.invocation(
+        [{"kind": "entities", "entities": [h.entity()]}, {"kind": "material", "material": h.material()}],
+        "dk-test",
+        context={"test_mode": True},
+    )
+    result = h.post(client, body).json()
+    assert result["test_mode"] is True
+    assert {w["status"] for w in result["output"]["writes"]} == {"simulated"}
+    assert not (storage_dir / "entities").exists()
+
+
+def test_unavailable_storage_is_failed_result(client: TestClient, h: SimpleNamespace) -> None:
+    result = h.post(
+        client,
+        h.invocation([{"kind": "entities", "entities": [h.entity()]}], "dk-down", target="broken-files"),
+    ).json()
+    assert result["status"] == "failed"
+    assert result["failure"]["kind"] == "connection_error"
+    assert result["failure"]["retryable"] is True
+
+
+@pytest.mark.parametrize(
+    ("mutate", "status", "code"),
+    [
+        (
+            lambda b: b.update(handler={"package_id": "jane.storage-files", "version": "9.9.9"}),
+            404,
+            "not_found",
+        ),
+        (lambda b: b["handler"].update(digest="sha256:" + "0" * 64), 422, "digest_mismatch"),
+        (lambda b: b.update(connections={"target": "nope"}), 404, "not_found"),
+        (lambda b: b.update(params={"unknown": 1}), 422, "validation_failed"),
+        (lambda b: b.update(inputs=[{"kind": "data", "data": {}}]), 422, "validation_failed"),
+        (lambda b: b["inputs"][0]["entities"][0]["fields"].update(price=None), 422, "validation_failed"),
+        (lambda b: b.pop("connections"), 422, "validation_failed"),
+    ],
+)
+def test_invalid_invocations(
+    client: TestClient, h: SimpleNamespace, mutate: Any, status: int, code: str
+) -> None:
+    body = h.invocation([{"kind": "entities", "entities": [h.entity()]}], "dk-bad")
+    mutate(body)
+    r = h.post(client, body)
+    assert r.status_code == status, r.text
+    assert r.json()["code"] == code
+
+
+def test_idempotency_key_must_equal_delivery_key(client: TestClient, h: SimpleNamespace) -> None:
+    body = h.invocation([{"kind": "entities", "entities": [h.entity()]}], "dk-1")
+    r = client.post("/v1/invocations", json=body, headers={"Idempotency-Key": "other"})
+    assert r.status_code == 422
+    assert client.post("/v1/invocations", json=body).status_code == 422
+
+
+def test_body_limit_and_async_mode(
+    settings: Settings, h: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("JANE_STORAGE_LIMITS__TRANSFER__MAX_REQUEST_BODY_BYTES", "2000")
+    with TestClient(build_app(settings)) as c:
+        big = h.invocation(
+            [{"kind": "material", "material": h.material(b"<html>" + b"x" * 4000 + b"</html>")}], "k"
+        )
+        assert h.post(c, big).status_code == 413
+        body = h.invocation([{"kind": "entities", "entities": [h.entity()]}], "dk-async", mode="async")
+        r = h.post(c, body)
+        assert r.status_code == 202
+        job = wait_job(c, r.json()["job_id"])
+        assert job["status"] == "succeeded"
+        assert job["result"]["output"]["writes"][0]["status"] == "written"
+
+
+def test_request_limits_apply_within_hard_caps(
+    settings: Settings, h: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("JANE_STORAGE_LIMITS__HARD_CAPS__RETRIES__MAX_ATTEMPTS", "3")
+    with TestClient(build_app(settings)) as c:
+        body = h.invocation(
+            [{"kind": "entities", "entities": [h.entity()]}],
+            "dk-lim",
+            limits={"retries": {"max_attempts": 50}},
+        )
+        assert h.post(c, body).status_code == 200
+
+
+def test_reads_objects_and_content_range(client: TestClient, h: SimpleNamespace) -> None:
+    ack = h.post(client, h.invocation([{"kind": "material", "material": h.material()}], "dk-read")).json()[
+        "output"
+    ]["writes"][0]
+    object_id = ack["object"]["object_id"]
+    page = client.get(
+        "/v1/objects", params={"connection_id": "raw-files", "source_id": "shop-example"}
+    ).json()
+    assert [i["object"]["object_id"] for i in page["items"]] == [object_id]
+    assert page["items"][0]["material"]["url"] == "https://shop.example.test/product/a-100"
+    detail = client.get(f"/v1/objects/{object_id}", params={"connection_id": "raw-files"}).json()
+    assert detail["material"]["content"]["kind"] == "blob"
+    assert detail["material"]["content"]["uri"].startswith("file://")
+    assert detail["material"]["format"]["media_type"] == "text/html"
+    full = client.get(f"/v1/objects/{object_id}/content", params={"connection_id": "raw-files"})
+    assert full.content == h.PAGE
+    assert full.headers["content-type"].startswith("text/html")
+    part = client.get(
+        f"/v1/objects/{object_id}/content",
+        params={"connection_id": "raw-files"},
+        headers={"Range": "bytes=0-8"},
+    )
+    assert part.status_code == 206
+    assert part.content == h.PAGE[:9]
+    assert client.get("/v1/objects/obj_none", params={"connection_id": "raw-files"}).status_code == 404
+    assert client.get("/v1/objects", params={"connection_id": "unknown"}).status_code == 404
+
+
+def test_entities_pagination_over_http(client: TestClient, h: SimpleNamespace) -> None:
+    entities = [h.entity(f"S-{i}") for i in range(5)]
+    h.post(client, h.invocation([{"kind": "entities", "entities": entities}], "dk-pages"))
+    seen: list[str] = []
+    cursor = None
+    while True:
+        params: dict[str, Any] = {"connection_id": "raw-files", "entity_type": "product", "limit": 2}
+        if cursor:
+            params["cursor"] = cursor
+        page = client.get("/v1/entities", params=params).json()
+        seen += [i["canonical_key"] for i in page["items"]]
+        cursor = page["next_cursor"]
+        if cursor is None:
+            break
+    assert len(seen) == len(set(seen)) == 5
+
+
+def test_connections_api(client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    body = {
+        "connection_id": "results-files",
+        "kind": "filesystem",
+        "params": {"base_path": str(tmp_path / "r")},
+        "secret_refs": {"token": "env:WP07_TEST_TOKEN"},
+    }
+    created = client.put("/v1/connections/results-files", json=body)
+    assert created.status_code == 201
+    etag = created.headers["ETag"]
+    assert client.get("/v1/connections/results-files").json() == body
+    stale = client.put("/v1/connections/results-files", json=body, headers={"If-Match": '"nope"'})
+    assert stale.status_code == 412
+    assert (
+        client.put("/v1/connections/results-files", json=body, headers={"If-Match": etag}).status_code == 200
+    )
+    missing = client.post("/v1/connections/results-files/test").json()
+    assert missing == {**missing, "ok": False, "secrets_resolved": {"token": False}}
+    monkeypatch.setenv("WP07_TEST_TOKEN", "x")
+    assert client.post("/v1/connections/results-files/test").json()["ok"] is True
+    leaked = {**body, "params": {"base_path": "/x", "password": "hunter2"}}
+    r = client.put("/v1/connections/results-files", json=leaked)
+    assert r.status_code == 422
+    assert r.json()["code"] == "secret_detected"
+    ids = [c["connection_id"] for c in client.get("/v1/connections").json()["items"]]
+    assert ids == ["broken-files", "raw-files", "results-files"]
+    assert client.delete("/v1/connections/results-files").status_code == 204
+    assert client.get("/v1/connections/results-files").status_code == 404
+
+
+def test_test_run_of_package_tests(client: TestClient, storage_dir: Path) -> None:
+    r = client.post(
+        "/v1/test-runs",
+        json={"handler": {"package_id": "jane.storage-files", "version": "1.0.0"}, "tests": "all"},
+        headers={"Idempotency-Key": "tr-1"},
+    )
+    assert r.status_code == 202
+    job = wait_job(client, r.json()["job_id"])
+    report = job["result"]
+    assert report["failed"] == 0
+    assert report["passed"] == 2
+    assert not (storage_dir / "entities").exists()
+
+
+def test_package_archive_with_data_writes(client: TestClient, h: SimpleNamespace, storage_dir: Path) -> None:
+    files_pkg = next(p for p in PackageCatalog.discover().all() if p.package_id == "jane.storage-files")
+    manifest = {
+        **files_pkg.manifest,
+        "package_id": "local.llm-results",
+        "entry": {**files_pkg.entry, "writes": "data"},
+        "input": {"accepts": ["data"]},
+        "tests": [],
+    }
+    files = [(p, d) for p, d in files_pkg.files if p != "jane-package.json"]
+    archive = canonical_archive([*files, ("jane-package.json", json.dumps(manifest).encode())])
+    body = h.invocation(
+        [{"kind": "data", "data": {"events": [{"title": "Подія"}]}}],
+        "dk-data",
+        package="local.llm-results",
+        package_archive={
+            "kind": "inline",
+            "media_type": "application/zip",
+            "encoding": "base64",
+            "data": base64.b64encode(archive).decode(),
+        },
+    )
+    body["handler"]["digest"] = "sha256:" + hashlib.sha256(archive).hexdigest()
+    result = h.post(client, body).json()
+    assert result["status"] == "success", result
+    path = storage_dir / result["output"]["writes"][0]["object"]["locator"]["path"]
+    assert json.loads(path.read_text(encoding="utf-8")) == {"events": [{"title": "Подія"}]}
+    assert zipfile.ZipFile(io.BytesIO(archive)).namelist()[0] == "jane-package.json"
+
+
+def test_metrics_count_writes(client: TestClient, h: SimpleNamespace) -> None:
+    h.post(client, h.invocation([{"kind": "entities", "entities": [h.entity()]}], "dk-m"))
+    body = client.get("/metrics").text
+    assert 'jane_storage_writes_total{adapter="filesystem",status="written"} 1.0' in body

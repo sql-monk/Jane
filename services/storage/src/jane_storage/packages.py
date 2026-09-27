@@ -18,6 +18,7 @@ import base64
 import hashlib
 import io
 import json
+import os
 import sys
 import zipfile
 from collections.abc import Mapping, Sequence
@@ -237,6 +238,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     pub = sub.add_parser("publish", help="publish installed storage packages to the registry (registry.v1)")
     pub.add_argument("--registry", required=True, help="registry base URL, e.g. http://localhost:8105")
     pub.add_argument("--token-env", default=None, help="environment variable with a bearer token")
+    pub.add_argument(
+        "--timeout-ms", type=int, default=30_000, help="HTTP timeout per request (default 30000)"
+    )
     arch = sub.add_parser("archive", help="write the canonical archive of a package")
     arch.add_argument("package_id")
     arch.add_argument("--out", required=True, type=Path)
@@ -254,12 +258,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         ns.out.write_bytes(matches[-1].archive)
         print(f"{ns.out}  {matches[-1].digest}")
         return 0
-    import os
-
     headers = {}
     if ns.token_env:
         headers["Authorization"] = f"Bearer {os.environ[ns.token_env]}"
-    with httpx.Client(base_url=ns.registry, timeout=30) as client:
+    with httpx.Client(base_url=ns.registry, timeout=ns.timeout_ms / 1000) as client:
         outcomes = publish(client, catalog.all(), headers)
     for o in outcomes:
         print(

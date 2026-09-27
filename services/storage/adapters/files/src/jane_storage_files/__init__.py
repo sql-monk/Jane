@@ -304,7 +304,7 @@ class _Store:
                     "material_id": obj.material_id,
                     "observation_id": obj.observation_id,
                     "source_id": obj.source_id,
-                    "format": obj.format,
+                    "stored_format": obj.format,
                 },
             )
             self.write_atomic(self.index_path(object_id), dumps({"object_key": obj.object_key}))
@@ -558,6 +558,10 @@ class FilesystemAdapter:
 
     async def close(self) -> None:
         self._store = None
+
+    def content_uri(self, rec: ObjectRecord) -> str | None:
+        """Persistent ``file://`` URI of a stored object (``ContentRef`` blob, single-node deployments)."""
+        return (self.store.base / str(rec.locator["path"])).resolve().as_uri()
 
     async def health(self) -> bool:
         try:

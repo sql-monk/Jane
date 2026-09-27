@@ -256,7 +256,7 @@ class PostgresAdapter:
             "material_id": obj.material_id,
             "observation_id": obj.observation_id,
             "source_id": obj.source_id,
-            "format": obj.format,
+            "stored_format": obj.format,
         }
         async with self._con() as con:
             row = await con.fetchrow(

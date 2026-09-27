@@ -81,7 +81,8 @@ def _price(amount: Any, currency: Any) -> dict[str, Any] | None:
 def extract(material: Material, params: dict[str, Any], ctx: Context) -> ExtractResult:
     page = _Page()
     page.feed(ctx.text())
-    url = (material.get("locator") or {}).get("url") if params.get("include_url", True) else None
+    page_url = (material.get("locator") or {}).get("url")
+    url = page_url if params.get("include_url", True) else None
     products = _ld_products(page, ctx)
 
     if products:
@@ -98,7 +99,7 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
     elif page.page_type == "product":
         ctx.log.info("no JSON-LD, using microdata", code="extract.microdata_fallback")
         fields = {
-            "sku": url.rstrip("/").rsplit("/", 1)[-1] if url else None,
+            "sku": page_url.rstrip("/").rsplit("/", 1)[-1] if page_url else None,
             "title": page.itemprops.get("name") or page.h1.strip() or None,
             "price": _price(page.itemprops.get("price"), params["default_currency"]),
             "availability": AVAILABILITY.get(page.availability.strip(), "unknown"),

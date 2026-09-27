@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["ok", "hang", "sleep", "network", "memory", "environment", "output", "raise", "bad_entity"],
+      "default": "ok"
+    },
+    "host": { "type": "string" },
+    "port": { "type": "integer" },
+    "mb": { "type": "integer", "minimum": 1 },
+    "bytes": { "type": "integer", "minimum": 1 }
+  }
+}

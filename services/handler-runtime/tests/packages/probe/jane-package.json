@@ -1,0 +1,16 @@
+{
+  "schema_version": "1",
+  "package_id": "wp06.sandbox-probe",
+  "version": "0.1.0",
+  "kind": "transform",
+  "title": "Sandbox probe (tests of handler-runtime)",
+  "entry": { "runtime": "python", "module": "probe.main", "callable": "extract" },
+  "input": { "accepts": ["material"] },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [{ "entity_type": "thing", "schema": "schemas/thing.schema.json", "key_fields": ["id"] }]
+  },
+  "dependencies": { "runtime_profile": "python-extractor@1", "python": [] },
+  "access": { "network": "none" },
+  "provenance": { "created_by": "human" }
+}

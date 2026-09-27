@@ -59,7 +59,7 @@ instructions, output_schema, model}` (`model` — псевдонім `default|ch
 
 ## 3. Код екстрактора
 Контракт коду, стани результату, контекст і тестові утиліти — [README SDK](../../../libs/extractor-sdk/README.md)
-(`libs/extractor-sdk`, WP-06; до злиття WP-06 у `main` — гілка `wp/06-handler-runtime`). Коротко: `extract(material,
+(`libs/extractor-sdk`, WP-06; runtime і CLI — `services/handler-runtime/README.md`). Коротко: `extract(material,
 params, ctx)` повертає `success(...)`, `empty()` або `unrecognized(...)`; `failed` — виняток або рішення runtime;
 без мережі, `subprocess`, запису поза `/tmp`, детерміновано; лише бібліотеки профілю runtime; пропущене поле ≠
 очищення (`cleared`), `null` у `fields` заборонено.

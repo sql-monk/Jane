@@ -551,9 +551,7 @@ class FakeHandler(ContractFake):
             hang = self.hang_after_effect
             if hang is not None and not self.hung.is_set():
                 self.hung.set()
-                deadline = time.monotonic() + 60
-                while not hang.is_set() and time.monotonic() < deadline:
-                    await asyncio.sleep(0.05)
+                await asyncio.to_thread(hang.wait, 60)
             return self.respond(request, 200, result)
         finally:
             with self.lock:

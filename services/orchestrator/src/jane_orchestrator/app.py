@@ -20,7 +20,6 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from jane_kit.errors import BadRequest, NotFound
-from jane_kit.health import CheckResult
 from jane_kit.idempotency import IDEMPOTENCY_HEADER, StoredResponse, idempotent
 from jane_kit.pagination import clamp_limit
 from jane_kit.service import create_app
@@ -81,17 +80,13 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.limits = resolved
 
-    def db_check() -> CheckResult:
+    async def db_check() -> bool:
         core = holder.get("core")
         if core is None:
-            return CheckResult(status="down", message="starting")
-        try:
-            core.db.ping()
-        except Exception as exc:
-            return CheckResult(status="down", message=type(exc).__name__)
-        return CheckResult(status="ok")
+            raise RuntimeError("starting")
+        return bool(await run_in_threadpool(core.db.ping))
 
-    app.state.health.register("database", db_check)
+    app.state.health.add("database", db_check)
 
     def admin() -> Admin:
         a: Admin = holder["admin"]

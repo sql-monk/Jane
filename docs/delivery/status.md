@@ -12,8 +12,8 @@
 | 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент | слот 2 |
 | 06 | Runtime обробників і SDK | 1 | review | `wp/06-handler-runtime` | агент / wp-reviewer | рев'ю 2 (гілку перебазовано на `3af51c4`) |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
-| 08 | Адаптери збереження | 1 | — | | | після M0 |
-| 09 | Оркестратор | 1 | active | `wp/09-orchestrator` | агент | слот 1 |
+| 08 | Адаптери збереження | 1 | active | `wp/08-storage-adapters` | агент | слот 3 |
+| 09 | Оркестратор | 1 | review | `wp/09-orchestrator` | агент / wp-reviewer | M1-base `c6ba650` |
 | 10 | LLM-шлюз і LLM-обробник | 1 | active | `wp/10-llm` | агент | слот 2 |
 | 11 | Асистент джерел | 1 | active | `wp/11-assistant` | агент | слот 2 |
 | 12 | Адмінка | 1 | — | | | після M0 |
@@ -57,3 +57,10 @@
 | WP-07 рев'ю | WP-00 | `default` формату в `package-manifest.schema.json` узгодити з описом і ТЗ §5 | зміна контракту через contract-guardian |
 - 2026-09-27 — WP-06 і WP-02 повернуто після рев'ю 1 (кілька екземплярів, контракт connections, lease/fencing, тайм-аути з рівнів лімітів). WP-07 — рев'ю 2.
 - 2026-09-27 — WP-07 прийнято (2 раунди) і злито; на main `just check` зелений, gitleaks 0. Адаптери додано в `just types`.
+- 2026-09-27 — WP-09 на рев'ю (2 нестабільні падіння з 7 — рецензент ганяє повторно); запущено WP-08.
+| WP-09 | WP-00 | форма входу `select: problems` і виходу етапу збереження; `ProblemGroup.note`; чи застосовуються активації до `collector.rules` | зміна контракту через contract-guardian |
+| WP-09 | WP-00 / WP-07 | фільтр `storage.v1 /v1/objects` за кількома `material_id` | зміна контракту через contract-guardian |
+| WP-09 | WP-01 | перевірка JWT у jane-kit | відкрито |
+| WP-09 | WP-02 / WP-04 | ідемпотентний `POST /v1/collections`; `limits.queue.max_unacked_materials` із запиту; `rules_ref` без registry для M1 | передати WP-02 (рев'ю 2), WP-04 |
+| WP-09 | WP-05 | registry віддає `kind`, `auto_changes_allowed`, `status`, `test_status`, `digest` | передати WP-05 |
+| WP-09 | WP-14 | профіль `PlatformLimits` для `JANE_ORCHESTRATOR_LIMITS_FILE` | після M1 |

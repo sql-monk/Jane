@@ -163,7 +163,9 @@ class PackageLoader:
         registry_limits: ClientLimits,
         registry_token: str | None = None,
         max_bytes: int = 20_000_000,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
+        self.transport = transport
         self.packages_dir = packages_dir
         self.registry_url = registry_url
         self.registry_limits = registry_limits
@@ -188,7 +190,9 @@ class PackageLoader:
         if not self.registry_url:
             return None
         headers = {"Authorization": f"Bearer {self.registry_token}"} if self.registry_token else None
-        async with ServiceClient(self.registry_url, self.registry_limits, headers=headers) as client:
+        async with ServiceClient(
+            self.registry_url, self.registry_limits, headers=headers, transport=self.transport
+        ) as client:
             try:
                 resp = await client.request("GET", f"/v1/packages/{package_id}/versions/{version}/archive")
             except RemoteError as exc:
@@ -253,13 +257,17 @@ def publish_request(root: Path) -> dict[str, Any]:
 
 
 async def publish(
-    root: Path, registry_url: str, limits: ClientLimits | None = None, token: str | None = None
+    root: Path,
+    registry_url: str,
+    limits: ClientLimits | None = None,
+    token: str | None = None,
+    transport: httpx.AsyncBaseTransport | None = None,
 ) -> dict[str, Any]:
     """Create the package (if needed) and publish its version in the registry (``registry.v1``)."""
     body = publish_request(root)
     manifest = body["manifest"]
     headers = {"Authorization": f"Bearer {token}"} if token else None
-    async with ServiceClient(registry_url, limits, headers=headers) as client:
+    async with ServiceClient(registry_url, limits, headers=headers, transport=transport) as client:
         create = {"package_id": manifest["package_id"], "kind": manifest["kind"], "title": manifest["title"]}
         if manifest.get("description"):
             create["description"] = manifest["description"]
@@ -273,3 +281,32 @@ async def publish(
             f"/v1/packages/{manifest['package_id']}/versions", body, idempotency_key=version_key
         )
         return result
+
+
+def main(argv: list[str] | None = None) -> int:
+    """``python -m jane_llm.packages {digest|publish} <dir> [--registry URL]``.
+
+    The registry token is read from the environment variable ``JANE_LLM_REGISTRY_TOKEN``.
+    """
+    import argparse
+    import os
+
+    parser = argparse.ArgumentParser(prog="python -m jane_llm.packages")
+    parser.add_argument("command", choices=["digest", "publish"])
+    parser.add_argument("directory", type=Path)
+    parser.add_argument("--registry", default=os.environ.get("JANE_LLM_REGISTRY_URL"))
+    ns = parser.parse_args(argv)
+    files = read_dir(ns.directory)
+    check_llm_manifest(json.loads(files[MANIFEST]))
+    if ns.command == "digest":
+        print(digest_of(build_archive(files)))
+        return 0
+    if not ns.registry:
+        parser.error("--registry (or JANE_LLM_REGISTRY_URL) is required for publish")
+    result = asyncio.run(publish(ns.directory, ns.registry, token=os.environ.get("JANE_LLM_REGISTRY_TOKEN")))
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

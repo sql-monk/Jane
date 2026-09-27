@@ -23,7 +23,7 @@ ALWAYS = [
 WP_ONLY = [
     (r"\bgit\b[^;&|\n]*\bpush\b[^;&|\n]*\b(main|master)\b",
      "push у main заборонено: зливає лише координатор."),
-    (r"\bgit\b[^;&|\n]*\bmerge\b",
+    (r"\bgit\b[^;&|\n]*\bmerge\b(?!-)",
      "git merge у checkout виконавця заборонено: зливає лише координатор."),
     (r"\bgit\b[^;&|\n]*\b(checkout|switch)\b\s+(-\S+\s+)*(main|master)\b",
      "перемикання на main заборонено: працюйте у своїй гілці wp/NN-*."),

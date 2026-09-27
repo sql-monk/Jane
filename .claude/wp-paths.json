@@ -28,7 +28,8 @@
         "tests/fixtures/**",
         "scripts/**",
         ".claude/settings.json",
-        ".claude/hooks/format.py"
+        ".claude/hooks/format.py",
+        ".claude/hooks/scan_secrets.py"
       ],
       "deny": [
         "TECHNICAL_SPECIFICATION.md",

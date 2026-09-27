@@ -1,18 +1,18 @@
 """Idempotent request handling by ``Idempotency-Key`` (TZ §11: a repeated technical delivery is a duplicate).
 
-Semantics (CONNECTION POINT WP-00: codes and header names follow ``contracts/`` conventions):
+Semantics of the WP-00 contract (``common.yaml#/components/parameters/IdempotencyKey``):
 
-* first request with a key runs the handler; the response is stored for ``ttl_s``;
-* the same key with the same request fingerprint replays the stored response
-  (header ``Idempotent-Replayed: true``) without running the handler again;
-* the same key with a *different* fingerprint -> 422 ``idempotency_key_reused``;
-* the same key while the first request is still running -> 409 ``idempotency_in_progress``
-  (retryable);
+* first request with a key runs the handler; the response is stored for
+  ``transfer.idempotency_ttl_seconds``;
+* same key + same request -> stored response with ``Idempotency-Replayed: true``, no new effect;
+* same key + different request -> 422 ``idempotency_key_reused``;
+* same key while the first request still runs -> 409 ``idempotency_in_progress`` (retryable);
+* the key is 1-255 printable ASCII characters;
 * if the handler raises, the key is released so the client can retry.
 
-:class:`InMemoryIdempotencyStore` suits one instance and tests. Services running several
-instances implement :class:`IdempotencyStore` on their own database (e.g. PostgreSQL
-``INSERT ... ON CONFLICT DO NOTHING``).
+:class:`InMemoryIdempotencyStore` suits one instance and tests. Services running several instances
+implement :class:`IdempotencyStore` on their own database (e.g. PostgreSQL ``INSERT ... ON CONFLICT
+DO NOTHING``).
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import re
 import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Mapping
@@ -28,9 +29,10 @@ from typing import Any, Literal, Protocol
 
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
+from pydantic import Field
 
 from jane_kit.config import Limits
-from jane_kit.errors import BadRequest, Conflict, JaneError
+from jane_kit.errors import FieldError, JaneError, ValidationFailed
 
 __all__ = [
     "IDEMPOTENCY_HEADER",
@@ -48,27 +50,23 @@ __all__ = [
 ]
 
 IDEMPOTENCY_HEADER = "Idempotency-Key"
-REPLAY_HEADER = "Idempotent-Replayed"
+REPLAY_HEADER = "Idempotency-Replayed"
+KEY_RE = re.compile(r"^[\x21-\x7E]{1,255}$")
 
 
 class IdempotencyLimits(Limits):
-    ttl_s: float = 24 * 3600.0
-    """How long a stored response is replayed."""
-    max_key_length: int = 255
-    in_memory_max_entries: int = 10_000
-    """Only for :class:`InMemoryIdempotencyStore`: oldest entries are evicted beyond this."""
+    idempotency_ttl_seconds: int = Field(default=86_400, ge=60)
+    """Contract ``limits.transfer.idempotency_ttl_seconds``: how long a key is remembered."""
+    in_memory_max_entries: int = Field(default=10_000, ge=1)
+    """Only :class:`InMemoryIdempotencyStore`: the oldest entries are evicted beyond this."""
 
 
 class IdempotencyKeyReused(JaneError):
-    status, code, title = 422, "idempotency_key_reused", "Idempotency key reused with a different request"
+    code = "idempotency_key_reused"
 
 
-class IdempotencyInProgress(Conflict):
-    code, title, retryable = (
-        "idempotency_in_progress",
-        "Request with this idempotency key is in progress",
-        True,
-    )
+class IdempotencyInProgress(JaneError):
+    code = "idempotency_in_progress"
 
 
 @dataclass(frozen=True)
@@ -105,6 +103,9 @@ class InMemoryIdempotencyStore:
         self._clock = clock
         self._records: OrderedDict[str, IdempotencyRecord] = OrderedDict()
         self._lock = asyncio.Lock()
+
+    def __len__(self) -> int:
+        return len(self._records)
 
     def _evict(self, now: float) -> None:
         for key in [k for k, r in self._records.items() if r.expires_at <= now]:
@@ -156,17 +157,17 @@ async def run_idempotent(
 ) -> tuple[StoredResponse, bool]:
     """Run ``handler`` once per key. Returns ``(response, replayed)``."""
     limits = limits or IdempotencyLimits()
-    if not key or len(key) > limits.max_key_length:
-        raise BadRequest(
-            f"{IDEMPOTENCY_HEADER} must be 1..{limits.max_key_length} characters",
-            code="idempotency_key_invalid",
+    if not KEY_RE.match(key):
+        raise ValidationFailed(
+            f"{IDEMPOTENCY_HEADER} must be 1-255 printable ASCII characters",
+            errors=[FieldError(parameter=IDEMPOTENCY_HEADER, message="invalid format")],
         )
-    existing = await store.begin(key, fp, limits.ttl_s)
+    existing = await store.begin(key, fp, float(limits.idempotency_ttl_seconds))
     if existing is not None:
         if existing.fingerprint != fp:
-            raise IdempotencyKeyReused()
+            raise IdempotencyKeyReused("the key was used with a different request")
         if existing.state != "completed" or existing.response is None:
-            raise IdempotencyInProgress()
+            raise IdempotencyInProgress("a request with this key is still running")
         return existing.response, True
     try:
         response = await handler()
@@ -187,12 +188,16 @@ async def idempotent(
 ) -> Response:
     """FastAPI helper: wrap an endpoint body so it honours ``Idempotency-Key``.
 
-    ``required=False`` runs the handler directly when the header is absent.
+    A missing header is ``422 validation_failed`` (the contract marks the header required);
+    ``required=False`` runs the handler directly instead.
     """
     key = request.headers.get(IDEMPOTENCY_HEADER)
     if key is None:
         if required:
-            raise BadRequest(f"{IDEMPOTENCY_HEADER} header is required", code="idempotency_key_missing")
+            raise ValidationFailed(
+                f"{IDEMPOTENCY_HEADER} header is required",
+                errors=[FieldError(parameter=IDEMPOTENCY_HEADER, message="required")],
+            )
         stored = await handler()
         return JSONResponse(stored.body, status_code=stored.status_code, headers=dict(stored.headers))
     fp = fingerprint(request.method, request.url.path, await request.body())

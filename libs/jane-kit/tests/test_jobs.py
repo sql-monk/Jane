@@ -2,31 +2,34 @@ from __future__ import annotations
 
 import asyncio
 import time
+from typing import Any
 
 import pytest
 from fastapi import Response
 from fastapi.testclient import TestClient
 
 from jane_kit.config import JaneSettings
-from jane_kit.errors import Conflict, LimitExceeded, NotFound, ValidationFailed
-from jane_kit.jobs import JobContext, JobLimits, JobRunner, JobState, accepted, jobs_router
+from jane_kit.errors import NotFound, ServiceUnavailable, ValidationFailed
+from jane_kit.jobs import JobContext, JobLimits, JobRunner, JobStatus, accepted, jobs_router
 from jane_kit.service import create_app
 
 
 async def test_job_success_with_progress() -> None:
     runner = JobRunner()
 
-    async def work(ctx: JobContext) -> dict[str, int]:
-        await ctx.progress(0.5, "half")
+    async def work(ctx: JobContext) -> dict[str, Any]:
+        await ctx.progress(5, 10, unit="pages", counters={"fetched": 5})
         return {"answer": 42}
 
-    job = await runner.submit("demo", work)
-    assert job.state == JobState.QUEUED
+    job = await runner.submit("collection", work, idempotency_key="k1")
+    assert job.status == JobStatus.QUEUED
+    assert job.job_id.startswith("job_")
+    assert job.links == {"self": f"/v1/jobs/{job.job_id}", "cancel": f"/v1/jobs/{job.job_id}/cancel"}
     done = await runner.wait(job.job_id)
-    assert done.state == JobState.SUCCEEDED
+    assert done.status == JobStatus.SUCCEEDED
     assert done.result == {"answer": 42}
-    assert done.progress == 1.0
-    assert done.message == "half"
+    assert done.progress is not None and (done.progress.completed, done.progress.total) == (5, 10)
+    assert done.started_at and done.finished_at and done.idempotency_key == "k1"
 
 
 async def test_concurrency_limit_from_config() -> None:
@@ -55,8 +58,9 @@ async def test_queue_limit_backpressure() -> None:
 
     await runner.submit("demo", work)
     await runner.submit("demo", work)
-    with pytest.raises(LimitExceeded):
+    with pytest.raises(ServiceUnavailable) as info:
         await runner.submit("demo", work)
+    assert info.value.status == 503 and info.value.retryable
     gate.set()
     await runner.shutdown()
 
@@ -72,37 +76,33 @@ async def test_cancel_running_and_queued_jobs() -> None:
     running = await runner.submit("demo", forever)
     queued = await runner.submit("demo", forever)
     await started.wait()
-    await runner.cancel(queued.job_id)
+    q = await runner.cancel(queued.job_id, reason="wrong scope")
+    assert q.status == JobStatus.CANCELLING and q.cancellation and q.cancellation.reason == "wrong scope"
     await runner.cancel(running.job_id)
-    assert (await runner.wait(running.job_id)).state == JobState.CANCELLED
-    assert (await runner.wait(queued.job_id)).state == JobState.CANCELLED
-    again = await runner.cancel(running.job_id)
-    assert again.state == JobState.CANCELLED
+    assert (await runner.wait(running.job_id)).status == JobStatus.CANCELLED
+    assert (await runner.wait(queued.job_id)).status == JobStatus.CANCELLED
+    again = await runner.cancel(running.job_id)  # terminal: unchanged
+    assert again.status == JobStatus.CANCELLED
 
 
-async def test_cooperative_cancellation() -> None:
+async def test_cooperative_cancellation_check() -> None:
     runner = JobRunner()
-    steps = 0
+    seen: list[bool] = []
 
     async def work(ctx: JobContext) -> None:
-        nonlocal steps
-        while True:
-            await ctx.check_cancelled()
-            steps += 1
-            await asyncio.sleep(0.005)
+        seen.append(await ctx.cancelled())
+        await ctx.check_cancelled()
 
     job = await runner.submit("demo", work)
-    await asyncio.sleep(0.03)
-    await runner.cancel(job.job_id)
-    assert (await runner.wait(job.job_id)).state == JobState.CANCELLED
-    assert steps > 0
+    await runner.wait(job.job_id)
+    assert seen == [False]
 
 
 async def test_failures_and_timeout() -> None:
-    runner = JobRunner(limits=JobLimits(job_timeout_s=0.05))
+    runner = JobRunner(limits=JobLimits(job_timeout_ms=50))
 
     async def invalid(ctx: JobContext) -> None:
-        raise ValidationFailed("bad input", code="bad_input")
+        raise ValidationFailed("bad input", code="schema_mismatch")
 
     async def crash(ctx: JobContext) -> None:
         raise RuntimeError("boom")
@@ -112,11 +112,10 @@ async def test_failures_and_timeout() -> None:
 
     j1, j2, j3 = [await runner.submit("demo", f) for f in (invalid, crash, slow)]
     r1, r2, r3 = [await runner.wait(j.job_id) for j in (j1, j2, j3)]
-    assert r1.state == JobState.FAILED and r1.error and r1.error.code == "bad_input"
-    assert r2.state == JobState.FAILED and r2.error and r2.error.code == "internal_error"
-    assert r3.state == JobState.FAILED and r3.error and r3.error.code == "job_timeout"
-    with pytest.raises(Conflict):
-        await runner.cancel(j1.job_id)
+    assert r1.status == JobStatus.FAILED and r1.error and r1.error.code == "schema_mismatch"
+    assert r2.status == JobStatus.FAILED and r2.error and r2.error.code == "internal_error"
+    assert r3.status == JobStatus.FAILED and r3.error and r3.error.code == "timeout"
+    assert (await runner.cancel(j1.job_id)).status == JobStatus.FAILED  # terminal: returned as is
     with pytest.raises(NotFound):
         await runner.get("nope")
 
@@ -131,20 +130,21 @@ def test_http_flow_202_poll_cancel() -> None:
         async def work(ctx: JobContext) -> None:
             await asyncio.sleep(3600)
 
-        job = await runner.submit("work", work)
-        return accepted(job, f"/v1/jobs/{job.job_id}")
+        return accepted(await runner.submit("work", work))
 
     with TestClient(app) as c:
         r = c.post("/v1/work")
         assert r.status_code == 202
         job_id = r.json()["job_id"]
         assert r.headers["Location"] == f"/v1/jobs/{job_id}"
-        assert c.get(f"/v1/jobs/{job_id}").json()["state"] in {"queued", "running"}
-        assert c.post(f"/v1/jobs/{job_id}/cancel").status_code == 202
+        assert c.get(f"/v1/jobs/{job_id}").json()["status"] in {"queued", "running"}
+        cancel = c.post(f"/v1/jobs/{job_id}/cancel", json={"reason": "test"})
+        assert cancel.status_code == 202 and cancel.json()["cancellation"]["reason"] == "test"
         for _ in range(100):
-            if c.get(f"/v1/jobs/{job_id}").json()["state"] == "cancelled":
+            if c.get(f"/v1/jobs/{job_id}").json()["status"] == "cancelled":
                 break
             time.sleep(0.01)
-        assert c.get(f"/v1/jobs/{job_id}").json()["state"] == "cancelled"
+        assert c.get(f"/v1/jobs/{job_id}").json()["status"] == "cancelled"
+        assert c.post(f"/v1/jobs/{job_id}/cancel").status_code == 200
         missing = c.get("/v1/jobs/unknown")
-        assert missing.status_code == 404 and missing.json()["code"] == "job_not_found"
+        assert missing.status_code == 404 and missing.json()["code"] == "not_found"

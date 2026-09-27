@@ -1,8 +1,8 @@
 # jane-kit
 
-Спільна бібліотека сервісів Jane. Дає однакову поведінку всім сервісам: конфігурація з успадкуванням
-лімітів, структуровані журнали, метрики Prometheus, health, модель помилок, ідемпотентність, асинхронні
-job, контрактні тести й моки, генерація клієнтів.
+Спільна бібліотека сервісів Jane. Дає однакову поведінку всім сервісам і реалізує конвенції контрактів
+WP-00 (скіл `jane-contracts`): модель помилок, ідемпотентність, асинхронні job, health/info, ліміти з
+успадкуванням, курсорна пагінація, `traceparent`, контрактні тести й моки, генерація клієнтів.
 
 Підключення в сервісі (uv workspace):
 
@@ -16,68 +16,76 @@ jane-kit = { workspace = true }
 
 ## Модулі
 
-| Модуль | Що дає |
-|---|---|
-| `jane_kit.config` | `Limits` (кожне поле з безпечним типовим значенням, інакше `TypeError`), `resolve_limits(model, *layers)` — злиття рівнів типові → платформа → джерело → завдання, стелі (`ceilings`), походження кожного значення (`explain()`); `load_layer` (TOML/JSON/YAML), `layer_from_env`; `JaneSettings` — налаштування процесу |
-| `jane_kit.logs` | JSON-журнали в stdout, `bind_context(request_id=..., job_id=...)` через `contextvars` |
-| `jane_kit.metrics` | `Metrics` з окремим реєстром на застосунок, `/metrics`, лічильник і гістограма HTTP за шаблоном маршруту |
-| `jane_kit.health` | `/health/live`, `/health/ready`; перевірки з тайм-аутом із конфігурації |
-| `jane_kit.errors` | RFC 9457 Problem Details (`application/problem+json`) зі стабільним `code`; `JaneError` та підкласи; обробники для FastAPI |
-| `jane_kit.idempotency` | `Idempotency-Key`: повтор повертає збережену відповідь, інший запит із тим самим ключем — 422, паралельний — 409; сховище за протоколом |
-| `jane_kit.jobs` | `202` + `job_id` + `Location`, стани `queued/running/succeeded/failed/cancelled`, прогрес, скасування, ліміти паралельності, черги й тайм-ауту |
-| `jane_kit.clients` | `ServiceClient` (httpx): тайм-аути й повтори з конфігурації, повтор лише для безпечних методів або з `Idempotency-Key`, `Retry-After`, `X-Request-ID`, `wait_for_job` |
-| `jane_kit.contracts` | `OpenAPISpec` (OpenAPI 3.1, `$ref` між файлами), `ContractClient` — перевіряє кожну відповідь справжнього сервісу, `build_mock_app` — мок сусіда з контракту |
-| `jane_kit.codegen` | `uv run jane-codegen client <openapi.yaml> --out <pkg>/_generated/<svc>` — моделі Pydantic + асинхронний клієнт |
-| `jane_kit.service` | `create_app(settings)` — FastAPI з усім вищенаведеним; `run()` — uvicorn |
-| `jane_kit.devstack` | `load_stack()` — порти й облікові дані стеку, піднятого `just up` (для інтеграційних тестів) |
+| Модуль | Що дає | Контракт WP-00 |
+|---|---|---|
+| `jane_kit.config` | `Limits` (кожне поле з безпечним типовим значенням, інакше `TypeError`); `resolve_limits(model, *layers)` — злиття platform → source → task → stage → request, `hard_caps`, `effective()` у формі `EffectiveLimits`; `load_layer` (`PlatformLimits` у TOML/JSON/YAML), `layer_from_env`; `JaneSettings` | `schemas/common/limits.schema.json` |
+| `jane_kit.errors` | `Problem`, `FieldError`, `JaneError(code=...)` і підкласи; статус і `retryable` — з каталогу `KNOWN_CODES`; обробники FastAPI (404/405/422/500 теж Problem) | `schemas/common/problem.schema.json`, `docs/errors.md` |
+| `jane_kit.idempotency` | `Idempotency-Key`: повтор → збережена відповідь і `Idempotency-Replayed: true`, інше тіло → 422 `idempotency_key_reused`, паралельно → 409 `idempotency_in_progress`; протокол сховища | `common.yaml` `IdempotencyKey` |
+| `jane_kit.jobs` | `202` + `Job` + `Location`; `queued/running/cancelling/succeeded/failed/cancelled`; прогрес, скасування (202 / 200 для завершених); ліміти паралельності, черги, тайм-ауту, зберігання | `schemas/common/job.schema.json`, `common.yaml` `Job`/`JobCancel` |
+| `jane_kit.health` | `GET /v1/health` (`ok`/`degraded`/`down`, 503 для down), `GET /v1/info` (`ServiceInfo`); тайм-аут перевірок | `common.yaml` `Health`/`Info` |
+| `jane_kit.pagination` | `Page[T]` (`items`, `next_cursor`), `clamp_limit`, непрозорі курсори | конвенція пагінації |
+| `jane_kit.tracing` | `traceparent` (W3C): продовження траси, `trace_id` у журналах і Problem | конвенція простежуваності |
+| `jane_kit.logs` | JSON-журнали в stdout, `bind_context(trace_id=..., job_id=...)` через `contextvars` | — |
+| `jane_kit.metrics` | `Metrics` з окремим реєстром на застосунок, `/metrics`, HTTP-метрики за шаблоном маршруту | — |
+| `jane_kit.clients` | `ServiceClient` (httpx): `timeouts.*_ms` і `RetryPolicy` з конфігурації, повтор лише для безпечних методів або з `Idempotency-Key` і лише retryable-помилок, `Retry-After`, `traceparent`, `wait_for_job` | `RetryPolicy` у limits |
+| `jane_kit.contracts` | `OpenAPISpec` (OpenAPI 3.1, `$ref` між файлами, `$ref` на path items), `ContractClient` — перевіряє кожну відповідь справжнього сервісу, `build_mock_app` — мок сусіда з прикладів контракту, `contracts_dir()`, `find_specs()` | `contracts/openapi/*.v1.yaml` |
+| `jane_kit.codegen` | `uv run jane-codegen client <spec> --out <pkg>/_generated/<svc>` — моделі Pydantic (datamodel-code-generator) + асинхронний клієнт на `ServiceClient` | — |
+| `jane_kit.service` | `create_app(settings, capabilities=...)` — FastAPI з усім вищенаведеним; `run()` — uvicorn | — |
+| `jane_kit.devstack` | `load_stack()` — порти й облікові дані стеку `just up` (для інтеграційних тестів) | — |
 
 ## Ліміти
 
-Числові ліміти не зашиваються в код (plan.md §3.6). Сервіс описує модель:
+Числові ліміти не зашиваються в код (plan.md §3.6). Сервіс описує модель з назвами полів контракту:
 
 ```python
-class CrawlLimits(Limits):
-    concurrency: int = Field(default=4, ge=1)
-    http: HttpLimits = HttpLimits()
+class Crawl(Limits):
+    max_depth: int = Field(default=3, ge=0)
+
+
+class CollectorLimits(Limits):
+    crawl: Crawl = Crawl()
 
 
 resolved = resolve_limits(
-    CrawlLimits,
-    *settings.platform_layers("JANE_WEB_COLLECTOR_LIMITS__"),  # файл + змінні середовища
-    LimitLayer("source", source_cfg, name="shop.example"),
-    LimitLayer("job", job_cfg, name="prices"),
+    CollectorLimits,
+    *settings.platform_layers("JANE_WEB_COLLECTOR_LIMITS__"),  # файл PlatformLimits + змінні середовища
+    LimitLayer("source", source_limits, name="shop"),
+    LimitLayer("task", task_limits, name="prices"),
+    LimitLayer("stage", stage_limits, name="fetch"),
 )
-resolved.limits.concurrency  # значення
-resolved.explain()  # [(шлях, значення, походження)]
+resolved.limits.crawl.max_depth  # значення
+resolved.effective()  # {"limits": {...}, "provenance": {"crawl.max_depth": "task" | "hard_cap" | ...}}
 ```
 
-Стеля (`ceilings`) верхнього рівня обмежує нижчі: завдання не може підняти значення вище стелі платформи
-(`on_exceed="clamp"` — обрізати й записати в `clamped`, `"error"` — помилка).
+`hard_caps` платформи обмежують результат (`min`); нижчий рівень може лише звузити стелю. Автономний
+режим: ліміти із запиту — шар `LimitLayer("request", ...)`, для відмови замість обрізання —
+`on_exceed="error"` (→ `limit_exceeded`).
 
 Типові значення лімітів самої бібліотеки:
 
 | Модель | Параметр | Типово |
 |---|---|---|
-| `JobLimits` | `max_concurrent_jobs` / `max_queued_jobs` / `job_timeout_s` | 4 / 1000 / 3600 |
-| `IdempotencyLimits` | `ttl_s` / `max_key_length` / `in_memory_max_entries` | 86400 / 255 / 10000 |
-| `ClientLimits` | `timeout_s` / `connect_timeout_s` / `max_retries` | 30 / 5 / 3 |
-| `ClientLimits` | `backoff_base_s` / `backoff_max_s` / `max_connections` | 0.2 / 10 / 20 |
-| `ClientLimits` | `job_poll_interval_s` / `job_wait_timeout_s` | 1 / 3600 |
-| `HealthRegistry` | `check_timeout_s` (аргумент `create_app(health_check_timeout_s=...)`) | 2 |
+| `JobLimits` | `max_concurrent_jobs` / `max_queued_jobs` | 4 / 1000 |
+| `JobLimits` | `job_timeout_ms` / `job_retention_seconds` | 3600000 / 86400 |
+| `IdempotencyLimits` | `idempotency_ttl_seconds` / `in_memory_max_entries` | 86400 / 10000 |
+| `ClientLimits` | `connect_timeout_ms` / `request_timeout_ms` / `max_connections` | 5000 / 30000 / 20 |
+| `ClientLimits.retries` | `max_attempts` / `initial_backoff_ms` / `max_backoff_ms` / `backoff_multiplier` / `jitter` | 4 / 200 / 10000 / 2.0 / true |
+| `ClientLimits` | `job_poll_interval_ms` / `job_wait_timeout_ms` | 1000 / 3600000 |
+| `PageLimits` | `default_page_size` / `max_page_size` | 50 / 500 |
+| `HealthRegistry` | `check_timeout_s` (`create_app(health_check_timeout_s=...)`) | 2 |
 
 ## Кілька екземплярів
 
 `InMemoryIdempotencyStore` і `InMemoryJobStore` — для одного екземпляра й тестів. Для кількох екземплярів
 сервіс реалізує протоколи `IdempotencyStore` і `JobStore` у власній БД; решта коду не змінюється.
 
-## Точки підключення WP-00
-
-Формат помилки (`errors.py`), шляхи health (`health.py`), стани й ендпоінти job (`jobs.py`), заголовки
-ідемпотентності (`idempotency.py`) і розташування контрактів (`contracts.find_specs`) узгоджуються з
-`contracts/` WP-00. Кожне таке місце позначене в коді як `CONNECTION POINT (WP-00)`.
-
 ## Тести
 
 ```
 just test jane-kit
+JANE_CONTRACTS_DIR=<шлях до contracts> just test jane-kit -m contract   # проти контрактів WP-00
 ```
+
+`tests/test_wp00_contracts.py` перевіряє відповідність контрактам WP-00 (каталог кодів помилок, Problem,
+Job, Health, ServiceInfo, EffectiveLimits, моки й клієнт для кожного `contracts/openapi/*.v1.yaml`);
+пропускається, доки `contracts/` немає в checkout.

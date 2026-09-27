@@ -1,16 +1,18 @@
-"""Service settings and limits inherited across levels: defaults -> platform -> source -> job.
+"""Service settings and limits inherited across levels: platform -> source -> task -> stage (-> request).
 
-Rules (plan.md §3.6, TZ §13.1.5):
+Follows ``contracts/schemas/common/limits.schema.json`` (WP-00):
 
-* Every numeric limit lives in a :class:`Limits` model and **must** declare a safe default there;
-  code never hard-codes a limit, it reads the resolved model.
-* A layer (platform, source, job) overrides any subset of fields. Missing fields are inherited.
-* A layer may also declare *ceilings*: upper bounds that later (more specific) layers cannot
-  exceed. A job cannot raise its concurrency above the platform ceiling, for example.
-* The result remembers where every value came from (``origin``) for diagnostics.
+* Every numeric limit lives in a :class:`Limits` model of the service and **must** declare a safe
+  default there (those defaults are the service's platform defaults); code never hard-codes a limit.
+* A layer overrides any subset of fields (deep merge); a missing field is inherited; ``null`` is not
+  a value (to inherit, omit the field).
+* ``hard_caps`` (platform level; a more specific layer may only tighten them) bound every value after
+  merging: effective = min(value, hard cap).
+* The result keeps the provenance of every leaf (``EffectiveLimits`` in the contract).
 
-Layers can be read from TOML/JSON/YAML files (``limits`` and ``ceilings`` tables) and from
-environment variables (``JANE_LIMITS__HTTP__TIMEOUT_S=5`` -> ``{"http": {"timeout_s": "5"}}``).
+Files: a platform file has the ``PlatformLimits`` shape ``{"profile", "defaults", "hard_caps"}``
+(TOML/JSON/YAML); other levels are plain Limits objects. Environment variables:
+``<PREFIX>CRAWL__MAX_DEPTH=5`` (value), ``<PREFIX>HARD_CAPS__CRAWL__MAX_DEPTH=10`` (hard cap).
 """
 
 from __future__ import annotations
@@ -40,19 +42,20 @@ __all__ = [
     "resolve_limits",
 ]
 
-LEVELS: tuple[str, ...] = ("default", "platform", "source", "job")
-"""Canonical inheritance order. Custom level names are allowed, order is the call order."""
+LEVELS: tuple[str, ...] = ("platform", "source", "task", "stage", "request")
+"""Levels of ``LimitLevel`` in the contract, least specific first (plus ``hard_cap`` in provenance)."""
 
 
 class LimitError(ValueError):
-    """Invalid limit configuration (unknown field, wrong type, bad ceiling)."""
+    """Invalid limit configuration (unknown field, wrong type, loosened hard cap)."""
 
 
 class Limits(BaseModel):
     """Base class for a service's limits. Subclasses must give every field a default.
 
-    Nested groups are allowed: declare a field whose type is another :class:`Limits` subclass
-    with a default instance (``http: HttpLimits = HttpLimits()``).
+    Use the field names of ``limits.schema.json`` where the limit exists there
+    (``timeouts.request_timeout_ms``, ``transfer.idempotency_ttl_seconds``...). Nested groups are
+    fields whose type is another :class:`Limits` subclass with a default instance.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True, validate_default=True)
@@ -69,12 +72,12 @@ class Limits(BaseModel):
 
 @dataclass(frozen=True)
 class LimitLayer:
-    """One level of configuration (e.g. platform, source ``shop.example``, job ``prices``)."""
+    """One level of configuration (platform, source ``shop``, task ``prices``, stage ``extract``...)."""
 
     level: str
     values: Mapping[str, Any] = field(default_factory=dict)
-    ceilings: Mapping[str, Any] = field(default_factory=dict)
-    name: str | None = None  # optional identifier, e.g. source id, for diagnostics
+    hard_caps: Mapping[str, Any] = field(default_factory=dict)
+    name: str | None = None  # e.g. source id or file name, for diagnostics
 
     @property
     def label(self) -> str:
@@ -85,18 +88,34 @@ class LimitLayer:
 class ResolvedLimits[L: Limits]:
     limits: L
     origin: dict[str, str]
-    """Dotted field path -> label of the layer that set the value (``default`` if inherited)."""
+    """Dotted leaf path -> label of the layer that set it (``default`` = the model's default)."""
     clamped: dict[str, str]
-    """Dotted field path -> label of the layer whose ceiling reduced the value."""
+    """Dotted leaf path -> label of the layer whose hard cap reduced the value."""
+
+    def provenance(self) -> dict[str, str]:
+        """Leaf path -> contract ``LimitLevel`` (model defaults count as ``platform``)."""
+        out = {}
+        for path in _flatten(self.limits.model_dump()):
+            if path in self.clamped:
+                out[path] = "hard_cap"
+            else:
+                out[path] = self.origin.get(path, "platform:default").split(":", 1)[0]
+                if out[path] == "default":
+                    out[path] = "platform"
+        return out
+
+    def effective(self) -> dict[str, Any]:
+        """``EffectiveLimits`` document: ``{"limits": {...}, "provenance": {...}}``."""
+        return {"limits": self.limits.model_dump(mode="json"), "provenance": self.provenance()}
 
     def explain(self) -> list[tuple[str, Any, str]]:
-        """Rows ``(path, value, origin)`` for logs and diagnostics endpoints."""
+        """Rows ``(path, value, origin)`` for logs and diagnostics."""
         flat = _flatten(self.limits.model_dump())
         rows = []
         for path in sorted(flat):
             origin = self.origin.get(path, "default")
             if path in self.clamped:
-                origin = f"{origin} (clamped by {self.clamped[path]})"
+                origin = f"{origin} (hard cap from {self.clamped[path]})"
             rows.append((path, flat[path], origin))
         return rows
 
@@ -134,42 +153,50 @@ def _field_paths(model: type[BaseModel], prefix: str = "") -> set[str]:
     return paths
 
 
+def _gt(a: Any, b: Any) -> bool:
+    try:
+        return bool(a > b)
+    except TypeError as exc:
+        raise LimitError(f"hard cap {b!r} is not comparable with value {a!r}") from exc
+
+
 def resolve_limits[L: Limits](
     model: type[L],
     *layers: LimitLayer,
     on_exceed: Literal["clamp", "error"] = "clamp",
 ) -> ResolvedLimits[L]:
-    """Merge ``layers`` (least specific first) over the defaults of ``model``.
+    """Merge ``layers`` (least specific first) over the defaults of ``model`` and apply hard caps.
 
-    ``on_exceed='clamp'`` lowers a value above an inherited ceiling to the ceiling and records it
-    in ``clamped``; ``'error'`` raises :class:`LimitError` instead.
+    ``on_exceed='clamp'`` lowers a value above a hard cap to the cap (recorded in ``clamped``,
+    provenance ``hard_cap``); ``'error'`` raises :class:`LimitError` instead (useful to reject a
+    request that asks for more than allowed with ``limit_exceeded``).
     """
     known = _field_paths(model)
     merged: dict[str, Any] = {}
     origin: dict[str, str] = {}
-    ceilings: dict[str, tuple[Any, str]] = {}
+    caps: dict[str, tuple[Any, str]] = {}
 
     for layer in layers:
         values = _flatten(layer.values)
-        caps = _flatten(layer.ceilings)
-        unknown = (set(values) | set(caps)) - known
+        layer_caps = _flatten(layer.hard_caps)
+        unknown = (set(values) | set(layer_caps)) - known
         if unknown:
             raise LimitError(f"{layer.label}: unknown limit(s) {sorted(unknown)} for {model.__name__}")
-        if caps:  # coerce ceilings to the declared field types ("4" from env -> 4)
+        nulls = sorted(p for p, v in {**values, **layer_caps}.items() if v is None)
+        if nulls:
+            raise LimitError(f"{layer.label}: null is not a limit value (omit the field to inherit): {nulls}")
+        if layer_caps:  # coerce to declared types ("4" from env -> 4)
             try:
-                typed = _flatten(model.model_validate(_unflatten(caps)).model_dump())
+                typed = _flatten(model.model_validate(_unflatten(layer_caps)).model_dump())
             except ValidationError as exc:
-                raise LimitError(f"{layer.label}: invalid ceilings for {model.__name__}: {exc}") from exc
-            caps = {path: typed[path] for path in caps}
-        for path, cap in caps.items():
-            if path in ceilings:
-                prev, prev_label = ceilings[path]
-                # A more specific layer may tighten a ceiling but never loosen it.
-                if _gt(cap, prev):
+                raise LimitError(f"{layer.label}: invalid hard_caps for {model.__name__}: {exc}") from exc
+            for path in layer_caps:
+                cap = typed[path]
+                if path in caps and _gt(cap, caps[path][0]):
                     raise LimitError(
-                        f"{layer.label}: ceiling {path}={cap!r} exceeds ceiling {prev!r} from {prev_label}"
+                        f"{layer.label}: hard cap {path}={cap!r} loosens {caps[path][0]!r} from {caps[path][1]}"
                     )
-            ceilings[path] = (cap, layer.label)
+                caps[path] = (cap, layer.label)
         for path, value in values.items():
             merged[path] = value
             origin[path] = layer.label
@@ -181,29 +208,18 @@ def resolve_limits[L: Limits](
 
     clamped: dict[str, str] = {}
     flat = _flatten(limits.model_dump())
-    for path, (cap, label) in ceilings.items():
+    for path, (cap, label) in caps.items():
         value = flat.get(path)
         if value is not None and _gt(value, cap):
             if on_exceed == "error":
                 raise LimitError(
-                    f"{path}={value!r} (from {origin.get(path, 'default')}) exceeds ceiling {cap!r} "
-                    f"from {label}"
+                    f"{path}={value!r} (from {origin.get(path, 'default')}) exceeds hard cap {cap!r} from {label}"
                 )
             flat[path] = cap
             clamped[path] = label
     if clamped:
-        try:
-            limits = model.model_validate(_unflatten(flat))
-        except ValidationError as exc:
-            raise LimitError(f"ceiling makes limits invalid for {model.__name__}: {exc}") from exc
+        limits = model.model_validate(_unflatten(flat))
     return ResolvedLimits(limits=limits, origin=origin, clamped=clamped)
-
-
-def _gt(a: Any, b: Any) -> bool:
-    try:
-        return bool(a > b)
-    except TypeError as exc:
-        raise LimitError(f"ceiling {b!r} is not comparable with value {a!r}") from exc
 
 
 def _read_mapping(path: Path) -> dict[str, Any]:
@@ -222,14 +238,22 @@ def _read_mapping(path: Path) -> dict[str, Any]:
     return data
 
 
-def load_layer(path: str | Path, level: str, *, name: str | None = None) -> LimitLayer:
-    """Read a layer file with optional ``limits`` and ``ceilings`` tables."""
+def load_layer(path: str | Path, level: str = "platform", *, name: str | None = None) -> LimitLayer:
+    """Read a layer file. ``level='platform'`` expects ``PlatformLimits`` (``defaults``/``hard_caps``/``profile``);
+    other levels expect a plain Limits object."""
     data = _read_mapping(Path(path))
-    extra = set(data) - {"limits", "ceilings"}
+    if level != "platform":
+        return LimitLayer(level=level, values=data, name=name)
+    extra = set(data) - {"profile", "defaults", "hard_caps"}
     if extra:
-        raise LimitError(f"{path}: unexpected top-level keys {sorted(extra)}; use 'limits' and 'ceilings'")
+        raise LimitError(
+            f"{path}: unexpected top-level keys {sorted(extra)}; PlatformLimits has profile/defaults/hard_caps"
+        )
     return LimitLayer(
-        level=level, values=data.get("limits") or {}, ceilings=data.get("ceilings") or {}, name=name
+        level="platform",
+        values=data.get("defaults") or {},
+        hard_caps=data.get("hard_caps") or {},
+        name=name or data.get("profile"),
     )
 
 
@@ -238,26 +262,23 @@ def layer_from_env(
     level: str = "platform",
     environ: Mapping[str, str] | None = None,
 ) -> LimitLayer:
-    """Layer from environment variables. ``__`` separates nesting; ``CEILING__`` marks a ceiling.
+    """Layer from environment variables; ``__`` separates nesting, ``HARD_CAPS__`` marks a hard cap.
 
-    ``JANE_LIMITS__MAX_DEPTH=5`` -> value; ``JANE_LIMITS__CEILING__MAX_DEPTH=10`` -> ceiling.
     Values stay strings; pydantic coerces them to the declared types.
     """
     env = os.environ if environ is None else environ
     values: dict[str, Any] = {}
-    ceilings: dict[str, Any] = {}
+    caps: dict[str, Any] = {}
     for key, raw in env.items():
         if not key.upper().startswith(prefix.upper()):
             continue
         parts = [p.lower() for p in key[len(prefix) :].split("__") if p]
-        if not parts:
-            continue
         target = values
-        if parts[0] == "ceiling":
-            target, parts = ceilings, parts[1:]
+        if parts[:1] == ["hard_caps"]:
+            target, parts = caps, parts[1:]
         if parts:
             target[".".join(parts)] = raw
-    return LimitLayer(level=level, values=_unflatten(values), ceilings=_unflatten(ceilings), name="env")
+    return LimitLayer(level=level, values=_unflatten(values), hard_caps=_unflatten(caps), name="env")
 
 
 class JaneSettings(BaseSettings):
@@ -275,8 +296,10 @@ class JaneSettings(BaseSettings):
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "json"
     metrics_enabled: bool = True
+    auth_mode: Literal["none", "api_key", "jwt"] = "none"
+    """Reported in ``/v1/info``; enforcement is per service (ADR on authentication, WP-00)."""
     limits_file: Path | None = None
-    """Platform-level limits file (TOML/JSON/YAML); env ``JANE_LIMITS__*`` overrides it."""
+    """Platform limits file (``PlatformLimits`` shape); env ``<PREFIX>LIMITS__*`` overrides it."""
 
     def platform_layers(self, env_prefix: str = "JANE_LIMITS__") -> list[LimitLayer]:
         """Platform layers in order: limits file, then environment overrides."""
@@ -284,7 +307,7 @@ class JaneSettings(BaseSettings):
         if self.limits_file is not None:
             layers.append(load_layer(self.limits_file, "platform", name=str(self.limits_file)))
         env_layer = layer_from_env(env_prefix, level="platform")
-        if env_layer.values or env_layer.ceilings:
+        if env_layer.values or env_layer.hard_caps:
             layers.append(env_layer)
         return layers
 

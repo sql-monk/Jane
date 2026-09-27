@@ -1,102 +1,91 @@
-"""Health endpoints: liveness (process is up) and readiness (dependencies are usable).
+"""``GET /v1/health`` and ``GET /v1/info`` per WP-00 ``common.yaml`` (pathItems Health, Info).
 
-CONNECTION POINT (WP-00): paths and body follow the health convention of ``contracts/``;
-defaults are ``GET /health/live`` and ``GET /health/ready``.
+Health: ``{"status": "ok"|"degraded"|"down", "checks": {name: {"status", "message"}}}``; HTTP 200 for
+ok/degraded, 503 for down. A check returns ``True``/``False``, a status string, or raises; each check
+is time-boxed by ``check_timeout_s`` (from config).
 """
 
 from __future__ import annotations
 
 import asyncio
 import inspect
-import time
 from collections.abc import Awaitable, Callable
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-__all__ = ["CheckResult", "HealthRegistry", "HealthReport", "install_health"]
+__all__ = ["CheckResult", "HealthRegistry", "HealthReport", "ServiceInfo", "install_health"]
 
-CheckFn = Callable[[], bool | Awaitable[bool]]
+Status = Literal["ok", "degraded", "down"]
+CheckFn = Callable[[], bool | str | Awaitable[bool | str]]
+_RANK = {"ok": 0, "degraded": 1, "down": 2}
 
 
 class CheckResult(BaseModel):
-    status: Literal["ok", "fail"]
-    duration_ms: float
-    error: str | None = None
+    status: Status
+    message: str | None = None
 
 
 class HealthReport(BaseModel):
-    status: Literal["ok", "fail"]
-    service: str
-    instance: str | None = None
-    version: str | None = None
+    status: Status
     checks: dict[str, CheckResult] = {}
 
 
+class ServiceInfo(BaseModel):
+    service: str
+    version: str
+    api_versions: list[str]
+    capabilities: dict[str, Any] = {}
+    auth_mode: Literal["none", "api_key", "jwt"] | None = None
+
+
 class HealthRegistry:
-    """Named readiness checks. A check returns ``True``/``False`` or raises; it is time-boxed."""
+    """Named health checks. ``critical=False`` checks can only make the service ``degraded``."""
 
-    def __init__(
-        self,
-        service: str,
-        *,
-        instance: str | None = None,
-        version: str | None = None,
-        check_timeout_s: float = 2.0,
-    ) -> None:
-        self.service = service
-        self.instance = instance
-        self.version = version
+    def __init__(self, check_timeout_s: float = 2.0) -> None:
         self.check_timeout_s = check_timeout_s
-        self._checks: dict[str, CheckFn] = {}
+        self._checks: dict[str, tuple[CheckFn, bool]] = {}
 
-    def add(self, name: str, check: CheckFn) -> None:
-        self._checks[name] = check
+    def add(self, name: str, check: CheckFn, *, critical: bool = True) -> None:
+        self._checks[name] = (check, critical)
 
-    async def _run(self, check: CheckFn) -> CheckResult:
-        start = time.perf_counter()
+    async def _run(self, check: CheckFn, critical: bool) -> CheckResult:
+        failed: Status = "down" if critical else "degraded"
         try:
             async with asyncio.timeout(self.check_timeout_s):
                 result = check()
                 if inspect.isawaitable(result):
                     result = await result
-            ok, error = bool(result), None if result else "check returned false"
         except TimeoutError:
-            ok, error = False, f"timeout after {self.check_timeout_s}s"
+            return CheckResult(status=failed, message=f"timeout after {self.check_timeout_s}s")
         except Exception as exc:
-            ok, error = False, f"{type(exc).__name__}: {exc}"
-        return CheckResult(
-            status="ok" if ok else "fail",
-            duration_ms=round((time.perf_counter() - start) * 1000, 2),
-            error=error,
+            return CheckResult(status=failed, message=f"{type(exc).__name__}: {exc}")
+        if isinstance(result, str) and result in _RANK:
+            status: Status = result  # type: ignore[assignment]
+            return CheckResult(status=status if critical or status != "down" else "degraded")
+        return (
+            CheckResult(status="ok") if result else CheckResult(status=failed, message="check returned false")
         )
 
-    async def readiness(self) -> HealthReport:
+    async def report(self) -> HealthReport:
         names = list(self._checks)
-        results = await asyncio.gather(*(self._run(self._checks[n]) for n in names))
+        results = await asyncio.gather(*(self._run(*self._checks[n]) for n in names))
         checks = dict(zip(names, results, strict=True))
-        status: Literal["ok", "fail"] = "ok" if all(r.status == "ok" for r in results) else "fail"
-        return HealthReport(
-            status=status, service=self.service, instance=self.instance, version=self.version, checks=checks
-        )
-
-    def liveness(self) -> HealthReport:
-        return HealthReport(status="ok", service=self.service, instance=self.instance, version=self.version)
+        worst = max((r.status for r in results), key=_RANK.__getitem__, default="ok")
+        return HealthReport(status=worst, checks=checks)
 
 
-def install_health(app: FastAPI, registry: HealthRegistry, prefix: str = "/health") -> None:
-    @app.get(f"{prefix}/live", tags=["health"], response_model=HealthReport)
-    async def live() -> HealthReport:
-        return registry.liveness()
+def install_health(
+    app: FastAPI, registry: HealthRegistry, info: Callable[[], ServiceInfo], prefix: str = "/v1"
+) -> None:
+    @app.get(f"{prefix}/health", tags=["system"], operation_id="getHealth", response_model=None)
+    async def health() -> JSONResponse:
+        report = await registry.report()
+        body = report.model_dump(mode="json", exclude_none=True)
+        return JSONResponse(body, status_code=503 if report.status == "down" else 200)
 
-    @app.get(
-        f"{prefix}/ready",
-        tags=["health"],
-        response_model=HealthReport,
-        responses={503: {"model": HealthReport}},
-    )
-    async def ready() -> JSONResponse:
-        report = await registry.readiness()
-        return JSONResponse(report.model_dump(mode="json"), status_code=200 if report.status == "ok" else 503)
+    @app.get(f"{prefix}/info", tags=["system"], operation_id="getServiceInfo", response_model=None)
+    async def service_info() -> JSONResponse:
+        return JSONResponse(info().model_dump(mode="json", exclude_none=True))

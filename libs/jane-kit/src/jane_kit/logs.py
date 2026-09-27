@@ -20,7 +20,12 @@ __all__ = ["JsonFormatter", "bind_context", "configure_logging", "current_contex
 _context: contextvars.ContextVar[Mapping[str, Any]] = contextvars.ContextVar("jane_log_context", default={})  # noqa: B039
 
 # Attributes every LogRecord has; anything else came from `extra=`.
-_STANDARD = set(logging.LogRecord("", 0, "", 0, "", None, None).__dict__) | {"message", "asctime", "taskName"}
+_STANDARD = set(logging.LogRecord("", 0, "", 0, "", None, None).__dict__) | {
+    "message",
+    "asctime",
+    "taskName",
+    "color_message",
+}  # uvicorn ANSI duplicate
 
 
 def current_context() -> dict[str, Any]:

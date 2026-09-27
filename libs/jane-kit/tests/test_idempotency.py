@@ -7,7 +7,7 @@ from fastapi import Request, Response
 from fastapi.testclient import TestClient
 
 from jane_kit.config import JaneSettings
-from jane_kit.errors import BadRequest
+from jane_kit.errors import ValidationFailed
 from jane_kit.idempotency import (
     IdempotencyInProgress,
     IdempotencyKeyReused,
@@ -43,8 +43,9 @@ async def test_reuse_with_different_request_rejected() -> None:
         return StoredResponse(200, {})
 
     await run_idempotent(store, "k", "fp1", handler)
-    with pytest.raises(IdempotencyKeyReused):
+    with pytest.raises(IdempotencyKeyReused) as info:
         await run_idempotent(store, "k", "fp2", handler)
+    assert (info.value.status, info.value.retryable) == (422, False)
 
 
 async def test_concurrent_duplicate_gets_in_progress() -> None:
@@ -57,8 +58,9 @@ async def test_concurrent_duplicate_gets_in_progress() -> None:
 
     first = asyncio.create_task(run_idempotent(store, "k", "fp", slow))
     await asyncio.sleep(0)
-    with pytest.raises(IdempotencyInProgress):
+    with pytest.raises(IdempotencyInProgress) as info:
         await run_idempotent(store, "k", "fp", slow)
+    assert (info.value.status, info.value.retryable) == (409, True)
     gate.set()
     assert (await first)[0].body == {"ok": True}
 
@@ -80,10 +82,8 @@ async def test_failed_handler_releases_key() -> None:
 
 async def test_ttl_expiry_and_eviction_from_limits() -> None:
     now = [0.0]
-    store = InMemoryIdempotencyStore(
-        IdempotencyLimits(ttl_s=10, in_memory_max_entries=2), clock=lambda: now[0]
-    )
-    limits = store.limits
+    limits = IdempotencyLimits(idempotency_ttl_seconds=60, in_memory_max_entries=2)
+    store = InMemoryIdempotencyStore(limits, clock=lambda: now[0])
     counter = 0
 
     async def handler() -> StoredResponse:
@@ -92,23 +92,21 @@ async def test_ttl_expiry_and_eviction_from_limits() -> None:
         return StoredResponse(200, counter)
 
     await run_idempotent(store, "a", "fp", handler, limits)
-    now[0] = 11
+    now[0] = 61
     response, replayed = await run_idempotent(store, "a", "fp", handler, limits)
     assert response.body == 2 and not replayed
-    await run_idempotent(store, "b", "fp", handler, limits)
-    await run_idempotent(store, "c", "fp", handler, limits)
-    await run_idempotent(store, "d", "fp", handler, limits)
-    assert len(store._records) <= 2
+    for key in ("b", "c", "d"):
+        await run_idempotent(store, key, "fp", handler, limits)
+    assert len(store) <= 2
 
 
-async def test_key_length_limit() -> None:
-    store = InMemoryIdempotencyStore()
-
+@pytest.mark.parametrize("key", ["", "x" * 256, "has space", "кирилиця"])
+async def test_key_format_from_contract(key: str) -> None:
     async def handler() -> StoredResponse:
         return StoredResponse(200, None)
 
-    with pytest.raises(BadRequest):
-        await run_idempotent(store, "x" * 11, "fp", handler, IdempotencyLimits(max_key_length=10))
+    with pytest.raises(ValidationFailed):
+        await run_idempotent(InMemoryIdempotencyStore(), key, "fp", handler)
 
 
 def test_fastapi_helper_end_to_end() -> None:
@@ -131,8 +129,11 @@ def test_fastapi_helper_end_to_end() -> None:
     r4 = c.post("/v1/orders", json={"a": 1})
     assert r1.status_code == r2.status_code == 201
     assert r1.json() == r2.json() == {"order": 1}
-    assert r2.headers["Idempotent-Replayed"] == "true"
+    assert "Idempotency-Replayed" not in r1.headers
+    assert r2.headers["Idempotency-Replayed"] == "true"
     assert r2.headers["Location"] == "/v1/orders/1"
     assert r3.status_code == 422 and r3.json()["code"] == "idempotency_key_reused"
-    assert r4.status_code == 400 and r4.json()["code"] == "idempotency_key_missing"
+    assert r4.status_code == 422 and r4.json()["errors"] == [
+        {"parameter": "Idempotency-Key", "message": "required"}
+    ]
     assert len(created) == 1

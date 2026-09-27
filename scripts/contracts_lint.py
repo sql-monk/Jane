@@ -1,17 +1,19 @@
-"""Lint `contracts/`: OpenAPI 3.1 documents and JSON Schema 2020-12 files.
+"""Lint `contracts/` (CI stage `contract`).
 
-* ``openapi*.yaml|yml|json`` -> openapi-spec-validator (3.1) + every ``$ref`` resolvable;
-* other ``*.schema.json|yaml`` / files under ``schemas/`` with ``$schema`` -> Draft 2020-12 meta-schema;
-* everything must parse as YAML/JSON (UTF-8).
-
-CONNECTION POINT (WP-00): if WP-00 adds its own linter config (e.g. ``contracts/.spectral.yaml`` or
-``contracts/lint.py``), call it from ``extra_linters`` below.
-Exit code 0 when there is nothing to lint (before WP-00 is merged).
+* If WP-00's linter ``contracts/tools/check_contracts.py`` exists, it is authoritative and is run via
+  ``uv run --script`` (schemas, OpenAPI, Jane conventions, examples, Redocly). Redocly needs Node/npx;
+  it runs only with ``JANE_CONTRACTS_REDOCLY=1`` (set in CI), otherwise ``--no-redocly`` is passed.
+* Fallback (no WP-00 linter): every YAML/JSON parses, documents with ``openapi`` are valid OpenAPI 3.1,
+  documents with ``$schema`` are valid JSON Schema 2020-12.
+Exit code 0 when there is nothing to lint (before WP-00 is merged). ``JANE_CONTRACTS_DIR`` overrides
+the location.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -24,7 +26,8 @@ from openapi_spec_validator import validate
 from openapi_spec_validator.readers import read_from_filename
 
 ROOT = Path(__file__).resolve().parents[1]
-CONTRACTS = ROOT / "contracts"
+CONTRACTS = Path(os.environ.get("JANE_CONTRACTS_DIR") or ROOT / "contracts")
+WP00_LINTER = CONTRACTS / "tools" / "check_contracts.py"
 
 
 def load(path: Path) -> Any:
@@ -32,11 +35,13 @@ def load(path: Path) -> Any:
     return json.loads(text) if path.suffix == ".json" else yaml.safe_load(text)
 
 
-def extra_linters() -> list[list[str]]:
-    cmds = []
-    if (CONTRACTS / "lint.py").is_file():
-        cmds.append([sys.executable, str(CONTRACTS / "lint.py")])
-    return cmds
+def run_wp00_linter() -> int:
+    redocly = os.environ.get("JANE_CONTRACTS_REDOCLY") == "1"
+    uv = shutil.which("uv")
+    cmd = [uv, "run", "--script", str(WP00_LINTER)] if uv else [sys.executable, str(WP00_LINTER)]
+    cmd.append("--require-redocly" if redocly else "--no-redocly")
+    print("$ " + " ".join(cmd), flush=True)
+    return subprocess.run(cmd, cwd=ROOT, check=False).returncode
 
 
 def main() -> int:
@@ -45,11 +50,13 @@ def main() -> int:
     if not CONTRACTS.is_dir():
         print("contracts lint: no contracts/ directory yet (WP-00) - nothing to check")
         return 0
+    if WP00_LINTER.is_file():
+        return run_wp00_linter()
     files = sorted(p for p in CONTRACTS.rglob("*") if p.is_file() and p.suffix in {".yaml", ".yml", ".json"})
     errors: list[str] = []
     specs = schemas = 0
     for path in files:
-        rel = path.relative_to(ROOT).as_posix()
+        rel = path.relative_to(CONTRACTS.parent).as_posix()
         try:
             doc = load(path)
         except (yaml.YAMLError, json.JSONDecodeError, UnicodeDecodeError) as exc:
@@ -76,15 +83,12 @@ def main() -> int:
                 Draft202012Validator.check_schema(doc)
             except SchemaError as exc:
                 errors.append(f"{rel}: invalid JSON Schema: {exc.message}")
-    code = 0
-    for cmd in extra_linters():
-        code = max(code, subprocess.run(cmd, cwd=ROOT, check=False).returncode)
     for e in errors:
         print(f"ERROR {e}")
     print(
         f"contracts lint: {len(files)} file(s), {specs} OpenAPI, {schemas} JSON Schema, {len(errors)} error(s)"
     )
-    return 1 if errors or code else 0
+    return 1 if errors else 0
 
 
 if __name__ == "__main__":

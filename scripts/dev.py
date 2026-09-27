@@ -89,14 +89,6 @@ def pytest_ok(code: int) -> bool:
     return code in (0, 5)  # 5 = no tests collected (e.g. no contract tests yet)
 
 
-def has_web() -> bool:
-    return (
-        any((p / "package.json").is_file() for p in (ROOT / "web").glob("*"))
-        if (ROOT / "web").is_dir()
-        else False
-    )
-
-
 # ----------------------------------------------------------------------------- quality
 def cmd_sync(_: argparse.Namespace) -> int:
     return run(["uv", "sync", "--all-packages"]).returncode
@@ -122,7 +114,7 @@ def cmd_types(_: argparse.Namespace) -> int:
         targets = [str(p.relative_to(ROOT)) for p in (m / "src", m / "tests") if p.is_dir()]
         if targets:
             code = max(code, run(uv_run("mypy", *targets)).returncode)
-    code = max(code, run(uv_run("mypy", "scripts")).returncode)
+    code = max(code, run(uv_run("mypy", "scripts", "infra/tests")).returncode)
     return code
 
 
@@ -150,24 +142,32 @@ def cmd_isolation(ns: argparse.Namespace) -> int:
     return 0 if pytest_ok(code) else code
 
 
+def web_packages() -> list[Path]:
+    web = ROOT / "web"
+    return sorted(p for p in web.glob("*") if (p / "package.json").is_file()) if web.is_dir() else []
+
+
 def cmd_web(_: argparse.Namespace) -> int:
-    if not has_web():
+    """Each web/<app> is a standalone pnpm project (own lockfile, `packageManager` pins pnpm)."""
+    packages = web_packages()
+    if not packages:
         print("web: no packages under web/ yet (WP-12) - skipped")
         return 0
     corepack = shutil.which("corepack")
     if corepack is None:
         print("corepack not found (Node.js 24 ships it)", file=sys.stderr)
         return 1
-    pnpm = [corepack, "pnpm"]
-    for args in (
-        ["install", "--frozen-lockfile"],
-        ["-r", "--if-present", "lint"],
-        ["-r", "--if-present", "typecheck"],
-        ["-r", "--if-present", "test"],
-    ):
-        code = run([*pnpm, *args]).returncode
-        if code:
-            return code
+    for pkg in packages:
+        pnpm = [corepack, "pnpm", "--dir", str(pkg.relative_to(ROOT))]
+        for args in (
+            ["install", "--frozen-lockfile"],
+            ["run", "--if-present", "lint"],
+            ["run", "--if-present", "typecheck"],
+            ["run", "--if-present", "test"],
+        ):
+            code = run([*pnpm, *args]).returncode
+            if code:
+                return code
     return 0
 
 

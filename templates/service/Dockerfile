@@ -26,5 +26,5 @@ ENV PATH=/app/.venv/bin:$PATH \
 USER jane
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \
-  CMD ["python", "-c", "import os, urllib.request; urllib.request.urlopen(f\"http://127.0.0.1:{os.environ['JANE_TEMPLATE_SERVICE_PORT']}/health/live\", timeout=2)"]
+  CMD ["python", "-c", "import os, urllib.request; urllib.request.urlopen(f\"http://127.0.0.1:{os.environ['JANE_TEMPLATE_SERVICE_PORT']}/v1/health\", timeout=2)"]
 CMD ["python", "-m", "jane_template_service"]

@@ -17,13 +17,24 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
         yield c
 
 
-def test_health_live_and_ready(client: TestClient) -> None:
-    live = client.get("/health/live")
-    assert live.status_code == 200
-    assert live.json()["status"] == "ok"
-    assert live.json()["service"] == "template-service"
-    ready = client.get("/health/ready")
-    assert ready.status_code == 200
+def wait_status(client: TestClient, job_id: str, wanted: str) -> dict[str, object]:
+    deadline = time.monotonic() + 5
+    job: dict[str, object] = {}
+    while time.monotonic() < deadline:
+        job = client.get(f"/v1/jobs/{job_id}").json()
+        if job["status"] == wanted:
+            break
+        time.sleep(0.02)
+    return job
+
+
+def test_health_and_info(client: TestClient) -> None:
+    health = client.get("/v1/health")
+    assert health.status_code == 200
+    assert health.json() == {"status": "ok", "checks": {}}
+    info = client.get("/v1/info").json()
+    assert info["service"] == "template-service"
+    assert info["api_versions"] == ["v1"]
 
 
 def test_metrics_exposed(client: TestClient) -> None:
@@ -33,18 +44,21 @@ def test_metrics_exposed(client: TestClient) -> None:
 
 
 def test_limits_come_from_config(client: TestClient) -> None:
-    rows = {r["path"]: r for r in client.get("/v1/info").json()["limits"]}
-    assert rows["jobs.max_concurrent_jobs"]["value"] == 2
-    assert rows["jobs.max_concurrent_jobs"]["origin"] == "platform:env"
-    assert rows["idempotency.ttl_s"]["origin"] == "default"
+    resolved = client.app.state.limits  # type: ignore[attr-defined]
+    assert resolved.limits.jobs.max_concurrent_jobs == 2
+    provenance = resolved.provenance()
+    assert provenance["jobs.max_concurrent_jobs"] == "platform"
+    assert resolved.origin["jobs.max_concurrent_jobs"] == "platform:env"
 
 
 def test_unknown_route_is_problem(client: TestClient) -> None:
-    r = client.get("/v1/nope")
+    r = client.get(
+        "/v1/nope", headers={"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}
+    )
     assert r.status_code == 404
     assert r.headers["content-type"].startswith("application/problem+json")
     assert r.json()["code"] == "not_found"
-    assert r.headers["X-Request-ID"]
+    assert r.json()["trace_id"] == "4bf92f3577b34da6a3ce929d0e0e4736"
 
 
 def test_example_job_is_idempotent_and_finishes(client: TestClient) -> None:
@@ -55,35 +69,29 @@ def test_example_job_is_idempotent_and_finishes(client: TestClient) -> None:
     assert first.headers["Location"] == f"/v1/jobs/{job_id}"
     again = client.post("/v1/examples/jobs", json={"steps": 2}, headers=headers)
     assert again.json()["job_id"] == job_id
-    assert again.headers["Idempotent-Replayed"] == "true"
+    assert again.headers["Idempotency-Replayed"] == "true"
     reused = client.post("/v1/examples/jobs", json={"steps": 3}, headers=headers)
     assert reused.status_code == 422
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:
-        state = client.get(f"/v1/jobs/{job_id}").json()
-        if state["state"] == "succeeded":
-            break
-        time.sleep(0.02)
-    assert state["state"] == "succeeded"
-    assert state["result"] == {"steps_done": 2}
+    assert reused.json()["code"] == "idempotency_key_reused"
+    job = wait_status(client, job_id, "succeeded")
+    assert job["status"] == "succeeded"
+    assert job["result"] == {"steps_done": 2}
+    assert job["progress"]["completed"] == 2  # type: ignore[index]
 
 
 def test_example_job_can_be_cancelled(client: TestClient) -> None:
     r = client.post(
-        "/v1/examples/jobs", json={"steps": 1000, "step_delay_s": 0.05}, headers={"Idempotency-Key": "k-2"}
+        "/v1/examples/jobs", json={"steps": 1000, "step_delay_ms": 50}, headers={"Idempotency-Key": "k-2"}
     )
     job_id = r.json()["job_id"]
-    assert client.post(f"/v1/jobs/{job_id}/cancel").status_code == 202
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:
-        state = client.get(f"/v1/jobs/{job_id}").json()["state"]
-        if state == "cancelled":
-            break
-        time.sleep(0.02)
-    assert state == "cancelled"
+    cancel = client.post(f"/v1/jobs/{job_id}/cancel", json={"reason": "test"})
+    assert cancel.status_code == 202
+    assert cancel.json()["status"] in {"cancelling", "cancelled"}
+    assert wait_status(client, job_id, "cancelled")["status"] == "cancelled"
+    assert client.post(f"/v1/jobs/{job_id}/cancel").status_code == 200  # already terminal
 
 
 def test_missing_idempotency_key_rejected(client: TestClient) -> None:
     r = client.post("/v1/examples/jobs", json={})
-    assert r.status_code == 400
-    assert r.json()["code"] == "idempotency_key_missing"
+    assert r.status_code == 422
+    assert r.json()["errors"][0]["parameter"] == "Idempotency-Key"

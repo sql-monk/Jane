@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import logging
@@ -10,9 +11,11 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 from jane_kit.config import JaneSettings
-from jane_kit.errors import NotFound
+from jane_kit.errors import JaneError, NotFound
 from jane_kit.logs import JsonFormatter, bind_context
 from jane_kit.service import create_app
+
+TRACEPARENT = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
 
 
 class Body(BaseModel):
@@ -20,12 +23,18 @@ class Body(BaseModel):
 
 
 def make_app() -> FastAPI:
-    app = create_app(JaneSettings(service_name="svc", instance_id="i-1"), configure_logs=False)
+    app = create_app(
+        JaneSettings(service_name="svc", instance_id="i-1"),
+        configure_logs=False,
+        capabilities={"strategies": ["recursive"]},
+    )
 
     @app.get("/v1/things/{thing_id}")
     async def get_thing(thing_id: str) -> dict[str, str]:
         if thing_id == "missing":
-            raise NotFound("no such thing", code="thing_not_found")
+            raise NotFound("no such thing")
+        if thing_id == "limited":
+            raise JaneError("slow down", code="rate_limited", retry_after_seconds=30)
         if thing_id == "boom":
             raise RuntimeError("secret internals")
         return {"id": thing_id}
@@ -42,42 +51,45 @@ def client() -> TestClient:
     return TestClient(make_app(), raise_server_exceptions=False)
 
 
-def test_health_endpoints(client: TestClient) -> None:
-    assert client.get("/health/live").json() == {
-        "status": "ok",
+def test_health_and_info(client: TestClient) -> None:
+    assert client.get("/v1/health").json() == {"status": "ok", "checks": {}}
+    assert client.get("/v1/info").json() == {
         "service": "svc",
-        "instance": "i-1",
         "version": "0.1.0",
-        "checks": {},
+        "api_versions": ["v1"],
+        "capabilities": {"strategies": ["recursive"]},
+        "auth_mode": "none",
     }
-    assert client.get("/health/ready").status_code == 200
 
 
-def test_readiness_fails_when_check_fails() -> None:
+def test_health_down_and_degraded() -> None:
     app = make_app()
 
     async def db_ok() -> bool:
         return True
 
-    def broken() -> bool:
-        raise ConnectionError("db down")
+    def cache_broken() -> bool:
+        raise ConnectionError("cache down")
 
     app.state.health.add("db", db_ok)
-    app.state.health.add("cache", broken)
-    r = TestClient(app).get("/health/ready")
-    assert r.status_code == 503
-    body = r.json()
-    assert body["checks"]["db"]["status"] == "ok"
-    assert body["checks"]["cache"] == {
-        "status": "fail",
-        "duration_ms": body["checks"]["cache"]["duration_ms"],
-        "error": "ConnectionError: db down",
+    app.state.health.add("cache", cache_broken, critical=False)
+    r = TestClient(app).get("/v1/health")
+    assert r.status_code == 200
+    assert r.json() == {
+        "status": "degraded",
+        "checks": {
+            "db": {"status": "ok"},
+            "cache": {"status": "degraded", "message": "ConnectionError: cache down"},
+        },
     }
 
+    app.state.health.add("queue", lambda: False)
+    r = TestClient(app).get("/v1/health")
+    assert r.status_code == 503
+    assert r.json()["status"] == "down"
 
-def test_readiness_check_timeout() -> None:
-    import asyncio
 
+def test_health_check_timeout() -> None:
     app = create_app(JaneSettings(), configure_logs=False, health_check_timeout_s=0.05)
 
     async def slow() -> bool:
@@ -85,36 +97,47 @@ def test_readiness_check_timeout() -> None:
         return True
 
     app.state.health.add("slow", slow)
-    r = TestClient(app).get("/health/ready")
+    r = TestClient(app).get("/v1/health")
     assert r.status_code == 503
-    assert "timeout" in r.json()["checks"]["slow"]["error"]
+    assert "timeout" in r.json()["checks"]["slow"]["message"]
 
 
-def test_errors_are_problem_details(client: TestClient) -> None:
-    r = client.get("/v1/things/missing", headers={"X-Request-ID": "req-42"})
+def test_errors_are_problem_details_with_trace(client: TestClient) -> None:
+    r = client.get("/v1/things/missing", headers={"traceparent": TRACEPARENT})
     assert r.status_code == 404
     assert r.headers["content-type"] == "application/problem+json"
-    assert r.headers["X-Request-ID"] == "req-42"
-    body = r.json()
-    assert body["code"] == "thing_not_found"
-    assert body["type"] == "urn:jane:problem:thing_not_found"
-    assert body["detail"] == "no such thing"
-    assert body["request_id"] == "req-42"
-    assert body["instance"] == "/v1/things/missing"
+    assert r.json() == {
+        "type": "urn:jane:problem:not_found",
+        "title": "Not found",
+        "status": 404,
+        "code": "not_found",
+        "detail": "no such thing",
+        "instance": "/v1/things/missing",
+        "retryable": False,
+        "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+    }
+
+
+def test_rate_limited_sets_retry_after(client: TestClient) -> None:
+    r = client.get("/v1/things/limited")
+    assert r.status_code == 429
+    assert r.headers["Retry-After"] == "30"
+    assert r.json()["retry_after_seconds"] == 30 and r.json()["retryable"] is True
 
 
 def test_validation_and_unhandled_errors(client: TestClient) -> None:
     r = client.post("/v1/things", json={"n": "x"})
     assert r.status_code == 422
     assert r.json()["code"] == "validation_failed"
-    assert r.json()["errors"][0]["loc"] == ["body", "n"]
+    assert r.json()["errors"][0]["pointer"] == "/n"
+    r = client.post("/v1/things", content=b"{not json", headers={"content-type": "application/json"})
+    assert r.status_code == 400 and r.json()["code"] == "bad_request"
     r = client.get("/v1/things/boom")
     assert r.status_code == 500
-    assert r.json()["code"] == "internal_error"
+    assert r.json()["code"] == "internal_error" and r.json()["retryable"] is True
     assert "secret" not in r.text
     r = client.delete("/v1/things/x")
-    assert r.status_code == 405
-    assert r.json()["code"] == "method_not_allowed"
+    assert r.status_code == 405 and r.json()["code"] == "method_not_allowed"
 
 
 def test_metrics_use_route_templates(client: TestClient) -> None:
@@ -140,13 +163,15 @@ def test_json_log_contains_context() -> None:
     log.addHandler(handler)
     log.setLevel(logging.INFO)
     log.propagate = False
-    with bind_context(request_id="r-1", job_id="j-1"):
-        log.info("hello %s", "світ", extra={"items": 3})
+    with bind_context(trace_id="t-1", job_id="j-1"):
+        log.info("hello %s", "світ", extra={"items": 3, "color_message": "ansi"})
     record = json.loads(stream.getvalue())
     assert record["msg"] == "hello світ"
-    assert record["service"] == "svc"
-    assert record["instance"] == "i-1"
-    assert record["request_id"] == "r-1"
-    assert record["job_id"] == "j-1"
-    assert record["items"] == 3
-    assert record["level"] == "info"
+    assert (record["service"], record["instance"], record["trace_id"], record["job_id"]) == (
+        "svc",
+        "i-1",
+        "t-1",
+        "j-1",
+    )
+    assert record["items"] == 3 and record["level"] == "info"
+    assert "color_message" not in record

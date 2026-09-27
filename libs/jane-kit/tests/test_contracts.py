@@ -123,9 +123,12 @@ def test_mock_app_from_contract(spec: OpenAPISpec) -> None:
 
 def test_find_specs(tmp_path: Path) -> None:
     (tmp_path / "svc").mkdir()
-    (tmp_path / "svc" / "openapi.yaml").write_text("openapi: 3.1.0\n", encoding="utf-8")
+    (tmp_path / "svc" / "collector.v1.yaml").write_text(
+        "openapi: 3.1.0\npaths:\n  /v1/x: {}\n", encoding="utf-8"
+    )
+    (tmp_path / "svc" / "common.yaml").write_text("openapi: 3.1.0\npaths: {}\n", encoding="utf-8")
     (tmp_path / "svc" / "schema.json").write_text("{}", encoding="utf-8")
-    assert [p.name for p in find_specs(tmp_path)] == ["openapi.yaml"]
+    assert [p.name for p in find_specs(tmp_path)] == ["collector.v1.yaml"]
     assert list(find_specs(tmp_path / "missing")) == []
 
 

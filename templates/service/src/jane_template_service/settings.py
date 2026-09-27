@@ -18,12 +18,13 @@ class Settings(JaneSettings):
 
 
 class ServiceLimits(Limits):
-    """Limits of this service (platform -> source -> job). Extend with your own groups."""
+    """Limits of this service. Use contract names (``limits.schema.json``) for limits that exist there."""
 
     jobs: JobLimits = JobLimits()
     idempotency: IdempotencyLimits = IdempotencyLimits()
 
 
-def platform_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLimits[ServiceLimits]:
-    """Defaults <- limits file <- ``JANE_TEMPLATE_SERVICE_LIMITS__*`` env <- ``extra`` layers."""
+def resolve_service_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLimits[ServiceLimits]:
+    """Defaults <- platform file (``..._LIMITS_FILE``) <- ``JANE_TEMPLATE_SERVICE_LIMITS__*`` <- ``extra``
+    (source/task/stage/request layers)."""
     return resolve_limits(ServiceLimits, *settings.platform_layers(f"{ENV_PREFIX}LIMITS__"), *extra)

@@ -1,12 +1,66 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
+    "allow": [
+      "Bash(uv *)",
+      "Bash(uvx *)",
+      "Bash(just *)",
+      "Bash(pytest *)",
+      "Bash(ruff *)",
+      "Bash(mypy *)",
+      "Bash(pnpm *)",
+      "Bash(corepack pnpm *)",
+      "Bash(docker compose *)",
+      "Bash(gitleaks *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git checkout -b *)",
+      "Bash(git switch -c *)",
+      "Bash(git rev-parse *)",
+      "Bash(git ls-files*)",
+      "Bash(git fetch*)",
+      "PowerShell(uv *)",
+      "PowerShell(uvx *)",
+      "PowerShell(just *)",
+      "PowerShell(pytest *)",
+      "PowerShell(ruff *)",
+      "PowerShell(mypy *)",
+      "PowerShell(pnpm *)",
+      "PowerShell(corepack pnpm *)",
+      "PowerShell(docker compose *)",
+      "PowerShell(gitleaks *)",
+      "PowerShell(git status*)",
+      "PowerShell(git diff*)",
+      "PowerShell(git log*)",
+      "PowerShell(git show*)",
+      "PowerShell(git branch*)",
+      "PowerShell(git add *)",
+      "PowerShell(git commit *)",
+      "PowerShell(git checkout -b *)",
+      "PowerShell(git switch -c *)",
+      "PowerShell(git rev-parse *)",
+      "PowerShell(git ls-files*)",
+      "PowerShell(git fetch*)"
+    ],
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(**/.env)",
       "Read(**/.env.*)",
-      "Read(**/secrets/**)"
+      "Read(**/secrets/**)",
+      "Bash(git push *main*)",
+      "Bash(git push *master*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "PowerShell(git push *main*)",
+      "PowerShell(git push *master*)",
+      "PowerShell(git push --force*)",
+      "PowerShell(git push -f*)"
     ]
   },
   "hooks": {
@@ -28,6 +82,28 @@
             "type": "command",
             "command": "uv run --no-project --quiet python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_bash.py\"",
             "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --no-project --quiet python \"$CLAUDE_PROJECT_DIR/.claude/hooks/scan_secrets.py\"",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --no-project --quiet python \"$CLAUDE_PROJECT_DIR/.claude/hooks/format.py\"",
+            "timeout": 60
           }
         ]
       }

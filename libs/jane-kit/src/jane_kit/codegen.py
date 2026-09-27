@@ -43,14 +43,15 @@ def _class_name(name: str) -> str:
 
 
 def _model_ref(spec: OpenAPISpec, op: Operation) -> str | None:
+    """Component name of the first 2xx JSON response schema, if it is ``#/components/schemas/<X>`` of this spec."""
     responses = op.spec.get("responses") or {}
     for status in sorted(responses):
         if status.startswith("2"):
-            resp = spec.resolve(responses[status])
-            for media in (resp.get("content") or {}).values():
-                ref = (media.get("schema") or {}).get("$ref", "")
-                if ref.startswith("#/components/schemas/"):
-                    return str(ref).rsplit("/", 1)[1]
+            resp = spec.follow(op.loc.child("responses", status))
+            for media in (resp.node.get("content") or {}).values():
+                ref = str((media.get("schema") or {}).get("$ref", ""))
+                if resp.uri == spec.base_uri and ref.startswith("#/components/schemas/"):
+                    return ref.rsplit("/", 1)[1]
             return None
     return None
 
@@ -77,7 +78,7 @@ def generate_client_source(spec: OpenAPISpec, class_name: str, source: str, with
         while name in used:
             name += "_"
         used.add(name)
-        params = [spec.resolve(p) for p in (op.spec.get("parameters") or [])]
+        params = list(op.parameters)
         path_params = [p["name"] for p in params if p.get("in") == "path"]
         query_params = [p["name"] for p in params if p.get("in") == "query"]
         args = ["self", *(f"{_snake(p)}: str" for p in path_params)]

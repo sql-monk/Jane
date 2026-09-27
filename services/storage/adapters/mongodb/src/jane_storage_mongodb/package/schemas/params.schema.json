@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "jane.storage-mongodb params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "prefix": {
+      "description": "Префікс колекцій (типово 'jane_': jane_entities, jane_entity_history, jane_deliveries, jane_objects, jane_object_chunks).",
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,40}$"
+    },
+    "format": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "raw": {
+          "type": "string",
+          "enum": [
+            "original",
+            "html",
+            "json"
+          ]
+        },
+        "entities": {
+          "type": "string",
+          "enum": [
+            "json"
+          ]
+        }
+      }
+    }
+  }
+}

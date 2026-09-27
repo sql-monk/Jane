@@ -1,0 +1,8 @@
+[
+  {
+    "entity_type": "product",
+    "key": {"scope": "shop-example", "natural": {"sku": "A-100"}},
+    "fields": {"sku": "A-100", "title": "Kettle A-100", "price": {"amount": 1299.0, "currency": "UAH"}},
+    "observation": {"observation_id": "obs_01J9ZQ4A0000000000000001", "observed_at": "2026-09-27T10:00:05Z"}
+  }
+]

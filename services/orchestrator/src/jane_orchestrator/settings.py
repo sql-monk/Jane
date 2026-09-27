@@ -42,7 +42,7 @@ class ExecutorConfig(BaseModel):
     handler executor."""
     sync_connections: bool | None = None
     """Push the connections registry to this executor (``PUT /v1/connections/{id}``). Default: true for
-    collectors and handlers."""
+    collectors, handlers and llm."""
     token: str | None = None
     """Bearer token for this executor (service account); never logged or returned by the API."""
 
@@ -50,7 +50,7 @@ class ExecutorConfig(BaseModel):
     def syncs_connections(self) -> bool:
         if self.sync_connections is not None:
             return self.sync_connections
-        return self.role in {"collector", "handler"}
+        return self.role in {"collector", "handler", "llm"}
 
 
 class Queue(Limits):

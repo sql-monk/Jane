@@ -114,7 +114,11 @@ def page(client: httpx.Client, cid: str, after: str | None = None, **params: Any
     query: dict[str, Any] = dict(params)
     if after:
         query["after"] = after
-    r = client.get(f"/v1/collections/{cid}/materials", params=query)
+    for _ in range(20):  # 503 service_unavailable is retryable (state store busy)
+        r = client.get(f"/v1/collections/{cid}/materials", params=query)
+        if r.status_code != 503:
+            break
+        time.sleep(float(r.headers.get("Retry-After", "1")))
     assert r.status_code == 200, r.text
     body: dict[str, Any] = r.json()
     return body

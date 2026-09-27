@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import re
+import sqlite3
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -20,7 +21,7 @@ from typing import Any
 from fastapi import FastAPI, Header, Query, Request, Response
 from fastapi.responses import JSONResponse
 
-from jane_kit.errors import FieldError, JaneError, NotFound, ValidationFailed
+from jane_kit.errors import FieldError, JaneError, NotFound, ValidationFailed, problem_response
 from jane_kit.idempotency import StoredResponse, idempotent
 from jane_kit.jobs import JobRunner, jobs_router
 from jane_kit.pagination import clamp_limit, decode_cursor, encode_cursor
@@ -101,6 +102,14 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         return "ok", None
 
     app.state.health.add("state_store", state_check)
+
+    async def state_busy(request: Request, exc: Exception) -> JSONResponse:
+        # another instance held the SQLite lock longer than state_busy_timeout_ms: retryable, not a 500
+        log.warning("state store busy", extra={"path": request.url.path, "error": str(exc)})
+        err = JaneError("state store is busy, retry", code="service_unavailable", retry_after_seconds=1)
+        return problem_response(err.to_problem(instance=request.url.path), err.headers)
+
+    app.add_exception_handler(sqlite3.OperationalError, state_busy)
     app.include_router(jobs_router(runner))
 
     async def json_body(request: Request) -> Any:

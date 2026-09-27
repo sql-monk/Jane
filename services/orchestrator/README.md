@@ -42,16 +42,18 @@ docker run --rm -p 8109:8000 -e JANE_ORCHESTRATOR_DATABASE_URL=postgresql://… 
 |---|---|
 | Збір (feed) | Запуск збору в колекторі (`Idempotency-Key: run:<run_id>:collect` — повтор після збою не створює другого збору), вибірка сторінок `GET /v1/collections/{id}/materials?after=`; елементи етапів створюються в одній транзакції з курсором, наступна вибірка підтверджує сторінку. Повторно видане спостереження (`observation_id`) не створює другого елемента |
 | Backpressure | Перед вибіркою: `queue.max_queue_depth` (активні елементи завдання) і `queue.max_inflight_materials` (матеріали запуску в обробці). Якщо місця немає — вибірка не робиться (`Run.backpressure=true`), буфер колектора (`queue.max_unacked_materials`, передається в запиті збору) заповнюється, і колектор призупиняє обхід |
-| Етап (item) | Воркер бере елемент з lease (`FOR UPDATE SKIP LOCKED`), викликає `POST /v1/invocations` з `delivery_key = sha256(run_id|stage_id|item_key)` як `Idempotency-Key`, heartbeat подовжує lease. Результат, наступні елементи й позначка завершення — одна транзакція. Після kill воркера lease спливає, інший воркер повторює з тим самим ключем, виконавець повертає збережений результат (`duplicate: true`) — без подвійного ефекту |
+| Етап (item) | Воркер бере елемент з lease (`FOR UPDATE SKIP LOCKED`), викликає `POST /v1/invocations` з `delivery_key = sha256(run_id|stage_id|item_key)` як `Idempotency-Key`, heartbeat подовжує lease. Результат, наступні елементи й позначка завершення — одна транзакція. Після kill воркера lease спливає, інший воркер повторює з тим самим ключем, виконавець повертає збережений результат (`duplicate: true`) — без подвійного ефекту. Перехоплення простроченого lease **не** витрачає `retries.max_attempts` (ефект міг відбутися); «отруйний» елемент, на якому воркери гинуть знову й знову, падає після `engine.max_lease_reclaims` перехоплень |
 | Повтори | `RetryPolicy` (platform → source → task(`retries`) → stage): лише для retryable-помилок (HTTP 409/429/5xx, `failure.retryable`), backoff із jitter, той самий ключ. Остаточна помилка → `on_failure`: `continue` (проблема записується) або `fail_run` |
 | DAG | `inputs[].from`, `select` (`output`, `input_material`, `problems`, `unmatched_materials`), умови `when` (`material.*`, `result.*`, `entity.*` — фільтр сутностей) |
 | Прив'язки | Етап із `bindings` отримує матеріал, що відповідає хоча б одній прив'язці (у прив'язці всі задані властивості — І). Матеріал, що не відповідає жодній прив'язці жодного етапу, — «невідомий»: реєструється (`/v1/unknown-materials`) і доставляється споживачам `unmatched_materials` **лише** за ефективного `forward_unknown_to_llm=true` (завдання, інакше джерело, типово false) |
-| Розклади | `manual`, `once`, `cron` (5 полів, IANA-зона), `interval` (перший запуск — `start_at` або через інтервал); `overlap: skip/queue/allow` (+ `max_parallel_runs_per_task`) |
+| Розклади | `manual`, `once`, `cron` (5 полів, IANA-зона), `interval` (перший запуск — `start_at` або через інтервал); `overlap: skip/queue/allow` (+ `max_parallel_runs_per_task`). Створення запуску й перехід `queued → running` серіалізуються per task (`pg_advisory_xact_lock`), тож ліміт діє для будь-якої кількості воркерів і екземплярів; черга — FIFO |
 | Скасування | `POST /v1/runs/{id}/cancel` = `/v1/jobs/{id}/cancel`: черга елементів скасовується, збір у колекторі скасовується, записане не відкочується |
+| Прибирання | Кожен воркер періодично (`scheduler_interval_ms`) закриває запуски, які інакше ніхто б не закрив: `cancelling` чи вичерпані (`feed_done`) запуски, чий воркер помер (елементи з простроченим lease скасовуються), і запуски понад `timeouts.run_timeout_ms` у будь-якій фазі (`failed`, код `timeout`) |
 | Повторна обробка | `POST /v1/reprocessing`: збережені RAW з `storage.v1 GET /v1/objects` (+ `GET /v1/objects/{id}` → Material) подаються на `from_stage` (або як вихід collect) |
 | Простежуваність | `/v1/materials/{id}/trace`: спостереження → етапи → `invocation_id`, стан, версія пакета (з digest), виходи (ключі сутностей, `object_id`, підключення) |
 | Активації | `POST …/stages/{stage}/activations`: `activate` (версія `approved` у registry), `rollback` (до попередньої або вказаної), `auto_activate` (лише якщо `change_policy.llm_versions=auto_after_checks`, `auto_changes_allowed`, `test_status=passed`; інакше 403 з `details.reason`). Аудит — `/v1/audit-events` |
-| Підключення | `/v1/connections`: лише несекретні `params` і `secret_refs` (секретоподібні `params` → 422 `secret_detected`); синхронізація `PUT/DELETE /v1/connections/{id}` у колектори, обробники й llm — асинхронно з повторами, стан у `executors[]` |
+| Підключення | `/v1/connections`: лише несекретні `params` і `secret_refs` (секретоподібні `params` → 422 `secret_detected`); синхронізація `PUT/DELETE /v1/connections/{id}` у колектори, обробники й llm — асинхронно з повторами, стан у `executors[]`. Оркестратор не розв'язує `secret_refs` і не має значень секретів: виконавцям пересилається той самий документ |
+| Бюджети LLM | `limits.llm.budget` і `limits.llm.max_requests_per_minute` джерела/завдання синхронізуються в LLM-шлюз (`llm.v1 PUT /v1/budgets/{source\|task}/{id}`, `BudgetDefinition`) при створенні/зміні; прибраний бюджет або видалений об'єкт → `DELETE` (діє успадкований). Асинхронно, ідемпотентно, з повторами (`sync_retry_ms`, `sync_max_attempts`) |
 
 ## Конфігурація
 
@@ -101,6 +103,9 @@ platform → source → task → stage → request (`RunRequest.limits`), `hard_
 | `job_poll_interval_ms` | 500 | опитування 202-job виконавця |
 | `problem_samples` / `trace_outputs_max` | 10 / 100 | зразки в групі проблем / посилання виходів на елемент |
 | `db_pool_max` | 10 | з'єднань із БД на процес |
+| `max_lease_reclaims` | 5 | перехоплень простроченого lease до позначення елемента `failed` (не спроби `retries`) |
+| `schedule_batch` | 20 | завдань, що стали запусками за один прохід планувальника |
+| `reap_batch` | 50 | запусків за один прохід прибирання |
 
 Ліміти сторінок: `…_LIMITS__PAGES__DEFAULT_PAGE_SIZE` = 50, `MAX_PAGE_SIZE` = 500.
 
@@ -155,6 +160,13 @@ api.post(
 job = api.post("/v1/tasks/shop-prices/runs", json={}, headers={"Idempotency-Key": str(uuid.uuid4())}).json()
 print(api.get(f"/v1/runs/{job['job_id']}").json()["status"])
 ```
+
+## Відомі обмеження
+
+- `concurrency.max_parallel_stage_items` — м'яке обмеження (кілька воркерів можуть на мить перевищити його).
+- Не застосовуються: `timeouts.stage_timeout_ms`, `timeouts.sync_response_max_ms`, `transfer.job_retention_seconds` (старі запуски не прибираються); ці ліміти лише передаються виконавцям.
+- Активація/відкат — лише для `handler`-етапів (не для версій правил колектора).
+- `auth_mode=jwt` не реалізовано (`none` — лише локально, `api_key` — працює).
 
 ## Журнали й метрики
 

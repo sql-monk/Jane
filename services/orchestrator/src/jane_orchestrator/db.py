@@ -225,6 +225,25 @@ MIGRATIONS: list[str] = [
         expires_at   timestamptz NOT NULL
     );
     """,
+    # 2 — lease take-overs counted apart from retry attempts; LLM budget sync (source/task levels)
+    """
+    ALTER TABLE items ADD COLUMN lease_reclaims integer NOT NULL DEFAULT 0;
+
+    CREATE TABLE budget_sync (
+        scope_type        text NOT NULL,
+        scope_id          text NOT NULL,
+        op                text NOT NULL,
+        doc               jsonb,
+        status            text NOT NULL,
+        message           text,
+        synced_at         timestamptz,
+        attempts          integer NOT NULL DEFAULT 0,
+        available_at      timestamptz NOT NULL DEFAULT now(),
+        lease_owner       text,
+        lease_expires_at  timestamptz,
+        PRIMARY KEY (scope_type, scope_id)
+    );
+    """,
 ]
 
 

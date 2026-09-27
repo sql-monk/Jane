@@ -55,6 +55,36 @@ class Admin:
         self.core = core
         self.runs = Runs(core)
 
+    # ================================================================== LLM budgets
+    def _enqueue_budget(
+        self, conn: Any, scope_type: str, scope_id: str, limits: Mapping[str, Any] | None
+    ) -> None:
+        """Queue the sync of a source/task LLM budget to the gateway (llm.v1 ``BudgetDefinition``).
+
+        ``limits.llm.budget`` / ``max_requests_per_minute`` set → PUT; unset after an earlier sync, or the
+        object deleted → DELETE (the inherited budget applies again)."""
+        if self.core.executors.first("llm") is None:
+            return
+        llm = (limits or {}).get("llm") or {}
+        doc: dict[str, Any] = {"scope_type": scope_type, "scope_id": scope_id}
+        if llm.get("budget"):
+            doc["budget"] = llm["budget"]
+        if llm.get("max_requests_per_minute"):
+            doc["max_requests_per_minute"] = llm["max_requests_per_minute"]
+        if len(doc) > 2:
+            conn.execute(
+                "INSERT INTO budget_sync (scope_type, scope_id, op, doc, status) VALUES (%s, %s, 'put', %s, 'pending')"
+                " ON CONFLICT (scope_type, scope_id) DO UPDATE SET op = 'put', doc = EXCLUDED.doc,"
+                " status = 'pending', attempts = 0, available_at = now(), message = NULL",
+                (scope_type, scope_id, Jsonb(doc)),
+            )
+        else:
+            conn.execute(
+                "UPDATE budget_sync SET op = 'delete', doc = NULL, status = 'pending', attempts = 0,"
+                " available_at = now(), message = NULL WHERE scope_type = %s AND scope_id = %s",
+                (scope_type, scope_id),
+            )
+
     # ================================================================== sources
     @staticmethod
     def _source_view(row: Mapping[str, Any]) -> dict[str, Any]:
@@ -76,6 +106,7 @@ class Admin:
             ).fetchone()
             if row is None:
                 raise Conflict(f"source '{clean['source_id']}' already exists")
+            self._enqueue_budget(conn, "source", clean["source_id"], clean.get("limits"))
             self.core.audit(conn, actor, "source.create", "source", clean["source_id"], {})
         return self._source_view(row), 1
 
@@ -107,6 +138,7 @@ class Admin:
                 (Jsonb(clean), source_id),
             ).fetchone()
             changed = sorted(k for k in set(clean) | set(row["doc"]) if clean.get(k) != row["doc"].get(k))
+            self._enqueue_budget(conn, "source", source_id, clean.get("limits"))
             self.core.audit(conn, actor, "source.update", "source", source_id, {"changed": changed})
         return self._source_view(new), int(new["version"])
 
@@ -120,6 +152,7 @@ class Admin:
             if conn.execute("SELECT 1 FROM tasks WHERE source_id = %s LIMIT 1", (source_id,)).fetchone():
                 raise Conflict(f"source '{source_id}' has tasks")
             conn.execute("DELETE FROM sources WHERE source_id = %s", (source_id,))
+            self._enqueue_budget(conn, "source", source_id, None)
             self.core.audit(conn, actor, "source.delete", "source", source_id, {})
 
     def list_sources(
@@ -211,6 +244,7 @@ class Admin:
             ).fetchone()
             if row is None:
                 raise Conflict(f"task '{doc['task_id']}' already exists")
+            self._enqueue_budget(conn, "task", doc["task_id"], doc.get("limits"))
             self.core.audit(conn, actor, "task.create", "task", doc["task_id"], {})
         return dict(row["doc"]), 1
 
@@ -253,6 +287,7 @@ class Admin:
                 ),
             ).fetchone()
             changed = sorted(k for k in set(doc) | set(row["doc"]) if doc.get(k) != row["doc"].get(k))
+            self._enqueue_budget(conn, "task", task_id, doc.get("limits"))
             self.core.audit(conn, actor, "task.update", "task", task_id, {"changed": changed})
         return dict(new["doc"]), int(new["version"])
 
@@ -266,6 +301,7 @@ class Admin:
             if active:
                 raise Conflict(f"task '{task_id}' has an active run; cancel it first")
             conn.execute("DELETE FROM tasks WHERE task_id = %s", (task_id,))
+            self._enqueue_budget(conn, "task", task_id, None)
             self.core.audit(conn, actor, "task.delete", "task", task_id, {})
 
     @staticmethod
@@ -462,12 +498,13 @@ class Admin:
             raise JaneError(str(exc), code="upstream_unavailable") from exc
 
     def activate(self, task_id: str, stage_id: str, body: Mapping[str, Any], actor: str) -> dict[str, Any]:
+        """Read → check in the registry (no DB lock held during network calls) → write if the task is unchanged."""
         kind = body["kind"]
         package = dict(body["package"]) if body.get("package") else None
-        with self.core.db.tx() as conn:
-            row = self.get_task_row(conn, task_id, lock=True)
-            doc = dict(row["doc"])
-            stages = stage_map(doc)
+        # 1. read
+        with self.core.db.conn() as conn:
+            row = self.get_task_row(conn, task_id)
+            stages = stage_map(row["doc"])
             if stage_id not in stages:
                 raise NotFound(f"stage '{stage_id}' not found in task '{task_id}'")
             stage = stages[stage_id]
@@ -476,61 +513,65 @@ class Admin:
                     "activations apply to handler stages",
                     errors=[FieldError(parameter="stage_id", message="stage is not kind=handler")],
                 )
-            current = dict(stage["handler"])
-            if kind == "rollback":
-                if package is None:
-                    last = conn.execute(
-                        "SELECT * FROM activations WHERE task_id = %s AND stage_id = %s ORDER BY seq DESC LIMIT 1",
-                        (task_id, stage_id),
-                    ).fetchone()
-                    if last is None or not last["previous"]:
-                        raise Conflict("nothing to roll back: the stage has no previous activation")
-                    package = dict(last["previous"])
-                version = self._registry_get(
-                    f"/v1/packages/{package['package_id']}/versions/{package['version']}"
+            read_version = int(row["version"])
+            if kind == "rollback" and package is None:
+                last = conn.execute(
+                    "SELECT * FROM activations WHERE task_id = %s AND stage_id = %s ORDER BY seq DESC LIMIT 1",
+                    (task_id, stage_id),
+                ).fetchone()
+                if last is None or not last["previous"]:
+                    raise Conflict("nothing to roll back: the stage has no previous activation")
+                package = dict(last["previous"])
+            source = conn.execute(
+                "SELECT doc FROM sources WHERE source_id = %s", (row["source_id"],)
+            ).fetchone()
+            policy = ((source["doc"] if source else {}).get("change_policy") or {}).get(
+                "llm_versions", "manual_approval"
+            )
+        if package is None:
+            raise ValidationFailed(
+                f"package is required for kind={kind}",
+                errors=[FieldError(pointer="/package", message="required")],
+            )
+        # 2. check (network, outside any transaction)
+        if kind == "auto_activate" and policy != "auto_after_checks":
+            raise AccessDeniedByPolicy(
+                "Automatic activation is not allowed",
+                title="Automatic activation is not allowed",
+                details={"reason": "source_policy"},
+            )
+        version = self._registry_get(f"/v1/packages/{package['package_id']}/versions/{package['version']}")
+        if kind == "rollback" and version.get("status") == "yanked":
+            raise Conflict(f"{package['package_id']}@{package['version']} is yanked")
+        if kind == "activate" and version.get("status") != "approved":
+            raise Conflict(
+                f"{package['package_id']}@{package['version']} is not approved (status {version.get('status')})"
+            )
+        if kind == "auto_activate":
+            pkg = self._registry_get(f"/v1/packages/{package['package_id']}")
+            reason = None
+            if not pkg.get("auto_changes_allowed"):
+                reason = "package_auto_changes_forbidden"
+            elif version.get("test_status") != "passed":
+                reason = "tests_not_passed"
+            if reason is not None:
+                raise AccessDeniedByPolicy(
+                    "Automatic activation is not allowed",
+                    title="Automatic activation is not allowed",
+                    details={"reason": reason},
                 )
-                if version.get("status") == "yanked":
-                    raise Conflict(f"{package['package_id']}@{package['version']} is yanked")
-            else:
-                if package is None:
-                    raise ValidationFailed(
-                        f"package is required for kind={kind}",
-                        errors=[FieldError(pointer="/package", message="required")],
-                    )
-                version = self._registry_get(
-                    f"/v1/packages/{package['package_id']}/versions/{package['version']}"
-                )
-                if kind == "activate" and version.get("status") != "approved":
-                    raise Conflict(
-                        f"{package['package_id']}@{package['version']} is not approved (status {version.get('status')})"
-                    )
-                if kind == "auto_activate":
-                    source = conn.execute(
-                        "SELECT doc FROM sources WHERE source_id = %s", (row["source_id"],)
-                    ).fetchone()
-                    policy = ((source["doc"] if source else {}).get("change_policy") or {}).get(
-                        "llm_versions", "manual_approval"
-                    )
-                    reason = None
-                    if policy != "auto_after_checks":
-                        reason = "source_policy"
-                    else:
-                        pkg = self._registry_get(f"/v1/packages/{package['package_id']}")
-                        if not pkg.get("auto_changes_allowed"):
-                            reason = "package_auto_changes_forbidden"
-                        elif version.get("test_status") != "passed":
-                            reason = "tests_not_passed"
-                    if reason is not None:
-                        raise AccessDeniedByPolicy(
-                            "Automatic activation is not allowed",
-                            title="Automatic activation is not allowed",
-                            details={"reason": reason},
-                        )
-            registry_digest = version.get("digest")
-            if package.get("digest") and registry_digest and package["digest"] != registry_digest:
-                raise JaneError("package digest differs from the registry", code="digest_mismatch")
-            if registry_digest:
-                package["digest"] = registry_digest
+        registry_digest = version.get("digest")
+        if package.get("digest") and registry_digest and package["digest"] != registry_digest:
+            raise JaneError("package digest differs from the registry", code="digest_mismatch")
+        if registry_digest:
+            package["digest"] = registry_digest
+        # 3. write, only if nobody changed the task meanwhile
+        with self.core.db.tx() as conn:
+            row = self.get_task_row(conn, task_id, lock=True)
+            if int(row["version"]) != read_version:
+                raise Conflict("the task changed during activation; repeat the request", retryable=True)
+            doc = dict(row["doc"])
+            current = dict(stage_map(doc)[stage_id]["handler"])
             for s in doc["stages"]:
                 if s["stage_id"] == stage_id:
                     s["handler"] = package

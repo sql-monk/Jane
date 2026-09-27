@@ -114,6 +114,13 @@ class EngineLimits(Limits):
     trace_outputs_max: int = Field(default=100, ge=0)
     """Output references (entity keys, stored object ids) recorded per item for the material trace."""
     db_pool_max: int = Field(default=10, ge=1)
+    max_lease_reclaims: int = Field(default=5, ge=1)
+    """Take-overs of an expired lease before an item is failed as poisonous (a worker keeps dying on it).
+    Take-overs are not retry attempts (``retries.max_attempts``): the handler may have done its effect."""
+    schedule_batch: int = Field(default=20, ge=1)
+    """Due tasks turned into runs per scheduler pass."""
+    reap_batch: int = Field(default=50, ge=1)
+    """Runs checked per housekeeping pass (finish cancelled/drained runs, run timeouts)."""
 
 
 class ServiceLimits(Limits):

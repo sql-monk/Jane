@@ -38,7 +38,7 @@ CONTRACTS = contracts_dir(Path(__file__).parent)
 assert CONTRACTS is not None, "contracts/ not found"
 SPECS = {
     name: OpenAPISpec.load(CONTRACTS / "openapi" / f"{name}.v1.yaml")
-    for name in ("collector", "handler", "storage", "registry", "orchestrator")
+    for name in ("collector", "handler", "storage", "registry", "orchestrator", "llm")
 }
 
 PG_IMAGE = os.environ.get("JANE_ORCHESTRATOR_TEST_PG_IMAGE", "postgres:18")
@@ -736,8 +736,14 @@ class FakeRegistry(ContractFake):
         return self.respond(request, 200, p) if p else problem(404, "not_found")
 
     async def version(self, request: Request) -> Response:
+        with self.lock:
+            self.requests.append((request.method, request.url.path, None))
+        if self.delay_s:
+            await asyncio.sleep(self.delay_s)
         v = self.versions.get((request.path_params["package_id"], request.path_params["version"]))
         return self.respond(request, 200, v) if v else problem(404, "not_found")
+
+    delay_s = 0.0
 
     def app(self) -> Starlette:
         return Starlette(
@@ -749,13 +755,60 @@ class FakeRegistry(ContractFake):
         )
 
 
+# ====================================================================== llm
+class FakeLlm(FakeHandler):
+    """LLM executor: handler.v1 invocations + llm.v1 budgets (``PUT/DELETE /v1/budgets/{scope}/{id}``)."""
+
+    def __init__(self) -> None:
+        super().__init__({"*": llm_triage}, kind="llm")
+        self.llm_spec = SPECS["llm"]
+        self.budgets: dict[tuple[str, str], dict[str, Any]] = {}
+        self.budget_calls: list[tuple[str, str]] = []
+
+    async def put_budget(self, request: Request) -> Response:
+        raw = await request.body()
+        body = json.loads(raw)
+        path = request.url.path
+        try:
+            self.llm_spec.validate_request("PUT", path, body)
+        except ContractViolation as exc:
+            self.violations.append(f"llm request PUT {path}: {exc}")
+            return problem(422, "validation_failed", str(exc))
+        key = (request.path_params["scope_type"], request.path_params["scope_id"])
+        with self.lock:
+            self.budgets[key] = body
+            self.budget_calls.append(("PUT", path))
+        try:
+            self.llm_spec.validate_response("PUT", path, 200, body, "application/json")
+        except ContractViolation as exc:
+            self.violations.append(f"llm response PUT {path}: {exc}")
+        return JSONResponse(body)
+
+    async def delete_budget(self, request: Request) -> Response:
+        key = (request.path_params["scope_type"], request.path_params["scope_id"])
+        with self.lock:
+            self.budget_calls.append(("DELETE", request.url.path))
+            found = self.budgets.pop(key, None)
+        return Response(status_code=204) if found else problem(404, "not_found")
+
+    def app(self) -> Starlette:
+        app = super().app()
+        app.router.routes.append(
+            Route("/v1/budgets/{scope_type}/{scope_id}", self.put_budget, methods=["PUT"])
+        )
+        app.router.routes.append(
+            Route("/v1/budgets/{scope_type}/{scope_id}", self.delete_budget, methods=["DELETE"])
+        )
+        return app
+
+
 # ====================================================================== neighbourhood
 @dataclass
 class Neighbours:
     collector: FakeCollector
     runtime: FakeHandler
     storage: FakeStorage
-    llm: FakeHandler
+    llm: FakeLlm
     registry: FakeRegistry
     servers: list[ServerThread] = field(default_factory=list)
     urls: dict[str, str] = field(default_factory=dict)
@@ -817,7 +870,7 @@ def start_neighbours(site: list[Page] | None = None) -> Neighbours:
         collector=FakeCollector(site),
         runtime=FakeHandler({"*": product_extractor, "shop-example.price-extractor": price_extractor}),
         storage=FakeStorage(),
-        llm=FakeHandler({"*": llm_triage}, kind="llm"),
+        llm=FakeLlm(),
         registry=FakeRegistry(),
     )
     for name, fake in (

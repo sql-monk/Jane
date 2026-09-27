@@ -115,7 +115,11 @@ class Engine:
                     FOR UPDATE OF i SKIP LOCKED
                 )
                 UPDATE items SET status = 'running', lease_owner = %s, lease_expires_at = now() + %s,
-                                 attempts = items.attempts + 1, started_at = coalesce(items.started_at, now()),
+                                 attempts = CASE WHEN c.old_status = 'running' THEN items.attempts
+                                                 ELSE items.attempts + 1 END,
+                                 lease_reclaims = items.lease_reclaims
+                                                  + CASE WHEN c.old_status = 'running' THEN 1 ELSE 0 END,
+                                 started_at = coalesce(items.started_at, now()),
                                  updated_at = now()
                 FROM c WHERE items.item_id = c.item_id
                 RETURNING items.*, c.old_status
@@ -149,13 +153,19 @@ class Engine:
             flat.get("timeouts.invocation_timeout_ms")
             or self.core.limits.contract.timeouts.invocation_timeout_ms
         )
-        if item["attempts"] > item["max_attempts"]:
+        if item["lease_reclaims"] > self.core.engine.max_lease_reclaims:
+            # a worker kept dying on this item: fail it instead of looping forever (not a retry attempt)
             return self._finish_failed(
                 item,
                 worker,
                 run,
                 stage,
-                problem("timeout", "attempts exhausted (worker lost the lease)", 504, True),
+                problem(
+                    "internal_error",
+                    f"lease taken over {item['lease_reclaims']} times (engine.max_lease_reclaims)",
+                    500,
+                    False,
+                ),
             )
         body: dict[str, Any] = {
             "handler": stage["handler"],
@@ -555,11 +565,19 @@ class Engine:
                 else 1
             )
             with self.core.db.tx() as conn:
+                # serialize queued -> running per task across all workers and instances
+                conn.execute(
+                    "SELECT pg_advisory_xact_lock(hashtext(%s))", (f"jane-run-start:{run['task_id']}",)
+                )
                 n = conn.execute(
                     "SELECT count(*) AS n FROM runs WHERE task_id = %s AND run_id <> %s AND status IN ('running', 'cancelling')",
                     (run["task_id"], run_id),
                 ).fetchone()
-                if int(n["n"]) >= allowed:
+                older = conn.execute(
+                    "SELECT 1 FROM runs WHERE task_id = %s AND status = 'queued' AND seq < %s LIMIT 1",
+                    (run["task_id"], run["seq"]),
+                ).fetchone()
+                if int(n["n"]) >= allowed or older is not None:
                     waiting = True
                 else:
                     waiting = False
@@ -874,7 +892,8 @@ class Engine:
         with self.core.db.tx() as conn:
             rows = conn.execute(
                 "SELECT t.*, s.doc AS source_doc FROM tasks t JOIN sources s ON s.source_id = t.source_id"
-                " WHERE t.next_run_at <= now() ORDER BY t.next_run_at LIMIT 20 FOR UPDATE OF t SKIP LOCKED"
+                " WHERE t.next_run_at <= now() ORDER BY t.next_run_at LIMIT %s FOR UPDATE OF t SKIP LOCKED",
+                (self.core.engine.schedule_batch,),
             ).fetchall()
             for row in rows:
                 doc = row["doc"]
@@ -895,6 +914,124 @@ class Engine:
                     (nxt, fired_at, row["task_id"]),
                 )
         return created
+
+    # ================================================================== housekeeping
+    def reap(self) -> int:
+        """Close runs nobody else will close: a cancelling or drained run whose last worker died (the item
+        and feed paths never see it again), and runs over ``timeouts.run_timeout_ms`` in any phase."""
+        eng = self.core.engine
+        with self.core.db.conn() as conn:
+            timed_out = conn.execute(
+                """
+                SELECT * FROM runs
+                WHERE status IN ('running', 'cancelling') AND started_at IS NOT NULL
+                  AND jsonb_typeof(limits->'task'->'timeouts'->'run_timeout_ms') = 'number'
+                  AND started_at + ((limits->'task'->'timeouts'->>'run_timeout_ms')::bigint
+                                    * interval '1 millisecond') < now()
+                ORDER BY started_at LIMIT %s
+                """,
+                (eng.reap_batch,),
+            ).fetchall()
+            drained = conn.execute(
+                "SELECT run_id FROM runs WHERE status IN ('running', 'cancelling') AND feed_done"
+                " ORDER BY updated_at LIMIT %s",
+                (eng.reap_batch,),
+            ).fetchall()
+        closed = 0
+        for run in timed_out:
+            if run["status"] == "cancelling":
+                with self.core.db.tx() as conn:
+                    conn.execute("UPDATE runs SET feed_done = true WHERE run_id = %s", (run["run_id"],))
+                    # items still leased by dead or stuck workers are cancelled regardless of the lease
+                    conn.execute(
+                        "UPDATE items SET status = 'cancelled', payload = NULL, lease_owner = NULL,"
+                        " finished_at = now(), updated_at = now() WHERE run_id = %s"
+                        " AND status IN ('queued', 'retrying', 'leased', 'running')",
+                        (run["run_id"],),
+                    )
+            else:
+                limit = run["limits"]["task"]["timeouts"]["run_timeout_ms"]
+                with self.core.db.tx() as conn:
+                    self.runs.fail_run(
+                        conn,
+                        run["run_id"],
+                        problem("timeout", f"run exceeded timeouts.run_timeout_ms={limit}", 504, True),
+                    )
+                    conn.execute(
+                        "UPDATE items SET status = 'cancelled', payload = NULL, lease_owner = NULL,"
+                        " finished_at = now(), updated_at = now() WHERE run_id = %s"
+                        " AND status IN ('leased', 'running')",
+                        (run["run_id"],),
+                    )
+                self._cancel_collection(run)
+            closed += 1
+        for row in drained:
+            closed += int(self.runs.maybe_finish(row["run_id"]) is not None)
+        for run in timed_out:
+            if run["status"] == "cancelling":
+                closed += int(self.runs.maybe_finish(run["run_id"]) is not None)
+        return closed
+
+    # ================================================================== LLM budget sync
+    def sync_budgets(self, worker: str) -> int:
+        """Push ``limits.llm.budget`` / ``max_requests_per_minute`` of sources and tasks to the LLM gateway
+        (``llm.v1 PUT/DELETE /v1/budgets/{scope_type}/{scope_id}``), idempotently, with retries."""
+        eng = self.core.engine
+        llm = self.core.executors.first("llm")
+        done = 0
+        while True:
+            with self.core.db.tx() as conn:
+                row = conn.execute(
+                    """
+                    UPDATE budget_sync SET lease_owner = %s, lease_expires_at = now() + %s, attempts = attempts + 1
+                    WHERE (scope_type, scope_id) = (
+                        SELECT scope_type, scope_id FROM budget_sync
+                        WHERE status = 'pending' AND available_at <= now()
+                          AND (lease_expires_at IS NULL OR lease_expires_at < now())
+                        LIMIT 1 FOR UPDATE SKIP LOCKED)
+                    RETURNING *
+                    """,
+                    (worker, self.lease),
+                ).fetchone()
+            if row is None:
+                return done
+            status, message = "synced", None
+            path = f"/v1/budgets/{row['scope_type']}/{row['scope_id']}"
+            if llm is None:
+                status, message = "failed", "no llm executor configured"
+            else:
+                try:
+                    if row["op"] == "delete":
+                        self.core.executors.call(llm, "DELETE", path, ok=(404,))
+                    else:
+                        self.core.executors.call(llm, "PUT", path, json=row["doc"])
+                except ExecutorError as exc:
+                    message = str(exc)
+                    status = (
+                        "pending" if exc.retryable and row["attempts"] < eng.sync_max_attempts else "failed"
+                    )
+            with self.core.db.tx() as conn:
+                if row["op"] == "delete" and status == "synced":
+                    conn.execute(
+                        "DELETE FROM budget_sync WHERE scope_type = %s AND scope_id = %s AND lease_owner = %s",
+                        (row["scope_type"], row["scope_id"], worker),
+                    )
+                else:
+                    conn.execute(
+                        "UPDATE budget_sync SET status = %s, message = %s, lease_owner = NULL, lease_expires_at = NULL,"
+                        " synced_at = CASE WHEN %s = 'synced' THEN now() ELSE synced_at END,"
+                        " available_at = now() + %s WHERE scope_type = %s AND scope_id = %s AND lease_owner = %s",
+                        (
+                            status,
+                            message,
+                            status,
+                            _ms(eng.sync_retry_ms),
+                            row["scope_type"],
+                            row["scope_id"],
+                            worker,
+                        ),
+                    )
+            done += 1
 
     # ================================================================== connection sync
     def sync_connections(self, worker: str) -> int:
@@ -1008,6 +1145,8 @@ class Worker:
             if self.scheduler:
                 did = eng.schedule_due() > 0 or did
             did = eng.sync_connections(self.name) > 0 or did
+            did = eng.sync_budgets(self.name) > 0 or did
+            did = eng.reap() > 0 or did
         return did
 
     def _loop(self) -> None:

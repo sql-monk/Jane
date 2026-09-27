@@ -65,6 +65,8 @@ class Runs:
         task_id = config["task_id"]
         schedule = config.get("schedule") or {}
         overlap = schedule.get("overlap", "skip")
+        # serialize run creation per task (overlap checks) with the queued -> running transition
+        conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"jane-run-start:{task_id}",))
         if enforce_overlap and overlap == "skip":
             active = conn.execute(
                 "SELECT 1 FROM runs WHERE task_id = %s AND status IN ('queued', 'running', 'cancelling') LIMIT 1",

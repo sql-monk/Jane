@@ -18,21 +18,22 @@ Checks:
      202 -> Job, examples present for request bodies and success responses);
   4. every example (inline in OpenAPI, $ref'd Example Objects, contracts/examples/schemas/**)
      validates against its schema; every contracts/examples/invalid/** example is rejected;
-  5. Python interfaces in contracts/python compile;
-  6. Redocly lint (npx @redocly/cli) if Node is available (required with --require-redocly).
+  5. Python interfaces in contracts/python compile and import;
+  6. tools/mock.py can serve a success example for every operation of every API;
+  7. Redocly lint (npx @redocly/cli) if Node is available (required with --require-redocly).
 """
 
 from __future__ import annotations
 
 import argparse
 import os
-import py_compile
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import (  # noqa: E402
@@ -327,12 +328,41 @@ def check_python(report: Report) -> None:
     for py in sorted((CONTRACTS_DIR / "python").rglob("*.py")):
         report.count("python_files")
         try:
-            py_compile.compile(str(py), doraise=True, cfile=None)
-        except py_compile.PyCompileError as exc:
-            report.error(f"{rel(py)}: {exc.msg}")
+            compile(py.read_text(encoding="utf-8"), str(py), "exec")
+        except SyntaxError as exc:
+            report.error(f"{rel(py)}:{exc.lineno}: {exc.msg}")
+    src = CONTRACTS_DIR / "python" / "src"
+    if src.exists():
+        import importlib
+
+        sys.path.insert(0, str(src))
+        for mod in ("jane_contracts", "jane_contracts.discovery", "jane_contracts.storage_adapter"):
+            try:
+                importlib.import_module(mod)
+            except Exception as exc:  # noqa: BLE001
+                report.error(f"import {mod} failed: {exc!r}")
 
 
-# 6. Redocly ------------------------------------------------------------------------------------
+# 6. Mock routes ------------------------------------------------------------------------------
+
+def check_mock_routes(report: Report) -> None:
+    """Every operation of every API can be served by tools/mock.py with a success response."""
+    import mock
+    from _common import API_NAMES
+
+    for api in API_NAMES:
+        for route in mock.load_routes(api):
+            report.count("mock_routes")
+            try:
+                code, _mt, _body = route.choose({})
+            except LookupError as exc:
+                report.error(f"mock {api}: {route.method} {route.template}: {exc}")
+                continue
+            if not 200 <= code < 300:
+                report.error(f"mock {api}: {route.method} {route.template}: no success response")
+
+
+# 7. Redocly ------------------------------------------------------------------------------------
 
 def run_redocly(report: Report, required: bool) -> str:
     npx = shutil.which("npx")
@@ -370,6 +400,7 @@ def main() -> int:
         ("Jane API conventions and inline examples", lambda: check_openapi_conventions(report, registry)),
         ("Standalone schema examples", lambda: check_schema_examples(report, registry)),
         ("Python interfaces compile", lambda: check_python(report)),
+        ("Mock server can serve every operation", lambda: check_mock_routes(report)),
     ]
     for title, fn in steps:
         before = len(report.errors)

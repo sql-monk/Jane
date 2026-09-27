@@ -1,0 +1,13 @@
+[project]
+name = "jane-contracts"
+version = "1.0.0"
+description = "Jane internal interface contracts: discovery strategy (Web Collector) and storage adapter protocols."
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jane_contracts"]

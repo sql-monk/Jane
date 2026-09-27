@@ -1,0 +1,12 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "sku": "phone-gamma",
+        "availability": "out_of_stock",
+        "price": { "amount": 399.0, "currency": "UAH" }
+      }
+    }
+  ]
+}

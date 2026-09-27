@@ -1,0 +1,3 @@
+- Запуск: `uv run --package jane-handler-runtime python -m jane_handler_runtime` (або Docker, див. README.md).
+- Тести: `just test handler-runtime` (інтеграційні: `-m integration` після `just up`).
+- Контракт: `contracts/openapi/handler-runtime.v1.yaml` (+ `contracts/openapi/common.yaml`); конвенції — скіл `jane-contracts`.

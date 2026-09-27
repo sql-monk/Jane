@@ -1,0 +1,22 @@
+[project]
+name = "jane-handler-runtime"
+version = "0.1.0"
+description = "Handler Runtime of the Jane platform."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "jane-kit",
+]
+
+[project.scripts]
+jane-handler-runtime = "jane_handler_runtime.__main__:main"
+
+[tool.uv.sources]
+jane-kit = { workspace = true }
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jane_handler_runtime"]

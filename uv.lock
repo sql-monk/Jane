@@ -9,6 +9,8 @@ resolution-markers = [
 
 [manifest]
 members = [
+    "jane-extractor-sdk",
+    "jane-handler-runtime",
     "jane-kit",
     "jane-storage",
     "jane-storage-files",
@@ -511,6 +513,22 @@ wheels = [
 name = "jane-contracts"
 version = "1.0.0"
 source = { editable = "contracts/python" }
+
+[[package]]
+name = "jane-extractor-sdk"
+version = "0.1.0"
+source = { editable = "libs/extractor-sdk" }
+
+[[package]]
+name = "jane-handler-runtime"
+version = "0.1.0"
+source = { editable = "services/handler-runtime" }
+dependencies = [
+    { name = "jane-kit" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "jane-kit", editable = "libs/jane-kit" }]
 
 [[package]]
 name = "jane-kit"

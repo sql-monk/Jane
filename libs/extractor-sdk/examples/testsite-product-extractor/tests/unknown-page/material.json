@@ -1,0 +1,12 @@
+{
+  "material_id": "web:5b0c1ad2f0e44b1f9c1d2e3f40516273",
+  "observation_id": "obs_example_careers_0001",
+  "source": { "source_id": "testsite", "kind": "web", "name": "Jane test site" },
+  "locator": { "url": "https://testsite.example.test/pages/careers" },
+  "fetched_at": "2026-09-27T10:00:00Z",
+  "format": { "media_type": "text/html", "charset": "utf-8", "content_kind": "page" },
+  "revision": { "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+  "content_file": "tests/unknown-page/page.html",
+  "content": { "kind": "inline", "media_type": "text/html", "encoding": "utf-8", "data": "" },
+  "collector": { "name": "web-collector", "version": "0.1.0" }
+}

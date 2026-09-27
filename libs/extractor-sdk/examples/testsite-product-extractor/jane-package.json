@@ -1,0 +1,104 @@
+{
+  "schema_version": "1",
+  "package_id": "testsite.product-extractor",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "Jane test site product cards",
+  "description": "Приклад пакета екстрактора SDK: картки товарів тестового сайту (JSON-LD, запасний варіант — мікродані).",
+  "tags": ["products", "html", "example"],
+  "entry": {
+    "runtime": "python",
+    "module": "testsite_products.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": ["material"],
+    "media_types": ["text/html"],
+    "content_kinds": ["page"]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "product",
+        "schema": "schemas/product.schema.json",
+        "key_fields": ["sku"],
+        "description": "Картка товару"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "product-phone-alpha",
+      "input": {
+        "file": "tests/product-phone-alpha/page.html",
+        "media_type": "text/html",
+        "url": "https://testsite.example.test/product/phone-alpha"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-phone-alpha/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "product-phone-gamma-out-of-stock",
+      "input": {
+        "file": "tests/product-phone-gamma/page.html",
+        "media_type": "text/html",
+        "url": "https://testsite.example.test/product/phone-gamma"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-phone-gamma/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "category-page-empty",
+      "input": {
+        "file": "tests/category-phones/page.html",
+        "media_type": "text/html",
+        "url": "https://testsite.example.test/catalog/phones/"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "unknown-page-empty",
+      "input": {
+        "material": "tests/unknown-page/material.json"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "product-without-price-unrecognized",
+      "input": {
+        "file": "tests/product-no-price/page.html",
+        "media_type": "text/html",
+        "url": "https://testsite.example.test/product/phone-omega"
+      },
+      "params": {
+        "include_url": false
+      },
+      "expected_status": "unrecognized",
+      "origin": "problem_sample"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": ["WP-06"],
+    "created_at": "2026-09-27T12:00:00Z",
+    "change_summary": "Example package of the extractor SDK."
+  },
+  "bindings_hint": {
+    "source_kinds": ["web"],
+    "url_patterns": ["/product/*"]
+  }
+}

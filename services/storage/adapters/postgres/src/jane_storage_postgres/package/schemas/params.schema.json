@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "jane.storage-postgresql params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "table_prefix": {
+      "description": "Префікс таблиць (типово 'jane_': jane_entities, jane_entity_history, jane_deliveries, jane_objects).",
+      "type": "string",
+      "pattern": "^[a-z_][a-z0-9_]{0,30}$"
+    },
+    "schema": {
+      "description": "Схема бази; типово params.schema підключення або 'public'.",
+      "type": "string",
+      "pattern": "^[a-z_][a-z0-9_]{0,62}$"
+    },
+    "format": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "raw": { "type": "string", "enum": ["original", "html", "json"] },
+        "entities": { "type": "string", "enum": ["json"] }
+      }
+    }
+  }
+}

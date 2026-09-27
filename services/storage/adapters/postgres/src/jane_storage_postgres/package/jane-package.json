@@ -1,0 +1,51 @@
+{
+  "schema_version": "1",
+  "package_id": "jane.storage-postgresql",
+  "version": "1.0.0",
+  "kind": "storage",
+  "title": "PostgreSQL storage",
+  "description": "Зберігає сутності (актуальний стан і історію) та RAW у PostgreSQL (bytea). Без format.raw: вебсторінка — text/html байт-у-байт, інший RAW — JSON-документ Material із вбудованим вмістом; перевизначення — params.format.raw = original | html | json.",
+  "tags": [
+    "storage",
+    "postgresql"
+  ],
+  "entry": {
+    "executor": "storage",
+    "adapter": "postgresql",
+    "writes": "raw_and_entities",
+    "format": {
+      "entities": "json"
+    },
+    "history": true
+  },
+  "input": {
+    "accepts": [
+      "material",
+      "entities"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "required_connections": [
+    {
+      "name": "target",
+      "kind": "postgresql",
+      "purpose": "база для результатів"
+    }
+  ],
+  "tests": [
+    {
+      "name": "idempotent-redelivery",
+      "input": {
+        "entities": "tests/redelivery/entities.json"
+      },
+      "expected_status": "success"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "WP-07"
+    ],
+    "created_at": "2026-09-27T08:00:00Z"
+  }
+}

@@ -1,0 +1,31 @@
+[project]
+name = "jane-storage-postgres"
+version = "0.1.0"
+description = "PostgreSQL adapter of the Jane storage handler (entities with history, RAW objects as bytea)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "jane-storage",
+    "jane-contracts",
+    "asyncpg>=0.30",
+]
+
+# Registration in the storage core (see services/storage/README.md, "Адаптери").
+[project.entry-points."jane.storage.adapters"]
+postgresql = "jane_storage_postgres:PostgresAdapter"
+
+[project.entry-points."jane.storage.packages"]
+"jane.storage-postgresql" = "jane_storage_postgres:package_dir"
+
+[tool.uv.sources]
+# A path (not workspace) source: uv does not treat a project nested in another member as a workspace
+# member when building it, see services/storage/README.md.
+jane-storage = { path = "../..", editable = true }
+jane-contracts = { path = "../../../../contracts/python", editable = true }
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jane_storage_postgres"]

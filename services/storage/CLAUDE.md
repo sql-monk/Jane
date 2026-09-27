@@ -1,0 +1,3 @@
+- Запуск: `uv run --all-packages python -m jane_storage` (адаптери — окремі пакети в `adapters/*`; Docker — README.md).
+- Тести: `just test storage`; PostgreSQL — `just up --project jane-wp07 postgres` + `just integration --project jane-wp07 services/storage`.
+- Контракт: `contracts/openapi/handler.v1.yaml`, `storage.v1.yaml`, `contracts/python/.../storage_adapter.py`, `contracts/docs/storage-adapter.md`.

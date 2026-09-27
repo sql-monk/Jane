@@ -1,0 +1,33 @@
+[project]
+name = "jane-storage"
+version = "0.1.0"
+description = "Storage handler of the Jane platform: core semantics, adapter registry, compatibility suite and HTTP service."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "jane-kit",
+    "jane-contracts",
+    "boto3>=1.35",
+]
+
+[project.optional-dependencies]
+# The adapter compatibility suite (jane_storage.compat) is a pytest-based module used by adapter packages.
+compat = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+]
+
+[project.scripts]
+jane-storage = "jane_storage.__main__:main"
+jane-storage-packages = "jane_storage.packages:main"
+
+[tool.uv.sources]
+jane-kit = { workspace = true }
+jane-contracts = { path = "../../contracts/python", editable = true }
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jane_storage"]

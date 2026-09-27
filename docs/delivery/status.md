@@ -9,12 +9,12 @@
 | 02 | Web Collector: ядро | 1 | active | `wp/02-web-collector-core` | агент / wp-reviewer | фінальне виправлення після рев'ю 2 (хибний succeeded), перевірка координатором |
 | 03 | Web Collector: стратегії пошуку | 1 | — | | | після M0 |
 | 04 | Telegram Collector | 1 | active | `wp/04-telegram-collector` | агент | слот 3 |
-| 05 | Репозиторій обробників | 1 | review | `wp/05-registry` | агент / wp-reviewer | |
+| 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент / wp-reviewer | виправлення після рев'ю 1 (lease ключів/job, secret_detected) |
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
 | 08 | Адаптери збереження | 1 | active | `wp/08-storage-adapters` | агент / wp-reviewer | виправлення після рев'ю 1 (дублі історії: s3 412, mongodb гонка) |
 | 09 | Оркестратор | 1 | active | `wp/09-orchestrator` | агент / wp-reviewer | виправлення після рев'ю 1 (cancelling, retries, overlap) |
-| 10 | LLM-шлюз і LLM-обробник | 1 | active | `wp/10-llm` | агент / wp-reviewer | виправлення після рев'ю 1 (ін'єкція в retry_hint, secret_refs) |
+| 10 | LLM-шлюз і LLM-обробник | 1 | review | `wp/10-llm` | агент / wp-reviewer | рев'ю 2 |
 | 11 | Асистент джерел | 1 | active | `wp/11-assistant` | агент / wp-reviewer | виправлення після рев'ю 1 (кілька екземплярів) |
 | 12 | Адмінка | 1 | active | `wp/12-admin` | агент | слот 3 |
 | 13 | Інтеграція й приймання | 2 | active | `wp/13-acceptance` | агент | фаза 1: матриця, сценарії, каркас e2e |
@@ -86,3 +86,4 @@
 | WP-08 | координатор / WP-01 | CI: сервіси `sqlserver mongodb minio s3` для інтеграційних тестів адаптерів | відкрито |
 - 2026-09-27 — WP-08 на рев'ю; запущено WP-13 (фаза 1).
 - 2026-09-27 — WP-08 повернуто після рев'ю 1: дубль історії в s3/minio (компенсація на 412) і mongodb (гонка двох екземплярів); схему `pending` визнано коректною.
+- 2026-09-27 — WP-05 повернуто після рев'ю 1 (відновлення ключів/job після падіння, прогалини secret_detected); рішення: `registry:approve` для `auto_changes_allowed` false→true. WP-10 — рев'ю 2.

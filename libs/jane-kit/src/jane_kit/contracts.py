@@ -47,12 +47,18 @@ __all__ = [
 
 HTTP_METHODS = ("get", "put", "post", "delete", "options", "head", "patch", "trace")
 
+# Tooling constants of this test/dev helper (not operational limits of a service):
+SPEC_CACHE_FILES = 256  # parsed contract files kept in memory
+MAX_REF_CHAIN = 32  # $ref -> $ref hops before reporting a cycle
+MAX_EXAMPLE_DEPTH = 12  # nesting depth when synthesising an example from a schema
+MAX_REPORTED_ERRORS = 10  # validation errors shown in one ContractViolation
+
 
 class ContractViolation(AssertionError):
     """The request or response does not match the contract."""
 
 
-@lru_cache(maxsize=256)
+@lru_cache(maxsize=SPEC_CACHE_FILES)
 def _load_cached(path: str, mtime_ns: int) -> Any:
     text = Path(path).read_text(encoding="utf-8")
     return json.loads(text) if path.lower().endswith(".json") else yaml.safe_load(text)
@@ -149,7 +155,7 @@ class OpenAPISpec:
 
     def follow(self, loc: Loc) -> Loc:
         """Follow ``$ref`` chains of non-schema objects (path items, responses, examples...)."""
-        for _ in range(32):
+        for _ in range(MAX_REF_CHAIN):
             if not (isinstance(loc.node, Mapping) and "$ref" in loc.node):
                 return loc
             loc = self.lookup(urljoin(loc.uri, str(loc.node["$ref"])))
@@ -217,7 +223,10 @@ class OpenAPISpec:
         validator = Draft202012Validator({"$ref": schema_uri}, registry=self.registry)
         errors = sorted(validator.iter_errors(instance), key=lambda e: list(e.absolute_path))
         if errors:
-            lines = [f"- at /{'/'.join(map(str, e.absolute_path))}: {e.message}" for e in errors[:10]]
+            lines = [
+                f"- at /{'/'.join(map(str, e.absolute_path))}: {e.message}"
+                for e in errors[:MAX_REPORTED_ERRORS]
+            ]
             raise ContractViolation(f"{what} does not match the contract:\n" + "\n".join(lines))
 
     def validate_component(self, name: str, instance: Any) -> None:
@@ -269,13 +278,19 @@ class OpenAPISpec:
 
 
 def contracts_dir(start: Path | None = None) -> Path | None:
-    """``contracts/`` of the repository: env ``JANE_CONTRACTS_DIR`` or the nearest ancestor with ``contracts/openapi``."""
+    """``contracts/`` of this checkout: env ``JANE_CONTRACTS_DIR``, else ``<checkout root>/contracts``.
+
+    The search stops at the checkout root (nearest ancestor with ``.git``), so a git worktree nested
+    inside another checkout never picks up that checkout's contracts.
+    """
     if env := os.environ.get("JANE_CONTRACTS_DIR"):
         return Path(env) if Path(env).is_dir() else None
     here = (start or Path.cwd()).resolve()
     for candidate in (here, *here.parents):
         if (candidate / "contracts" / "openapi").is_dir():
             return candidate / "contracts"
+        if (candidate / ".git").exists():
+            return None
     return None
 
 
@@ -359,7 +374,7 @@ def example_from_schema(spec: OpenAPISpec, schema: Loc | Mapping[str, Any], dept
     loc = schema if isinstance(schema, Loc) else Loc(spec.base_uri, "", schema)
     loc = spec.follow(loc)
     s = loc.node
-    if not isinstance(s, Mapping) or depth > 12:
+    if not isinstance(s, Mapping) or depth > MAX_EXAMPLE_DEPTH:
         return None
     if s.get("examples"):
         return s["examples"][0]

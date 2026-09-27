@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any, Literal, Self
 
 import yaml
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 __all__ = [
@@ -37,6 +37,7 @@ __all__ = [
     "LimitLayer",
     "Limits",
     "ResolvedLimits",
+    "contract_field",
     "layer_from_env",
     "load_layer",
     "resolve_limits",
@@ -78,6 +79,7 @@ class LimitLayer:
     values: Mapping[str, Any] = field(default_factory=dict)
     hard_caps: Mapping[str, Any] = field(default_factory=dict)
     name: str | None = None  # e.g. source id or file name, for diagnostics
+    profile: str | None = None  # PlatformLimits.profile of a platform file
 
     @property
     def label(self) -> str:
@@ -91,6 +93,28 @@ class ResolvedLimits[L: Limits]:
     """Dotted leaf path -> label of the layer that set it (``default`` = the model's default)."""
     clamped: dict[str, str]
     """Dotted leaf path -> label of the layer whose hard cap reduced the value."""
+    hard_caps: dict[str, Any] = field(default_factory=dict)
+    """Dotted leaf path -> effective hard cap (the tightest one of all layers)."""
+    profile: str | None = None
+    """Name of the platform limits profile, if a PlatformLimits file declared one."""
+
+    def platform_limits(self) -> dict[str, Any]:
+        """``PlatformLimits`` document for ``/v1/info`` (WP-00 ``ServiceInfo.limits``).
+
+        Only fields that map to ``limits.schema.json`` (declared with :func:`contract_field` or nested
+        under a group with a contract path) are included; service-specific limits stay internal because
+        the contract schema is strict (``additionalProperties: false``).
+        """
+        mapping = _contract_paths(type(self.limits))
+        flat = _flatten(self.limits.model_dump(mode="json"))
+        defaults = {mapping[p]: v for p, v in flat.items() if p in mapping}
+        caps = {mapping[p]: v for p, v in self.hard_caps.items() if p in mapping}
+        doc: dict[str, Any] = {"defaults": _unflatten(defaults)}
+        if caps:
+            doc["hard_caps"] = _unflatten(caps)
+        if self.profile:
+            doc["profile"] = self.profile
+        return doc
 
     def provenance(self) -> dict[str, str]:
         """Leaf path -> contract ``LimitLevel`` (model defaults count as ``platform``)."""
@@ -139,6 +163,33 @@ def _unflatten(flat: Mapping[str, Any]) -> dict[str, Any]:
         for part in parents:
             node = node.setdefault(part, {})
         node[leaf] = value
+    return out
+
+
+CONTRACT_KEY = "contract"
+
+
+def contract_field(path: str, default: Any, **kwargs: Any) -> Any:
+    """``Field`` for a limit that exists in ``limits.schema.json`` under dotted ``path``
+    (e.g. ``"transfer.idempotency_ttl_seconds"``). For a nested group, ``path`` is the group
+    (``"retries"``) and its fields map to ``retries.<name>``."""
+    extra = dict(kwargs.pop("json_schema_extra", None) or {})
+    extra[CONTRACT_KEY] = path
+    return Field(default=default, json_schema_extra=extra, **kwargs)
+
+
+def _contract_paths(model: type[BaseModel], prefix: str = "", group: str | None = None) -> dict[str, str]:
+    """Model leaf path -> contract path for fields that have one."""
+    out: dict[str, str] = {}
+    for name, info in model.model_fields.items():
+        extra = info.json_schema_extra if isinstance(info.json_schema_extra, dict) else {}
+        own = extra.get(CONTRACT_KEY)
+        contract = str(own) if own else (f"{group}.{name}" if group else None)
+        ann = info.annotation
+        if isinstance(ann, type) and issubclass(ann, BaseModel):
+            out.update(_contract_paths(ann, f"{prefix}{name}.", contract))
+        elif contract:
+            out[f"{prefix}{name}"] = contract
     return out
 
 
@@ -219,7 +270,14 @@ def resolve_limits[L: Limits](
             clamped[path] = label
     if clamped:
         limits = model.model_validate(_unflatten(flat))
-    return ResolvedLimits(limits=limits, origin=origin, clamped=clamped)
+    profile = next((layer.profile for layer in reversed(layers) if layer.profile), None)
+    return ResolvedLimits(
+        limits=limits,
+        origin=origin,
+        clamped=clamped,
+        hard_caps={p: c for p, (c, _) in caps.items()},
+        profile=profile,
+    )
 
 
 def _read_mapping(path: Path) -> dict[str, Any]:
@@ -254,6 +312,7 @@ def load_layer(path: str | Path, level: str = "platform", *, name: str | None = 
         values=data.get("defaults") or {},
         hard_caps=data.get("hard_caps") or {},
         name=name or data.get("profile"),
+        profile=data.get("profile"),
     )
 
 
@@ -296,6 +355,8 @@ class JaneSettings(BaseSettings):
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "json"
     metrics_enabled: bool = True
+    health_check_timeout_ms: int = Field(default=2_000, ge=1)
+    """Time box of every ``/v1/health`` check (env ``<PREFIX>HEALTH_CHECK_TIMEOUT_MS``)."""
     auth_mode: Literal["none", "api_key", "jwt"] = "none"
     """Reported in ``/v1/info``; enforcement is per service (ADR on authentication, WP-00)."""
     limits_file: Path | None = None

@@ -51,10 +51,11 @@ services:
       <<: *healthcheck
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
 
-  # MinIO server. Upstream stopped publishing images; the default is the community build of the
-  # same server (pgsty/minio). Override JANE_IMAGE_MINIO to use another MinIO image.
+  # MinIO server. Upstream stopped publishing images; the default is a third-party community build of
+  # the same server (pgsty/minio), pinned by digest - supplier risk, see infra/README.md.
+  # Override JANE_IMAGE_MINIO to use another MinIO image.
   minio:
-    image: ${JANE_IMAGE_MINIO:-pgsty/minio:RELEASE.2026-08-04T00-00-00Z}
+    image: ${JANE_IMAGE_MINIO:-pgsty/minio:RELEASE.2026-08-04T00-00-00Z@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372}
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${JANE_MINIO_ACCESS_KEY:-jane}
@@ -76,7 +77,7 @@ services:
       - >-
         printf '{"identities":[{"name":"jane","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","List","Tagging","Write"]}]}'
         "$$S3_ACCESS_KEY" "$$S3_SECRET_KEY" > /tmp/s3.json &&
-        exec weed server -dir=/data -master.volumeSizeLimitMB=64 -volume.max=0 -s3 -s3.port=8333 -s3.config=/tmp/s3.json
+        exec weed server -dir=/data -master.volumeSizeLimitMB=${JANE_S3_VOLUME_SIZE_LIMIT_MB:-64} -volume.max=0 -s3 -s3.port=8333 -s3.config=/tmp/s3.json
     environment:
       S3_ACCESS_KEY: ${JANE_S3_ACCESS_KEY:-jane}
       S3_SECRET_KEY: ${JANE_S3_SECRET_KEY:?run `just up` or set JANE_S3_SECRET_KEY}
@@ -86,9 +87,10 @@ services:
       <<: *healthcheck
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/healthz || exit 1"]
 
+  # No `image:` on purpose: compose tags the build as <project>-testsite, so parallel stacks never
+  # overwrite each other's image.
   testsite:
     build: ../tests/fixtures/testsite
-    image: ${JANE_IMAGE_TESTSITE:-jane-testsite:dev}
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_TESTSITE:-}:8080"]
     healthcheck:
       <<: *healthcheck

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -84,6 +85,41 @@ def test_scan_allows_clean_commit_and_ignores_other_commands(repo: Path) -> None
         run_hook("scan_secrets.py", {"tool_input": {"command": "git status"}, "cwd": str(repo)}).returncode
         == 0
     )
+
+
+HEX64 = hashlib.sha256(b"jane-delivery").hexdigest()  # high-entropy, like real delivery keys
+
+
+def _gitleaks_on_commit(base: Path, files: dict[str, str]) -> int:
+    """Commit ``files`` into a fresh repo and scan its history with the repository's .gitleaks.toml."""
+    repo = base / f"r{len(list(base.iterdir()))}"
+    repo.mkdir()
+    git(repo, "init", "-q")
+    git(repo, "config", "user.email", "test@example.invalid")
+    git(repo, "config", "user.name", "test")
+    for rel, text in files.items():
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text(text, encoding="utf-8")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "x")
+    cfg = str(ROOT / ".gitleaks.toml")
+    cmd = ["gitleaks", "git", "--config", cfg, "--no-banner", "--redact", "--exit-code", "3", str(repo)]
+    return subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=60).returncode
+
+
+@needs_gitleaks
+def test_gitleaks_config_allows_only_contract_delivery_keys(tmp_path: Path) -> None:
+    allowed = {
+        "contracts/examples/invocation.json": f'{{"delivery_key": "{HEX64}"}}\n',
+        "contracts/openapi/storage.v1.yaml": f"delivery_key: {HEX64}\n",
+    }
+    assert _gitleaks_on_commit(tmp_path, allowed) == 0
+    # the same value under another name, or outside contracts/, is still a finding
+    assert _gitleaks_on_commit(tmp_path, {"contracts/examples/x.yaml": f"api_key: {HEX64}\n"}) == 3
+    assert _gitleaks_on_commit(tmp_path, {"app/settings.yaml": f"delivery_key: {HEX64}\n"}) == 3
+    # real-looking credentials are caught everywhere, contracts/ included
+    assert _gitleaks_on_commit(tmp_path, {"creds.txt": FAKE}) == 3
+    assert _gitleaks_on_commit(tmp_path, {"contracts/examples/leak.txt": FAKE}) == 3
 
 
 def test_hooks_never_fail_on_bad_input() -> None:

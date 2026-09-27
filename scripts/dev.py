@@ -130,7 +130,12 @@ def cmd_contract(ns: argparse.Namespace) -> int:
 
 
 def cmd_integration(ns: argparse.Namespace) -> int:
-    code = run(uv_run("pytest", "-m", "integration", *ns.pytest_args)).returncode
+    # Tests find the stack via JANE_STACK_FILE (jane_kit.devstack.load_stack), so they never pick up
+    # another project's stack file.
+    project = ns.project or default_project()
+    print(f"stack project: {project}", flush=True)
+    env = {"JANE_STACK_FILE": str(stack_file(project))}
+    code = run(uv_run("pytest", "-m", "integration", *ns.pytest_args), env=env).returncode
     return 0 if pytest_ok(code) else code
 
 
@@ -524,10 +529,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     def add(name: str, fn: object, help_: str, pytest_args: bool = False) -> argparse.ArgumentParser:
-        p = sub.add_parser(name, help=help_)
-        p.set_defaults(fn=fn)
-        if pytest_args:
-            p.add_argument("pytest_args", nargs=argparse.REMAINDER, help="extra pytest arguments")
+        # Commands with pytest_args pass every unknown argument to pytest unchanged
+        # (`just unit -v -k limits`), no `--` needed.
+        p = sub.add_parser(name, help=help_ + (" (unknown arguments go to pytest)" if pytest_args else ""))
+        p.set_defaults(fn=fn, takes_pytest_args=pytest_args)
         return p
 
     add("sync", cmd_sync, "uv sync --all-packages")
@@ -536,13 +541,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     add("types", cmd_types, "mypy for every workspace member")
     add("unit", cmd_unit, "unit tests", True)
     add("contract", cmd_contract, "contracts lint + contract tests", True)
-    add("integration", cmd_integration, "integration tests (need `just up`)", True)
+    p = add("integration", cmd_integration, "integration tests (need `just up`)", True)
+    p.add_argument("--project", help="compose project of the stack (default: unique per checkout)")
     add("isolation", cmd_isolation, "sandbox isolation tests (Linux only)", True)
     add("web", cmd_web, "pnpm install/lint/typecheck/test for web/* (if present)")
     add("check", cmd_check, "lint + types + unit + contract (+ web)", True)
-    p = add("test", cmd_test, "tests of one service/library")
+    p = add("test", cmd_test, "tests of one service/library", True)
     p.add_argument("target")
-    p.add_argument("pytest_args", nargs=argparse.REMAINDER, help="extra pytest arguments")
 
     for name, fn, help_ in (
         ("up", cmd_up, "start the dev stack"),
@@ -579,9 +584,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("spec")
     p.add_argument("out")
 
-    ns = ap.parse_args(argv)
-    if getattr(ns, "pytest_args", None) and ns.pytest_args[:1] == ["--"]:
-        ns.pytest_args = ns.pytest_args[1:]
+    ns, extra = ap.parse_known_args(argv)
+    extra = [a for a in extra if a != "--"]
+    if extra and not ns.takes_pytest_args:
+        ap.error(f"unrecognized arguments: {' '.join(extra)}")
+    ns.pytest_args = extra
     return int(ns.fn(ns))
 
 

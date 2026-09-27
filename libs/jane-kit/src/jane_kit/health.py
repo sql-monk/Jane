@@ -39,12 +39,14 @@ class ServiceInfo(BaseModel):
     api_versions: list[str]
     capabilities: dict[str, Any] = {}
     auth_mode: Literal["none", "api_key", "jwt"] | None = None
+    limits: dict[str, Any] | None = None
+    """``PlatformLimits``: the service's configured defaults and hard caps (contract fields only)."""
 
 
 class HealthRegistry:
     """Named health checks. ``critical=False`` checks can only make the service ``degraded``."""
 
-    def __init__(self, check_timeout_s: float = 2.0) -> None:
+    def __init__(self, check_timeout_s: float) -> None:
         self.check_timeout_s = check_timeout_s
         self._checks: dict[str, tuple[CheckFn, bool]] = {}
 

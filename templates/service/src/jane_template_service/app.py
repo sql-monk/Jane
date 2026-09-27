@@ -26,7 +26,13 @@ from .settings import Settings, resolve_service_limits
 log = logging.getLogger(__name__)
 
 
-class ExampleJobRequest(BaseModel):  # EXAMPLE
+class ExampleJobRequest(BaseModel):
+    """EXAMPLE - delete together with the /v1/examples endpoint.
+
+    The bounds below validate the demo payload only; they are not operational limits of the service
+    (those live in ``ServiceLimits`` and come from configuration).
+    """
+
     steps: int = Field(default=3, ge=1, le=1000)
     step_delay_ms: int = Field(default=10, ge=0, le=60_000)
 
@@ -40,7 +46,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        log.info("effective limits", extra={"limits": resolved.effective()})
+        log.info("configured limits", extra={"limits": resolved.effective()})
         yield
         await runner.shutdown()
 
@@ -50,6 +56,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         version=__version__,
         lifespan=lifespan,
         capabilities={"examples": ["jobs"]},
+        limits=resolved,  # published in /v1/info as PlatformLimits (WP-00 ServiceInfo.limits)
     )
     app.state.limits = resolved
     app.include_router(jobs_router(runner))

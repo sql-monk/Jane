@@ -80,6 +80,27 @@ def test_health_and_info_match_schema() -> None:
     COMMON.validate_component("ServiceInfo", client.get("/v1/info").json())
 
 
+def test_info_limits_match_platform_limits_schema() -> None:
+    from jane_kit.clients import ClientLimits
+    from jane_kit.idempotency import IdempotencyLimits
+    from jane_kit.jobs import JobLimits
+
+    class AllLimits(Limits):
+        jobs: JobLimits = JobLimits()
+        idempotency: IdempotencyLimits = IdempotencyLimits()
+        client: ClientLimits = ClientLimits()
+
+    resolved = resolve_limits(
+        AllLimits,
+        LimitLayer("platform", hard_caps={"client": {"request_timeout_ms": 60_000}}, profile="dev-laptop"),
+    )
+    app = create_app(JaneSettings(service_name="svc"), configure_logs=False, limits=resolved)
+    info = TestClient(app).get("/v1/info").json()
+    assert info["limits"]["profile"] == "dev-laptop"
+    assert info["limits"]["hard_caps"] == {"timeouts": {"request_timeout_ms": 60_000}}
+    COMMON.validate_component("ServiceInfo", info)
+
+
 class Crawl(Limits):
     max_depth: int = Field(default=3, ge=0)
 

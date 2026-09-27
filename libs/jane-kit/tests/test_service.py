@@ -10,8 +10,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from jane_kit.config import JaneSettings
+from jane_kit.config import JaneSettings, LimitLayer, resolve_limits
 from jane_kit.errors import JaneError, NotFound
+from jane_kit.jobs import JobLimits
 from jane_kit.logs import JsonFormatter, bind_context
 from jane_kit.service import create_app
 
@@ -90,7 +91,7 @@ def test_health_down_and_degraded() -> None:
 
 
 def test_health_check_timeout() -> None:
-    app = create_app(JaneSettings(), configure_logs=False, health_check_timeout_s=0.05)
+    app = create_app(JaneSettings(health_check_timeout_ms=50), configure_logs=False)
 
     async def slow() -> bool:
         await asyncio.sleep(1)
@@ -175,3 +176,30 @@ def test_json_log_contains_context() -> None:
     )
     assert record["items"] == 3 and record["level"] == "info"
     assert "color_message" not in record
+
+
+def test_health_check_timeout_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("JANE_HEALTH_CHECK_TIMEOUT_MS", "40")
+    settings = JaneSettings()
+    assert settings.health_check_timeout_ms == 40
+    app = create_app(settings, configure_logs=False)
+    assert app.state.health.check_timeout_s == 0.04
+
+    async def slow() -> bool:
+        await asyncio.sleep(1)
+        return True
+
+    app.state.health.add("slow", slow)
+    body = TestClient(app).get("/v1/health").json()
+    assert body["checks"]["slow"]["message"] == "timeout after 0.04s"
+
+
+def test_info_publishes_platform_limits() -> None:
+    resolved = resolve_limits(JobLimits, LimitLayer("platform", hard_caps={"job_retention_seconds": 3600}))
+    app = create_app(JaneSettings(), configure_logs=False, limits=resolved)
+    limits = TestClient(app).get("/v1/info").json()["limits"]
+    # only contract fields; service-specific ones (max_concurrent_jobs...) stay internal
+    assert limits == {
+        "defaults": {"transfer": {"job_retention_seconds": 3600}},
+        "hard_caps": {"transfer": {"job_retention_seconds": 3600}},
+    }

@@ -4,6 +4,11 @@ Scans the staged diff and the unstaged diff of tracked files (covers `git commit
 `git add ... && git commit`). Files that are still untracked at this point are covered by the git
 pre-commit hook (`just hooks`). Findings block the command (exit 2) with a redacted report.
 If gitleaks is not installed the hook only warns: it must not break work on machines without it.
+
+Time budget: ``JANE_SECRET_SCAN_TIMEOUT_S`` (default 100 s) is the total for both scans, so both scans
+plus the ``uv run`` start-up fit into the hook timeout (150 s in ``.claude/settings.json``). A scan
+that runs out of time is reported as a warning and does not block. Rules: gitleaks defaults extended by
+``.gitleaks.toml`` in the repository root (picked up automatically for the scanned path).
 """
 
 from __future__ import annotations
@@ -14,16 +19,17 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from jane_wp import find_root
 
 COMMIT_RE = re.compile(r"\bgit\b[^;&|\n]*\bcommit\b")
-TIMEOUT_S = float(os.environ.get("JANE_SECRET_SCAN_TIMEOUT_S", "60"))
+TOTAL_TIMEOUT_S = float(os.environ.get("JANE_SECRET_SCAN_TIMEOUT_S", "100"))
 
 
-def scan(root: Path, gitleaks: str, staged: bool) -> tuple[int, str]:
+def scan(root: Path, gitleaks: str, staged: bool, timeout_s: float) -> tuple[int, str]:
     cmd = [gitleaks, "git", "--pre-commit", "--redact", "--no-banner", "--verbose", "--exit-code", "3"]
     if staged:
         cmd.append("--staged")
@@ -35,7 +41,7 @@ def scan(root: Path, gitleaks: str, staged: bool) -> tuple[int, str]:
         text=True,
         encoding="utf-8",
         errors="replace",
-        timeout=TIMEOUT_S,
+        timeout=timeout_s,
         check=False,
     )
     return proc.returncode, (proc.stdout + proc.stderr).strip()
@@ -58,8 +64,20 @@ def main() -> int:
         )
         return 0
     reports = []
+    deadline = time.monotonic() + TOTAL_TIMEOUT_S
     for staged in (True, False):
-        code, out = scan(root, gitleaks, staged)
+        remaining = deadline - time.monotonic()
+        try:
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired("gitleaks", 0)
+            code, out = scan(root, gitleaks, staged, remaining)
+        except subprocess.TimeoutExpired:
+            print(
+                f"Jane secret scan: gitleaks did not finish within {TOTAL_TIMEOUT_S:.0f}s "
+                "(JANE_SECRET_SCAN_TIMEOUT_S); commit is not fully scanned.",
+                file=sys.stderr,
+            )
+            continue
         if code == 3:
             reports.append(("staged" if staged else "unstaged") + " changes:\n" + out[-4000:])
         elif code not in (0, 3):

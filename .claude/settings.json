@@ -16,14 +16,17 @@
       "Bash(git diff*)",
       "Bash(git log*)",
       "Bash(git show*)",
-      "Bash(git branch*)",
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(git checkout -b *)",
       "Bash(git switch -c *)",
       "Bash(git rev-parse *)",
       "Bash(git ls-files*)",
-      "Bash(git fetch*)",
+      "Bash(git branch --show-current)",
+      "Bash(git branch --list*)",
+      "Bash(git branch -a)",
+      "Bash(git branch -vv)",
+      "Bash(git fetch origin)",
       "PowerShell(uv *)",
       "PowerShell(uvx *)",
       "PowerShell(just *)",
@@ -38,14 +41,17 @@
       "PowerShell(git diff*)",
       "PowerShell(git log*)",
       "PowerShell(git show*)",
-      "PowerShell(git branch*)",
       "PowerShell(git add *)",
       "PowerShell(git commit *)",
       "PowerShell(git checkout -b *)",
       "PowerShell(git switch -c *)",
       "PowerShell(git rev-parse *)",
       "PowerShell(git ls-files*)",
-      "PowerShell(git fetch*)"
+      "PowerShell(git branch --show-current)",
+      "PowerShell(git branch --list*)",
+      "PowerShell(git branch -a)",
+      "PowerShell(git branch -vv)",
+      "PowerShell(git fetch origin)"
     ],
     "deny": [
       "Read(./.env)",
@@ -60,7 +66,37 @@
       "PowerShell(git push *main*)",
       "PowerShell(git push *master*)",
       "PowerShell(git push --force*)",
-      "PowerShell(git push -f*)"
+      "PowerShell(git push -f*)",
+      "Bash(git branch -f*)",
+      "Bash(git branch --force*)",
+      "Bash(git branch -D*)",
+      "Bash(git branch -d*)",
+      "Bash(git branch --delete*)",
+      "Bash(git branch -M*)",
+      "Bash(git branch -m*)",
+      "Bash(git branch --move*)",
+      "Bash(git branch -C*)",
+      "Bash(git branch -c*)",
+      "Bash(git branch --copy*)",
+      "Bash(git branch * main*)",
+      "Bash(git branch * master*)",
+      "Bash(git fetch *:*)",
+      "Bash(git update-ref*)",
+      "PowerShell(git branch -f*)",
+      "PowerShell(git branch --force*)",
+      "PowerShell(git branch -D*)",
+      "PowerShell(git branch -d*)",
+      "PowerShell(git branch --delete*)",
+      "PowerShell(git branch -M*)",
+      "PowerShell(git branch -m*)",
+      "PowerShell(git branch --move*)",
+      "PowerShell(git branch -C*)",
+      "PowerShell(git branch -c*)",
+      "PowerShell(git branch --copy*)",
+      "PowerShell(git branch * main*)",
+      "PowerShell(git branch * master*)",
+      "PowerShell(git fetch *:*)",
+      "PowerShell(git update-ref*)"
     ]
   },
   "hooks": {
@@ -91,7 +127,7 @@
           {
             "type": "command",
             "command": "uv run --no-project --quiet python \"$CLAUDE_PROJECT_DIR/.claude/hooks/scan_secrets.py\"",
-            "timeout": 120
+            "timeout": 150
           }
         ]
       }

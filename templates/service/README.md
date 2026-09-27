@@ -47,6 +47,7 @@ just test template-service -m integration   # потребує `just up`
 | `JANE_TEMPLATE_SERVICE_LOG_LEVEL` | `INFO` | рівень журналу |
 | `JANE_TEMPLATE_SERVICE_LOG_FORMAT` | `json` | `json` або `console` |
 | `JANE_TEMPLATE_SERVICE_METRICS_ENABLED` | `true` | ендпоінт `/metrics` |
+| `JANE_TEMPLATE_SERVICE_HEALTH_CHECK_TIMEOUT_MS` | `2000` | тайм-аут кожної перевірки `/v1/health` |
 | `JANE_TEMPLATE_SERVICE_AUTH_MODE` | `none` | значення для `/v1/info` (`none`, `api_key`, `jwt`) |
 | `JANE_TEMPLATE_SERVICE_LIMITS_FILE` | — | файл `PlatformLimits` (`profile`, `defaults`, `hard_caps`; TOML/JSON/YAML) |
 | `JANE_TEMPLATE_SERVICE_LIMITS__<ГРУПА>__<ПАРАМЕТР>` | — | перевизначення, напр. `..._LIMITS__JOBS__MAX_CONCURRENT_JOBS=8` |
@@ -55,16 +56,19 @@ just test template-service -m integration   # потребує `just up`
 ## Ліміти
 
 Рівні: типові значення сервісу → платформа (файл, потім змінні середовища) → джерело → завдання → етап
-(→ запит в автономному режимі); `hard_caps` обмежують результат. Ефективні значення з походженням
-(`EffectiveLimits`) пишуться в журнал під час старту.
+(→ запит в автономному режимі); `hard_caps` обмежують результат. `GET /v1/info` повертає `limits` —
+налаштовані типові значення й `hard_caps` сервісу у формі `PlatformLimits` (лише поля з `limits.schema.json`;
+специфічні для сервісу ліміти, як-от `jobs.max_concurrent_jobs`, у контракті відсутні й видно їх лише в журналі
+старту). Ефективні ліміти для джерела/завдання/етапу рахує оркестратор (`GET /v1/limits/effective`).
 
 | Параметр | Типово | Опис |
 |---|---|---|
 | `jobs.max_concurrent_jobs` | 4 | job, що виконуються одночасно в одному екземплярі |
 | `jobs.max_queued_jobs` | 1000 | понад це — `503 service_unavailable` (backpressure) |
 | `jobs.job_timeout_ms` | 3600000 | максимальна тривалість job (`failed`, код `timeout`) |
-| `jobs.job_retention_seconds` | 86400 | скільки зберігається завершений job |
-| `idempotency.idempotency_ttl_seconds` | 86400 | скільки пам'ятається `Idempotency-Key` |
+| `jobs.job_retention_seconds` | 86400 | скільки зберігається завершений job (контракт: `transfer.job_retention_seconds`) |
+| `jobs.queue_full_retry_after_seconds` | 1 | `Retry-After` у відповіді 503, коли черга job заповнена |
+| `idempotency.idempotency_ttl_seconds` | 86400 | скільки пам'ятається `Idempotency-Key` (контракт: `transfer.idempotency_ttl_seconds`) |
 | `idempotency.in_memory_max_entries` | 10000 | розмір сховища ключів у пам'яті |
 
 ## Приклад виклику зі стороннього застосунку

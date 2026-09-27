@@ -31,7 +31,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import Field
 
-from jane_kit.config import Limits
+from jane_kit.config import Limits, contract_field
 from jane_kit.errors import FieldError, JaneError, ValidationFailed
 
 __all__ = [
@@ -55,7 +55,7 @@ KEY_RE = re.compile(r"^[\x21-\x7E]{1,255}$")
 
 
 class IdempotencyLimits(Limits):
-    idempotency_ttl_seconds: int = Field(default=86_400, ge=60)
+    idempotency_ttl_seconds: int = contract_field("transfer.idempotency_ttl_seconds", 86_400, ge=60)
     """Contract ``limits.transfer.idempotency_ttl_seconds``: how long a key is remembered."""
     in_memory_max_entries: int = Field(default=10_000, ge=1)
     """Only :class:`InMemoryIdempotencyStore`: the oldest entries are evicted beyond this."""

@@ -23,7 +23,7 @@ from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from jane_kit.config import Limits
+from jane_kit.config import Limits, contract_field
 from jane_kit.errors import JaneError, NotFound, Problem, ServiceUnavailable, Timeout
 from jane_kit.logs import bind_context
 
@@ -118,8 +118,10 @@ class JobLimits(Limits):
     """Beyond this, submit fails with 503 ``service_unavailable`` (backpressure, retryable)."""
     job_timeout_ms: int = Field(default=3_600_000, ge=1)
     """Wall-clock limit per job; exceeded -> ``failed`` with code ``timeout``."""
-    job_retention_seconds: int = Field(default=86_400, ge=60)
+    job_retention_seconds: int = contract_field("transfer.job_retention_seconds", 86_400, ge=60)
     """Contract ``limits.transfer.job_retention_seconds``: finished jobs are kept at least this long."""
+    queue_full_retry_after_seconds: int = Field(default=1, ge=0)
+    """``Retry-After`` sent with 503 when the job queue is full."""
 
 
 class JobCancelledError(Exception):
@@ -237,7 +239,7 @@ class JobRunner:
         if len(self._tasks) >= self.limits.max_concurrent_jobs + self.limits.max_queued_jobs:
             raise ServiceUnavailable(
                 "job queue is full",
-                retry_after_seconds=1,
+                retry_after_seconds=self.limits.queue_full_retry_after_seconds,
                 details={"limit": self.limits.max_queued_jobs, "path": "max_queued_jobs"},
             )
         job_id = job_id or f"job_{uuid.uuid4().hex}"

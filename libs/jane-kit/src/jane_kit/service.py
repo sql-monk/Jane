@@ -17,7 +17,7 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI, Request, Response
 
-from jane_kit.config import JaneSettings
+from jane_kit.config import JaneSettings, ResolvedLimits
 from jane_kit.errors import install_error_handlers
 from jane_kit.health import HealthRegistry, ServiceInfo, install_health
 from jane_kit.logs import bind_context, configure_logging
@@ -41,11 +41,15 @@ def create_app(
     api_versions: tuple[str, ...] = ("v1",),
     capabilities: Mapping[str, Any] | Callable[[], Mapping[str, Any]] | None = None,
     lifespan: Lifespan | None = None,
-    health_check_timeout_s: float = 2.0,
+    limits: ResolvedLimits[Any] | None = None,
     configure_logs: bool = True,
     **fastapi_kwargs: Any,
 ) -> FastAPI:
-    """Build a FastAPI app. ``app.state.health`` and ``app.state.metrics`` are ready to extend."""
+    """Build a FastAPI app. ``app.state.health`` and ``app.state.metrics`` are ready to extend.
+
+    ``limits`` (the service's resolved platform limits) is published in ``/v1/info`` as ``limits``
+    (``PlatformLimits``: contract-mapped defaults and hard caps, WP-00 ``ServiceInfo``).
+    """
     if configure_logs:
         configure_logging(
             settings.service_name, settings.log_level, settings.log_format, settings.instance_id
@@ -71,11 +75,12 @@ def create_app(
             api_versions=list(api_versions),
             capabilities=dict(caps or {}),
             auth_mode=settings.auth_mode,
+            limits=limits.platform_limits() if limits is not None else None,
         )
 
     app = FastAPI(title=title or settings.service_name, version=version, lifespan=_lifespan, **fastapi_kwargs)
     app.state.settings = settings
-    app.state.health = HealthRegistry(check_timeout_s=health_check_timeout_s)
+    app.state.health = HealthRegistry(check_timeout_s=settings.health_check_timeout_ms / 1000)
     install_error_handlers(app)
     install_health(app, app.state.health, info)
     if settings.metrics_enabled:

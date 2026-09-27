@@ -18,9 +18,9 @@ just down -v                # зупинити й видалити томи та
 | `postgres` | `postgres:18` | 5432 | `pg_isready` | оркестратор, адаптер PostgreSQL |
 | `sqlserver` | `mcr.microsoft.com/mssql/server:2022-latest` (Developer) | 1433 | `sqlcmd SELECT 1` | адаптер SQL Server |
 | `mongodb` | `mongo:8.0` | 27017 | `mongosh ping` | адаптер MongoDB |
-| `minio` | `pgsty/minio:RELEASE.2026-08-04T00-00-00Z` | 9000 (API), 9001 (консоль) | `/minio/health/live` | адаптер MinIO, blob-сховище матеріалів |
+| `minio` | `pgsty/minio:RELEASE.2026-08-04T00-00-00Z@sha256:b6bfe723…` (digest) | 9000 (API), 9001 (консоль) | `/minio/health/live` | адаптер MinIO, blob-сховище матеріалів |
 | `s3` | `chrislusf/seaweedfs:4.47` (S3-шлюз) | 8333 | `/healthz` | адаптер S3 |
-| `testsite` | збирається з `tests/fixtures/testsite` | 8080 | `GET /robots.txt` | Web Collector і стратегії |
+| `testsite` | збирається з `tests/fixtures/testsite`, тег `<проєкт>-testsite` | 8080 | `GET /robots.txt` | Web Collector і стратегії |
 | `proxy` | `caddy:2-alpine` | 8080 | `/_proxy/health` | єдина точка входу (`/testsite/*`, далі — сервіси) |
 
 ## Параметризація та ізоляція
@@ -35,9 +35,12 @@ just down -v                # зупинити й видалити томи та
 - **Адреса.** `JANE_BIND` (типово `127.0.0.1`) — назовні хоста стек не відкривається.
 - **Облікові дані.** Генеруються випадково під час першого `just up` для проєкту й зберігаються в
   `.jane/stack-<проєкт>.json` (у `.gitignore`); у репозиторії їх немає. `just down -v` видаляє файл.
-- **Образи.** `JANE_IMAGE_<СЕРВІС>` (наприклад `JANE_IMAGE_MINIO`) — замінити реєстр або версію.
+- **Образи.** `JANE_IMAGE_<СЕРВІС>` (наприклад `JANE_IMAGE_MINIO`) — замінити реєстр або версію. Образ testsite
+  збирається з тегом `<проєкт>-testsite`, тож паралельні стеки не перезаписують образ одне одного.
+- **SeaweedFS.** Розмір тому — `JANE_S3_VOLUME_SIZE_LIMIT_MB` (типово 64).
 - **Тести.** `jane_kit.devstack.load_stack()` повертає адреси й облікові дані (або `None`, якщо стек не
-  запущено — тоді інтеграційні тести пропускаються). Змінна `JANE_STACK_FILE` вказує файл явно.
+  запущено — тоді інтеграційні тести пропускаються). Береться стек **цього** checkout (типове ім'я проєкту);
+  `just integration --project <ім'я>` задає інший (через `JANE_STACK_FILE`).
 
 Прямий запуск без just (наприклад, у власному скрипті): задати змінні `JANE_PG_PASSWORD`,
 `JANE_MSSQL_SA_PASSWORD`, `JANE_MONGO_PASSWORD`, `JANE_MINIO_SECRET_KEY`, `JANE_S3_SECRET_KEY` і виконати
@@ -64,6 +67,14 @@ just down -v                # зупинити й видалити томи та
 Upstream MinIO припинив публікацію образів у Docker Hub і `quay.io` (станом на 2026-09 обидва недоступні без
 авторизації). `pgsty/minio` — збірка того самого сервера MinIO (AGPLv3) спільнотою Pigsty. Якщо у вашому
 середовищі є доступ до іншого образу MinIO, задайте `JANE_IMAGE_MINIO`.
+
+**Ризик постачальника.** Це сторонній образ, не від MinIO, Inc.: його можуть змінити, перестати оновлювати
+або видалити, і ми не контролюємо ланцюжок збірки. Тому образ закріплено за digest
+(`sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372`) — підміна тегу не змінить того, що
+запускається. Образ використовується лише в локальному dev-стеку й CI (не в робочому середовищі), без
+секретів поза згенерованими для стеку. Оновлення — свідомо: новий тег і digest у `infra/compose.yaml`,
+перевірка `just up` + `just integration`. Якщо образ зникне — `JANE_IMAGE_MINIO` на інший образ сервера MinIO
+(наприклад, власну збірку з вихідного коду).
 
 ## Reverse proxy
 

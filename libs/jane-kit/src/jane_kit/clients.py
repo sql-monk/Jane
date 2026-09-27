@@ -21,7 +21,7 @@ from typing import Any, Self
 import httpx
 from pydantic import Field
 
-from jane_kit.config import Limits
+from jane_kit.config import Limits, contract_field
 from jane_kit.errors import Problem
 from jane_kit.idempotency import IDEMPOTENCY_HEADER
 from jane_kit.logs import current_context
@@ -46,9 +46,9 @@ class RetryPolicy(Limits):
 
 
 class ClientLimits(Limits):
-    connect_timeout_ms: int = Field(default=5_000, ge=1)
-    request_timeout_ms: int = Field(default=30_000, ge=1)
-    retries: RetryPolicy = RetryPolicy()
+    connect_timeout_ms: int = contract_field("timeouts.connect_timeout_ms", 5_000, ge=1)
+    request_timeout_ms: int = contract_field("timeouts.request_timeout_ms", 30_000, ge=1)
+    retries: RetryPolicy = contract_field("retries", RetryPolicy())
     max_connections: int = Field(default=20, ge=1)
     job_poll_interval_ms: int = Field(default=1_000, ge=1)
     job_wait_timeout_ms: int = Field(default=3_600_000, ge=1)

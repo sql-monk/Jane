@@ -51,6 +51,20 @@ def test_limits_come_from_config(client: TestClient) -> None:
     assert resolved.origin["jobs.max_concurrent_jobs"] == "platform:env"
 
 
+def test_info_limits_and_health_timeout_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("JANE_TEMPLATE_SERVICE_HEALTH_CHECK_TIMEOUT_MS", "150")
+    monkeypatch.setenv("JANE_TEMPLATE_SERVICE_LIMITS__IDEMPOTENCY__IDEMPOTENCY_TTL_SECONDS", "600")
+    monkeypatch.setenv("JANE_TEMPLATE_SERVICE_LIMITS__HARD_CAPS__JOBS__JOB_RETENTION_SECONDS", "3600")
+    app = build_app(Settings(log_format="console"))
+    assert app.state.health.check_timeout_s == 0.15
+    with TestClient(app) as c:
+        limits = c.get("/v1/info").json()["limits"]
+    assert limits == {
+        "defaults": {"transfer": {"idempotency_ttl_seconds": 600, "job_retention_seconds": 3600}},
+        "hard_caps": {"transfer": {"job_retention_seconds": 3600}},
+    }
+
+
 def test_unknown_route_is_problem(client: TestClient) -> None:
     r = client.get(
         "/v1/nope", headers={"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}

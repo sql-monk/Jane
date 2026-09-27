@@ -17,7 +17,8 @@
 ## Команди
 
 Усі рецепти `justfile` — один виклик `scripts/dev.py` (Python, stdlib), тож однаково працюють на Windows і Linux.
-Без just: `uv run --no-project python scripts/dev.py <команда>`.
+Без just: `uv run --no-project python scripts/dev.py <команда>`. Невідомі аргументи `check`, `unit`, `contract`,
+`integration`, `isolation`, `test` передаються pytest без `--` (`just unit -v -k limits`).
 
 | Команда | Що робить |
 |---|---|
@@ -26,7 +27,7 @@
 | `just types` | mypy (strict) для кожного члена workspace, `scripts/`, `infra/tests/` |
 | `just unit` / `just contract` | тести без маркерів / `@pytest.mark.contract` + лінтер `contracts/` |
 | `just test <сервіс> [аргументи pytest]` | тести одного сервісу чи бібліотеки (`web-collector`, `jane-kit`, `testsite`) без `integration` |
-| `just integration` | тести `@pytest.mark.integration` (потрібен `just up`) |
+| `just integration [--project <ім'я>]` | тести `@pytest.mark.integration` проти стеку цього checkout (або названого проєкту; потрібен `just up`) |
 | `just isolation` | тести `@pytest.mark.isolation` (лише Linux; WP-06) |
 | `just up [сервіси]` / `just down [-v]` | dev-стек з унікальним compose-проєктом, див. [infra/README.md](infra/README.md) |
 | `just env` / `just ps` / `just logs [сервіс]` | адреси й згенеровані облікові дані / стан / журнали стеку |

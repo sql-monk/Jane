@@ -18,11 +18,11 @@ jane-kit = { workspace = true }
 
 | Модуль | Що дає | Контракт WP-00 |
 |---|---|---|
-| `jane_kit.config` | `Limits` (кожне поле з безпечним типовим значенням, інакше `TypeError`); `resolve_limits(model, *layers)` — злиття platform → source → task → stage → request, `hard_caps`, `effective()` у формі `EffectiveLimits`; `load_layer` (`PlatformLimits` у TOML/JSON/YAML), `layer_from_env`; `JaneSettings` | `schemas/common/limits.schema.json` |
+| `jane_kit.config` | `Limits` (кожне поле з безпечним типовим значенням, інакше `TypeError`); `resolve_limits(model, *layers)` — злиття platform → source → task → stage → request, `hard_caps`, `effective()` у формі `EffectiveLimits`, `platform_limits()` у формі `PlatformLimits` (лише поля, позначені `contract_field`); `load_layer` (`PlatformLimits` у TOML/JSON/YAML), `layer_from_env`; `JaneSettings` | `schemas/common/limits.schema.json` |
 | `jane_kit.errors` | `Problem`, `FieldError`, `JaneError(code=...)` і підкласи; статус і `retryable` — з каталогу `KNOWN_CODES`; обробники FastAPI (404/405/422/500 теж Problem) | `schemas/common/problem.schema.json`, `docs/errors.md` |
 | `jane_kit.idempotency` | `Idempotency-Key`: повтор → збережена відповідь і `Idempotency-Replayed: true`, інше тіло → 422 `idempotency_key_reused`, паралельно → 409 `idempotency_in_progress`; протокол сховища | `common.yaml` `IdempotencyKey` |
 | `jane_kit.jobs` | `202` + `Job` + `Location`; `queued/running/cancelling/succeeded/failed/cancelled`; прогрес, скасування (202 / 200 для завершених); ліміти паралельності, черги, тайм-ауту, зберігання | `schemas/common/job.schema.json`, `common.yaml` `Job`/`JobCancel` |
-| `jane_kit.health` | `GET /v1/health` (`ok`/`degraded`/`down`, 503 для down), `GET /v1/info` (`ServiceInfo`); тайм-аут перевірок | `common.yaml` `Health`/`Info` |
+| `jane_kit.health` | `GET /v1/health` (`ok`/`degraded`/`down`, 503 для down), `GET /v1/info` (`ServiceInfo` з `limits` = `PlatformLimits` сервісу, якщо `create_app(limits=...)`); тайм-аут перевірок — `JaneSettings.health_check_timeout_ms` | `common.yaml` `Health`/`Info` |
 | `jane_kit.pagination` | `Page[T]` (`items`, `next_cursor`), `clamp_limit`, непрозорі курсори | конвенція пагінації |
 | `jane_kit.tracing` | `traceparent` (W3C): продовження траси, `trace_id` у журналах і Problem | конвенція простежуваності |
 | `jane_kit.logs` | JSON-журнали в stdout, `bind_context(trace_id=..., job_id=...)` через `contextvars` | — |
@@ -61,18 +61,23 @@ resolved.effective()  # {"limits": {...}, "provenance": {"crawl.max_depth": "tas
 режим: ліміти із запиту — шар `LimitLayer("request", ...)`, для відмови замість обрізання —
 `on_exceed="error"` (→ `limit_exceeded`).
 
+Ліміт, що є в `limits.schema.json`, оголошуйте через `contract_field("<група>.<поле>", типове, ...)` (для
+групи — `contract_field("retries", RetryPolicy())`): такі поля потрапляють у `/v1/info` → `limits`
+(`PlatformLimits`: `defaults` і `hard_caps`). Специфічні для сервісу ліміти лишаються внутрішніми, бо схема
+контракту строга. Ефективні ліміти з походженням для джерела/завдання/етапу рахує лише оркестратор.
+
 Типові значення лімітів самої бібліотеки:
 
 | Модель | Параметр | Типово |
 |---|---|---|
 | `JobLimits` | `max_concurrent_jobs` / `max_queued_jobs` | 4 / 1000 |
-| `JobLimits` | `job_timeout_ms` / `job_retention_seconds` | 3600000 / 86400 |
+| `JobLimits` | `job_timeout_ms` / `job_retention_seconds` / `queue_full_retry_after_seconds` | 3600000 / 86400 / 1 |
 | `IdempotencyLimits` | `idempotency_ttl_seconds` / `in_memory_max_entries` | 86400 / 10000 |
 | `ClientLimits` | `connect_timeout_ms` / `request_timeout_ms` / `max_connections` | 5000 / 30000 / 20 |
 | `ClientLimits.retries` | `max_attempts` / `initial_backoff_ms` / `max_backoff_ms` / `backoff_multiplier` / `jitter` | 4 / 200 / 10000 / 2.0 / true |
 | `ClientLimits` | `job_poll_interval_ms` / `job_wait_timeout_ms` | 1000 / 3600000 |
 | `PageLimits` | `default_page_size` / `max_page_size` | 50 / 500 |
-| `HealthRegistry` | `check_timeout_s` (`create_app(health_check_timeout_s=...)`) | 2 |
+| `JaneSettings` | `health_check_timeout_ms` (env `<PREFIX>HEALTH_CHECK_TIMEOUT_MS`) | 2000 |
 
 ## Кілька екземплярів
 

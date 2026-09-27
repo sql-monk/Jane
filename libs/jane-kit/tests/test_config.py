@@ -5,15 +5,37 @@ from pathlib import Path
 import pytest
 from pydantic import Field
 
+from jane_kit.clients import ClientLimits
 from jane_kit.config import (
     JaneSettings,
     LimitError,
     LimitLayer,
     Limits,
+    contract_field,
     layer_from_env,
     load_layer,
     resolve_limits,
 )
+
+
+class SvcLimits(Limits):
+    client: ClientLimits = ClientLimits()
+    crawl_depth: int = contract_field("crawl.max_depth", 3, ge=0)
+    internal_only: int = 7
+
+
+def test_platform_limits_maps_contract_fields(tmp_path: Path) -> None:
+    f = tmp_path / "p.json"
+    f.write_text(
+        '{"profile": "ci", "defaults": {"crawl_depth": 2}, "hard_caps": {"crawl_depth": 4}}', encoding="utf-8"
+    )
+    doc = resolve_limits(SvcLimits, load_layer(f)).platform_limits()
+    assert doc["profile"] == "ci"
+    assert doc["hard_caps"] == {"crawl": {"max_depth": 4}}
+    assert doc["defaults"]["crawl"] == {"max_depth": 2}
+    assert doc["defaults"]["timeouts"] == {"connect_timeout_ms": 5000, "request_timeout_ms": 30000}
+    assert doc["defaults"]["retries"]["max_attempts"] == 4
+    assert "internal_only" not in str(doc) and "job_poll_interval_ms" not in str(doc)
 
 
 class CrawlGroup(Limits):

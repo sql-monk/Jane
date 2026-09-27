@@ -14,8 +14,9 @@ description: Конвенції API й контрактів Jane — /v1, мод
   `orchestrator`, `llm`, `assistant`; спільні компоненти — `common.yaml`.
 - `contracts/schemas/**.schema.json` — JSON Schema 2020-12 (матеріал, результат обробника, сутність,
   маніфест пакета, правила колектора, завдання, ліміти, job, помилка, ContentRef).
-- `contracts/examples/` — валідні приклади; `contracts/python/jane_contracts/` — Python Protocol-и
-  (стратегія пошуку, адаптер збереження). `contracts/docs/` — пояснення (помилки, власність даних, пакети).
+- `contracts/examples/` — валідні (і навмисно невалідні) приклади; `contracts/python/src/jane_contracts/` —
+  Python Protocol-и (стратегія пошуку WP-02/03, адаптер збереження WP-07/08; пакет `jane-contracts`).
+- `contracts/docs/` — помилки, власність даних, пакети, стратегії, адаптери; рішення — `docs/adr/`.
 
 ## 2. Правила API (обов'язкові)
 1. **Версія в шляху**: усе під `/v1/...`. Зворотно сумісні зміни (нове необов'язкове поле, новий

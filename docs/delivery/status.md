@@ -9,7 +9,7 @@
 | 02 | Web Collector: ядро | 1 | review | `wp/02-web-collector-core` | агент / wp-reviewer | фінальне виправлення готове, перевіряє координатор (20× stalled) |
 | 03 | Web Collector: стратегії пошуку | 1 | — | | | після M0 |
 | 04 | Telegram Collector | 1 | review | `wp/04-telegram-collector` | агент / wp-reviewer | |
-| 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент / wp-reviewer | виправлення після рев'ю 1 (lease ключів/job, secret_detected) |
+| 05 | Репозиторій обробників | 1 | review | `wp/05-registry` | агент / wp-reviewer | рев'ю 2 (+ перевірка сканера на ReDoS) |
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
 | 08 | Адаптери збереження | 1 | active | `wp/08-storage-adapters` | агент / wp-reviewer | фінальне виправлення після рев'ю 2 (відкат новішого знімка s3), перевірка координатором |

@@ -249,6 +249,9 @@ _PLACEHOLDER = re.compile(
     r"dummy\S*|test\S*|fake\S*|redacted|your[_-]?\S*|none|null|true|false|env:.*|file:.*|vault:.*|secret_refs.*)$"
 )
 _HEX = re.compile(r"[0-9a-fA-F-]+")
+_LOWER = re.compile(r"[a-z]")
+_UPPER = re.compile(r"[A-Z]")
+_DIGIT = re.compile(r"[0-9]")
 _NON_ASCII = re.compile(r"[^\t\n\r\x20-\x7e]+")
 _ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _WORDS = re.compile(r"^[a-z]+(?:[_.-][a-z]+)*$")
@@ -292,11 +295,7 @@ def _high_entropy(token: str, limits: SecretScanLimits) -> bool:
         return False
     if _HEX.fullmatch(token):  # digests, UUIDs
         return False
-    if not (
-        any(c.islower() for c in token)
-        and any(c.isupper() for c in token)
-        and any(c.isdigit() for c in token)
-    ):
+    if not (_LOWER.search(token) and _UPPER.search(token) and _DIGIT.search(token)):
         return False
     return _entropy(token) >= limits.entropy_threshold
 
@@ -349,6 +348,7 @@ def _scan_into(
     line_of = _Lines(text)
     lower = text.lower()
     config = _is_config(path)
+    has_assignment = "=" in text or ":" in text
 
     def add(code: str, message: str, index: int) -> None:
         line = line_of(index)
@@ -359,6 +359,8 @@ def _scan_into(
     for det in _DETECTORS if detectors else ():
         check()
         if det.config_only and not config:
+            continue
+        if det.anchor and not has_assignment:
             continue
         if det.keywords and not any(k in lower for k in det.keywords):
             continue
@@ -391,7 +393,9 @@ def _scan_into(
 
 
 def _matches(det: _Detector, text: str) -> Iterator[re.Match[str]]:
-    if det.anchor is None:
+    if det.anchor is None or det.anchor == "line":
+        # The multiline anchor consumes horizontal whitespace only. Each line has one start position, and the
+        # whitespace quantifier is possessive, so finditer cannot rescan a line from successive keywords.
         yield from det.pattern.finditer(text)
         return
     tried: set[int] = set()

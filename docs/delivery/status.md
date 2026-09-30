@@ -8,7 +8,7 @@
 | 01 | Каркас, CI, dev-стек | 0 | accepted | `wp/01-scaffold-ci` | агент / wp-reviewer (2 раунди + інтеграційне виправлення) | злито `4468cee` |
 | 02 | Web Collector: ядро | 1 | accepted | `wp/02-web-collector-core` | агент / wp-reviewer (2 раунди + фінальне виправлення, перевірено координатором) | злито `69e656a` |
 | 03 | Web Collector: стратегії пошуку | 1 | active | `wp/03-web-collector-discovery` | агент | після злиття WP-02 |
-| 04 | Telegram Collector | 1 | active | `wp/04-telegram-collector` | агент / wp-reviewer | виправлення після рев'ю 1 (set_paused без fence, обхід allowlist) |
+| 04 | Telegram Collector | 1 | review | `wp/04-telegram-collector` | агент / wp-reviewer | рев'ю 2 |
 | 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент / wp-reviewer | фінальне виправлення після рев'ю 2 (ReDoS у сканері), перевірка координатором |
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
@@ -17,8 +17,8 @@
 | 10 | LLM-шлюз і LLM-обробник | 1 | accepted | `wp/10-llm` | агент / wp-reviewer (2 раунди) | злито `00870c2` |
 | 11 | Асистент джерел | 1 | accepted | `wp/11-assistant` | агент / wp-reviewer (2 раунди) | злито `7dc7074` |
 | 12 | Адмінка | 1 | active | `wp/12-admin` | агент / wp-reviewer | виправлення після рев'ю 1 (реальний API для storage) |
-| 13 | Інтеграція й приймання | 2 | active | `wp/13-acceptance` | агент | фаза 1 злито `6cb5ddf`; M1 — після злиття WP-02 і WP-09 |
-| 14 | Профілі лімітів і експлуатація | 2 | — | | | після M1 |
+| 13 | Інтеграція й приймання | 2 | active | `wp/13-acceptance` | агент | фаза M1 (фаза 1 злито `6cb5ddf`) |
+| 14 | Профілі лімітів і експлуатація | 2 | active | `wp/14-limit-profiles-ops` | агент | після M1 |
 
 ## Віхи
 | Віха | Умова | Стан |
@@ -109,3 +109,4 @@
 - 2026-09-30 — WP-05 рев'ю 2: ReDoS у сканері секретів (O(N²) на переносах рядка) — фінальне виправлення, перевіряє координатор тестом лінійності.
 - 2026-09-30 — main (фаза 1 WP-13 + WP-08 + WP-02): types/unit/contract зелені, lint зелений для коду репозиторію (падав лише на невідстежуваних `.codex/`, `.agents/` поза репозиторієм); gitleaks 0.
 - 2026-09-30 — **M1 досягнуто**: WP-09 прийнято (2 раунди) і злито `3a56c4f`. CI на GitHub був червоний з 27.09 (платформний `type: ignore` у handler-runtime, видно лише на Linux) — виправлено `132664b`, CI зелений. WP-09a: гонка/живучість прибиральників (неблокуюче).
+- 2026-09-30 — WP-04 рев'ю 2; запущено WP-14; WP-13 — фаза M1.

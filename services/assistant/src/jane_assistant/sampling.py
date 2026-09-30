@@ -237,7 +237,12 @@ async def sample_source(
             samples.extend(batch)
             confidence = confidence_of(samples, ob.min_examples_per_type)
             await progress(len(samples), f"sampled {len(samples)}, confidence {confidence:.2f}")
-            if confidence >= ob.min_confidence:
+            # Good-Turing coverage is 1.0 after two identical classifications, even if a
+            # slow collector has not delivered the other page types yet. While collection
+            # is active, require evidence of distinct types before trusting that estimate.
+            if confidence >= ob.min_confidence and (
+                len({s.material_type for s in samples}) >= ob.min_distinct_types or (ended and not reserve)
+            ):
                 break
             if len(samples) >= max_samples:
                 message = f"reached limits.llm.max_onboarding_samples={max_samples} with confidence {confidence:.2f}"
@@ -249,7 +254,9 @@ async def sample_source(
                 break
     finally:
         await collector.cancel(collection_id)
-    sufficient = confidence >= ob.min_confidence
+    sufficient = confidence >= ob.min_confidence and (
+        len({s.material_type for s in samples}) >= ob.min_distinct_types or (ended and not reserve)
+    )
     try:
         stats = (await collector.collection(collection_id)).get("stats") or {}
     except Exception:

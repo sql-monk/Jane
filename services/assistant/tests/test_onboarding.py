@@ -9,6 +9,7 @@ import json
 from typing import Any
 
 from assistant_fakes import World
+from assistant_fakes.base import FakeRequest, Reply
 from assistant_fakes.runtime import PRODUCT_CODE_V1
 from assistant_fakes.site import INJECTION
 
@@ -144,6 +145,55 @@ def test_new_source_by_name_to_proposals_package_and_tests(w: World) -> None:
         replay.headers.get("Idempotency-Replayed") == "true"
         and replay.json()["job_id"] == acc.json()["job_id"]
     )
+
+
+def test_name_only_sampling_waits_for_types_beyond_first_streamed_products(w: World) -> None:
+    """A slow collector must not make two early product pages look like the entire source."""
+
+    def one_material_per_poll(req: FakeRequest) -> Reply:
+        req.query["limit"] = "1"  # contract-valid long-poll page, as from a slow live collector
+        return w.collector.materials(req)
+
+    w.collector.app.on("listCollectionMaterials")(one_material_per_poll)
+    job_id, sid = start(w, {"query": "Shop Example kettles", "expected_entity_types": ["product"]})
+    first = w.result(job_id, "OnboardingSession")
+    assert first["status"] == "needs_disambiguation"
+    selected = w.api.post(
+        f"/v1/onboarding-sessions/{sid}/candidate-selection", json={"candidate_id": "cand_1"}
+    )
+    assert selected.status_code == 200
+    result = w.result(selected.json()["job_id"], "OnboardingSession")
+
+    collected = next(iter(w.collector.collections.values()))["items"]
+    assert all("/product/" in item["locator"]["url"] for item in collected[:2])
+    assert len(w.collector.app.called("listCollectionMaterials")) >= 10
+    assert result["status"] == "proposals_ready", result
+    assert result["sample"]["sufficient"] and result["sample"]["materials"] >= 10
+    assert result["sample"]["distinct_types"] >= 2
+    assert {t["type"] for t in result["analysis"]["material_types"]} >= {"product", "category"}
+    assert result["proposals"][0]["extractors"][0]["tested_on_samples"]["passed"] >= 2
+    assert w.violations() == []
+
+
+def test_single_streamed_type_reports_insufficient_at_sample_budget(w: World) -> None:
+    """High coverage from one early type is not enough when the collector still has more pages."""
+
+    def one_material_per_poll(req: FakeRequest) -> Reply:
+        req.query["limit"] = "1"
+        return w.collector.materials(req)
+
+    w.collector.app.on("listCollectionMaterials")(one_material_per_poll)
+    job_id, _ = start(
+        w,
+        {"query": "https://shop.example.test/", "limits": {"max_onboarding_samples": 4}},
+        key="single-type-bound",
+    )
+    result = w.result(job_id, "OnboardingSession")
+    assert result["status"] == "insufficient_sample", result
+    assert result["sample"]["materials"] == 4 and result["sample"]["distinct_types"] == 1
+    assert result["sample"]["confidence"] >= 0.8 and not result["sample"]["sufficient"]
+    assert "max_onboarding_samples=4" in result["sample"]["message"]
+    assert w.violations() == []
 
 
 def test_existing_extractor_is_bound_and_auto_activation_creates_source_and_task(w: World) -> None:

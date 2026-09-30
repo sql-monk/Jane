@@ -4,7 +4,7 @@ import { uniqueId } from "./seed";
 // The admin talks to a real registry. Each test creates its own package, so no contract example
 // response or shared registry state is assumed. The contract examples supply valid input documents.
 test.describe("real registry: rules package, approval and independent fork @hybrid", () => {
-  test("create and publish rules, approve, fork, then observe a later parent version", async ({
+  test("create and publish rules, approve, fork, then explicitly port a later parent version", async ({
     admin,
     request,
   }) => {
@@ -82,5 +82,33 @@ test.describe("real registry: rules package, approval and independent fork @hybr
     await expect(admin.getByLabel("Відмінності версій")).toContainText("rules.json");
     const forkVersions = await (await request.get(`${base}/v1/packages/${forkId}/versions`)).json();
     expect(forkVersions.items.map((v: { version: string }) => v.version)).toEqual(["1.0.0"]);
+
+    await admin.getByLabel("Версія батька").selectOption("1.1.0");
+    await admin.getByLabel("Нова версія форку").fill("1.1.0");
+    await admin.getByRole("button", { name: "Перенести зміни" }).click();
+    const port = await captureRequest(
+      admin,
+      "POST",
+      `/api/registry/v1/packages/${forkId}/upstream-ports`,
+      () => admin.getByRole("button", { name: "Так, перенести в нову версію" }).click(),
+    );
+    expect(port.request.headers()["idempotency-key"]).toBeTruthy();
+    expect(port.body).toEqual({ parent_version: "1.1.0", new_version: "1.1.0", base_version: "1.0.0" });
+    const panel = admin.getByLabel("Перенесення змін батька");
+    await expect(panel.locator(".job-head .badge")).toHaveText("succeeded", { timeout: 120_000 });
+    await expect
+      .poll(async () => {
+        const response = await request.get(`${base}/v1/packages/${forkId}/versions/1.1.0`);
+        return response.status();
+      })
+      .toBe(200);
+    const ported = await (await request.get(`${base}/v1/packages/${forkId}/versions/1.1.0`)).json();
+    expect(ported.manifest?.provenance?.upstream_port?.parent_version).toBe("1.1.0");
+    await admin.goto(`/packages/${forkId}`);
+    await admin.getByRole("tab", { name: "Відмінності" }).click();
+    await admin.getByLabel("Від (версія або parent:<версія>)").fill("1.0.0");
+    await admin.getByLabel("До версії").fill("1.1.0");
+    await admin.getByRole("button", { name: "Порівняти" }).click();
+    await expect(admin.getByLabel("Відмінності версій")).toContainText("feed");
   });
 });

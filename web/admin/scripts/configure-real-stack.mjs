@@ -56,6 +56,9 @@ const override = {
     "handler-runtime": {
       environment: { JANE_HANDLER_RUNTIME_REGISTRY_URL: "http://registry:8000" },
     },
+    "web-collector": {
+      environment: { JANE_WEB_COLLECTOR_REGISTRY_URL: "http://registry:8000" },
+    },
     orchestrator: {
       environment: { JANE_ORCHESTRATOR_EXECUTORS: JSON.stringify(executors) },
     },
@@ -85,6 +88,7 @@ try {
       "registry",
       "handler-runtime",
       "orchestrator",
+      "web-collector",
     ],
     { env: { ...process.env, ...stack.env }, stdio: "inherit" },
   );

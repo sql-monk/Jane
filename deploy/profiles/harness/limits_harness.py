@@ -978,6 +978,8 @@ def evaluate(ns: argparse.Namespace) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(
         prog="limits_harness.py", description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )

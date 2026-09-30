@@ -701,7 +701,7 @@ def verify_telegram(svc: Services, history: Mapping[str, Any], changes: Mapping[
         "raw_objects": len(raw),
         "events": {k: v.get("fields") for k, v in sorted(events.items())},
         "lecture_version": lecture.get("version"),
-        "substitute": "Telegram = recorded backend of telegram-collector (Z)",
+        "substitute": "Telegram = recorded backend of telegram-collector (З)",
     }
 
 
@@ -750,6 +750,8 @@ def cmd_online(ns: argparse.Namespace) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")  # Ukrainian text also when redirected on Windows
     ap = argparse.ArgumentParser(
         prog="jane_examples.py", description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )

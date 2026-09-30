@@ -53,7 +53,7 @@ Docker-сокет із групою, визначеною автоматично
 | S-M1-04 | Рекурсивний збір зі стороннього застосунку, runtime через CLI | 1, 10 | web-collector, handler-runtime | **пройдено на гілці WP-13** |
 | S-M1-05 | Заміна сховища лише конфігурацією завдання (PostgreSQL ↔ files) | 3 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
 | S-M1-06 | Новий прогін дає нове спостереження й подію історії | 8 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
-| S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | ще не реалізовано в WP-13 |
+| S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | **1 Docker e2e пройшов на гілці WP-13**; виконання LLM-пакета й форки кожного типу ще відкриті |
 | S-M2-02 | Telegram: історія, нові, редагування як ревізії → збереження | 1, 8, 12 | telegram-collector, storage | **1 passed на спільній гілці WP-01a/00a/13** (Telegram — З) |
 | S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | **10 Docker e2e пройшли на гілці WP-13** (`test_m2_discovery.py`) |
 | S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage | ще не реалізовано в WP-13 |
@@ -132,6 +132,12 @@ PostgreSQL (`jane.storage-postgresql` / `results-pg`) і files (`jane.storage-fi
 ## M2 — повний стек
 
 ### S-M2-01. Єдиний репозиторій: типи, версії, форки
+`tests/e2e/test_m2_registry.py` піднімає реальний registry і перевіряє публікацію пакетів,
+архіви та SHA-256, правила Web Collector із registry, виконання екстрактора runtime через
+архів registry і завдання оркестратора на незмінній версії форку. Локальний `package-host`
+лишається типовим для старих M1-тестів; registry-сценарій вибирає реальний URL через тестову
+конфігурацію. LLM-пакет тут лише публікується; усі форки типів окремо не перевіряються.
+
 1. Публікація в registry (`POST /v1/packages`, `…/versions`): екстрактор testsite, `jane.storage-files`,
    `jane.storage-postgresql` (`jane-storage-packages publish`), LLM-пакет WP-10, правила колектора
    testsite.

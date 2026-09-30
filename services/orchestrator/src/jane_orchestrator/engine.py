@@ -203,7 +203,7 @@ class Engine:
             lambda: self._extend_item(item["item_id"], worker), self.core.engine.heartbeat_ms
         ) as hb:
             try:
-                result = self._invoke(executor, body, item, run["trace_id"], timeout_ms)
+                result = self._invoke_after_in_progress(executor, body, item, run["trace_id"], timeout_ms, hb)
             except ExecutorError as exc:
                 error = exc
         if hb.lost:
@@ -225,6 +225,48 @@ class Engine:
                     item, worker, run, stage, retries, err, retryable=True, result=result
                 )
         return self._complete(item, worker, run, stage, result)
+
+    def _invoke_after_in_progress(
+        self,
+        executor: Any,
+        body: dict[str, Any],
+        item: Mapping[str, Any],
+        trace_id: str,
+        timeout_ms: int,
+        heartbeat: Heartbeat,
+    ) -> dict[str, Any]:
+        """Replay a delivery in flight under one lease, without spending ordinary retry attempts."""
+        deadline: float | None = None
+        while True:
+            if heartbeat.lost:
+                raise ExecutorError(executor.executor, 409, None, "item lease lost")
+            remaining_ms = int((deadline - time.monotonic()) * 1000) if deadline else timeout_ms
+            if remaining_ms <= 0:
+                break
+            try:
+                return self._invoke(executor, body, item, trace_id, min(timeout_ms, remaining_ms))
+            except ExecutorError as exc:
+                if exc.status != 409 or exc.code != "idempotency_in_progress":
+                    raise
+                if deadline is None:
+                    deadline = time.monotonic() + self.core.engine.idempotency_in_progress_max_wait_ms / 1000
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                time.sleep(min(self.core.engine.idempotency_in_progress_poll_ms / 1000, remaining))
+        raise ExecutorError(
+            executor.executor,
+            409,
+            {
+                "type": "urn:jane:problem:idempotency_in_progress",
+                "title": "Invocation still in progress",
+                "status": 409,
+                "code": "idempotency_in_progress",
+                "retryable": False,
+                "detail": "configured wait for an in-progress delivery key expired",
+            },
+            "configured wait for an in-progress delivery key expired",
+        )
 
     def _invoke(
         self, executor: Any, body: dict[str, Any], item: Mapping[str, Any], trace_id: str, timeout_ms: int
@@ -616,7 +658,13 @@ class Engine:
             self._release_feed(run_id, worker, feed_done=True)
             return "timeout"
         capacity = self._capacity(run, task_limits)
-        if capacity <= 0:
+        acknowledge_only = (
+            capacity <= 0
+            and not run["input"].get("stored_materials")
+            and bool(run["collection_id"])
+            and bool(run["feed_cursor"])
+        )
+        if capacity <= 0 and not acknowledge_only:
             self.core.metrics.inc("backpressure")
             self._release_feed(run_id, worker, eng.backpressure_recheck_ms, backpressure=True)
             return "backpressure"
@@ -625,11 +673,14 @@ class Engine:
                 if run["input"].get("stored_materials"):
                     outcome = self._feed_stored(run, worker, capacity)
                 else:
-                    outcome = self._feed_collector(run, worker, capacity)
+                    outcome = self._feed_collector(run, worker, max(capacity, 1), acknowledge_only)
             if hb.lost:
                 return "lease_lost"
             if outcome == "failed":
                 self._release_feed(run_id, worker, feed_done=True)
+            elif outcome == "backpressure":
+                self.core.metrics.inc("backpressure")
+                self._release_feed(run_id, worker, eng.backpressure_recheck_ms, backpressure=True)
             elif outcome.startswith("wait:"):
                 reason = outcome.split(":", 1)[1]
                 delay = int(reason) if reason.isdigit() else eng.backpressure_recheck_ms
@@ -697,7 +748,9 @@ class Engine:
             body["urls"] = run["input"]["urls"]
         return body
 
-    def _feed_collector(self, run: dict[str, Any], worker: str, capacity: int) -> str:
+    def _feed_collector(
+        self, run: dict[str, Any], worker: str, capacity: int, acknowledge_only: bool = False
+    ) -> str:
         eng = self.core.engine
         config = run["config"]
         collect = next(s for s in config["stages"] if s["kind"] == "collect")
@@ -738,7 +791,7 @@ class Engine:
                     "UPDATE runs SET collection_id = %s WHERE run_id = %s AND feed_lease_owner = %s",
                     (run["collection_id"], run["run_id"], worker),
                 )
-        params: dict[str, Any] = {"limit": capacity, "wait_ms": eng.feed_wait_ms}
+        params: dict[str, Any] = {"limit": capacity, "wait_ms": 0 if acknowledge_only else eng.feed_wait_ms}
         if run["feed_cursor"]:
             params["after"] = run["feed_cursor"]
         page = self.core.executors.call(
@@ -750,6 +803,10 @@ class Engine:
             timeout_ms=self.core.limits.contract.timeouts.request_timeout_ms + eng.feed_wait_ms,
         ).json()
         materials = page.get("items") or []
+        if acknowledge_only and materials:
+            # `after` has acknowledged the durable previous page. Leave any new materials
+            # unacknowledged until queue capacity returns; the collector will redeliver them.
+            return "backpressure"
         feed_error = None
         if page.get("end_of_stream") and page.get("collection_status") == "failed":
             job = self.core.executors.call(
@@ -770,9 +827,11 @@ class Engine:
                     extra={"run_id": run["run_id"], "delay_ms": delay_ms},
                 )
                 return f"wait:{delay_ms}"
-        created = self._accept_materials(
-            run, worker, materials, page.get("next_cursor"), bool(page.get("end_of_stream")), feed_error
-        )
+        # The collector acknowledges `next_cursor` only when a subsequent request sends it as
+        # `after`. Keep the feed claimable after a nonempty terminal page so a crash cannot leave
+        # its final materials permanently unacknowledged.
+        end = bool(page.get("end_of_stream")) and not materials
+        created = self._accept_materials(run, worker, materials, page.get("next_cursor"), end, feed_error)
         return f"fed:{created}"
 
     def _rate_limit_restart(self, run: Mapping[str, Any], error: Mapping[str, Any]) -> int | None:

@@ -109,6 +109,10 @@ class EngineLimits(Limits):
     executor_health_timeout_ms: int = Field(default=2_000, ge=1)
     job_poll_interval_ms: int = Field(default=500, ge=10)
     """Polling interval for an executor's 202 job (async handler invocation)."""
+    idempotency_in_progress_poll_ms: int = Field(default=500, ge=10)
+    """Delay between replays while an executor is still processing the same delivery key."""
+    idempotency_in_progress_max_wait_ms: int = Field(default=120_000, ge=1)
+    """Bound on waiting for an already running invocation; expiry fails the item without a new effect."""
     problem_samples: int = Field(default=10, ge=0)
     """Samples kept per problem group."""
     trace_outputs_max: int = Field(default=100, ge=0)

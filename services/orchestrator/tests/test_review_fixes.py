@@ -33,7 +33,9 @@ def test_cancel_then_worker_killed_run_becomes_cancelled(
     victim = worker_process(db_dsn, neighbours, fast_engine, "victim")
     try:
         assert neighbours.storage.hung.wait(60)
-        wait_until(lambda: _feed_done(db_dsn, run_id), 30)
+        # A terminal material page still needs one cursor-confirming pull. With one worker
+        # blocked in storage, cancellation must work even before that final acknowledgement.
+        assert not _feed_done(db_dsn, run_id)
         assert api.post(f"/v1/runs/{run_id}/cancel", json={"reason": "x"}).json()["status"] == "cancelling"
         victim.kill()
         victim.wait(30)
@@ -83,6 +85,120 @@ def test_worker_kill_does_not_spend_retry_attempts(
     taken_over = [i for i in items if i["lease_reclaims"]]
     assert taken_over and all(i["attempts"] == 1 for i in taken_over)
     assert set(neighbours.storage.effects.values()) == {1}
+
+
+@pytest.mark.parametrize(
+    ("max_wait_ms", "outcome", "final_status"),
+    [(5000, "success", "completed"), (100, "failed", "failed")],
+)
+def test_reclaimed_in_progress_delivery_keeps_attempt_and_key(
+    make_client: Any,
+    neighbours: Neighbours,
+    db_dsn: str,
+    monkeypatch: pytest.MonkeyPatch,
+    max_wait_ms: int,
+    outcome: str,
+    final_status: str,
+) -> None:
+    monkeypatch.setenv("JANE_ORCHESTRATOR_LIMITS__ENGINE__IDEMPOTENCY_IN_PROGRESS_POLL_MS", "20")
+    monkeypatch.setenv(
+        "JANE_ORCHESTRATOR_LIMITS__ENGINE__IDEMPOTENCY_IN_PROGRESS_MAX_WAIT_MS", str(max_wait_ms)
+    )
+    api = make_client(run_workers=False)
+    engine = api.app.state.engine
+    assert post(api, "/v1/sources", source_doc()).status_code == 201
+    assert post(api, "/v1/tasks", catalog_task(retries={"max_attempts": 1})).status_code == 201
+    run_id = start(api, "shop-catalog")
+    for _ in range(10):
+        feed = engine.claim_feed("feed")
+        if feed is not None:
+            engine.process_feed(feed, "feed")
+        if items_by_stage(db_dsn, run_id).get("store-raw"):
+            break
+    first = engine.claim_item("first")
+    assert first is not None and first["stage_id"] == "store-raw"
+    key = first["delivery_key"]
+    original_can_finish = threading.Event()
+    neighbours.storage.pause_before_effect = original_can_finish
+    first_outcome: list[str] = []
+    original = threading.Thread(
+        target=lambda: first_outcome.append(engine.process_item(first, "first")), daemon=True
+    )
+    original.start()
+    try:
+        wait_until(lambda: key in neighbours.storage.in_flight, 5)
+        with psycopg.connect(db_dsn) as conn:
+            conn.execute(
+                "UPDATE items SET lease_expires_at = now() - interval '1 second' WHERE item_id = %s",
+                (first["item_id"],),
+            )
+        reclaimed = engine.claim_item("second")
+        assert reclaimed is not None and reclaimed["item_id"] == first["item_id"]
+        assert reclaimed["delivery_key"] == key and reclaimed["attempts"] == 1
+        second_outcome: list[str] = []
+        replay = threading.Thread(
+            target=lambda: second_outcome.append(engine.process_item(reclaimed, "second")), daemon=True
+        )
+        replay.start()
+        wait_until(lambda: neighbours.storage.calls[key] >= 2, 5)
+        if outcome == "failed":
+            replay.join(5)
+        else:
+            original_can_finish.set()
+            replay.join(5)
+        assert not replay.is_alive()
+        assert second_outcome == [outcome]
+    finally:
+        original_can_finish.set()
+        original.join(5)
+    assert not original.is_alive()
+    assert first_outcome == ["lease_lost"]
+    rows = items_by_stage(db_dsn, run_id)["store-raw"]
+    item = next(row for row in rows if row["item_id"] == first["item_id"])
+    assert item["status"] == final_status and item["attempts"] == 1
+    assert neighbours.storage.calls[key] >= 2
+    assert neighbours.storage.key_mismatch == []
+    assert neighbours.storage.effects[key] == 1
+    if outcome == "failed":
+        assert item["error"]["code"] == "idempotency_in_progress"
+        assert item["error"]["retryable"] is False
+    else:
+        assert neighbours.storage.calls[key] >= 3  # original, 409, then replayed result
+        assert neighbours.storage.duplicates[key] >= 1
+
+
+def test_final_collector_page_is_acknowledged_before_feed_done(
+    make_client: Any, neighbours: Neighbours, db_dsn: str
+) -> None:
+    api = make_client(run_workers=False)
+    engine = api.app.state.engine
+    assert post(api, "/v1/sources", source_doc()).status_code == 201
+    assert (
+        post(
+            api,
+            "/v1/tasks",
+            catalog_task(limits={"queue": {"max_inflight_materials": 6}}),
+        ).status_code
+        == 201
+    )
+    run_id = start(api, "shop-catalog")
+    feed = engine.claim_feed("first")
+    assert feed is not None
+    engine.process_feed(feed, "first")
+    collection = next(iter(neighbours.collector.collections.values()))
+    assert not _feed_done(db_dsn, run_id)
+    assert collection.acked == 0
+    with psycopg.connect(db_dsn, row_factory=psycopg.rows.dict_row) as conn:
+        row = conn.execute("SELECT * FROM runs WHERE run_id = %s", (run_id,)).fetchone()
+    assert row is not None
+    assert engine._capacity(row, {"queue.max_queue_depth": 10000, "queue.max_inflight_materials": 6}) == 0
+    second = make_client(run_workers=False).app.state.engine
+    feed = second.claim_feed("second")
+    assert feed is not None
+    second.process_feed(feed, "second")
+    assert _feed_done(db_dsn, run_id)
+    assert collection.acked == len(collection.materials)
+    assert collection.pulls >= 2
 
 
 def test_poison_item_fails_after_configured_lease_takeovers(

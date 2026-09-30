@@ -533,6 +533,8 @@ class FakeHandler(ContractFake):
         self.duplicates: Counter[str] = Counter()
         self.key_mismatch: list[str] = []
         self.delay_s = 0.0
+        self.pause_before_effect: threading.Event | None = None
+        """When set, hold an in-flight request before its effect until the test releases it."""
         self.hang_after_effect: threading.Event | None = None
         """If set: the first execution records its effect, then never answers until the event is set."""
         self.hung = threading.Event()
@@ -565,6 +567,8 @@ class FakeHandler(ContractFake):
         try:
             if self.delay_s:
                 await asyncio.sleep(self.delay_s)
+            if self.pause_before_effect is not None:
+                await asyncio.to_thread(self.pause_before_effect.wait)
             pkg = body["handler"]["package_id"]
             with self.lock:
                 if self.fail_retryable[pkg] > 0:

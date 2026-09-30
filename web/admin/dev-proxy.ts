@@ -36,16 +36,25 @@ export function apiTarget(env: NodeJS.ProcessEnv = process.env): string | undefi
   return target ? target.replace(/\/+$/, "") : undefined;
 }
 
+/**
+ * Hybrid mode: one real service instead of its mock, e.g. JANE_ADMIN_TARGET_LLM=http://127.0.0.1:8110 or
+ * JANE_ADMIN_TARGET_ASSISTANT=... (base URL of the service itself; the /api/<service> prefix is stripped).
+ */
+export function serviceTarget(api: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const value = env[`JANE_ADMIN_TARGET_${api.toUpperCase()}`]?.trim();
+  return value ? value.replace(/\/+$/, "") : undefined;
+}
+
 export function buildProxy(env: NodeJS.ProcessEnv = process.env): Record<string, ProxyOptions> {
   const target = apiTarget(env);
   if (target) {
     return { "/api": { target, changeOrigin: true } };
   }
   const proxy: Record<string, ProxyOptions> = {};
-  MOCK_SERVICES.forEach(({ service }, index) => {
+  MOCK_SERVICES.forEach(({ api, service }, index) => {
     const prefix = `/api/${service}`;
     proxy[prefix] = {
-      target: `http://127.0.0.1:${mockPort(index, env)}`,
+      target: serviceTarget(api, env) ?? `http://127.0.0.1:${mockPort(index, env)}`,
       changeOrigin: true,
       rewrite: (p: string) => p.slice(prefix.length) || "/",
     };

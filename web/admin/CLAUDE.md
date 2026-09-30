@@ -1,0 +1,3 @@
+- Запуск: `corepack pnpm install && corepack pnpm mocks` + `corepack pnpm dev` (http://127.0.0.1:4600; реальний стек — `JANE_ADMIN_API_TARGET`).
+- Тести: `corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test`; e2e — `corepack pnpm e2e` (моки), `pnpm e2e:real <url>`.
+- Контракти: `contracts/openapi/*.v1.yaml` → `pnpm gen:api` → `src/api/generated/` (не редагувати вручну).

@@ -118,6 +118,30 @@ def _archive(registry: JaneClient, package_id: str, version: str, digest: str) -
     return response.content
 
 
+def _archive_file(archive: bytes, path: str) -> bytes:
+    with zipfile.ZipFile(io.BytesIO(archive)) as zipped:
+        return zipped.read(path)
+
+
+def _run_stage_handler(orch: JaneClient, run_id: str, stage_id: str) -> dict[str, Any]:
+    """Handler ref that the orchestrator recorded for ``stage_id`` of this run (material trace)."""
+    items = list_items(orch, run_id, stage_id)
+    assert len(items) == 1 and items[0]["status"] == "completed", items
+    response = orch.api("orchestrator").get(f"/v1/materials/{items[0]['material_id']}/trace")
+    assert response.status_code == 200, response.text
+    trace = response.json()
+    stages = [
+        stage
+        for observation in trace["observations"]
+        if observation.get("run_id") == run_id
+        for stage in observation["stages"]
+        if stage["stage_id"] == stage_id
+    ]
+    assert len(stages) == 1, trace
+    assert stages[0]["result_status"] == "success", stages
+    return dict(stages[0]["handler"])
+
+
 def test_registry_packages_runtime_and_fork(registry_stack: E2EStack, run_id: str) -> None:
     stack = registry_stack
     stack.ensure("registry", "handler-runtime", "storage", "web-collector", "orchestrator")
@@ -207,6 +231,24 @@ def test_registry_packages_runtime_and_fork(registry_stack: E2EStack, run_id: st
         parent_v2_files[source] += b"\n# Registry upstream acceptance marker.\n"
         parent_v2 = _publish_version(registry, parent_v2_manifest, parent_v2_files)
         assert parent_v2["digest"] != parent_v1["digest"]
+        parent_v2_archive = _archive(registry, parent_id, "1.1.0", parent_v2["digest"])
+        marker = b"# Registry upstream acceptance marker."
+        assert marker in _archive_file(parent_v2_archive, source)
+        assert marker not in _archive_file(fork_archive, source)
+
+        # The runtime refuses a registry archive whose digest differs from the pinned one.
+        wrong_key = delivery_key(run_id, "registry-wrong-digest", material["observation_id"])
+        wrong_pin: dict[str, Any] = dict(invocation)
+        wrong_pin["handler"] = {**handler, "digest": parent_v2["digest"]}
+        wrong_pin["delivery"] = {"delivery_key": wrong_key}
+        mismatch = runtime.api("handler").post(
+            "/v1/invocations",
+            json=wrong_pin,
+            headers={"Idempotency-Key": wrong_key},
+        )
+        assert mismatch.status_code == 422, mismatch.text
+        assert mismatch.json()["code"] == "digest_mismatch", mismatch.text
+
         assert _archive(registry, fork_id, "1.0.0", fork_v1["digest"]) == fork_archive
         unchanged = registry.api("registry").get(f"/v1/packages/{fork_id}/versions/1.0.0").json()
         assert unchanged["digest"] == fork_v1["digest"] and unchanged["files"] == fork_v1["files"]
@@ -240,10 +282,8 @@ def test_registry_packages_runtime_and_fork(registry_stack: E2EStack, run_id: st
         create_task(orch, task)
         run = wait_run(orch, start_run(orch, task_id))
         assert run["status"] == "succeeded", run
-        extracted = list_items(orch, run["run_id"], "extract-products")
-        assert len(extracted) == 1 and extracted[0]["status"] == "completed", extracted
-        trace = orch.api("orchestrator").get(f"/v1/materials/{extracted[0]['material_id']}/trace").json()
-        assert fork_v1["digest"] in json.dumps(trace), trace
+        fork_pin = {"package_id": fork_id, "version": "1.0.0", "digest": fork_v1["digest"]}
+        assert _run_stage_handler(orch, run["run_id"], "extract-products") == fork_pin
 
         port_request = {"parent_version": "1.1.0", "new_version": "1.1.0"}
         started = registry.api("registry").post(
@@ -257,15 +297,38 @@ def test_registry_packages_runtime_and_fork(registry_stack: E2EStack, run_id: st
         ported = job["result"]
         assert ported["version"] == "1.1.0" and ported["digest"] != fork_v1["digest"]
         assert ported["manifest"]["fork_of"] == fork_ref
-        assert _archive(registry, fork_id, "1.1.0", ported["digest"])
+        # The port carries the parent's 1.1.0 change; the fork's 1.0.0 stays without it.
+        ported_archive = _archive(registry, fork_id, "1.1.0", ported["digest"])
+        assert _archive_file(ported_archive, source) == _archive_file(parent_v2_archive, source)
+        assert marker in _archive_file(ported_archive, source)
+        assert _archive(registry, fork_id, "1.0.0", fork_v1["digest"]) == fork_archive
+        assert marker not in _archive_file(fork_archive, source)
+        ported_vs_parent = (
+            registry.api("registry")
+            .get(f"/v1/packages/{fork_id}/diff", params={"from": "1.1.0", "to": "parent:1.1.0"})
+            .json()
+        )
+        source_status = [f["status"] for f in ported_vs_parent["files"] if f["path"] == source]
+        assert source_status == ["unchanged"], ported_vs_parent
         assert (
             registry.api("registry").get(f"/v1/packages/{fork_id}/upstream").json()["newer_parent_versions"]
             == []
         )
 
-        # Registry records connection requirements, while actual connection IDs stay with tasks.
+        # With fork 1.1.0 published, the task pinned to fork 1.0.0 still executes exactly that version.
+        pinned_run = wait_run(orch, start_run(orch, task_id))
+        assert pinned_run["status"] == "succeeded", pinned_run
+        pinned = _run_stage_handler(orch, pinned_run["run_id"], "extract-products")
+        assert pinned == fork_pin, pinned
+        assert pinned["digest"] != ported["digest"]
+
+        # A storage package (parent and fork alike) only declares required_connections; concrete
+        # connection IDs such as raw-files live in task configuration, never in the package.
         storage_id = "jane.storage-files"
         storage_version = published[storage_id]
+        required = storage_version["manifest"]["required_connections"]
+        assert required and all("name" in c and "kind" in c for c in required), required
+        assert "raw-files" not in json.dumps(storage_version["manifest"])
         storage_fork_id = f"jane.storage-files-{run_id}"
         storage_fork = registry.api("registry").post(
             f"/v1/packages/{storage_id}/forks",
@@ -273,13 +336,16 @@ def test_registry_packages_runtime_and_fork(registry_stack: E2EStack, run_id: st
             headers={"Idempotency-Key": _key()},
         )
         assert storage_fork.status_code == 201, storage_fork.text
+        assert storage_fork.json()["fork_of"] == {
+            "package_id": storage_id,
+            "version": "1.0.0",
+            "digest": storage_version["digest"],
+        }
         storage_fork_manifest = (
             registry.api("registry").get(f"/v1/packages/{storage_fork_id}/versions/1.0.0").json()["manifest"]
         )
-        assert (
-            storage_fork_manifest["required_connections"]
-            == storage_version["manifest"]["required_connections"]
-        )
+        assert storage_fork_manifest["kind"] == "storage"
+        assert storage_fork_manifest["required_connections"] == required
         assert "connections" not in storage_fork_manifest
         assert "raw-files" not in json.dumps(storage_fork_manifest)
 

@@ -1,0 +1,16 @@
+{
+  "api_base": "/api",
+  "services": {
+    "orchestrator": "orchestrator",
+    "registry": "registry",
+    "storage": "storage",
+    "llm": "llm",
+    "handler": "handler-runtime",
+    "assistant": "assistant",
+    "collector": "web-collector"
+  },
+  "auth": { "mode": "api_key" },
+  "polling": { "initial_ms": 1000, "max_ms": 15000, "multiplier": 1.5 },
+  "page_size": 50,
+  "preview_max_bytes": 262144
+}

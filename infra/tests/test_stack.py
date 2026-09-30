@@ -5,6 +5,7 @@ just up && just integration infra/tests
 
 from __future__ import annotations
 
+import urllib.error
 import urllib.request
 import uuid
 
@@ -27,6 +28,37 @@ def test_postgres(stack: StackInfo) -> None:
     psycopg = pytest.importorskip("psycopg")
     with psycopg.connect(stack.get("postgres", "dsn"), connect_timeout=10) as conn:
         assert conn.execute("select 1").fetchone() == (1,)
+
+
+def test_postgres_service_roles_cannot_enter_other_databases(stack: StackInfo) -> None:
+    psycopg = pytest.importorskip("psycopg")
+    names = ("handler-runtime", "orchestrator", "registry", "llm", "assistant", "storage-results")
+    pg = stack.services["postgres"]
+    for name in names:
+        info = stack.services[f"db-{name}"]
+        with psycopg.connect(info["db_dsn"], connect_timeout=5) as conn:
+            assert conn.execute("SELECT current_user, current_database()").fetchone() == (
+                info["db_user"],
+                info["db_name"],
+            )
+            assert conn.execute(
+                "SELECT rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = current_user"
+            ).fetchone() == (False, False, False)
+        for other in (
+            "jane",
+            "postgres",
+            "template1",
+            *(stack.services[f"db-{n}"]["db_name"] for n in names if n != name),
+        ):
+            with pytest.raises(psycopg.OperationalError, match="permission denied for database"):
+                psycopg.connect(
+                    host=pg["host"],
+                    port=pg["port"],
+                    user=info["db_user"],
+                    password=info["db_password"],
+                    dbname=other,
+                    connect_timeout=5,
+                )
 
 
 def test_sqlserver(stack: StackInfo) -> None:
@@ -93,3 +125,11 @@ def test_testsite_direct_and_through_proxy(stack: StackInfo) -> None:
         assert b'href="/testsite/catalog/"' in r.read()
     with urllib.request.urlopen(stack.url("proxy") + "/_proxy/health", timeout=5) as r:
         assert r.status == 200
+        assert "frame-ancestors 'none'" in r.headers["Content-Security-Policy"]
+        assert r.headers["X-Content-Type-Options"] == "nosniff"
+    with urllib.request.urlopen(stack.url("proxy") + "/config.json", timeout=5) as r:
+        assert b'"api_base": "/api"' in r.read()
+        assert r.headers["Cache-Control"] == "no-store"
+    with pytest.raises(urllib.error.HTTPError) as unknown:
+        urllib.request.urlopen(stack.url("proxy") + "/api/no-such-service/v1/health", timeout=5)
+    assert unknown.value.code == 404

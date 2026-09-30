@@ -52,6 +52,10 @@ integration *args:
 isolation *args:
     @isolation
 
+# End-to-end acceptance scenarios; stack is isolated and cleaned by the test fixture
+e2e *args:
+    @e2e
+
 # Admin web checks via pnpm (when web/* exists; WP-12)
 web:
     @web

@@ -15,7 +15,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "e2e": "node scripts/e2e.mjs",
-    "e2e:real": "node scripts/e2e.mjs --real"
+    "e2e:real": "node scripts/e2e.mjs --real",
+    "e2e:real:prepare": "node scripts/configure-real-stack.mjs"
   },
   "dependencies": {
     "@codemirror/lang-json": "^6.0.2",

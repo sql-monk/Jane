@@ -1,25 +1,8 @@
 // Client-side validation of configuration documents against the contract JSON Schemas (2020-12).
+// Ajv compiles at build time: runtime compilation uses new Function, forbidden by the Caddy CSP.
 // The service remains the authority (422 problem+json); this only gives early feedback in editors.
-import Ajv2020, { type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
-import addFormats from "ajv-formats";
-import { contractSchemas } from "../api/generated/schemas";
-
-const BASE = "https://contracts.jane.invalid/schemas/";
-
-let ajv: Ajv2020 | null = null;
-const cache = new Map<string, ValidateFunction>();
-
-function instance(): Ajv2020 {
-  if (ajv) return ajv;
-  // strict: false - the contracts use the OpenAPI `discriminator` annotation, which is not a JSON Schema keyword.
-  const created = new Ajv2020({ strict: false, allErrors: true, validateFormats: true });
-  addFormats(created);
-  for (const [rel, schema] of Object.entries(contractSchemas)) {
-    created.addSchema({ ...schema, $id: BASE + rel });
-  }
-  ajv = created;
-  return created;
-}
+import type { ErrorObject, ValidateFunction } from "ajv";
+import * as compiled from "../api/generated/validators.js";
 
 /** A schema reference: `task-config.schema.json` or `common/limits.schema.json#/$defs/PlatformLimits`. */
 export type SchemaRef = string;
@@ -44,15 +27,8 @@ function describe(error: ErrorObject): SchemaIssue {
 }
 
 export function validateAgainst(ref: SchemaRef, value: unknown): SchemaIssue[] {
-  let validate = cache.get(ref);
-  if (!validate) {
-    const [file, fragment] = ref.split("#");
-    const id = BASE + file + (fragment ? `#${fragment}` : "");
-    const found = instance().getSchema(id);
-    if (!found) throw new Error(`unknown contract schema: ${ref}`);
-    validate = found;
-    cache.set(ref, validate);
-  }
+  const validate = validators[ref];
+  if (!validate) throw new Error(`unknown contract schema: ${ref}`);
   if (validate(value)) return [];
   const issues = (validate.errors ?? []).map(describe);
   // oneOf/anyOf branches produce noise: keep unique messages, most specific (deepest pointer) first.
@@ -80,3 +56,16 @@ export const SCHEMAS = {
   connection: "common/connection.schema.json",
   manifest: "package-manifest.schema.json",
 } as const;
+
+const validators: Record<string, ValidateFunction> = {
+  [SCHEMAS.source]: compiled.source,
+  [SCHEMAS.task]: compiled.task,
+  [SCHEMAS.schedule]: compiled.schedule,
+  [SCHEMAS.stage]: compiled.stage,
+  [SCHEMAS.collectorRules]: compiled.collectorRules,
+  [SCHEMAS.strategy]: compiled.strategy,
+  [SCHEMAS.limits]: compiled.limits,
+  [SCHEMAS.platformLimits]: compiled.platformLimits,
+  [SCHEMAS.connection]: compiled.connection,
+  [SCHEMAS.manifest]: compiled.manifest,
+};

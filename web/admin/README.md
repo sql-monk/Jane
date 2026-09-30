@@ -32,6 +32,7 @@ corepack pnpm dev            # http://127.0.0.1:4600, Vite проксіює /api
 | `pnpm gen:api`                | перегенерувати `src/api/generated/*` після зміни `contracts/`                      |
 | `pnpm e2e`                    | Playwright на контрактних моках (браузер: `pnpm exec playwright install chromium`) |
 | `pnpm e2e:real <url>`         | Playwright на реальному стеку через reverse proxy (див. «Режими e2e»)              |
+| `pnpm e2e:real:prepare <id>`  | тестові зв'язки реальних сервісів в ізольованому Compose-проєкті                   |
 | `pnpm e2e -- --grep @hybrid`  | сценарії проти окремих реальних сервісів (потрібні `JANE_ADMIN_TARGET_*`)          |
 | `pnpm build` / `pnpm preview` | production-збірка в `dist/` і її перегляд з тим самим проксі                       |
 
@@ -44,6 +45,23 @@ corepack pnpm dev            # http://127.0.0.1:4600, Vite проксіює /api
 | Моки          | `pnpm e2e`                                                                      | 26 сценаріїв `@mock` із контрактними прикладами, 2 auth, маскування помилки; `@hybrid` пропускаються   |
 | Гібрид        | `JANE_ADMIN_TARGET_<API>=<url сервісу>` + `pnpm e2e -- --grep @hybrid`          | реальні orchestrator, registry, handler-runtime, storage, LLM, assistant; сценарії самі засівають дані |
 | Реальний стек | `pnpm e2e:real <url reverse proxy>` (`JANE_ADMIN_E2E_API_KEY` — справжній ключ) | auth, маскування помилки, `@hybrid` проти `<url>/api/<service>`; `@mock` пропускаються                 |
+
+Для повного прогону на локальному Compose-стеку спочатку зберіть UI та підніміть потрібні профілі:
+
+```text
+corepack pnpm --dir web/admin build
+just up proxy storage registry handler-runtime web-collector orchestrator assistant llm --project jane-admin-real
+corepack pnpm --dir web/admin e2e:real:prepare jane-admin-real
+corepack pnpm --dir web/admin e2e:real http://127.0.0.1:<порт proxy з just env>
+```
+
+`e2e:real:prepare` читає створений `just up` файл `.jane/stack-<id>.json` і тимчасовим Compose
+override задає адреси реальних виконавців для orchestrator, адресу registry для handler-runtime та
+джерело runtime-профілю для registry. Файли `infra/` і секрети стеку він не змінює та не друкує.
+Для Storage типовий dev-стек використовує `raw-files` + `jane.storage-files` і `results-pg` +
+`jane.storage-postgresql`; нестандартні підключення/пакети задають
+`JANE_ADMIN_E2E_STORAGE_CONNECTION`, `JANE_ADMIN_E2E_STORAGE_PACKAGE`,
+`JANE_ADMIN_E2E_RESULTS_CONNECTION`, `JANE_ADMIN_E2E_RESULTS_PACKAGE`.
 
 Гібридні сценарії для orchestrator і registry засівають унікальні джерела, завдання й пакети через реальні API.
 Registry (WP-05) є в `main`: для справжнього прогону тестів пакета запустіть handler-runtime з
@@ -94,5 +112,6 @@ handler-runtime із реальним registry (тести пакета), storag
 ## Структура
 
 `src/api/generated` — типи з контрактів і JSON Schema (ajv валідує редактори конфігурацій);
+`gen:api` також створює статичні Ajv-валідатори, щоб редактори працювали зі строгим CSP Caddy без `unsafe-eval`;
 `src/api` — клієнти openapi-fetch, problem+json, job-опитування; `src/pages` — екрани; `src/components` —
 редактори (CodeMirror), DAG, diff, звіти тестів; `e2e` — Playwright; `dev-proxy.ts` — проксі dev/e2e.

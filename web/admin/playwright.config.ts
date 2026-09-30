@@ -1,6 +1,6 @@
 // Playwright e2e for the admin.
 //   * default: contract mocks (`uv run contracts/tools/mock.py <api>`, one per service) + Vite as the reverse proxy;
-//   * real API: JANE_ADMIN_API_TARGET=<Jane reverse proxy URL> - only Vite starts, `/api/*` goes to the real stack,
+//   * real API: JANE_ADMIN_API_TARGET=<Jane reverse proxy URL> - Caddy serves the built admin and real APIs;
 //     tests tagged @mock (they depend on contract example data) are skipped; auth and the data-independent
 //     @hybrid scenarios (they seed their own data through the service APIs) run against the stack;
 //   * hybrid: JANE_ADMIN_TARGET_<API>=<service URL> replaces one mock by a real service (see README).
@@ -36,21 +36,23 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
   ...(real ? { grepInvert: /@mock/ } : {}),
   use: {
-    baseURL: `http://127.0.0.1:${adminPort}`,
+    baseURL: real ?? `http://127.0.0.1:${adminPort}`,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: [
-    ...mocks,
-    {
-      // A production build served by `vite preview` (same proxy as `vite dev`): fast, close to deployment.
-      command: `node node_modules/vite/bin/vite.js build --logLevel warn && node node_modules/vite/bin/vite.js preview --port ${adminPort} --strictPort --host 127.0.0.1`,
-      url: `http://127.0.0.1:${adminPort}/config.json`,
-      reuseExistingServer: reuse,
-      timeout: 120_000,
-      stdout: "ignore",
-      stderr: "pipe",
-    },
-  ],
+  webServer: real
+    ? []
+    : [
+        ...mocks,
+        {
+          // A production build served by `vite preview` (same proxy as `vite dev`): fast, close to deployment.
+          command: `node node_modules/vite/bin/vite.js build --logLevel warn && node node_modules/vite/bin/vite.js preview --port ${adminPort} --strictPort --host 127.0.0.1`,
+          url: `http://127.0.0.1:${adminPort}/config.json`,
+          reuseExistingServer: reuse,
+          timeout: 120_000,
+          stdout: "ignore",
+          stderr: "pipe",
+        },
+      ],
 });

@@ -387,7 +387,8 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
         },
       },
       ApiFeedStrategy: {
-        description: "Перелік матеріалів із документованого API або JSON-каналу сайту.",
+        description:
+          "Перелік матеріалів із документованого API або JSON-каналу сайту. Web Collector v1 виконує GET, якщо стратегія api_feed зареєстрована. POST і emit_items_as_materials: true зарезервовані: правила з ними валідні за схемою, але /v1/rules/validations повертає valid: true, supported: false, а запуск збору відхиляється HTTP 422 validation_failed.",
         allOf: [{ $ref: "#/$defs/StrategyCommon" }],
         type: "object",
         unevaluatedProperties: false,
@@ -395,8 +396,17 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
         properties: {
           type: { const: "api_feed" },
           url: { type: "string", format: "uri" },
-          method: { type: "string", enum: ["GET", "POST"], default: "GET" },
-          body: { description: "Тіло для POST (JSON)." },
+          method: {
+            type: "string",
+            enum: ["GET", "POST"],
+            default: "GET",
+            description:
+              "GET — типовий виконуваний метод. POST зарезервований у Web Collector v1: schema-valid, але supported: false; збір відхиляється validation_failed.",
+          },
+          body: {
+            description:
+              "JSON-тіло для POST; опція зарезервована разом із POST і не виконується Web Collector v1.",
+          },
           items_path: { type: "string", description: "JSONPath до масиву елементів, наприклад '$.items'." },
           url_path: {
             type: "string",
@@ -406,7 +416,8 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
           emit_items_as_materials: {
             type: "boolean",
             default: false,
-            description: "true — кожен елемент JSON також видається як окремий матеріал (application/json).",
+            description:
+              "true — зарезервована опція видачі кожного елемента JSON як окремого матеріалу (application/json). Web Collector v1 її не виконує: schema-valid, але supported: false; збір відхиляється validation_failed.",
           },
           pagination: {
             type: "object",

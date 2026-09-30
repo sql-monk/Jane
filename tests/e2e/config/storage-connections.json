@@ -12,6 +12,34 @@
       "title": "e2e: results in the stack PostgreSQL",
       "params": { "host": "postgres", "port": 5432, "database": "jane_storage_results", "schema": "e2e_results", "sslmode": "disable" },
       "secret_refs": { "username": "env:JANE_SECRET_E2E_STORAGE_RESULTS_USER", "password": "env:JANE_SECRET_E2E_STORAGE_RESULTS_PASSWORD" }
+    },
+    {
+      "connection_id": "e2e-sqlserver",
+      "kind": "sqlserver",
+      "title": "e2e: RAW and entities in SQL Server",
+      "params": { "host": "sqlserver", "port": 1433, "database": "jane_e2e", "schema": "e2e" },
+      "secret_refs": { "username": "env:JANE_SECRET_E2E_SQLSERVER_USER", "password": "env:JANE_SECRET_E2E_SQLSERVER_PASSWORD" }
+    },
+    {
+      "connection_id": "e2e-mongodb",
+      "kind": "mongodb",
+      "title": "e2e: RAW and entities in MongoDB",
+      "params": { "host": "mongodb", "port": 27017, "database": "jane_e2e", "auth_source": "admin" },
+      "secret_refs": { "username": "env:JANE_SECRET_E2E_MONGO_USER", "password": "env:JANE_SECRET_E2E_MONGO_PASSWORD" }
+    },
+    {
+      "connection_id": "e2e-minio",
+      "kind": "minio",
+      "title": "e2e: RAW and entities in MinIO",
+      "params": { "endpoint": "http://minio:9000", "bucket": "jane-e2e", "prefix": "e2e" },
+      "secret_refs": { "access_key": "env:JANE_SECRET_E2E_MINIO_ACCESS_KEY", "secret_key": "env:JANE_SECRET_E2E_MINIO_SECRET_KEY" }
+    },
+    {
+      "connection_id": "e2e-s3",
+      "kind": "s3",
+      "title": "e2e: RAW and entities in SeaweedFS S3",
+      "params": { "endpoint": "http://s3:8333", "region": "us-east-1", "bucket": "jane-e2e", "prefix": "e2e", "addressing_style": "path", "create_bucket": true },
+      "secret_refs": { "access_key": "env:JANE_SECRET_E2E_S3_ACCESS_KEY", "secret_key": "env:JANE_SECRET_E2E_S3_SECRET_KEY" }
     }
   ]
 }

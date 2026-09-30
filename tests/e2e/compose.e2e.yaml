@@ -24,6 +24,14 @@ services:
       # Secret values only through secret_refs (ADR-0006); names use the JANE_SECRET_ prefix.
       JANE_SECRET_E2E_STORAGE_RESULTS_USER: jane_storage_results
       JANE_SECRET_E2E_STORAGE_RESULTS_PASSWORD: ${JANE_PG_STORAGE_RESULTS_PASSWORD:?set by tests/e2e}
+      JANE_SECRET_E2E_SQLSERVER_USER: sa
+      JANE_SECRET_E2E_SQLSERVER_PASSWORD: ${JANE_MSSQL_SA_PASSWORD:?set by tests/e2e}
+      JANE_SECRET_E2E_MONGO_USER: ${JANE_MONGO_USER:?set by tests/e2e}
+      JANE_SECRET_E2E_MONGO_PASSWORD: ${JANE_MONGO_PASSWORD:?set by tests/e2e}
+      JANE_SECRET_E2E_MINIO_ACCESS_KEY: ${JANE_MINIO_ACCESS_KEY:?set by tests/e2e}
+      JANE_SECRET_E2E_MINIO_SECRET_KEY: ${JANE_MINIO_SECRET_KEY:?set by tests/e2e}
+      JANE_SECRET_E2E_S3_ACCESS_KEY: ${JANE_S3_ACCESS_KEY:?set by tests/e2e}
+      JANE_SECRET_E2E_S3_SECRET_KEY: ${JANE_S3_SECRET_KEY:?set by tests/e2e}
 
   handler-runtime:
     environment:

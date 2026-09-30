@@ -1,0 +1,46 @@
+{
+  "schema_version": "1",
+  "package_id": "e2e.instock-product-extractor",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "E2E fixture: product cards with in-stock offers only",
+  "description": "Фікстура WP-13 для S-M2-11: навмисно вузький екстрактор тестового сайту. Картка товару з JSON-LD Product і availability InStock — success; інший стан пропозиції — unrecognized (сигнатура unknown-availability, часткова сутність); сторінка без JSON-LD Product — empty. Так оркестратор отримує справжні проблемні результати для гілки з LLM.",
+  "tags": ["e2e", "products", "html"],
+  "entry": {
+    "runtime": "python",
+    "module": "e2e_instock_products.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": ["material"],
+    "media_types": ["text/html"],
+    "content_kinds": ["page"]
+  },
+  "output": {
+    "entities": [
+      {
+        "entity_type": "product",
+        "schema": "schemas/product.schema.json",
+        "key_fields": ["sku"],
+        "description": "Картка товару"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "provenance": {
+    "created_by": "human",
+    "authors": ["WP-13"],
+    "created_at": "2026-09-30T00:00:00Z",
+    "change_summary": "E2E fixture for S-M2-11: problem results of a real extractor run."
+  },
+  "bindings_hint": {
+    "source_kinds": ["web"],
+    "url_patterns": ["/product/*"]
+  }
+}

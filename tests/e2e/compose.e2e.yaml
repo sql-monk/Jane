@@ -44,6 +44,8 @@ services:
     environment:
       # SUBSTITUTE of the external LLM: deterministic provider `fake` (real Anthropic - not verified).
       JANE_LLM_SEED_FILE: /cfg/llm-seed.yaml
+      # LLM packages of orchestrated stages (no package_archive) come from the same local archive stand-in.
+      JANE_LLM_REGISTRY_URL: http://package-host:8080
     volumes:
       - ../tests/e2e/config/llm-seed.yaml:/cfg/llm-seed.yaml:ro
 
@@ -83,7 +85,9 @@ services:
          {"executor": "storage-read", "role": "storage_read", "base_url": "http://storage:8000",
           "sync_connections": false},
          {"executor": "handler-runtime", "role": "handler", "base_url": "http://handler-runtime:8000",
-          "capabilities": {"default": true, "handler_kinds": ["extractor", "transform"]}, "sync_connections": false}]
+          "capabilities": {"default": true, "handler_kinds": ["extractor", "transform"]}, "sync_connections": false},
+         {"executor": "llm", "role": "llm", "base_url": "http://llm:8110",
+          "capabilities": {"packages": ["jane.llm-*", "e2e.llm-*"], "handler_kinds": ["llm"]}, "sync_connections": false}]
       # Shorter item/feed lease than the default (30 s): take-over after a killed worker fits the e2e budget.
       JANE_ORCHESTRATOR_LIMITS__ENGINE__LEASE_MS: ${JANE_E2E_ORCHESTRATOR_LEASE_MS:-8000}
       JANE_ORCHESTRATOR_LIMITS__ENGINE__HEARTBEAT_MS: ${JANE_E2E_ORCHESTRATOR_HEARTBEAT_MS:-2000}

@@ -20,7 +20,7 @@
 | 11 | Асистент джерел | 1 | accepted | `wp/11-assistant` | агент / wp-reviewer (2 раунди) | злито `7dc7074` |
 | 12 | Адмінка | 1 | accepted | `wp/12-admin`, `wp/12b-real-api`, `wp/12c-full-real-api` | агент / незалежний рев'юер (2 раунди); WP-12b і WP-12c незалежно прийнято | злито `743426a`; real через Caddy 14 passed, cancel детермінований; 5 з 26 `@mock` лише на моках, 12 частково (див. WP-12.md) |
 | 13 | Інтеграція й приймання | 2 | active | `wp/13-acceptance` | агенти / незалежний wp-reviewer для інкременту | M1 і S-M2-03/08/09 злито; решта M2 відкрита |
-| 14 | Профілі лімітів і експлуатація | 2 | blocked | `wp/14-limit-profiles-ops` | агент | кандидати готові; потрібні підтверджені середовища, вимірювання й відтворювані приклади |
+| 14 | Профілі лімітів і експлуатація | 2 | active | `wp/14-limit-profiles-ops` | агент / незалежний wp-reviewer (2 раунди фази 1) | фазу 1 прийнято й злито локально `d750a9d`; вимірювання профілів фази 2 і критерій 13 ще відкриті |
 
 ## Віхи
 | Віха | Умова | Стан |
@@ -263,3 +263,24 @@ WP-04 прийнято після повторного рев'ю: `just test tel
 - WP-07b зупинено: `wp/07b-secret-policy` `7528a64` (код+тести `9125c61` WIP; `just test storage` 112 passed). Лишилось: README, `just check`, dev-стек, рев'ю; env allowlist для compose — у WP-07.md гілки. **Нова вразливість (рішення координатора):** `jane_storage/content.py` читає будь-який `file:///…` blob (напр. `/proc/self/environ`) і віддає через `GET /v1/objects/{id}/content`; `download_url` дає SSRF — потрібні дозволений каталог і allowlist.
 - WP-13 надійність зупинено: `wp/13-reliability` `e5da543` (база `d728d19`): R-01, R-03, R-08 — 3×«3 passed, 1 xfailed», `just e2e` 28 passed / 1 xfailed. Лишилось: rebase на `main` (конфлікт лише `matrix.md`, `scenarios.md`), повтори, `just check`, рев'ю. **Дефект WP-02:** буфер перевищує `queue.max_unacked_materials` на `max_parallel_fetches − 1` (`_wait_backpressure()` у `crawler.py` не резервує місце; репро у WP-13.md гілки). Ризик WP-09: `409 idempotency_in_progress` після перехоплення lease витрачає спробу.
 - WP-13 S-M2-06/07 зупинено: `wp/13-assistant-flows` `e489ff6` (rebase на `c90f54c`, без конфліктів): S-M2-06 (з підказкою) і S-M2-07 passed, S-M2-06 «лише назва» — xfail (дефект WP-11). Лишилось: повний `just e2e` (очікується 32 passed / 1 xfailed), `just check`, рев'ю. Запити до WP-11, WP-09, WP-01/07 — у WP-13.md гілки.
+
+
+## Продовження (2026-09-30, сесія 4)
+
+- `main` `72c6ce1`: GitHub CI `36716070067` завершився успішно.
+- WP-14 фаза 1: незалежне рев'ю раунд 1 повернуло перевірку `applied_fields`;
+  автор виправив і додав негативні тести (`5bf6b60`). Раунд 2 прийняв.
+  Злито в локальний `main` `d750a9d`; `origin/main` ще не оновлено.
+  Фаза 2: три вимірювання `dev-laptop` і перевірка `ci` на вільній машині.
+- WP-13 S-M2-06/07: гілка `wp/13-assistant-flows` `234892d`, авторський
+  `just e2e` — 32 passed / 1 xfailed, `just check` зелений; незалежне
+  рев'ю повернуло інкремент через непідтверджений сценарій «лише назва».
+  XFAIL — дефект вибірки WP-11, критерій 4 ще відкритий; запущено WP-11b.
+- WP-13 R-01/R-03/R-08: гілка `wp/13-reliability` `2110470`,
+  після rebase на `72c6ce1`: `just e2e` — 33 passed / 1 xfailed,
+  `just check` зелений; чекає незалежного рев'ю. XFAIL — перевищення
+  `queue.max_unacked_materials` у WP-02; R-01 з довгим викликом ще не перевірено.
+- WP-07b: гілка `wp/07b-secret-policy` `962e937`, `just check`
+  і dev-стек пройшли, незалежне рев'ю триває.
+- WP-02b: окрема гілка `wp/02b-backpressure`; виправлення точної межі буфера
+  й тести в роботі.

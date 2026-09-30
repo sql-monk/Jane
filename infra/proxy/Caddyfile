@@ -37,7 +37,10 @@
 		reverse_proxy registry:8000
 	}
 	handle_path /api/telegram-collector/* {
-		reverse_proxy telegram-collector:8000
+		reverse_proxy telegram-collector:8102
+	}
+	handle /api/* {
+		respond "Jane dev proxy: unknown API" 404
 	}
 
 	# Test site under a prefix; it rewrites its links from X-Forwarded-Prefix.

@@ -5,6 +5,7 @@ just up && just integration infra/tests
 
 from __future__ import annotations
 
+import urllib.error
 import urllib.request
 import uuid
 
@@ -93,3 +94,11 @@ def test_testsite_direct_and_through_proxy(stack: StackInfo) -> None:
         assert b'href="/testsite/catalog/"' in r.read()
     with urllib.request.urlopen(stack.url("proxy") + "/_proxy/health", timeout=5) as r:
         assert r.status == 200
+        assert "frame-ancestors 'none'" in r.headers["Content-Security-Policy"]
+        assert r.headers["X-Content-Type-Options"] == "nosniff"
+    with urllib.request.urlopen(stack.url("proxy") + "/config.json", timeout=5) as r:
+        assert b'"api_base": "/api"' in r.read()
+        assert r.headers["Cache-Control"] == "no-store"
+    with pytest.raises(urllib.error.HTTPError) as unknown:
+        urllib.request.urlopen(stack.url("proxy") + "/api/no-such-service/v1/health", timeout=5)
+    assert unknown.value.code == 404

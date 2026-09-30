@@ -6,6 +6,8 @@
 ```
 just up                     # увесь стек, чекає health-checks
 just up postgres minio      # лише потрібні сервіси
+just up storage registry     # профілі застосунків; їхні залежності стартують автоматично
+just web && just up proxy    # зібрати адмінку та віддавати dist через Caddy
 just env                    # адреси й облікові дані (dotenv); just env --format json
 just integration            # інтеграційні тести, зокрема infra/tests (smoke усього стеку)
 just down -v                # зупинити й видалити томи, зібрані образи (<проєкт>-testsite) і файл стеку
@@ -22,6 +24,8 @@ just down -v                # зупинити й видалити томи, з�
 | `s3` | `chrislusf/seaweedfs:4.47` (S3-шлюз) | 8333 | `/healthz` | адаптер S3 |
 | `testsite` | збирається з `tests/fixtures/testsite`, тег `<проєкт>-testsite` | 8080 | `GET /robots.txt` | Web Collector і стратегії |
 | `proxy` | `caddy:2-alpine` | 8080 | `/_proxy/health` | єдина точка входу (`/testsite/*`, далі — сервіси) |
+| `storage`, `handler-runtime`, `orchestrator`, `registry`, `assistant` | збираються з `services/<name>/Dockerfile` | 8000 | `/v1/health` з образу / compose | профілі з іменами сервісів |
+| `web-collector`, `telegram-collector`, `llm` | збираються з `services/<name>/Dockerfile` | 8101, 8102, 8110 | `/v1/health` з образу / compose | профілі з іменами сервісів |
 
 ## Параметризація та ізоляція
 
@@ -38,6 +42,15 @@ just down -v                # зупинити й видалити томи, з�
 - **Образи.** `JANE_IMAGE_<СЕРВІС>` (наприклад `JANE_IMAGE_MINIO`) — замінити реєстр або версію. Образ testsite
   збирається з тегом `<проєкт>-testsite`, тож паралельні стеки не перезаписують образ одне одного.
 - **SeaweedFS.** Розмір тому — `JANE_S3_VOLUME_SIZE_LIMIT_MB` (типово 64).
+- **Застосунки.** Профілі вимкнені за замовчуванням, щоб `just up` не будував усі образи. `just up
+  assistant` також піднімає `llm` і PostgreSQL; `registry` піднімає PostgreSQL і MinIO. PostgreSQL-схеми
+  сервісів окремі; приклад конфігурації storage — `infra/config/storage-connections.json`. Додаткові URL
+  сусідів для assistant задавайте лише коли відповідні сервіси запущені. Для handler-runtime потрібен
+  налаштований образ пісочниці (`JANE_HANDLER_RUNTIME_PROFILE_IMAGES`), якщо запускати екстрактори.
+- **Статика адмінки.** `just up` підмонтовує `web/admin/dist`, якщо тека вже існує; інакше Caddy показує
+  службову сторінку з `infra/proxy/empty`. Прямий `docker compose` приймає `JANE_ADMIN_DIST_PATH`.
+  `/config.json` береться з `infra/proxy/admin-config.json`; для іншого середовища задайте
+  `JANE_ADMIN_CONFIG_PATH` до власного JSON-файлу. Після зміни файлу образ адмінки перебудовувати не треба.
 - **Тести.** `jane_kit.devstack.load_stack()` повертає адреси й облікові дані (або `None`, якщо стек не
   запущено — тоді інтеграційні тести пропускаються). Береться стек **цього** checkout (типове ім'я проєкту);
   `just integration --project <ім'я>` задає інший (через `JANE_STACK_FILE`).
@@ -78,5 +91,8 @@ Upstream MinIO припинив публікацію образів у Docker Hu
 
 ## Reverse proxy
 
-Caddy (`infra/proxy/Caddyfile`): `/_proxy/health`, `/testsite/*` (з `X-Forwarded-Prefix`). Сервіси додаються
-блоками `handle_path /api/<сервіс>/*`, коли отримають записи в compose (WP-13).
+Caddy (`infra/proxy/Caddyfile`): `/_proxy/health`, `/testsite/*` (з `X-Forwarded-Prefix`),
+`/api/<service>/*` для всіх сервісів і статика адмінки. Префікс `/api/<service>` видаляється перед
+передаванням запиту сервісу. CSP, `nosniff` і `Referrer-Policy` встановлюються для відповідей proxy.
+Для OIDC додайте довірене джерело до `JANE_CSP_CONNECT_SRC` і `JANE_CSP_FORM_ACTION` (типово порожні).
+Незапущений профіль поверне 502 на своєму API-маршруті; невідомий API-маршрут — 404.

@@ -97,6 +97,23 @@ def test_e2e_runs_only_acceptance_suite(monkeypatch: pytest.MonkeyPatch) -> None
     assert seen[-5:] == ["pytest", "tests/e2e", "-m", "e2e", "-v"]
 
 
+def test_down_includes_inactive_profiles(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    path = tmp_path / "stack-test.json"
+    path.write_text('{"env":{"JANE_PG_PASSWORD":"local-test"}}', encoding="utf-8")
+    monkeypatch.setattr(dev, "stack_file", lambda project: path)
+    seen: list[str] = []
+
+    def fake_compose(project: str, env: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
+        seen.extend(args)
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(dev, "compose", fake_compose)
+    assert dev.cmd_down(Namespace(project="test", volumes=True)) == 0
+    assert seen[:2] == ["--profile", "*"]
+    assert "-v" in seen
+    assert not path.exists()
+
+
 def test_devstack_uses_the_same_default_project(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from jane_kit import devstack
 

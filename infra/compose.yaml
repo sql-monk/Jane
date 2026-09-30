@@ -153,6 +153,12 @@ services:
     volumes: ["web-collector-data:/var/lib/jane-web-collector"]
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_WEB_COLLECTOR:-}:8101"]
 
+  telegram-collector:
+    profiles: ["telegram-collector"]
+    build: { context: .., dockerfile: services/telegram-collector/Dockerfile }
+    volumes: ["telegram-collector-data:/var/lib/jane-telegram-collector"]
+    ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_TELEGRAM_COLLECTOR:-}:8102"]
+
   orchestrator:
     profiles: ["orchestrator"]
     build: { context: .., dockerfile: services/orchestrator/Dockerfile }
@@ -162,8 +168,22 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
 
+  registry:
+    profiles: ["registry"]
+    build: { context: .., dockerfile: services/registry/Dockerfile }
+    environment:
+      JANE_REGISTRY_DB_URL: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?run `just up`}@postgres:5432/${JANE_PG_DB:-jane}
+      JANE_REGISTRY_DB_SCHEMA: jane_registry
+      JANE_REGISTRY_S3_ENDPOINT_URL: http://minio:9000
+      JANE_REGISTRY_S3_ACCESS_KEY: ${JANE_MINIO_ACCESS_KEY:-jane}
+      JANE_REGISTRY_S3_SECRET_KEY: ${JANE_MINIO_SECRET_KEY:?run `just up`}
+    ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_REGISTRY:-}:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      minio: { condition: service_healthy }
+
   llm:
-    profiles: ["llm"]
+    profiles: ["llm", "assistant"]
     build: { context: .., dockerfile: services/llm/Dockerfile }
     environment:
       JANE_LLM_STORE: postgres
@@ -185,8 +205,6 @@ services:
       JANE_ASSISTANT_LLM_URL: http://llm:8110
       JANE_ASSISTANT_HANDLER_RUNTIME_URL: http://handler-runtime:8000
       JANE_ASSISTANT_STORAGE_URL: http://storage:8000
-      JANE_ASSISTANT_COLLECTOR_WEB_URL: http://web-collector:8101
-      JANE_ASSISTANT_ORCHESTRATOR_URL: http://orchestrator:8000
       JANE_ASSISTANT_LOG_FORMAT: json
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_ASSISTANT:-}:8000"]
     depends_on:
@@ -204,3 +222,4 @@ volumes:
   s3-data:
   storage-data:
   web-collector-data:
+  telegram-collector-data:

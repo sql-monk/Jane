@@ -237,6 +237,14 @@ PORT_VARS = {
     "s3": ("JANE_PORT_S3", 8333),
     "testsite": ("JANE_PORT_TESTSITE", 8080),
     "proxy": ("JANE_PORT_PROXY", 8080),
+    "storage": ("JANE_PORT_STORAGE", 8000),
+    "handler-runtime": ("JANE_PORT_HANDLER_RUNTIME", 8000),
+    "web-collector": ("JANE_PORT_WEB_COLLECTOR", 8101),
+    "telegram-collector": ("JANE_PORT_TELEGRAM_COLLECTOR", 8102),
+    "orchestrator": ("JANE_PORT_ORCHESTRATOR", 8000),
+    "registry": ("JANE_PORT_REGISTRY", 8000),
+    "llm": ("JANE_PORT_LLM", 8110),
+    "assistant": ("JANE_PORT_ASSISTANT", 8000),
 }
 
 
@@ -343,6 +351,18 @@ def describe(project: str, env: dict[str, str]) -> dict[str, dict[str, object]]:
         }
     if ports["proxy"]:
         services["proxy"] = {"host": host, "port": ports["proxy"], "url": f"http://{host}:{ports['proxy']}"}
+    for name in (
+        "storage",
+        "handler-runtime",
+        "web-collector",
+        "telegram-collector",
+        "orchestrator",
+        "registry",
+        "llm",
+        "assistant",
+    ):
+        if port := ports[name]:
+            services[name] = {"host": host, "port": port, "url": f"http://{host}:{port}"}
     return services
 
 
@@ -388,7 +408,7 @@ def cmd_down(ns: argparse.Namespace) -> int:
         env.setdefault(var, "unused")
     # -v also removes locally built images (<project>-testsite) so they do not pile up.
     args = ["down", "--remove-orphans"] + (["-v", "--rmi", "local"] if ns.volumes else [])
-    code = compose(project, env, *args).returncode
+    code = compose(project, env, "--profile", "*", *args).returncode
     if ns.volumes and code == 0 and path.is_file():
         path.unlink()
     return code
@@ -403,12 +423,14 @@ def _stack_env(project: str) -> dict[str, str]:
 
 def cmd_ps(ns: argparse.Namespace) -> int:
     project = ns.project or default_project()
-    return compose(project, _stack_env(project), "ps").returncode
+    return compose(project, _stack_env(project), "--profile", "*", "ps").returncode
 
 
 def cmd_logs(ns: argparse.Namespace) -> int:
     project = ns.project or default_project()
-    return compose(project, _stack_env(project), "logs", "--tail", str(ns.tail), *ns.services).returncode
+    return compose(
+        project, _stack_env(project), "--profile", "*", "logs", "--tail", str(ns.tail), *ns.services
+    ).returncode
 
 
 def cmd_env(ns: argparse.Namespace) -> int:

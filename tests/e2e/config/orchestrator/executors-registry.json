@@ -1,0 +1,8 @@
+[
+  {
+    "executor": "registry",
+    "role": "registry",
+    "base_url": "http://registry:8000",
+    "sync_connections": false
+  }
+]

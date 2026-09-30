@@ -279,7 +279,7 @@ def test_connections_api(client: TestClient, tmp_path: Path, monkeypatch: pytest
         "connection_id": "results-files",
         "kind": "filesystem",
         "params": {"base_path": str(tmp_path / "r")},
-        "secret_refs": {"token": "env:WP07_TEST_TOKEN"},
+        "secret_refs": {"token": "env:JANE_SECRET_WP07_TEST_TOKEN"},
     }
     created = client.put("/v1/connections/results-files", json=body)
     assert created.status_code == 201
@@ -292,7 +292,7 @@ def test_connections_api(client: TestClient, tmp_path: Path, monkeypatch: pytest
     )
     missing = client.post("/v1/connections/results-files/test").json()
     assert missing == {**missing, "ok": False, "secrets_resolved": {"token": False}}
-    monkeypatch.setenv("WP07_TEST_TOKEN", "x")
+    monkeypatch.setenv("JANE_SECRET_WP07_TEST_TOKEN", "x")
     assert client.post("/v1/connections/results-files/test").json()["ok"] is True
     leaked = {**body, "params": {"base_path": "/x", "password": "hunter2"}}
     r = client.put("/v1/connections/results-files", json=leaked)

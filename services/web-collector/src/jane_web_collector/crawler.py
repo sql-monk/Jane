@@ -211,6 +211,8 @@ class CrawlRun:
         self._stop_exc: BaseException | None = None
         self.strategy_limits: dict[str, ServiceLimits] = {}
         self._last_progress = 0.0
+        self._material_commit_lock = asyncio.Lock()
+        self._backpressure_waiters = 0
 
     # ------------------------------------------------------------------ helpers for strategies
     def _tx(self) -> Any:
@@ -410,6 +412,7 @@ class CrawlRun:
         limit = self.limits.queue.max_unacked_materials
         if self.state.unacked_count(self.collection_id) < limit:
             return
+        self._backpressure_waiters += 1
         self.state.set_paused(self.collection_id, True)
         event = self.deps.ack_events.setdefault(self.collection_id, asyncio.Event())
         try:
@@ -420,7 +423,8 @@ class CrawlRun:
                         event.wait(), timeout=self.limits.collector.backpressure_poll_ms / 1000
                     )
         finally:
-            self.state.set_paused(self.collection_id, False)
+            self._backpressure_waiters -= 1
+            self.state.set_paused(self.collection_id, self._backpressure_waiters > 0)
 
     def _stored_links_candidates(self, links: Sequence[str], parent: str) -> list[DiscoveredUrl]:
         out: list[DiscoveredUrl] = []
@@ -660,39 +664,48 @@ class CrawlRun:
         if duplicate_of is None:
             candidates = await self._on_fetched(resource, exclude=caller)
         links = self.extract_links(resource) if doc is not None else None
-        with self._tx() as db:
-            if duplicate_of is not None:
-                self.stats["duplicates"] += 1
-            self.state.add_urls(db, self.collection_id, extra_done, status="done")
-            for other in claimed:  # redirect hops and the final URL were claimed while following redirects
-                self.state.mark_url(
-                    db, self.collection_id, other, "done" if other == canonical else "redirect"
-                )
-            self.insert_rows(db, self.admit(candidates, row.depth))
-            if error is not None:
-                self._error(
-                    db,
-                    url,
-                    error[0],
-                    error[1],
-                    http_status=result.status if result.status >= 400 else None,
-                    attempts=result.attempts,
-                )
+        # Serialize the capacity check and material commit for this collection.
+        # The fenced SQLite transaction excludes a stale owner on another instance.
+        async with self._material_commit_lock:
             if material is not None:
-                self.state.append_material(db, self.collection_id, material["observation_id"], material)
-                self.stats["emitted"] += 1
-            self.state.put_url_state(
-                db,
-                self.state_key,
-                url,
-                status=result.status,
-                etag=result.headers.get("etag"),
-                last_modified=result.headers.get("last-modified"),
-                content_sha256=content_sha if result.status < 300 else None,
-                links=links,
-            )
-            self.state.mark_url(db, self.collection_id, url, "failed" if result.status >= 400 else "done")
-            self._persist(db)
+                await self._wait_backpressure()
+            if self.cancelled:
+                raise JobCancelledError(self.collection_id)
+            with self._tx() as db:
+                if duplicate_of is not None:
+                    self.stats["duplicates"] += 1
+                self.state.add_urls(db, self.collection_id, extra_done, status="done")
+                for (
+                    other
+                ) in claimed:  # redirect hops and the final URL were claimed while following redirects
+                    self.state.mark_url(
+                        db, self.collection_id, other, "done" if other == canonical else "redirect"
+                    )
+                self.insert_rows(db, self.admit(candidates, row.depth))
+                if error is not None:
+                    self._error(
+                        db,
+                        url,
+                        error[0],
+                        error[1],
+                        http_status=result.status if result.status >= 400 else None,
+                        attempts=result.attempts,
+                    )
+                if material is not None:
+                    self.state.append_material(db, self.collection_id, material["observation_id"], material)
+                    self.stats["emitted"] += 1
+                self.state.put_url_state(
+                    db,
+                    self.state_key,
+                    url,
+                    status=result.status,
+                    etag=result.headers.get("etag"),
+                    last_modified=result.headers.get("last-modified"),
+                    content_sha256=content_sha if result.status < 300 else None,
+                    links=links,
+                )
+                self.state.mark_url(db, self.collection_id, url, "failed" if result.status >= 400 else "done")
+                self._persist(db)
         return resource
 
     def _strategy_type(self, strategy_id: str | None) -> str | None:

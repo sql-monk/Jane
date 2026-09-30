@@ -1,5 +1,11 @@
-import { API_KEY, captureRequest, expect, realServiceUrl, test } from "./fixtures";
-import { uniqueId } from "./seed";
+import { captureRequest, expect, realServiceUrl, test } from "./fixtures";
+import {
+  TESTSITE_URL,
+  jsonRequest,
+  publishTestsiteRules,
+  testsiteRecursivePageCount,
+  uniqueId,
+} from "./seed";
 
 // The main admin API against the REAL orchestrator (WP-09, PostgreSQL). Every scenario creates its own objects
 // with unique ids through the UI, so nothing depends on contract example data.
@@ -97,6 +103,9 @@ test.describe("real orchestrator: sources, tasks, schedules, limits, connections
     await expect(admin.getByRole("table", { name: "Ефективні ліміти" })).toContainText(
       "queue.max_queue_depth",
     );
+    await expect(admin.getByRole("alert")).toHaveCount(0);
+    // This source has no collector rules and a non-resolvable host, so the run may end at once: here only the
+    // start of a test-mode run is checked. Cancelling a run that is still collecting is the next scenario.
     await admin.getByRole("tab", { name: "Запуски" }).click();
     await admin.getByLabel("Причина").fill("e2e test-mode run");
     await admin.getByLabel("Тестовий режим (без запису в робочі дані)").check();
@@ -109,31 +118,130 @@ test.describe("real orchestrator: sources, tasks, schedules, limits, connections
     await expect(admin.getByText("так (без запису в робочі дані)")).toBeVisible();
     await admin.getByRole("tab", { name: "Елементи й помилки" }).click();
     await expect(admin.getByRole("region", { name: "Елементи запуску" })).toBeVisible();
-    await admin.getByRole("button", { name: "Скасувати запуск" }).click();
-    await admin.getByLabel("Причина: Скасувати запуск").fill("e2e stop test run");
-    const cancelled = await captureRequest(
-      admin,
-      "POST",
-      /\/api\/orchestrator\/v1\/runs\/run_[^/]+\/cancel/,
-      () => admin.getByRole("button", { name: "Скасувати", exact: true }).click(),
+  });
+
+  test("run cancel: a slow real testsite collection is cancelled from the UI while running; run and collection end cancelled", async ({
+    admin,
+    request,
+  }) => {
+    test.setTimeout(240_000);
+    const registry = realServiceUrl("registry");
+    const collector = realServiceUrl("collector");
+    test.skip(!registry || !collector, "a real collection needs the real registry and web collector");
+    const orchestratorUrl = realServiceUrl("orchestrator") as string;
+    // Deterministic, not a race: the task limits (contract field rate.requests_per_second_per_host, set in the
+    // task editor) slow the recursive crawl of the testsite to one page per 5 s, so a full crawl takes minutes
+    // and the run is still collecting when the button is pressed.
+    const limits = { rate: { requests_per_second_per_host: 0.2 } };
+    const fullCrawl = testsiteRecursivePageCount();
+    const rules = await publishTestsiteRules(
+      request,
+      registry as string,
+      "e2e-cancel-rules",
+      "slow testsite collection cancelled from the admin",
     );
-    expect(cancelled.body).toEqual({ reason: "e2e stop test run" });
-    await expect(admin.getByText(/Скасування:/)).toBeVisible();
+    const sourceId = uniqueId("e2e-cancel-src");
+    const taskId = uniqueId("e2e-cancel-task");
+
+    await admin.goto("/sources/new");
+    await admin.getByLabel("Ідентифікатор (source_id)").fill(sourceId);
+    await admin.getByLabel("Назва").fill(`E2E cancel ${sourceId}`);
+    await admin.getByLabel("URL").fill(`${TESTSITE_URL}/`);
+    await admin.getByLabel("Пакет правил (package_id)").fill(rules.package_id);
+    await admin.getByLabel("Версія", { exact: true }).fill(rules.version);
+    await admin.getByRole("button", { name: "Створити джерело" }).click();
+    await expect(admin).toHaveURL(new RegExp(`/sources/${sourceId}$`));
+
+    await admin.goto("/tasks/new");
+    await admin.getByLabel("Ідентифікатор (task_id)").fill(taskId);
+    await admin.getByLabel("Назва").fill(`E2E cancel ${taskId}`);
+    await admin.getByLabel("Джерело (source_id)").fill(sourceId);
+    await admin.getByRole("textbox", { name: "Ліміти завдання" }).fill(JSON.stringify(limits));
+    await expect(admin.getByText("Відповідає схемі контракту")).toBeVisible();
+    const created = await captureRequest(admin, "POST", "/api/orchestrator/v1/tasks", () =>
+      admin.getByRole("button", { name: "Створити завдання" }).click(),
+    );
+    expect(created.body).toMatchObject({ task_id: taskId, input: { source_id: sourceId }, limits });
+    await expect(admin).toHaveURL(new RegExp(`/tasks/${taskId}$`));
+    await admin.getByRole("tab", { name: "Ефективні ліміти" }).click();
+    const rate = admin
+      .getByRole("table", { name: "Ефективні ліміти" })
+      .getByRole("row")
+      .filter({ hasText: "rate.requests_per_second_per_host" })
+      .getByRole("cell");
+    await expect(rate.nth(1)).toHaveText("0.2");
+    await expect(rate.nth(2)).toHaveText("task");
+
+    await admin.getByRole("tab", { name: "Запуски" }).click();
+    await admin.getByLabel("Причина").fill("e2e slow collection to cancel");
+    await admin.getByLabel("Тестовий режим (без запису в робочі дані)").check();
+    const started = await captureRequest(admin, "POST", `/api/orchestrator/v1/tasks/${taskId}/runs`, () =>
+      admin.getByRole("button", { name: "Запустити" }).click(),
+    );
+    expect(started.body).toEqual({ reason: "e2e slow collection to cancel", test_mode: true });
+    await expect(admin).toHaveURL(/\/runs\/run_/);
+    const runId = admin.url().split("/").at(-1) as string;
+    const runUrl = `${orchestratorUrl}/v1/runs/${runId}`;
+
+    // In progress for real: the orchestrator started a collection and the collector fetches testsite pages.
+    let collectionId = "";
     await expect
       .poll(
         async () => {
-          const response = await admin.request.get(
-            `${realServiceUrl("orchestrator")}/v1/runs/${admin.url().split("/").at(-1)}`,
-            {
-              headers: { Authorization: `Bearer ${API_KEY}` },
-            },
-          );
-          expect(response.ok(), await response.text()).toBeTruthy();
-          return ((await response.json()) as { status: string }).status;
+          const run = await jsonRequest(request, "get", runUrl);
+          collectionId = typeof run["collection_id"] === "string" ? run["collection_id"] : "";
+          return `${String(run["status"])}:${collectionId ? "collecting" : "-"}`;
         },
         { timeout: 60_000 },
       )
+      .toBe("running:collecting");
+    const collectionUrl = `${collector as string}/v1/collections/${collectionId}`;
+    await expect
+      .poll(
+        async () => {
+          const collection = await jsonRequest(request, "get", collectionUrl);
+          const fetched = (collection["stats"] as { fetched?: number } | undefined)?.fetched ?? 0;
+          return `${String(collection["status"])}:${fetched > 0 ? "fetching" : "-"}`;
+        },
+        { timeout: 60_000 },
+      )
+      .toBe("running:fetching");
+    expect((await jsonRequest(request, "get", collectionUrl))["effective_limits"]).toMatchObject(limits);
+
+    const status = admin
+      .locator(".kv-row")
+      .filter({ has: admin.locator("dt", { hasText: /^Стан$/ }) })
+      .locator(".badge");
+    await admin.getByRole("tab", { name: "Помилки колектора" }).click();
+    await expect(admin.getByText(`Помилки й пропуски збору ${collectionId}`)).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(status).toHaveText("running");
+    await admin.getByRole("button", { name: "Скасувати запуск" }).click();
+    await admin.getByLabel("Причина: Скасувати запуск").fill("e2e stop test run");
+    const cancelled = await captureRequest(admin, "POST", `/api/orchestrator/v1/runs/${runId}/cancel`, () =>
+      admin.getByRole("button", { name: "Скасувати", exact: true }).click(),
+    );
+    expect(cancelled.body).toEqual({ reason: "e2e stop test run" });
+    // 202 = cancellation accepted for a run that is still in progress (200 would mean it had already ended).
+    const response = await cancelled.request.response();
+    expect(response?.status()).toBe(202);
+    expect(((await response?.json()) as { status: string }).status).toBe("cancelling");
+    await expect(admin.getByText(/Скасування:/)).toContainText("cancelling");
+
+    await expect
+      .poll(async () => (await jsonRequest(request, "get", runUrl))["status"], { timeout: 60_000 })
       .toBe("cancelled");
+    await expect
+      .poll(async () => (await jsonRequest(request, "get", collectionUrl))["status"], { timeout: 60_000 })
+      .toBe("cancelled");
+    const stopped = await jsonRequest(request, "get", collectionUrl);
+    expect(stopped["finished_at"]).toBeTruthy();
+    const fetched = (stopped["stats"] as { fetched: number }).fetched;
+    expect(fetched).toBeGreaterThan(0);
+    expect(fetched, "the collection stopped before a full crawl").toBeLessThan(fullCrawl);
+    await expect(status).toHaveText("cancelled", { timeout: 30_000 });
+    await expect(admin.getByRole("button", { name: "Скасувати запуск" })).toHaveCount(0);
     await expect(admin.getByRole("alert")).toHaveCount(0);
   });
 

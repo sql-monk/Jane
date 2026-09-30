@@ -5,10 +5,86 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import type { APIRequestContext } from "@playwright/test";
-import { API_KEY } from "./fixtures";
+import { API_KEY, expect } from "./fixtures";
+
+const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..");
+
+/** The deterministic testsite (tests/fixtures/testsite) as the Compose services see it. */
+export const TESTSITE_URL = "http://testsite:8080";
 
 export function uniqueId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/** A JSON call to a real service with the dev API key; every POST carries a fresh Idempotency-Key. */
+export async function jsonRequest(
+  request: APIRequestContext,
+  method: "get" | "post" | "put",
+  url: string,
+  data?: unknown,
+  expected: number | number[] = 200,
+): Promise<Record<string, unknown>> {
+  const response = await request[method](url, {
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      ...(method === "post" ? { "Idempotency-Key": uniqueId("e2e") } : {}),
+    },
+    ...(data === undefined ? {} : { data }),
+  });
+  expect([expected].flat(), `${method.toUpperCase()} ${url}: ${await response.text()}`).toContain(
+    response.status(),
+  );
+  return (await response.json()) as Record<string, unknown>;
+}
+
+/**
+ * Publishes and approves the testsite collector rules (tests/e2e/config/rules/testsite.web-rules: seed `/`,
+ * recursive crawl, `/calendar/` excluded) under a unique package id in the real registry.
+ */
+export async function publishTestsiteRules(
+  request: APIRequestContext,
+  registryUrl: string,
+  prefix: string,
+  reason: string,
+): Promise<{ package_id: string; version: string }> {
+  const rulesDir = path.join(REPO_ROOT, "tests", "e2e", "config", "rules", "testsite.web-rules", "1.0.0");
+  const manifest = JSON.parse(readFileSync(path.join(rulesDir, "jane-package.json"), "utf8")) as Record<
+    string,
+    unknown
+  >;
+  const packageId = uniqueId(prefix);
+  const version = String(manifest["version"]);
+  manifest["package_id"] = packageId;
+  await jsonRequest(
+    request,
+    "post",
+    `${registryUrl}/v1/packages`,
+    { package_id: packageId, kind: "collector-rules", title: `Testsite rules ${packageId}` },
+    201,
+  );
+  await jsonRequest(
+    request,
+    "post",
+    `${registryUrl}/v1/packages/${packageId}/versions`,
+    {
+      manifest,
+      files: {
+        "rules.json": { encoding: "utf-8", data: readFileSync(path.join(rulesDir, "rules.json"), "utf8") },
+      },
+    },
+    201,
+  );
+  await jsonRequest(request, "post", `${registryUrl}/v1/packages/${packageId}/versions/${version}/status`, {
+    status: "approved",
+    reason,
+  });
+  return { package_id: packageId, version };
+}
+
+/** Pages a complete recursive crawl of the testsite fetches (tests/fixtures/testsite/expected_urls.json). */
+export function testsiteRecursivePageCount(): number {
+  const file = path.join(REPO_ROOT, "tests", "fixtures", "testsite", "expected_urls.json");
+  return (JSON.parse(readFileSync(file, "utf8")) as { sets: { recursive: string[] } }).sets.recursive.length;
 }
 
 /** Publish an SDK example into the real registry for the real handler-runtime UI scenario. */

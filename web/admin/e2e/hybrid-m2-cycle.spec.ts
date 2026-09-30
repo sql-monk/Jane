@@ -1,29 +1,15 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import type { APIRequestContext } from "@playwright/test";
-import { API_KEY, captureRequest, expect, realServiceUrl, test } from "./fixtures";
-import { publishExtractorPackage, uniqueId } from "./seed";
+import { captureRequest, expect, realServiceUrl, test } from "./fixtures";
+import {
+  TESTSITE_URL as site,
+  jsonRequest,
+  publishExtractorPackage,
+  publishTestsiteRules,
+  uniqueId,
+} from "./seed";
 
 const repo = path.resolve(import.meta.dirname, "..", "..", "..");
-const site = "http://testsite:8080";
-const auth = { Authorization: `Bearer ${API_KEY}` };
-
-async function jsonRequest(
-  request: APIRequestContext,
-  method: "get" | "post" | "put",
-  url: string,
-  data?: unknown,
-  expected: number | number[] = 200,
-): Promise<Record<string, unknown>> {
-  const response = await request[method](url, {
-    headers: { ...auth, ...(method === "post" ? { "Idempotency-Key": uniqueId("e2e") } : {}) },
-    ...(data === undefined ? {} : { data }),
-  });
-  expect([expected].flat(), `${method.toUpperCase()} ${url}: ${await response.text()}`).toContain(
-    response.status(),
-  );
-  return (await response.json()) as Record<string, unknown>;
-}
 
 // One isolated end-to-end browser scenario: real Caddy, Registry, Collector, Orchestrator,
 // Handler Runtime and Storage. The testsite and package fixtures are deterministic local inputs.
@@ -41,39 +27,13 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
   const orchestratorUrl = orchestrator as string;
   const sourceId = uniqueId("e2e-m2-source");
   const taskId = uniqueId("e2e-m2-task");
-  const rulesId = uniqueId("e2e-m2-rules");
-  const rulesDir = path.join(repo, "tests", "e2e", "config", "rules", "testsite.web-rules", "1.0.0");
-  const rulesManifest = JSON.parse(readFileSync(path.join(rulesDir, "jane-package.json"), "utf8")) as Record<
-    string,
-    unknown
-  >;
-  rulesManifest["package_id"] = rulesId;
-  const rulesText = readFileSync(path.join(rulesDir, "rules.json"), "utf8");
-  await jsonRequest(
+  const rules = await publishTestsiteRules(
     request,
-    "post",
-    `${registryUrl}/v1/packages`,
-    {
-      package_id: rulesId,
-      kind: "collector-rules",
-      title: `M2 testsite rules ${rulesId}`,
-    },
-    201,
+    registryUrl,
+    "e2e-m2-rules",
+    "M2 deterministic local testsite rules",
   );
-  await jsonRequest(
-    request,
-    "post",
-    `${registryUrl}/v1/packages/${rulesId}/versions`,
-    {
-      manifest: rulesManifest,
-      files: { "rules.json": { encoding: "utf-8", data: rulesText } },
-    },
-    201,
-  );
-  await jsonRequest(request, "post", `${registryUrl}/v1/packages/${rulesId}/versions/1.0.0/status`, {
-    status: "approved",
-    reason: "M2 deterministic local testsite rules",
-  });
+  const rulesId = rules.package_id;
 
   const extractorDir = path.join(repo, "libs", "extractor-sdk", "examples", "testsite-product-extractor");
   const extractor = await publishExtractorPackage(request, registryUrl, extractorDir);

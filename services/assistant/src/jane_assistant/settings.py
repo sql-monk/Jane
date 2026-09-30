@@ -128,6 +128,8 @@ class LlmLimits(Limits):
 class OnboardingLimits(Limits):
     min_confidence: float = Field(default=0.8, gt=0, le=1)
     """Sampling stops once the sample-coverage confidence reaches this value."""
+    min_distinct_types: int = Field(default=2, ge=1)
+    """Do not trust coverage of a single material type while collection is still running."""
     sample_batch_size: int = Field(default=10, ge=1)
     """Materials classified per LLM request during adaptive sampling."""
     max_sample_chars: int = Field(default=6_000, ge=200)

@@ -35,6 +35,12 @@ CREDENTIAL_KEYS = (
     "JANE_PG_USER",
     "JANE_PG_DB",
     "JANE_PG_PASSWORD",
+    "JANE_PG_HANDLER_RUNTIME_PASSWORD",
+    "JANE_PG_ORCHESTRATOR_PASSWORD",
+    "JANE_PG_REGISTRY_PASSWORD",
+    "JANE_PG_LLM_PASSWORD",
+    "JANE_PG_ASSISTANT_PASSWORD",
+    "JANE_PG_STORAGE_RESULTS_PASSWORD",
     "JANE_MSSQL_SA_PASSWORD",
     "JANE_MONGO_USER",
     "JANE_MONGO_PASSWORD",
@@ -201,6 +207,12 @@ class E2EStack:
             "JANE_PG_USER": "jane",
             "JANE_PG_DB": "jane",
             "JANE_PG_PASSWORD": secrets.token_urlsafe(18),
+            "JANE_PG_HANDLER_RUNTIME_PASSWORD": secrets.token_urlsafe(18),
+            "JANE_PG_ORCHESTRATOR_PASSWORD": secrets.token_urlsafe(18),
+            "JANE_PG_REGISTRY_PASSWORD": secrets.token_urlsafe(18),
+            "JANE_PG_LLM_PASSWORD": secrets.token_urlsafe(18),
+            "JANE_PG_ASSISTANT_PASSWORD": secrets.token_urlsafe(18),
+            "JANE_PG_STORAGE_RESULTS_PASSWORD": secrets.token_urlsafe(18),
             "JANE_MSSQL_SA_PASSWORD": "Jn1_" + secrets.token_hex(12),
             "JANE_MONGO_USER": "jane",
             "JANE_MONGO_PASSWORD": secrets.token_urlsafe(18),
@@ -311,8 +323,6 @@ class E2EStack:
             raise StackError("; ".join(reasons))
         if "handler-runtime" in wanted:
             self._prepare_handler_runtime()
-        if "orchestrator" in wanted:
-            self._create_database("jane_orchestrator")
         self.compose(
             "up",
             "-d",
@@ -353,38 +363,6 @@ class E2EStack:
             timeout=600,
         )
         return str(r.stdout).strip().splitlines()[-1]
-
-    def _create_database(self, name: str) -> None:
-        """Own database of a service in the stack PostgreSQL (idempotent)."""
-        env = self.env()
-        self.compose("up", "-d", "--wait", "postgres", timeout=self.timeout_s)
-        self._started.add("postgres")
-        user = env["JANE_PG_USER"]
-        exists = self.compose(
-            "exec",
-            "-T",
-            "postgres",
-            "psql",
-            "-U",
-            user,
-            "-d",
-            env["JANE_PG_DB"],
-            "-tAc",
-            f"SELECT 1 FROM pg_database WHERE datname = '{name}'",
-        ).stdout.strip()
-        if exists != "1":
-            self.compose(
-                "exec",
-                "-T",
-                "postgres",
-                "psql",
-                "-U",
-                user,
-                "-d",
-                env["JANE_PG_DB"],
-                "-c",
-                f'CREATE DATABASE "{name}"',
-            )
 
     def _image_exists(self, image: str) -> bool:
         return self._run(["docker", "image", "inspect", image], check=False).returncode == 0

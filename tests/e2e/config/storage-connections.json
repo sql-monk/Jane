@@ -10,8 +10,8 @@
       "connection_id": "results-pg",
       "kind": "postgresql",
       "title": "e2e: results in the stack PostgreSQL",
-      "params": { "host": "postgres", "port": 5432, "database": "jane", "schema": "e2e_results", "sslmode": "disable" },
-      "secret_refs": { "username": "env:JANE_SECRET_E2E_PG_USER", "password": "env:JANE_SECRET_E2E_PG_PASSWORD" }
+      "params": { "host": "postgres", "port": 5432, "database": "jane_storage_results", "schema": "e2e_results", "sslmode": "disable" },
+      "secret_refs": { "username": "env:JANE_SECRET_E2E_STORAGE_RESULTS_USER", "password": "env:JANE_SECRET_E2E_STORAGE_RESULTS_PASSWORD" }
     }
   ]
 }

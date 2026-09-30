@@ -28,8 +28,8 @@ services:
       JANE_STORAGE_CONNECTIONS_FILE: /cfg/storage-connections.json
       JANE_STORAGE_LOG_FORMAT: json
       # Secret values only through secret_refs (ADR-0006); names use the JANE_SECRET_ prefix.
-      JANE_SECRET_E2E_PG_USER: ${JANE_PG_USER:-jane}
-      JANE_SECRET_E2E_PG_PASSWORD: ${JANE_PG_PASSWORD:?set by tests/e2e}
+      JANE_SECRET_E2E_STORAGE_RESULTS_USER: jane_storage_results
+      JANE_SECRET_E2E_STORAGE_RESULTS_PASSWORD: ${JANE_PG_STORAGE_RESULTS_PASSWORD:?set by tests/e2e}
     volumes:
       - storage-data:/var/lib/jane/storage
       - ../tests/e2e/config/storage-connections.json:/cfg/storage-connections.json:ro
@@ -49,7 +49,7 @@ services:
       JANE_HANDLER_RUNTIME_PROFILE_IMAGES: '{"python-extractor@1": "${JANE_E2E_SANDBOX_IMAGE:?set by tests/e2e}"}'
       JANE_HANDLER_RUNTIME_SANDBOX_LABELS: '{"io.jane.e2e-project": "${JANE_E2E_PROJECT:-jane-e2e}"}'
       # Shared state of several instances (idempotency keys, jobs, results) in the service's own schema.
-      JANE_HANDLER_RUNTIME_STATE_DSN: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?set by tests/e2e}@postgres:5432/${JANE_PG_DB:-jane}
+      JANE_HANDLER_RUNTIME_STATE_DSN: postgresql://jane_handler_runtime:${JANE_PG_HANDLER_RUNTIME_PASSWORD:?set by tests/e2e}@postgres:5432/jane_handler_runtime
       JANE_HANDLER_RUNTIME_LOG_FORMAT: json
       # Packages without package_archive (orchestrated stages) come from here. Until WP-05 is merged this is
       # the STAND-IN `package-host` serving archives of LOCAL packages (tests/e2e/jane_e2e/package_host.py).
@@ -71,7 +71,7 @@ services:
       dockerfile: services/llm/Dockerfile
     environment:
       JANE_LLM_STORE: postgres
-      JANE_LLM_DATABASE_URL: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?set by tests/e2e}@postgres:5432/${JANE_PG_DB:-jane}
+      JANE_LLM_DATABASE_URL: postgresql://jane_llm:${JANE_PG_LLM_PASSWORD:?set by tests/e2e}@postgres:5432/jane_llm
       # SUBSTITUTE of the external LLM: deterministic provider `fake` (real Anthropic - not verified).
       JANE_LLM_FAKE_PROVIDER_ENABLED: "true"
       JANE_LLM_SEED_FILE: /cfg/llm-seed.yaml
@@ -91,12 +91,10 @@ services:
       context: ..
       dockerfile: services/assistant/Dockerfile
     environment:
-      JANE_ASSISTANT_STATE_DSN: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?set by tests/e2e}@postgres:5432/${JANE_PG_DB:-jane}
+      JANE_ASSISTANT_STATE_DSN: postgresql://jane_assistant:${JANE_PG_ASSISTANT_PASSWORD:?set by tests/e2e}@postgres:5432/jane_assistant
       JANE_ASSISTANT_LLM_URL: http://llm:8110
       JANE_ASSISTANT_HANDLER_RUNTIME_URL: http://handler-runtime:8000
       JANE_ASSISTANT_STORAGE_URL: http://storage:8000
-      JANE_ASSISTANT_COLLECTOR_WEB_URL: http://web-collector:8101
-      JANE_ASSISTANT_ORCHESTRATOR_URL: http://orchestrator:8000
       # Neighbours not merged yet (registry, telegram collector) are added with their WPs.
       # SUBSTITUTE of a web search provider: static list with the test site.
       JANE_ASSISTANT_SEARCH_PROVIDER: static
@@ -145,7 +143,7 @@ services:
       dockerfile: services/orchestrator/Dockerfile
     environment:
       # Own database of the service (created by the e2e harness before start).
-      JANE_ORCHESTRATOR_DATABASE_URL: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?set by tests/e2e}@postgres:5432/jane_orchestrator
+      JANE_ORCHESTRATOR_DATABASE_URL: postgresql://jane_orchestrator:${JANE_PG_ORCHESTRATOR_PASSWORD:?set by tests/e2e}@postgres:5432/jane_orchestrator
       JANE_ORCHESTRATOR_EXECUTORS: >-
         [{"executor": "web-collector", "role": "collector", "base_url": "http://web-collector:8101",
           "capabilities": {"collector": "web"}, "sync_connections": false},

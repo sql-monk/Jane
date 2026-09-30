@@ -45,13 +45,13 @@ CONNECTIONS: list[dict[str, Any]] = [
         "params": {
             "host": "postgres",
             "port": 5432,
-            "database": "jane",
+            "database": "jane_storage_results",
             "schema": "e2e_results",
             "sslmode": "disable",
         },
         "secret_refs": {
-            "username": "env:JANE_SECRET_E2E_PG_USER",
-            "password": "env:JANE_SECRET_E2E_PG_PASSWORD",
+            "username": "env:JANE_SECRET_E2E_STORAGE_RESULTS_USER",
+            "password": "env:JANE_SECRET_E2E_STORAGE_RESULTS_PASSWORD",
         },
     },
 ]

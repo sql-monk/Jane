@@ -1,7 +1,7 @@
 // Runs the Playwright e2e suite (cross-platform wrapper, no shell-specific env syntax).
 //
 //   pnpm e2e                         contract mocks (default)
-//   pnpm e2e:real http://127.0.0.1:8080   real Jane reverse proxy (`just env` prints its port); @mock tests skipped
+//   pnpm e2e:real http://127.0.0.1:8080   built admin and APIs on the real Jane reverse proxy; @mock tests skipped
 //   pnpm e2e -- --grep packages      extra arguments go to `playwright test`
 import { spawnSync } from "node:child_process";
 import path from "node:path";
@@ -23,7 +23,7 @@ if (realIndex >= 0) {
     process.exit(2);
   }
   env.JANE_ADMIN_API_TARGET = target;
-  console.log(`e2e: real API via ${target} (tests tagged @mock are skipped)`);
+  console.log(`e2e: real UI and API via ${target} (tests tagged @mock are skipped)`);
 } else {
   delete env.JANE_ADMIN_API_TARGET;
   const real = Object.keys(env)

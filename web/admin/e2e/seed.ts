@@ -109,12 +109,13 @@ export async function storageInvoke(
   connectionId: string,
   deliveryKey: string,
   input: Record<string, unknown>,
+  packageId = process.env["JANE_ADMIN_E2E_STORAGE_PACKAGE"] || "jane.storage-files",
 ): Promise<Record<string, unknown>> {
   const response = await request.post(`${storageUrl}/v1/invocations`, {
     headers: { "Idempotency-Key": deliveryKey, Authorization: `Bearer ${API_KEY}` },
     data: {
       handler: {
-        package_id: process.env["JANE_ADMIN_E2E_STORAGE_PACKAGE"] || "jane.storage-files",
+        package_id: packageId,
         version: "1.0.0",
       },
       connections: { target: connectionId },

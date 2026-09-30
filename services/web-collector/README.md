@@ -63,6 +63,9 @@ just test web-collector -m contract     # лише контрактні
 | `RULES_DIR` | — | локальні пакети правил: `<package_id>/<version>/jane-package.json` + `rules.json` або архів `<package_id>-<version>.zip` |
 | `REGISTRY_URL` | — | registry.v1 для `rules_ref` (після `RULES_DIR`) |
 | `REGISTRY_TOKEN_ENV` | — | **ім'я** змінної середовища з bearer-токеном до registry (не значення) |
+| `SECRET_ENV_PREFIX` | `JANE_SECRET_` | `secret_refs` типу `env:` читаються лише з цим префіксом; порожній вимикає `env:` |
+| `SECRET_FILES_DIR` | `/run/secrets` | `secret_refs` типу `file:` читаються лише з цього каталогу після розв'язання `..` і symlink; порожній вимикає `file:` |
+| `CONNECTION_ORIGIN_ALLOWLIST` | `[]` | JSON-масив точних HTTP(S) origin (`scheme://host[:port]`), яким дозволено надсилати облікові дані підключень; порожній список забороняє всі |
 | `CONTRACTS_DIR` | `JANE_CONTRACTS_DIR` або `contracts/` checkout | JSON Schema контрактів для валідації запитів і правил |
 | `DISCOVERY_PATH` | `services/web-collector/strategies/discovery` | пакет стратегій WP-03 |
 | `USER_AGENT` | `JaneBot/0.1 (+https://github.com/jane)` | типовий User-Agent; перше слово — токен для `robots.txt` |
@@ -148,8 +151,14 @@ just test web-collector -m contract     # лише контрактні
   повторно завантажуються лише URL, що були в польоті.
 - **`llm_explore`**: валідна за схемою, але колектор її не виконує (ADR-0010): `supported: false`, збір — `validation_failed`.
 - **Підключення** (`/v1/connections`, лише `kind=http`): `params.auth_scheme` = `bearer` (`secret_refs.token`),
-  `basic` (`username`, `password`) або `header` (`params.header_name`, `secret_refs.value`); секрети — `env:`/`file:`
-  у середовищі колектора, у `params` відхиляються (`secret_detected`). Облікові дані не йдуть на інший хост при переадресації.
+  `basic` (`username`, `password`) або `header` (`params.header_name`, `secret_refs.value`); секрети — лише дозволені
+  `env:`/`file:` у середовищі колектора, у `params` відхиляються (`secret_detected`). Для автентифікованого збору
+  оператор задає `JANE_WEB_COLLECTOR_CONNECTION_ORIGIN_ALLOWLIST='["https://shop.example.test"]'`.
+  Облікові дані не йдуть на інший origin або при переході з HTTPS на HTTP. `rules.fetch.headers` приймає лише
+  `Accept`, `Accept-Language` і `Cache-Control`; для `X-Client-Key` та інших облікових заголовків використовується
+  кероване підключення (`auth_scheme=header`) з дозволеним origin. Значення секрету з керівними символами або
+  поза видимим ASCII відхиляється до HTTP-запиту; повідомлення про транспортні помилки не містять значень
+  заголовків.
 
 ## Підключення стратегій (WP-03)
 

@@ -17,6 +17,9 @@ from urllib.parse import urljoin, urlsplit
 
 import httpx
 
+from jane_kit.errors import FieldError, ValidationFailed
+
+from .connections import ConnectionPolicy, header_name_safe, header_value_safe, is_safe_rule_header
 from .settings import ServiceLimits, Timeouts
 
 __all__ = ["FetchError", "Fetcher", "HostLimiter", "HttpResult", "build_client"]
@@ -151,13 +154,25 @@ class Fetcher:
         user_agent: str,
         headers: Mapping[str, str] | None = None,
         auth_headers: Mapping[str, str] | None = None,
+        connection_policy: ConnectionPolicy | None = None,
         crawl_delay_for: DelayFor | None = None,
     ) -> None:
         self.client = client
         self.limits = limits
         self.limiter = limiter
-        self.headers = {"User-Agent": user_agent, **dict(headers or {})}
+        source_headers = dict(headers or {})
+        invalid = [name for name in source_headers if not is_safe_rule_header(name)]
+        if invalid:
+            raise ValidationFailed(
+                "source rules contain headers outside the allowlist",
+                errors=[
+                    FieldError(pointer=f"/fetch/headers/{name}", message="header is not allowed")
+                    for name in invalid
+                ],
+            )
+        self.headers = {"User-Agent": user_agent, **source_headers}
         self.auth_headers = dict(auth_headers or {})
+        self.connection_policy = connection_policy or ConnectionPolicy()
         self.crawl_delay_for = crawl_delay_for
 
     def _backoff(self, attempt: int) -> float:
@@ -175,6 +190,8 @@ class Fetcher:
     async def _one_request(
         self, url: str, headers: Mapping[str, str], max_bytes: int, timeouts: Timeouts | None = None
     ) -> tuple[int, dict[str, str], bytes, bool]:
+        if any(not header_name_safe(name) or not header_value_safe(value) for name, value in headers.items()):
+            raise FetchError("access_denied_by_policy", "HTTP request header rejected by policy")
         host = urlsplit(url).netloc
         delay = await self.crawl_delay_for(url) if self.crawl_delay_for else None
         if (
@@ -253,7 +270,18 @@ class Fetcher:
 
     def auth_headers_for(self, current: str, original: str) -> dict[str, str]:
         """Credentials only for the original host (never leak them to a redirect target on another host)."""
-        if self.auth_headers and urlsplit(current).netloc == urlsplit(original).netloc:
+        if not self.auth_headers:
+            return {}
+        if not self.connection_policy.origin_allowed(original):
+            raise FetchError("access_denied_by_policy", "authenticated origin is not in the allowlist")
+        start = urlsplit(original)
+        target = urlsplit(current)
+        if (
+            start.scheme.lower() == target.scheme.lower()
+            and start.hostname == target.hostname
+            and (start.port or (443 if start.scheme.lower() == "https" else 80))
+            == (target.port or (443 if target.scheme.lower() == "https" else 80))
+        ):
             return self.auth_headers
         return {}
 
@@ -266,8 +294,12 @@ class Fetcher:
         for attempt in range(1, max_attempts + 1):
             try:
                 status, hdrs, body, truncated = await self._one_request(url, headers, max_bytes, timeouts)
-            except httpx.TransportError as exc:
-                last_error = f"{type(exc).__name__}: {exc}"
+            except httpx.TimeoutException:
+                last_error = "HTTP Timeout"
+                last_status = None
+            except httpx.TransportError:
+                # httpx can include raw header values (including credentials) in LocalProtocolError text.
+                last_error = "HTTP transport failed"
                 last_status = None
             else:
                 if status not in RETRY_STATUSES:

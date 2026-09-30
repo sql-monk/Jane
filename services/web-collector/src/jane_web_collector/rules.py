@@ -33,6 +33,7 @@ from jsonschema.exceptions import ValidationError
 from jane_kit.contracts import OpenAPISpec, contracts_dir
 from jane_kit.errors import FieldError, JaneError, ServiceUnavailable, ValidationFailed
 
+from .connections import header_value_safe, is_safe_rule_header
 from .discovery.registry import RESERVED_TYPES, Registry
 
 __all__ = ["ContractSchemas", "RulesLoader", "RulesReport", "validate_rules"]
@@ -142,6 +143,24 @@ def validate_rules(schemas: ContractSchemas, registry: Registry, rules: Any) -> 
             FieldError(pointer="/collector", message="web-collector executes only collector=web rules")
         )
         return RulesReport(True, False, errors, warnings)
+    for name, value in ((rules.get("fetch") or {}).get("headers") or {}).items():
+        if not is_safe_rule_header(name):
+            errors.append(
+                FieldError(
+                    pointer=f"/fetch/headers/{name}",
+                    code="secret_detected",
+                    message="only Accept, Accept-Language and Cache-Control are allowed in source rules",
+                )
+            )
+        elif not header_value_safe(value):
+            errors.append(
+                FieldError(
+                    pointer=f"/fetch/headers/{name}",
+                    message="header value must contain only visible ASCII without control characters",
+                )
+            )
+    if errors:
+        return RulesReport(False, False, errors, warnings)
     has_depth = "max_depth" in ((rules.get("limits") or {}).get("crawl") or {})
     for i, strategy in enumerate(rules.get("strategies") or []):
         kind = strategy.get("type")
@@ -323,6 +342,12 @@ class RulesLoader:
     async def _load_registry(self, ref: Mapping[str, Any]) -> dict[str, Any]:
         headers = {}
         if self.registry_token_env and (token := os.environ.get(self.registry_token_env)):
+            if not header_value_safe(token):
+                raise ServiceUnavailable(
+                    "registry credential is not valid for an HTTP header",
+                    code="upstream_unavailable",
+                    retryable=False,
+                )
             headers["Authorization"] = f"Bearer {token}"
         base = f"{self.registry_url}/v1/packages/{ref['package_id']}/versions/{ref['version']}"
         try:
@@ -354,8 +379,8 @@ class RulesLoader:
                 raw = file_resp.content
                 self._check_file_digest(ref, version, name, raw)
                 text = raw.decode("utf-8")
-        except httpx.HTTPError as exc:
+        except httpx.HTTPError:
             raise ServiceUnavailable(
-                f"registry unavailable: {exc}", code="upstream_unavailable", retryable=True
-            ) from exc
+                "registry HTTP request failed", code="upstream_unavailable", retryable=True
+            ) from None
         return self._rules_from_manifest(manifest, lambda _n: text, ref)

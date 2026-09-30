@@ -27,7 +27,7 @@ from jane_kit.pagination import clamp_limit, decode_cursor, encode_cursor
 from jane_kit.service import create_app
 
 from . import __version__
-from .connections import check_params, connection_etag, resolve_secret
+from .connections import check_params, connection_etag
 from .discovery.registry import Registry
 from .engine import Engine
 from .materials import rfc3339
@@ -59,6 +59,7 @@ def _parse_after(after: str | None) -> int | None:
 
 def build_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
+    connection_policy = settings.connection_policy()
     resolved = resolve_service_limits(settings)
     limits = resolved.limits
     state = StateStore(settings.state_dir / "state.db", busy_timeout_ms=settings.state_busy_timeout_ms)
@@ -286,7 +287,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                 "connection_id in the body differs from the path",
                 errors=[FieldError(pointer="/connection_id", message="must equal the path parameter")],
             )
-        check_params(payload)
+        check_params(payload, connection_policy)
         current = state.get_connection(connection_id)
         if if_match is not None and (current is None or current[1] != if_match):
             raise JaneError("If-Match does not match the current ETag", code="precondition_failed")
@@ -307,7 +308,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             raise NotFound(f"connection {connection_id} not found")
         started = time.perf_counter()
         refs = found[0].get("secret_refs") or {}
-        resolved_map = {name: resolve_secret(ref) is not None for name, ref in refs.items()}
+        resolved_map = {name: connection_policy.resolve(ref) is not None for name, ref in refs.items()}
         ok = all(resolved_map.values())
         body: dict[str, Any] = {
             "ok": ok,

@@ -33,7 +33,7 @@ from jane_contracts.discovery import (
 from jane_kit.config import LimitLayer, ResolvedLimits
 from jane_kit.jobs import JobCancelledError, JobContext
 
-from .connections import auth_headers
+from .connections import ConnectionPolicy, auth_headers
 from .discovery.links import extract_hrefs, html_meta, is_html, parse_html
 from .discovery.registry import Registry
 from .fetcher import Fetcher, FetchError, HostLimiter, HttpResult
@@ -89,6 +89,7 @@ class RunDeps:
     heartbeat_seconds: float
     user_agent: str
     version: str
+    connection_policy: ConnectionPolicy = field(default_factory=ConnectionPolicy)
     ack_events: dict[str, asyncio.Event] = field(default_factory=dict)
 
 
@@ -187,7 +188,7 @@ class CrawlRun:
         if fetch_cfg.get("connection_id"):
             found = self.state.get_connection(fetch_cfg["connection_id"])
             if found is not None:
-                creds = auth_headers(found[0])
+                creds = auth_headers(found[0], deps.connection_policy)
         self.limiter = HostLimiter(self.limits)
         self.robots_fetcher = Fetcher(
             deps.client, self.limits, self.limiter, user_agent=user_agent, headers=headers
@@ -200,6 +201,7 @@ class CrawlRun:
             user_agent=user_agent,
             headers=headers,
             auth_headers=creds,
+            connection_policy=deps.connection_policy,
             crawl_delay_for=None if self.owner_policy else self._crawl_delay,
         )
         self.strategies: list[tuple[str, DiscoveryStrategy, StrategyContext, int]] = []

@@ -95,12 +95,12 @@ def test_every_operation_matches_the_contract(
     assert api.get("/v1/states/never-used").status_code == 404
 
     # connections
-    monkeypatch.setenv("SITE_TOKEN", "x")
+    monkeypatch.setenv("JANE_SECRET_SITE_TOKEN", "x")
     conn = {
         "connection_id": "site-auth",
         "kind": "http",
         "params": {"auth_scheme": "bearer"},
-        "secret_refs": {"token": "env:SITE_TOKEN"},
+        "secret_refs": {"token": "env:JANE_SECRET_SITE_TOKEN"},
     }
     created = api.put("/v1/connections/site-auth", json=conn)
     assert created.status_code == 201

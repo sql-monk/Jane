@@ -29,6 +29,8 @@ from jane_kit.idempotency import IdempotencyLimits
 from jane_kit.jobs import JobLimits
 from jane_kit.pagination import PageLimits
 
+from .connections import ConnectionPolicy
+
 ENV_PREFIX = "JANE_WEB_COLLECTOR_"
 LIMITS_ENV_PREFIX = f"{ENV_PREFIX}LIMITS__"
 
@@ -51,6 +53,12 @@ class Settings(JaneSettings):
     """registry.v1 base URL for ``rules_ref``; checked after ``rules_dir``."""
     registry_token_env: str | None = None
     """Name of the environment variable holding the bearer token for the registry (never the value)."""
+    secret_env_prefix: str = "JANE_SECRET_"  # noqa: S105 - variable-name prefix, not a credential
+    """Only env: references with this prefix may be resolved; empty disables env: references."""
+    secret_files_dir: Path | None = Path("/run/secrets")
+    """Only file: references inside this directory may be resolved; empty disables file: references."""
+    connection_origin_allowlist: list[str] = Field(default_factory=list)
+    """Exact HTTP(S) origins allowed to receive resolved connection credentials; empty denies all."""
     contracts_dir: Path | None = None
     """``contracts/`` with the JSON Schemas; default: ``JANE_CONTRACTS_DIR`` or the checkout's contracts."""
     discovery_path: Path | None = None
@@ -74,7 +82,15 @@ class Settings(JaneSettings):
                 f"heartbeat_interval_ms ({self.heartbeat_interval_ms}) + state_busy_timeout_ms "
                 f"({self.state_busy_timeout_ms}) must be less than lease_seconds*1000 ({lease_ms})"
             )
+        self.connection_policy()
         return self
+
+    def connection_policy(self) -> ConnectionPolicy:
+        return ConnectionPolicy(
+            env_prefix=self.secret_env_prefix,
+            files_dir=self.secret_files_dir,
+            origin_allowlist=tuple(self.connection_origin_allowlist),
+        )
 
 
 class Concurrency(Limits):

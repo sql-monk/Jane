@@ -1,8 +1,8 @@
 """Managed connections (``/v1/connections``, ADR-0006) for sites that need HTTP authentication.
 
 Only ``kind=http`` is used by the web collector. Secret values never pass the API: ``secret_refs`` point to
-``env:VAR`` or ``file:<path>`` in this service's environment (``vault:`` has no provider in v1 and is reported
-as unresolved). How the resolved secrets are applied (service convention for ``params``, documented in README):
+``env:VAR`` or ``file:<path>`` within operator-configured bounds (``vault:`` has no provider in v1 and is
+rejected). How the resolved secrets are applied (service convention for ``params``, documented in README):
 
 * ``params.auth_scheme = "bearer"`` + ``secret_refs.token`` -> ``Authorization: Bearer <token>``;
 * ``params.auth_scheme = "basic"`` + ``secret_refs.username`` / ``secret_refs.password``;
@@ -17,18 +17,137 @@ import json
 import os
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from jane_kit.errors import FieldError, JaneError, ValidationFailed
 
-__all__ = ["SUPPORTED_KINDS", "auth_headers", "check_params", "connection_etag", "resolve_secret"]
+__all__ = [
+    "SUPPORTED_KINDS",
+    "ConnectionPolicy",
+    "auth_headers",
+    "check_params",
+    "connection_etag",
+    "header_name_safe",
+    "header_value_safe",
+    "is_safe_rule_header",
+]
 
 SUPPORTED_KINDS = frozenset({"http"})
 _SECRET_KEY = re.compile(
     r"(pass(word|wd)?|secret|token|api[_-]?key|authorization|cookie|private[_-]?key|credential)", re.I
 )
 _SECRET_VALUE = re.compile(r"^(bearer|basic)\s+\S+|-----BEGIN [A-Z ]*PRIVATE KEY-----", re.I)
+_ENV_NAME = re.compile(r"[A-Z_][A-Z0-9_]{0,127}\Z")
+_FORBIDDEN_DESTINATION_HEADERS = frozenset({"host", "content-length", "transfer-encoding"})
+_SAFE_RULE_HEADERS = frozenset({"accept", "accept-language", "cache-control"})
+_HEADER_NAME = re.compile(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+\Z")
+
+
+def is_safe_rule_header(name: str) -> bool:
+    """Only these non-credential headers may come from a source-controlled rules package."""
+    return name.lower() in _SAFE_RULE_HEADERS
+
+
+def header_name_safe(value: object) -> bool:
+    return isinstance(value, str) and _HEADER_NAME.fullmatch(value) is not None
+
+
+def header_value_safe(value: object) -> bool:
+    """HTTP header values must be visible ASCII, with no control characters to reach error text."""
+    return isinstance(value, str) and bool(value) and all(32 <= ord(char) <= 126 for char in value)
+
+
+def _origin(url: str, *, allow_path: bool = False) -> tuple[str, str, int] | None:
+    """An exact HTTP(S) origin; reject userinfo, paths and ambiguous authorities."""
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError:
+        return None
+    if (
+        parts.scheme not in {"http", "https"}
+        or not parts.hostname
+        or parts.username is not None
+        or parts.password is not None
+        or (not allow_path and (parts.path not in {"", "/"} or parts.query or parts.fragment))
+        or port == 0
+        or "\\" in url
+        or any(c.isspace() for c in url)
+    ):
+        return None
+    return parts.scheme, parts.hostname.lower().rstrip("."), port or (443 if parts.scheme == "https" else 80)
+
+
+@dataclass(frozen=True)
+class ConnectionPolicy:
+    """Operator-controlled secret and authenticated destination boundaries."""
+
+    env_prefix: str = "JANE_SECRET_"
+    files_dir: Path | None = Path("/run/secrets")
+    origin_allowlist: tuple[str, ...] = ()
+    _origins: frozenset[tuple[str, str, int]] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        parsed = [_origin(entry) for entry in self.origin_allowlist]
+        if any(origin is None for origin in parsed):
+            raise ValueError("connection_origin_allowlist entries must be exact HTTP(S) origins")
+        object.__setattr__(self, "_origins", frozenset(origin for origin in parsed if origin is not None))
+
+    def origin_allowed(self, url: str) -> bool:
+        return (origin := _origin(url, allow_path=True)) is not None and origin in self._origins
+
+    def secret_file(self, ref: str) -> Path | None:
+        if self.files_dir is None or not ref.startswith("file:") or not ref[5:]:
+            return None
+        try:
+            path = Path(ref[5:]).resolve()
+            base = self.files_dir.resolve()
+        except (OSError, RuntimeError, ValueError):
+            return None
+        return path if path != base and path.is_relative_to(base) else None
+
+    def ref_error(self, ref: str) -> str | None:
+        if ref.startswith("env:"):
+            name = ref[4:]
+            if (
+                not self.env_prefix
+                or not _ENV_NAME.fullmatch(name)
+                or not name.startswith(self.env_prefix)
+                or name == self.env_prefix
+            ):
+                return "env: reference is outside the configured secret prefix"
+            return None
+        if ref.startswith("file:"):
+            if self.secret_file(ref) is None:
+                return "file: reference is outside the configured secret directory or files are disabled"
+            return None
+        return "secret reference scheme is not configured"
+
+    def resolve(self, ref: str) -> str | None:
+        if self.ref_error(ref) is not None:
+            return None
+        if ref.startswith("env:"):
+            return os.environ.get(ref[4:]) or None
+        path = self.secret_file(ref)
+        if path is None:
+            return None
+        try:
+            return path.read_text(encoding="utf-8").strip() or None
+        except (OSError, UnicodeDecodeError):
+            return None
+
+    def validate_refs(self, body: Mapping[str, Any]) -> None:
+        refs = body.get("secret_refs") or {}
+        errors = [
+            FieldError(pointer=f"/secret_refs/{name}", message=message)
+            for name, ref in refs.items()
+            if (message := self.ref_error(ref)) is not None
+        ]
+        if errors:
+            raise ValidationFailed("secret reference is not allowed", errors=errors)
 
 
 def connection_etag(body: Mapping[str, Any]) -> str:
@@ -52,7 +171,7 @@ def _walk(value: Any, pointer: str) -> list[str]:
     return hits
 
 
-def check_params(body: Mapping[str, Any]) -> None:
+def check_params(body: Mapping[str, Any], policy: ConnectionPolicy) -> None:
     """Reject non-http kinds and secret-looking values in ``params`` (``secret_detected``)."""
     if body.get("kind") not in SUPPORTED_KINDS:
         raise ValidationFailed(
@@ -66,32 +185,35 @@ def check_params(body: Mapping[str, Any]) -> None:
             code="secret_detected",
             errors=[FieldError(pointer=p, message="secret-like value") for p in hits],
         )
+    params = body.get("params") or {}
+    header_name = params.get("header_name")
+    if header_name is not None and (
+        not header_name_safe(header_name) or header_name.lower() in _FORBIDDEN_DESTINATION_HEADERS
+    ):
+        raise ValidationFailed(
+            "header_name cannot control the HTTP destination or message framing",
+            errors=[FieldError(pointer="/params/header_name", message="header is not allowed")],
+        )
+    policy.validate_refs(body)
 
 
-def resolve_secret(ref: str) -> str | None:
-    scheme, _, target = ref.partition(":")
-    if scheme == "env":
-        return os.environ.get(target)
-    if scheme == "file":
-        path = Path(target)
-        try:
-            return path.read_text(encoding="utf-8").strip() if path.is_file() else None
-        except OSError:
-            return None
-    return None  # vault: no provider configured in v1
-
-
-def auth_headers(connection: Mapping[str, Any]) -> dict[str, str]:
+def auth_headers(connection: Mapping[str, Any], policy: ConnectionPolicy) -> dict[str, str]:
+    policy.validate_refs(connection)  # also rejects unsafe records written before the policy existed
     params = connection.get("params") or {}
     refs = connection.get("secret_refs") or {}
     scheme = str(params.get("auth_scheme", "")).lower()
 
     def secret(name: str) -> str:
-        value = resolve_secret(refs[name]) if name in refs else None
+        value = policy.resolve(refs[name]) if name in refs else None
         if value is None:
             raise ValidationFailed(
                 f"connection {connection.get('connection_id')}: secret {name} is not resolvable",
                 errors=[FieldError(pointer=f"/secret_refs/{name}", message="unresolved")],
+            )
+        if not header_value_safe(value):
+            raise ValidationFailed(
+                "connection secret cannot be used as an HTTP header",
+                errors=[FieldError(pointer=f"/secret_refs/{name}", message="invalid HTTP header value")],
             )
         return value
 
@@ -101,5 +223,13 @@ def auth_headers(connection: Mapping[str, Any]) -> dict[str, str]:
         pair = f"{secret('username')}:{secret('password')}".encode()
         return {"Authorization": "Basic " + base64.b64encode(pair).decode()}
     if scheme == "header" and params.get("header_name"):
+        if (
+            not header_name_safe(params["header_name"])
+            or params["header_name"].lower() in _FORBIDDEN_DESTINATION_HEADERS
+        ):
+            raise ValidationFailed(
+                "header_name cannot control the HTTP destination or message framing",
+                errors=[FieldError(pointer="/params/header_name", message="header is not allowed")],
+            )
         return {str(params["header_name"]): secret("value")}
     return {}

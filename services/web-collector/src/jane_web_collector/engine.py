@@ -49,6 +49,7 @@ class Engine:
         runner: JobRunner,
     ) -> None:
         self.settings = settings
+        self.connection_policy = settings.connection_policy()
         self.base = base_limits
         self.limits = base_limits.limits
         self.state = state
@@ -75,6 +76,7 @@ class Engine:
             heartbeat_seconds=settings.heartbeat_interval_ms / 1000,
             user_agent=settings.user_agent,
             version=__version__,
+            connection_policy=self.connection_policy,
         )
         self.local: set[str] = set()
         self.shutting_down = False
@@ -238,7 +240,7 @@ class Engine:
                         FieldError(pointer=f"{pointer}/fetch/connection_id", message="unknown connection")
                     ],
                 )
-            auth_headers(found[0])  # fail fast on unresolved secrets
+            auth_headers(found[0], self.connection_policy)  # fail fast on unresolved secrets
         cid = f"job_{uuid.uuid4().hex}"
         state_key = payload.get("state_key") or payload.get("source_id") or cid
         if self.state.active_for_state_key(state_key):
@@ -378,7 +380,7 @@ class Engine:
                     "unknown connection",
                     errors=[FieldError(pointer="/rules/fetch/connection_id", message="unknown")],
                 )
-            creds = auth_headers(found[0])
+            creds = auth_headers(found[0], self.connection_policy)
         base_fetcher = Fetcher(
             self.client, limits, self._fetch_limiter, user_agent=user_agent, headers=headers
         )
@@ -414,6 +416,7 @@ class Engine:
             user_agent=user_agent,
             headers=headers,
             auth_headers=creds,
+            connection_policy=self.connection_policy,
             crawl_delay_for=crawl_delay,
         )
         try:
@@ -421,7 +424,9 @@ class Engine:
         except FetchError as exc:
             raise JaneError(
                 exc.message,
-                code=exc.code if exc.code in {"rate_limited", "limit_exceeded"} else "source_unavailable",
+                code=exc.code
+                if exc.code in {"rate_limited", "limit_exceeded", "access_denied_by_policy"}
+                else "source_unavailable",
                 details={
                     k: v for k, v in {"http_status": exc.http_status, "attempts": exc.attempts}.items() if v
                 },

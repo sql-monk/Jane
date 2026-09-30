@@ -27,9 +27,21 @@ function StageVersionCard({ taskId, stage }: { taskId: string; stage: Stage }) {
   const api = useApi();
   const queryClient = useQueryClient();
   const handler = stage.handler;
-  const packageId = handler?.package_id ?? "";
+  const currentPackage = handler?.package_id ?? "";
+  // The stage may be switched to an independent fork of its package (ТЗ §7, §10): pick the package, then its version.
+  const [packageId, setPackageId] = useState(currentPackage);
   const [version, setVersion] = useState("");
   const [last, setLast] = useState<Activation | null>(null);
+
+  const forks = useQuery({
+    queryKey: ["packages", "forks", currentPackage],
+    enabled: Boolean(currentPackage),
+    queryFn: () =>
+      unwrap(api.registry.GET("/v1/packages", { params: { query: { fork_of: currentPackage } } })),
+  });
+  const candidates = [
+    ...new Set([currentPackage, ...(forks.data?.items ?? []).map((p) => p.package_id)].filter(Boolean)),
+  ];
 
   const history = useQuery({
     queryKey: ["activations", taskId, stage.stage_id],
@@ -75,13 +87,31 @@ function StageVersionCard({ taskId, stage }: { taskId: string; stage: Stage }) {
   return (
     <Section
       title={`Етап ${stage.stage_id}`}
-      actions={<Link to={`/tasks?package_id=${encodeURIComponent(packageId)}`}>Усі прив'язки пакета</Link>}
+      actions={
+        <Link to={`/tasks?package_id=${encodeURIComponent(currentPackage)}`}>Усі прив'язки пакета</Link>
+      }
     >
       <p>
         Поточна версія: <strong data-testid={`current-${stage.stage_id}`}>{refLabel(handler)}</strong>{" "}
-        <Link to={`/packages/${encodeURIComponent(packageId)}`}>пакет</Link>
+        <Link to={`/packages/${encodeURIComponent(currentPackage)}`}>пакет</Link>
       </p>
       <div className="inline-form">
+        <Field label="Пакет (поточний або його форк)">
+          <select
+            aria-label={`Пакет для ${stage.stage_id}`}
+            value={packageId}
+            onChange={(e) => {
+              setPackageId(e.target.value);
+              setVersion("");
+            }}
+          >
+            {candidates.map((id) => (
+              <option key={id} value={id}>
+                {id === currentPackage ? `${id} (поточний)` : `${id} (форк)`}
+              </option>
+            ))}
+          </select>
+        </Field>
         <Field label="Погоджена версія">
           <select
             aria-label={`Версія для ${stage.stage_id}`}
@@ -105,7 +135,7 @@ function StageVersionCard({ taskId, stage }: { taskId: string; stage: Stage }) {
             activate.mutate({
               kind: "activate",
               package: {
-                package_id: selected.package_id,
+                package_id: packageId,
                 version: selected.version,
                 digest: selected.digest,
               },

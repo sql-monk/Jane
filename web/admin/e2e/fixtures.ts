@@ -1,7 +1,19 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test as base, expect, type Page, type Request } from "@playwright/test";
-import { MOCK_SERVICES, mockPort } from "../dev-proxy.ts";
+import { MOCK_SERVICES, apiTarget, mockPort, serviceTarget } from "../dev-proxy.ts";
+
+/**
+ * Direct URL of a REAL service for seeding data in hybrid/real runs: JANE_ADMIN_TARGET_<API> (hybrid) or
+ * `<JANE_ADMIN_API_TARGET>/api/<service>` (whole stack behind the reverse proxy). Undefined on pure mocks.
+ */
+export function realServiceUrl(api: string): string | undefined {
+  const direct = serviceTarget(api);
+  if (direct) return direct;
+  const stack = apiTarget();
+  const service = MOCK_SERVICES.find((s) => s.api === api)?.service;
+  return stack && service ? `${stack}/api/${service}` : undefined;
+}
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..");
 
@@ -12,7 +24,7 @@ export function openapiExample<T = Record<string, unknown>>(name: string): T {
 }
 
 /** Dev API key used by the suite; it must never appear on a page, in a URL or in localStorage. */
-export const API_KEY = "e2e-admin-key-7f3c-never-shown";
+export const API_KEY = process.env["JANE_ADMIN_E2E_API_KEY"] || "e2e-admin-key-7f3c-never-shown";
 
 /** Base URL of the contract mock of an API (mock mode only), e.g. for reading contract examples. */
 export function mockUrl(api: string): string {

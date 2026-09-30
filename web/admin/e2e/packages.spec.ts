@@ -173,4 +173,48 @@ test.describe("packages, versions, tests without writes, diff, forks, upstream, 
     await admin.goto("/audit");
     await expect(admin.getByRole("table", { name: "Події аудиту" })).toContainText("stage.activate");
   });
+
+  test("fork in a task: bind an approved version of the fork to the stage", async ({ admin, request }) => {
+    // Registry answers for fork_of=<package> with the fork from the forkPackage 201 contract example.
+    const forked = await (
+      await request.post(`${mockUrl("registry")}/v1/packages/${PKG}/forks`, {
+        headers: { "Idempotency-Key": "e2e-fork-binding" },
+        data: { new_package_id: "acme.product-extractor", from_version: "1.2.0" },
+      })
+    ).json();
+    await admin.route(
+      (url) => url.pathname === "/api/registry/v1/packages" && url.searchParams.get("fork_of") === PKG,
+      (route) => route.fulfill({ json: { items: [forked], next_cursor: null } }),
+    );
+    const versionsOf: string[] = [];
+    admin.on("request", (r) => {
+      const m = /\/api\/registry\/v1\/packages\/([^/]+)\/versions$/.exec(new URL(r.url()).pathname);
+      if (m?.[1]) versionsOf.push(decodeURIComponent(m[1]));
+    });
+
+    await admin.goto("/tasks/shop-catalog");
+    await admin.getByRole("tab", { name: "Версії етапів" }).click();
+    const card = admin.getByRole("region", { name: "Етап extract-products" });
+    const pkgSelect = card.getByLabel("Пакет для extract-products");
+    await expect(pkgSelect.locator("option")).toHaveText([
+      `${PKG} (поточний)`,
+      "acme.product-extractor (форк)",
+    ]);
+    await pkgSelect.selectOption("acme.product-extractor");
+    await expect.poll(() => versionsOf).toContain("acme.product-extractor");
+    await card.getByLabel("Версія для extract-products").selectOption("1.2.0");
+    await card.getByRole("button", { name: "Активувати" }).click();
+    await card.getByLabel("Причина: Активувати").fill("switch the stage to the ACME fork");
+    const { body } = await captureRequest(
+      admin,
+      "POST",
+      "/api/orchestrator/v1/tasks/shop-catalog/stages/extract-products/activations",
+      () => card.getByRole("button", { name: "Активувати версію" }).click(),
+    );
+    expect(body).toMatchObject({
+      kind: "activate",
+      package: { package_id: "acme.product-extractor", version: "1.2.0" },
+      reason: "switch the stage to the ACME fork",
+    });
+  });
 });

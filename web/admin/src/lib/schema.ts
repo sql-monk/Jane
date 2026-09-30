@@ -1,6 +1,6 @@
 // Client-side validation of configuration documents against the contract JSON Schemas (2020-12).
 // The service remains the authority (422 problem+json); this only gives early feedback in editors.
-import Ajv2020, { type ErrorObject, type ValidateFunction } from "ajv/dist/2020";
+import Ajv2020, { type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { contractSchemas } from "../api/generated/schemas";
 

@@ -1,12 +1,11 @@
-import { serviceTarget } from "../dev-proxy.ts";
-import { captureRequest, expect, test } from "./fixtures";
+import { captureRequest, expect, realServiceUrl, test } from "./fixtures";
 
 // Screens against REAL services (WP-10 llm, WP-11 assistant) while the other neighbours stay contract mocks.
 // Run: JANE_ADMIN_TARGET_LLM=http://127.0.0.1:<port> [JANE_ADMIN_TARGET_ASSISTANT=...] pnpm e2e --grep @hybrid
 // Nothing here depends on contract example data - only on behaviour of the real service.
 test.describe("real llm and assistant services @hybrid", () => {
   test("LLM: providers, aliases, budget round-trip, usage", async ({ admin }) => {
-    test.skip(!serviceTarget("llm"), "JANE_ADMIN_TARGET_LLM is not set");
+    test.skip(!realServiceUrl("llm"), "JANE_ADMIN_TARGET_LLM / JANE_ADMIN_API_TARGET is not set");
     await admin.goto("/llm");
     const providers = admin.getByRole("table", { name: "Провайдери LLM" });
     await expect(providers).toBeVisible();
@@ -46,7 +45,7 @@ test.describe("real llm and assistant services @hybrid", () => {
   });
 
   test("assistant: onboarding job is accepted and its state is shown", async ({ admin }) => {
-    test.skip(!serviceTarget("assistant"), "JANE_ADMIN_TARGET_ASSISTANT is not set");
+    test.skip(!realServiceUrl("assistant"), "JANE_ADMIN_TARGET_ASSISTANT / JANE_ADMIN_API_TARGET is not set");
     await admin.goto("/assistant");
     await admin.getByLabel("Назва або посилання").fill("https://shop.example.test/");
     await admin.getByLabel("Тип джерела (необов'язково)").fill("web");

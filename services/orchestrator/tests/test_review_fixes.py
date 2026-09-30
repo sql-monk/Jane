@@ -88,8 +88,8 @@ def test_worker_kill_does_not_spend_retry_attempts(
 
 
 @pytest.mark.parametrize(
-    ("max_wait_ms", "outcome", "final_status"),
-    [(5000, "success", "completed"), (100, "failed", "failed")],
+    ("max_wait_ms", "outcome"),
+    [(5000, "success"), (300, "retrying")],
 )
 def test_reclaimed_in_progress_delivery_keeps_attempt_and_key(
     make_client: Any,
@@ -98,9 +98,9 @@ def test_reclaimed_in_progress_delivery_keeps_attempt_and_key(
     monkeypatch: pytest.MonkeyPatch,
     max_wait_ms: int,
     outcome: str,
-    final_status: str,
 ) -> None:
     monkeypatch.setenv("JANE_ORCHESTRATOR_LIMITS__ENGINE__IDEMPOTENCY_IN_PROGRESS_POLL_MS", "20")
+    monkeypatch.setenv("JANE_ORCHESTRATOR_LIMITS__ENGINE__IDEMPOTENCY_IN_PROGRESS_RETRY_MS", "20")
     monkeypatch.setenv(
         "JANE_ORCHESTRATOR_LIMITS__ENGINE__IDEMPOTENCY_IN_PROGRESS_MAX_WAIT_MS", str(max_wait_ms)
     )
@@ -120,6 +120,7 @@ def test_reclaimed_in_progress_delivery_keeps_attempt_and_key(
     key = first["delivery_key"]
     original_can_finish = threading.Event()
     neighbours.storage.pause_before_effect = original_can_finish
+    neighbours.storage.in_progress_retryable_after_409 = outcome == "retrying"
     first_outcome: list[str] = []
     original = threading.Thread(
         target=lambda: first_outcome.append(engine.process_item(first, "first")), daemon=True
@@ -141,8 +142,17 @@ def test_reclaimed_in_progress_delivery_keeps_attempt_and_key(
         )
         replay.start()
         wait_until(lambda: neighbours.storage.calls[key] >= 2, 5)
-        if outcome == "failed":
+        if outcome == "retrying":
             replay.join(5)
+            parked = next(
+                row
+                for row in items_by_stage(db_dsn, run_id)["store-raw"]
+                if row["item_id"] == first["item_id"]
+            )
+            assert parked["status"] == "retrying" and parked["attempts"] == 1
+            assert parked["error"]["code"] == "idempotency_in_progress"
+            assert neighbours.storage.effects[key] == 0
+            assert neighbours.storage.in_progress_rejections[key] >= 2
         else:
             original_can_finish.set()
             replay.join(5)
@@ -153,18 +163,22 @@ def test_reclaimed_in_progress_delivery_keeps_attempt_and_key(
         original.join(5)
     assert not original.is_alive()
     assert first_outcome == ["lease_lost"]
+    if outcome == "retrying":
+        # The original call finishes after the bounded wait; a later claim must still
+        # retrieve its result with the same key even though max_attempts is only 1.
+        time.sleep(0.05)
+        third = engine.claim_item("third")
+        assert third is not None and third["item_id"] == first["item_id"]
+        assert third["attempts"] == 1 and third["delivery_key"] == key
+        assert engine.process_item(third, "third") == "success"
     rows = items_by_stage(db_dsn, run_id)["store-raw"]
     item = next(row for row in rows if row["item_id"] == first["item_id"])
-    assert item["status"] == final_status and item["attempts"] == 1
+    assert item["status"] == "completed" and item["attempts"] == 1
     assert neighbours.storage.calls[key] >= 2
     assert neighbours.storage.key_mismatch == []
     assert neighbours.storage.effects[key] == 1
-    if outcome == "failed":
-        assert item["error"]["code"] == "idempotency_in_progress"
-        assert item["error"]["retryable"] is False
-    else:
-        assert neighbours.storage.calls[key] >= 3  # original, 409, then replayed result
-        assert neighbours.storage.duplicates[key] >= 1
+    assert neighbours.storage.calls[key] >= 3  # original, 409, then replayed result
+    assert neighbours.storage.duplicates[key] >= 1
 
 
 def test_final_collector_page_is_acknowledged_before_feed_done(
@@ -481,6 +495,47 @@ def test_activation_does_not_hold_task_lock_during_registry_calls(
     assert again.status_code == 200
 
 
+def test_rate_limited_page_is_acknowledged_before_collection_restart(
+    make_client: Any, neighbours: Neighbours, db_dsn: str
+) -> None:
+    col = neighbours.collector
+    col.rate_limit_after = 2
+    col.retry_after_seconds = 1
+    api = make_client(run_workers=False)
+    assert post(api, "/v1/sources", source_doc()).status_code == 201
+    assert post(api, "/v1/tasks", catalog_task(retries={"max_attempts": 3})).status_code == 201
+    run_id = start(api, "shop-catalog")
+    first_engine = api.app.state.engine
+    feed = first_engine.claim_feed("first")
+    assert feed is not None
+    first_engine.process_feed(feed, "first")
+    old_collection = next(iter(col.collections.values()))
+    assert len(items_by_stage(db_dsn, run_id)["collect"]) == 2
+    assert old_collection.acked == 0 and old_collection.pulls == 1
+    with psycopg.connect(db_dsn, row_factory=psycopg.rows.dict_row) as conn:
+        row = conn.execute(
+            "SELECT collection_id, feed_cursor, collection_restarts FROM runs WHERE run_id = %s",
+            (run_id,),
+        ).fetchone()
+    assert row is not None
+    assert row["collection_id"] == old_collection.cid
+    assert row["feed_cursor"] is not None and row["collection_restarts"] == 0
+
+    second_engine = make_client(run_workers=False).app.state.engine
+    feed = second_engine.claim_feed("second")
+    assert feed is not None
+    second_engine.process_feed(feed, "second")
+    assert old_collection.acked == 2 and old_collection.pulls >= 2
+    with psycopg.connect(db_dsn, row_factory=psycopg.rows.dict_row) as conn:
+        row = conn.execute(
+            "SELECT collection_id, feed_cursor, collection_restarts FROM runs WHERE run_id = %s",
+            (run_id,),
+        ).fetchone()
+    assert row is not None
+    assert row["collection_id"] is None and row["feed_cursor"] is None
+    assert row["collection_restarts"] == 1
+
+
 def test_rate_limited_collection_restarts_after_retry_after(
     make_client: Any, neighbours: Neighbours, db_dsn: str
 ) -> None:
@@ -498,6 +553,7 @@ def test_rate_limited_collection_restarts_after_retry_after(
     run = wait_run(client, start(client, "shop-catalog"), 60)
     assert run["status"] == "succeeded", run
     first, second = sorted(col.collections.values(), key=lambda c: c.started)
+    assert first.acked == 2 and first.pulls >= 2
     assert first.request.get("mode", "full") == "full" and second.request["mode"] == "incremental"
     assert second.started - first.ended >= 1.0  # not earlier than retry_after_seconds
     assert len(items_by_stage(db_dsn, run["run_id"])["collect"]) == 6  # nothing lost, nothing duplicated

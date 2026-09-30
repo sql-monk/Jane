@@ -115,7 +115,10 @@ class Engine:
                     FOR UPDATE OF i SKIP LOCKED
                 )
                 UPDATE items SET status = 'running', lease_owner = %s, lease_expires_at = now() + %s,
-                                 attempts = CASE WHEN c.old_status = 'running' THEN items.attempts
+                                 attempts = CASE WHEN c.old_status = 'running'
+                                                   OR (c.old_status = 'retrying' AND
+                                                       items.error->>'code' = 'idempotency_in_progress')
+                                                 THEN items.attempts
                                                  ELSE items.attempts + 1 END,
                                  lease_reclaims = items.lease_reclaims
                                                   + CASE WHEN c.old_status = 'running' THEN 1 ELSE 0 END,
@@ -210,6 +213,8 @@ class Engine:
             log.warning("item lease lost during invocation", extra={"item_id": item["item_id"]})
             return "lease_lost"
         if error is not None:
+            if error.status == 409 and error.code == "idempotency_in_progress":
+                return self._park_in_progress(item, worker, error.as_problem())
             return self._retry_or_fail(
                 item, worker, run, stage, retries, error.as_problem(), retryable=error.retryable
             )
@@ -246,7 +251,10 @@ class Engine:
             try:
                 return self._invoke(executor, body, item, trace_id, min(timeout_ms, remaining_ms))
             except ExecutorError as exc:
-                if exc.status != 409 or exc.code != "idempotency_in_progress":
+                in_progress = exc.status == 409 and exc.code == "idempotency_in_progress"
+                # Once the executor confirmed this key is active, a later network timeout or
+                # retryable 5xx cannot prove the effect did not happen. Keep checking the key.
+                if not in_progress and (deadline is None or not exc.retryable):
                     raise
                 if deadline is None:
                     deadline = time.monotonic() + self.core.engine.idempotency_in_progress_max_wait_ms / 1000
@@ -262,10 +270,10 @@ class Engine:
                 "title": "Invocation still in progress",
                 "status": 409,
                 "code": "idempotency_in_progress",
-                "retryable": False,
-                "detail": "configured wait for an in-progress delivery key expired",
+                "retryable": True,
+                "detail": "configured wait window expired; delivery key will be checked again",
             },
-            "configured wait for an in-progress delivery key expired",
+            "configured wait window expired; delivery key will be checked again",
         )
 
     def _invoke(
@@ -314,6 +322,21 @@ class Engine:
         out = dict(row)
         out["run_status"] = run["status"] if run else None
         return out
+
+    def _park_in_progress(self, item: Mapping[str, Any], worker: str, err: dict[str, Any]) -> str:
+        """Release the worker, retaining the delivery key and attempt until its result can be replayed."""
+        delay = self.core.engine.idempotency_in_progress_retry_ms
+        with self.core.db.tx() as conn:
+            if self._lock_item(conn, item, worker) is None:
+                return "lease_lost"
+            conn.execute(
+                "UPDATE items SET status = 'retrying', lease_owner = NULL, lease_expires_at = NULL,"
+                " available_at = now() + %s, error = %s, updated_at = now() WHERE item_id = %s",
+                (_ms(delay), Jsonb(err), item["item_id"]),
+            )
+        self.core.metrics.inc("items", outcome="retrying")
+        log.info("in-progress delivery parked", extra={"item_id": item["item_id"], "delay_ms": delay})
+        return "retrying"
 
     def _retry_or_fail(
         self,
@@ -815,7 +838,15 @@ class Engine:
             feed_error = job.get("error") or problem("source_unavailable", "collection failed", 502, True)
             delay_ms = self._rate_limit_restart(run, feed_error)
             if delay_ms is not None:
-                created = self._accept_materials(run, worker, materials, page.get("next_cursor"), False, None)
+                if materials:
+                    # Keep this collection and its durable cursor until a later GET with `after`
+                    # confirms the last page. A crash before that GET must not orphan its buffer.
+                    created = self._accept_materials(
+                        run, worker, materials, page.get("next_cursor"), False, None
+                    )
+                    return f"fed:{created}"
+                # Empty terminal response after `after` confirms every accepted page. Retrying
+                # the same GET after a crash is safe, then the next collection may start.
                 with self.core.db.tx() as conn:
                     conn.execute(
                         "UPDATE runs SET collection_id = NULL, feed_cursor = NULL,"

@@ -530,6 +530,9 @@ class FakeHandler(ContractFake):
         self.in_flight: set[str] = set()
         self.effects: Counter[str] = Counter()
         self.calls: Counter[str] = Counter()
+        self.in_progress_rejections: Counter[str] = Counter()
+        self.in_progress_retryable_after_409 = False
+        """Return a retryable 503 after the first in-flight 409 to exercise uncertain retries."""
         self.duplicates: Counter[str] = Counter()
         self.key_mismatch: list[str] = []
         self.delay_s = 0.0
@@ -560,6 +563,9 @@ class FakeHandler(ContractFake):
                 stored = {**self.results[key], "duplicate": True}
                 return self.respond(request, 200, stored, {"Idempotency-Replayed": "true"})
             if key in self.in_flight:
+                self.in_progress_rejections[key] += 1
+                if self.in_progress_retryable_after_409 and self.in_progress_rejections[key] > 1:
+                    return problem(503, "service_unavailable", retryable=True)
                 return problem(409, "idempotency_in_progress", retryable=True)
             self.in_flight.add(key)
             self.concurrent += 1

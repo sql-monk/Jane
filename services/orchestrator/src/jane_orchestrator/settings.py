@@ -112,7 +112,9 @@ class EngineLimits(Limits):
     idempotency_in_progress_poll_ms: int = Field(default=500, ge=10)
     """Delay between replays while an executor is still processing the same delivery key."""
     idempotency_in_progress_max_wait_ms: int = Field(default=120_000, ge=1)
-    """Bound on waiting for an already running invocation; expiry fails the item without a new effect."""
+    """Maximum time one worker waits for an already running invocation before parking the item."""
+    idempotency_in_progress_retry_ms: int = Field(default=5_000, ge=10)
+    """Delay before another worker checks a parked delivery key; run_timeout_ms bounds the run."""
     problem_samples: int = Field(default=10, ge=0)
     """Samples kept per problem group."""
     trace_outputs_max: int = Field(default=100, ge=0)

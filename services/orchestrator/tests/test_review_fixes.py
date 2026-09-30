@@ -287,3 +287,141 @@ def test_collection_waits_for_its_connections_to_reach_the_collector(
     paths = [p for _, p, _ in neighbours.collector.requests]
     assert paths.index("/v1/connections/tg-main") < paths.index("/v1/collections")
     assert neighbours.collector.connections["tg-main"] == account  # only secret_refs, never values
+
+
+# ---------------------------------------------------------------- WP-09a: reaper races and fairness
+def _metric(client: Any, status: str) -> float:
+    import re
+
+    text = client.get("/metrics").text
+    pattern = r"jane_orchestrator_runs_total\{status=\"" + re.escape(status) + r"\"\} ([0-9.]+)"
+    m = re.search(pattern, text)
+    return float(m.group(1)) if m else 0.0
+
+
+def _drive_feeds(engine: Any, db_dsn: str, run_ids: list[str]) -> None:
+    def done() -> bool:
+        feed = engine.claim_feed("driver")
+        if feed is not None:
+            engine.process_feed(feed, "driver")
+        with psycopg.connect(db_dsn) as c:
+            n = c.execute(
+                "SELECT count(*) FROM runs WHERE run_id = ANY(%s) AND feed_done", (run_ids,)
+            ).fetchone()
+            return bool(n and n[0] == len(run_ids))
+
+    wait_until(done, 60)
+
+
+def _race(engine: Any, n: int = 8) -> list[int]:
+    barrier = threading.Barrier(n)
+    out: list[int] = []
+    lock = threading.Lock()
+
+    def go() -> None:
+        barrier.wait()
+        r = engine.reap()
+        with lock:
+            out.append(r)
+
+    threads = [threading.Thread(target=go) for _ in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(30)
+    return out
+
+
+def test_concurrent_reapers_fail_timed_out_run_once(
+    make_client: Any, neighbours: Neighbours, db_dsn: str
+) -> None:
+    client = make_client(run_workers=False)
+    engine = client.app.state.engine
+    assert post(client, "/v1/sources", source_doc()).status_code == 201
+    task = catalog_task(limits={"timeouts": {"run_timeout_ms": 1000}})
+    assert post(client, "/v1/tasks", task).status_code == 201
+    run_id = start(client, "shop-catalog")
+    _drive_feeds(engine, db_dsn, [run_id])
+    with psycopg.connect(db_dsn, autocommit=True) as c:  # a collection still to cancel
+        c.execute("UPDATE runs SET collector_cancelled = false WHERE run_id = %s", (run_id,))
+    time.sleep(1.5)
+    before_failed = _metric(client, "failed")
+    before_cancel = len(neighbours.collector.cancelled)
+    results = _race(engine)
+    assert client.get(f"/v1/runs/{run_id}").json()["status"] == "failed"
+    assert _metric(client, "failed") - before_failed == 1
+    assert len(neighbours.collector.cancelled) - before_cancel == 1
+    assert sum(results) == 1
+    with psycopg.connect(db_dsn) as c:
+        active = c.execute(
+            "SELECT count(*) FROM items WHERE run_id = %s AND status IN ('queued','retrying','running')",
+            (run_id,),
+        ).fetchone()
+    assert active is not None and active[0] == 0
+
+
+def test_concurrent_reapers_close_cancelling_run_once(
+    make_client: Any, neighbours: Neighbours, db_dsn: str
+) -> None:
+    client = make_client(run_workers=False)
+    engine = client.app.state.engine
+    assert post(client, "/v1/sources", source_doc()).status_code == 201
+    assert post(client, "/v1/tasks", catalog_task()).status_code == 201
+    run_id = start(client, "shop-catalog")
+    _drive_feeds(engine, db_dsn, [run_id])
+    with psycopg.connect(db_dsn, autocommit=True) as c:  # a worker holds one item, then dies
+        c.execute(
+            "UPDATE items SET status = 'running', lease_owner = 'dead', lease_expires_at = now() + interval '1 hour'"
+            " WHERE item_id = (SELECT item_id FROM items WHERE run_id = %s AND status = 'queued' ORDER BY seq LIMIT 1)",
+            (run_id,),
+        )
+    assert client.post(f"/v1/runs/{run_id}/cancel", json={"reason": "x"}).json()["status"] == "cancelling"
+    with psycopg.connect(db_dsn, autocommit=True) as c:
+        c.execute(
+            "UPDATE items SET lease_expires_at = now() - interval '1 second' WHERE run_id = %s AND status = 'running'",
+            (run_id,),
+        )
+    before = _metric(client, "cancelled")
+    results = _race(engine)
+    assert client.get(f"/v1/runs/{run_id}").json()["status"] == "cancelled"
+    assert _metric(client, "cancelled") - before == 1
+    assert sum(results) == 1
+
+
+def test_reaper_reaches_orphaned_runs_beyond_batch_of_busy_runs(
+    make_client: Any, neighbours: Neighbours, db_dsn: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("JANE_ORCHESTRATOR_LIMITS__ENGINE__REAP_BATCH", "2")
+    client = make_client(run_workers=False)
+    engine = client.app.state.engine
+    assert engine.core.engine.reap_batch == 2
+    assert post(client, "/v1/sources", source_doc()).status_code == 201
+    task = catalog_task(
+        schedule={"type": "manual", "overlap": "allow"},
+        limits={"concurrency": {"max_parallel_runs_per_task": 10}},
+    )
+    assert post(client, "/v1/tasks", task).status_code == 201
+    runs = [start(client, "shop-catalog") for _ in range(8)]
+    _drive_feeds(engine, db_dsn, runs)
+    busy, orphaned = runs[:5], runs[5:]
+    with psycopg.connect(db_dsn, autocommit=True) as c:
+        for run_id in runs:  # every run: one item held by a worker
+            c.execute(
+                "UPDATE items SET status = 'running', lease_owner = 'w', lease_expires_at = now() + interval '1 hour'"
+                " WHERE item_id = (SELECT item_id FROM items WHERE run_id = %s AND status = 'queued'"
+                " ORDER BY seq LIMIT 1)",
+                (run_id,),
+            )
+    for run_id in runs:  # busy runs cancelled first: their updated_at is the oldest
+        assert client.post(f"/v1/runs/{run_id}/cancel", json={}).json()["status"] == "cancelling"
+    with psycopg.connect(db_dsn, autocommit=True) as c:  # the workers of the orphaned runs died
+        c.execute(
+            "UPDATE items SET lease_expires_at = now() - interval '1 second' WHERE run_id = ANY(%s)"
+            " AND status = 'running'",
+            (orphaned,),
+        )
+    for _ in range(3):
+        engine.reap()
+    status = {r: client.get(f"/v1/runs/{r}").json()["status"] for r in runs}
+    assert all(status[r] == "cancelled" for r in orphaned), status
+    assert all(status[r] == "cancelling" for r in busy), status  # live leases: left to their workers

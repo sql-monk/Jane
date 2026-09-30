@@ -3,10 +3,15 @@
 * Definitions (``connection.schema.json``: ``params`` + ``secret_refs``) come from a config file
   (``JANE_STORAGE_CONNECTIONS_FILE``, JSON/YAML: ``{"connections": [...]}``) and from
   ``PUT /v1/connections/{id}`` (the orchestrator syncs its registry; values are never secrets).
-* ``secret_refs`` are resolved only here, in the executor's environment: ``env:VAR``,
-  ``file:<path>``; ``vault:`` is not supported in v1 (reported as unresolved).
+* ``secret_refs`` are resolved only here, in the executor's environment, under the secret policy
+  (:mod:`jane_storage.policy`): ``env:`` only with the configured prefix, ``file:`` only inside the secrets
+  directory, ``vault:`` disabled, and every network address of the connection from the host allowlist.
+  ``PUT`` of a violating connection → 422 (``secret_ref_not_allowed`` / ``host_not_allowed``); a violating
+  connection from the config file (or stored bypassing the API) is kept, but gets no secrets and is rejected
+  (422) when used.
 * :class:`AdapterPool` keeps one opened adapter per (connection, definition ETag, options) and closes
-  adapters whose connection changed or was deleted.
+  adapters whose connection changed or was deleted. Adapter errors raised while opening are redacted: the
+  resolved secret values of the connection never reach responses or logs.
 """
 
 from __future__ import annotations
@@ -14,21 +19,24 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-import os
+import logging
 import re
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from jane_contracts.storage_adapter import ResolvedConnection, StorageAdapter
+from jane_contracts.storage_adapter import AdapterError, ResolvedConnection, StorageAdapter
 from jane_kit.errors import FieldError, JaneError, NotFound, ValidationFailed
 
 from .adapters import UnknownAdapter, create_adapter
+from .policy import ConnectionPolicy, redact
 
 __all__ = ["AdapterPool", "ConnectionRegistry", "SecretUnresolved", "StoredConnection"]
+
+log = logging.getLogger("jane_storage.connections")
 
 _SECRET_NAME = re.compile(r"(pass(word)?|secret|token|api[_-]?key|private[_-]?key|credential)", re.I)
 _SECRET_VALUE = re.compile(
@@ -76,19 +84,23 @@ class ConnectionRegistry:
         self,
         validator: Any = None,
         environ: Mapping[str, str] | None = None,
+        policy: ConnectionPolicy | None = None,
     ) -> None:
         self._items: dict[str, StoredConnection] = {}
         self._resolved: dict[str, ResolvedConnection] = {}
         self._validator = validator
         self._environ = environ
+        self.policy = policy if policy is not None else ConnectionPolicy()
 
     # -------------------------------------------------------------------------------- definitions
     def load_file(self, path: Path) -> int:
+        """Connections of the config file. A policy violation does not stop the service (the connection is
+        kept, gets no secrets and is rejected when used); other validation errors do."""
         text = path.read_text(encoding="utf-8")
         data = yaml.safe_load(text) if path.suffix.lower() in {".yaml", ".yml"} else json.loads(text)
         items = data.get("connections", []) if isinstance(data, Mapping) else data
         for doc in items:
-            self.put(dict(doc))
+            self.put(dict(doc), enforce_policy=False)
         return len(items)
 
     def validate(self, doc: Mapping[str, Any]) -> None:
@@ -103,9 +115,24 @@ class ConnectionRegistry:
         if secrets:
             raise JaneError("secret-like values in params", code="secret_detected", errors=secrets)
 
-    def put(self, doc: dict[str, Any]) -> tuple[StoredConnection, bool]:
+    def put(self, doc: dict[str, Any], *, enforce_policy: bool = True) -> tuple[StoredConnection, bool]:
+        """Store a definition. ``enforce_policy`` (the API): a secret-policy violation → 422 and nothing is
+        stored; otherwise (config file) the connection is stored with a warning and rejected when used."""
         self.validate(doc)
         cid = str(doc["connection_id"])
+        violations = self.policy.violations(doc)
+        if violations and enforce_policy:
+            raise ValidationFailed(
+                "connection violates the secret policy of this executor", errors=violations
+            )
+        if violations:
+            log.warning(
+                "connection violates the secret policy: it gets no secrets and is rejected when used",
+                extra={
+                    "connection_id": cid,
+                    "violations": [f"{v.pointer} ({v.code}): {v.message}" for v in violations],
+                },
+            )
         created = cid not in self._items
         stored = StoredConnection(document=doc, etag=_etag(doc))
         self._items[cid] = stored
@@ -133,30 +160,62 @@ class ConnectionRegistry:
     def list(self) -> list[StoredConnection]:
         return [self._items[k] for k in sorted(self._items)]
 
+    # -------------------------------------------------------------------------------- policy
+    def policy_errors(self, connection_id: str) -> list[FieldError]:
+        """Secret-policy violations of a stored connection (``add_resolved`` ones are the embedder's)."""
+        stored = self.get(connection_id)
+        if connection_id in self._resolved:
+            return []
+        return self.policy.violations(stored.document)
+
+    def ensure_allowed(
+        self, connection_id: str, *, pointer: str | None = None, parameter: str | None = None
+    ) -> None:
+        """422 (``secret_ref_not_allowed`` / ``host_not_allowed``) if the connection violates the policy."""
+        errors = self.policy_errors(connection_id)
+        if errors:
+            raise ValidationFailed(
+                f"connection {connection_id!r} violates the secret policy of this executor; it gets no secrets",
+                errors=[
+                    FieldError(
+                        pointer=pointer,
+                        parameter=parameter,
+                        code=e.code,
+                        message=f"connection {connection_id} {e.pointer}: {e.message}",
+                    )
+                    for e in errors
+                ],
+            )
+
     # -------------------------------------------------------------------------------- secrets
     def _resolve_ref(self, ref: str) -> str | None:
-        env: Mapping[str, str] = os.environ if self._environ is None else self._environ
-        scheme, _, rest = ref.partition(":")
-        if scheme == "env":
-            return env.get(rest)
-        if scheme == "file":
-            try:
-                return Path(rest).read_text(encoding="utf-8").strip()
-            except OSError:
-                return None
-        return None  # vault: not supported in v1 (ADR-0006: optional provider)
+        """Value of an allowed reference (``None``: missing, empty or not allowed; ``vault:`` is disabled)."""
+        return self.policy.resolve(str(ref), self._environ)
 
     def secrets_resolved(self, connection_id: str) -> dict[str, bool]:
+        """Name → resolvable (never values); all ``False`` for a connection that violates the policy."""
         stored = self.get(connection_id)
         if connection_id in self._resolved:
             return dict.fromkeys(self._resolved[connection_id].secrets, True)
         refs = stored.document.get("secret_refs") or {}
+        if self.policy_errors(connection_id):
+            return dict.fromkeys(refs, False)
         return {name: self._resolve_ref(ref) is not None for name, ref in refs.items()}
+
+    def secret_values(self, connection_id: str) -> list[str]:
+        """Resolved values of the connection — only to redact error messages."""
+        if connection_id in self._resolved:
+            return list(self._resolved[connection_id].secrets.values())
+        if connection_id not in self._items or self.policy_errors(connection_id):
+            return []
+        refs = self._items[connection_id].document.get("secret_refs") or {}
+        return [v for ref in refs.values() if (v := self._resolve_ref(ref)) is not None]
 
     def resolve(self, connection_id: str) -> ResolvedConnection:
         stored = self.get(connection_id)
         if connection_id in self._resolved:
             return self._resolved[connection_id]
+        self.ensure_allowed(connection_id)
         values: dict[str, str] = {}
         missing = []
         for name, ref in (stored.document.get("secret_refs") or {}).items():
@@ -197,6 +256,7 @@ class AdapterPool:
                 f"connection {connection_id!r} is {stored.kind!r}, the package needs {adapter_kind!r}",
                 errors=[FieldError(pointer="/connections/target", message="connection kind mismatch")],
             )
+        self.registry.ensure_allowed(connection_id, pointer="/connections/target")
 
     async def adapter_for(
         self, connection_id: str, adapter_kind: str, options: Mapping[str, Any]
@@ -216,12 +276,23 @@ class AdapterPool:
                     raise ValidationFailed(
                         str(exc), errors=[FieldError(pointer="/handler", message=str(exc))]
                     ) from exc
-                await adapter.open(conn, merged)
+                try:
+                    await adapter.open(conn, merged)
+                except AdapterError as exc:
+                    raise self._redacted(exc, conn.secrets.values()) from None
                 self._open[key] = adapter
             if key not in self._schema_ready:
-                await adapter.ensure_schema([])
+                try:
+                    await adapter.ensure_schema([])
+                except AdapterError as exc:
+                    raise self._redacted(exc, self.registry.secret_values(connection_id)) from None
                 self._schema_ready.add(key)
             return adapter
+
+    @staticmethod
+    def _redacted(exc: AdapterError, secrets: Iterable[str]) -> AdapterError:
+        """Driver messages may echo a login or a connection string: never pass secret values on."""
+        return AdapterError(redact(str(exc), secrets), retryable=exc.retryable)
 
     async def _close_stale(self, connection_id: str, etag: str | None) -> None:
         for key in [k for k in self._open if k[0] == connection_id and k[1] != etag]:

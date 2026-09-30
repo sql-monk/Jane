@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import SettingsConfigDict
 
 from jane_kit.clients import RetryPolicy
@@ -12,6 +12,8 @@ from jane_kit.config import JaneSettings, LimitLayer, Limits, ResolvedLimits, co
 from jane_kit.idempotency import IdempotencyLimits
 from jane_kit.jobs import JobLimits
 from jane_kit.pagination import PageLimits
+
+from .policy import ConnectionPolicy
 
 ENV_PREFIX = "JANE_STORAGE_"
 
@@ -29,6 +31,31 @@ class Settings(JaneSettings):
     """Extra storage package directories besides the installed adapter distributions."""
     validate_requests: bool = True
     """Validate invocations against ``contracts/schemas`` when the contracts directory is available."""
+    secret_env_prefix: str = "JANE_SECRET_"  # noqa: S105 - a variable-name prefix, not a secret
+    """``env:`` secret references may name only variables with this prefix (empty: ``env:`` disabled)."""
+    secret_files_dir: Path | None = Path("/run/secrets")
+    """``file:`` secret references must point inside this directory (empty: ``file:`` disabled)."""
+    connection_host_allowlist: list[str] = Field(default_factory=list)
+    """``hostname`` / ``hostname:port`` a connection may contact (JSON list); default none: connections with
+    a network address are rejected."""
+
+    @field_validator("secret_files_dir", mode="before")
+    @classmethod
+    def _empty_files_dir_disables(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("connection_host_allowlist")
+    @classmethod
+    def _valid_allowlist(cls, value: list[str]) -> list[str]:
+        ConnectionPolicy(host_allowlist=tuple(value))  # raises on an entry that is not hostname[:port]
+        return value
+
+    def connection_policy(self) -> ConnectionPolicy:
+        return ConnectionPolicy(
+            env_prefix=self.secret_env_prefix,
+            files_dir=self.secret_files_dir,
+            host_allowlist=tuple(self.connection_host_allowlist),
+        )
 
 
 class Timeouts(Limits):

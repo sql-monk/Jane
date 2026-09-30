@@ -151,8 +151,8 @@ def pg_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestC
     if stack is None or "postgres" not in stack.services:
         pytest.skip("dev stack with postgres is not running (just up postgres)")
     pg = stack.services["postgres"]
-    monkeypatch.setenv("WP07_SWAP_PG_USER", pg["user"])
-    monkeypatch.setenv("WP07_SWAP_PG_PASSWORD", pg["password"])
+    monkeypatch.setenv("JANE_SECRET_WP07_SWAP_PG_USER", pg["user"])
+    monkeypatch.setenv("JANE_SECRET_WP07_SWAP_PG_PASSWORD", pg["password"])
     schema = f"swap_{hashlib.sha256(str(tmp_path).encode()).hexdigest()[:10]}"
     conns = tmp_path / "c.json"
     conns.write_text(
@@ -175,8 +175,8 @@ def pg_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestC
                             "sslmode": "disable",
                         },
                         "secret_refs": {
-                            "username": "env:WP07_SWAP_PG_USER",
-                            "password": "env:WP07_SWAP_PG_PASSWORD",
+                            "username": "env:JANE_SECRET_WP07_SWAP_PG_USER",
+                            "password": "env:JANE_SECRET_WP07_SWAP_PG_PASSWORD",
                         },
                     },
                 ]
@@ -184,7 +184,12 @@ def pg_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestC
         ),
         encoding="utf-8",
     )
-    with TestClient(build_app(Settings(log_format="console", connections_file=conns))) as client:
+    settings = Settings(
+        log_format="console",
+        connections_file=conns,
+        connection_host_allowlist=[f"{pg['host']}:{pg['port']}"],
+    )
+    with TestClient(build_app(settings)) as client:
         yield client
     import asyncio
 

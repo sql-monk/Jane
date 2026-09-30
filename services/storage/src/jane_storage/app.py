@@ -165,7 +165,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     runner = JobRunner(limits=limits.jobs)
     keys = InMemoryIdempotencyStore(limits.idempotency)
     root = contracts_dir(Path(__file__).parent) if settings.validate_requests else None
-    registry = ConnectionRegistry(validator=_connection_validator(root))
+    registry = ConnectionRegistry(validator=_connection_validator(root), policy=settings.connection_policy())
     if settings.connections_file is not None:
         registry.load_file(settings.connections_file)
     pool = AdapterPool(registry, limits.adapters.model_dump())
@@ -454,6 +454,13 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             "checked_at": format_ts(datetime.now().astimezone()),
             "secrets_resolved": resolved_secrets,
         }
+        violations = registry.policy_errors(connection_id)
+        if violations:
+            # config file / bypassing the API: no secret is read and the adapter is not opened
+            out["message"] = "connection violates the secret policy of this executor: " + "; ".join(
+                f"{v.pointer} ({v.code}): {v.message}" for v in violations
+            )
+            return JSONResponse(out)
         if not all(resolved_secrets.values()):
             missing = sorted(k for k, v in resolved_secrets.items() if not v)
             out["message"] = f"secret(s) not resolvable in this executor: {missing}"
@@ -469,6 +476,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     # ------------------------------------------------------------------ storage.v1
     async def reader(connection_id: str) -> Any:
         stored = registry.get(connection_id)
+        registry.ensure_allowed(connection_id, parameter="connection_id")
         try:
             return await pool.adapter_for(connection_id, stored.kind, {})
         except AdapterError as exc:

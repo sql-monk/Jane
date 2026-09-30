@@ -6,9 +6,9 @@
 |---|---|---|---|---|---|---|
 | 00 | Архітектура й контракти | 0 | accepted | `wp/00-architecture-contracts` | агент / wp-reviewer (2 раунди) | злито `e2714ec` |
 | 01 | Каркас, CI, dev-стек | 0 | accepted | `wp/01-scaffold-ci` | агент / wp-reviewer (2 раунди + інтеграційне виправлення) | злито `4468cee` |
-| 02 | Web Collector: ядро | 1 | active | `wp/02-web-collector-core` | агент / wp-reviewer | фінальне виправлення після рев'ю 2 (хибний succeeded), перевірка координатором |
+| 02 | Web Collector: ядро | 1 | review | `wp/02-web-collector-core` | агент / wp-reviewer | фінальне виправлення готове, перевіряє координатор (20× stalled) |
 | 03 | Web Collector: стратегії пошуку | 1 | — | | | після M0 |
-| 04 | Telegram Collector | 1 | active | `wp/04-telegram-collector` | агент | слот 3 |
+| 04 | Telegram Collector | 1 | review | `wp/04-telegram-collector` | агент / wp-reviewer | |
 | 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент / wp-reviewer | виправлення після рев'ю 1 (lease ключів/job, secret_detected) |
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
@@ -90,3 +90,7 @@
 | WP-11 | WP-01 | перенести PostgreSQL-реалізації `JobStore`/`IdempotencyStore` (з lease) у jane-kit — зараз дубльовані в handler-runtime, assistant, registry, llm | після M2, окреме доручення |
 - 2026-09-30 — WP-10 і WP-11 прийнято (2 раунди) і злито; main `just check` зелений, gitleaks 0. Третій ліміт сесії перервав WP-02, 04, 05, 08, 09, 12, 13 — відновлено.
 - 2026-09-30 — WP-08 рев'ю 2: виправлення п.1 внесло відкат новішого підтвердженого знімка в s3/minio — фінальне виправлення, перевіряє координатор скриптом рецензента.
+| WP-04 | WP-01 | винести спільне для колекторів у jane-kit: `ContractSchemas`, `RulesLoader`, SQLite `JobStore`/`IdempotencyStore` (дубль WP-02/04) | після M2, разом із запитом WP-11 |
+| WP-04 | WP-00 | 404 у `/v1/fetches`; поле `pts` у `CollectorState.cursors`; 503 при зайнятому сховищі стану | зміна контракту через contract-guardian |
+| WP-04 | WP-09 | перезапуск після `rate_limited` не раніше `retry_after_seconds` у режимі `incremental`; синхронізація `telegram_account` перед збором | передати WP-09 |
+| WP-04 | людина | тестовий обліковий запис і канал Telegram для перевірки Telethon на реальному сервісі | питання до людини |

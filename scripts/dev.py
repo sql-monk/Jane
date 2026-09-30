@@ -180,6 +180,7 @@ def cmd_web(_: argparse.Namespace) -> int:
             ["run", "--if-present", "lint"],
             ["run", "--if-present", "typecheck"],
             ["run", "--if-present", "test"],
+            ["run", "--if-present", "build"],
         ):
             code = run([*pnpm, *args], cwd=pkg).returncode
             if code:

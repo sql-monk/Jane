@@ -140,8 +140,9 @@ def test_web_runs_corepack_from_each_package(monkeypatch: pytest.MonkeyPatch, tm
 
     monkeypatch.setattr(dev, "run", fake_run)
     assert dev.cmd_web(Namespace()) == 0
-    assert len(calls) == 4
+    assert len(calls) == 5
     assert all(cwd == package and cmd[:2] == ["corepack", "pnpm"] for cmd, cwd in calls)
+    assert calls[-1][0][-2:] == ["--if-present", "build"]
 
 
 def test_e2e_runs_only_acceptance_suite(monkeypatch: pytest.MonkeyPatch) -> None:

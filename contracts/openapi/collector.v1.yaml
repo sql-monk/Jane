@@ -613,7 +613,7 @@ components:
           type: boolean
         supported:
           type: boolean
-          description: false — правила валідні за схемою, але ця реалізація колектора не підтримує якусь стратегію.
+          description: false — правила валідні за схемою, але ця реалізація колектора не виконує стратегію або її опцію (зокрема api_feed POST чи emit_items_as_materials=true). Попередження містять точні JSON Pointer; запуск збору з такими правилами повертає 422 validation_failed.
         errors:
           type: array
           items:

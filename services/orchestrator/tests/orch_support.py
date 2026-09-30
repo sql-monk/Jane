@@ -248,6 +248,9 @@ class Collection:
     pulls: int = 0
     redelivered: int = 0
     delivered_upto: int = 0
+    fail_at: int | None = None
+    started: float = 0.0
+    ended: float = 0.0
 
 
 class FakeCollector(ContractFake):
@@ -260,6 +263,11 @@ class FakeCollector(ContractFake):
         self.collections: dict[str, Collection] = {}
         self.by_key: dict[str, str] = {}
         self.cancelled: list[str] = []
+        self.rate_limit_after: int | None = None
+        """The first collection ends with ``rate_limited`` (retryable) after this many materials."""
+        self.retry_after_seconds = 1
+        self.emitted_urls: set[str] = set()
+        """Collector state: an ``incremental`` collection skips URLs emitted before."""
 
     def material(self, cid: str, i: int, page: Page, source_id: str | None) -> dict[str, Any]:
         digest = hashlib.sha256(page.html.encode()).hexdigest()
@@ -306,6 +314,8 @@ class FakeCollector(ContractFake):
             if body.get("urls"):
                 wanted = set(body["urls"])
                 pages = [p for p in self.site if p.url in wanted]
+            if body.get("mode") == "incremental":
+                pages = [p for p in pages if p.url not in self.emitted_urls]
             unacked = ((body.get("limits") or {}).get("queue") or {}).get(
                 "max_unacked_materials", self.DEFAULT_UNACKED
             )
@@ -314,19 +324,32 @@ class FakeCollector(ContractFake):
                 body,
                 [self.material(cid, i, p, body.get("source_id")) for i, p in enumerate(pages)],
                 unacked,
+                started=time.monotonic(),
             )
+            if self.rate_limit_after is not None and not self.collections:
+                col.fail_at = self.rate_limit_after
             self.collections[cid] = col
             self.by_key[key] = cid
         return self.respond(request, 202, self._job(col), {"Location": f"/v1/jobs/{cid}"})
 
     def _job(self, col: Collection) -> dict[str, Any]:
-        return {
+        job: dict[str, Any] = {
             "job_id": col.cid,
             "kind": "collection",
             "status": col.status,
             "created_at": "2026-09-27T10:00:00Z",
             "links": {"self": f"/v1/jobs/{col.cid}"},
         }
+        if col.status == "failed":
+            job["error"] = {
+                "type": "urn:jane:problem:rate_limited",
+                "title": "Rate limited",
+                "status": 429,
+                "code": "rate_limited",
+                "retryable": True,
+                "retry_after_seconds": self.retry_after_seconds,
+            }
+        return job
 
     async def materials(self, request: Request) -> Response:
         await self._body(request)
@@ -341,7 +364,8 @@ class FakeCollector(ContractFake):
                 col.acked = max(col.acked, idx)
             limit = int(q.get("limit", 50))
             # the collector emits only up to acked + max_unacked (backpressure pauses crawling)
-            emitted = min(len(col.materials), col.acked + col.max_unacked)
+            total = len(col.materials) if col.fail_at is None else min(col.fail_at, len(col.materials))
+            emitted = min(total, col.acked + col.max_unacked)
             col.paused = emitted < len(col.materials)
             if col.status == "cancelled":
                 emitted = col.acked
@@ -350,9 +374,11 @@ class FakeCollector(ContractFake):
                 col.redelivered += min(len(items), col.delivered_upto - col.acked)
             col.delivered_upto = max(col.delivered_upto, col.acked + len(items))
             col.max_unacked_seen = max(col.max_unacked_seen, col.delivered_upto - col.acked)
-            end = col.acked + len(items) >= len(col.materials) or col.status == "cancelled"
+            end = col.acked + len(items) >= total or col.status == "cancelled"
             if end and col.status == "running":
-                col.status = "succeeded"
+                col.status = "failed" if col.fail_at is not None else "succeeded"
+                col.ended = time.monotonic()
+            self.emitted_urls.update(m["locator"]["url"] for m in items)
             last = col.acked + len(items) - 1
         page = {
             "items": items,

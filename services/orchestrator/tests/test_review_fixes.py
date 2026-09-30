@@ -232,3 +232,58 @@ def test_activation_does_not_hold_task_lock_during_registry_calls(
     assert result["r"].json()["retryable"] is True
     again = post(client, url, body)
     assert again.status_code == 200
+
+
+def test_rate_limited_collection_restarts_after_retry_after(
+    make_client: Any, neighbours: Neighbours, db_dsn: str
+) -> None:
+    col = neighbours.collector
+    col.rate_limit_after = 2  # the first collection hits rate_limited after two materials
+    col.retry_after_seconds = 1
+    client = make_client()
+    assert post(client, "/v1/sources", source_doc()).status_code == 201
+    assert (
+        post(
+            client, "/v1/tasks", catalog_task(retries={"max_attempts": 3, "initial_backoff_ms": 10})
+        ).status_code
+        == 201
+    )
+    run = wait_run(client, start(client, "shop-catalog"), 60)
+    assert run["status"] == "succeeded", run
+    first, second = sorted(col.collections.values(), key=lambda c: c.started)
+    assert first.request.get("mode", "full") == "full" and second.request["mode"] == "incremental"
+    assert second.started - first.ended >= 1.0  # not earlier than retry_after_seconds
+    assert len(items_by_stage(db_dsn, run["run_id"])["collect"]) == 6  # nothing lost, nothing duplicated
+    assert neighbours.all_violations() == []
+
+
+def test_rate_limited_collection_without_retries_fails_the_run(
+    make_client: Any, neighbours: Neighbours
+) -> None:
+    neighbours.collector.rate_limit_after = 2
+    client = make_client()
+    assert post(client, "/v1/sources", source_doc()).status_code == 201
+    assert post(client, "/v1/tasks", catalog_task(retries={"max_attempts": 1})).status_code == 201
+    run = wait_run(client, start(client, "shop-catalog"), 60)
+    assert run["status"] == "failed" and run["error"]["code"] == "rate_limited"
+    assert len(neighbours.collector.collections) == 1
+
+
+def test_collection_waits_for_its_connections_to_reach_the_collector(
+    make_client: Any, neighbours: Neighbours, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("JANE_ORCHESTRATOR_LIMITS__ENGINE__SCHEDULER_INTERVAL_MS", "700")  # sync runs late
+    client = make_client()
+    account = {
+        "connection_id": "tg-main",
+        "kind": "telegram_account",
+        "secret_refs": {"session": "env:TG_SESSION"},
+    }
+    assert post(client, "/v1/sources", source_doc(connections={"account": "tg-main"})).status_code == 201
+    assert post(client, "/v1/tasks", catalog_task()).status_code == 201
+    assert client.put("/v1/connections/tg-main", json=account).status_code == 200
+    run = wait_run(client, start(client, "shop-catalog"), 60)
+    assert run["status"] == "succeeded"
+    paths = [p for _, p, _ in neighbours.collector.requests]
+    assert paths.index("/v1/connections/tg-main") < paths.index("/v1/collections")
+    assert neighbours.collector.connections["tg-main"] == account  # only secret_refs, never values

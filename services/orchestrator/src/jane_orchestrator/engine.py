@@ -617,6 +617,10 @@ class Engine:
                 return "lease_lost"
             if outcome == "failed":
                 self._release_feed(run_id, worker, feed_done=True)
+            elif outcome.startswith("wait:"):
+                reason = outcome.split(":", 1)[1]
+                delay = int(reason) if reason.isdigit() else eng.backpressure_recheck_ms
+                self._release_feed(run_id, worker, delay)
             else:
                 self._release_feed(run_id, worker)
         except ExecutorError as exc:
@@ -689,7 +693,12 @@ class Engine:
         if executor is None:
             raise ExecutorError("collector:" + name, 503, None, f"no collector executor for '{name}'")
         if not run["collection_id"]:
+            if self._connections_pending(run, executor.executor):
+                return "wait:connections"  # e.g. telegram_account not yet pushed to this collector
             body = self._collection_request(run)
+            restarts = int(run.get("collection_restarts") or 0)
+            if restarts:
+                body["mode"] = "incremental"  # continue from the collector's saved cursor/state
             if "rules_ref" not in body:
                 with self.core.db.tx() as conn:
                     self.runs.fail_run(
@@ -707,7 +716,7 @@ class Engine:
                 "POST",
                 "/v1/collections",
                 json=body,
-                idempotency_key=f"run:{run['run_id']}:collect",
+                idempotency_key=f"run:{run['run_id']}:collect" + (f":{restarts}" if restarts else ""),
                 trace_id=run["trace_id"],
             ).json()
             run["collection_id"] = job["job_id"]
@@ -734,10 +743,57 @@ class Engine:
                 executor, "GET", f"/v1/jobs/{run['collection_id']}", trace_id=run["trace_id"]
             ).json()
             feed_error = job.get("error") or problem("source_unavailable", "collection failed", 502, True)
+            delay_ms = self._rate_limit_restart(run, feed_error)
+            if delay_ms is not None:
+                created = self._accept_materials(run, worker, materials, page.get("next_cursor"), False, None)
+                with self.core.db.tx() as conn:
+                    conn.execute(
+                        "UPDATE runs SET collection_id = NULL, feed_cursor = NULL,"
+                        " collection_restarts = collection_restarts + 1 WHERE run_id = %s AND feed_lease_owner = %s",
+                        (run["run_id"], worker),
+                    )
+                log.info(
+                    "rate-limited collection restarts later",
+                    extra={"run_id": run["run_id"], "delay_ms": delay_ms},
+                )
+                return f"wait:{delay_ms}"
         created = self._accept_materials(
             run, worker, materials, page.get("next_cursor"), bool(page.get("end_of_stream")), feed_error
         )
         return f"fed:{created}"
+
+    def _rate_limit_restart(self, run: Mapping[str, Any], error: Mapping[str, Any]) -> int | None:
+        """Delay before restarting a collection that ended with ``rate_limited`` (retryable), or ``None``.
+
+        Waits at least ``retry_after_seconds`` of the collector's Problem (otherwise the collect stage backoff);
+        restarts are bounded by the collect stage ``retries.max_attempts``."""
+        if error.get("code") != "rate_limited" or error.get("retryable") is False:
+            return None
+        collect_id = collect_stage_id(run["config"])
+        retries = run["limits"]["stages"][collect_id].get("retries") or {}
+        restarts = int(run.get("collection_restarts") or 0)
+        if restarts + 1 >= int(retries.get("max_attempts") or 1):
+            return None
+        after = error.get("retry_after_seconds")
+        backoff = backoff_ms(retries, restarts + 1)
+        return max(int(after) * 1000, backoff) if isinstance(after, int | float) else backoff
+
+    def _connections_pending(self, run: Mapping[str, Any], executor: str) -> bool:
+        """True while a connection the collection needs is still being pushed to this collector."""
+        collect = next(s for s in run["config"]["stages"] if s["kind"] == "collect")
+        ids = {
+            *(run["source_doc"].get("connections") or {}).values(),
+            *(collect.get("connections") or {}).values(),
+        }
+        if not ids:
+            return False
+        with self.core.db.conn() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM connection_sync WHERE executor = %s AND connection_id = ANY(%s)"
+                " AND op = 'put' AND status = 'pending' LIMIT 1",
+                (executor, list(ids)),
+            ).fetchone()
+        return row is not None
 
     def _accept_materials(
         self,

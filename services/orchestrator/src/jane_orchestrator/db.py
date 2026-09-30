@@ -244,6 +244,10 @@ MIGRATIONS: list[str] = [
         PRIMARY KEY (scope_type, scope_id)
     );
     """,
+    # 3 — restart of a rate-limited collection (collector job failed with rate_limited, retryable)
+    """
+    ALTER TABLE runs ADD COLUMN collection_restarts integer NOT NULL DEFAULT 0;
+    """,
 ]
 
 

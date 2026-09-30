@@ -27,6 +27,27 @@ services:
       <<: *healthcheck
       test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
 
+  pg-provision:
+    image: ${JANE_IMAGE_POSTGRES:-postgres:18}
+    entrypoint: ["sh", "/opt/jane/provision.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${JANE_PG_USER:-jane}
+      PGPASSWORD: ${JANE_PG_PASSWORD:?run `just up`}
+      PGDATABASE: postgres
+      JANE_PG_HANDLER_RUNTIME_PASSWORD: ${JANE_PG_HANDLER_RUNTIME_PASSWORD:?run `just up`}
+      JANE_PG_ORCHESTRATOR_PASSWORD: ${JANE_PG_ORCHESTRATOR_PASSWORD:?run `just up`}
+      JANE_PG_REGISTRY_PASSWORD: ${JANE_PG_REGISTRY_PASSWORD:?run `just up`}
+      JANE_PG_LLM_PASSWORD: ${JANE_PG_LLM_PASSWORD:?run `just up`}
+      JANE_PG_ASSISTANT_PASSWORD: ${JANE_PG_ASSISTANT_PASSWORD:?run `just up`}
+      JANE_PG_STORAGE_RESULTS_PASSWORD: ${JANE_PG_STORAGE_RESULTS_PASSWORD:?run `just up`}
+    volumes:
+      - ./postgres/provision.sh:/opt/jane/provision.sh:ro
+      - ./postgres/provision.sql:/opt/jane/provision.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
   sqlserver:
     image: ${JANE_IMAGE_SQLSERVER:-mcr.microsoft.com/mssql/server:2022-latest}
     environment:
@@ -119,14 +140,17 @@ services:
     environment:
       JANE_STORAGE_CONNECTIONS_FILE: /cfg/storage-connections.json
       JANE_STORAGE_LOG_FORMAT: json
-      JANE_SECRET_DEV_PG_USER: ${JANE_PG_USER:-jane}
-      JANE_SECRET_DEV_PG_PASSWORD: ${JANE_PG_PASSWORD:?run `just up`}
+      JANE_SECRET_DEV_PG_USER: jane_storage_results
+      JANE_SECRET_DEV_PG_PASSWORD: ${JANE_PG_STORAGE_RESULTS_PASSWORD:?run `just up`}
     volumes:
       - storage-data:/var/lib/jane/storage
-      - ./config/storage-connections.json:/cfg/storage-connections.json:ro
+      - type: bind
+        source: ${JANE_STORAGE_CONNECTIONS_FILE_HOST:-./config/storage-connections.json}
+        target: /cfg/storage-connections.json
+        read_only: true
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_STORAGE:-}:8000"]
     depends_on:
-      postgres: { condition: service_healthy }
+      pg-provision: { condition: service_completed_successfully }
     healthcheck:
       <<: *healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
@@ -135,14 +159,14 @@ services:
     profiles: ["handler-runtime"]
     build: { context: .., dockerfile: services/handler-runtime/Dockerfile }
     environment:
-      JANE_HANDLER_RUNTIME_STATE_DSN: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?run `just up`}@postgres:5432/${JANE_PG_DB:-jane}
+      JANE_HANDLER_RUNTIME_STATE_DSN: postgresql://jane_handler_runtime:${JANE_PG_HANDLER_RUNTIME_PASSWORD:?run `just up`}@postgres:5432/jane_handler_runtime
       JANE_HANDLER_RUNTIME_LOG_FORMAT: json
     volumes:
       - ${JANE_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
     group_add: ["${JANE_DOCKER_GID:-0}"]
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_HANDLER_RUNTIME:-}:8000"]
     depends_on:
-      postgres: { condition: service_healthy }
+      pg-provision: { condition: service_completed_successfully }
     healthcheck:
       <<: *healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
@@ -163,23 +187,23 @@ services:
     profiles: ["orchestrator"]
     build: { context: .., dockerfile: services/orchestrator/Dockerfile }
     environment:
-      JANE_ORCHESTRATOR_DATABASE_URL: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?run `just up`}@postgres:5432/${JANE_PG_DB:-jane}
+      JANE_ORCHESTRATOR_DATABASE_URL: postgresql://jane_orchestrator:${JANE_PG_ORCHESTRATOR_PASSWORD:?run `just up`}@postgres:5432/jane_orchestrator
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_ORCHESTRATOR:-}:8000"]
     depends_on:
-      postgres: { condition: service_healthy }
+      pg-provision: { condition: service_completed_successfully }
 
   registry:
     profiles: ["registry"]
     build: { context: .., dockerfile: services/registry/Dockerfile }
     environment:
-      JANE_REGISTRY_DB_URL: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?run `just up`}@postgres:5432/${JANE_PG_DB:-jane}
+      JANE_REGISTRY_DB_URL: postgresql://jane_registry:${JANE_PG_REGISTRY_PASSWORD:?run `just up`}@postgres:5432/jane_registry
       JANE_REGISTRY_DB_SCHEMA: jane_registry
       JANE_REGISTRY_S3_ENDPOINT_URL: http://minio:9000
       JANE_REGISTRY_S3_ACCESS_KEY: ${JANE_MINIO_ACCESS_KEY:-jane}
       JANE_REGISTRY_S3_SECRET_KEY: ${JANE_MINIO_SECRET_KEY:?run `just up`}
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_REGISTRY:-}:8000"]
     depends_on:
-      postgres: { condition: service_healthy }
+      pg-provision: { condition: service_completed_successfully }
       minio: { condition: service_healthy }
 
   llm:
@@ -187,12 +211,12 @@ services:
     build: { context: .., dockerfile: services/llm/Dockerfile }
     environment:
       JANE_LLM_STORE: postgres
-      JANE_LLM_DATABASE_URL: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?run `just up`}@postgres:5432/${JANE_PG_DB:-jane}
+      JANE_LLM_DATABASE_URL: postgresql://jane_llm:${JANE_PG_LLM_PASSWORD:?run `just up`}@postgres:5432/jane_llm
       JANE_LLM_FAKE_PROVIDER_ENABLED: "true"
       JANE_LLM_LOG_FORMAT: json
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_LLM:-}:8110"]
     depends_on:
-      postgres: { condition: service_healthy }
+      pg-provision: { condition: service_completed_successfully }
     healthcheck:
       <<: *healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8110/v1/health', timeout=2)"]
@@ -201,14 +225,14 @@ services:
     profiles: ["assistant"]
     build: { context: .., dockerfile: services/assistant/Dockerfile }
     environment:
-      JANE_ASSISTANT_STATE_DSN: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?run `just up`}@postgres:5432/${JANE_PG_DB:-jane}
+      JANE_ASSISTANT_STATE_DSN: postgresql://jane_assistant:${JANE_PG_ASSISTANT_PASSWORD:?run `just up`}@postgres:5432/jane_assistant
       JANE_ASSISTANT_LLM_URL: http://llm:8110
       JANE_ASSISTANT_HANDLER_RUNTIME_URL: http://handler-runtime:8000
       JANE_ASSISTANT_STORAGE_URL: http://storage:8000
       JANE_ASSISTANT_LOG_FORMAT: json
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_ASSISTANT:-}:8000"]
     depends_on:
-      postgres: { condition: service_healthy }
+      pg-provision: { condition: service_completed_successfully }
       llm: { condition: service_healthy }
     healthcheck:
       <<: *healthcheck

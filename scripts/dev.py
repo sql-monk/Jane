@@ -247,13 +247,28 @@ PORT_VARS = {
     "assistant": ("JANE_PORT_ASSISTANT", 8000),
 }
 
+PG_SERVICE_DATABASES = {
+    "handler-runtime": ("jane_handler_runtime", "JANE_PG_HANDLER_RUNTIME_PASSWORD"),
+    "orchestrator": ("jane_orchestrator", "JANE_PG_ORCHESTRATOR_PASSWORD"),
+    "registry": ("jane_registry", "JANE_PG_REGISTRY_PASSWORD"),
+    "llm": ("jane_llm", "JANE_PG_LLM_PASSWORD"),
+    "assistant": ("jane_assistant", "JANE_PG_ASSISTANT_PASSWORD"),
+    "storage-results": ("jane_storage_results", "JANE_PG_STORAGE_RESULTS_PASSWORD"),
+}
+DEFAULT_STACK_SERVICES = ("postgres", "sqlserver", "mongodb", "minio", "s3", "testsite", "proxy")
+
 
 def load_or_create_credentials(project: str) -> dict[str, str]:
     path = stack_file(project)
     if path.is_file():
         data = json.loads(path.read_text(encoding="utf-8"))
         if "env" in data:
-            return dict(data["env"])
+            creds = dict(data["env"])
+            if missing := [key for _, key in PG_SERVICE_DATABASES.values() if key not in creds]:
+                creds.update({key: secrets.token_urlsafe(24) for key in missing})
+                data["env"] = creds
+                path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            return creds
     creds = {
         "JANE_PG_USER": "jane",
         "JANE_PG_DB": "jane",
@@ -266,6 +281,7 @@ def load_or_create_credentials(project: str) -> dict[str, str]:
         "JANE_S3_ACCESS_KEY": "jane-" + secrets.token_hex(4),
         "JANE_S3_SECRET_KEY": secrets.token_urlsafe(24),
     }
+    creds.update({key: secrets.token_urlsafe(24) for _, key in PG_SERVICE_DATABASES.values()})
     STACK_DIR.mkdir(exist_ok=True)
     path.write_text(
         json.dumps({"project": project, "env": creds, "services": {}}, indent=2), encoding="utf-8"
@@ -363,6 +379,17 @@ def describe(project: str, env: dict[str, str]) -> dict[str, dict[str, object]]:
     ):
         if port := ports[name]:
             services[name] = {"host": host, "port": port, "url": f"http://{host}:{port}"}
+    if pg_port := ports["postgres"]:
+        for name, (database, password_key) in PG_SERVICE_DATABASES.items():
+            services[f"db-{name}"] = {
+                "host": host,
+                "port": pg_port,
+                "endpoint": f"postgresql://{host}:{pg_port}/{database}",
+                "db_user": database,
+                "db_password": env[password_key],
+                "db_name": database,
+                "db_dsn": f"postgresql://{database}:{env[password_key]}@{host}:{pg_port}/{database}",
+            }
     return services
 
 
@@ -375,7 +402,17 @@ def cmd_up(ns: argparse.Namespace) -> int:
     args = ["up", "-d", "--wait", "--wait-timeout", str(ns.wait_timeout)]
     if not ns.no_build:
         args.append("--build")
-    code = compose(project, env, *args, *ns.services).returncode
+    selected = list(ns.services) or list(DEFAULT_STACK_SERVICES)
+    if "pg-provision" in selected:
+        selected.remove("pg-provision")
+        if "postgres" not in selected:
+            selected.append("postgres")
+    code = compose(project, env, *args, *selected).returncode
+    db_apps = set(PG_SERVICE_DATABASES) - {"storage-results"}
+    if code == 0 and "postgres" in selected and not (db_apps | {"storage"}) & set(selected):
+        # `up --wait` treats a successful one-shot target as a failure. For infrastructure-only
+        # starts, wait for postgres first, then run the idempotent provisioner to completion.
+        code = compose(project, env, "run", "--rm", "--no-deps", "pg-provision").returncode
     services = describe(project, env)
     stack_file(project).write_text(
         json.dumps(
@@ -404,6 +441,7 @@ def cmd_down(ns: argparse.Namespace) -> int:
         "JANE_MONGO_PASSWORD",
         "JANE_MINIO_SECRET_KEY",
         "JANE_S3_SECRET_KEY",
+        *(key for _, key in PG_SERVICE_DATABASES.values()),
     ):
         env.setdefault(var, "unused")
     # -v also removes locally built images (<project>-testsite) so they do not pile up.

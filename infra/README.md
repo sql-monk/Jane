@@ -18,6 +18,7 @@ just down -v                # зупинити й видалити томи, з�
 | Сервіс | Образ (типово) | Порт у контейнері | Health-check | Для кого |
 |---|---|---|---|---|
 | `postgres` | `postgres:18` | 5432 | `pg_isready` | оркестратор, адаптер PostgreSQL |
+| `pg-provision` | `postgres:18` | — | успішне завершення SQL | окремі ролі й бази сервісів |
 | `sqlserver` | `mcr.microsoft.com/mssql/server:2022-latest` (Developer) | 1433 | `sqlcmd SELECT 1` | адаптер SQL Server |
 | `mongodb` | `mongo:8.0` | 27017 | `mongosh ping` | адаптер MongoDB |
 | `minio` | `pgsty/minio:RELEASE.2026-08-04T00-00-00Z@sha256:b6bfe723…` (digest) | 9000 (API), 9001 (консоль) | `/minio/health/live` | адаптер MinIO, blob-сховище матеріалів |
@@ -39,12 +40,29 @@ just down -v                # зупинити й видалити томи, з�
 - **Адреса.** `JANE_BIND` (типово `127.0.0.1`) — назовні хоста стек не відкривається.
 - **Облікові дані.** Генеруються випадково під час першого `just up` для проєкту й зберігаються в
   `.jane/stack-<проєкт>.json` (у `.gitignore`); у репозиторії їх немає. `just down -v` видаляє файл.
+- **Власність PostgreSQL.** `pg-provision` створює й оновлює окремі LOGIN ролі й бази. Кожен сервіс
+  отримує пароль тільки своєї ролі, не пароль суперкористувача `jane`. `PUBLIC` не має `CONNECT` до
+  цих баз; `infra/tests/test_stack.py` перевіряє вхід кожною роллю у свою базу і відмову на чужі.
+  На повторному `just up` паролі з файлу стеку зберігаються; provisioner ідемпотентний і не видаляє дані.
+
+  | Сервіс / ціль | Роль і база | Змінна пароля в `.jane/stack-*.json` |
+  |---|---|---|
+  | handler-runtime | `jane_handler_runtime` | `JANE_PG_HANDLER_RUNTIME_PASSWORD` |
+  | orchestrator | `jane_orchestrator` | `JANE_PG_ORCHESTRATOR_PASSWORD` |
+  | registry | `jane_registry` | `JANE_PG_REGISTRY_PASSWORD` |
+  | llm | `jane_llm` | `JANE_PG_LLM_PASSWORD` |
+  | assistant | `jane_assistant` | `JANE_PG_ASSISTANT_PASSWORD` |
+  | storage `results-pg` | `jane_storage_results` | `JANE_PG_STORAGE_RESULTS_PASSWORD` |
+
+  `just env --format json` показує відповідні `db_dsn` для незалежного запуску сервісів. База `jane`
+  залишається лише для адміністративного облікового запису dev-стеку; сервіси до неї не підключаються.
 - **Образи.** `JANE_IMAGE_<СЕРВІС>` (наприклад `JANE_IMAGE_MINIO`) — замінити реєстр або версію. Образ testsite
   збирається з тегом `<проєкт>-testsite`, тож паралельні стеки не перезаписують образ одне одного.
 - **SeaweedFS.** Розмір тому — `JANE_S3_VOLUME_SIZE_LIMIT_MB` (типово 64).
 - **Застосунки.** Профілі вимкнені за замовчуванням, щоб `just up` не будував усі образи. `just up
-  assistant` також піднімає `llm` і PostgreSQL; `registry` піднімає PostgreSQL і MinIO. PostgreSQL-схеми
-  сервісів окремі; приклад конфігурації storage — `infra/config/storage-connections.json`. Додаткові URL
+  assistant` також піднімає `llm` і PostgreSQL; `registry` піднімає PostgreSQL і MinIO. Окремі бази
+  створює `pg-provision` до запуску застосунку; приклад storage — `infra/config/storage-connections.json`.
+  Його host-файл можна підмінити через `JANE_STORAGE_CONNECTIONS_FILE_HOST` (абсолютний шлях). Додаткові URL
   сусідів для assistant задавайте лише коли відповідні сервіси запущені. Для handler-runtime потрібен
   налаштований образ пісочниці (`JANE_HANDLER_RUNTIME_PROFILE_IMAGES`), якщо запускати екстрактори.
 - **Статика адмінки.** `just up` підмонтовує `web/admin/dist`, якщо тека вже існує; інакше Caddy показує
@@ -55,9 +73,11 @@ just down -v                # зупинити й видалити томи, з�
   запущено — тоді інтеграційні тести пропускаються). Береться стек **цього** checkout (типове ім'я проєкту);
   `just integration --project <ім'я>` задає інший (через `JANE_STACK_FILE`).
 
-Прямий запуск без just (наприклад, у власному скрипті): задати змінні `JANE_PG_PASSWORD`,
-`JANE_MSSQL_SA_PASSWORD`, `JANE_MONGO_PASSWORD`, `JANE_MINIO_SECRET_KEY`, `JANE_S3_SECRET_KEY` і виконати
-`docker compose -f infra/compose.yaml -p <унікальне-ім'я> up -d --wait`.
+Прямий запуск без just: задати змінні `JANE_PG_PASSWORD`, `JANE_MSSQL_SA_PASSWORD`,
+`JANE_MONGO_PASSWORD`, `JANE_MINIO_SECRET_KEY`, `JANE_S3_SECRET_KEY` і всі шість
+`JANE_PG_*_PASSWORD` із таблиці вище. Спершу `docker compose -f infra/compose.yaml -p <унікальне-ім'я>
+up -d --wait postgres`, потім `docker compose -f infra/compose.yaml -p <те саме ім'я> run --rm
+--no-deps pg-provision`, далі `up -d --wait <сервіс>`. Для звичайної роботи `just up` робить це сам.
 
 ## Чому SeaweedFS як S3-замінник
 

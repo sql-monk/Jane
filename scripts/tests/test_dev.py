@@ -67,6 +67,65 @@ def test_default_project_is_valid_and_stable(monkeypatch: pytest.MonkeyPatch) ->
     assert dev.default_project() == "jane-custom"
 
 
+def test_existing_stack_receives_distinct_service_credentials(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    path = tmp_path / "stack-test.json"
+    path.write_text('{"env":{"JANE_PG_PASSWORD":"existing"},"services":{}}', encoding="utf-8")
+    monkeypatch.setattr(dev, "stack_file", lambda project: path)
+    creds = dev.load_or_create_credentials("test")
+    assert creds["JANE_PG_PASSWORD"] == "existing"
+    passwords = [creds[key] for _, key in dev.PG_SERVICE_DATABASES.values()]
+    assert len(passwords) == len(set(passwords))
+    assert all(password != "existing" for password in passwords)
+    assert dev.load_or_create_credentials("test") == creds
+
+
+def test_describe_separates_database_credentials_from_app_urls(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        dev, "host_port", lambda project, env, service, port: 15432 if service == "postgres" else None
+    )
+    env = {"JANE_PG_USER": "jane", "JANE_PG_PASSWORD": "root-test", "JANE_PG_DB": "jane"}
+    env.update({key: f"{name}-test" for name, (_, key) in dev.PG_SERVICE_DATABASES.items()})
+    services = dev.describe("test", env)
+    assert "handler-runtime" not in services
+    assert services["db-handler-runtime"]["db_user"] == "jane_handler_runtime"
+    assert services["db-handler-runtime"]["db_name"] == "jane_handler_runtime"
+
+
+def test_up_postgres_runs_provision_gate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    path = tmp_path / "stack-test.json"
+    monkeypatch.setattr(dev, "ROOT", tmp_path)
+    monkeypatch.setattr(dev, "stack_file", lambda project: path)
+    monkeypatch.setattr(dev, "describe", lambda project, env: {})
+    calls: list[list[str]] = []
+
+    def fake_compose(project: str, env: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
+        calls.append(list(args))
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(dev, "compose", fake_compose)
+    assert dev.cmd_up(Namespace(project="test", wait_timeout=10, no_build=True, services=["postgres"])) == 0
+    assert calls[0][-1] == "postgres"
+    assert calls[1] == ["run", "--rm", "--no-deps", "pg-provision"]
+
+
+def test_up_default_excludes_one_shot_from_wait(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(dev, "ROOT", tmp_path)
+    monkeypatch.setattr(dev, "stack_file", lambda project: tmp_path / "stack-test.json")
+    monkeypatch.setattr(dev, "describe", lambda project, env: {})
+    calls: list[list[str]] = []
+
+    def fake_compose(project: str, env: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
+        calls.append(list(args))
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(dev, "compose", fake_compose)
+    assert dev.cmd_up(Namespace(project="test", wait_timeout=10, no_build=True, services=[])) == 0
+    assert calls[0][-len(dev.DEFAULT_STACK_SERVICES) :] == list(dev.DEFAULT_STACK_SERVICES)
+    assert calls[1] == ["run", "--rm", "--no-deps", "pg-provision"]
+
+
 def test_web_runs_corepack_from_each_package(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     package = tmp_path / "web" / "admin"
     package.mkdir(parents=True)

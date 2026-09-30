@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 import sys
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 
 MARKER = ".jane-wp"
@@ -38,7 +39,7 @@ def read_wp(root: Path) -> str | None:
     return m.group(1) if m else "??"
 
 
-@lru_cache(maxsize=None)
+@cache
 def _glob_to_regex(pattern: str) -> re.Pattern[str]:
     out = []
     i = 0
@@ -113,17 +114,28 @@ def _check_diff(argv: list[str]) -> int:
     if wp is None:
         print("WP unknown: pass --wp NN or create .jane-wp", file=sys.stderr)
         return 2
-    out = subprocess.run(
-        ["git", "diff", "--name-only", f"{base}...HEAD"],
-        cwd=root, capture_output=True, text=True, check=True,
+    git = shutil.which("git")
+    if git is None or base.startswith("-"):
+        print("git executable missing or invalid base ref", file=sys.stderr)
+        return 2
+    # Fixed argument vectors, no shell; the ref cannot introduce Git options.
+    out = subprocess.run(  # noqa: S603
+        [git, "diff", "--name-only", f"{base}...HEAD"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout
-    untracked = subprocess.run(
-        ["git", "ls-files", "--others", "--exclude-standard"],
-        cwd=root, capture_output=True, text=True, check=True,
+    untracked = subprocess.run(  # noqa: S603
+        [git, "ls-files", "--others", "--exclude-standard"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout
     files = sorted({f for f in (out + untracked).splitlines() if f and f != MARKER})
     bad = [(f, r) for f in files if (r := check(root, wp, f))]
-    for f, reason in bad:
+    for f, _reason in bad:
         print(f"OUTSIDE  {f}")
     print(f"WP-{wp}: {len(files)} changed file(s), {len(bad)} outside ownership")
     return 1 if bad else 0

@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from jane_wp import find_root, read_wp  # noqa: E402
+from jane_wp import find_root, read_wp
 
 
 def main() -> int:

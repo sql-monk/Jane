@@ -47,7 +47,8 @@ def _bin(name: str, *dirs: Path) -> str | None:
 
 def _run(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess[str] | None:
     try:
-        return subprocess.run(
+        # Callers supply a resolved formatter executable and fixed arguments; no shell.
+        return subprocess.run(  # noqa: S603
             cmd,
             cwd=cwd,
             capture_output=True,

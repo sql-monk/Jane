@@ -34,7 +34,8 @@ def scan(root: Path, gitleaks: str, staged: bool, timeout_s: float) -> tuple[int
     if staged:
         cmd.append("--staged")
     cmd.append(str(root))
-    proc = subprocess.run(
+    # gitleaks comes from shutil.which; arguments are fixed and shell is disabled.
+    proc = subprocess.run(  # noqa: S603
         cmd,
         cwd=root,
         capture_output=True,

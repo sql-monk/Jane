@@ -58,12 +58,18 @@ def extract(material: dict, params: dict, ctx) -> dict:
     """material — Material (contracts/schemas/material.schema.json) з уже завантаженим вмістом:
     ctx.text() / ctx.bytes(); params — перевірені за params_schema; ctx.log — журнал."""
     return {
-        "status": "success",            # success | empty | unrecognized  (failed — лише через виняток)
-        "entities": [{"entity_type": "product",
-                      "key": {"scope": material["source"].get("source_id", "local"), "natural": {"sku": "A-100"}},
-                      "fields": {"sku": "A-100", "price": {"amount": 1299.0, "currency": "UAH"}}}],
-        "unrecognized": None,           # {"partial": true, "reason": "...", "signature": "missing-selector:.price"}
-        "diagnostics": [{"level": "warning", "code": "extract.missing_selector", "message": "...", "selector": ".price"}],
+        "status": "success",  # success | empty | unrecognized  (failed — лише через виняток)
+        "entities": [
+            {
+                "entity_type": "product",
+                "key": {"scope": material["source"].get("source_id", "local"), "natural": {"sku": "A-100"}},
+                "fields": {"sku": "A-100", "price": {"amount": 1299.0, "currency": "UAH"}},
+            }
+        ],
+        "unrecognized": None,  # {"partial": true, "reason": "...", "signature": "missing-selector:.price"}
+        "diagnostics": [
+            {"level": "warning", "code": "extract.missing_selector", "message": "...", "selector": ".price"}
+        ],
     }
 ```
 Runtime сам додає `observation` (з матеріалу), `provenance` (пакет, виклик), валідує `fields` за

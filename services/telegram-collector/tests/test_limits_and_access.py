@@ -6,6 +6,7 @@ import base64
 import time
 from datetime import timedelta
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 from urllib.request import url2pathname
 
@@ -355,7 +356,7 @@ def test_connection_policy_rejects_exfiltration(
     def conn(**overrides: object) -> dict[str, object]:
         return {"connection_id": "tg", "kind": "telegram_account", "params": {"api_id": 1}, **overrides}
 
-    rejected = [
+    rejected: list[tuple[dict[str, Any], str, str]] = [
         ({"secret_refs": {"session": "env:PGPASSWORD"}}, "/secret_refs/session", "secret_ref_not_allowed"),
         (
             {"secret_refs": {"session": f"file:{secrets_dir / '..' / 'outside'}"}},

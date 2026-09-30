@@ -408,15 +408,21 @@ class Runs:
         )
         return int(cur.rowcount or 0)
 
-    def fail_run(self, conn: Any, run_id: str, problem: Mapping[str, Any]) -> None:
-        """Mark a run failed (``on_failure: fail_run``, collector failure, run timeout). Caller holds a tx."""
-        conn.execute(
+    def fail_run(self, conn: Any, run_id: str, problem: Mapping[str, Any]) -> bool:
+        """Mark a run failed (``on_failure: fail_run``, collector failure, run timeout). Caller holds a tx.
+
+        Returns ``True`` only for the caller that actually changed the state (several workers or reapers may
+        race for the same run): only that caller counts the metric and cancels the collection."""
+        cur = conn.execute(
             "UPDATE runs SET status = 'failed', error = %s, finished_at = now(), updated_at = now()"
             " WHERE run_id = %s AND status NOT IN ('succeeded', 'failed', 'cancelled')",
             (Jsonb(dict(problem)), run_id),
         )
+        if cur.rowcount != 1:
+            return False
         self._cancel_pending_items(conn, run_id)
         self.core.metrics.inc("runs", status="failed")
+        return True
 
     def maybe_finish(self, run_id: str) -> str | None:
         """Close the run when the feed is exhausted and no item is active. Returns the new status."""

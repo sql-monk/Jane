@@ -321,10 +321,11 @@ class Engine:
                 " error = %s, finished_at = now(), updated_at = now() WHERE item_id = %s",
                 (Jsonb(err), item["item_id"]),
             )
-            if stage.get("on_failure") == "fail_run":
-                self.runs.fail_run(conn, run["run_id"], {**err, "details": {"stage_id": stage["stage_id"]}})
+            run_failed = stage.get("on_failure") == "fail_run" and self.runs.fail_run(
+                conn, run["run_id"], {**err, "details": {"stage_id": stage["stage_id"]}}
+            )
         self.core.metrics.inc("items", outcome="failed")
-        if stage.get("on_failure") == "fail_run":
+        if run_failed:
             self._cancel_collection(run)
         self.runs.maybe_finish(run["run_id"])
         return "failed"
@@ -406,14 +407,17 @@ class Engine:
                     result,
                 )
                 self._insert_items(conn, run, new_items)
-            if final_failed and stage.get("on_failure") == "fail_run":
-                self.runs.fail_run(
+            run_failed = (
+                final_failed
+                and stage.get("on_failure") == "fail_run"
+                and self.runs.fail_run(
                     conn,
                     run["run_id"],
                     problem("upstream_conflict", f"stage '{stage['stage_id']}' failed", 502),
                 )
+            )
         self.core.metrics.inc("items", outcome=str(status))
-        if final_failed and stage.get("on_failure") == "fail_run":
+        if run_failed:
             self._cancel_collection(run)
         self.runs.maybe_finish(run["run_id"])
         return str(status)
@@ -594,12 +598,13 @@ class Engine:
         run_timeout = task_limits.get("timeouts.run_timeout_ms")
         if run_timeout and run["started_at"] and now() - run["started_at"] > _ms(int(run_timeout)):
             with self.core.db.tx() as conn:
-                self.runs.fail_run(
+                changed = self.runs.fail_run(
                     conn,
                     run_id,
                     problem("timeout", f"run exceeded timeouts.run_timeout_ms={run_timeout}", 504, True),
                 )
-            self._cancel_collection(run)
+            if changed:
+                self._cancel_collection(run)
             self._release_feed(run_id, worker, feed_done=True)
             return "timeout"
         capacity = self._capacity(run, task_limits)
@@ -974,7 +979,11 @@ class Engine:
     # ================================================================== housekeeping
     def reap(self) -> int:
         """Close runs nobody else will close: a cancelling or drained run whose last worker died (the item
-        and feed paths never see it again), and runs over ``timeouts.run_timeout_ms`` in any phase."""
+        and feed paths never see it again), and runs over ``timeouts.run_timeout_ms`` in any phase.
+
+        Only runs that need action are selected, so busy runs never crowd out the ones to close (a batch of
+        ``reap_batch`` always makes progress). Several reapers may pick the same run: state changes are
+        conditional and only the reaper that changed the state counts it and calls the collector."""
         eng = self.core.engine
         with self.core.db.conn() as conn:
             timed_out = conn.execute(
@@ -988,16 +997,30 @@ class Engine:
                 """,
                 (eng.reap_batch,),
             ).fetchall()
+            # candidates that maybe_finish will close: a drained running run with no active item, or a
+            # cancelling run whose remaining items are not held by a live lease
             drained = conn.execute(
-                "SELECT run_id FROM runs WHERE status IN ('running', 'cancelling') AND feed_done"
-                " ORDER BY updated_at LIMIT %s",
+                """
+                SELECT r.run_id FROM runs r
+                WHERE r.feed_done AND (
+                    (r.status = 'running' AND NOT EXISTS (
+                        SELECT 1 FROM items i WHERE i.run_id = r.run_id
+                          AND i.status IN ('queued', 'retrying', 'leased', 'running')))
+                    OR (r.status = 'cancelling' AND NOT EXISTS (
+                        SELECT 1 FROM items i WHERE i.run_id = r.run_id
+                          AND i.status IN ('leased', 'running') AND i.lease_expires_at >= now())))
+                ORDER BY r.seq LIMIT %s
+                """,
                 (eng.reap_batch,),
             ).fetchall()
         closed = 0
         for run in timed_out:
             if run["status"] == "cancelling":
                 with self.core.db.tx() as conn:
-                    conn.execute("UPDATE runs SET feed_done = true WHERE run_id = %s", (run["run_id"],))
+                    conn.execute(
+                        "UPDATE runs SET feed_done = true WHERE run_id = %s AND status = 'cancelling'",
+                        (run["run_id"],),
+                    )
                     # items still leased by dead or stuck workers are cancelled regardless of the lease
                     conn.execute(
                         "UPDATE items SET status = 'cancelled', payload = NULL, lease_owner = NULL,"
@@ -1005,27 +1028,27 @@ class Engine:
                         " AND status IN ('queued', 'retrying', 'leased', 'running')",
                         (run["run_id"],),
                     )
-            else:
-                limit = run["limits"]["task"]["timeouts"]["run_timeout_ms"]
-                with self.core.db.tx() as conn:
-                    self.runs.fail_run(
-                        conn,
-                        run["run_id"],
-                        problem("timeout", f"run exceeded timeouts.run_timeout_ms={limit}", 504, True),
-                    )
+                closed += int(self.runs.maybe_finish(run["run_id"]) is not None)
+                continue
+            limit = run["limits"]["task"]["timeouts"]["run_timeout_ms"]
+            with self.core.db.tx() as conn:
+                changed = self.runs.fail_run(
+                    conn,
+                    run["run_id"],
+                    problem("timeout", f"run exceeded timeouts.run_timeout_ms={limit}", 504, True),
+                )
+                if changed:
                     conn.execute(
                         "UPDATE items SET status = 'cancelled', payload = NULL, lease_owner = NULL,"
                         " finished_at = now(), updated_at = now() WHERE run_id = %s"
                         " AND status IN ('leased', 'running')",
                         (run["run_id"],),
                     )
+            if changed:
                 self._cancel_collection(run)
-            closed += 1
+                closed += 1
         for row in drained:
             closed += int(self.runs.maybe_finish(row["run_id"]) is not None)
-        for run in timed_out:
-            if run["status"] == "cancelling":
-                closed += int(self.runs.maybe_finish(run["run_id"]) is not None)
         return closed
 
     # ================================================================== LLM budget sync

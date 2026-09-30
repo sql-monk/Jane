@@ -241,6 +241,8 @@ def test_probe_site_logs_requests_failures_and_retry_after(probe: str) -> None:
 # ------------------------------------------------------------------------------------------ sandbox probe
 def test_sandbox_probe_package() -> None:
     assert_package_tests_pass(lh.PROBE_PACKAGE)
+    manifest = json.loads((lh.PROBE_PACKAGE / "jane-package.json").read_text(encoding="utf-8"))
+    assert lh.examples().package_json_problems(lh.PROBE_PACKAGE, manifest) == []
     result = run_local(
         lh.PROBE_PACKAGE,
         file=lh.PROBE_PACKAGE / "tests" / "page" / "page.html",

@@ -35,6 +35,7 @@ from urllib.parse import urlsplit
 
 import httpx
 from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
 from referencing import Registry, Resource
 
 from jane_kit.contracts import ContractClient, OpenAPISpec
@@ -204,6 +205,28 @@ def validate(schema: str, doc: Any) -> list[str]:
     return [f"{'/'.join(map(str, e.absolute_path)) or '/'}: {e.message}" for e in validator.iter_errors(doc)]
 
 
+def package_json_problems(directory: Path, manifest: Mapping[str, Any]) -> list[str]:
+    """Every JSON file of a package parses; params and entity schemas are valid JSON Schemas.
+
+    The SDK's in-process test run does not load the schemas, the registry and the runtime do (422).
+    """
+    problems: list[str] = []
+    for path in sorted(directory.rglob("*.json")):
+        try:
+            read_json(path)
+        except ValueError as exc:
+            problems.append(f"{path.relative_to(directory).as_posix()}: invalid JSON: {exc}")
+    schemas = [manifest.get("params_schema")] + [
+        e.get("schema") for e in (manifest.get("output") or {}).get("entities", [])
+    ]
+    for rel in [s for s in schemas if isinstance(s, str)]:
+        try:
+            Draft202012Validator.check_schema(read_json(directory / rel))
+        except (ValueError, SchemaError) as exc:
+            problems.append(f"{rel}: not a valid JSON Schema: {str(exc)[:200]}")
+    return problems
+
+
 def check_offline() -> list[str]:
     """Problems of the examples in this checkout (empty = reproducible): the same checks as the tests."""
     from jane_extractor_sdk.testing import run_package_tests
@@ -222,6 +245,7 @@ def check_offline() -> list[str]:
         ]
         if raw != json.dumps(manifest, ensure_ascii=False, indent=2) + "\n":
             problems.append(f"{package_id}: jane-package.json is not in canonical JSON form (see write_json)")
+        problems += [f"{package_id}: {e}" for e in package_json_problems(directory, manifest)]
         if manifest["kind"] == "collector-rules":
             rules = read_json(directory / manifest["entry"]["rules"])
             problems += [f"{package_id}: rules {e}" for e in validate("collector-rules.schema.json", rules)]

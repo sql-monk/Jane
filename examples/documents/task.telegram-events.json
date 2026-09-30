@@ -37,7 +37,7 @@
       "handler": {
         "package_id": "examples.telegram-event-extractor",
         "version": "1.0.0",
-        "digest": "sha256:f9acb06c514fa291c53f8ffdb816464f9c9994acc861a0d347f01657097c8ba7"
+        "digest": "sha256:37143cc4a36963d4825aac6fd7cac108f1479005af26ab24309d499859f17d55"
       },
       "inputs": [
         {

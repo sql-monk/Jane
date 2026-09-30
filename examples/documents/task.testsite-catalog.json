@@ -1,0 +1,106 @@
+{
+  "task_id": "testsite-catalog",
+  "title": "Повний каталог товарів testsite",
+  "description": "Критерій 5 ТЗ §12: категорії з пагінацією → RAW у files, повні картки товарів у PostgreSQL.",
+  "input": {
+    "source_id": "testsite-shop"
+  },
+  "stages": [
+    {
+      "stage_id": "collect",
+      "kind": "collect",
+      "collector": {
+        "collector": "web",
+        "mode": "full"
+      }
+    },
+    {
+      "stage_id": "store-raw",
+      "kind": "handler",
+      "handler": {
+        "package_id": "jane.storage-files",
+        "version": "1.0.0",
+        "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+      },
+      "connections": {
+        "target": "raw-files"
+      },
+      "inputs": [
+        {
+          "from": "collect"
+        }
+      ]
+    },
+    {
+      "stage_id": "extract-products",
+      "kind": "handler",
+      "handler": {
+        "package_id": "examples.testsite-catalog-extractor",
+        "version": "1.0.0",
+        "digest": "sha256:5d5df84301dad59b47d4fc3a087de46f6cac12e01a7617579421178b125c84e2"
+      },
+      "inputs": [
+        {
+          "from": "collect",
+          "when": {
+            "field": "material.format.media_type",
+            "op": "eq",
+            "value": "text/html"
+          }
+        }
+      ],
+      "bindings": [
+        {
+          "url_patterns": [
+            {
+              "value": "*/product/*"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage_id": "store-products",
+      "kind": "handler",
+      "handler": {
+        "package_id": "jane.storage-postgresql",
+        "version": "1.0.0",
+        "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+      },
+      "connections": {
+        "target": "results-pg"
+      },
+      "inputs": [
+        {
+          "from": "extract-products",
+          "select": "output",
+          "when": {
+            "field": "result.status",
+            "op": "in",
+            "value": [
+              "success",
+              "unrecognized"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "schedule": {
+    "type": "cron",
+    "cron": "0 3 * * 0",
+    "timezone": "Europe/Kyiv",
+    "overlap": "skip"
+  },
+  "limits": {
+    "crawl": {
+      "max_depth": 3,
+      "max_pages_per_run": 200
+    }
+  },
+  "forward_unknown_to_llm": false,
+  "labels": {
+    "example": "wp14-catalog",
+    "kind": "catalog"
+  }
+}

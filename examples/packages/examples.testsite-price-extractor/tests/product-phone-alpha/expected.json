@@ -1,0 +1,22 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "sku": "phone-alpha",
+        "price": {
+          "amount": 299.0,
+          "currency": "UAH"
+        },
+        "availability": "in_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "sku": "phone-alpha"
+        }
+      }
+    }
+  ]
+}

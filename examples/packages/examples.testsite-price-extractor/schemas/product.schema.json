@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "product (лише ціна й наявність)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sku"],
+  "properties": {
+    "sku": { "type": "string", "minLength": 1 },
+    "price": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amount", "currency"],
+      "properties": {
+        "amount": { "type": "number", "minimum": 0 },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+      }
+    },
+    "availability": { "type": "string", "enum": ["in_stock", "out_of_stock", "preorder", "unknown"] }
+  }
+}

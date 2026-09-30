@@ -1,0 +1,112 @@
+{
+  "schema_version": "1",
+  "package_id": "examples.testsite-price-extractor",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "Jane test site: price and availability only",
+  "description": "Екстрактор прикладу «перевірка цін»: лише sku, ціна й наявність (completeness: partial) для часткового оновлення товару.",
+  "tags": [
+    "examples",
+    "testsite",
+    "products",
+    "prices"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_example_price.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "product",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "sku"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення)"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "product-phone-alpha",
+      "input": {
+        "file": "tests/product-phone-alpha/page.html",
+        "media_type": "text/html",
+        "url": "http://testsite:8080/product/phone-alpha"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-phone-alpha/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "product-laptop-four-out-of-stock",
+      "input": {
+        "file": "tests/product-laptop-four/page.html",
+        "media_type": "text/html",
+        "url": "http://testsite:8080/product/laptop-four"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-laptop-four/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "category-page-empty",
+      "input": {
+        "file": "tests/category-laptops/page.html",
+        "media_type": "text/html",
+        "url": "http://testsite:8080/catalog/laptops/"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "product-without-price-unrecognized",
+      "input": {
+        "file": "tests/product-no-price/page.html",
+        "media_type": "text/html",
+        "url": "http://testsite:8080/product/phone-omega"
+      },
+      "expected_status": "unrecognized",
+      "origin": "problem_sample"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "WP-14"
+    ],
+    "created_at": "2026-09-30T00:00:00Z",
+    "change_summary": "Partial price and availability update for the reproducible price-check example."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "url_patterns": [
+      "/product/*"
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "source_id": "testsite-shop",
+  "kind": "web",
+  "title": "Jane test site (магазин)",
+  "description": "Локальний testsite у compose-мережі. Ліміт частоти джерела дозволений лише для цього контрольованого сайту.",
+  "locator": {
+    "url": "http://testsite:8080/"
+  },
+  "collector_rules": {
+    "package_id": "examples.testsite-web-rules",
+    "version": "1.0.0",
+    "digest": "sha256:db018cbb61ab3d33b74033494bb293530954279a176a34ab043de7af16e36d7d"
+  },
+  "limits": {
+    "rate": {
+      "requests_per_second_per_host": 2,
+      "min_delay_ms_per_host": 250
+    }
+  },
+  "forward_unknown_to_llm": false,
+  "expected_entity_types": [
+    "product"
+  ],
+  "change_policy": {
+    "llm_versions": "manual_approval"
+  },
+  "labels": {
+    "example": "wp14-catalog"
+  }
+}

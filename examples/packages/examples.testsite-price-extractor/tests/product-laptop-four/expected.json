@@ -1,0 +1,22 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "sku": "laptop-four",
+        "price": {
+          "amount": 1199.0,
+          "currency": "UAH"
+        },
+        "availability": "out_of_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "sku": "laptop-four"
+        }
+      }
+    }
+  ]
+}

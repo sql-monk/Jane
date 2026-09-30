@@ -1,0 +1,111 @@
+# Jane full chain with one limits profile applied through the orchestrator and the collectors (WP-14).
+#
+#   uv run --all-packages python deploy/profiles/stack.py up --profile dev-laptop     # recommended
+#   docker compose -f infra/compose.yaml -f deploy/profiles/compose.stack.yaml -p <unique> up -d --wait <services>
+#
+# The base file (WP-01) describes the services; this overlay only wires them into one working chain:
+#   * JANE_PROFILE_FILE - host path of deploy/profiles/<profile>.json (PlatformLimits), mounted read-only as the
+#     LIMITS_FILE of the services that accept the whole document: the orchestrator (seeds its platform document
+#     on first start and passes effective stage limits to every executor call) and both collectors. storage,
+#     handler-runtime, registry, llm and assistant refuse to start with a full PlatformLimits file (unknown
+#     groups -> LimitError, see docs/delivery/WP-14.md); they get the profile values through the orchestrator;
+#   * registry -> handler-runtime profile check, handler-runtime and web-collector read packages/rules from the
+#     registry, the orchestrator knows its executors (collector, runtime, storage, registry);
+#   * JANE_SANDBOX_IMAGE - image of runtime profile python-extractor@1 (`jane-handler-runtime build-image`),
+#     JANE_DOCKER_SOCKET / JANE_DOCKER_GID - docker API socket for sandboxes and its group inside containers;
+#   * probe-site (compose profile `limits-probe`) - instrumented HTTP site of the limits harness.
+# stack.py sets all variables, a unique project, generated credentials and host ports chosen by Docker.
+# With several -f files relative paths resolve against the FIRST file (infra/), hence `../deploy/...`.
+
+x-health: &health
+  interval: 5s
+  timeout: 5s
+  retries: 60
+  start_period: 20s
+
+x-limits: &limits
+  type: bind
+  source: ${JANE_PROFILE_FILE:?set by deploy/profiles/stack.py}
+  target: /cfg/limits/platform.json
+  read_only: true
+
+services:
+  handler-runtime:
+    environment:
+      JANE_HANDLER_RUNTIME_PROFILE_IMAGES: '{"python-extractor@1": "${JANE_SANDBOX_IMAGE:?set by deploy/profiles/stack.py}"}'
+      JANE_HANDLER_RUNTIME_SANDBOX_LABELS: '{"io.jane.stack": "${JANE_STACK_PROJECT:-jane-stack}"}'
+      JANE_HANDLER_RUNTIME_REGISTRY_URL: http://registry:8000
+
+  registry:
+    environment:
+      # dependencies.python of extractors is checked against the runtime's published profile.
+      JANE_REGISTRY_RUNTIME_PROFILES: '["http://handler-runtime:8000/v1/info"]'
+    healthcheck:
+      <<: *health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
+
+  web-collector:
+    environment:
+      JANE_WEB_COLLECTOR_LIMITS_FILE: /cfg/limits/platform.json
+      JANE_WEB_COLLECTOR_REGISTRY_URL: http://registry:8000
+      JANE_WEB_COLLECTOR_LOG_FORMAT: json
+    volumes: [*limits]
+    depends_on:
+      testsite: { condition: service_healthy }
+    healthcheck:
+      <<: *health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8101/v1/health', timeout=2)"]
+
+  telegram-collector:
+    build:
+      # `--extra telethon` for the real Telegram backend (JANE_TELEGRAM_EXTRAS); empty = recorded backend only.
+      args:
+        EXTRAS: ${JANE_TELEGRAM_EXTRAS:-}
+    environment:
+      JANE_TELEGRAM_COLLECTOR_LIMITS_FILE: /cfg/limits/platform.json
+      JANE_TELEGRAM_COLLECTOR_REGISTRY_URL: http://registry:8000
+      # `recorded` replays examples/telegram/recordings (external-service SUBSTITUTE); `telethon` = real Telegram.
+      JANE_TELEGRAM_COLLECTOR_CLIENT_BACKEND: ${JANE_TELEGRAM_BACKEND:-recorded}
+      JANE_TELEGRAM_COLLECTOR_RECORDINGS_DIR: /cfg/telegram-recordings
+      # Real account only: values come from the operator's environment, never from files in Git.
+      JANE_SECRET_TG_API_HASH: ${JANE_SECRET_TG_API_HASH:-}
+      JANE_SECRET_TG_SESSION: ${JANE_SECRET_TG_SESSION:-}
+    volumes:
+      - *limits
+      - ${JANE_TELEGRAM_RECORDINGS_DIR:-../examples/telegram/recordings}:/cfg/telegram-recordings:ro
+    healthcheck:
+      <<: *health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8102/v1/health', timeout=2)"]
+
+  orchestrator:
+    environment:
+      JANE_ORCHESTRATOR_LIMITS_FILE: /cfg/limits/platform.json
+      JANE_ORCHESTRATOR_LOG_FORMAT: json
+      JANE_ORCHESTRATOR_EXECUTORS: >-
+        [{"executor": "web-collector", "role": "collector", "base_url": "http://web-collector:8101",
+          "capabilities": {"collector": "web"}, "sync_connections": false},
+         {"executor": "storage", "role": "handler", "base_url": "http://storage:8000",
+          "capabilities": {"packages": ["jane.storage-*"]}},
+         {"executor": "storage-read", "role": "storage_read", "base_url": "http://storage:8000",
+          "sync_connections": false},
+         {"executor": "handler-runtime", "role": "handler", "base_url": "http://handler-runtime:8000",
+          "capabilities": {"default": true, "handler_kinds": ["extractor", "transform"]}, "sync_connections": false},
+         {"executor": "registry", "role": "registry", "base_url": "http://registry:8000"}]
+    volumes: [*limits]
+    healthcheck:
+      <<: *health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
+
+  # Instrumented site of the limits harness (deploy/profiles/harness/probe_site.py): logs the arrival and
+  # end of every request so request rate, per-host parallelism, timeouts and retries are measured outside
+  # the component under test.
+  probe-site:
+    profiles: ["limits-probe"]
+    image: ${JANE_IMAGE_PYTHON:-python:3.12-slim}
+    command: ["python", "/app/probe_site.py", "--host", "0.0.0.0", "--port", "8080"]
+    volumes:
+      - ../deploy/profiles/harness/probe_site.py:/app/probe_site.py:ro
+    ports: ["${JANE_BIND:-127.0.0.1}::8080"]
+    healthcheck:
+      <<: *health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/_probe/health', timeout=2)"]

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "examples.testsite-catalog-extractor params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "default_currency": {
+      "description": "Валюта, якщо сторінка її не вказує.",
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "default": "UAH"
+    },
+    "include_url": {
+      "description": "Додавати URL сторінки в поле url.",
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

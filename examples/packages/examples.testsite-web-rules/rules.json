@@ -1,0 +1,26 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": ["testsite"],
+    "allowed_schemes": ["http"],
+    "path_prefixes": ["/catalog/", "/product/"]
+  },
+  "strategies": [
+    {
+      "type": "listing",
+      "strategy_id": "categories",
+      "start_urls": [
+        "http://testsite:8080/catalog/phones/",
+        "http://testsite:8080/catalog/laptops/",
+        "http://testsite:8080/catalog/accessories/"
+      ],
+      "item_links": { "value": "main li a" }
+    }
+  ],
+  "robots": { "mode": "respect" },
+  "normalization": { "strip_query_params": ["utm_*"] },
+  "sections": [
+    { "section_id": "products", "patterns": [{ "value": "testsite/product/**" }] },
+    { "section_id": "catalog", "patterns": [{ "value": "testsite/catalog/**" }] }
+  ]
+}

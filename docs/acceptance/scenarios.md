@@ -41,7 +41,9 @@ Docker-сокет із групою, визначеною автоматично
 
 Змінні: `JANE_E2E_PROJECT`, `JANE_E2E_KEEP`, `JANE_E2E_WAIT_TIMEOUT` (типово 900 с),
 `JANE_E2E_SANDBOX_WALL_TIME_MS` (типово 60000; ліміт запиту до пісочниці), `JANE_E2E_DOCKER_SOCKET`,
-`JANE_E2E_DOCKER_GID`, `JANE_E2E_SANDBOX_IMAGE`.
+`JANE_E2E_DOCKER_GID`, `JANE_E2E_SANDBOX_IMAGE`, `JANE_E2E_HTTP_KEEPALIVE_S` (типово 2 с; час простою,
+після якого тестовий клієнт не використовує з'єднання повторно; має бути меншим за keep-alive сервісів —
+5 с у uvicorn).
 
 ## Стан сценаріїв
 
@@ -53,22 +55,22 @@ Docker-сокет із групою, визначеною автоматично
 | S-M1-04 | Рекурсивний збір зі стороннього застосунку, runtime через CLI | 1, 10 | web-collector, handler-runtime | **пройдено на гілці WP-13** |
 | S-M1-05 | Заміна сховища лише конфігурацією завдання (PostgreSQL ↔ files) | 3 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
 | S-M1-06 | Новий прогін дає нове спостереження й подію історії | 8 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
-| S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | **1 Docker e2e пройшов на гілці WP-13**; виконання LLM-пакета й форки кожного типу ще відкриті |
+| S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | **1 Docker e2e пройшов на гілці WP-13** (у `main` не злито); виконання LLM-пакета й форки інших типів ще відкриті |
 | S-M2-02 | Telegram: історія, нові, редагування як ревізії → збереження | 1, 8, 12 | telegram-collector, storage | **1 passed на спільній гілці WP-01a/00a/13** (Telegram — З) |
-| S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | **10 Docker e2e пройшли на гілці WP-13** (`test_m2_discovery.py`) |
+| S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | **10 Docker e2e пройшли на `main` `1306ad3`** (`test_m2_discovery.py`; `just e2e`, CI `36694741989`) |
 | S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage | ще не реалізовано в WP-13 |
 | S-M2-05a | Невідома сторінка: асистент викликає LLM лише з прапорцем (без оркестратора) | 11 | testsite, assistant, llm, postgres | **реалізовано, проходить** (LLM — З) |
 | S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, runtime, storage, llm | **пройдено на гілці `wp/13-llm-routing`** (`test_m2_llm_routing.py`; LLM — З, архіви пакетів — `package-host` Т); сторінки з ін'єкцією на testsite немає |
 | S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator | ще не реалізовано в WP-13 |
 | S-M2-07 | Проблемні приклади → нова версія → тести → активація → відкат | 6 | orchestrator, assistant, llm, registry, runtime | ще не реалізовано в WP-13 |
-| S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, усі сховища | **1 Docker e2e пройшов на гілці WP-13**; незалежний повтор пройшов |
-| S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці | **1 Docker e2e пройшов на гілці WP-13** (кількість сторінок); темп ще не виміряно |
+| S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, усі сховища | **1 Docker e2e пройшов на `main` `1306ad3`** (`just e2e`, CI `36694741989`); S3 — З |
+| S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці | **1 Docker e2e пройшов на `main` `1306ad3`** (кількість сторінок; `just e2e`, CI `36694741989`); темп ще не виміряно |
 | S-M2-10 | Адмінка на реальному API (Playwright) | 6, 7 (UI) | admin, усі API | WP-12 частково перевірив реальні API; повний Caddy прогін відкритий |
 | S-M2-11 | Ланцюжок з умовами `when` і LLM-етапом | 2 | orchestrator, web-collector, runtime, storage, llm | **пройдено на гілці `wp/13-llm-routing`** (`test_m2_llm_routing.py`; LLM — З, архіви пакетів — `package-host` Т) |
 | R-01 | Kill воркера оркестратора посеред ланцюжка | 8 | orchestrator ×2, виконавці | чекає WP-09 |
 | R-02 | Kill і рестарт кожного сервісу; повтор після рестарту — дубль | 8 | storage, handler-runtime (далі — усі) | **реалізовано для storage і runtime, проходить** |
 | R-03 | Розрив мережі між оркестратором і виконавцем | 8 | orchestrator, виконавці | чекає WP-09 |
-| R-04 | Повторна доставка на кожен виконавець | 8 | усі виконавці | storage, runtime — у S-M1-01 і R-02; інші — з WP |
+| R-04 | Повторна доставка на кожен виконавець | 8 | усі виконавці | **частково**: Web/Telegram Collector і LLM — 4 Docker e2e на гілці WP-13 (`test_r04_idempotency.py`, у `main` не злито; Telegram і LLM-провайдер — З); storage, runtime — дубль у S-M1-01, R-02, R-06 без перевірки 422 і `Idempotency-Replayed`; повтор під час виконання, після рестарту й на іншому екземплярі колекторів і LLM — ні |
 | R-05 | Запізнілий результат не замінює новішого | 8 | storage, handler-runtime | **реалізовано, проходить** |
 | R-06 | Кілька екземплярів кожного компонента | 8 | усі | **runtime ×2 реалізовано, проходить**; інші — з WP |
 | R-07 | Повний цикл LLM → тести → активація → відкат під навантаженням і з рестартами | 6, 8 | orchestrator, assistant, llm, registry, runtime, storage | чекає WP-09, 05 |
@@ -147,6 +149,15 @@ PostgreSQL (`jane.storage-postgresql` / `results-pg`) і files (`jane.storage-fi
    оновлення, `GET …/diff` — відмінності. `POST …/upstream-ports` створює нову версію форку. Етап на
    форку до активації працює тим самим кодом.
 4. Секрет у пакеті відхиляється (`secret_detected`), а форк не копіює підключень.
+
+**Стан.** Усі сервіси сценарію реальні (**Р**: registry на PostgreSQL + MinIO, runtime, Web Collector,
+orchestrator, storage), замінників немає. Крок 1 виконано для всіх чотирьох типів, крок 3 — для форку
+екстрактора, крок 4 — `secret_detected` для пакета екстрактора й форк `jane.storage-files` без
+підключень завдання. Крок 2 виконано для етапу екстрактора (архів із registry,
+перевірка дайджесту) і правил колектора; storage-етапи посилаються на `jane.storage-*@1.0.0` без
+дайджесту й виконуються вбудованими адаптерами. Не перевірено: виконання LLM-пакета через шлюз, архіви
+решти чотирьох storage-пакетів, незмінність форків LLM, storage і правил після оновлення батька.
+Сценарій пройшов на гілці WP-13 окремо й у повному `just e2e`; у `main` не злитий.
 
 ### S-M2-02. Telegram
 Клієнт Telegram — **З** (записаний бекенд WP-04). Кроки: історія каналу → нові повідомлення →
@@ -308,4 +319,10 @@ LLM — **З**, архіви пакетів-фікстур — `package-host` (*
 | R-07 | S-M2-07 з рестартом асистента й runtime посередині | цикл завершується або відновлюється без втрати й дублювання версій; відкат працює |
 | R-08 | Малий `limits.queue.max_unacked_materials`, повільний споживач | колектор призупиняється, пам'ять не росте, після споживання продовжує |
 
-Реалізовані зараз: `tests/e2e/test_reliability.py` — `test_r_02_…`, `test_r_05_…`, `test_r_06_…`.
+Реалізовані зараз: `tests/e2e/test_reliability.py` — `test_r_02_…`, `test_r_05_…`, `test_r_06_…`;
+`tests/e2e/test_r04_idempotency.py` — частина R-04 (лише гілка WP-13):
+`test_r_04_collectors_replay_one_job_without_new_materials[web-collector|telegram-collector]` і
+`test_r_04_llm_replay_does_not_spend_usage_twice[sync|async]`. Вони надсилають `POST /v1/collections`
+і `POST /v1/completions` повторно з тим самим `Idempotency-Key` після завершення першого виклику,
+а потім той самий ключ з іншим тілом. Telegram-мережа — записаний backend (**З**), LLM-провайдер —
+`fake` (**З**), HTTP-сервіси реальні.

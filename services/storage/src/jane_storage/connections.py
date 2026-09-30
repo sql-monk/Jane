@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 import hashlib
 import json
 import logging
@@ -161,7 +162,7 @@ class ConnectionRegistry:
         return [self._items[k] for k in sorted(self._items)]
 
     # -------------------------------------------------------------------------------- policy
-    def policy_errors(self, connection_id: str) -> list[FieldError]:
+    def policy_errors(self, connection_id: str) -> builtins.list[FieldError]:
         """Secret-policy violations of a stored connection (``add_resolved`` ones are the embedder's)."""
         stored = self.get(connection_id)
         if connection_id in self._resolved:
@@ -202,7 +203,7 @@ class ConnectionRegistry:
             return dict.fromkeys(refs, False)
         return {name: self._resolve_ref(ref) is not None for name, ref in refs.items()}
 
-    def secret_values(self, connection_id: str) -> list[str]:
+    def secret_values(self, connection_id: str) -> builtins.list[str]:
         """Resolved values of the connection — only to redact error messages."""
         if connection_id in self._resolved:
             return list(self._resolved[connection_id].secrets.values())

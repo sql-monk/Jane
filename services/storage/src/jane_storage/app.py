@@ -181,6 +181,8 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             max_bytes=lim.objects.max_object_bytes,
             request_timeout_ms=lim.timeouts.request_timeout_ms,
             transit=transit,
+            files_dir=settings.content_files_dir,
+            download_host_allowlist=settings.download_host_allowlist,
         )
         return StorageHandler(
             catalog, pool, reader, retries=lim.retries, request_validator=_request_validator(root)

@@ -38,13 +38,17 @@ class Settings(JaneSettings):
     connection_host_allowlist: list[str] = Field(default_factory=list)
     """``hostname`` / ``hostname:port`` a connection may contact (JSON list); default none: connections with
     a network address are rejected."""
+    content_files_dir: Path | None = None
+    """Only ``file:///`` ContentRef blobs below this directory may be read; None disables local blobs."""
+    download_host_allowlist: list[str] = Field(default_factory=list)
+    """``hostname`` or ``hostname:port`` allowed for ContentRef download_url; empty disables downloads."""
 
-    @field_validator("secret_files_dir", mode="before")
+    @field_validator("secret_files_dir", "content_files_dir", mode="before")
     @classmethod
     def _empty_files_dir_disables(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
 
-    @field_validator("connection_host_allowlist")
+    @field_validator("connection_host_allowlist", "download_host_allowlist")
     @classmethod
     def _valid_allowlist(cls, value: list[str]) -> list[str]:
         ConnectionPolicy(host_allowlist=tuple(value))  # raises on an entry that is not hostname[:port]

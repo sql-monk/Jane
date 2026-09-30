@@ -8,10 +8,12 @@
 ```json
 {"connection_id": "results-pg", "kind": "postgresql",
  "params": {"host": "postgres", "port": 5432, "database": "jane_results", "schema": "public", "sslmode": "prefer"},
- "secret_refs": {"username": "env:RESULTS_PG_USER", "password": "env:RESULTS_PG_PASSWORD"}}
+ "secret_refs": {"username": "env:JANE_SECRET_RESULTS_PG_USER", "password": "env:JANE_SECRET_RESULTS_PG_PASSWORD"}}
 ```
 
 Параметри етапу: `table_prefix` (типово `jane_`), `schema` (перекриває `params.schema`), `format.raw`.
+Для адреси `postgres:5432` задайте `JANE_STORAGE_CONNECTION_HOST_ALLOWLIST='["postgres:5432"]'`;
+інші адреси мають бути явно дозволені тим самим налаштуванням.
 
 ## Таблиці
 

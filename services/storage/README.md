@@ -39,7 +39,8 @@ Docker (контекст — корінь репозиторію; образ м�
 docker build -f services/storage/Dockerfile -t jane-storage .
 docker run -p 8107:8000 -v jane-storage:/var/lib/jane/storage \
   -v ./connections.json:/cfg/connections.json:ro -e JANE_STORAGE_CONNECTIONS_FILE=/cfg/connections.json \
-  -e RESULTS_PG_USER=... -e RESULTS_PG_PASSWORD=... jane-storage
+  -e JANE_STORAGE_CONNECTION_HOST_ALLOWLIST='["postgres:5432"]' \
+  -e JANE_SECRET_RESULTS_PG_USER=... -e JANE_SECRET_RESULTS_PG_PASSWORD=... jane-storage
 ```
 
 `connections.json` (секрети — лише посиланнями `env:`/`file:`, ADR-0006):
@@ -49,7 +50,7 @@ docker run -p 8107:8000 -v jane-storage:/var/lib/jane/storage \
   {"connection_id": "raw-files", "kind": "filesystem", "params": {"base_path": "/var/lib/jane/storage"}},
   {"connection_id": "results-pg", "kind": "postgresql",
    "params": {"host": "postgres", "port": 5432, "database": "jane_results", "schema": "public", "sslmode": "prefer"},
-   "secret_refs": {"username": "env:RESULTS_PG_USER", "password": "env:RESULTS_PG_PASSWORD"}}
+   "secret_refs": {"username": "env:JANE_SECRET_RESULTS_PG_USER", "password": "env:JANE_SECRET_RESULTS_PG_PASSWORD"}}
 ]}
 ```
 
@@ -111,6 +112,23 @@ entities = httpx.get(
 Інші налаштування: `JANE_STORAGE_PORT` (8107), `JANE_STORAGE_CONNECTIONS_FILE`, `JANE_STORAGE_TRANSIT_CONNECTION_ID`
 (підключення `s3`/`minio` для читання `s3://`-матеріалів), `JANE_STORAGE_PACKAGE_DIRS`, `JANE_CONTRACTS_DIR`
 (валідація запитів за контрактами), `JANE_STORAGE_LOG_FORMAT`.
+
+### Політика секретів і вмісту
+
+| Змінна | Типово | Дія |
+|---|---|---|
+| `JANE_STORAGE_SECRET_ENV_PREFIX` | `JANE_SECRET_` | `secret_refs` типу `env:` можуть називати лише змінні з цим префіксом; порожнє значення вимикає `env:` |
+| `JANE_STORAGE_SECRET_FILES_DIR` | `/run/secrets` | `secret_refs` типу `file:` можуть читати лише файли цього каталогу після розв'язання `..` і symlink; порожнє значення вимикає `file:` |
+| `JANE_STORAGE_CONNECTION_HOST_ALLOWLIST` | `[]` | JSON-список дозволених `hostname` або `hostname:port` для мережевих адрес підключень; порожній список забороняє всі такі підключення |
+| `JANE_STORAGE_CONTENT_FILES_DIR` | не задано | `ContentRef` з `file:///…` читається лише з цього каталогу після розв'язання symlink; без змінної локальні blob заборонені |
+| `JANE_STORAGE_DOWNLOAD_HOST_ALLOWLIST` | `[]` | JSON-список дозволених `hostname` або `hostname:port` для `ContentRef.download_url`; порожній список забороняє HTTP-завантаження |
+
+Для `download_url` дозволені лише HTTP(S) URL без userinfo; порт звіряється з allowlist (типово 80/443).
+HTTP-перенаправлення не виконуються. Змінні HTTP-проксі середовища для цих завантажень не застосовуються.
+Каталог `JANE_STORAGE_CONTENT_FILES_DIR` має бути окремим спільним транзитним томом, доступним виробнику
+`ContentRef` і storage за однаковим шляхом. Не спрямовуйте його на `/`, `/run/secrets` або каталог конфігурації.
+Якщо виробник використовує `s3://` з налаштованим `JANE_STORAGE_TRANSIT_CONNECTION_ID`, цей каталог не потрібний.
+Невідповідні адреси чи файли відхиляються до читання вмісту.
 
 ## Адаптери
 

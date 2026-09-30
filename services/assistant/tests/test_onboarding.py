@@ -8,11 +8,13 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import pytest
 from assistant_fakes import World
 from assistant_fakes.base import FakeRequest, Reply
 from assistant_fakes.runtime import PRODUCT_CODE_V1
-from assistant_fakes.site import INJECTION
+from assistant_fakes.site import INJECTION, material, page, product
 
+from jane_assistant.content import url_shape
 from jane_assistant.packages import extractor_draft
 
 
@@ -178,6 +180,20 @@ def test_name_only_sampling_waits_for_types_beyond_first_streamed_products(w: Wo
 def test_single_streamed_type_reports_insufficient_at_sample_budget(w: World) -> None:
     """High coverage from one early type is not enough when the collector still has more pages."""
 
+    def only_products(req: FakeRequest) -> Reply:
+        reply = w.collector.start(req)
+        collection = next(iter(w.collector.collections.values()))
+        collection["items"] = [
+            material(
+                f"https://shop.example.test/product/p-{i:02d}",
+                product(f"P-{i:02d}", f"Product {i}", "100"),
+            )
+            for i in range(12)
+        ]
+        return reply
+
+    w.collector.app.on("startCollection")(only_products)
+
     def one_material_per_poll(req: FakeRequest) -> Reply:
         req.query["limit"] = "1"
         return w.collector.materials(req)
@@ -191,8 +207,202 @@ def test_single_streamed_type_reports_insufficient_at_sample_budget(w: World) ->
     result = w.result(job_id, "OnboardingSession")
     assert result["status"] == "insufficient_sample", result
     assert result["sample"]["materials"] == 4 and result["sample"]["distinct_types"] == 1
-    assert result["sample"]["confidence"] >= 0.8 and not result["sample"]["sufficient"]
+    fetched = len(next(iter(w.collector.collections.values()))["items"])
+    unseen = min((fetched - 4) / fetched, 1 - 0.1 ** (1 / 4))
+    assert result["sample"]["confidence"] == pytest.approx(0.9 * (1 - unseen), abs=1e-4)
+    assert not result["sample"]["sufficient"]
     assert "max_onboarding_samples=4" in result["sample"]["message"]
+    assert w.violations() == []
+
+
+def test_name_only_sampling_finds_types_after_long_homogeneous_prefix(w: World) -> None:
+    """Two early types do not prove diversity when the collector has later URL families."""
+
+    def delayed_types(req: FakeRequest) -> Reply:
+        reply = w.collector.start(req)
+        collection = next(iter(w.collector.collections.values()))
+        base = "https://shop.example.test"
+        products = [
+            material(f"{base}/product/p-{i:02d}", product(f"P-{i:02d}", f"Product {i}", "100"))
+            for i in range(17)
+        ]
+        collection["items"] = [
+            *products,
+            material(f"{base}/news/1", page("article", "First article", "<p>News</p>")),
+            material(f"{base}/news/2", page("article", "Second article", "<p>News</p>")),
+            material(f"{base}/catalog/kettles/", page("category", "Kettles", "<p>List</p>")),
+            material(f"{base}/catalog/toasters/", page("category", "Toasters", "<p>List</p>")),
+            material(f"{base}/news/", page("news_list", "News", "<p>Index</p>")),
+            material(f"{base}/news/page/2", page("news_list", "More news", "<p>Index</p>")),
+            material(f"{base}/about", page("other", "About", "<p>About us</p>")),
+            material(f"{base}/contact", page("other", "Contact", "<p>Call us</p>")),
+        ]
+        return reply
+
+    def delayed_materials(req: FakeRequest) -> Reply:
+        req.query["limit"] = "1" if req.query.get("after") else "18"
+        return w.collector.materials(req)
+
+    w.collector.app.on("startCollection")(delayed_types)
+    w.collector.app.on("listCollectionMaterials")(delayed_materials)
+    job_id, sid = start(w, {"query": "Shop Example kettles"}, key="delayed-types")
+    first = w.result(job_id, "OnboardingSession")
+    assert first["status"] == "needs_disambiguation", first
+    selected = w.api.post(
+        f"/v1/onboarding-sessions/{sid}/candidate-selection", json={"candidate_id": "cand_1"}
+    )
+    assert selected.status_code == 200
+    result = w.result(selected.json()["job_id"], "OnboardingSession")
+
+    assert result["status"] == "proposals_ready", result
+    assert result["sample"]["sufficient"]
+    assert result["sample"]["materials"] < len(next(iter(w.collector.collections.values()))["items"])
+    assert result["sample"]["distinct_types"] >= 4
+    assert {t["type"] for t in result["analysis"]["material_types"]} >= {
+        "product",
+        "article",
+        "category",
+        "news_list",
+        "other",
+    }
+    assert len(w.collector.app.called("listCollectionMaterials")) >= 8
+    assert w.violations() == []
+
+
+@pytest.mark.parametrize("sample_budget", [8, 60])
+def test_same_url_shape_late_type_is_classified_or_insufficient(w: World, sample_budget: int) -> None:
+    """News-list pages share the article URL shape and arrive after a confident first page."""
+
+    def delayed_type(req: FakeRequest) -> Reply:
+        reply = w.collector.start(req)
+        collection = next(iter(w.collector.collections.values()))
+        base = "https://shop.example.test"
+        collection["items"] = [
+            *[
+                material(f"{base}/product/p-{i:02d}", product(f"P-{i:02d}", f"Product {i}", "100"))
+                for i in range(4)
+            ],
+            *[
+                material(f"{base}/news/{i}", page("article", f"Article {i}", "<p>Story</p>"))
+                for i in range(1, 5)
+            ],
+            *[
+                material(f"{base}/news/{i}", page("news_list", f"News list {i}", "<p>Index</p>"))
+                for i in (5, 6)
+            ],
+        ]
+        return reply
+
+    def eight_then_rest(req: FakeRequest) -> Reply:
+        if not req.query.get("after"):
+            req.query["limit"] = "8"
+        return w.collector.materials(req)
+
+    w.collector.app.on("startCollection")(delayed_type)
+    w.collector.app.on("listCollectionMaterials")(eight_then_rest)
+    job_id, sid = start(
+        w,
+        {"query": "Shop Example kettles", "limits": {"max_onboarding_samples": sample_budget}},
+        key=f"same-shape-{sample_budget}",
+    )
+    assert w.result(job_id, "OnboardingSession")["status"] == "needs_disambiguation"
+    selected = w.api.post(
+        f"/v1/onboarding-sessions/{sid}/candidate-selection", json={"candidate_id": "cand_1"}
+    )
+    assert selected.status_code == 200
+    result = w.result(selected.json()["job_id"], "OnboardingSession")
+
+    items = next(iter(w.collector.collections.values()))["items"]
+    assert url_shape(items[4]) == url_shape(items[8]) == url_shape(items[9])
+
+    if sample_budget == 8:
+        assert result["status"] == "insufficient_sample", result
+        assert not result["sample"]["sufficient"]
+        assert "max_onboarding_samples=8" in result["sample"]["message"]
+    else:
+        assert result["status"] == "proposals_ready", result
+        assert result["sample"]["sufficient"]
+        assert result["sample"]["materials"] == 10
+        assert {t["type"] for t in result["analysis"]["material_types"]} >= {
+            "product",
+            "article",
+            "news_list",
+        }
+        assert len(w.collector.app.called("listCollectionMaterials")) == 2
+    assert w.violations() == []
+
+
+@pytest.mark.parametrize("layout", ["separate_shapes", "shared_shape", "one_type"])
+def test_large_source_uses_representative_sample_within_budget(w: World, layout: str) -> None:
+    """A 100-page source must not be capped by classified/fetched, including one URL family."""
+
+    def hundred_pages(req: FakeRequest) -> Reply:
+        reply = w.collector.start(req)
+        collection = next(iter(w.collector.collections.values()))
+        base = "https://shop.example.test"
+        products = [
+            material(
+                f"{base}/{'item' if layout == 'shared_shape' else 'product'}/{i:03d}",
+                product(f"P-{i:03d}", f"Product {i}", "100"),
+            )
+            for i in range(50 if layout != "one_type" else 100)
+        ]
+        categories = (
+            [
+                material(
+                    f"{base}/{'item' if layout == 'shared_shape' else 'catalog'}/{i:03d}",
+                    page("category", f"Category {i}", "<p>Products</p>"),
+                )
+                for i in range(50, 100)
+            ]
+            if layout != "one_type"
+            else []
+        )
+        collection["items"] = [*products, *categories]
+        return reply
+
+    w.collector.app.on("startCollection")(hundred_pages)
+    job_id, sid = start(w, {"query": "Shop Example kettles"}, key=f"hundred-{layout}")
+    assert w.result(job_id, "OnboardingSession")["status"] == "needs_disambiguation"
+    selected = w.api.post(
+        f"/v1/onboarding-sessions/{sid}/candidate-selection", json={"candidate_id": "cand_1"}
+    )
+    assert selected.status_code == 200
+    result = w.result(selected.json()["job_id"], "OnboardingSession")
+
+    assert result["status"] == "proposals_ready", result
+    assert result["sample"]["sufficient"] and result["sample"]["confidence"] >= 0.8
+    assert result["sample"]["materials"] < 60
+    types = {t["type"] for t in result["analysis"]["material_types"]}
+    assert "product" in types
+    if layout != "one_type":
+        assert "category" in types
+    assert len(next(iter(w.collector.collections.values()))["items"]) == 100
+    assert w.violations() == []
+
+
+def test_confident_sample_stays_insufficient_when_collection_never_ends(w: World) -> None:
+    """A contract-valid stream that stalls cannot certify undiscovered material types."""
+
+    def never_finished(req: FakeRequest) -> Reply:
+        reply = w.collector.materials(req)
+        reply.body["end_of_stream"] = False
+        reply.body["collection_status"] = "running"
+        return reply
+
+    w.collector.app.on("listCollectionMaterials")(never_finished)
+    job_id, _ = start(w, {"query": "https://shop.example.test/"}, key="never-finished")
+    result = w.result(job_id, "OnboardingSession")
+
+    assert result["status"] == "insufficient_sample", result
+    fetched = len(next(iter(w.collector.collections.values()))["items"])
+    assert result["sample"]["materials"] < fetched
+    count = result["sample"]["materials"]
+    unseen = min((fetched - count) / fetched, 1 - 0.2 ** (1 / count))
+    assert result["sample"]["confidence"] == pytest.approx(0.9 * (1 - unseen), abs=1e-4)
+    assert not result["sample"]["sufficient"]
+    assert "did not finish" in result["sample"]["message"]
+    assert len(w.collector.app.called("listCollectionMaterials")) >= 30
     assert w.violations() == []
 
 

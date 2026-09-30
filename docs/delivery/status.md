@@ -13,7 +13,7 @@
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
 | 08 | Адаптери збереження | 1 | accepted | `wp/08-storage-adapters` | агент / wp-reviewer (2 раунди + фінальне виправлення, перевірено координатором) | злито `a14e775` |
-| 09 | Оркестратор | 1 | accepted | `wp/09-orchestrator` | агент / wp-reviewer (2 раунди) | злито `3a56c4f`; доповнення 09a (прибиральники) |
+| 09 | Оркестратор | 1 | accepted | `wp/09-orchestrator` | агент / wp-reviewer (2 раунди) | злито `3a56c4f`; доповнення 09a (прибиральники) злито |
 | 10 | LLM-шлюз і LLM-обробник | 1 | accepted | `wp/10-llm` | агент / wp-reviewer (2 раунди) | злито `00870c2` |
 | 11 | Асистент джерел | 1 | accepted | `wp/11-assistant` | агент / wp-reviewer (2 раунди) | злито `7dc7074` |
 | 12 | Адмінка | 1 | review | `wp/12-admin` | агент / wp-reviewer | рев'ю 2 |
@@ -113,6 +113,8 @@
 - 2026-09-30 — WP-12 рев'ю 2; запущено доповнення WP-01a (сервіси в compose, Caddy /api/* + CSP, `just e2e`, CI e2e і адаптерів, pnpm у `just web`).
 
 ## Передача справ (2026-09-30)
+WP-09a завершено після передачі: конкурентні прибиральники й справедливий відбір перевірено (3 нові тести, повний файл 14 тестів; ruff, mypy), звіт доповнено і гілку злито в `main`. Після злиття `just check`: types ok, unit 411 passed, contract 66 passed / 3 skipped; lint впав лише на локальних невідстежуваних `.codex/` і `.agents/`. `ruff check . --extend-exclude .agents,.codex` і відповідний `ruff format --check` пройшли (274 файли). Gitleaks по Git-історії: 0 витоків. CI на GitHub перевіряється після push.
+
 Попередній координатор зупинився на вимогу людини; фонові агенти зупинені. Worktree і коміти збережено в `.claude/worktrees/agent-*` (гілки `wp/NN-*`). Незакомічені зміни є у WP-03, WP-05, WP-13 — перед продовженням `git status` у їхніх worktree.
 
 | WP | Стан на момент передачі | Worktree / гілка / SHA | Наступний крок |

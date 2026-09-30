@@ -6,17 +6,17 @@
 |---|---|---|---|---|---|---|
 | 00 | Архітектура й контракти | 0 | accepted | `wp/00-architecture-contracts` | агент / wp-reviewer (2 раунди) | злито `e2714ec` |
 | 01 | Каркас, CI, dev-стек | 0 | accepted | `wp/01-scaffold-ci` | агент / wp-reviewer (2 раунди + інтеграційне виправлення) | злито `4468cee` |
-| 02 | Web Collector: ядро | 1 | review | `wp/02-web-collector-core` | агент / wp-reviewer | фінальне виправлення готове, перевіряє координатор (20× stalled) |
-| 03 | Web Collector: стратегії пошуку | 1 | — | | | після M0 |
-| 04 | Telegram Collector | 1 | review | `wp/04-telegram-collector` | агент / wp-reviewer | |
-| 05 | Репозиторій обробників | 1 | review | `wp/05-registry` | агент / wp-reviewer | рев'ю 2 (+ перевірка сканера на ReDoS) |
+| 02 | Web Collector: ядро | 1 | accepted | `wp/02-web-collector-core` | агент / wp-reviewer (2 раунди + фінальне виправлення, перевірено координатором) | злито `69e656a` |
+| 03 | Web Collector: стратегії пошуку | 1 | active | `wp/03-web-collector-discovery` | агент | після злиття WP-02 |
+| 04 | Telegram Collector | 1 | active | `wp/04-telegram-collector` | агент / wp-reviewer | виправлення після рев'ю 1 (set_paused без fence, обхід allowlist) |
+| 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент / wp-reviewer | фінальне виправлення після рев'ю 2 (ReDoS у сканері), перевірка координатором |
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
 | 08 | Адаптери збереження | 1 | accepted | `wp/08-storage-adapters` | агент / wp-reviewer (2 раунди + фінальне виправлення, перевірено координатором) | злито `a14e775` |
-| 09 | Оркестратор | 1 | active | `wp/09-orchestrator` | агент / wp-reviewer | виправлення після рев'ю 1 (cancelling, retries, overlap) |
+| 09 | Оркестратор | 1 | review | `wp/09-orchestrator` | агент / wp-reviewer | рев'ю 2; M1-base `7244d1f` |
 | 10 | LLM-шлюз і LLM-обробник | 1 | accepted | `wp/10-llm` | агент / wp-reviewer (2 раунди) | злито `00870c2` |
 | 11 | Асистент джерел | 1 | accepted | `wp/11-assistant` | агент / wp-reviewer (2 раунди) | злито `7dc7074` |
-| 12 | Адмінка | 1 | review | `wp/12-admin` | агент / wp-reviewer | |
+| 12 | Адмінка | 1 | active | `wp/12-admin` | агент / wp-reviewer | виправлення після рев'ю 1 (реальний API для storage) |
 | 13 | Інтеграція й приймання | 2 | active | `wp/13-acceptance` | агент | фаза 1 злито `6cb5ddf`; M1 — після злиття WP-02 і WP-09 |
 | 14 | Профілі лімітів і експлуатація | 2 | — | | | після M1 |
 
@@ -105,3 +105,6 @@
 | WP-12 | WP-11 / WP-00 | `GET /v1/onboarding-sessions` і список job вдосконалення; задокументувати `Job.links.session` | зміна контракту через contract-guardian |
 | WP-12 | WP-00 | приклади завершених job із `result` (TestReport, AcceptanceResult, ImprovementResult); ETag у прикладах orchestrator | зміна контракту через contract-guardian |
 - 2026-09-30 — WP-08 прийнято (фінальне виправлення перевірено координатором скриптом рецензента) і злито `a14e775`. WP-12 на рев'ю.
+- 2026-09-30 — WP-02 прийнято (фінальне виправлення перевірено координатором: stalled 20/20, тест рецензента 3/3) і злито `69e656a`; запущено WP-03. WP-04 і WP-12 повернуто після рев'ю 1. WP-09 — рев'ю 2.
+- 2026-09-30 — WP-05 рев'ю 2: ReDoS у сканері секретів (O(N²) на переносах рядка) — фінальне виправлення, перевіряє координатор тестом лінійності.
+- 2026-09-30 — main (фаза 1 WP-13 + WP-08 + WP-02): types/unit/contract зелені, lint зелений для коду репозиторію (падав лише на невідстежуваних `.codex/`, `.agents/` поза репозиторієм); gitleaks 0.

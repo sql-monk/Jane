@@ -1,0 +1,3 @@
+- Запуск: `uv run --package jane-orchestrator python -m jane_orchestrator` (API + воркери; `… worker` — лише воркери; потрібна PostgreSQL, див. README.md).
+- Тести: `just test orchestrator` (unit + contract), `just test orchestrator -m integration` (PostgreSQL: dev-стек або Docker).
+- Контракт: `contracts/openapi/orchestrator.v1.yaml` (+ `common.yaml`); клієнтські: collector/handler/storage/registry `.v1.yaml`.

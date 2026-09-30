@@ -67,14 +67,14 @@ Docker-сокет із групою, визначеною автоматично
 | S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці | **1 Docker e2e пройшов на `main` `1306ad3`** (кількість сторінок; `just e2e`, CI `36694741989`); темп ще не виміряно |
 | S-M2-10 | Адмінка на реальному API (Playwright) | 6, 7 (UI) | admin, усі API | WP-12 частково перевірив реальні API; повний Caddy прогін відкритий |
 | S-M2-11 | Ланцюжок з умовами `when` і LLM-етапом | 2 | orchestrator, web-collector, runtime, storage, llm | **пройдено на гілці `wp/13-llm-routing`** (`test_m2_llm_routing.py`; LLM — З, архіви пакетів — `package-host` Т) |
-| R-01 | Kill воркера оркестратора посеред ланцюжка | 8 | orchestrator ×2, виконавці | чекає WP-09 |
+| R-01 | Kill воркера оркестратора посеред ланцюжка | 8 | orchestrator ×2, web-collector, runtime, storage | **пройдено на гілці `wp/13-reliability`** (`test_reliability_orchestrated.py`) |
 | R-02 | Kill і рестарт кожного сервісу; повтор після рестарту — дубль | 8 | storage, handler-runtime (далі — усі) | **реалізовано для storage і runtime, проходить** |
-| R-03 | Розрив мережі між оркестратором і виконавцем | 8 | orchestrator, виконавці | чекає WP-09 |
+| R-03 | Розрив мережі між оркестратором і виконавцем | 8 | orchestrator, storage (+ web-collector, runtime) | **пройдено на гілці `wp/13-reliability`** (розрив до storage) |
 | R-04 | Повторна доставка на кожен виконавець | 8 | усі виконавці | **частково**: Web/Telegram Collector і LLM — 4 Docker e2e на гілці WP-13 (`test_r04_idempotency.py`, у `main` не злито; Telegram і LLM-провайдер — З); storage, runtime — дубль у S-M1-01, R-02, R-06 без перевірки 422 і `Idempotency-Replayed`; повтор під час виконання, після рестарту й на іншому екземплярі колекторів і LLM — ні |
 | R-05 | Запізнілий результат не замінює новішого | 8 | storage, handler-runtime | **реалізовано, проходить** |
 | R-06 | Кілька екземплярів кожного компонента | 8 | усі | **runtime ×2 реалізовано, проходить**; інші — з WP |
 | R-07 | Повний цикл LLM → тести → активація → відкат під навантаженням і з рестартами | 6, 8 | orchestrator, assistant, llm, registry, runtime, storage | чекає WP-09, 05 |
-| R-08 | Обмежена черга стримує збір (backpressure) | 8, 13 | orchestrator, web-collector | чекає WP-09, 02 |
+| R-08 | Обмежена черга стримує збір (backpressure) | 8, 13 | orchestrator, web-collector (+ runtime, storage) | **пройдено на гілці `wp/13-reliability`**, крім межі буфера: колектор тримає більше непідтверджених, ніж `max_unacked_materials` (дефект WP-02, `xfail(strict)`) |
 
 ## M1 — перший наскрізний зріз
 
@@ -316,14 +316,14 @@ LLM — **З**, архіви пакетів-фікстур — `package-host` (*
 
 | ID | Як відтворюємо | Що очікуємо |
 |---|---|---|
-| R-01 | Два воркери оркестратора. Посеред прогону один отримує `docker kill`, потім рестарт | прогін завершено; кожен ефект один раз (кількість записів у storage = кількості матеріалів); lease перехоплено; retries не витрачено на kill |
+| R-01 | Дві репліки оркестратора на одній БД (`--scale`). Storage на кілька секунд `docker pause`, доки всі воркери обох реплік не стоять у викликах storage; тоді `docker kill` репліки 1, `unpause`, після перехоплення — `docker start` | прогін завершено; кожен ефект один раз (кількість записів у storage = кількості матеріалів); lease перехоплено; retries не витрачено на kill |
 | R-02 | `docker kill` + `up` кожного сервісу між доставкою й повтором (зараз — storage і handler-runtime) | повтор з тим самим `delivery_key` дає `duplicate: true`; runtime повертає той самий `invocation_id` (стан у PostgreSQL) |
-| R-03 | `docker network disconnect` виконавця на час прогону, потім `connect` | оркестратор повторює з backoff, після відновлення прогін завершується без дублів |
+| R-03 | `docker network disconnect` storage посеред прогону (після першого записаного RAW), доки елемент збереження не дійде до 3-ї спроби, потім `connect` | оркестратор повторює з backoff (`retrying`, `upstream_unavailable`, `retryable`), після відновлення прогін завершується без дублів |
 | R-04 | Той самий `delivery_key` на кожен виконавець (storage, runtime, llm, колектори — `Idempotency-Key`) | дубль без побічного ефекту, `Idempotency-Replayed: true`; інше тіло дає 422 `idempotency_key_reused` |
 | R-05 | Новіше спостереження (ціна 199), потім старіше (ціна 249) того самого товару | стан лишається 199; старіше отримує `stale`, `price` у `stale_fields`, подія є в історії |
 | R-06 | `--scale <сервіс>=2` (зараз — handler-runtime); запит на екземпляр 1, повтор на екземпляр 2 | повтор — дубль із тим самим `invocation_id`; результат читається з іншого екземпляра; далі так само для колекторів (спільний стан), registry, llm (спільний бюджет), assistant, orchestrator (воркери не дублюють) |
 | R-07 | S-M2-07 з рестартом асистента й runtime посередині | цикл завершується або відновлюється без втрати й дублювання версій; відкат працює |
-| R-08 | Малий `limits.queue.max_unacked_materials`, повільний споживач | колектор призупиняється, пам'ять не росте, після споживання продовжує |
+| R-08 | `queue.max_unacked_materials: 2` і `queue.max_inflight_materials: 1` у завданні (повільний споживач — оркестратор з екстракцією в пісочниці); окремо колектор без споживача | колектор призупиняється (`paused_by_backpressure`), непідтверджених не більше за ліміт, після споживання продовжує й завершує; пам'ять не вимірюється |
 
 Реалізовані зараз: `tests/e2e/test_reliability.py` — `test_r_02_…`, `test_r_05_…`, `test_r_06_…`;
 `tests/e2e/test_r04_idempotency.py` — частина R-04 (лише гілка WP-13):
@@ -332,3 +332,40 @@ LLM — **З**, архіви пакетів-фікстур — `package-host` (*
 і `POST /v1/completions` повторно з тим самим `Idempotency-Key` після завершення першого виклику,
 а потім той самий ключ з іншим тілом. Telegram-мережа — записаний backend (**З**), LLM-провайдер —
 `fake` (**З**), HTTP-сервіси реальні.
+
+### R-01, R-03, R-08 на завданнях оркестратора
+`tests/e2e/test_reliability_orchestrated.py`. Реальні orchestrator, web-collector, handler-runtime,
+storage, testsite і PostgreSQL; `package-host` (**Т**) лише віддає архів локального екстрактора. Збої —
+лише засобами Docker. Усе, що перевіряється, читається через `orchestrator.v1`, `collector.v1` і
+`storage.v1`. Поза контрактом — лише лічильник `jane_orchestrator_leases_reclaimed_total` (`/metrics`
+jane-kit, описаний у README оркестратора) і JSON-журнали оркестратора (`orchestrator started` із
+кількістю воркерів, `item lease reclaimed` з `item_id`).
+
+- **R-01** (`test_r_01_…`). Завдання M1 на 10 URL (8 товарів + категорія + FAQ), збір пригальмовано
+  `rate.requests_per_second_per_host: 2`, `retries.max_attempts: 3`. Оркестратор масштабується до 2
+  реплік. Після першого записаного RAW storage ставиться на `docker pause`, доки кількість елементів
+  збереження в стані `running` не дорівнює всім воркерам обох реплік (воркер тримає не більше одного
+  lease). Отже, репліка 1 у момент `docker kill` тримає рівно свою половину lease — вікно kill не
+  залежить від часу. Далі `unpause`; елементи репліки 2 завершуються одразу, а lease мертвої репліки
+  лишаються `running` до спливання, після чого репліка 2 їх перехоплює. Потім `docker start` репліки 1
+  і очікування `healthy`. Перевірки: прогін `succeeded`; кількість перехоплень (метрика) дорівнює
+  кількості воркерів репліки; `item_id` з журналу `item lease reclaimed` збігаються з lease мертвої
+  репліки; усі елементи `completed` з `attempts = 1` (повтори були доступні, але не витрачені);
+  `assert_effects_once`: один RAW на матеріал, одна сутність і одна подія історії на товар.
+- **R-03** (`test_r_03_…`). Завдання M1 на 8 URL; для етапів збереження `retries` (8 спроб, 1000 мс ×2
+  до 4000 мс, без jitter) і `timeouts.invocation_timeout_ms: 10000`. Після першого записаного RAW —
+  `docker network disconnect` storage, доки якийсь елемент збереження не дійде до 3-ї спроби, потім
+  `connect` з псевдонімом `storage`. Перевірки: помилки `retrying`-елементів — `upstream_unavailable`,
+  `retryable: true`, `details.executor: storage`; для кожного спостереженого переходу спроб верхня межа
+  проміжку між захопленнями (за часом опитувань) не менша за затримку політики — повтор без backoff
+  дав би меншу межу; після відновлення прогін `succeeded`, усі елементи `success`, ефекти один раз.
+- **R-08** (`test_r_08_bounded_queue_…`). Завдання на 8 товарів із `queue.max_unacked_materials: 2` і
+  `queue.max_inflight_materials: 1`; `GET /v1/limits/effective` показує значення з походженням `task`,
+  `effective_limits` збору в колекторі — те саме значення. Під час прогону кожні 200 мс читаються
+  `Run.backpressure` і `Collection` колектора. Перевірки: колектор був `paused_by_backpressure`, поки
+  `fetched < 8`; оркестратор показував `backpressure: true`; після паузи `fetched` зростав до 8; збір і
+  прогін `succeeded`, `emitted = fetched = 8`, дублів і помилок немає, ефекти один раз.
+- **R-08, межа буфера** (`test_r_08_collector_buffer_never_exceeds_max_unacked`, `xfail(strict=True)`).
+  Колектор напряму (`collector.v1`), споживач нічого не читає, `max_unacked_materials: 2`. Очікується
+  пауза з `unacked ≤ 2`; фактично буфер стає 5 = ліміт + `max_parallel_fetches` − 1 (дефект WP-02,
+  див. звіт WP-13). Коли дефект виправлять, тест дасть XPASS і впаде, тож позначку треба буде зняти.

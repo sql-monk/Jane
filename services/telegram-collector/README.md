@@ -60,10 +60,10 @@ just test telegram-collector          # усе: unit, сценарії на сп
 | `CONTRACTS_DIR` | `JANE_CONTRACTS_DIR` або `contracts/` checkout | схеми для валідації |
 | `SECRET_ENV_PREFIX` | `JANE_SECRET_` | `env:`-посилання `secret_refs` — лише змінні з цим префіксом |
 | `SECRET_FILES_DIR` | `/run/secrets` | `file:`-посилання — лише всередині цього каталогу |
-| `TELEGRAM_HOST_ALLOWLIST` | `[]` | дозволені хости в хостових `params` підключення |
+| `TELEGRAM_HOST_ALLOWLIST` | `[]` | дозволені хости (`hostname` або `hostname:port`) у хостових `params` підключення |
 | `LEASE_SECONDS` | `30` | lease збору; без heartbeat довше — збір перехоплює інший екземпляр |
-| `HEARTBEAT_INTERVAL_MS` | `5000` | як часто власник продовжує lease і перевіряє скасування |
-| `STATE_BUSY_TIMEOUT_MS` | `10000` | скільки запис чекає блокування SQLite іншим процесом |
+| `HEARTBEAT_INTERVAL_MS` | `5000` | як часто власник продовжує lease і перевіряє скасування; з тим самим інтервалом кожен екземпляр шукає збори з простроченим lease (перехоплення — не пізніше ніж за один інтервал після спливання lease) |
+| `STATE_BUSY_TIMEOUT_MS` | `10000` | скільки запис чекає блокування SQLite іншим процесом; не дочекався — 503 `service_unavailable` з `Retry-After` = це значення в секундах (вгору, ≥ 1) |
 | `LIMITS_FILE` | — | файл `PlatformLimits` (TOML/JSON/YAML) |
 | `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | журнали |
 
@@ -146,7 +146,9 @@ just test telegram-collector          # усе: unit, сценарії на сп
 
 **Кілька екземплярів** (один вузол, спільний `STATE_DIR`): збір виконує власник lease; heartbeat
 (`HEARTBEAT_INTERVAL_MS`) продовжує lease і помічає скасування з іншого екземпляра; кожен запис збору
-перевіряє lease (fencing) — «завислий» власник після пробудження нічого не запише. Читати матеріали,
+(матеріал, прогрес, курсор, статистика, прапорець `paused_by_backpressure`, термінальний статус) іде в
+транзакції, що перевіряє lease (fencing), а Job пишеться лише власником в одній транзакції з перевіркою
+власника — «завислий» власник після пробудження нічого не запише. Читати матеріали,
 підтверджувати, скасовувати й повторювати `POST /v1/collections` з тим самим `Idempotency-Key` можна через
 будь-який екземпляр. Між вузлами стан не спільний (ADR-0007: v1 одновузловий).
 
@@ -161,7 +163,8 @@ just test telegram-collector          # усе: unit, сценарії на сп
 визначає, *куди* піде розв'язаний секрет, тому колектор обмежує: `env:`-посилання — лише змінні з префіксом
 `JANE_TELEGRAM_COLLECTOR_SECRET_ENV_PREFIX` (типово `JANE_SECRET_`, тобто не `PGPASSWORD`); `file:` — лише
 всередині `JANE_TELEGRAM_COLLECTOR_SECRET_FILES_DIR` (типово `/run/secrets`, після розв'язання шляху, без `..`);
-`vault:` вимкнено; хостові `params` (`server`, `host`, `proxy_host`, `proxy`, `api_base`, `dc_address`) — лише
+`vault:` вимкнено; хостові `params` (`server`, `host`, `proxy_host`, `proxy`, `api_base`, `dc_address`) — суворо
+`hostname[:port]` або `scheme://hostname[:port]` (без `@`, `\`, шляхів, пробілів і керівних символів — інакше 422) і лише
 хости з `JANE_TELEGRAM_COLLECTOR_TELEGRAM_HOST_ALLOWLIST` (JSON-список; типово порожній — такі параметри
 відхиляються; адаптер Telethon їх не використовує). Порушення — 422 при `PUT /v1/connections`
 (`secret_ref_not_allowed` / `host_not_allowed`); підключення, збережене в обхід API, не отримує секретів
@@ -223,4 +226,8 @@ with httpx.Client(base_url="http://127.0.0.1:8102") as api:
 - Бекенд `telethon` не перевірено на реальному сервісі (немає тестового облікового запису).
 - Канали одного збору читаються послідовно; паралельність — кількома зборами (`jobs.max_concurrent_jobs`).
 - `revision.content_sha256` рахується за текстом; зміна лише медіа видно за `sequence`, не за хешем.
+- `revision.sequence` = `edit_date` у секундах (так вимагає опис поля в `material.schema.json`), тож два
+  редагування в одну секунду мають однакову `sequence`; вони все одно видаються як різні ревізії (різний
+  `content_sha256`), а порядок між ними — за `observation_id` (монотонний, ADR-0008 п.6). Строго монотонна
+  `sequence` потребує зміни опису поля в контракті (запит до WP-00 у звіті WP-04).
 - Стан — SQLite на одному вузлі; спільного сховища для кількох вузлів немає.

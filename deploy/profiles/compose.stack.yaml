@@ -9,8 +9,9 @@
 #     on first start and passes effective stage limits to every executor call) and both collectors. storage,
 #     handler-runtime, registry, llm and assistant refuse to start with a full PlatformLimits file (unknown
 #     groups -> LimitError, see docs/delivery/WP-14.md); they get the profile values through the orchestrator;
-#   * registry -> handler-runtime profile check, handler-runtime and web-collector read packages/rules from the
-#     registry, the orchestrator knows its executors (collector, runtime, storage, registry);
+#   * registry -> handler-runtime profile check, handler-runtime and the collectors read packages/rules from the
+#     registry; JANE_EXECUTORS_FILE - the orchestrator's executors (only the services of this stack);
+#   * JANE_TELEGRAM_RECORDINGS_DIR - a writable copy of examples/telegram/recordings (recorded backend);
 #   * JANE_SANDBOX_IMAGE - image of runtime profile python-extractor@1 (`jane-handler-runtime build-image`),
 #     JANE_DOCKER_SOCKET / JANE_DOCKER_GID - docker API socket for sandboxes and its group inside containers;
 #   * probe-site (compose profile `limits-probe`) - instrumented HTTP site of the limits harness.
@@ -72,7 +73,10 @@ services:
       JANE_SECRET_TG_SESSION: ${JANE_SECRET_TG_SESSION:-}
     volumes:
       - *limits
-      - ${JANE_TELEGRAM_RECORDINGS_DIR:-../examples/telegram/recordings}:/cfg/telegram-recordings:ro
+      - type: bind
+        source: ${JANE_TELEGRAM_RECORDINGS_DIR:-../examples/telegram/recordings}
+        target: /cfg/telegram-recordings
+        read_only: true
     healthcheck:
       <<: *health
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8102/v1/health', timeout=2)"]
@@ -81,17 +85,14 @@ services:
     environment:
       JANE_ORCHESTRATOR_LIMITS_FILE: /cfg/limits/platform.json
       JANE_ORCHESTRATOR_LOG_FORMAT: json
-      JANE_ORCHESTRATOR_EXECUTORS: >-
-        [{"executor": "web-collector", "role": "collector", "base_url": "http://web-collector:8101",
-          "capabilities": {"collector": "web"}, "sync_connections": false},
-         {"executor": "storage", "role": "handler", "base_url": "http://storage:8000",
-          "capabilities": {"packages": ["jane.storage-*"]}},
-         {"executor": "storage-read", "role": "storage_read", "base_url": "http://storage:8000",
-          "sync_connections": false},
-         {"executor": "handler-runtime", "role": "handler", "base_url": "http://handler-runtime:8000",
-          "capabilities": {"default": true, "handler_kinds": ["extractor", "transform"]}, "sync_connections": false},
-         {"executor": "registry", "role": "registry", "base_url": "http://registry:8000"}]
-    volumes: [*limits]
+      # Executors of the services started with this stack (written by stack.py for each `up`).
+      JANE_ORCHESTRATOR_EXECUTORS_FILE: /cfg/executors.json
+    volumes:
+      - *limits
+      - type: bind
+        source: ${JANE_EXECUTORS_FILE:?set by deploy/profiles/stack.py}
+        target: /cfg/executors.json
+        read_only: true
     healthcheck:
       <<: *health
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]

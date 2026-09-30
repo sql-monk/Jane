@@ -1,0 +1,23 @@
+{
+  "entities": [
+    {
+      "entity_type": "event",
+      "fields": {
+        "event_id": "jane_events_example/1/1",
+        "title": "Лекція про історію міста",
+        "date": "2026-10-05",
+        "time": "18:30",
+        "place": "Міська бібліотека",
+        "channel": "jane_events_example",
+        "message_id": 1
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "telegram-events",
+        "natural": {
+          "event_id": "jane_events_example/1/1"
+        }
+      }
+    }
+  ]
+}

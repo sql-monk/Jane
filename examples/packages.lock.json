@@ -19,6 +19,18 @@
       "digest": "sha256:d143e1e9b7a4f3f2ea28886cc6fd37c29cb9915fce772d1a84b1ea6ea6bfa2f9",
       "path": "examples/packages/examples.testsite-price-extractor"
     },
+    "examples.telegram-rules": {
+      "version": "1.0.0",
+      "kind": "collector-rules",
+      "digest": "sha256:cc734c10a59bb73d2dda0fc1c1c8fdb228c56a993aa43c39eb78067d68332eba",
+      "path": "examples/packages/examples.telegram-rules"
+    },
+    "examples.telegram-event-extractor": {
+      "version": "1.0.0",
+      "kind": "extractor",
+      "digest": "sha256:f9acb06c514fa291c53f8ffdb816464f9c9994acc861a0d347f01657097c8ba7",
+      "path": "examples/packages/examples.telegram-event-extractor"
+    },
     "jane.storage-files": {
       "version": "1.0.0",
       "kind": "storage",

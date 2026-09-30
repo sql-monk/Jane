@@ -1,0 +1,18 @@
+{
+  "collector": "telegram",
+  "channels": [
+    {
+      "username": "jane_events_example"
+    }
+  ],
+  "history": {
+    "enabled": true
+  },
+  "updates": {
+    "new_messages": true,
+    "edits": true
+  },
+  "media": {
+    "download": false
+  }
+}

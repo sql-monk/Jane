@@ -39,7 +39,7 @@ def test_offline_check_has_no_problems() -> None:
     assert ex.check_offline() == []
 
 
-@pytest.mark.parametrize("package_id", EXTRACTORS)
+@pytest.mark.parametrize("package_id", [*EXTRACTORS, "examples.telegram-event-extractor"])
 def test_manifest_tests_pass_in_process(package_id: str) -> None:
     assert_package_tests_pass(ex.PACKAGES_DIR / package_id)
 
@@ -127,3 +127,42 @@ def test_documents_hold_no_secret_values() -> None:
             for ref in (conn.get("secret_refs") or {}).values():
                 assert ref.startswith("env:JANE_SECRET_"), (path.name, ref)
         assert "password" not in json.dumps([c.get("params") for c in doc.get("connections", [])]).lower()
+
+
+def test_telegram_example_channel_rules_source_and_recording_agree() -> None:
+    """The recorded channel (substitute of Telegram) gives 2 events from 3 messages with the example extractor."""
+    recording = ex.read_json(ex.EXAMPLES / "telegram" / "recordings" / f"{ex.TG_CHANNEL}.json")
+    rules = ex.read_json(ex.PACKAGES_DIR / "examples.telegram-rules" / "rules.json")
+    source = ex.read_json(ex.DOCUMENTS_DIR / ex.TG_SOURCE_DOC)
+    assert recording["channel"]["username"] == rules["channels"][0]["username"] == ex.TG_CHANNEL
+    assert source["locator"]["telegram_username"] == ex.TG_CHANNEL
+    package = ex.PACKAGES_DIR / "examples.telegram-event-extractor"
+    found: list[str] = []
+    for message in recording["messages"]:
+        material = {
+            "material_id": f"tg:{recording['channel']['channel_id']}:{message['id']}",
+            "observation_id": f"obs_{message['id']}",
+            "source": {"source_id": source["source_id"], "kind": "telegram"},
+            "locator": {"telegram": {"channel_username": ex.TG_CHANNEL, "message_id": message["id"]}},
+            "fetched_at": message["date"],
+            "format": {"media_type": "text/plain", "charset": "utf-8", "content_kind": "message"},
+            "content": {
+                "kind": "inline",
+                "media_type": "text/plain",
+                "encoding": "utf-8",
+                "data": message["text"],
+            },
+        }
+        result = run_local(package, {"kind": "material", "material": material})
+        found += [e["fields"]["event_id"] for e in (result.get("output") or {}).get("entities", [])]
+    assert found == [f"{ex.TG_CHANNEL}/1/1", f"{ex.TG_CHANNEL}/3/2"]
+
+
+def test_real_telegram_path_uses_only_secret_refs() -> None:
+    account = ex.read_json(ex.TG_ACCOUNT_DOC)
+    assert account["kind"] == "telegram_account"
+    assert set(account["secret_refs"].values()) == {
+        "env:JANE_SECRET_TG_API_HASH",
+        "env:JANE_SECRET_TG_SESSION",
+    }
+    assert ex.validate("common/connection.schema.json", account) == []

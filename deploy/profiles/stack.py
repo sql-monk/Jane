@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 import secrets
+import shutil
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -69,6 +70,61 @@ PG_PASSWORD_KEYS = (
     "JANE_PG_STORAGE_RESULTS_PASSWORD",
 )
 SANDBOX_LABEL = "io.jane.stack"
+RECORDINGS = ROOT / "examples" / "telegram" / "recordings"
+# Executors the orchestrator gets for each service of the stack (orchestrator.v1 Executor, README of WP-09).
+EXECUTORS: dict[str, list[dict[str, Any]]] = {
+    "web-collector": [
+        {
+            "executor": "web-collector",
+            "role": "collector",
+            "base_url": "http://web-collector:8101",
+            "capabilities": {"collector": "web"},
+            "sync_connections": False,
+        }
+    ],
+    "telegram-collector": [
+        {
+            "executor": "telegram-collector",
+            "role": "collector",
+            "base_url": "http://telegram-collector:8102",
+            "capabilities": {"collector": "telegram"},
+            # telegram_account connections are pushed only for the real backend (recorded needs none).
+            "sync_connections": False,
+        }
+    ],
+    "storage": [
+        {
+            "executor": "storage",
+            "role": "handler",
+            "base_url": "http://storage:8000",
+            "capabilities": {"packages": ["jane.storage-*"]},
+        },
+        {
+            "executor": "storage-read",
+            "role": "storage_read",
+            "base_url": "http://storage:8000",
+            "sync_connections": False,
+        },
+    ],
+    "handler-runtime": [
+        {
+            "executor": "handler-runtime",
+            "role": "handler",
+            "base_url": "http://handler-runtime:8000",
+            "capabilities": {"default": True, "handler_kinds": ["extractor", "transform"]},
+            "sync_connections": False,
+        }
+    ],
+    "registry": [{"executor": "registry", "role": "registry", "base_url": "http://registry:8000"}],
+}
+
+
+def executors_for(services: Sequence[str], *, telegram_backend: str = "recorded") -> list[dict[str, Any]]:
+    out = [dict(e) for name in services for e in EXECUTORS.get(name, [])]
+    for e in out:
+        if e["executor"] == "telegram-collector" and telegram_backend != "recorded":
+            e["sync_connections"] = True
+    return out
 
 
 class StackError(RuntimeError):
@@ -94,6 +150,15 @@ def stack_file(project: str) -> Path:
 
 def sandbox_image(project: str) -> str:
     return f"{project}-python-extractor:1"
+
+
+def executors_file(project: str) -> Path:
+    return STACK_DIR / f"executors-{project}.json"
+
+
+def recordings_dir(project: str) -> Path:
+    """Writable copy of the Telegram recordings of this stack (the example edits it between runs)."""
+    return STACK_DIR / f"telegram-recordings-{project}"
 
 
 def new_credentials() -> dict[str, str]:
@@ -155,6 +220,8 @@ class Stack:
             "JANE_STACK_PROJECT": self.project,
             "JANE_DOCKER_SOCKET": os.environ.get("JANE_DOCKER_SOCKET", "/var/run/docker.sock"),
             "JANE_DOCKER_GID": os.environ.get("JANE_DOCKER_GID", self.creds.get("JANE_DOCKER_GID", "0")),
+            "JANE_EXECUTORS_FILE": executors_file(self.project).resolve().as_posix(),
+            "JANE_TELEGRAM_RECORDINGS_DIR": recordings_dir(self.project).resolve().as_posix(),
         }
 
     def run(
@@ -188,6 +255,16 @@ class Stack:
         apps = sorted(APP_SERVICES & set(services))
         profiles = [*apps, *(["limits-probe"] if "probe-site" in services else [])]
         os.environ["COMPOSE_PROFILES"] = ",".join(profiles)
+        STACK_DIR.mkdir(exist_ok=True)
+        backend = os.environ.get("JANE_TELEGRAM_BACKEND", "recorded")
+        executors_file(self.project).write_text(
+            json.dumps(executors_for(services, telegram_backend=backend), indent=2), encoding="utf-8"
+        )
+        recordings = recordings_dir(self.project)
+        recordings.mkdir(exist_ok=True)
+        for path in sorted(RECORDINGS.glob("*.json")):
+            if not (recordings / path.name).exists():
+                shutil.copyfile(path, recordings / path.name)
         self._save({})
         self.compose(
             "up",
@@ -245,6 +322,8 @@ class Stack:
             self.run(["docker", "rm", "-f", cid], check=False)
         self.run(["docker", "image", "rm", "-f", sandbox_image(self.project)], check=False)
         stack_file(self.project).unlink(missing_ok=True)
+        executors_file(self.project).unlink(missing_ok=True)
+        shutil.rmtree(recordings_dir(self.project), ignore_errors=True)
 
     def _ids(self, cmd: Sequence[str]) -> list[str]:
         r = self.run(cmd, check=False, quiet=True)
@@ -269,7 +348,15 @@ class Stack:
             "volumes": self._ids(["docker", "volume", "ls", "-q", "--filter", label]),
             "networks": self._ids(["docker", "network", "ls", "-q", "--filter", label]),
             "images": [i for i in images if i.startswith(f"{self.project}-")],
-            "stack_file": [str(stack_file(self.project))] if stack_file(self.project).exists() else [],
+            "files": [
+                str(p)
+                for p in (
+                    stack_file(self.project),
+                    executors_file(self.project),
+                    recordings_dir(self.project),
+                )
+                if p.exists()
+            ],
         }
 
 
@@ -284,12 +371,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     ap.add_argument("--services", nargs="*", default=None, help=f"default: {' '.join(DEFAULT_SERVICES)}")
     ap.add_argument("--probe", action="store_true", help="also start probe-site of the limits harness")
+    ap.add_argument(
+        "--telegram", action="store_true", help="also start telegram-collector (recorded backend)"
+    )
     ap.add_argument("--wait-timeout", type=int, default=900, help="seconds for health checks (default 900)")
     ns = ap.parse_args(argv)
     project = ns.project or default_project()
     stack = Stack(project, ns.profile)
     if ns.command == "up":
-        services = list(ns.services or DEFAULT_SERVICES) + (["probe-site"] if ns.probe else [])
+        services = list(ns.services or DEFAULT_SERVICES)
+        services += (["telegram-collector"] if ns.telegram else []) + (["probe-site"] if ns.probe else [])
         urls = stack.up(services, wait_timeout_s=ns.wait_timeout)
         print(f"project: {project}   profile: {ns.profile}   stack file: {stack_file(project).as_posix()}")
         for name, url in urls.items():

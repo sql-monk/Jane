@@ -99,8 +99,15 @@ def test_stack_overlay_applies_the_profile_where_it_is_accepted() -> None:
         assert services[name]["environment"][var] == "/cfg/limits/platform.json"
     for name in ("storage", "handler-runtime", "registry"):
         assert not any("LIMITS_FILE" in k for k in (services.get(name) or {}).get("environment", {}))
-    executors = json.loads(services["orchestrator"]["environment"]["JANE_ORCHESTRATOR_EXECUTORS"])
+    assert (
+        services["orchestrator"]["environment"]["JANE_ORCHESTRATOR_EXECUTORS_FILE"] == "/cfg/executors.json"
+    )
+    executors = jane_stack.executors_for(jane_stack.DEFAULT_SERVICES)
     assert {e["role"] for e in executors} == {"collector", "handler", "storage_read", "registry"}
+    assert "telegram-collector" not in {e["executor"] for e in executors}
+    telegram = jane_stack.executors_for(["telegram-collector"], telegram_backend="telethon")
+    assert telegram[0]["sync_connections"] is True  # telegram_account is pushed only for the real backend
+    assert jane_stack.executors_for(["telegram-collector"])[0]["sync_connections"] is False
     assert (
         services["handler-runtime"]["environment"]["JANE_HANDLER_RUNTIME_REGISTRY_URL"]
         == "http://registry:8000"

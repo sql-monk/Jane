@@ -10,6 +10,7 @@ Against a running stack (``deploy/profiles/stack.py up --project <p>``)::
 
     uv run --all-packages python examples/jane_examples.py demo --project <p>
     # = publish -> apply -> catalog -> price-check -> verify; each step is also a command of its own
+    uv run --all-packages python examples/jane_examples.py telegram --project <p>   # publish -> apply -> telegram
 
 Packages are archived with the registry's canonical algorithm (``jane_registry.archive``: zip stored, sorted
 paths, fixed time and mode), so the digests in ``packages.lock.json`` and in the task documents are exactly the
@@ -50,12 +51,18 @@ LOCAL_PACKAGES = (
     "examples.testsite-web-rules",
     "examples.testsite-catalog-extractor",
     "examples.testsite-price-extractor",
+    "examples.telegram-rules",
+    "examples.telegram-event-extractor",
 )
 STORAGE_PACKAGES = ("jane.storage-files", "jane.storage-postgresql")
 SOURCE_DOC = "source.testsite-shop.json"
 CATALOG_DOC = "task.testsite-catalog.json"
 PRICE_DOC = "task.testsite-price-check.json"
 CONNECTIONS_DOC = "connections.json"
+TG_SOURCE_DOC = "source.telegram-events.json"
+TG_TASK_DOC = "task.telegram-events.json"
+TG_ACCOUNT_DOC = EXAMPLES / "telegram" / "connection.telegram-account.json"
+TG_CHANNEL = "jane_events_example"
 TESTSITE_HOST = "testsite:8080"  # the test site as the services see it inside the compose network
 TERMINAL = frozenset({"succeeded", "failed", "cancelled"})
 PRICE_FIELDS = frozenset({"sku", "price", "availability"})
@@ -145,7 +152,7 @@ def document_refs(doc: Mapping[str, Any]) -> Iterator[dict[str, Any]]:
 def cmd_lock(_: argparse.Namespace) -> int:
     lock = compute_lock()
     write_json(LOCK_FILE, lock)
-    for name in (SOURCE_DOC, CATALOG_DOC, PRICE_DOC):
+    for name in (SOURCE_DOC, CATALOG_DOC, PRICE_DOC, TG_SOURCE_DOC, TG_TASK_DOC):
         path = DOCUMENTS_DIR / name
         doc = read_json(path)
         for ref in document_refs(doc):
@@ -229,6 +236,8 @@ def check_offline() -> list[str]:
         (SOURCE_DOC, "source.schema.json"),
         (CATALOG_DOC, "task-config.schema.json"),
         (PRICE_DOC, "task-config.schema.json"),
+        (TG_SOURCE_DOC, "source.schema.json"),
+        (TG_TASK_DOC, "task-config.schema.json"),
     ):
         doc = read_json(DOCUMENTS_DIR / name)
         problems += [f"{name}: {e}" for e in validate(schema, doc)]
@@ -239,7 +248,7 @@ def check_offline() -> list[str]:
                 entry["digest"],
             ):
                 problems.append(f"{name}: {ref['package_id']} is not pinned to the lock (version + digest)")
-    for conn in read_json(DOCUMENTS_DIR / CONNECTIONS_DOC)["connections"]:
+    for conn in [*read_json(DOCUMENTS_DIR / CONNECTIONS_DOC)["connections"], read_json(TG_ACCOUNT_DOC)]:
         problems += [
             f"connections {conn['connection_id']}: {e}"
             for e in validate("common/connection.schema.json", conn)
@@ -381,7 +390,7 @@ def publish(svc: Services) -> dict[str, Any]:
 def apply(svc: Services) -> dict[str, Any]:
     """Connections, the source and the catalog task in the orchestrator (the price check comes later)."""
     orch = svc.orchestrator
-    for conn in read_json(DOCUMENTS_DIR / CONNECTIONS_DOC)["connections"]:
+    for conn in [*read_json(DOCUMENTS_DIR / CONNECTIONS_DOC)["connections"], read_json(TG_ACCOUNT_DOC)]:
         orch.call("PUT", f"/v1/connections/{conn['connection_id']}", ok=(200, 201), json=conn)
     source = read_json(DOCUMENTS_DIR / SOURCE_DOC)
     r = orch.call("POST", "/v1/sources", ok=(201, 409), json=source, headers={"Idempotency-Key": key()})
@@ -591,6 +600,87 @@ def site_path(url: str) -> str:
     return parts.path + (f"?{query}" if query else "")
 
 
+# ============================================================================================ telegram
+def telegram_run(svc: Services, timeout_s: float, reason: str) -> dict[str, Any]:
+    run_id = start_run(svc.orchestrator, "telegram-events", reason)
+    run = wait_run(svc.orchestrator, run_id, timeout_s)
+    log(f"telegram: run {run_id} {run['status']} {run.get('counters')}")
+    if run["status"] != "succeeded":
+        raise RuntimeError(f"telegram run failed: {json.dumps(run)[:2000]}")
+    return run_summary(run)
+
+
+def telegram(svc: Services, project: str, timeout_s: float) -> dict[str, Any]:
+    """Events from Telegram on the RECORDED backend (external-service substitute, mark "З").
+
+    Run 1 reads the channel history; then the recording gets an edit of message 1 and a new message 4 (as
+    the channel would), run 2 (incremental) must see exactly these two as new observations; the edit updates
+    the stored event instead of adding one.
+    """
+    from jane_telegram_collector.recorded import Recording  # type: ignore[import-untyped]
+
+    orch = svc.orchestrator
+    source = read_json(DOCUMENTS_DIR / TG_SOURCE_DOC)
+    r = orch.call("POST", "/v1/sources", ok=(201, 409), json=source, headers={"Idempotency-Key": key()})
+    log(f"orchestrator: source {source['source_id']} -> {r.status_code}")
+    create_task(orch, read_json(DOCUMENTS_DIR / TG_TASK_DOC))
+    history = telegram_run(svc, timeout_s, "WP-14 example: channel history")
+    recording_path = STACK_DIR / f"telegram-recordings-{project}" / f"{TG_CHANNEL}.json"
+    rec = Recording(recording_path, channel_id="", username=TG_CHANNEL)
+    rec.reload()
+    rec.edit(
+        1,
+        "Подія: Лекція про історію міста | 2026-10-05 19:00 | Міська бібліотека, зала 2",
+        edit_date=datetime(2026, 9, 30, 8, 0, tzinfo=UTC),
+    )
+    rec.post(
+        "Подія: Осінній ярмарок | 2026-10-19 10:00 | Центральна площа",
+        date=datetime(2026, 9, 30, 9, 0, tzinfo=UTC),
+    )
+    log("telegram: recording changed (message 1 edited, message 4 posted)")
+    changes = telegram_run(svc, timeout_s, "WP-14 example: new and edited messages")
+    return {"history": history, "changes": changes, "verify": verify_telegram(svc, history, changes)}
+
+
+def verify_telegram(svc: Services, history: Mapping[str, Any], changes: Mapping[str, Any]) -> dict[str, Any]:
+    source_id = read_json(DOCUMENTS_DIR / TG_SOURCE_DOC)["source_id"]
+    failures: list[str] = []
+    if (history.get("counters") or {}).get("materials") != 3:
+        failures.append(f"history run: expected 3 messages, got {history.get('counters')}")
+    if (changes.get("counters") or {}).get("materials") != 2:
+        failures.append(f"changes run: expected 2 observations (edit + new), got {changes.get('counters')}")
+    raw = svc.storage.pages("/v1/objects", {"connection_id": "raw-files", "source_id": source_id})
+    if len(raw) != 5 or len({o["material"]["observation_id"] for o in raw}) != 5:
+        failures.append(f"RAW: expected 5 distinct observations, got {len(raw)}")
+    events = {
+        e["key"]["natural"]["event_id"]: e
+        for e in svc.storage.pages(
+            "/v1/entities", {"connection_id": "results-pg", "entity_type": "event", "scope": source_id}
+        )
+    }
+    expected = {f"{TG_CHANNEL}/1/1", f"{TG_CHANNEL}/3/2", f"{TG_CHANNEL}/4/1"}
+    if set(events) != expected:
+        failures.append(f"events: expected {sorted(expected)}, got {sorted(events)}")
+    lecture = events.get(f"{TG_CHANNEL}/1/1") or {}
+    fields = lecture.get("fields") or {}
+    if fields.get("time") != "19:00" or not str(fields.get("place", "")).endswith("зала 2"):
+        failures.append(f"edited message did not update the event: {fields}")
+    history_of_lecture = svc.storage.pages(
+        "/v1/entity-history",
+        {"connection_id": "results-pg", "entity_type": "event", "key": lecture.get("canonical_key", "")},
+    )
+    if len(history_of_lecture) != 2:
+        failures.append(f"the edited event should have 2 history entries, got {len(history_of_lecture)}")
+    return {
+        "ok": not failures,
+        "failures": failures,
+        "raw_objects": len(raw),
+        "events": {k: v.get("fields") for k, v in sorted(events.items())},
+        "lecture_version": lecture.get("version"),
+        "substitute": "Telegram = recorded backend of telegram-collector (Z)",
+    }
+
+
 def summary_path(project: str) -> Path:
     return STACK_DIR / f"examples-{project}.json"
 
@@ -600,9 +690,10 @@ def cmd_online(ns: argparse.Namespace) -> int:
     out_path = summary_path(ns.project)
     state: dict[str, Any] = read_json(out_path) if out_path.is_file() else {}
     try:
-        steps = (
-            ["publish", "apply", "catalog", "price-check", "verify"] if ns.command == "demo" else [ns.command]
-        )
+        steps = {
+            "demo": ["publish", "apply", "catalog", "price-check", "verify"],
+            "telegram": ["publish", "apply", "telegram"],  # publish/apply are idempotent
+        }.get(ns.command, [ns.command])
         for step in steps:
             if step == "publish":
                 state["publish"] = publish(svc)
@@ -612,6 +703,8 @@ def cmd_online(ns: argparse.Namespace) -> int:
                 state["catalog"] = catalog(svc, ns.timeout)
             elif step == "price-check":
                 state["price_check"] = price_check(svc, ns.first_check_in, ns.timeout)
+            elif step == "telegram":
+                state["telegram"] = telegram(svc, ns.project, ns.timeout)
             elif step == "verify":
                 if "catalog" not in state or "price_check" not in state:
                     raise SystemExit("verify needs the catalog and price-check runs of this project")
@@ -620,6 +713,10 @@ def cmd_online(ns: argparse.Namespace) -> int:
             write_json(out_path, state)
     finally:
         svc.close()
+    if ns.command == "telegram":
+        print(json.dumps(state["telegram"]["verify"], ensure_ascii=False, indent=2))
+        print(f"summary: {out_path.relative_to(ROOT).as_posix()}")
+        return 0 if state["telegram"]["verify"]["ok"] else 1
     result = state.get("verify")
     if result is not None:
         print(json.dumps({k: v for k, v in result.items() if k != "effective_collect_limits"}, indent=2))
@@ -640,7 +737,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("snapshot", help="offline: regenerate package test pages from the testsite").set_defaults(
         fn=cmd_snapshot
     )
-    for name in ("demo", "publish", "apply", "catalog", "price-check", "verify"):
+    for name in ("demo", "publish", "apply", "catalog", "price-check", "verify", "telegram"):
         p = sub.add_parser(name, help=f"against a running stack: {name}")
         p.add_argument("--project", required=True, help="compose project of deploy/profiles/stack.py up")
         p.add_argument("--timeout", type=float, default=600.0, help="seconds per run (default 600)")

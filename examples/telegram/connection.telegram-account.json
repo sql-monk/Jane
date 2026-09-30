@@ -1,0 +1,12 @@
+{
+  "connection_id": "tg-main",
+  "kind": "telegram_account",
+  "title": "Реальний обліковий запис Telegram (лише для реального шляху)",
+  "params": {
+    "api_id": 0
+  },
+  "secret_refs": {
+    "api_hash": "env:JANE_SECRET_TG_API_HASH",
+    "session": "env:JANE_SECRET_TG_SESSION"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "entities": [
+    {
+      "entity_type": "event",
+      "fields": {
+        "event_id": "jane_events_example/3/2",
+        "title": "Концерт камерної музики",
+        "date": "2026-10-12",
+        "place": "Філармонія"
+      }
+    },
+    {
+      "entity_type": "event",
+      "fields": {
+        "event_id": "jane_events_example/3/3",
+        "title": "Open-air cinema",
+        "date": "2026-10-13",
+        "place": "Central park"
+      }
+    }
+  ]
+}

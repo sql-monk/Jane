@@ -1,0 +1,26 @@
+{
+  "schema_version": "1",
+  "package_id": "examples.telegram-rules",
+  "version": "1.0.0",
+  "kind": "collector-rules",
+  "title": "Telegram: the events channel of the WP-14 example",
+  "description": "Правила Telegram Collector для прикладу «події з Telegram»: історія, нові повідомлення й редагування каналу jane_events_example (записаний backend або реальний канал після заміни username).",
+  "tags": [
+    "examples",
+    "telegram",
+    "events"
+  ],
+  "entry": {
+    "collector": "telegram",
+    "rules": "rules.json"
+  },
+  "tests": [],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "WP-14"
+    ],
+    "created_at": "2026-09-30T00:00:00Z",
+    "change_summary": "Rules of the reproducible Telegram example."
+  }
+}

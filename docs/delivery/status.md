@@ -12,7 +12,7 @@
 | 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент / wp-reviewer | виправлення після рев'ю 1 (lease ключів/job, secret_detected) |
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
-| 08 | Адаптери збереження | 1 | active | `wp/08-storage-adapters` | агент / wp-reviewer | виправлення після рев'ю 1 (дублі історії: s3 412, mongodb гонка) |
+| 08 | Адаптери збереження | 1 | review | `wp/08-storage-adapters` | агент / wp-reviewer | рев'ю 2 |
 | 09 | Оркестратор | 1 | active | `wp/09-orchestrator` | агент / wp-reviewer | виправлення після рев'ю 1 (cancelling, retries, overlap) |
 | 10 | LLM-шлюз і LLM-обробник | 1 | accepted | `wp/10-llm` | агент / wp-reviewer (2 раунди) | злито `00870c2` |
 | 11 | Асистент джерел | 1 | accepted | `wp/11-assistant` | агент / wp-reviewer (2 раунди) | злито `7dc7074` |

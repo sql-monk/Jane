@@ -232,7 +232,9 @@ class E2EStack:
             "JANE_DOCKER_GID": os.environ.get("JANE_E2E_DOCKER_GID", ""),
             "JANE_STORAGE_CONNECTIONS_FILE_HOST": (
                 self.root / "tests" / "e2e" / "config" / "storage-connections.json"
-            ).resolve().as_posix(),
+            )
+            .resolve()
+            .as_posix(),
             "COMPOSE_PROFILES": ",".join(self.available_apps()),
             "JANE_E2E_PACKAGES_DIR": self.packages_dir.as_posix(),
             "JANE_E2E_TELEGRAM_RECORDINGS_DIR": self.telegram_recordings_dir.as_posix(),

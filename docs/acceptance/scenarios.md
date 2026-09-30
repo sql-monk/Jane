@@ -28,15 +28,15 @@ uv run --all-packages pytest tests/e2e -v -k s_m1_01         # один сцен
 ```
 
 `just check` сценаріїв e2e не запускає: `tests/e2e` не входить до `testpaths` кореневого `pyproject.toml`,
-а маркер `e2e` реєструє `tests/e2e/conftest.py`. Окремий рецепт `just e2e` — запит до WP-01 (див. звіт).
+а маркер `e2e` реєструє `tests/e2e/conftest.py`. Окремий рецепт `just e2e` запускає їх у CI після WP-01a.
 
-Потрібні Docker (Compose v2) і `uv`. Стек складається з `infra/compose.yaml` (WP-01) і накладки
-`tests/e2e/compose.e2e.yaml` (сервіси Jane). Проєкт унікальний (`jane-e2e-<хеш checkout>` або
+Потрібні Docker (Compose v2) і `uv`. Сервіси Jane описані в `infra/compose.yaml` (WP-01a), а накладка
+`tests/e2e/compose.e2e.yaml` додає тестові налаштування. Проєкт унікальний (`jane-e2e-<хеш checkout>` або
 `JANE_E2E_PROJECT`), порти хоста обирає Docker, облікові дані генеруються. Файл стеку
 `.jane/stack-<проєкт>.json` має ту саму форму, що й у `just up`, тож `just env --project <проєкт>` працює.
 Сервіси піднімаються ліниво: сценарій запускає лише те, що йому потрібно. Для handler-runtime стек
 збирає образ пісочниці `python-extractor@1` (`jane-handler-runtime build-image`) і передає сервісу
-Docker-сокет із групою, визначеною автоматично (`JANE_E2E_DOCKER_GID`).
+Docker-сокет із групою, визначеною автоматично (`JANE_DOCKER_GID`).
 
 Змінні: `JANE_E2E_PROJECT`, `JANE_E2E_KEEP`, `JANE_E2E_WAIT_TIMEOUT` (типово 900 с),
 `JANE_E2E_SANDBOX_WALL_TIME_MS` (типово 60000; ліміт запиту до пісочниці), `JANE_E2E_DOCKER_SOCKET`,
@@ -52,18 +52,18 @@ Docker-сокет із групою, визначеною автоматично
 | S-M1-04 | Рекурсивний збір зі стороннього застосунку, runtime через CLI | 1, 10 | web-collector, handler-runtime | **пройдено на гілці WP-13** |
 | S-M1-05 | Заміна сховища лише конфігурацією завдання (PostgreSQL ↔ files) | 3 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
 | S-M1-06 | Новий прогін дає нове спостереження й подію історії | 8 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
-| S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | чекає WP-05 |
-| S-M2-02 | Telegram: історія, нові, редагування як ревізії → збереження | 1, 8, 12 | telegram-collector, storage | чекає WP-04 |
-| S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | чекає WP-02, 03 |
-| S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage | чекає WP-09, 02 |
+| S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | ще не реалізовано в WP-13 |
+| S-M2-02 | Telegram: історія, нові, редагування як ревізії → збереження | 1, 8, 12 | telegram-collector, storage | **1 passed на спільній гілці WP-01a/00a/13** (Telegram — З) |
+| S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | 69 тестів WP-03 пройшли; e2e WP-13 ще не реалізовано |
+| S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage | ще не реалізовано в WP-13 |
 | S-M2-05a | Невідома сторінка: асистент викликає LLM лише з прапорцем (без оркестратора) | 11 | testsite, assistant, llm, postgres | **реалізовано, проходить** (LLM — З) |
-| S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, llm, assistant | чекає WP-09, 02 |
-| S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator | чекає WP-05, 02, 09 |
-| S-M2-07 | Проблемні приклади → нова версія → тести → активація → відкат | 6 | orchestrator, assistant, llm, registry, runtime | чекає WP-09, 05 |
-| S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, усі сховища | чекає WP-08, 09 |
-| S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці | чекає WP-09 |
-| S-M2-10 | Адмінка на реальному API (Playwright) | 6, 7 (UI) | admin, усі API | чекає WP-12 |
-| S-M2-11 | Ланцюжок з умовами `when` і LLM-етапом | 2 | orchestrator, runtime, storage, llm | чекає WP-09 |
+| S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, llm, assistant | ще не реалізовано в WP-13 |
+| S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator | ще не реалізовано в WP-13 |
+| S-M2-07 | Проблемні приклади → нова версія → тести → активація → відкат | 6 | orchestrator, assistant, llm, registry, runtime | ще не реалізовано в WP-13 |
+| S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, усі сховища | ще не реалізовано в WP-13 |
+| S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці | ще не реалізовано в WP-13 |
+| S-M2-10 | Адмінка на реальному API (Playwright) | 6, 7 (UI) | admin, усі API | WP-12 частково перевірив реальні API; повний Caddy прогін відкритий |
+| S-M2-11 | Ланцюжок з умовами `when` і LLM-етапом | 2 | orchestrator, runtime, storage, llm | ще не реалізовано в WP-13 |
 | R-01 | Kill воркера оркестратора посеред ланцюжка | 8 | orchestrator ×2, виконавці | чекає WP-09 |
 | R-02 | Kill і рестарт кожного сервісу; повтор після рестарту — дубль | 8 | storage, handler-runtime (далі — усі) | **реалізовано для storage і runtime, проходить** |
 | R-03 | Розрив мережі між оркестратором і виконавцем | 8 | orchestrator, виконавці | чекає WP-09 |

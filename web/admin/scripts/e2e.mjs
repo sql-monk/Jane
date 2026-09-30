@@ -26,7 +26,12 @@ if (realIndex >= 0) {
   console.log(`e2e: real API via ${target} (tests tagged @mock are skipped)`);
 } else {
   delete env.JANE_ADMIN_API_TARGET;
-  console.log("e2e: contract mocks (contracts/tools/mock.py)");
+  const real = Object.keys(env)
+    .filter((k) => k.startsWith("JANE_ADMIN_TARGET_") && env[k])
+    .map((k) => `${k.slice("JANE_ADMIN_TARGET_".length).toLowerCase()}=${env[k]}`);
+  console.log(
+    `e2e: contract mocks (contracts/tools/mock.py)${real.length ? `; real services instead of mocks: ${real.join(", ")}` : ""}`,
+  );
 }
 
 const cli = path.join(appRoot, "node_modules", "@playwright", "test", "cli.js");

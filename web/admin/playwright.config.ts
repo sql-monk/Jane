@@ -1,7 +1,9 @@
 // Playwright e2e for the admin.
 //   * default: contract mocks (`uv run contracts/tools/mock.py <api>`, one per service) + Vite as the reverse proxy;
 //   * real API: JANE_ADMIN_API_TARGET=<Jane reverse proxy URL> - only Vite starts, `/api/*` goes to the real stack,
-//     tests tagged @mock (they depend on contract example data) are skipped.
+//     tests tagged @mock (they depend on contract example data) are skipped; auth and the data-independent
+//     @hybrid scenarios (they seed their own data through the service APIs) run against the stack;
+//   * hybrid: JANE_ADMIN_TARGET_<API>=<service URL> replaces one mock by a real service (see README).
 // Ports are configurable: JANE_ADMIN_PORT (admin, 4600), JANE_ADMIN_MOCK_PORT_BASE (first mock, 4611).
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";

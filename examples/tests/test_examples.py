@@ -104,6 +104,33 @@ def test_price_check_urls_are_catalog_products_inside_the_rules_scope() -> None:
         assert any(parts.path.startswith(prefix) for prefix in rules["scope"]["path_prefixes"])
 
 
+@pytest.mark.parametrize("applied_fields", [[], ["price"], ["availability"]])
+def test_price_update_rejects_unapplied_fields_without_optional_field_orders(
+    applied_fields: list[str],
+) -> None:
+    state = {
+        "fields": {
+            "sku": "phone-alpha",
+            "price": {"amount": "1"},
+            "availability": "in_stock",
+            "title": "Phone Alpha",
+            "category": "phones",
+            "url": "/product/phone-alpha",
+        }
+    }
+    entry = {
+        "record": {
+            "completeness": "partial",
+            "fields": {"sku": "phone-alpha", "price": {"amount": "1"}, "availability": "in_stock"},
+            "observation": {"observation_id": "obs_price"},
+            "provenance": {"package": {"package_id": "examples.testsite-price-extractor"}},
+        },
+        "applied_fields": applied_fields,
+    }
+    _, failures = ex.check_price_update("phone-alpha", state, entry)
+    assert any("price and availability were not both applied" in failure for failure in failures)
+
+
 def test_tasks_are_independent_and_differ_only_where_the_spec_says() -> None:
     """TZ §6: separate tasks; the price check reads given URLs and stores a partial update, on a schedule."""
     catalog = ex.read_json(ex.DOCUMENTS_DIR / ex.CATALOG_DOC)

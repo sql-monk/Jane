@@ -514,6 +514,40 @@ def price_check(svc: Services, first_in_s: int, timeout_s: float) -> dict[str, A
     }
 
 
+def check_price_update(
+    sku: str, state: Mapping[str, Any], entry: Mapping[str, Any]
+) -> tuple[dict[str, Any], list[str]]:
+    """Check that a partial price record actually changed both requested fields."""
+    record = entry["record"]
+    orders = state.get("field_orders") or {}
+    price_obs = (orders.get("price") or {}).get("observation_id")
+    title_obs = (orders.get("title") or {}).get("observation_id")
+    info = {
+        "completeness": record.get("completeness"),
+        "record_fields": sorted(record["fields"]),
+        "applied_fields": entry.get("applied_fields"),
+        "package": (record.get("provenance") or {}).get("package"),
+        "state_fields": sorted(state.get("fields") or {}),
+        "state_version": state.get("version"),
+        "price_observation_is_price_check": price_obs == record["observation"]["observation_id"],
+        "title_observation_kept_from_catalog": bool(title_obs) and title_obs != price_obs,
+    }
+    failures: list[str] = []
+    if record.get("completeness") != "partial" or set(record["fields"]) != PRICE_FIELDS:
+        failures.append(f"{sku}: price-check record is not a partial price/availability update: {info}")
+    if not {"price", "availability"} <= set(entry.get("applied_fields") or []):
+        failures.append(f"{sku}: price and availability were not both applied: {info}")
+    if (info["package"] or {}).get("package_id") != "examples.testsite-price-extractor":
+        failures.append(f"{sku}: price-check record was not produced by the price extractor: {info}")
+    if not {"title", "category", "url"} <= set(state.get("fields") or {}):
+        failures.append(f"{sku}: fields of the full card were lost after the partial update: {info}")
+    if orders and not (
+        info["price_observation_is_price_check"] and info["title_observation_kept_from_catalog"]
+    ):
+        failures.append(f"{sku}: field orders do not show a partial update: {orders}")
+    return info, failures
+
+
 def verify(svc: Services, catalog_run: Mapping[str, Any], price_run: Mapping[str, Any]) -> dict[str, Any]:
     """Effects through the public read APIs: RAW, full cards, partial price update, limits provenance."""
     source_id = read_json(DOCUMENTS_DIR / SOURCE_DOC)["source_id"]
@@ -557,31 +591,9 @@ def verify(svc: Services, catalog_run: Mapping[str, Any], price_run: Mapping[str
         if len(records) != 1:
             failures.append(f"{sku}: expected one history entry of the price-check run, got {len(records)}")
             continue
-        record = records[0]["record"]
-        orders = state.get("field_orders") or {}
-        price_obs = (orders.get("price") or {}).get("observation_id")
-        title_obs = (orders.get("title") or {}).get("observation_id")
-        info = {
-            "completeness": record.get("completeness"),
-            "record_fields": sorted(record["fields"]),
-            "applied_fields": records[0].get("applied_fields"),
-            "package": (record.get("provenance") or {}).get("package"),
-            "state_fields": sorted(state.get("fields") or {}),
-            "state_version": state.get("version"),
-            "price_observation_is_price_check": price_obs == record["observation"]["observation_id"],
-            "title_observation_kept_from_catalog": bool(title_obs) and title_obs != price_obs,
-        }
+        info, update_failures = check_price_update(sku, state, records[0])
         partial[sku] = info
-        if record.get("completeness") != "partial" or set(record["fields"]) - PRICE_FIELDS:
-            failures.append(f"{sku}: price-check record is not a partial price/availability update: {info}")
-        if (info["package"] or {}).get("package_id") != "examples.testsite-price-extractor":
-            failures.append(f"{sku}: price-check record was not produced by the price extractor: {info}")
-        if not {"title", "category", "url"} <= set(state.get("fields") or {}):
-            failures.append(f"{sku}: fields of the full card were lost after the partial update: {info}")
-        if orders and not (
-            info["price_observation_is_price_check"] and info["title_observation_kept_from_catalog"]
-        ):
-            failures.append(f"{sku}: field orders do not show a partial update: {orders}")
+        failures.extend(update_failures)
 
     orch = svc.orchestrator
     platform = orch.call("GET", "/v1/limits/platform").json()

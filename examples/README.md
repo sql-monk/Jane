@@ -80,8 +80,9 @@ uv run --all-packages python deploy/profiles/stack.py down --project jane-exampl
      документа не змінюється) і чекає на запуск із `trigger: schedule`, тобто перевіряє саме розклад;
    - **verify** — через `storage.v1`: 23 RAW-сторінки каталогу, 16 повних карток, для кожного з 4 товарів
      перевірки цін — один запис історії з `completeness: partial` лише з `sku`, `price`, `availability`
-     від пакета `examples.testsite-price-extractor`, а `title`, `category`, `url` лишаються; `field_orders`
-     показують, що `price` оновлено спостереженням перевірки, а `title` — ні. Також `GET /v1/limits/effective`:
+     від пакета `examples.testsite-price-extractor`; `applied_fields` підтверджує застосування `price` та
+     `availability`, а `title`, `category`, `url` лишаються. Якщо є необов'язкове `field_orders`, воно
+     додатково показує, що `price` оновлено спостереженням перевірки, а `title` — ні. Також `GET /v1/limits/effective`:
      частота з рівня `source`, `crawl.max_pages_per_run` з рівня `task`; розклад каталогу не змінився.
 3. `telegram` — джерело й завдання подій, запуск 1 читає історію (3 повідомлення → 2 події), потім скрипт
    редагує повідомлення 1 і додає повідомлення 4 у копії запису (`.jane/telegram-recordings-<проєкт>/`),

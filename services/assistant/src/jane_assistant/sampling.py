@@ -8,17 +8,18 @@ the least represented URL shapes (diversity), classifies them with the cheap mod
 the confidence:
 
     coverage   = 1 - (materials of types seen fewer than min_examples_per_type times) / n
-    confidence = known frequent-type materials / all fetched materials x mean model confidence
+    confidence = (1 - estimated unseen-type share) x mean model confidence
 
 ``coverage`` is the Good-Turing sample-coverage estimate (with ``min_examples_per_type = 2`` it is
 exactly ``1 - singletons / n``): the probability that the next material belongs to a type already
 seen often enough. This estimate cannot detect a type that occurs later in a source ordered by URL
 or discovery strategy. After the first classification batch, the sampler probes the remaining
 bounded collector stream, classifies newly seen URL shapes, then samples more within known shapes
-if confidence is still low. Unclassified materials count as potentially unseen types in the
-confidence denominator, including when their URL shape is already known. An unfinished stream
-cannot establish diversity, so a polling or sample-budget limit reports an insufficient sample.
-The collector's fetch bound is ``max_onboarding_samples x fetch_ratio``.
+if confidence is still low. Unclassified materials count toward a finite-population estimate of
+unseen types even when their URL shape is already known; this estimate also accounts for the
+observed rare types. An unfinished stream cannot establish diversity, so a polling or sample-budget
+limit reports an insufficient sample. The collector's fetch bound is
+``max_onboarding_samples x fetch_ratio``.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from math import ceil
+from math import pow as float_pow
 from typing import Any
 
 from .clients import CollectorClient, idem_key
@@ -75,14 +76,20 @@ class SampleResult:
         return out
 
 
-def pick_diverse(reserve: list[Sample], seen: Counter[str], size: int) -> list[Sample]:
+def pick_diverse(
+    reserve: list[Sample], seen: Counter[str], size: int, *, from_tail: bool = False
+) -> list[Sample]:
     """Round-robin over URL shapes: always take a material of the least represented shape
-    (already classified + already picked), keeping the collector's order within a shape."""
+    (already classified + already picked). After EOS, prefer later items within a shape so a
+    source ordered by URL does not hide a late type behind early pages of the same shape."""
     picked: Counter[str] = Counter()
     left = list(reserve)
     batch: list[Sample] = []
     while left and len(batch) < size:
-        best = min(range(len(left)), key=lambda i: (seen[left[i].shape] + picked[left[i].shape], i))
+        best = min(
+            range(len(left)),
+            key=lambda i: (seen[left[i].shape] + picked[left[i].shape], -i if from_tail else i),
+        )
         s = left.pop(best)
         picked[s.shape] += 1
         batch.append(s)
@@ -97,15 +104,40 @@ def coverage(counts: Counter[str], min_examples: int) -> float:
     return 1.0 - rare / n
 
 
-def confidence_of(samples: list[Sample], min_examples: int, unclassified: int = 0) -> float:
+def unseen_risk(classified: int, fetched: int, min_confidence: float) -> float:
+    """Estimate unseen-type share from a bounded, diversity-seeking sample.
+
+    The finite-population share caps the estimate for small streams. The second term is the
+    with-replacement miss rate at the configured confidence level; it avoids requiring a fixed
+    fraction of a large source. This is a sampling estimate, not a completeness guarantee.
+    """
+    if classified == 0 or fetched == 0:
+        return 1.0
+    if classified >= fetched:
+        return 0.0
+    return min(
+        (fetched - classified) / fetched,
+        1.0 - float_pow(1.0 - min_confidence, 1.0 / classified),
+    )
+
+
+def confidence_of(
+    samples: list[Sample],
+    min_examples: int,
+    unclassified: int,
+    min_confidence: float,
+    min_distinct_types: int,
+) -> float:
     if not samples:
         return 0.0
     counts = Counter(s.material_type for s in samples)
     mean = sum(s.confidence for s in samples) / len(samples)
-    # Treat every fetched but unclassified material as a possible new type. This is a
-    # conservative lower bound for frequent-type coverage of the fetched collection.
-    known = sum(count for count in counts.values() if count >= min_examples)
-    return known / (len(samples) + unclassified) * mean
+    rare_share = 1.0 - coverage(counts, min_examples)
+    # When fewer types than the configured diversity target have appeared, use a
+    # tighter miss-risk level. A genuinely homogeneous source can still become sufficient.
+    risk_confidence = 1.0 - (1.0 - min_confidence) / max(1, min_distinct_types - len(counts) + 1)
+    unseen_share = unseen_risk(len(samples), len(samples) + unclassified, risk_confidence)
+    return (1.0 - max(rare_share, unseen_share)) * mean
 
 
 def sampling_rules(
@@ -202,7 +234,6 @@ async def sample_source(
     try:
         while True:
             unseen_shape = any(s.shape not in shapes for s in reserve)
-            enough_types = len({s.material_type for s in samples}) >= ob.min_distinct_types
             probing = bool(samples) and not unseen_shape
             if not ended and (len(reserve) < ob.sample_batch_size or probing):
                 page = await collector.materials(
@@ -229,7 +260,13 @@ async def sample_source(
                     if ck := (m.get("format") or {}).get("content_kind"):
                         content_kinds[str(ck)] += 1
                     reserve.append(Sample(m, text, shape))
-                confidence = confidence_of(samples, ob.min_examples_per_type, len(reserve))
+                confidence = confidence_of(
+                    samples,
+                    ob.min_examples_per_type,
+                    len(reserve),
+                    ob.min_confidence,
+                    ob.min_distinct_types,
+                )
                 if not ended and not items and empty_polls >= ob.max_empty_polls:
                     message = (
                         f"collection did not finish after {empty_polls} empty poll(s); "
@@ -241,12 +278,7 @@ async def sample_source(
                 unseen_shape = any(s.shape not in shapes for s in reserve)
                 if samples and not unseen_shape and not ended:
                     continue
-            if (
-                confidence >= ob.min_confidence
-                and ended
-                and not unseen_shape
-                and (enough_types or not reserve)
-            ):
+            if confidence >= ob.min_confidence and ended and not unseen_shape:
                 break
             if not reserve:
                 message = message or (
@@ -258,18 +290,26 @@ async def sample_source(
             if samples and novel_shapes:
                 batch_size = min(len(novel_shapes), ob.sample_batch_size)
             elif ended and samples:
-                counts = Counter(s.material_type for s in samples)
-                known = sum(count for count in counts.values() if count >= ob.min_examples_per_type)
                 mean = sum(s.confidence for s in samples) / len(samples)
-                needed = (
-                    max(1, ceil(ob.min_confidence * (len(samples) + len(reserve)) / mean) - known)
-                    if mean > 0
-                    else ob.sample_batch_size
+                fetched = len(samples) + len(reserve)
+                batch_size = min(len(reserve), room, ob.sample_batch_size)
+                distinct = len({s.material_type for s in samples})
+                risk_confidence = 1.0 - (1.0 - ob.min_confidence) / max(
+                    1, ob.min_distinct_types - distinct + 1
                 )
-                batch_size = min(needed, ob.sample_batch_size)
+                # Smallest next batch that could meet the threshold if its classifications
+                # resolve the current rare types. Re-evaluate after that batch.
+                if mean > 0:
+                    for additional in range(1, batch_size + 1):
+                        optimistic = mean * (
+                            1.0 - unseen_risk(len(samples) + additional, fetched, risk_confidence)
+                        )
+                        if optimistic >= ob.min_confidence:
+                            batch_size = additional
+                            break
             else:
                 batch_size = ob.sample_batch_size
-            batch = pick_diverse(reserve, shapes, min(batch_size, room))
+            batch = pick_diverse(reserve, shapes, min(batch_size, room), from_tail=ended and bool(samples))
             reserve = [s for s in reserve if not any(s is b for b in batch)]
             try:
                 await _classify(llm, batch, limits, model)
@@ -279,18 +319,18 @@ async def sample_source(
             for s in batch:
                 shapes[s.shape] += 1
             samples.extend(batch)
-            confidence = confidence_of(samples, ob.min_examples_per_type, len(reserve))
+            confidence = confidence_of(
+                samples,
+                ob.min_examples_per_type,
+                len(reserve),
+                ob.min_confidence,
+                ob.min_distinct_types,
+            )
             await progress(len(samples), f"sampled {len(samples)}, confidence {confidence:.2f}")
             # A high score over classified pages says nothing about types in later pages.
             # Only a closed stream with all observed URL shapes represented confirms diversity.
             unseen_shape = any(s.shape not in shapes for s in reserve)
-            enough_types = len({s.material_type for s in samples}) >= ob.min_distinct_types
-            if (
-                confidence >= ob.min_confidence
-                and ended
-                and not unseen_shape
-                and (enough_types or not reserve)
-            ):
+            if confidence >= ob.min_confidence and ended and not unseen_shape:
                 break
             if len(samples) >= max_samples:
                 message = f"reached limits.llm.max_onboarding_samples={max_samples} with confidence {confidence:.2f}"
@@ -307,7 +347,6 @@ async def sample_source(
         and confidence >= ob.min_confidence
         and ended
         and not any(s.shape not in shapes for s in reserve)
-        and (len({s.material_type for s in samples}) >= ob.min_distinct_types or not reserve)
     )
     try:
         stats = (await collector.collection(collection_id)).get("stats") or {}

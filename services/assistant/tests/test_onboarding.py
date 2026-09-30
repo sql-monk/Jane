@@ -77,9 +77,7 @@ def test_new_source_by_name_to_proposals_package_and_tests(w: World) -> None:
     s = w.result(r.json()["job_id"], "OnboardingSession")
     assert s["status"] == "proposals_ready", s
     assert s["sample"]["sufficient"] is True and s["sample"]["confidence"] >= 0.8
-    # This small site has a singleton home type; the conservative coverage bound
-    # needs every fetched page. The larger mixed-stream test below checks early LLM stop.
-    assert s["sample"]["materials"] == len(next(iter(w.collector.collections.values()))["items"])
+    assert s["sample"]["materials"] < 16  # adaptive: stopped before exhausting the site
     assert {t["type"] for t in s["analysis"]["material_types"]} >= {"product", "category"}
     assert "llm_explore" not in s["analysis"]["discovery_methods"]  # only real discovery strategies
     assert "product" in {e["entity_type"] for e in s["analysis"]["entities"]}
@@ -210,7 +208,8 @@ def test_single_streamed_type_reports_insufficient_at_sample_budget(w: World) ->
     assert result["status"] == "insufficient_sample", result
     assert result["sample"]["materials"] == 4 and result["sample"]["distinct_types"] == 1
     fetched = len(next(iter(w.collector.collections.values()))["items"])
-    assert result["sample"]["confidence"] == pytest.approx(0.9 * 4 / fetched, abs=1e-4)
+    unseen = min((fetched - 4) / fetched, 1 - 0.1 ** (1 / 4))
+    assert result["sample"]["confidence"] == pytest.approx(0.9 * (1 - unseen), abs=1e-4)
     assert not result["sample"]["sufficient"]
     assert "max_onboarding_samples=4" in result["sample"]["message"]
     assert w.violations() == []
@@ -333,6 +332,55 @@ def test_same_url_shape_late_type_is_classified_or_insufficient(w: World, sample
     assert w.violations() == []
 
 
+@pytest.mark.parametrize("layout", ["separate_shapes", "shared_shape", "one_type"])
+def test_large_source_uses_representative_sample_within_budget(w: World, layout: str) -> None:
+    """A 100-page source must not be capped by classified/fetched, including one URL family."""
+
+    def hundred_pages(req: FakeRequest) -> Reply:
+        reply = w.collector.start(req)
+        collection = next(iter(w.collector.collections.values()))
+        base = "https://shop.example.test"
+        products = [
+            material(
+                f"{base}/{'item' if layout == 'shared_shape' else 'product'}/{i:03d}",
+                product(f"P-{i:03d}", f"Product {i}", "100"),
+            )
+            for i in range(50 if layout != "one_type" else 100)
+        ]
+        categories = (
+            [
+                material(
+                    f"{base}/{'item' if layout == 'shared_shape' else 'catalog'}/{i:03d}",
+                    page("category", f"Category {i}", "<p>Products</p>"),
+                )
+                for i in range(50, 100)
+            ]
+            if layout != "one_type"
+            else []
+        )
+        collection["items"] = [*products, *categories]
+        return reply
+
+    w.collector.app.on("startCollection")(hundred_pages)
+    job_id, sid = start(w, {"query": "Shop Example kettles"}, key=f"hundred-{layout}")
+    assert w.result(job_id, "OnboardingSession")["status"] == "needs_disambiguation"
+    selected = w.api.post(
+        f"/v1/onboarding-sessions/{sid}/candidate-selection", json={"candidate_id": "cand_1"}
+    )
+    assert selected.status_code == 200
+    result = w.result(selected.json()["job_id"], "OnboardingSession")
+
+    assert result["status"] == "proposals_ready", result
+    assert result["sample"]["sufficient"] and result["sample"]["confidence"] >= 0.8
+    assert result["sample"]["materials"] < 60
+    types = {t["type"] for t in result["analysis"]["material_types"]}
+    assert "product" in types
+    if layout != "one_type":
+        assert "category" in types
+    assert len(next(iter(w.collector.collections.values()))["items"]) == 100
+    assert w.violations() == []
+
+
 def test_confident_sample_stays_insufficient_when_collection_never_ends(w: World) -> None:
     """A contract-valid stream that stalls cannot certify undiscovered material types."""
 
@@ -349,7 +397,9 @@ def test_confident_sample_stays_insufficient_when_collection_never_ends(w: World
     assert result["status"] == "insufficient_sample", result
     fetched = len(next(iter(w.collector.collections.values()))["items"])
     assert result["sample"]["materials"] < fetched
-    assert 0 < result["sample"]["confidence"] <= 0.9 * result["sample"]["materials"] / fetched
+    count = result["sample"]["materials"]
+    unseen = min((fetched - count) / fetched, 1 - 0.2 ** (1 / count))
+    assert result["sample"]["confidence"] == pytest.approx(0.9 * (1 - unseen), abs=1e-4)
     assert not result["sample"]["sufficient"]
     assert "did not finish" in result["sample"]["message"]
     assert len(w.collector.app.called("listCollectionMaterials")) >= 30

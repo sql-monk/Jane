@@ -664,13 +664,18 @@ class S3Adapter:
         if written is None:
             if not self._applied(new, event):
                 return conflict()
-            # our CAS took effect (the 412 answered botocore's retry of it): committed, keep the claim
+            # Our CAS took effect (the 412 answered botocore's retry of it): committed, keep the claim.
+            # Roll forward only the stored document of *our* version, with *its* ETag. If the snapshot is
+            # already newer, another commit replaced ours and rolled our event forward itself: writing
+            # anything here would roll that newer, acknowledged snapshot back.
             got = self._get_json(skey)
-            written = got[1] if got is not None and isinstance(got[0].get("pending"), Mapping) else None
-        if written is not None:
-            with contextlib.suppress(ClientError, BotoCoreError, OSError):
-                # committed; rolling forward now only saves readers the work
-                self._roll_forward(doc, written)
+            if got is not None and int(got[0]["version"]) == new.version:
+                with contextlib.suppress(ClientError, BotoCoreError, OSError):
+                    self._roll_forward(*got)
+            return CommitResult(CommitOutcome.COMMITTED, new)
+        with contextlib.suppress(ClientError, BotoCoreError, OSError):
+            # committed; rolling forward now only saves readers the work
+            self._roll_forward(doc, written)  # our document with the ETag of our own write
         return CommitResult(CommitOutcome.COMMITTED, new)
 
     async def commit_entity(

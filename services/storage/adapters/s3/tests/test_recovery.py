@@ -249,6 +249,54 @@ async def test_snapshot_cas_applied_but_answered_412_is_committed_once(env: Env,
     assert await env.history(plain) == expected
 
 
+async def test_ambiguous_cas_recovery_never_rolls_back_a_newer_snapshot(env: Env) -> None:
+    """Review 2: A's CAS of version 2 (K#0) is applied, the response lost; before botocore's retry
+    answers 412, instance B commits version 3 (OTHER#0) and does not roll it forward (crash / still
+    running). A's recovery finds its event in the history of version 2 — and must not write anything
+    over version 3: final version 3, history OTHER#0, K#0, base#0, OTHER#0 delivered."""
+    plain = await env.adapter()
+    await env.engine(plain).store_entity(record(at=0), "base#0")
+    other = record(fields={"title": "other"}, at=6, obs="obs_other")
+
+    def no_own_roll_forward(self: S3Adapter, doc: Any, etag: str) -> str | None:
+        pending = doc.get("pending")
+        if isinstance(pending, dict) and pending.get("delivery_key") == "OTHER#0":
+            return None  # B's own commit stays pending (B crashed right after its CAS)
+        return S3Adapter._roll_forward(self, doc, etag)
+
+    b_cls = type("NoRollForwardB", (adapter_class(env.kind),), {"_roll_forward": no_own_roll_forward})
+    b = await env.adapter(b_cls)
+    b_results: list[CommitResult] = []
+
+    def b_commits() -> None:
+        current = b._read_entity("product", KEY)
+        assert current is not None and current.version == 2
+        merged = merge(current, other, now=datetime.now(UTC))
+        b_results.append(b._commit(merged.snapshot, 2, event_for(other, "OTHER#0", merged.applied)))
+
+    done: list[bool] = []
+
+    def hook(key: str, kwargs: dict[str, Any], real: Callable[[], str | None]) -> str | None:
+        if key.endswith(SNAP) and kwargs.get("if_match") is not None and not done:
+            done.append(True)
+            assert real() is not None  # A's CAS of version 2 is applied on the server
+            b_commits()  # B commits version 3 between the lost response and the retry
+            return real()  # the retry: 412
+        return real()
+
+    a = await env.adapter(hooked(env.kind, hook))
+    ack = await env.engine(a).store_entity(record(fields={"price": 5.0}, at=5), "K#0")
+    assert ack["status"] == "written"
+    assert ack["entity"]["version"] == 2
+    assert [r.outcome for r in b_results] == [CommitOutcome.COMMITTED]
+    snap = await plain.read_entity("product", KEY)
+    assert snap is not None and snap.version == 3
+    assert snap.fields["title"] == "other" and snap.fields["price"] == 5.0
+    assert await env.history(plain) == ["OTHER#0", "K#0", "base#0"]
+    assert (await plain.get_delivery("OTHER#0")) is not None
+    assert (await plain.get_delivery("K#0")) is not None
+
+
 async def test_claim_applied_but_answered_412_is_ours(env: Env) -> None:
     adapter = await env.adapter(hooked(env.kind, retried_after_success(claim_key("K#0"))))
     ack = await env.engine(adapter).store_entity(record(at=0), "K#0")

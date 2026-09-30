@@ -146,7 +146,7 @@ def test_max_pages_budget_stops_the_run(client: TestClient, site: Site) -> None:
 
 
 def test_backpressure_pauses_until_materials_are_pulled(client: TestClient, site: Site) -> None:
-    limits = {**FAST_LIMITS, "queue": {"max_unacked_materials": 3}}
+    limits = {**FAST_LIMITS, "queue": {"max_unacked_materials": 2}}
     cid = start(client, {"source_kind": "web", "rules": web_rules(site), "limits": limits})
     import time
 
@@ -158,10 +158,12 @@ def test_backpressure_pauses_until_materials_are_pulled(client: TestClient, site
             break
         time.sleep(0.05)
     assert view["paused_by_backpressure"] is True
-    assert view["stats"]["unacked"] <= 3 + FAST_LIMITS["concurrency"]["max_parallel_fetches"]
+    assert view["stats"]["unacked"] == 2
     fetched_while_paused = view["stats"]["fetched"]
     time.sleep(0.5)
-    assert client.get(f"/v1/collections/{cid}").json()["stats"]["fetched"] <= fetched_while_paused + 4
+    still_paused = client.get(f"/v1/collections/{cid}").json()
+    assert still_paused["stats"]["unacked"] == 2
+    assert still_paused["stats"]["fetched"] <= fetched_while_paused + 4
     materials = drain(client, cid)  # pulling acknowledges and releases the crawl
     assert wait_done(client, cid)["status"] == "succeeded"
     assert len(materials) > 10

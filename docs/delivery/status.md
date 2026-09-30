@@ -12,11 +12,11 @@
 | 05 | Репозиторій обробників | 1 | review | `wp/05-registry` | агент / wp-reviewer | рев'ю 2 (+ перевірка сканера на ReDoS) |
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
-| 08 | Адаптери збереження | 1 | active | `wp/08-storage-adapters` | агент / wp-reviewer | фінальне виправлення після рев'ю 2 (відкат новішого знімка s3), перевірка координатором |
+| 08 | Адаптери збереження | 1 | accepted | `wp/08-storage-adapters` | агент / wp-reviewer (2 раунди + фінальне виправлення, перевірено координатором) | злито `a14e775` |
 | 09 | Оркестратор | 1 | active | `wp/09-orchestrator` | агент / wp-reviewer | виправлення після рев'ю 1 (cancelling, retries, overlap) |
 | 10 | LLM-шлюз і LLM-обробник | 1 | accepted | `wp/10-llm` | агент / wp-reviewer (2 раунди) | злито `00870c2` |
 | 11 | Асистент джерел | 1 | accepted | `wp/11-assistant` | агент / wp-reviewer (2 раунди) | злито `7dc7074` |
-| 12 | Адмінка | 1 | active | `wp/12-admin` | агент | слот 3 |
+| 12 | Адмінка | 1 | review | `wp/12-admin` | агент / wp-reviewer | |
 | 13 | Інтеграція й приймання | 2 | active | `wp/13-acceptance` | агент | фаза 1 злито `6cb5ddf`; M1 — після злиття WP-02 і WP-09 |
 | 14 | Профілі лімітів і експлуатація | 2 | — | | | після M1 |
 
@@ -100,3 +100,8 @@
 | WP-13 | WP-10 / WP-11 | детермінований сценарій фейкового провайдера LLM-шлюзу для S-M2-06/07 | WP-13 налаштовує скрипти фейка (`params.responses`) у своїх сценаріях |
 - 2026-09-30 — WP-13 фаза 1 злито (`6cb5ddf`): матриця 13 критеріїв, сценарії M1/M2/надійності, каркас e2e (6 сценаріїв проходять). WP-04 на рев'ю.
 | WP-11 | координатор (M2) | асистент надсилає один bearer-токен усім сусідам (`JANE_ASSISTANT_SERVICE_TOKEN_ENV`); для ключа registry з `actor: llm` потрібна окрема змінна токена на сусіда | доповнення WP-11 перед M2 |
+| WP-12 | WP-01 | `scripts/dev.py cmd_web`: запускати pnpm з каталогу `web/<app>` (corepack бере `packageManager`); тоді прибрати обхід `pmOnFail: warn` | доручення WP-01 після M1 |
+| WP-12 | WP-01 / WP-13 | Caddy: `/api/<service>/*` для всіх сервісів і роздача `web/admin/dist` із замінним `config.json` | доручення WP-01 після M1 |
+| WP-12 | WP-11 / WP-00 | `GET /v1/onboarding-sessions` і список job вдосконалення; задокументувати `Job.links.session` | зміна контракту через contract-guardian |
+| WP-12 | WP-00 | приклади завершених job із `result` (TestReport, AcceptanceResult, ImprovementResult); ETag у прикладах orchestrator | зміна контракту через contract-guardian |
+- 2026-09-30 — WP-08 прийнято (фінальне виправлення перевірено координатором скриптом рецензента) і злито `a14e775`. WP-12 на рев'ю.

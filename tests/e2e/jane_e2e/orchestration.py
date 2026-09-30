@@ -6,8 +6,10 @@ RAW of every page into files, extraction by a local package (bound to product UR
 
 from __future__ import annotations
 
+import json
 import time
 import uuid
+from pathlib import Path
 from typing import Any
 
 from jane_e2e.clients import JaneClient
@@ -31,30 +33,8 @@ TERMINAL = frozenset({"succeeded", "failed", "cancelled"})
 
 # Same documents as tests/e2e/config/storage-connections.json: the orchestrator's registry is the source of
 # truth for stages (ADR-0006) and pushes them to storage (PUT /v1/connections/{id}).
-CONNECTIONS: list[dict[str, Any]] = [
-    {
-        "connection_id": "raw-files",
-        "kind": "filesystem",
-        "title": "e2e: RAW and documents on the storage volume",
-        "params": {"base_path": "/var/lib/jane/storage"},
-    },
-    {
-        "connection_id": "results-pg",
-        "kind": "postgresql",
-        "title": "e2e: results in the stack PostgreSQL",
-        "params": {
-            "host": "postgres",
-            "port": 5432,
-            "database": "jane_storage_results",
-            "schema": "e2e_results",
-            "sslmode": "disable",
-        },
-        "secret_refs": {
-            "username": "env:JANE_SECRET_E2E_STORAGE_RESULTS_USER",
-            "password": "env:JANE_SECRET_E2E_STORAGE_RESULTS_PASSWORD",
-        },
-    },
-]
+CONNECTIONS_FILE = Path(__file__).resolve().parents[1] / "config" / "storage-connections.json"
+CONNECTIONS: list[dict[str, Any]] = json.loads(CONNECTIONS_FILE.read_text(encoding="utf-8"))["connections"]
 
 
 def _key() -> str:

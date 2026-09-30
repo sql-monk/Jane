@@ -7,7 +7,7 @@
 | 00 | Архітектура й контракти | 0 | accepted | `wp/00-architecture-contracts` | агент / wp-reviewer (2 раунди) | злито `e2714ec` |
 | 01 | Каркас, CI, dev-стек | 0 | accepted | `wp/01-scaffold-ci` | агент / wp-reviewer (2 раунди + інтеграційне виправлення) | злито `4468cee` |
 | 02 | Web Collector: ядро | 1 | accepted | `wp/02-web-collector-core`, `wp/02a-api-feed-validation` | агент / wp-reviewer (2 раунди + фінальне виправлення, перевірено координатором); WP-02a незалежно перевірено | злито `69e656a`; WP-02a: рання відмова для POST/JSON emit |
-| 03 | Web Collector: стратегії пошуку | 1 | active | `wp/03-web-collector-discovery` | агент | після злиття WP-02 |
+| 03 | Web Collector: стратегії пошуку | 1 | accepted | `wp/03-web-collector-discovery` | агент / незалежний wp-reviewer (2 раунди) | злито; 69 тестів пакета і повний `just check` пройшли |
 | 04 | Telegram Collector | 1 | accepted | `wp/04-telegram-collector` | агент / wp-reviewer (2 раунди), перевірка координатором | рев'ю 2 прийнято; злито в `main` |
 | 05 | Репозиторій обробників | 1 | accepted | `wp/05-registry` | агент / wp-reviewer (2 раунди), перевірка координатором | виправлення ReDoS перевірено; злито в `main` |
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
@@ -150,3 +150,5 @@ WP-04 прийнято після повторного рев'ю: `just test tel
 - WP-12 виправив витік тексту з `problem+json`; незалежний браузерний повтор дав 5 passed.
   Повторне рев'ю прийняло виправлення. Повний прогін через Caddy з реальним API лишається відкритим
   для WP-13/M2.
+- WP-03 після синхронізації з WP-02a прийнято незалежним рев'юером: 69 тестів пакета, `just check`
+  (626 unit, 70 contract passed / 3 skipped, 40 web), власність шляхів без порушень. Злито в `main`.

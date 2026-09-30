@@ -20,6 +20,7 @@ import secrets
 import shutil
 import subprocess
 import sys
+import time
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -431,6 +432,35 @@ class E2EStack:
 
     def start_instance(self, service: str, index: int) -> None:
         self._run(["docker", "start", self.container(service, index)])
+
+    def pause_instance(self, service: str, index: int = 1) -> None:
+        """``docker pause`` (cgroup freezer): the replica keeps its sockets but answers nothing."""
+        self._run(["docker", "pause", self.container(service, index)])
+
+    def unpause_instance(self, service: str, index: int = 1) -> None:
+        self._run(["docker", "unpause", self.container(service, index)])
+
+    def state(self, service: str, index: int = 1) -> dict[str, Any]:
+        """``docker inspect`` ``.State`` of one replica (``Status``, ``Paused``, ``Health.Status``...)."""
+        r = self._run(["docker", "inspect", "--format", "{{json .State}}", self.container(service, index)])
+        state: dict[str, Any] = json.loads(str(r.stdout))
+        return state
+
+    def wait_healthy(self, service: str, index: int = 1, timeout_s: float | None = None) -> None:
+        """Wait for the health-check of one replica (after ``start_instance``)."""
+        deadline = time.monotonic() + (timeout_s or self.timeout_s)
+        while True:
+            state = self.state(service, index)
+            if state.get("Running") and (state.get("Health") or {}).get("Status") == "healthy":
+                return
+            if time.monotonic() > deadline:
+                raise StackError(f"{service}#{index} is not healthy: {state}")
+            time.sleep(1.0)
+
+    def logs(self, service: str, index: int = 1) -> str:
+        """Everything one replica wrote to stdout/stderr (kept across ``docker kill`` + ``docker start``)."""
+        r = self._run(["docker", "logs", self.container(service, index)])
+        return f"{r.stdout}\n{r.stderr}"
 
     @property
     def network(self) -> str:

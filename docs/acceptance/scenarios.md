@@ -56,20 +56,21 @@ Docker-сокет із групою, визначеною автоматично
 | S-M2-02 | Telegram: історія, нові, редагування як ревізії → збереження | 1, 8, 12 | telegram-collector, storage | чекає WP-04 |
 | S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | чекає WP-02, 03 |
 | S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage | чекає WP-09, 02 |
-| S-M2-05 | Невідомі сторінки: LLM лише з прапорцем | 11 | orchestrator, web-collector, llm, assistant | чекає WP-09, 10, 11 |
-| S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator | чекає WP-11, 10, 05 |
-| S-M2-07 | Проблемні приклади → нова версія → тести → активація → відкат | 6 | orchestrator, assistant, llm, registry, runtime | чекає WP-11, 09, 05, 10 |
+| S-M2-05a | Невідома сторінка: асистент викликає LLM лише з прапорцем (без оркестратора) | 11 | testsite, assistant, llm, postgres | **реалізовано, проходить** (LLM — З) |
+| S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, llm, assistant | чекає WP-09, 02 |
+| S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator | чекає WP-05, 02, 09 |
+| S-M2-07 | Проблемні приклади → нова версія → тести → активація → відкат | 6 | orchestrator, assistant, llm, registry, runtime | чекає WP-09, 05 |
 | S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, усі сховища | чекає WP-08, 09 |
 | S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці | чекає WP-09 |
 | S-M2-10 | Адмінка на реальному API (Playwright) | 6, 7 (UI) | admin, усі API | чекає WP-12 |
-| S-M2-11 | Ланцюжок з умовами `when` і LLM-етапом | 2 | orchestrator, runtime, storage, llm | чекає WP-09, 10 |
+| S-M2-11 | Ланцюжок з умовами `when` і LLM-етапом | 2 | orchestrator, runtime, storage, llm | чекає WP-09 |
 | R-01 | Kill воркера оркестратора посеред ланцюжка | 8 | orchestrator ×2, виконавці | чекає WP-09 |
 | R-02 | Kill і рестарт кожного сервісу; повтор після рестарту — дубль | 8 | storage, handler-runtime (далі — усі) | **реалізовано для storage і runtime, проходить** |
 | R-03 | Розрив мережі між оркестратором і виконавцем | 8 | orchestrator, виконавці | чекає WP-09 |
 | R-04 | Повторна доставка на кожен виконавець | 8 | усі виконавці | storage, runtime — у S-M1-01 і R-02; інші — з WP |
 | R-05 | Запізнілий результат не замінює новішого | 8 | storage, handler-runtime | **реалізовано, проходить** |
 | R-06 | Кілька екземплярів кожного компонента | 8 | усі | **runtime ×2 реалізовано, проходить**; інші — з WP |
-| R-07 | Повний цикл LLM → тести → активація → відкат під навантаженням і з рестартами | 6, 8 | orchestrator, assistant, llm, registry, runtime, storage | чекає WP-11, 09, 05, 10 |
+| R-07 | Повний цикл LLM → тести → активація → відкат під навантаженням і з рестартами | 6, 8 | orchestrator, assistant, llm, registry, runtime, storage | чекає WP-09, 05 |
 | R-08 | Обмежена черга стримує збір (backpressure) | 8, 13 | orchestrator, web-collector | чекає WP-09, 02 |
 
 ## M1 — перший наскрізний зріз
@@ -155,6 +156,19 @@ PostgreSQL (`jane.storage-postgresql` / `results-pg`) і у файли (`jane.st
 partial`). Після каталогу ціну змінено на testsite (або через інший набір сторінок). Перевірка цін
 оновлює лише `price` і `availability`, а `title` та інші поля лишаються. Скасування або зміна одного
 завдання не впливає на інше.
+
+### S-M2-05a. Невідома сторінка: асистент і LLM-шлюз напряму
+`tests/e2e/test_m2.py::test_s_m2_05a_unknown_page_goes_to_llm_only_with_flag`. Сторінка
+`/pages/event-spring-meetup` testsite має тип `unknown`, матеріал формує замінник колектора (**Т**). Кроки:
+
+1. `POST /v1/unknown-materials` асистента з `forward_unknown_to_llm: false` дає 403 `access_denied_by_policy`.
+   `GET /v1/usage` LLM-шлюзу (`totals.requests`) до й після виклику однаковий.
+2. Той самий матеріал із `forward_unknown_to_llm: true` дає 202, job асистента завершується `succeeded`,
+   а `totals.requests` шлюзу зростає.
+
+LLM — **З**: вбудований детермінований провайдер `fake` (псевдоніми `cheap`/`strong` задано в
+`tests/e2e/config/llm-seed.yaml`). Пошуковий провайдер асистента — **З** (`static`,
+`tests/e2e/config/assistant-search.json`). Стан асистента й шлюзу зберігається в PostgreSQL стеку.
 
 ### S-M2-05. Невідомі сторінки й LLM
 Джерело з `forward_unknown_to_llm: false`, завдання з прив'язками екстракторів, прогін на testsite

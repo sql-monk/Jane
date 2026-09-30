@@ -1,8 +1,7 @@
 """Shared helpers of the WP-03 discovery strategies.
 
 * limits: every number comes from ``ctx.limits`` (effective limits of the strategy, ``strategies[].limits``
-  already merged in by the core); :data:`FALLBACK_LIMITS` are used only if a core does not provide a value
-  and equal the Web Collector defaults;
+  already merged in by the core); a missing or invalid value is a configuration error;
 * safe decoding of navigation documents: bounded gzip decompression and an XML parser that never resolves
   entities, never touches the network and rejects documents that declare DTD entities;
 * dates (W3C Datetime / RFC 3339 / RFC 822), URL helpers and the navigation fetch wrapper around
@@ -25,7 +24,6 @@ from lxml import etree  # type: ignore[import-untyped]
 from jane_contracts.discovery import DiscoveryContext, FetchedResource, FetchRejected
 
 __all__ = [
-    "FALLBACK_LIMITS",
     "HTML_TYPES",
     "BudgetExhausted",
     "Decoded",
@@ -48,14 +46,6 @@ __all__ = [
     "text_of",
 ]
 
-FALLBACK_LIMITS: dict[str, int] = {
-    "crawl.max_depth": 5,
-    "crawl.max_links_per_page": 2000,
-    "crawl.max_material_bytes": 10 * 1024 * 1024,
-    "crawl.max_seed_urls": 100_000,
-}
-"""Only for a core that does not pass a value in ``ctx.limits``; the same as the Web Collector defaults."""
-
 HTML_TYPES = frozenset({"text/html", "application/xhtml+xml"})
 GZIP_MAGIC = b"\x1f\x8b"
 
@@ -69,13 +59,13 @@ class UnsafeDocument(ValueError):
 
 
 def limit(ctx: DiscoveryContext, path: str) -> int:
-    """Effective limit ``group.name`` of this strategy (``ctx.limits``), else the documented fallback."""
+    """Require an effective ``group.name`` limit supplied by the core for this strategy."""
     group, _, name = path.partition(".")
     section = ctx.limits.get(group) if isinstance(ctx.limits, Mapping) else None
     value = section.get(name) if isinstance(section, Mapping) else None
     if isinstance(value, int) and not isinstance(value, bool):
         return value
-    return FALLBACK_LIMITS[path]
+    raise ValueError(f"missing or invalid effective limit: {path}")
 
 
 def bump(stats: dict[str, int], key: str, by: int = 1) -> None:

@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import urlsplit
 
+import pytest
 from fastapi.testclient import TestClient
 
 from jane_web_collector.testing import FAST_LIMITS, Site, drain, errors, start, wait_done, web_rules
@@ -156,12 +157,24 @@ def test_incremental_run_rereads_navigation_documents_only(
     assert not [p for p in site.requests if p.startswith(("/product/", "/news/2026/"))]
 
 
-def test_unsupported_api_feed_config_fails_the_collection_loudly(client: TestClient, site: Site) -> None:
-    strategy = {**api(site), "method": "POST", "body": {"q": "phones"}}
+@pytest.mark.parametrize(
+    ("options", "error_part"),
+    [
+        ({"method": "POST", "body": {"q": "phones"}}, "POST"),
+        ({"emit_items_as_materials": True}, "emit_items_as_materials"),
+    ],
+    ids=["post", "json-materials"],
+)
+def test_schema_valid_api_feed_options_need_core_support(
+    client: TestClient, site: Site, options: dict[str, Any], error_part: str
+) -> None:
+    strategy = {**api(site), **options}
     rules = web_rules(site, strategies=[strategy])
+    report = client.post("/v1/rules/validations", json=rules).json()
+    assert report["valid"] is True and report["supported"] is True, report
     cid = start(client, {"source_kind": "web", "rules": rules, "limits": FAST_LIMITS})
     view = wait_done(client, cid)
     assert view["status"] == "failed"
     job = client.get(f"/v1/jobs/{cid}").json()
-    assert "POST" in str(job.get("error"))
+    assert error_part in str(job.get("error"))
     assert site.requests == {}

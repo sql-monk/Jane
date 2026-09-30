@@ -366,12 +366,14 @@ def test_rule_origins(discovery: ModuleType) -> None:
     assert origins(no_urls) == ["http://x.test", "http://y.test"]
 
 
-def test_limits_fallback_only_without_a_value(discovery: ModuleType) -> None:
+def test_limits_require_effective_value_from_context(discovery: ModuleType) -> None:
     common = discovery._common
     ctx = SimpleNamespace(limits={"crawl": {"max_depth": 9, "max_links_per_page": True}})
     assert common.limit(ctx, "crawl.max_depth") == 9
-    assert common.limit(ctx, "crawl.max_links_per_page") == common.FALLBACK_LIMITS["crawl.max_links_per_page"]
-    assert common.limit(ctx, "crawl.max_material_bytes") == 10 * MiB
+    with pytest.raises(ValueError, match=r"missing or invalid effective limit: crawl\.max_links_per_page"):
+        common.limit(ctx, "crawl.max_links_per_page")
+    with pytest.raises(ValueError, match=r"missing or invalid effective limit: crawl\.max_material_bytes"):
+        common.limit(ctx, "crawl.max_material_bytes")
 
 
 def test_zlib_stream_without_gzip_header_is_not_touched(discovery: ModuleType) -> None:

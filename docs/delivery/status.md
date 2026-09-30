@@ -216,3 +216,9 @@ WP-04 прийнято після повторного рев'ю: `just test tel
   Та сама гонка можлива в постійному клієнті оркестратора до виконавців (`services/orchestrator/.../executors.py`)
   і в `jane_kit.clients.ServiceClient`. Треба: `keepalive_expiry` клієнта з конфігурації й менший за
   keep-alive сервера, повтор такого збою без витрати спроби; тест. Доручити після M2 разом з іншими задачами jane-kit.
+- WP-13 S-M2-11 + S-M2-05 (`wp/13-llm-routing` `5e30b82`): 2 нові e2e на реальних orchestrator/web-collector/
+  runtime/storage/llm (LLM — **З** `fake`, архіви — **Т** `package-host`), `just e2e` 25 passed, `just check` ok
+  → незалежне рев'ю. Конфлікт із `wp/13-acceptance` лише в `matrix.md` і `WP-13.md` — зводить координатор.
+  Запити: WP-01 — сторінка `unknown` з ін'єкцією на testsite (частина S-M2-05 про ін'єкцію доки лише в тестах
+  WP-10); WP-00 — форма входу `select: problems` і перетворення виходу LLM на сутність; WP-09/WP-11 — чи має
+  оркестратор викликати асистента `POST /v1/unknown-materials`.

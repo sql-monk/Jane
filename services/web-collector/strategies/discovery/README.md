@@ -41,7 +41,7 @@
 | `feed` | `urls`, `autodiscover` (true) | RSS 2.0, RSS 1.0 (RDF), Atom; посилання запису: RSS `link` → `guid isPermaLink` → `rdf:about`, Atom `link rel=alternate` з урахуванням `xml:base`; `lastmod` — `atom:updated`/`dc:date`/`pubDate` або `updated`/`published`. `autodiscover`: `<link rel="alternate" type="application/rss+xml\|atom+xml\|rdf+xml">` на HTML-сторінці з `urls` і на всіх HTML-сторінках глибини 0, отриманих іншими стратегіями (seed-сторінки) |
 | `listing` | `start_urls`, `item_links`, `next_page`, `page_param` (`name`, `start`=1, `step`=1, `stop_when_empty`=true), `search` (`url_template` з `{query}`, `queries`) | Стартові сторінки = `start_urls` + сторінки пошуку для кожного запиту. З кожної сторінки списку (отриманої будь-якою стратегією): посилання `item_links` (без нього — усі `a[href]`, крім пагінації й самої сторінки) і наступна сторінка — через `page_param`, якщо задано, інакше `next_page` (типово `rel=next`). Ланцюжок зупиняється на не-2xx, на порожній сторінці (`stop_when_empty`), на повторі елементів попередньої сторінки й на глибині |
 | `url_template` | `template` (RFC 6570, рівень 1), `variables` (`range` або `values`), `stop_after_consecutive_misses` | Змінні комбінуються в порядку появи в шаблоні (остання змінюється найшвидше), значення кодуються за RFC 6570. Без `stop_after_consecutive_misses` — усі URL одразу в чергу ядра (паралельно). З ним — послідовно через `ctx.fetch` (як матеріали): найглибша змінна зупиняється після N поспіль 404/410 і починається наступне значення зовнішніх змінних; інші помилки й відмови промахами не вважаються |
-| `api_feed` | `url`, `items_path`, `url_path`, `lastmod_path`, `pagination` (`none`, `next_url` + `next_url_path`, `cursor` + `cursor_path` + `cursor_param`, `page` + `page_param`) | Сторінки API (GET) — навігаційні документи; `url_path` кожного елемента — кандидат у матеріали (відносні URL — від адреси сторінки). Пагінація зупиняється без наступної сторінки, на повторі URL чи курсора, на сторінці без нових елементів, на не-2xx або не-JSON і на глибині. `method: POST` і `emit_items_as_materials: true` ядро v1 виконати не може — збір завершується `failed` з поясненням (див. «Відомі обмеження») |
+| `api_feed` | `url`, `items_path`, `url_path`, `lastmod_path`, `pagination` (`none`, `next_url` + `next_url_path`, `cursor` + `cursor_path` + `cursor_param`, `page` + `page_param`) | Сторінки API (GET) — навігаційні документи; `url_path` кожного елемента — кандидат у матеріали (відносні URL — від адреси сторінки). Пагінація зупиняється без наступної сторінки, на повторі URL чи курсора, на сторінці без нових елементів, на не-2xx або не-JSON і на глибині. `method: POST` і `emit_items_as_materials: true` ядро v1 виконати не може — валідація повертає `supported: false`, а запит на збір отримує 422 до запуску job (див. «Відомі обмеження») |
 
 JSONPath (`api_feed`) — підмножина без залежностей: `$`/`@`, `.name`, `['name']`, `[n]` (зокрема від'ємні),
 `[*]`, `.*`, `..name`, `..*`; шлях без `$` — від кореня (`items` = `$.items`). Фільтри, зрізи й об'єднання —
@@ -127,8 +127,8 @@ uv run --all-packages pytest services/web-collector/strategies # лише WP-03,
 ## Відомі обмеження
 
 - `api_feed`: `method: POST` (тіло запиту) і `emit_items_as_materials` потребують розширення `DiscoveryContext`
-  (запит до WP-00/WP-02) — зараз збір завершується `failed` з поясненням, `POST /v1/rules/validations` про це не
-  знає (перевіряє лише тип стратегії).
+  (запит до WP-00/WP-02). WP-02a повертає для цих schema-valid опцій `valid: true, supported: false` з точним
+  pointer; `POST /v1/collections` відповідає 422 до запуску job.
 - `use_lastmod_for_revisit`: `lastmod` передається ядру в кандидаті, але ядро v1 не використовує його для
   рішення про повторне відвідування (запит до WP-02).
 - `listing` в `incremental`-зборі: відомі сторінки списків ядро пропускає (`revisit.mode=never`) або отримує

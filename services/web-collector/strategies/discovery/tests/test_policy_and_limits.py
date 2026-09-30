@@ -158,23 +158,37 @@ def test_incremental_run_rereads_navigation_documents_only(
 
 
 @pytest.mark.parametrize(
-    ("options", "error_part"),
+    ("options", "pointers"),
     [
-        ({"method": "POST", "body": {"q": "phones"}}, "POST"),
-        ({"emit_items_as_materials": True}, "emit_items_as_materials"),
+        ({"method": "POST", "body": {"q": "phones"}}, ["/strategies/0/method"]),
+        ({"emit_items_as_materials": True}, ["/strategies/0/emit_items_as_materials"]),
+        (
+            {"method": "POST", "body": {}, "emit_items_as_materials": True},
+            ["/strategies/0/method", "/strategies/0/emit_items_as_materials"],
+        ),
     ],
-    ids=["post", "json-materials"],
+    ids=["post", "json-materials", "both"],
 )
-def test_schema_valid_api_feed_options_need_core_support(
-    client: TestClient, site: Site, options: dict[str, Any], error_part: str
+def test_schema_valid_api_feed_options_are_rejected_before_job(
+    client: TestClient, site: Site, options: dict[str, Any], pointers: list[str]
 ) -> None:
     strategy = {**api(site), **options}
     rules = web_rules(site, strategies=[strategy])
     report = client.post("/v1/rules/validations", json=rules).json()
-    assert report["valid"] is True and report["supported"] is True, report
-    cid = start(client, {"source_kind": "web", "rules": rules, "limits": FAST_LIMITS})
-    view = wait_done(client, cid)
-    assert view["status"] == "failed"
-    job = client.get(f"/v1/jobs/{cid}").json()
-    assert error_part in str(job.get("error"))
+    assert report["valid"] is True and report["supported"] is False, report
+    assert report["errors"] == []
+    assert [(w["pointer"], w["code"]) for w in report["warnings"]] == [
+        (pointer, "unsupported_strategy") for pointer in pointers
+    ]
+    response = client.post(
+        "/v1/collections",
+        json={"source_kind": "web", "rules": rules, "limits": FAST_LIMITS},
+        headers={"Idempotency-Key": "api-feed-unsupported"},
+    )
+    assert response.status_code == 422, response.text
+    problem = response.json()
+    assert problem["code"] == "validation_failed"
+    assert [(e["pointer"], e["code"]) for e in problem["errors"]] == [
+        ("/rules" + pointer, "unsupported_strategy") for pointer in pointers
+    ]
     assert site.requests == {}

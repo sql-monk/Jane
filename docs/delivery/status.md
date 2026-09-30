@@ -260,3 +260,4 @@ WP-04 прийнято після повторного рев'ю: `just test tel
 
 Далі за WP-13: S-M2-04 (використати пакети `examples/packages/examples.testsite-*` з WP-14), R-07, решта R-04/R-06, потім критерії 1–12 на одній ревізії `main`. Потім M3: WP-14 фаза 2, фінальне рев'ю.
 Процес: рев'ю wp-reviewer обов'язкове перед злиттям (класифікатор блокує злиття без нього); push у `main` робить людина; CI — `gh run list`.
+- WP-07b зупинено: `wp/07b-secret-policy` `7528a64` (код+тести `9125c61` WIP; `just test storage` 112 passed). Лишилось: README, `just check`, dev-стек, рев'ю; env allowlist для compose — у WP-07.md гілки. **Нова вразливість (рішення координатора):** `jane_storage/content.py` читає будь-який `file:///…` blob (напр. `/proc/self/environ`) і віддає через `GET /v1/objects/{id}/content`; `download_url` дає SSRF — потрібні дозволений каталог і allowlist.

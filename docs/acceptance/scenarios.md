@@ -61,8 +61,8 @@ Docker-сокет із групою, визначеною автоматично
 | S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage | ще не реалізовано в WP-13 |
 | S-M2-05a | Невідома сторінка: асистент викликає LLM лише з прапорцем (без оркестратора) | 11 | testsite, assistant, llm, postgres | **реалізовано, проходить** (LLM — З) |
 | S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, runtime, storage, llm | **пройдено на гілці `wp/13-llm-routing`** (`test_m2_llm_routing.py`; LLM — З, архіви пакетів — `package-host` Т); сторінки з ін'єкцією на testsite немає |
-| S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator | ще не реалізовано в WP-13 |
-| S-M2-07 | Проблемні приклади → нова версія → тести → активація → відкат | 6 | orchestrator, assistant, llm, registry, runtime | ще не реалізовано в WP-13 |
+| S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator, storage | **пройдено на гілці `wp/13-assistant-flows`** з назвою й підказкою обходу (`test_m2_assistant.py`; LLM і пошук — З); лише з назвою — `xfail(strict)`: дефект WP-11 (вибірка зупиняється на двох товарах) |
+| S-M2-07 | Проблемні приклади → нова версія → тести → активація → відкат | 6 | orchestrator, assistant, llm, registry, runtime, storage, web-collector | **пройдено на гілці `wp/13-assistant-flows`** (`test_m2_assistant.py`; LLM — З) |
 | S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, усі сховища | **1 Docker e2e пройшов на `main` `1306ad3`** (`just e2e`, CI `36694741989`); S3 — З |
 | S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці | **1 Docker e2e пройшов на `main` `1306ad3`** (кількість сторінок; `just e2e`, CI `36694741989`); темп ще не виміряно |
 | S-M2-10 | Адмінка на реальному API (Playwright) | 6, 7 (UI) | admin, усі API | WP-12 частково перевірив реальні API; повний Caddy прогін відкритий |
@@ -242,6 +242,36 @@ e2e не перевіряє; доказ поки що — `services/llm/tests/te
 `candidate-selection` → `acceptance`. Результат: пакет у registry, його тести пройшли в реальному runtime,
 створено джерело й завдання в оркестраторі. Прогін завдання дає сутності в storage.
 
+`tests/e2e/test_m2_assistant.py`. Модуль піднімає **власний** стек (проєкт `<проєкт>-assistant-<id>`), у якому
+runtime, колектор і оркестратор беруть пакети й правила з реального registry (`package-host` не
+використовується): assistant, llm, registry, web-collector, handler-runtime, orchestrator, storage, testsite,
+PostgreSQL, MinIO. S-M2-06 іде першим, поки в registry немає екстракторів.
+
+1. `test_s_m2_06_name_and_crawl_hints_to_extractor_source_task_and_entities`. Запит — назва `testsite` і
+   підказка обходу користувача (`crawl_hints`: `seed_list` із вхідними сторінками розділів, фрагмент
+   `CollectorRules`, ТЗ §8 «правила обходу»). Статичний пошук дає двох кандидатів з однаковою впевненістю →
+   `needs_disambiguation` → `candidate-selection` тестового сайту. Адаптивна вибірка через реальний Web
+   Collector (≥ 4 типи матеріалів, впевненість ≥ 0.8) → аналіз (сутність `product`) → новий екстрактор від
+   LLM пройшов тести на вибірці в реальному runtime → ≥ 2 варіанти, рівно один рекомендований, у кожного
+   `coverage` (оцінка зі статистики колектора), `cost` (запити, вартість LLM на підготовку > 0, на прогін 0),
+   `risks`. `acceptance` рекомендованого (sitemap) з `activate: true` і власним `source_id` → у registry
+   екстрактор і правила колектора з `provenance.created_by: llm` (провайдер `e2e-assistant` — **З**),
+   `approved`, `test_status: passed`, дайджест архіву збігається; тести опублікованої версії окремо пройшли
+   в реальному runtime за посиланням (архів із registry). В оркестраторі — джерело й завдання
+   `collect → extract-product → store-product`; прогін дає 17 сутностей `product` (усі товари sitemap) у
+   PostgreSQL через `storage.v1`.
+2. `test_s_m2_06_name_only_sample_distinguishes_material_types` — лише назва: вибірка має розрізняти типи
+   матеріалів, а екстрактор — пройти тести. **`xfail(strict=True)`**: вибірка зупиняється на перших двох
+   сторінках товарів (`materials: 2, distinct_types: 1, confidence: 0.95, sufficient: true`), без негативного
+   прикладу згенерований екстрактор не отримує тестів — дефект WP-11 (запит у звіті WP-13). Тест зупиняється
+   до `acceptance` і нічого не публікує.
+
+LLM — **З**: відповіді фейкового провайдера WP-10 задано скриптами (`tests/e2e/config/llm-seed.yaml`,
+підключення `e2e-assistant-scripts`, псевдоніми `cheap`/`strong`): лише текст відповідей на кроки classify,
+analyze, propose, generate_extractor, improve; класифікація — один матеріал на запит
+(`onboarding.sample_batch_size=1` у `compose.e2e.yaml`), щоб відповідь стосувалась саме його. Пошук —
+**З** (`static`, `tests/e2e/config/assistant-search.json`).
+
 ### S-M2-07. Вдосконалення екстрактора
 Екстрактор, який не розпізнає частину сторінок (`unrecognized`, наприклад товар без ціни), дає в
 оркестраторі групу проблем (`/v1/problem-groups`). Далі `POST /v1/improvement-runs` → нова версія в registry
@@ -249,6 +279,35 @@ e2e не перевіряє; доказ поки що — `services/llm/tests/te
 (`activations`) → повторна обробка RAW (`/v1/reprocessing`) дає `success` → відкат на попередню версію →
 поведінка повертається → аудит (`/v1/audit-events`) містить активацію й відкат. Окремо перевіряється, що
 заборона автозмін пакета блокує автоактивацію.
+
+`tests/e2e/test_m2_assistant.py::test_s_m2_07_improvement_activation_rollback_and_forbidden_auto_changes`, той
+самий стек, що й S-M2-06.
+
+1. Написаний людиною пакет-фікстура `e2e.improvable-product-extractor@1.0.0` (InStock → `success`, інша
+   наявність → `unrecognized` `unknown-availability`; 2 старі тести) опубліковано в реальний registry й
+   погоджено. Джерело з `change_policy.llm_versions: auto_after_checks`, два завдання на цьому пакеті (дві
+   прив'язки). Прогін: alpha/beta — `success`, gamma (OutOfStock)/zeta (PreOrder) — `unrecognized`; група
+   проблем `unknown-availability`, `count: 2`, `open`.
+2. `POST /v1/improvement-runs`: проблемні приклади — збережений RAW за `material_ref` і `HandlerResult`
+   runtime, успішні — alpha/beta; `approval: auto_after_checks`. Результат — `new_version` 1.1.0 (адитивна
+   зміна схеми), 1 спроба, звіти `tests` (старі тести + `problem-p1/p2` + регресії `success-s1/s2`) і
+   `bindings:<завдання>/extract-products` для обох прив'язок без жодного провалу. У registry версія з
+   `created_by: llm`, `based_on` 1.0.0, `approved`, `test_status: passed`, diff змінює код і схему; тести
+   опублікованої версії пройшли в runtime. Обидва етапи автоматично активовано (`auto_activate`), група —
+   `resolved` з `assistant_job_id`.
+3. `/v1/reprocessing` збереженого RAW gamma/zeta з `extract-products` → `success` з дайджестом 1.1.0, у
+   PostgreSQL `out_of_stock` і `pre_order`.
+4. `rollback` етапу завдання каталогу → 1.0.0 (друга прив'язка лишається на 1.1.0); повторна обробка → знову
+   `unrecognized`, `store-products` нічого не отримує. Аудит етапу: `stage.auto_activate` (1.0.0 → 1.1.0) і
+   `stage.rollback` (1.1.0 → 1.0.0).
+5. Заборона автозмін: `PATCH /v1/packages/{id}` `auto_changes_allowed: false` → той самий запит вдосконалення
+   дає `proposal_only`, `activated: false`, версію не опубліковано (404), `latest_version` лишається 1.1.0,
+   активацій не додалось, група — `unresolved`. Прямий `auto_activate` 1.1.0 в оркестраторі → 403
+   `access_denied_by_policy`, `details.reason: package_auto_changes_forbidden`.
+
+LLM — **З** (виправлення коду задано скриптом `improve` у `llm-seed.yaml`; тести, публікація, політики й
+активація — справжній код сервісів). RAW files читається runtime зі спільного тому storage лише для
+читання (`JANE_HANDLER_RUNTIME_BLOB_ROOTS`, ADR-0004: `file://` лише на одному вузлі зі спільним томом).
 
 ### S-M2-08. Усі адаптери збереження
 `tests/e2e/test_m2_storage.py` послідовно змінює те саме завдання через GET/ETag + PUT для

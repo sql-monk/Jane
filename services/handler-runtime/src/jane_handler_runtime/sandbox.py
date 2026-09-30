@@ -187,8 +187,8 @@ class SubprocessSandbox:
                 self._killed.discard(key)
                 out.seek(0)
                 err.seek(0)
-                stdout, out_trunc = read_limited(out, limits.max_output_bytes)  # type: ignore[arg-type]
-                stderr, err_trunc = read_limited(err, limits.max_output_bytes)  # type: ignore[arg-type]
+                stdout, out_trunc = read_limited(out, limits.max_output_bytes)  # type: ignore[arg-type,unused-ignore]
+                stderr, err_trunc = read_limited(err, limits.max_output_bytes)  # type: ignore[arg-type,unused-ignore]
                 return SandboxOutcome(
                     exit_code=proc.returncode,
                     stdout=stdout,

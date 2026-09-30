@@ -55,7 +55,7 @@ Docker-сокет із групою, визначеною автоматично
 | S-M1-06 | Новий прогін дає нове спостереження й подію історії | 8 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
 | S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | ще не реалізовано в WP-13 |
 | S-M2-02 | Telegram: історія, нові, редагування як ревізії → збереження | 1, 8, 12 | telegram-collector, storage | **1 passed на спільній гілці WP-01a/00a/13** (Telegram — З) |
-| S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | 69 тестів WP-03 пройшли; e2e WP-13 ще не реалізовано |
+| S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | **10 Docker e2e пройшли на гілці WP-13** (`test_m2_discovery.py`) |
 | S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage | ще не реалізовано в WP-13 |
 | S-M2-05a | Невідома сторінка: асистент викликає LLM лише з прапорцем (без оркестратора) | 11 | testsite, assistant, llm, postgres | **реалізовано, проходить** (LLM — З) |
 | S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, llm, assistant | ще не реалізовано в WP-13 |
@@ -150,6 +150,13 @@ PostgreSQL (`jane.storage-postgresql` / `results-pg`) і files (`jane.storage-fi
 перевірено на реальному сервісі».
 
 ### S-M2-03. Стратегії пошуку матеріалів
+`tests/e2e/test_m2_discovery.py` запускає реальні HTTP-колекції Web Collector у Docker Compose:
+сім стратегій окремо й три комбінації. Кожна множина канонічних URL має точно збігатися з
+`expected_urls.json` після впорядкування query-параметрів; перевіряються `only:*`, відсутність
+дублікатів, приватних та зовнішніх URL, `/calendar/` і ненормалізованих редиректів. Для рекурсії
+додатково перевіряються лічильники `skipped_robots`, `skipped_out_of_scope` і помилки політики
+через HTTP API колектора.
+
 Для кожної стратегії окремо (recursive, sitemap, feeds, categories, search, api, template) запускається
 колекція на testsite, а зібрані URL порівнюються з `tests/fixtures/testsite/expected_urls.json`
 (`sets.*`). Комбінації (sitemap + recursive, api + recursive, feeds + template) дають об'єднання й

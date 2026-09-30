@@ -51,6 +51,9 @@ services:
       # Shared state of several instances (idempotency keys, jobs, results) in the service's own schema.
       JANE_HANDLER_RUNTIME_STATE_DSN: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?set by tests/e2e}@postgres:5432/${JANE_PG_DB:-jane}
       JANE_HANDLER_RUNTIME_LOG_FORMAT: json
+      # Packages without package_archive (orchestrated stages) come from here. Until WP-05 is merged this is
+      # the STAND-IN `package-host` serving archives of LOCAL packages (tests/e2e/jane_e2e/package_host.py).
+      JANE_HANDLER_RUNTIME_REGISTRY_URL: http://package-host:8080
     volumes:
       - ${JANE_E2E_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
     group_add: ["${JANE_E2E_DOCKER_GID:-0}"]
@@ -92,7 +95,9 @@ services:
       JANE_ASSISTANT_LLM_URL: http://llm:8110
       JANE_ASSISTANT_HANDLER_RUNTIME_URL: http://handler-runtime:8000
       JANE_ASSISTANT_STORAGE_URL: http://storage:8000
-      # Neighbours not merged yet (registry, collectors, orchestrator) are added with their WPs.
+      JANE_ASSISTANT_COLLECTOR_WEB_URL: http://web-collector:8101
+      JANE_ASSISTANT_ORCHESTRATOR_URL: http://orchestrator:8000
+      # Neighbours not merged yet (registry, telegram collector) are added with their WPs.
       # SUBSTITUTE of a web search provider: static list with the test site.
       JANE_ASSISTANT_SEARCH_PROVIDER: static
       JANE_ASSISTANT_SEARCH_STATIC_FILE: /cfg/assistant-search.json
@@ -107,5 +112,74 @@ services:
       <<: *e2e-health
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
 
+  web-collector:
+    profiles: ["web-collector"]
+    build:
+      context: ..
+      dockerfile: services/web-collector/Dockerfile
+    environment:
+      # Local rules packages (<package_id>/<version>/jane-package.json + rules.json) until WP-05 is merged.
+      JANE_WEB_COLLECTOR_RULES_DIR: /cfg/rules
+      JANE_WEB_COLLECTOR_LOG_FORMAT: json
+      # Shorter lease than the default (30 s) so that take-over after a kill fits the e2e time budget;
+      # the startup rule HEARTBEAT_INTERVAL_MS + STATE_BUSY_TIMEOUT_MS < LEASE_SECONDS*1000 holds.
+      JANE_WEB_COLLECTOR_LEASE_SECONDS: ${JANE_E2E_COLLECTOR_LEASE_SECONDS:-10}
+      JANE_WEB_COLLECTOR_HEARTBEAT_INTERVAL_MS: ${JANE_E2E_COLLECTOR_HEARTBEAT_MS:-2000}
+      JANE_WEB_COLLECTOR_STATE_BUSY_TIMEOUT_MS: ${JANE_E2E_COLLECTOR_BUSY_TIMEOUT_MS:-5000}
+    volumes:
+      # One state directory for every replica (SQLite WAL on one Docker host): the documented way to run
+      # several instances of the collector (services/web-collector/README.md).
+      - web-collector-state:/var/lib/jane-web-collector
+      - ../tests/e2e/config/rules:/cfg/rules:ro
+    ports: ["${JANE_BIND:-127.0.0.1}::8101"]
+    depends_on:
+      testsite: { condition: service_healthy }
+    healthcheck:
+      <<: *e2e-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8101/v1/health', timeout=2)"]
+
+  orchestrator:
+    profiles: ["orchestrator"]
+    build:
+      context: ..
+      dockerfile: services/orchestrator/Dockerfile
+    environment:
+      # Own database of the service (created by the e2e harness before start).
+      JANE_ORCHESTRATOR_DATABASE_URL: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?set by tests/e2e}@postgres:5432/jane_orchestrator
+      JANE_ORCHESTRATOR_EXECUTORS: >-
+        [{"executor": "web-collector", "role": "collector", "base_url": "http://web-collector:8101",
+          "capabilities": {"collector": "web"}, "sync_connections": false},
+         {"executor": "storage", "role": "handler", "base_url": "http://storage:8000",
+          "capabilities": {"packages": ["jane.storage-*"]}},
+         {"executor": "storage-read", "role": "storage_read", "base_url": "http://storage:8000",
+          "sync_connections": false},
+         {"executor": "handler-runtime", "role": "handler", "base_url": "http://handler-runtime:8000",
+          "capabilities": {"default": true, "handler_kinds": ["extractor", "transform"]}, "sync_connections": false}]
+      # Shorter item/feed lease than the default (30 s): take-over after a killed worker fits the e2e budget.
+      JANE_ORCHESTRATOR_LIMITS__ENGINE__LEASE_MS: ${JANE_E2E_ORCHESTRATOR_LEASE_MS:-8000}
+      JANE_ORCHESTRATOR_LIMITS__ENGINE__HEARTBEAT_MS: ${JANE_E2E_ORCHESTRATOR_HEARTBEAT_MS:-2000}
+      JANE_ORCHESTRATOR_LOG_FORMAT: json
+    ports: ["${JANE_BIND:-127.0.0.1}::8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      <<: *e2e-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
+
+  # STAND-IN (Т) for the registry (WP-05): only GET /v1/packages/{id}/versions/{v}/archive of LOCAL packages
+  # written by the harness to JANE_E2E_PACKAGES_DIR. Replaced by the real registry when WP-05 is merged.
+  package-host:
+    profiles: ["package-host"]
+    image: ${JANE_IMAGE_PYTHON:-python:3.12-slim}
+    command: ["python", "/app/package_host.py", "/packages", "8080"]
+    volumes:
+      - ../tests/e2e/jane_e2e/package_host.py:/app/package_host.py:ro
+      - ${JANE_E2E_PACKAGES_DIR:?set by tests/e2e}:/packages:ro
+    ports: ["${JANE_BIND:-127.0.0.1}::8080"]
+    healthcheck:
+      <<: *e2e-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/v1/health', timeout=2)"]
+
 volumes:
   storage-data:
+  web-collector-state:

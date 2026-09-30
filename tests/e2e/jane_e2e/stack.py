@@ -89,7 +89,12 @@ SERVICES: dict[str, ServiceSpec] = {
             depends=("postgres",),
         ),
         ServiceSpec(
-            "web-collector", "WP-02", 8000, "app", ("services/web-collector/Dockerfile",), compose=False
+            "web-collector",
+            "WP-02",
+            8101,
+            "app",
+            ("services/web-collector/Dockerfile",),
+            depends=("testsite",),
         ),
         ServiceSpec(
             "telegram-collector",
@@ -101,8 +106,10 @@ SERVICES: dict[str, ServiceSpec] = {
         ),
         ServiceSpec("registry", "WP-05", 8000, "app", ("services/registry/Dockerfile",), compose=False),
         ServiceSpec(
-            "orchestrator", "WP-09", 8000, "app", ("services/orchestrator/Dockerfile",), compose=False
+            "orchestrator", "WP-09", 8000, "app", ("services/orchestrator/Dockerfile",), depends=("postgres",)
         ),
+        # STAND-IN for the registry (WP-05) serving LOCAL package archives - see jane_e2e/package_host.py.
+        ServiceSpec("package-host", "WP-13", 8080, "app", ("tests/e2e/jane_e2e/package_host.py",)),
         ServiceSpec("llm", "WP-10", 8110, "app", ("services/llm/Dockerfile",), depends=("postgres",)),
         ServiceSpec(
             "assistant", "WP-11", 8000, "app", ("services/assistant/Dockerfile",), depends=("postgres", "llm")
@@ -212,7 +219,20 @@ class E2EStack:
             "JANE_E2E_DOCKER_SOCKET": os.environ.get("JANE_E2E_DOCKER_SOCKET", "/var/run/docker.sock"),
             "JANE_E2E_DOCKER_GID": os.environ.get("JANE_E2E_DOCKER_GID", ""),
             "COMPOSE_PROFILES": ",".join(self.available_apps()),
+            "JANE_E2E_PACKAGES_DIR": self.packages_dir.as_posix(),
         }
+
+    @property
+    def packages_dir(self) -> Path:
+        """Archives of local packages served by the ``package-host`` stand-in (``<id>/<version>.zip``)."""
+        path = STACK_DIR / f"e2e-packages-{self.project}"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def publish_local_package(self, package_id: str, version: str, archive: bytes) -> None:
+        target = self.packages_dir / package_id / f"{version}.zip"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(archive)
 
     def _write_stack_file(self, creds: Mapping[str, str], services: Mapping[str, Any]) -> None:
         STACK_DIR.mkdir(exist_ok=True)
@@ -283,6 +303,8 @@ class E2EStack:
             raise StackError("; ".join(reasons))
         if "handler-runtime" in wanted:
             self._prepare_handler_runtime()
+        if "orchestrator" in wanted:
+            self._create_database("jane_orchestrator")
         self.compose(
             "up",
             "-d",
@@ -323,6 +345,38 @@ class E2EStack:
             timeout=600,
         )
         return str(r.stdout).strip().splitlines()[-1]
+
+    def _create_database(self, name: str) -> None:
+        """Own database of a service in the stack PostgreSQL (idempotent)."""
+        env = self.env()
+        self.compose("up", "-d", "--wait", "postgres", timeout=self.timeout_s)
+        self._started.add("postgres")
+        user = env["JANE_PG_USER"]
+        exists = self.compose(
+            "exec",
+            "-T",
+            "postgres",
+            "psql",
+            "-U",
+            user,
+            "-d",
+            env["JANE_PG_DB"],
+            "-tAc",
+            f"SELECT 1 FROM pg_database WHERE datname = '{name}'",
+        ).stdout.strip()
+        if exists != "1":
+            self.compose(
+                "exec",
+                "-T",
+                "postgres",
+                "psql",
+                "-U",
+                user,
+                "-d",
+                env["JANE_PG_DB"],
+                "-c",
+                f'CREATE DATABASE "{name}"',
+            )
 
     def _image_exists(self, image: str) -> bool:
         return self._run(["docker", "image", "inspect", image], check=False).returncode == 0
@@ -365,6 +419,40 @@ class E2EStack:
 
     def kill(self, service: str) -> None:
         self.compose("kill", service)
+
+    def container(self, service: str, index: int = 1) -> str:
+        """Container id of one replica of a service."""
+        labels = {
+            "com.docker.compose.project": self.project,
+            "com.docker.compose.service": service,
+            "com.docker.compose.container-number": str(index),
+        }
+        filters = [arg for k, v in labels.items() for arg in ("--filter", f"label={k}={v}")]
+        r = self._run(["docker", "ps", "-a", "-q", *filters])
+        cid = str(r.stdout).strip().splitlines()
+        if not cid:
+            raise StackError(f"{service}#{index}: no container")
+        return str(cid[0])
+
+    def kill_instance(self, service: str, index: int) -> None:
+        """``docker kill`` (SIGKILL) of one replica - the others keep running."""
+        self._run(["docker", "kill", self.container(service, index)])
+
+    def start_instance(self, service: str, index: int) -> None:
+        self._run(["docker", "start", self.container(service, index)])
+
+    @property
+    def network(self) -> str:
+        return f"{self.project}_default"
+
+    def disconnect(self, service: str, index: int = 1) -> None:
+        """Network partition: detach one replica from the stack network."""
+        self._run(["docker", "network", "disconnect", "-f", self.network, self.container(service, index)])
+
+    def reconnect(self, service: str, index: int = 1) -> None:
+        self._run(
+            ["docker", "network", "connect", "--alias", service, self.network, self.container(service, index)]
+        )
 
     def restart(self, service: str) -> None:
         self.compose(

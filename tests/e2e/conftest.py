@@ -20,6 +20,7 @@ import sys
 import uuid
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -27,7 +28,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from jane_e2e.clients import JaneClient
+from jane_e2e.orchestration import put_connections
 from jane_e2e.stack import SERVICES, E2EStack
+from jane_e2e.steps import extractor_archive
 
 E2E_DIR = Path(__file__).resolve().parent
 
@@ -99,3 +102,22 @@ def client(stack: E2EStack) -> Iterator[Callable[..., JaneClient]]:
 def run_id() -> str:
     """Unique id of one scenario run: namespaces sources, observations and delivery keys on a reused stack."""
     return uuid.uuid4().hex[:12]
+
+
+@pytest.fixture
+def extractor(stack: E2EStack) -> dict[str, Any]:
+    """Handler ref of the LOCAL example extractor; its archive is served by the ``package-host`` stand-in
+    (the orchestrator sends no ``package_archive``; the runtime then asks its registry URL)."""
+    handler, archive = extractor_archive()
+    stack.publish_local_package(handler["package_id"], handler["version"], archive)
+    return handler
+
+
+@pytest.fixture
+def orchestrated(require: Callable[..., None], client: Callable[..., JaneClient]) -> JaneClient:
+    """Full M1 set (testsite, web-collector, orchestrator, storage, handler-runtime, package-host) with the
+    storage connections registered in the orchestrator; returns the orchestrator client."""
+    require("testsite", "web-collector", "storage", "handler-runtime", "package-host", "orchestrator")
+    orch = client("orchestrator")
+    put_connections(orch)
+    return orch

@@ -1,0 +1,17 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": ["testsite"],
+    "allowed_schemes": ["http"],
+    "exclude": [{ "value": "*/calendar/**" }]
+  },
+  "strategies": [
+    { "type": "seed_list", "strategy_id": "home", "urls": ["http://testsite:8080/"] },
+    { "type": "recursive", "strategy_id": "links" }
+  ],
+  "robots": { "mode": "respect" },
+  "normalization": { "strip_query_params": ["utm_*"] },
+  "limits": {
+    "rate": { "requests_per_second_per_host": 20, "min_delay_ms_per_host": 0 }
+  }
+}

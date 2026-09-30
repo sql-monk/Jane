@@ -12,7 +12,15 @@ from jane_e2e.clients import JaneClient
 from jane_e2e.materials import delivery_key
 from jane_extractor_sdk.package import build_archive
 
-__all__ = ["EXTRACTOR_DIR", "extract", "extractor_ref", "sandbox_limits", "store"]
+__all__ = [
+    "EXTRACTOR_DIR",
+    "collector_fetch",
+    "extract",
+    "extractor_archive",
+    "extractor_ref",
+    "sandbox_limits",
+    "store",
+]
 
 ROOT = Path(__file__).resolve().parents[3]
 EXTRACTOR_DIR = ROOT / "libs" / "extractor-sdk" / "examples" / "testsite-product-extractor"
@@ -27,6 +35,32 @@ def sandbox_limits() -> dict[str, Any]:
     """
     wall = int(os.environ.get("JANE_E2E_SANDBOX_WALL_TIME_MS", "60000"))
     return {"sandbox": {"wall_time_ms": wall}, "timeouts": {"invocation_timeout_ms": wall + 30000}}
+
+
+def extractor_archive(package_dir: Path = EXTRACTOR_DIR) -> tuple[dict[str, Any], bytes]:
+    """Local package: handler ref (id, version, digest of the canonical SDK archive) and the archive bytes."""
+    archive = build_archive(package_dir)
+    handler = {
+        "package_id": "testsite.product-extractor",
+        "version": "1.0.0",
+        "digest": "sha256:" + hashlib.sha256(archive).hexdigest(),
+    }
+    return handler, archive
+
+
+def collector_fetch(collector: JaneClient, url: str, source_id: str) -> dict[str, Any]:
+    """One page through the real Web Collector (collector.v1 fetchMaterial) - a new observation each call."""
+    body = {
+        "source_kind": "web",
+        "source_id": source_id,
+        "url": url,
+        "rules_ref": {"package_id": "testsite.web-rules", "version": "1.0.0"},
+    }
+    r = collector.api("collector").post("/v1/fetches", json=body)
+    assert r.status_code == 200, r.text
+    material: dict[str, Any] = r.json()
+    assert material["collector"]["name"] == "web-collector", material["collector"]
+    return material
 
 
 def extractor_ref(package_dir: Path = EXTRACTOR_DIR) -> tuple[dict[str, Any], dict[str, Any]]:

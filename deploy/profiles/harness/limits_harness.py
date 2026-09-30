@@ -213,6 +213,8 @@ class ResourceSampler(threading.Thread):
     def run(self) -> None:
         while not self.stop_event.is_set():
             ts = time.time()
+            label = f"label={jane_stack.SANDBOX_LABEL}={self.project}"
+            sandboxes = set(run_cmd(["docker", "ps", "--filter", label, "--format", "{{.Names}}"]).split())
             raw = run_cmd(["docker", "stats", "--no-stream", "--format", "{{json .}}"], timeout=60)
             for line in raw.splitlines():
                 try:
@@ -220,7 +222,7 @@ class ResourceSampler(threading.Thread):
                 except ValueError:
                     continue
                 name = str(row.get("Name", ""))
-                if name.startswith(f"{self.project}-") or name.startswith("jane-sandbox"):
+                if name.startswith(f"{self.project}-") or name in sandboxes:
                     self.rows.append(
                         {"t": ts, "name": name, "mem": row.get("MemUsage"), "cpu": row.get("CPUPerc")}
                     )

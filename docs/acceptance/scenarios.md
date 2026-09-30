@@ -55,14 +55,14 @@ Docker-сокет із групою, визначеною автоматично
 | S-M1-06 | Новий прогін дає нове спостереження й подію історії | 8 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
 | S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | ще не реалізовано в WP-13 |
 | S-M2-02 | Telegram: історія, нові, редагування як ревізії → збереження | 1, 8, 12 | telegram-collector, storage | **1 passed на спільній гілці WP-01a/00a/13** (Telegram — З) |
-| S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | 69 тестів WP-03 пройшли; e2e WP-13 ще не реалізовано |
+| S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | **10 Docker e2e пройшли на гілці WP-13** (`test_m2_discovery.py`) |
 | S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage | ще не реалізовано в WP-13 |
 | S-M2-05a | Невідома сторінка: асистент викликає LLM лише з прапорцем (без оркестратора) | 11 | testsite, assistant, llm, postgres | **реалізовано, проходить** (LLM — З) |
 | S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, llm, assistant | ще не реалізовано в WP-13 |
 | S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator | ще не реалізовано в WP-13 |
 | S-M2-07 | Проблемні приклади → нова версія → тести → активація → відкат | 6 | orchestrator, assistant, llm, registry, runtime | ще не реалізовано в WP-13 |
-| S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, усі сховища | ще не реалізовано в WP-13 |
-| S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці | ще не реалізовано в WP-13 |
+| S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, усі сховища | **1 Docker e2e пройшов на гілці WP-13**; незалежний повтор пройшов |
+| S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці | **1 Docker e2e пройшов на гілці WP-13** (кількість сторінок); темп ще не виміряно |
 | S-M2-10 | Адмінка на реальному API (Playwright) | 6, 7 (UI) | admin, усі API | WP-12 частково перевірив реальні API; повний Caddy прогін відкритий |
 | S-M2-11 | Ланцюжок з умовами `when` і LLM-етапом | 2 | orchestrator, runtime, storage, llm | ще не реалізовано в WP-13 |
 | R-01 | Kill воркера оркестратора посеред ланцюжка | 8 | orchestrator ×2, виконавці | чекає WP-09 |
@@ -150,6 +150,13 @@ PostgreSQL (`jane.storage-postgresql` / `results-pg`) і files (`jane.storage-fi
 перевірено на реальному сервісі».
 
 ### S-M2-03. Стратегії пошуку матеріалів
+`tests/e2e/test_m2_discovery.py` запускає реальні HTTP-колекції Web Collector у Docker Compose:
+сім стратегій окремо й три комбінації. Кожна множина канонічних URL має точно збігатися з
+`expected_urls.json` після впорядкування query-параметрів; перевіряються `only:*`, відсутність
+дублікатів, приватних та зовнішніх URL, `/calendar/` і ненормалізованих редиректів. Для рекурсії
+додатково перевіряються лічильники `skipped_robots`, `skipped_out_of_scope` і помилки політики
+через HTTP API колектора.
+
 Для кожної стратегії окремо (recursive, sitemap, feeds, categories, search, api, template) запускається
 колекція на testsite, а зібрані URL порівнюються з `tests/fixtures/testsite/expected_urls.json`
 (`sets.*`). Комбінації (sitemap + recursive, api + recursive, feeds + template) дають об'єднання й
@@ -196,12 +203,22 @@ LLM — **З**: вбудований детермінований провайд
 заборона автозмін пакета блокує автоактивацію.
 
 ### S-M2-08. Усі адаптери збереження
+`tests/e2e/test_m2_storage.py` послідовно змінює те саме завдання через GET/ETag + PUT для
+filesystem, PostgreSQL, SQL Server, MongoDB, MinIO і S3 (SeaweedFS — **З**). Кожний прогін
+перевіряє RAW, сутність і історію через `storage.v1`, вміст через нативний інтерфейс сховища,
+а повтор того самого виклику обробника — як дублікат без нового ефекту.
+
 Для кожного з filesystem, postgresql, sqlserver, mongodb, minio, s3 (SeaweedFS — **З**) виконується: RAW
 testsite і сутності через реальний storage, читання через `storage.v1`, повтор дає дубль, запис видно в
 самому сховищі. Заміна адаптера робиться через `PUT /v1/tasks/{id}` (лише `handler.package_id` і
 `connections.target`), без зміни образів колектора й екстрактора.
 
 ### S-M2-09. Ліміти без зміни коду
+`tests/e2e/test_m2_limits.py` встановлює через HTTP ліміт платформи `crawl.max_pages_per_run=1`,
+перевіряє походження `platform` і фактичну одну сторінку в колекторі та оркестраторі. Потім змінює
+ліміт того самого завдання на 2, перевіряє походження `task` і дві сторінки в наступному прогоні;
+початковий документ платформи відновлюється. Темп запитів цей тест не вимірює.
+
 `PUT /v1/limits/platform` (наприклад, `rate.requests_per_second_per_host`, `crawl.max_pages_per_run`) і
 ліміти на джерелі або завданні → `GET /v1/limits/effective` показує значення й походження → наступний
 прогін дотримується нового ліміту (кількість сторінок, темп). Без перезбирання образів.

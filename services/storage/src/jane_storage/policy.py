@@ -173,9 +173,14 @@ def _endpoint(params: Mapping[str, Any]) -> list[Address]:
 
 
 def _s3(params: Mapping[str, Any]) -> list[Address]:
-    """``params.endpoint``; without it AWS: ``https://s3.<region>.amazonaws.com`` (region default ``us-east-1``).
-    Virtual-hosted addressing contacts ``<bucket>.<endpoint host>``, a subdomain of the checked host."""
+    """``params.endpoint``; without it AWS: ``https://s3.<region>.amazonaws.com``.
+
+    A custom endpoint is safe with path addressing only: virtual/auto may send credentials to a
+    bucket-prefixed host which differs from the allow-listed endpoint host.
+    """
     if params.get("endpoint"):
+        if params.get("addressing_style", "auto") != "path":
+            raise AddressError("/params/addressing_style", "custom S3 endpoint requires path addressing")
         return _endpoint(params)
     region = params.get("region") or "us-east-1"
     if not isinstance(region, str) or not _REGION.fullmatch(region):
@@ -185,6 +190,8 @@ def _s3(params: Mapping[str, Any]) -> list[Address]:
 
 def _minio(params: Mapping[str, Any]) -> list[Address]:
     """``params.endpoint`` (the adapter refuses to open without one)."""
+    if params.get("endpoint") and params.get("addressing_style", "path") != "path":
+        raise AddressError("/params/addressing_style", "custom MinIO endpoint requires path addressing")
     return _endpoint(params) if params.get("endpoint") else []
 
 

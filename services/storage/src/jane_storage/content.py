@@ -102,15 +102,15 @@ class ContentReader:
                 raise ContentError("local blob not found", retryable=False) from exc
             except OSError as exc:
                 raise ContentError("cannot read local blob", retryable=True, kind="connection_error") from exc
+        if parsed.scheme == "s3" and (parsed.query or parsed.fragment):
+            raise ContentError("invalid s3 blob URI", retryable=False)
         if parsed.scheme == "s3" and self._transit is not None:
             conn = await self._transit()
             if conn is not None:
                 return await asyncio.to_thread(self._read_s3, conn, parsed.netloc, parsed.path.lstrip("/"))
         if url := ref.get("download_url"):
             return await self._download(str(url))
-        raise ContentError(
-            f"cannot read blob {uri}: no transit connection configured and no download_url", retryable=False
-        )
+        raise ContentError("no transit connection configured and no download_url", retryable=False)
 
     def _read_allowed_file(self, path: Path) -> bytes:
         assert self._files_dir is not None
@@ -152,11 +152,11 @@ class ContentReader:
         except ClientError as exc:
             code = str(exc.response.get("Error", {}).get("Code", ""))
             missing = code in {"NoSuchKey", "404", "NoSuchBucket"}
-            raise ContentError(f"s3://{bucket}/{key}: {code}", retryable=not missing) from exc
-        except BotoCoreError as exc:
             raise ContentError(
-                f"s3://{bucket}/{key}: {exc}", retryable=True, kind="connection_error"
+                "s3 blob not found" if missing else "s3 blob read failed", retryable=not missing
             ) from exc
+        except BotoCoreError as exc:
+            raise ContentError("s3 blob read failed", retryable=True, kind="connection_error") from exc
 
     async def _download(self, url: str) -> bytes:
         if not self._download_allowed(url):

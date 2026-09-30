@@ -9,7 +9,6 @@ resolves and *where* the adapter sends it. The policy restricts ``env:`` to ``JA
 from __future__ import annotations
 
 import json
-import os
 import socket
 import struct
 import threading
@@ -178,8 +177,29 @@ REJECTED: list[tuple[dict[str, Any], str, str]] = [
     ),
     (other("s3", {"bucket": "b", "region": "eu-west-1"}), "/params/region", "host_not_allowed"),
     (
-        other("s3", {"bucket": "b", "endpoint": "https://evil.example.org"}),
+        other("s3", {"bucket": "b", "endpoint": "https://evil.example.org", "addressing_style": "path"}),
         "/params/endpoint",
+        "host_not_allowed",
+    ),
+    *(
+        (
+            other(
+                kind,
+                {
+                    "bucket": "outside",
+                    "endpoint": "http://minio.internal.test:9000",
+                    "addressing_style": style,
+                },
+            ),
+            "/params/addressing_style",
+            "host_not_allowed",
+        )
+        for kind in ("s3", "minio")
+        for style in ("auto", "virtual")
+    ),
+    (
+        other("s3", {"bucket": "outside", "endpoint": "http://minio.internal.test:9000"}),
+        "/params/addressing_style",
         "host_not_allowed",
     ),
     # adapters unknown to the core and unused host-like params: generic keys
@@ -281,6 +301,10 @@ def test_put_rejects_exfiltrating_connections(tmp_path: Path, secrets_dir: Path,
             other("mongodb", {"host": "mongo.internal.test", "port": 27019}),
             other("mongodb", {"host": "mongodb+srv://mongo.internal.test/jane"}),
             other("minio", {"endpoint": "http://minio.internal.test:9000", "bucket": "b"}),
+            other(
+                "s3",
+                {"endpoint": "http://minio.internal.test:9000", "bucket": "b", "addressing_style": "path"},
+            ),
             other("minio", {"bucket": "b"}),  # no endpoint: the adapter refuses to open, nothing is contacted
             other("s3", {"bucket": "b", "region": "eu-central-1"}),
             other("filesystem", {"base_path": str(tmp_path / "files")}),
@@ -295,9 +319,11 @@ def test_put_rejects_exfiltrating_connections(tmp_path: Path, secrets_dir: Path,
     assert listener.received == []
 
 
-@pytest.mark.skipif(os.name == "nt", reason="symlinks need extra privileges on Windows")
 def test_symlink_out_of_the_secrets_directory_is_rejected(tmp_path: Path, secrets_dir: Path) -> None:
-    (secrets_dir / "link").symlink_to(tmp_path / "outside")
+    try:
+        (secrets_dir / "link").symlink_to(tmp_path / "outside")
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks require extra privileges on this platform")
     policy = ConnectionPolicy(files_dir=secrets_dir)
     assert policy.ref_error(f"file:{secrets_dir / 'link'}") is not None
     assert policy.resolve(f"file:{secrets_dir / 'link'}") is None
@@ -449,7 +475,7 @@ def test_policy_settings_from_environment(monkeypatch: pytest.MonkeyPatch, tmp_p
         ("mongodb", {"host": "mongodb+srv://cluster.example.org/x"}, ["cluster.example.org"]),
         ("s3", {"bucket": "b"}, ["s3.us-east-1.amazonaws.com:443"]),
         ("s3", {"bucket": "b", "region": "eu-central-1"}, ["s3.eu-central-1.amazonaws.com:443"]),
-        ("s3", {"bucket": "b", "endpoint": "http://s3:8333"}, ["s3:8333"]),
+        ("s3", {"bucket": "b", "endpoint": "http://s3:8333", "addressing_style": "path"}, ["s3:8333"]),
         ("minio", {"bucket": "b", "endpoint": "https://minio"}, ["minio:443"]),
         ("minio", {"bucket": "b"}, []),
         ("filesystem", {"base_path": "/var/lib/jane"}, []),

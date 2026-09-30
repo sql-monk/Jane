@@ -125,6 +125,15 @@ def test_content_policy_settings_from_environment(monkeypatch: pytest.MonkeyPatc
     assert settings.download_host_allowlist == ["cdn.internal:443"]
 
 
+@pytest.mark.asyncio
+async def test_s3_uri_never_appears_in_failure() -> None:
+    marker = "private-marker-4d6c"
+    for uri in (f"s3://bucket/item?token={marker}", f"s3://bucket/{marker}"):
+        with pytest.raises(ContentError) as failure:
+            await reader().read(blob(uri, b"payload"))
+        assert marker not in str(failure.value)
+
+
 def test_invocation_does_not_store_a_local_secret(
     settings: Settings, h: SimpleNamespace, tmp_path: Path
 ) -> None:
@@ -140,3 +149,14 @@ def test_invocation_does_not_store_a_local_secret(
         objects = client.get("/v1/objects", params={"connection_id": "raw-files"})
         assert objects.status_code == 200
         assert objects.json()["items"] == []
+
+
+def test_invocation_does_not_return_s3_uri_marker(settings: Settings, h: SimpleNamespace) -> None:
+    marker = "private-marker-c9ea"
+    material = h.material()
+    material["content"] = blob(f"s3://bucket/key?token={marker}", b"payload")
+    with TestClient(build_app(settings)) as client:
+        response = h.post(client, h.invocation([{"kind": "material", "material": material}], "blocked-s3"))
+    assert response.status_code == 200
+    assert response.json()["status"] == "failed"
+    assert marker not in response.text

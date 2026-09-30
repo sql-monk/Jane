@@ -269,8 +269,9 @@ class StateStore:
                 "UPDATE collections SET meta = ? WHERE collection_id = ?", (_dumps(meta), collection_id)
             )
 
-    def set_paused(self, collection_id: str, paused: bool) -> None:
-        with self.tx() as db:
+    def set_paused(self, collection_id: str, paused: bool, *, fence: Fence) -> None:
+        """Only the current lease holder may change a run's backpressure state."""
+        with self.tx(fence) as db:
             db.execute(
                 "UPDATE collections SET paused = ? WHERE collection_id = ?", (int(paused), collection_id)
             )

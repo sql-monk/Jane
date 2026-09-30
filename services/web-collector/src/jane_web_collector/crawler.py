@@ -413,9 +413,9 @@ class CrawlRun:
         if self.state.unacked_count(self.collection_id) < limit:
             return
         self._backpressure_waiters += 1
-        self.state.set_paused(self.collection_id, True)
-        event = self.deps.ack_events.setdefault(self.collection_id, asyncio.Event())
         try:
+            self.state.set_paused(self.collection_id, True, fence=self.fence)
+            event = self.deps.ack_events.setdefault(self.collection_id, asyncio.Event())
             while self.state.unacked_count(self.collection_id) >= limit and not self.cancelled:
                 event.clear()
                 with contextlib.suppress(TimeoutError):  # an ack may come through another instance
@@ -424,7 +424,8 @@ class CrawlRun:
                     )
         finally:
             self._backpressure_waiters -= 1
-            self.state.set_paused(self.collection_id, self._backpressure_waiters > 0)
+            with contextlib.suppress(LeaseLost):
+                self.state.set_paused(self.collection_id, self._backpressure_waiters > 0, fence=self.fence)
 
     def _stored_links_candidates(self, links: Sequence[str], parent: str) -> list[DiscoveredUrl]:
         out: list[DiscoveredUrl] = []

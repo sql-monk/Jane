@@ -326,7 +326,8 @@ def test_s_m1_04_collector_and_extractor_used_by_a_third_party_app(
     assert view["status"] == "succeeded", view
     got = [_path(m["locator"]["canonical_url"]) for m in materials]
     assert len(got) == len(set(got)), "a page was emitted twice"
-    assert set(got) == expected_set("recursive"), set(got) ^ expected_set("recursive")
+    expected = {_path(path) for path in expected_set("recursive")}
+    assert set(got) == expected, set(got) ^ expected
     assert not set(got) & expected_set("robots_disallowed")
     assert all(urlsplit(m["locator"]["final_url"]).hostname == "testsite" for m in materials)
 

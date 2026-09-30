@@ -17,6 +17,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import subprocess
 import sys
 from collections.abc import Iterable, Mapping, Sequence
@@ -34,6 +35,12 @@ CREDENTIAL_KEYS = (
     "JANE_PG_USER",
     "JANE_PG_DB",
     "JANE_PG_PASSWORD",
+    "JANE_PG_HANDLER_RUNTIME_PASSWORD",
+    "JANE_PG_ORCHESTRATOR_PASSWORD",
+    "JANE_PG_REGISTRY_PASSWORD",
+    "JANE_PG_LLM_PASSWORD",
+    "JANE_PG_ASSISTANT_PASSWORD",
+    "JANE_PG_STORAGE_RESULTS_PASSWORD",
     "JANE_MSSQL_SA_PASSWORD",
     "JANE_MONGO_USER",
     "JANE_MONGO_PASSWORD",
@@ -89,20 +96,26 @@ SERVICES: dict[str, ServiceSpec] = {
             depends=("postgres",),
         ),
         ServiceSpec(
-            "web-collector", "WP-02", 8000, "app", ("services/web-collector/Dockerfile",), compose=False
+            "web-collector",
+            "WP-02",
+            8101,
+            "app",
+            ("services/web-collector/Dockerfile",),
+            depends=("testsite",),
         ),
         ServiceSpec(
             "telegram-collector",
             "WP-04",
-            8000,
+            8102,
             "app",
             ("services/telegram-collector/Dockerfile",),
-            compose=False,
         ),
-        ServiceSpec("registry", "WP-05", 8000, "app", ("services/registry/Dockerfile",), compose=False),
+        ServiceSpec("registry", "WP-05", 8000, "app", ("services/registry/Dockerfile",)),
         ServiceSpec(
-            "orchestrator", "WP-09", 8000, "app", ("services/orchestrator/Dockerfile",), compose=False
+            "orchestrator", "WP-09", 8000, "app", ("services/orchestrator/Dockerfile",), depends=("postgres",)
         ),
+        # STAND-IN for the registry (WP-05) serving LOCAL package archives - see jane_e2e/package_host.py.
+        ServiceSpec("package-host", "WP-13", 8080, "app", ("tests/e2e/jane_e2e/package_host.py",)),
         ServiceSpec("llm", "WP-10", 8110, "app", ("services/llm/Dockerfile",), depends=("postgres",)),
         ServiceSpec(
             "assistant", "WP-11", 8000, "app", ("services/assistant/Dockerfile",), depends=("postgres", "llm")
@@ -194,6 +207,12 @@ class E2EStack:
             "JANE_PG_USER": "jane",
             "JANE_PG_DB": "jane",
             "JANE_PG_PASSWORD": secrets.token_urlsafe(18),
+            "JANE_PG_HANDLER_RUNTIME_PASSWORD": secrets.token_urlsafe(18),
+            "JANE_PG_ORCHESTRATOR_PASSWORD": secrets.token_urlsafe(18),
+            "JANE_PG_REGISTRY_PASSWORD": secrets.token_urlsafe(18),
+            "JANE_PG_LLM_PASSWORD": secrets.token_urlsafe(18),
+            "JANE_PG_ASSISTANT_PASSWORD": secrets.token_urlsafe(18),
+            "JANE_PG_STORAGE_RESULTS_PASSWORD": secrets.token_urlsafe(18),
             "JANE_MSSQL_SA_PASSWORD": "Jn1_" + secrets.token_hex(12),
             "JANE_MONGO_USER": "jane",
             "JANE_MONGO_PASSWORD": secrets.token_urlsafe(18),
@@ -209,10 +228,36 @@ class E2EStack:
         return {
             "JANE_E2E_PROJECT": self.project,
             "JANE_E2E_SANDBOX_IMAGE": self.sandbox_image,
-            "JANE_E2E_DOCKER_SOCKET": os.environ.get("JANE_E2E_DOCKER_SOCKET", "/var/run/docker.sock"),
-            "JANE_E2E_DOCKER_GID": os.environ.get("JANE_E2E_DOCKER_GID", ""),
+            "JANE_DOCKER_SOCKET": os.environ.get("JANE_E2E_DOCKER_SOCKET", "/var/run/docker.sock"),
+            "JANE_DOCKER_GID": os.environ.get("JANE_E2E_DOCKER_GID", ""),
+            "JANE_STORAGE_CONNECTIONS_FILE_HOST": (
+                self.root / "tests" / "e2e" / "config" / "storage-connections.json"
+            )
+            .resolve()
+            .as_posix(),
             "COMPOSE_PROFILES": ",".join(self.available_apps()),
+            "JANE_E2E_PACKAGES_DIR": self.packages_dir.as_posix(),
+            "JANE_E2E_TELEGRAM_RECORDINGS_DIR": self.telegram_recordings_dir.as_posix(),
         }
+
+    @property
+    def packages_dir(self) -> Path:
+        """Archives of local packages served by the ``package-host`` stand-in (``<id>/<version>.zip``)."""
+        path = STACK_DIR / f"e2e-packages-{self.project}"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @property
+    def telegram_recordings_dir(self) -> Path:
+        """Writable host directory mounted into the recorded Telegram backend for S-M2-02."""
+        path = STACK_DIR / f"e2e-telegram-recordings-{self.project}"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def publish_local_package(self, package_id: str, version: str, archive: bytes) -> None:
+        target = self.packages_dir / package_id / f"{version}.zip"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(archive)
 
     def _write_stack_file(self, creds: Mapping[str, str], services: Mapping[str, Any]) -> None:
         STACK_DIR.mkdir(exist_ok=True)
@@ -302,12 +347,12 @@ class E2EStack:
         if not self._image_exists(self.sandbox_image):
             cli = [sys.executable, "-m", "jane_handler_runtime.cli"]
             self._run([*cli, "build-image", "--tag", self.sandbox_image], timeout=1800)
-        if not env["JANE_E2E_DOCKER_GID"]:
-            env["JANE_E2E_DOCKER_GID"] = self._docker_socket_gid()
+        if not env["JANE_DOCKER_GID"]:
+            env["JANE_DOCKER_GID"] = self._docker_socket_gid()
 
     def _docker_socket_gid(self) -> str:
         """Group of the docker socket *as seen inside a container* (0 on Docker Desktop, docker gid on Linux)."""
-        sock = self.env()["JANE_E2E_DOCKER_SOCKET"]
+        sock = self.env()["JANE_DOCKER_SOCKET"]
         r = self._run(
             [
                 "docker",
@@ -366,6 +411,40 @@ class E2EStack:
     def kill(self, service: str) -> None:
         self.compose("kill", service)
 
+    def container(self, service: str, index: int = 1) -> str:
+        """Container id of one replica of a service."""
+        labels = {
+            "com.docker.compose.project": self.project,
+            "com.docker.compose.service": service,
+            "com.docker.compose.container-number": str(index),
+        }
+        filters = [arg for k, v in labels.items() for arg in ("--filter", f"label={k}={v}")]
+        r = self._run(["docker", "ps", "-a", "-q", *filters])
+        cid = str(r.stdout).strip().splitlines()
+        if not cid:
+            raise StackError(f"{service}#{index}: no container")
+        return str(cid[0])
+
+    def kill_instance(self, service: str, index: int) -> None:
+        """``docker kill`` (SIGKILL) of one replica - the others keep running."""
+        self._run(["docker", "kill", self.container(service, index)])
+
+    def start_instance(self, service: str, index: int) -> None:
+        self._run(["docker", "start", self.container(service, index)])
+
+    @property
+    def network(self) -> str:
+        return f"{self.project}_default"
+
+    def disconnect(self, service: str, index: int = 1) -> None:
+        """Network partition: detach one replica from the stack network."""
+        self._run(["docker", "network", "disconnect", "-f", self.network, self.container(service, index)])
+
+    def reconnect(self, service: str, index: int = 1) -> None:
+        self._run(
+            ["docker", "network", "connect", "--alias", service, self.network, self.container(service, index)]
+        )
+
     def restart(self, service: str) -> None:
         self.compose(
             "up", "-d", "--wait", "--wait-timeout", str(self.timeout_s), service, timeout=self.timeout_s + 60
@@ -390,4 +469,7 @@ class E2EStack:
         if volumes:
             self._run(["docker", "image", "rm", "-f", self.sandbox_image], check=False)
             self.stack_file.unlink(missing_ok=True)
+            recordings = self.telegram_recordings_dir.resolve()
+            if recordings.is_relative_to(STACK_DIR.resolve()):
+                shutil.rmtree(recordings)
         self._started.clear()

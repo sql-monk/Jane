@@ -1,0 +1,18 @@
+{
+  "schema_version": "1",
+  "package_id": "testsite.web-rules",
+  "version": "1.0.0",
+  "kind": "collector-rules",
+  "title": "e2e: crawl rules of the Jane test site (compose host testsite:8080)",
+  "entry": {
+    "collector": "web",
+    "rules": "rules.json"
+  },
+  "tests": [],
+  "provenance": {
+    "created_by": "human",
+    "authors": ["WP-13"],
+    "created_at": "2026-09-30T00:00:00Z",
+    "change_summary": "Local rules package for M1 e2e scenarios (served from JANE_WEB_COLLECTOR_RULES_DIR until the registry is merged)."
+  }
+}

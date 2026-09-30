@@ -11,13 +11,13 @@
 2. **Замінники зовнішніх систем позначаються явно:** фейковий провайдер LLM (WP-10), записаний або фейковий
    клієнт Telegram (WP-04), статичний пошуковий провайдер (WP-11), SeaweedFS замість AWS S3 (WP-01).
    У матриці вони мають позначку **З**.
-3. **Тимчасові замінники компонентів**, яких ще немає в `main` (позначка **Т**), використовуються лише для
-   перевірки каркаса й сусідніх компонентів. Зараз такий замінник один — колектор у S-M1-01: матеріал
-   формує тест із реальної відповіді testsite (`collector.name = e2e-standin-collector`). Доказом критерію
-   такий сценарій не є. Сценарій-двійник із реальним компонентом (S-M1-02) стартує, щойно WP злито.
+3. **Тимчасові замінники компонентів** мають позначку **Т**. У M1 використано лише `package-host`:
+   він віддає архів локального пакета runtime через HTTP у сценаріях з оркестратором. Це перевірка
+   виконання локального пакета, а не перевірка реального registry; для M2 потрібен окремий сценарій із registry.
 4. **Незалежність від стану.** Кожен прогін має свій `run_id`, від якого залежать `source_id` (а отже
    `key.scope` сутностей), `observation_id` і `delivery_key`. Тому сценарії можна повторювати на тому самому
-   стеку. Сховище перевіряється і через API (`storage.v1`), і в самому сховищі (файл на томі, таблиця).
+   стеку. Сховище перевіряється через `storage.v1`: список об'єктів, метадані й вміст. У S-M1-01
+   RAW-файл додатково читається прямо з тому; таблиці PostgreSQL ці сценарії прямо не читають.
 5. **Сервіс, якого немає в `main`**, дає `skip` з причиною («WP-NN ще не злито в main»), а не падіння.
 
 ## Запуск
@@ -29,15 +29,15 @@ uv run --all-packages pytest tests/e2e -v -k s_m1_01         # один сцен
 ```
 
 `just check` сценаріїв e2e не запускає: `tests/e2e` не входить до `testpaths` кореневого `pyproject.toml`,
-а маркер `e2e` реєструє `tests/e2e/conftest.py`. Окремий рецепт `just e2e` — запит до WP-01 (див. звіт).
+а маркер `e2e` реєструє `tests/e2e/conftest.py`. Окремий рецепт `just e2e` запускає їх у CI після WP-01a.
 
-Потрібні Docker (Compose v2) і `uv`. Стек складається з `infra/compose.yaml` (WP-01) і накладки
-`tests/e2e/compose.e2e.yaml` (сервіси Jane). Проєкт унікальний (`jane-e2e-<хеш checkout>` або
+Потрібні Docker (Compose v2) і `uv`. Сервіси Jane описані в `infra/compose.yaml` (WP-01a), а накладка
+`tests/e2e/compose.e2e.yaml` додає тестові налаштування. Проєкт унікальний (`jane-e2e-<хеш checkout>` або
 `JANE_E2E_PROJECT`), порти хоста обирає Docker, облікові дані генеруються. Файл стеку
 `.jane/stack-<проєкт>.json` має ту саму форму, що й у `just up`, тож `just env --project <проєкт>` працює.
 Сервіси піднімаються ліниво: сценарій запускає лише те, що йому потрібно. Для handler-runtime стек
 збирає образ пісочниці `python-extractor@1` (`jane-handler-runtime build-image`) і передає сервісу
-Docker-сокет із групою, визначеною автоматично (`JANE_E2E_DOCKER_GID`).
+Docker-сокет із групою, визначеною автоматично (`JANE_DOCKER_GID`).
 
 Змінні: `JANE_E2E_PROJECT`, `JANE_E2E_KEEP`, `JANE_E2E_WAIT_TIMEOUT` (типово 900 с),
 `JANE_E2E_SANDBOX_WALL_TIME_MS` (типово 60000; ліміт запиту до пісочниці), `JANE_E2E_DOCKER_SOCKET`,
@@ -47,23 +47,24 @@ Docker-сокет із групою, визначеною автоматично
 
 | ID | Назва | Критерії | Сервіси | Стан |
 |---|---|---|---|---|
-| S-M1-01 | Web → RAW у files ‖ екстракція локальним пакетом → PostgreSQL (замінник колектора) | 1, 2, 8, 12 | testsite, storage, handler-runtime, postgres | **реалізовано, проходить** |
-| S-M1-02 | Те саме з реальним Web Collector | 1, 2, 12 | + web-collector | реалізовано, `skip` до WP-02 |
-| S-M1-03 | M1-завдання через оркестратор | 2 | + orchestrator | каркас, `skip` до WP-02, 09 |
-| S-M1-04 | Колектор зі стороннього застосунку (`/v1/collections`), runtime через CLI | 1 | web-collector, handler-runtime | чекає WP-02 |
-| S-M1-05 | Заміна сховища лише конфігурацією (PostgreSQL ↔ files) | 3 | storage, handler-runtime | **реалізовано, проходить** |
-| S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | чекає WP-05 |
-| S-M2-02 | Telegram: історія, нові, редагування як ревізії → збереження | 1, 8, 12 | telegram-collector, storage | чекає WP-04 |
-| S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | чекає WP-02, 03 |
-| S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage | чекає WP-09, 02 |
+| S-M1-01 | Web Collector → RAW у files ‖ екстракція локальним пакетом → PostgreSQL | 1, 2, 8, 12 | testsite, web-collector, storage, handler-runtime, postgres | **пройдено на гілці WP-13** |
+| S-M1-02 | Колекція з курсорним підтвердженням і повторною доставкою → RAW та екстракція | 1, 2, 12 | web-collector, storage, handler-runtime | **пройдено на гілці WP-13** |
+| S-M1-03 | M1-завдання через оркестратор: RAW, екстракція, trace, unknown | 2, 8, 11, 12 | + orchestrator, локальний `package-host` (Т) | **пройдено на гілці WP-13** |
+| S-M1-04 | Рекурсивний збір зі стороннього застосунку, runtime через CLI | 1, 10 | web-collector, handler-runtime | **пройдено на гілці WP-13** |
+| S-M1-05 | Заміна сховища лише конфігурацією завдання (PostgreSQL ↔ files) | 3 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
+| S-M1-06 | Новий прогін дає нове спостереження й подію історії | 8 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
+| S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | ще не реалізовано в WP-13 |
+| S-M2-02 | Telegram: історія, нові, редагування як ревізії → збереження | 1, 8, 12 | telegram-collector, storage | **1 passed на спільній гілці WP-01a/00a/13** (Telegram — З) |
+| S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | 69 тестів WP-03 пройшли; e2e WP-13 ще не реалізовано |
+| S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage | ще не реалізовано в WP-13 |
 | S-M2-05a | Невідома сторінка: асистент викликає LLM лише з прапорцем (без оркестратора) | 11 | testsite, assistant, llm, postgres | **реалізовано, проходить** (LLM — З) |
-| S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, llm, assistant | чекає WP-09, 02 |
-| S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator | чекає WP-05, 02, 09 |
-| S-M2-07 | Проблемні приклади → нова версія → тести → активація → відкат | 6 | orchestrator, assistant, llm, registry, runtime | чекає WP-09, 05 |
-| S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, усі сховища | чекає WP-08, 09 |
-| S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці | чекає WP-09 |
-| S-M2-10 | Адмінка на реальному API (Playwright) | 6, 7 (UI) | admin, усі API | чекає WP-12 |
-| S-M2-11 | Ланцюжок з умовами `when` і LLM-етапом | 2 | orchestrator, runtime, storage, llm | чекає WP-09 |
+| S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, llm, assistant | ще не реалізовано в WP-13 |
+| S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator | ще не реалізовано в WP-13 |
+| S-M2-07 | Проблемні приклади → нова версія → тести → активація → відкат | 6 | orchestrator, assistant, llm, registry, runtime | ще не реалізовано в WP-13 |
+| S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, усі сховища | ще не реалізовано в WP-13 |
+| S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці | ще не реалізовано в WP-13 |
+| S-M2-10 | Адмінка на реальному API (Playwright) | 6, 7 (UI) | admin, усі API | WP-12 частково перевірив реальні API; повний Caddy прогін відкритий |
+| S-M2-11 | Ланцюжок з умовами `when` і LLM-етапом | 2 | orchestrator, runtime, storage, llm | ще не реалізовано в WP-13 |
 | R-01 | Kill воркера оркестратора посеред ланцюжка | 8 | orchestrator ×2, виконавці | чекає WP-09 |
 | R-02 | Kill і рестарт кожного сервісу; повтор після рестарту — дубль | 8 | storage, handler-runtime (далі — усі) | **реалізовано для storage і runtime, проходить** |
 | R-03 | Розрив мережі між оркестратором і виконавцем | 8 | orchestrator, виконавці | чекає WP-09 |
@@ -76,11 +77,10 @@ Docker-сокет із групою, визначеною автоматично
 ## M1 — перший наскрізний зріз
 
 ### S-M1-01. Web → RAW у files ‖ екстракція локальним пакетом → PostgreSQL
-`tests/e2e/test_m1.py::test_s_m1_01_raw_to_files_and_extraction_to_postgres_standin_collector`
+`tests/e2e/test_m1.py::test_s_m1_01_collector_fetch_to_files_and_extraction_to_postgres`
 
-1. Тест завантажує `/product/phone-alpha` з реального testsite (сервіс стеку) і формує `Material`
-   (**Т**: замінник колектора, `collector.name = e2e-standin-collector`, `material_id` — за правилом
-   колектора `web:` + sha256(URL)[:32]).
+1. Сторонній клієнт викликає `POST /v1/fetches` реального Web Collector для `/product/phone-alpha`
+   на testsite та отримує `Material` через `collector.v1`.
 2. **Гілка RAW.** Виклик `POST /v1/invocations` storage: `jane.storage-files`, підключення `raw-files`.
    Очікується `success`, `WriteAck.status = written`, файл `.html`, `sha256` збігається. Файл на томі storage
    (`docker compose exec storage cat …`) збігається з відповіддю testsite байт у байт. `GET /v1/objects`
@@ -94,35 +94,40 @@ Docker-сокет із групою, визначеною автоматично
    PostgreSQL стеку), очікується `written`. Повторна доставка дає `duplicate`. `GET /v1/entities` показує
    `version = 1` і ті самі поля, `GET /v1/entity-history` — одну подію.
 
-### S-M1-02. Те саме з реальним Web Collector
-`test_s_m1_02_raw_and_extraction_with_real_web_collector`. Замість кроку 1 викликається `POST /v1/fetches`
-колектора (`source_kind: web`, URL `http://testsite:8080/product/phone-alpha` у мережі compose). Далі
-виконуються кроки 2–5 без змін. Потрібен запис `web-collector` у накладці compose (WP-13 додасть після
-злиття WP-02: порт 8101, том стану `/var/lib/jane-web-collector`).
+### S-M1-02. Колекція з підтвердженням отримання
+`test_s_m1_02_collection_pull_with_ack_then_chain`: Web Collector отримує явний список трьох URL і локальний
+пакет правил. Два читання без курсорного підтвердження повертають ті самі `observation_id`; після
+підтвердження всі матеріали зберігаються як RAW, товарні сторінки екстрагуються, `/about` не дає товару.
 
 ### S-M1-03. M1-завдання через оркестратор
 1. Реєстр виконавців оркестратора (`JANE_ORCHESTRATOR_EXECUTORS`): web-collector (`collector`), handler-runtime
    (`handler`), storage (`handler` для `jane.storage-*` і `storage_read`). Підключення `raw-files` і `results-pg`
    задаються через `PUT /v1/connections/{id}` оркестратора і синхронізуються у storage.
 2. `POST /v1/sources` (testsite), `POST /v1/tasks` з DAG `collect` → `store-raw` ‖ `extract-products`
-   (прив'язка `url_patterns: /product/*`) → `store-products`. Усі версії пакетів зафіксовано. Екстрактор до
-   M2 передається локально, з M2 — з registry.
-3. `POST /v1/tasks/{id}/runs` зі списком URL, далі очікування завершення прогону (`GET /v1/runs/{id}`).
+   (прив'язка `url_patterns: /product/*`) → `store-products`. Версію й дайджест локального екстрактора
+   зафіксовано; його архів runtime отримує з тестового `package-host` (**Т**).
+3. `POST /v1/tasks/{id}/runs`, далі очікування завершення прогону (`GET /v1/runs/{id}`).
 4. Перевірки: `GET /v1/runs/{id}/items` — кожен матеріал пройшов потрібні етапи. `GET /v1/materials/{id}/trace`
    дає ланцюжок матеріал → етап → результат → версія пакета. RAW лежить у files (як у S-M1-01),
-   сутності товарів — у PostgreSQL. Сторінки категорій через `bindings` до екстрактора не потрапили.
+   сутності товарів — у PostgreSQL. Категорія та невідома сторінка через `bindings` до екстрактора не
+   потрапили, LLM не викликано. Другий технічний запис не створюється.
 
 ### S-M1-04. Колектор і екстрактор зі стороннього застосунку
-1. `POST /v1/collections` Web Collector з inline-правилами (явний перелік URL testsite), оркестратор не
-   запущено. Далі очікування job, `GET /v1/collections/{id}/materials` з курсорною пагінацією, перевірка
-   `Material` за схемою.
+1. `POST /v1/collections` Web Collector з inline-правилами рекурсивного обходу testsite, оркестратор
+   не використовується. `GET /v1/collections/{id}/materials` з курсорним підтвердженням повертає саме
+   очікуваний рекурсивний набір URL і не завантажує заборонені robots.txt сторінки.
 2. Runtime через CLI (`jane-handler-runtime run <пакет> <файл>`) на збереженій сторінці — без інших сервісів.
 
 ### S-M1-05. Заміна сховища лише конфігурацією
-`test_s_m1_05_storage_swap_is_configuration_only`. Той самий `HandlerResult` екстрактора записується в
-PostgreSQL (`jane.storage-postgresql` / `results-pg`) і у файли (`jane.storage-files` / `raw-files`).
-Змінюються лише `handler.package_id` і `connections.target`. `canonical_key` і `fields` в обох сховищах
-збігаються, повтор у кожному дає дубль.
+`test_s_m1_05_storage_swap_is_task_configuration_only`. Два завдання з тим самим колектором і
+екстрактором відрізняються лише `handler.package_id` і `connections.target` етапу збереження сутностей:
+PostgreSQL (`jane.storage-postgresql` / `results-pg`) і files (`jane.storage-files` / `raw-files`).
+Прочитані через API ключі та поля сутностей збігаються.
+
+### S-M1-06. Новий прогін — нове спостереження
+`test_s_m1_06_new_observation_is_a_new_record`. Два прогони того самого завдання дають для кожного
+матеріалу два різні спостереження RAW і дві події історії сутності. Технічні повтори всередині
+кожного прогону не створюють зайвих об'єктів.
 
 ## M2 — повний стек
 

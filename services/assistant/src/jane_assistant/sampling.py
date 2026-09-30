@@ -12,8 +12,12 @@ the confidence:
 
 ``coverage`` is the Good-Turing sample-coverage estimate (with ``min_examples_per_type = 2`` it is
 exactly ``1 - singletons / n``): the probability that the next material belongs to a type already
-seen often enough. Sampling stops when ``confidence >= limits.onboarding.min_confidence``, or when the
-sample bound, the collection or the LLM budget runs out; then the sample is reported insufficient.
+seen often enough. This estimate cannot detect a type that occurs later in a source ordered by URL
+or discovery strategy. After the first classification batch, the sampler probes the remaining
+bounded collector stream, classifies newly seen URL shapes, then samples more within known shapes
+if confidence is still low. An unfinished stream cannot establish diversity, so a polling or
+sample-budget limit reports an insufficient
+sample. The collector's fetch bound is ``max_onboarding_samples x fetch_ratio``.
 """
 
 from __future__ import annotations
@@ -192,7 +196,10 @@ async def sample_source(
     message: str | None = None
     try:
         while True:
-            if not ended and len(reserve) < ob.sample_batch_size:
+            unseen_shape = any(s.shape not in shapes for s in reserve)
+            enough_types = len({s.material_type for s in samples}) >= ob.min_distinct_types
+            probing = bool(samples) and not unseen_shape
+            if not ended and (len(reserve) < ob.sample_batch_size or probing):
                 page = await collector.materials(
                     collection_id,
                     after,
@@ -217,15 +224,37 @@ async def sample_source(
                     if ck := (m.get("format") or {}).get("content_kind"):
                         content_kinds[str(ck)] += 1
                     reserve.append(Sample(m, text, shape))
-                if not ended and not items and not reserve and empty_polls < ob.max_empty_polls:
+                if not ended and not items and empty_polls >= ob.max_empty_polls:
+                    message = (
+                        f"collection did not finish after {empty_polls} empty poll(s); "
+                        "cannot confirm material-type diversity"
+                    )
+                    break
+                if not ended and not items and not reserve:
                     continue
+                unseen_shape = any(s.shape not in shapes for s in reserve)
+                if samples and not unseen_shape and not ended:
+                    continue
+            if (
+                confidence >= ob.min_confidence
+                and ended
+                and not unseen_shape
+                and (enough_types or not reserve)
+            ):
+                break
             if not reserve:
                 message = message or (
                     f"the source yielded only {len(samples)} material(s); cannot distinguish material types"
                 )
                 break
             room = max_samples - len(samples)
-            batch = pick_diverse(reserve, shapes, min(ob.sample_batch_size, room))
+            novel_shapes = {s.shape for s in reserve if s.shape not in shapes}
+            batch_size = (
+                min(len(novel_shapes), ob.sample_batch_size)
+                if samples and novel_shapes
+                else ob.sample_batch_size
+            )
+            batch = pick_diverse(reserve, shapes, min(batch_size, room))
             reserve = [s for s in reserve if not any(s is b for b in batch)]
             try:
                 await _classify(llm, batch, limits, model)
@@ -237,11 +266,15 @@ async def sample_source(
             samples.extend(batch)
             confidence = confidence_of(samples, ob.min_examples_per_type)
             await progress(len(samples), f"sampled {len(samples)}, confidence {confidence:.2f}")
-            # Good-Turing coverage is 1.0 after two identical classifications, even if a
-            # slow collector has not delivered the other page types yet. While collection
-            # is active, require evidence of distinct types before trusting that estimate.
-            if confidence >= ob.min_confidence and (
-                len({s.material_type for s in samples}) >= ob.min_distinct_types or (ended and not reserve)
+            # A high score over classified pages says nothing about types in later pages.
+            # Only a closed stream with all observed URL shapes represented confirms diversity.
+            unseen_shape = any(s.shape not in shapes for s in reserve)
+            enough_types = len({s.material_type for s in samples}) >= ob.min_distinct_types
+            if (
+                confidence >= ob.min_confidence
+                and ended
+                and not unseen_shape
+                and (enough_types or not reserve)
             ):
                 break
             if len(samples) >= max_samples:
@@ -254,8 +287,11 @@ async def sample_source(
                 break
     finally:
         await collector.cancel(collection_id)
-    sufficient = confidence >= ob.min_confidence and (
-        len({s.material_type for s in samples}) >= ob.min_distinct_types or (ended and not reserve)
+    sufficient = (
+        confidence >= ob.min_confidence
+        and ended
+        and not any(s.shape not in shapes for s in reserve)
+        and (len({s.material_type for s in samples}) >= ob.min_distinct_types or not reserve)
     )
     try:
         stats = (await collector.collection(collection_id)).get("stats") or {}

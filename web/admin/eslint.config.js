@@ -24,6 +24,11 @@ export default tseslint.config(
     },
   },
   {
+    // Playwright fixtures use `use(...)` and `async ({}, use)` by design.
+    files: ["e2e/**/*.ts"],
+    rules: { "react-hooks/rules-of-hooks": "off", "no-empty-pattern": "off" },
+  },
+  {
     files: ["**/*.{js,mjs}"],
     extends: [js.configs.recommended],
     languageOptions: { ecmaVersion: 2022, sourceType: "module", globals: globals.node },

@@ -7,6 +7,7 @@ behaviour but also on any divergence from the contract.
 
 from __future__ import annotations
 
+import os
 import time
 from functools import cache
 from pathlib import Path
@@ -40,12 +41,27 @@ def spec(api: str) -> OpenAPISpec:
     return OpenAPISpec.load(CONTRACTS / f"{api}.v1.yaml")
 
 
+def keepalive_expiry_s() -> float:
+    """Idle time after which the test client drops a pooled connection (``JANE_E2E_HTTP_KEEPALIVE_S``).
+
+    Must stay below the services' server-side idle timeout (uvicorn ``timeout_keep_alive``, 5 s by default).
+    With httpx's own default of 5 s both sides expire the connection at the same moment, and a request sent
+    after ~5 s of idleness races the server's close: ``RemoteProtocolError: Server disconnected without
+    sending a response`` although the service is healthy and never sees the request.
+    """
+    return float(os.environ.get("JANE_E2E_HTTP_KEEPALIVE_S", "2"))
+
+
 class JaneClient:
     """HTTP client of one service instance; ``api(name)`` validates against that contract."""
 
     def __init__(self, base_url: str, timeout_s: float = 120.0) -> None:
         self.base_url = base_url
-        self.http = httpx.Client(base_url=base_url, timeout=timeout_s)
+        self.http = httpx.Client(
+            base_url=base_url,
+            timeout=timeout_s,
+            limits=httpx.Limits(keepalive_expiry=keepalive_expiry_s()),
+        )
         self._clients: dict[str, ContractClient] = {}
 
     def close(self) -> None:

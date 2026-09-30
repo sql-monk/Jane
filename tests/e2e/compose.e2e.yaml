@@ -37,8 +37,8 @@ services:
     environment:
       JANE_HANDLER_RUNTIME_PROFILE_IMAGES: '{"python-extractor@1": "${JANE_E2E_SANDBOX_IMAGE:?set by tests/e2e}"}'
       JANE_HANDLER_RUNTIME_SANDBOX_LABELS: '{"io.jane.e2e-project": "${JANE_E2E_PROJECT:-jane-e2e}"}'
-      # Packages without package_archive (orchestrated stages) come from a local archive stand-in.
-      JANE_HANDLER_RUNTIME_REGISTRY_URL: http://package-host:8080
+      # M1 uses the local package-host; registry acceptance opts into the real service.
+      JANE_HANDLER_RUNTIME_REGISTRY_URL: ${JANE_E2E_RUNTIME_REGISTRY_URL:-http://package-host:8080}
 
   llm:
     environment:
@@ -58,7 +58,8 @@ services:
   web-collector:
     environment:
       # Local rules packages (<package_id>/<version>/jane-package.json + rules.json).
-      JANE_WEB_COLLECTOR_RULES_DIR: /cfg/rules
+      JANE_WEB_COLLECTOR_RULES_DIR: ${JANE_E2E_COLLECTOR_RULES_DIR:-/cfg/rules}
+      JANE_WEB_COLLECTOR_REGISTRY_URL: ${JANE_E2E_COLLECTOR_REGISTRY_URL:-}
       JANE_WEB_COLLECTOR_LOG_FORMAT: json
       # Shorter lease than the default (30 s) so that take-over after a kill fits the e2e time budget;
       # the startup rule HEARTBEAT_INTERVAL_MS + STATE_BUSY_TIMEOUT_MS < LEASE_SECONDS*1000 holds.
@@ -93,6 +94,9 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
 
   registry:
+    environment:
+      # Registry acceptance opts into the runtime's published profile.
+      JANE_REGISTRY_RUNTIME_PROFILES: ${JANE_E2E_REGISTRY_RUNTIME_PROFILES:-[]}
     healthcheck:
       <<: *e2e-health
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]

@@ -41,10 +41,12 @@ export async function fetchPackageFile(
       parseAs: "arrayBuffer",
     },
   );
-  if (error !== undefined || !response.ok || !data) {
+  if (error !== undefined || !response.ok) {
     throw new ApiError(response.status, toProblem(response.status, error, response.statusText));
   }
-  return decodeFile(data as unknown as ArrayBuffer);
+  // openapi-fetch may return undefined for a successful zero-byte file (for example __init__.py).
+  // It is a valid package file and must survive an editor round trip.
+  return decodeFile((data ?? new ArrayBuffer(0)) as ArrayBuffer);
 }
 
 /** All files of a version except the manifest (the registry builds jane-package.json from `manifest`). */

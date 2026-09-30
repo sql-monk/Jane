@@ -1,4 +1,4 @@
-import { captureRequest, expect, realServiceUrl, test } from "./fixtures";
+import { API_KEY, captureRequest, expect, realServiceUrl, test } from "./fixtures";
 import { uniqueId } from "./seed";
 
 // The main admin API against the REAL orchestrator (WP-09, PostgreSQL). Every scenario creates its own objects
@@ -118,6 +118,22 @@ test.describe("real orchestrator: sources, tasks, schedules, limits, connections
       () => admin.getByRole("button", { name: "Скасувати", exact: true }).click(),
     );
     expect(cancelled.body).toEqual({ reason: "e2e stop test run" });
+    await expect(admin.getByText(/Скасування:/)).toBeVisible();
+    await expect
+      .poll(
+        async () => {
+          const response = await admin.request.get(
+            `${realServiceUrl("orchestrator")}/v1/runs/${admin.url().split("/").at(-1)}`,
+            {
+              headers: { Authorization: `Bearer ${API_KEY}` },
+            },
+          );
+          expect(response.ok(), await response.text()).toBeTruthy();
+          return ((await response.json()) as { status: string }).status;
+        },
+        { timeout: 60_000 },
+      )
+      .toBe("cancelled");
     await expect(admin.getByRole("alert")).toHaveCount(0);
   });
 

@@ -9,7 +9,7 @@
 | 02 | Web Collector: ядро | 1 | accepted | `wp/02-web-collector-core` | агент / wp-reviewer (2 раунди + фінальне виправлення, перевірено координатором) | злито `69e656a` |
 | 03 | Web Collector: стратегії пошуку | 1 | active | `wp/03-web-collector-discovery` | агент | після злиття WP-02 |
 | 04 | Telegram Collector | 1 | review | `wp/04-telegram-collector` | агент / wp-reviewer | рев'ю 2 |
-| 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент / wp-reviewer | фінальне виправлення після рев'ю 2 (ReDoS у сканері), перевірка координатором |
+| 05 | Репозиторій обробників | 1 | accepted | `wp/05-registry` | агент / wp-reviewer (2 раунди), перевірка координатором | виправлення ReDoS перевірено; злито в `main` |
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
 | 08 | Адаптери збереження | 1 | accepted | `wp/08-storage-adapters` | агент / wp-reviewer (2 раунди + фінальне виправлення, перевірено координатором) | злито `a14e775` |
@@ -114,6 +114,8 @@
 
 ## Передача справ (2026-09-30)
 WP-09a завершено після передачі: конкурентні прибиральники й справедливий відбір перевірено (3 нові тести, повний файл 14 тестів; ruff, mypy), звіт доповнено і гілку злито в `main`. Після злиття `just check`: types ok, unit 411 passed, contract 66 passed / 3 skipped; lint впав лише на локальних невідстежуваних `.codex/` і `.agents/`. `ruff check . --extend-exclude .agents,.codex` і відповідний `ruff format --check` пройшли (274 файли). Gitleaks по Git-історії: 0 витоків. CI на GitHub перевіряється після push.
+
+WP-05 завершено після передачі: сканер секретів виправлено від квадратичної роботи, координатор перевірив 35 тестів лінійності, 29 інтеграційних тестів PostgreSQL/MinIO і повний `just check` (515 unit, 69 contract passed / 3 skipped; lint/types ok). Гілку перебазовано на `main`, перевірка власності: 0 чужих файлів, злито в `main`. Linux CI перевіряється після push.
 
 Попередній координатор зупинився на вимогу людини; фонові агенти зупинені. Worktree і коміти збережено в `.claude/worktrees/agent-*` (гілки `wp/NN-*`). Незакомічені зміни є у WP-03, WP-05, WP-13 — перед продовженням `git status` у їхніх worktree.
 

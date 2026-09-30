@@ -584,14 +584,22 @@ class Engine:
                 if int(n["n"]) >= allowed or older is not None:
                     waiting = True
                 else:
-                    waiting = False
-                    conn.execute(
-                        "UPDATE runs SET status = 'running', started_at = now(), updated_at = now()"
-                        " WHERE run_id = %s AND status = 'queued'",
-                        (run_id,),
-                    )
-                    run["status"] = "running"
-                    run["started_at"] = now()
+                    # Lock this row before evaluating the timestamp. An UPDATE blocked on another
+                    # row holder can otherwise evaluate clock_timestamp() before the wait.
+                    locked = conn.execute(
+                        "SELECT status FROM runs WHERE run_id = %s FOR UPDATE", (run_id,)
+                    ).fetchone()
+                    waiting = locked is None or locked["status"] != "queued"
+                    if not waiting:
+                        started = conn.execute(
+                            "UPDATE runs SET status = 'running', started_at = clock_timestamp(),"
+                            " updated_at = clock_timestamp() WHERE run_id = %s AND status = 'queued'"
+                            " RETURNING started_at",
+                            (run_id,),
+                        ).fetchone()
+                        assert started is not None
+                        run["status"] = "running"
+                        run["started_at"] = started["started_at"]
             if waiting:
                 self._release_feed(run_id, worker, eng.backpressure_recheck_ms)
                 return "waiting"

@@ -5,6 +5,7 @@ it to the API.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import hashlib
@@ -42,7 +43,7 @@ from .blobs import BlobStore
 from .diffing import diff_files, diff_manifest
 from .merge import merge_packages
 from .profiles import ProfileSource, check_dependencies
-from .secrets import oversized_files, scan_files
+from .secrets import ScanBudgetExceeded, oversized_files, scan_files
 from .semver import SemVer, max_version
 from .settings import ServiceLimits
 from .store import (
@@ -470,7 +471,14 @@ class RegistryService:
                     for p in too_big
                 ],
             )
-        findings = scan_files(files, self.limits.secrets)
+        try:
+            # CPU work in a worker thread: the event loop keeps serving other requests of this instance
+            findings = await asyncio.to_thread(scan_files, files, self.limits.secrets)
+        except ScanBudgetExceeded as exc:
+            raise LimitExceeded(
+                str(exc),
+                details={"path": "secrets.scan_time_budget_ms", "limit": exc.budget_ms},
+            ) from exc
         if findings:
             log.warning(
                 "secret detected in package",

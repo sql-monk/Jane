@@ -6,7 +6,9 @@ import base64
 import hashlib
 import io
 import json
+import random
 import re
+import time
 import warnings
 import zipfile
 from typing import Any
@@ -394,3 +396,69 @@ def test_semver_ordering() -> None:
     assert SemVer("1.0.0+a") == SemVer("1.0.0+b")
     with pytest.raises(ValueError, match="not a semantic version"):
         SemVer("latest")
+
+
+# ------------------------------------------------------------------------------------ review 2: no ReDoS
+def _best_scan_time(path: str, data: bytes, runs: int = 3) -> float:
+    limits = SecretScanLimits()
+    best = float("inf")
+    for _ in range(runs):
+        t0 = time.perf_counter()
+        scan_files({path: data}, limits)
+        best = min(best, time.perf_counter() - t0)
+    return best
+
+
+ADVERSARIAL = [
+    ("c.yaml", lambda n: b"\n" * n),
+    ("LICENSE", lambda n: b"\n" * n),
+    ("c.yaml", lambda n: b" \n" * (n // 2)),
+    ("c.ini", lambda n: b"\t\r\n" * (n // 3)),
+    ("c.yaml", lambda n: b"\0 " * (n // 2)),
+    ("m.bin", lambda n: random.Random(1).randbytes(n)),
+    ("blob", lambda n: random.Random(2).randbytes(n)),
+    ("c.yaml", lambda n: random.Random(3).randbytes(n)),
+    ("c.py", lambda n: b"eyJ-" * (n // 4)),
+    ("c.py", lambda n: b"bearer" + b"\n" * n + b"!"),
+    ("c.py", lambda n: b"=" + b"\n" * n + b"!"),
+    ("c.yaml", lambda n: b"a." * (n // 2)),
+    ("c.yaml", lambda n: b"password" * (n // 8)),  # keyword-dense line without newline
+    ("LICENSE", lambda n: b"password" * (n // 8)),
+    ("c.py", lambda n: b"secret" * (n // 6)),
+    ("c.yaml", lambda n: b"password=a" * (n // 10)),
+    ("c.yaml", lambda n: b"token " * (n // 6)),
+]
+
+
+@pytest.mark.parametrize(("path", "gen"), ADVERSARIAL)
+def test_scanner_is_linear_on_adversarial_input(path: str, gen: Any) -> None:
+    """Doubling the input must not quadruple the time (the old ``(?m)^\\s*`` pattern was O(N^2): 20 000 newlines
+    took 20 s). The 2N input is the N input twice, so the keyword pre-filter behaves the same on both. Minimum of
+    5 runs per size; the 5 ms floor absorbs timer noise on tiny timings. A loaded machine can push one pair over
+    the bound, so up to 3 pairs are measured: a quadratic scanner fails all of them (ratio about 4)."""
+    data = gen(256 * 1024)
+    pairs = []
+    for _ in range(3):
+        t1 = _best_scan_time(path, data, runs=5)
+        t2 = _best_scan_time(path, data + data, runs=5)
+        pairs.append(f"t(N)={t1:.4f}s t(2N)={t2:.4f}s ratio={t2 / max(t1, 1e-9):.2f}")
+        if t2 <= 2.5 * max(t1, 0.005):
+            return
+    pytest.fail(f"{path}: not linear: " + "; ".join(pairs))
+
+
+@pytest.mark.parametrize(("path", "gen"), ADVERSARIAL)
+def test_scanner_handles_the_largest_scannable_file_fast(path: str, gen: Any) -> None:
+    """A file of ``max_scan_bytes_per_file`` (2 MiB) of adversarial content is scanned well within a second
+    (a wide bound for slow CI machines; locally it is a fraction of a second)."""
+    size = SecretScanLimits().max_scan_bytes_per_file
+    assert _best_scan_time(path, gen(size), runs=1) < 2.0
+
+
+def test_scan_time_budget_is_enforced() -> None:
+    from jane_registry.secrets import ScanBudgetExceeded
+
+    limits = SecretScanLimits(scan_time_budget_ms=1)
+    files = {f"f{i}.py": b"x = 1\n" * 20_000 for i in range(50)}
+    with pytest.raises(ScanBudgetExceeded):
+        scan_files(files, limits)

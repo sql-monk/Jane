@@ -26,7 +26,7 @@ from typing import Any
 import httpx
 
 from .archive import MANIFEST_NAME, ArchiveError, ArchiveLimits, digest_of, is_canonical, read_archive
-from .secrets import oversized_files, scan_files
+from .secrets import ScanBudgetExceeded, oversized_files, scan_files
 from .settings import PackageLimits, SecretScanLimits
 from .validation import ContractSchemas, PackageValidator, find_contracts_dir
 
@@ -200,7 +200,12 @@ def verify_archive(
     report.errors.extend(
         f"{p}: larger than secrets.max_scan_bytes_per_file, cannot be scanned" for p in too_big
     )
-    findings = scan_files(files, slimits)
+    try:
+        findings = scan_files(files, slimits)
+    except ScanBudgetExceeded as exc:
+        report.checks["secrets"] = False
+        report.errors.append(str(exc))
+        return report
     report.checks["secrets"] = not findings
     report.errors.extend(f"{f.path}: {f.message}" for f in findings)
     return report

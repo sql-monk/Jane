@@ -84,6 +84,9 @@ class SecretScanLimits(Limits):
     422 ``limit_exceeded`` (it is never accepted unscanned)."""
     min_entropy_token_length: int = Field(default=32, ge=8)
     """Shortest quoted/assigned token checked for high entropy."""
+    scan_time_budget_ms: int = Field(default=20_000, ge=1)
+    """Wall time of scanning one package; beyond it the publish fails with 422 ``limit_exceeded``
+    (a safeguard - the patterns themselves are linear)."""
     max_findings_per_file: int = Field(default=20, ge=1)
     """Findings reported per file (one is enough to reject; the cap keeps responses and scans small)."""
     entropy_threshold: float = Field(default=4.3, gt=0)

@@ -121,7 +121,7 @@ upstream-port записує `provenance.created_by` = `actor` того, хто 
 | `packages.max_versions_per_package` | 1000 | версій одного пакета (`422 limit_exceeded`) |
 | `packages.archive_cache_bytes` | 64 MiB | LRU архівів у пам'яті екземпляра |
 | `requests.max_request_body_bytes` (= `transfer.max_request_body_bytes`) | 30 MiB | тіло запиту (`413 payload_too_large`) |
-| `secrets.max_scan_bytes_per_file` / `max_findings_per_file` / `min_entropy_token_length` / `entropy_threshold` | 2 MiB / 20 / 32 / 4.3 | сканування секретів (більший файл — `limit_exceeded`) |
+| `secrets.max_scan_bytes_per_file` / `scan_time_budget_ms` / `max_findings_per_file` / `min_entropy_token_length` / `entropy_threshold` | 2 MiB / 20000 / 20 / 32 / 4.3 | сканування секретів (завеликий файл або перевищення часу — `limit_exceeded`) |
 | `recovery.in_progress_lease_ms` / `job_lease_ms` / `job_heartbeat_ms` | 120000 / 60000 / 15000 | відновлення після падіння екземпляра |
 | `diff.max_context_lines` / `max_diff_file_bytes` / `max_merge_file_bytes` | 50 / 1 MiB / 1 MiB | diff і злиття |
 | `profiles.fetch_timeout_ms` / `refresh_seconds` | 5000 / 300 | читання профілів runtime |

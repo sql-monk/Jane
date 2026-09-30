@@ -424,3 +424,16 @@ def test_review1_scan_limit_encodings_and_paths(backend: Any, uid: Any, monkeypa
         dot = publish(c, pid, files=extractor_files(extra={"src/demo_extractor/./x.py": b"1"}))
         assert dot.status_code == 422 and dot.json()["errors"][0]["code"] == "invalid_path"
         assert c.get(f"/v1/packages/{pid}/versions").json()["items"] == []
+
+
+def test_review2_scan_time_budget(backend: Any, uid: Any, monkeypatch: Any) -> None:
+    """Review 2: scanning has a configured time budget; exceeding it refuses the publish (limit_exceeded)."""
+    monkeypatch.setenv("JANE_REGISTRY_LIMITS__SECRETS__SCAN_TIME_BUDGET_MS", "1")
+    with backend.client() as c:
+        pid = uid("budget")
+        create(c, pid)
+        big = {f"tests/data/f{i}.txt": b"x = 1\n" * 50_000 for i in range(8)}
+        r = publish(c, pid, files=extractor_files(extra=big))
+        assert r.status_code == 422 and r.json()["code"] == "limit_exceeded"
+        assert r.json()["details"]["path"] == "secrets.scan_time_budget_ms"
+        assert c.get(f"/v1/packages/{pid}/versions").json()["items"] == []

@@ -57,6 +57,15 @@ docker run -d -p 127.0.0.1:8105:8000 --network <мережа стеку> \
 Кілька екземплярів працюють на одній БД і одному бакеті: ключі ідемпотентності й job зберігаються в
 PostgreSQL, публікації одного пакета серіалізуються блокуванням рядка пакета.
 
+**Відновлення після падіння екземпляра.** Ключ `Idempotency-Key` запиту, що ще виконується, має lease
+`recovery.in_progress_lease_ms` (типово 120 с): якщо екземпляр упав посеред запиту, після lease повтор із тим
+самим ключем на будь-якому екземплярі виконується заново (до того — `409 idempotency_in_progress`, retryable).
+Кожен незавершений job (`upstream_port`) має власника (екземпляр, унікальний на кожен запуск) і lease
+`recovery.job_lease_ms` (60 с), який власник поновлює кожні `recovery.job_heartbeat_ms` (15 с). Job із
+простроченим lease при читанні (і під час прибирання на старті) стає `failed` з
+`service_unavailable` (`retryable: true`), `cancelling` → `cancelled`. Скасування з іншого екземпляра
+перевіряється перед публікацією версії: скасований port нічого не публікує.
+
 ## Конфігурація
 
 Змінні середовища з префіксом `JANE_REGISTRY_` (поля [`settings.py`](src/jane_registry/settings.py)).
@@ -75,11 +84,18 @@ PostgreSQL, публікації одного пакета серіалізую�
 | `CONTRACTS_DIR` | `contracts/` checkout або `/app/contracts` | де лежать контрактні схеми |
 | `REQUIRE_TESTS` | `true` | extractor/llm мають щонайменше один тест `success` і один `empty`/`unrecognized` |
 | `AUTH_MODE` | `none` | `none` (лише локально) або `api_key`; `jwt` у цій версії не реалізовано (сервіс не стартує) |
-| `API_KEYS_FILE` | — | для `api_key`: `[{"name", "sha256": "<hex ключа>", "scopes": [...]}]` |
+| `API_KEYS_FILE` | — | для `api_key`: `[{"name", "sha256": "<hex ключа>", "scopes": [...], "actor": "human"\|"llm"\|"import"}]` (`actor` типово `human`) |
 | `LIMITS_FILE`, `LIMITS__<група>__<поле>` | — | ліміти (файл `PlatformLimits` або змінні) |
 
-Scopes (ADR-0005): `registry:read` — усі GET і `/v1/jobs`; `registry:write` — створення пакета, публікація,
-PATCH, форк, звіти тестів, upstream-ports; `registry:approve` — `POST …/status`.
+Scopes (ADR-0005): `registry:read` — усі GET, зокрема `GET /v1/jobs/{id}`; `registry:write` — створення пакета,
+публікація, PATCH, форк, звіти тестів, upstream-ports, `POST /v1/jobs/{id}/cancel`; `registry:approve` —
+`POST …/status` і **дозвіл автозмін** (PATCH `auto_changes_allowed: false → true`; заборонити автозміни може
+будь-хто з `registry:write`).
+
+`actor` ключа визначає походження того, що створює клієнт: ключ асистента з `actor: "llm"` може публікувати лише
+версії з `provenance.created_by: llm` (інакше `403`), тож заборона автозмін не обходиться підміною походження;
+upstream-port записує `provenance.created_by` = `actor` того, хто його запустив (`requested_by` = ім'я ключа).
+У `auth_mode=none` усі клієнти — `human`.
 
 ### Профілі runtime
 
@@ -105,7 +121,8 @@ PATCH, форк, звіти тестів, upstream-ports; `registry:approve` —
 | `packages.max_versions_per_package` | 1000 | версій одного пакета (`422 limit_exceeded`) |
 | `packages.archive_cache_bytes` | 64 MiB | LRU архівів у пам'яті екземпляра |
 | `requests.max_request_body_bytes` (= `transfer.max_request_body_bytes`) | 30 MiB | тіло запиту (`413 payload_too_large`) |
-| `secrets.max_scan_bytes_per_file` / `min_entropy_token_length` / `entropy_threshold` | 2 MiB / 32 / 4.3 | сканування секретів |
+| `secrets.max_scan_bytes_per_file` / `max_findings_per_file` / `min_entropy_token_length` / `entropy_threshold` | 2 MiB / 20 / 32 / 4.3 | сканування секретів (більший файл — `limit_exceeded`) |
+| `recovery.in_progress_lease_ms` / `job_lease_ms` / `job_heartbeat_ms` | 120000 / 60000 / 15000 | відновлення після падіння екземпляра |
 | `diff.max_context_lines` / `max_diff_file_bytes` / `max_merge_file_bytes` | 50 / 1 MiB / 1 MiB | diff і злиття |
 | `profiles.fetch_timeout_ms` / `refresh_seconds` | 5000 / 300 | читання профілів runtime |
 | `db.pool_min_size` / `pool_max_size` / `connect_timeout_ms` / `statement_timeout_ms` | 1 / 10 / 5000 / 30000 | PostgreSQL |
@@ -152,9 +169,22 @@ registry записує маніфест форку й версії upstream-por
 | профіль runtime і `dependencies.python`; `dependencies.packages` | `422 dependency_not_allowed`; `422 validation_failed` |
 
 Нова версія — `status: draft`, `test_status: unknown`, `created_by` з маніфесту, `published_by` — хто публікував.
-Ідентичний вміст зберігається один раз (content-addressed). Секрети шукаються за: іменами файлів (`.env`,
-`*.pem`, `id_rsa`, `.netrc`…), відомими форматами ключів і токенів, паролями в URL, присвоєннями
-секретоподібним іменам, високоентропійними рядками в коді/конфігурації (не в HTML-входах тестів).
+Ідентичний вміст зберігається один раз (content-addressed). Секрети шукаються за:
+- іменами файлів (`.env`, `*.pem`, `id_rsa`, `.netrc`…);
+- відомими форматами: приватні ключі PEM (зокрема розірвані й екрановані), AWS, GitHub, GitLab, Slack
+  (токени й webhook), Google, SendGrid, Stripe, Hugging Face, `sk-…` (OpenAI/Anthropic), ключі й SAS
+  Azure Storage, токени Telegram-ботів, JWT, паролі в URL;
+- значеннями після `Bearer`/`Basic`/`token` (`Authorization: Bearer …`);
+- присвоєннями секретоподібним іменам (`password`, `secret`, `token`, `api_key`/`api.key`, `client_secret`,
+  `sessionid`, `cookie`…): у лапках — у будь-якому файлі; без лапок (`password: …` YAML, `password = …`
+  INI/.properties/.env) — у конфігураційних файлах; `Password=…;`/`Pwd=…;` у рядках підключення — усюди;
+  заповнювачі (`${VAR}`, `<…>`, `changeme`, імена змінних середовища) не вважаються секретами;
+- високоентропійними рядками в коді/конфігурації (не в HTML-входах тестів).
+
+Файли з BOM UTF-16 або з байтами NUL додатково декодуються (UTF-16 LE/BE, Latin-1), тож NUL-префікс чи UTF-16
+не ховають секрет. Файл, більший за `secrets.max_scan_bytes_per_file`, не приймається неперевіреним:
+`422 limit_exceeded` (`details.path = secrets.max_scan_bytes_per_file`). Шляхи з сегментом `.` і шляхи, що
+відрізняються лише регістром літер, відхиляються (`422 validation_failed`: `invalid_path`, `duplicate_path`).
 
 **Статуси:** `draft → approved | rejected | deprecated | yanked`; `approved → deprecated | yanked`;
 `deprecated → approved | yanked`; `rejected`, `yanked` — кінцеві. Інший перехід — `409 conflict`. Кожна
@@ -193,7 +223,9 @@ uv run --package jane-registry jane-registry verify ./export/shop.product-extrac
 ```
 
 `export` завантажує архів версії та, рекурсивно, `dependencies.packages`, перевіряє `ETag` і `digest`,
-пише архіви й індекс `jane-export.json`. `verify` працює **без registry**: дайджест (з індексу або
+пише архіви й індекс `jane-export.json` (межа замикання залежностей — `--max-packages`, типово 100).
+`verify` бере ліміти з тієї самої конфігурації, що й сервіс (`JANE_REGISTRY_LIMITS__PACKAGES__*`,
+`__SECRETS__*`), і працює **без registry**: дайджест (з індексу або
 `--digest`), канонічна форма, маніфест за контрактною схемою (якщо доступна тека `contracts/`), наявність
 файлів, секрети. Експортований архів виконує handler-runtime (`jane-handler-runtime test <zip>` або
 `HandlerInvocation.package_archive`). Тест `test_exported_package_runs_without_registry` зупиняє сервер

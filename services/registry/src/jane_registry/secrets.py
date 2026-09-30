@@ -126,8 +126,8 @@ _PATTERNS: tuple[tuple[str, str, re.Pattern[str]], ...] = (
 _URL_CREDENTIALS = re.compile(r"\b[a-zA-Z][a-zA-Z0-9+.-]{1,20}://([^\s:/?#@\"'<>]+):([^\s/?#@\"'<>]+)@")
 _AUTH_VALUE = re.compile(r"(?i)\b(?:bearer|basic|token)\s+([A-Za-z0-9._~+/=-]{16,})")
 _NAME = (
-    r"[a-z0-9_.-]{0,40}(?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|"
-    r"private[_-]?key|client[_-]?secret|auth|session(?:[_-]?id)?|cookie)"
+    r"[a-z0-9_.-]{0,40}(?:password|passwd|pwd|secret|token|api[_.-]?key|access[_.-]?key|"
+    r"private[_.-]?key|client[_.-]?secret|auth|session(?:[_-]?id)?|cookie)"
 )
 _ASSIGNMENT = re.compile(rf"(?i)[\"']?\b({_NAME})\b[\"']?\s*(?:=|:|:=)\s*[\"']([^\"'\s]{{6,}})[\"']")
 _UNQUOTED_ASSIGNMENT = re.compile(

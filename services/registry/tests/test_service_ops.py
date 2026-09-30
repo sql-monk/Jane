@@ -5,6 +5,7 @@ from __future__ import annotations
 import concurrent.futures
 import hashlib
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -190,3 +191,208 @@ def test_several_instances_share_state(real_backend: Any, profile_file: Path, ui
         ).json()
         seen = b.get(f"/v1/jobs/{job['job_id']}")
         assert seen.status_code == 200 and seen.json()["kind"] == "upstream_port"
+
+
+def _keys_settings(tmp_path: Path, profile_file: Path, keys: dict[str, tuple[list[str], str]]) -> Settings:
+    doc = [
+        {"name": n, "sha256": hashlib.sha256(f"key-{n}".encode()).hexdigest(), "scopes": s, "actor": a}
+        for n, (s, a) in keys.items()
+    ]
+    keys_file = tmp_path / "keys.json"
+    keys_file.write_text(json.dumps(doc), encoding="utf-8")
+    return Settings(
+        log_format="console",
+        db="memory",
+        blob="filesystem",
+        blob_root=tmp_path / "b",
+        auth_mode="api_key",
+        api_keys_file=keys_file,
+        runtime_profiles=[str(profile_file)],
+    )
+
+
+def test_review1_scopes_and_actor(tmp_path: Path, profile_file: Path) -> None:
+    """Allowing automatic changes needs registry:approve; cancelling a job needs registry:write; an llm key
+    publishes only created_by=llm versions and its upstream ports are recorded as llm."""
+    rw = ["registry:read", "registry:write"]
+    settings = _keys_settings(
+        tmp_path,
+        profile_file,
+        {
+            "reader": (["registry:read"], "human"),
+            "writer": (rw, "human"),
+            "admin": ([*rw, "registry:approve"], "human"),
+            "assistant": (rw, "llm"),
+        },
+    )
+
+    def h(name: str, key: str | None = None) -> dict[str, str]:
+        out = {"Authorization": f"Bearer key-{name}"}
+        if key:
+            out["Idempotency-Key"] = key
+        return out
+
+    patch_ct = {"Content-Type": "application/merge-patch+json"}
+    with TestClient(build_app(settings)) as c:
+        body = {"package_id": "locked.pkg", "kind": "extractor", "title": "L", "auto_changes_allowed": False}
+        assert c.post("/v1/packages", json=body, headers=h("writer", "k1")).status_code == 201
+        denied = c.patch(
+            "/v1/packages/locked.pkg",
+            content=b'{"auto_changes_allowed": true}',
+            headers={**patch_ct, **h("writer")},
+        )
+        assert denied.status_code == 403 and denied.json()["code"] == "forbidden"
+        # locking needs only write
+        assert (
+            c.patch(
+                "/v1/packages/locked.pkg",
+                content=b'{"auto_changes_allowed": false}',
+                headers={**patch_ct, **h("writer")},
+            ).status_code
+            == 200
+        )
+        ok = c.patch(
+            "/v1/packages/locked.pkg",
+            content=b'{"auto_changes_allowed": true}',
+            headers={**patch_ct, **h("admin")},
+        )
+        assert ok.status_code == 200 and ok.json()["auto_changes_allowed"] is True
+
+        human_manifest = publish_body(extractor_manifest("locked.pkg"), extractor_files())
+        mismatch = c.post(
+            "/v1/packages/locked.pkg/versions", json=human_manifest, headers=h("assistant", "k2")
+        )
+        assert mismatch.status_code == 403
+        llm = publish_body(
+            extractor_manifest("locked.pkg", provenance={"created_by": "llm"}), extractor_files()
+        )
+        assert (
+            c.post("/v1/packages/locked.pkg/versions", json=llm, headers=h("assistant", "k3")).status_code
+            == 201
+        )
+
+        fork = {"new_package_id": "locked.fork", "from_version": "1.0.0", "auto_changes_allowed": True}
+        assert (
+            c.post("/v1/packages/locked.pkg/forks", json=fork, headers=h("assistant", "k4")).status_code
+            == 201
+        )
+        parent2 = publish_body(
+            extractor_manifest("locked.pkg", "1.1.0", provenance={"created_by": "llm"}, description="v2"),
+            extractor_files(),
+        )
+        assert (
+            c.post("/v1/packages/locked.pkg/versions", json=parent2, headers=h("assistant", "k5")).status_code
+            == 201
+        )
+        port = c.post(
+            "/v1/packages/locked.fork/upstream-ports",
+            json={"parent_version": "1.1.0", "new_version": "1.1.0"},
+            headers=h("assistant", "k6"),
+        )
+        assert port.status_code == 202
+        job_id = port.json()["job_id"]
+        assert c.post(f"/v1/jobs/{job_id}/cancel", headers=h("reader")).status_code == 403
+        for _ in range(200):
+            job = c.get(f"/v1/jobs/{job_id}", headers=h("reader")).json()
+            if job["status"] in {"succeeded", "failed"}:
+                break
+            time.sleep(0.02)
+        assert job["status"] == "succeeded", job
+        prov = job["result"]["manifest"]["provenance"]
+        assert prov["created_by"] == "llm" and prov["upstream_port"]["requested_by"] == "assistant"
+        assert c.post(f"/v1/jobs/{job_id}/cancel", headers=h("writer")).status_code == 200  # terminal
+
+
+async def test_port_checks_cancellation_before_publishing(tmp_path: Path, profile_file: Path) -> None:
+    """A cancellation seen before publishing (e.g. requested on another instance) publishes nothing."""
+    from jane_kit.jobs import JobCancelledError
+    from jane_registry.auth import Principal
+
+    settings = Settings(
+        log_format="console",
+        db="memory",
+        blob="filesystem",
+        blob_root=tmp_path / "b",
+        runtime_profiles=[str(profile_file)],
+    )
+    app = build_app(settings)
+    with TestClient(app) as c:
+        c.post(
+            "/v1/packages",
+            json={"package_id": "p.cancel", "kind": "extractor", "title": "P"},
+            headers={"Idempotency-Key": "c"},
+        )
+        c.post(
+            "/v1/packages/p.cancel/versions",
+            json=publish_body(extractor_manifest("p.cancel"), extractor_files()),
+            headers={"Idempotency-Key": "v"},
+        )
+        c.post(
+            "/v1/packages/p.cancel/forks",
+            json={"new_package_id": "p.cancel-f", "from_version": "1.0.0"},
+            headers={"Idempotency-Key": "f"},
+        )
+        service = app.state.service
+        who = Principal("tester", frozenset({"registry:write"}))
+        plan = await service.plan_port("p.cancel-f", {"parent_version": "1.0.0", "new_version": "1.0.1"}, who)
+
+        async def cancelled() -> None:
+            raise JobCancelledError("job")
+
+        with pytest.raises(JobCancelledError):
+            await service.port(plan, who, before_publish=cancelled)
+        assert [v["version"] for v in c.get("/v1/packages/p.cancel-f/versions").json()["items"]] == ["1.0.0"]
+
+
+@pytest.mark.integration
+def test_recovery_after_instance_crash(
+    real_backend: Any, profile_file: Path, uid: Any, monkeypatch: Any
+) -> None:
+    """Review 1: an instance dies holding an Idempotency-Key and a running job. Another instance frees the
+    key after its lease and reports the job as failed (retryable) instead of running forever."""
+    import asyncio
+
+    from jane_kit.idempotency import fingerprint
+    from jane_kit.jobs import Job, JobStatus
+
+    monkeypatch.setenv("JANE_REGISTRY_LIMITS__RECOVERY__IN_PROGRESS_LEASE_MS", "1000")
+    monkeypatch.setenv("JANE_REGISTRY_LIMITS__RECOVERY__JOB_LEASE_MS", "1000")
+    monkeypatch.setenv("JANE_REGISTRY_LIMITS__RECOVERY__JOB_HEARTBEAT_MS", "200")
+    schema = f"t_{uid('crash').split('-')[1]}"
+    common = {"runtime_profiles": [str(profile_file)]}
+    pid = uid("crash")
+    raw = json.dumps(publish_body(extractor_manifest(pid), extractor_files())).encode()
+    ct = {"Content-Type": "application/json"}
+    key = f"pub-{pid}"
+    path = f"/v1/packages/{pid}/versions"
+
+    app_a = build_app(real_backend.settings(schema, instance_id="instance-a", **common))
+    with TestClient(app_a) as a:
+        assert (
+            a.post(
+                "/v1/packages",
+                json={"package_id": pid, "kind": "extractor", "title": "C"},
+                headers={"Idempotency-Key": f"c-{pid}"},
+            ).status_code
+            == 201
+        )
+        comp = app_a.state.components
+        portal = a.portal
+        assert portal is not None
+        # "crash" in the middle of a request and of a job: claimed, never completed
+        claimed = portal.call(comp.idempotency.begin, key, fingerprint("POST", path, raw), 86400.0)
+        assert claimed is None
+        running = Job(job_id=f"job_{pid}", kind="upstream_port", status=JobStatus.RUNNING)
+        portal.call(comp.jobs.create, running)
+        portal.call(comp.jobs.save, running)
+        blocked = a.post(path, content=raw, headers={**ct, "Idempotency-Key": key})
+        assert blocked.status_code == 409 and blocked.json()["code"] == "idempotency_in_progress"
+        assert a.get(f"/v1/jobs/{running.job_id}").json()["status"] == "running"  # heartbeat keeps it alive
+    # instance A is gone; its leases are no longer renewed
+    asyncio.run(asyncio.sleep(1.5))
+    with TestClient(build_app(real_backend.settings(schema, instance_id="instance-b", **common))) as b:
+        retry = b.post(path, content=raw, headers={**ct, "Idempotency-Key": key})
+        assert retry.status_code == 201, retry.text
+        job = b.get(f"/v1/jobs/{running.job_id}").json()
+        assert job["status"] == "failed"
+        assert job["error"]["code"] == "service_unavailable" and job["error"]["retryable"] is True

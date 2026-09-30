@@ -143,6 +143,7 @@ def test_exported_package_runs_without_registry(backend: Any, uid: Any, tmp_path
         "digest": True,
         "canonical": True,
         "manifest": True,
+        "scan_limit": True,
         "secrets": True,
     }
     assert main(["verify", str(out / f"{rules_id}-1.0.0.zip")]) == 0

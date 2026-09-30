@@ -399,3 +399,28 @@ def test_health_and_metrics(client: TestClient) -> None:
     info = client.get("/v1/info").json()
     assert info["service"] == "registry" and info["capabilities"]["archive"]["compression"] == "stored"
     assert "jane_http_requests_total" in client.get("/metrics").text
+
+
+def test_review1_scan_limit_encodings_and_paths(backend: Any, uid: Any, monkeypatch: Any) -> None:
+    """Review 1: a file too large to scan is refused, not accepted; UTF-16 text is scanned; case-only and
+    dot-segment path variants are rejected."""
+    monkeypatch.setenv("JANE_REGISTRY_LIMITS__SECRETS__MAX_SCAN_BYTES_PER_FILE", "4096")
+    with backend.client() as c:
+        pid = uid("review1")
+        create(c, pid)
+        aws = "AKIA" + "QX7Z" * 4
+        padded = b"#" * 4096 + f"\nK = '{aws}'\n".encode()
+        big = publish(c, pid, files=extractor_files(extra={"src/demo_extractor/pad.py": padded}))
+        assert big.status_code == 422 and big.json()["code"] == "limit_exceeded"
+        assert big.json()["details"]["path"] == "secrets.max_scan_bytes_per_file"
+        assert big.json()["errors"][0]["pointer"] == "/files/src~1demo_extractor~1pad.py"
+        utf16 = ('{"k": "' + aws + '"}').encode("utf-16")
+        hidden = publish(c, pid, files=extractor_files(extra={"tests/cfg.json": utf16}))
+        assert hidden.status_code == 422 and hidden.json()["code"] == "secret_detected"
+        case = publish(
+            c, pid, files=extractor_files(extra={"tests/Readme.txt": b"1", "tests/README.txt": b"2"})
+        )
+        assert case.status_code == 422 and case.json()["errors"][0]["code"] == "duplicate_path"
+        dot = publish(c, pid, files=extractor_files(extra={"src/demo_extractor/./x.py": b"1"}))
+        assert dot.status_code == 422 and dot.json()["errors"][0]["code"] == "invalid_path"
+        assert c.get(f"/v1/packages/{pid}/versions").json()["items"] == []

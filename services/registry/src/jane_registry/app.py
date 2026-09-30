@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -156,7 +157,9 @@ def build_components(settings: Settings, limits: ServiceLimits) -> Components:
         rec = limits.recovery
         store = pg
         idem = PostgresIdempotencyStore(pg, rec.in_progress_lease_ms / 1000)
-        jobs = PostgresJobStore(pg, limits.jobs, settings.instance_id, rec.job_lease_ms / 1000)
+        # the owner is unique per start: a restarted instance must not renew the jobs of its previous life
+        owner = f"{settings.instance_id}-{uuid.uuid4().hex[:8]}"
+        jobs = PostgresJobStore(pg, limits.jobs, owner, rec.job_lease_ms / 1000)
     else:
         store, idem, jobs = (
             MemoryStore(),

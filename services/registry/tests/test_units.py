@@ -171,6 +171,93 @@ def test_secret_file_names() -> None:
     assert _codes({".env.sample": b"A=b"}) == []
 
 
+# review 1: every value below is assembled at run time so that no secret-looking literal is committed
+RND = (
+    base64.b64encode(hashlib.sha256(b"wp05-review-1").digest())
+    .decode()[:36]
+    .replace("/", "x")
+    .replace("+", "y")
+)
+
+
+@pytest.mark.parametrize(
+    ("name", "text", "code"),
+    [
+        ("src/h.py", 'HEADERS = {"Authorization": "Bearer ' + RND + '"}\n', "authorization_value"),
+        ("src/b.py", "curl -H 'Authorization: Basic " + RND + "'\n", "authorization_value"),
+        ("conf/db.yaml", "db:\n  password: " + "Sup3r" + "S3cretPwd2024\n", "secret_assignment"),
+        ("conf/db.ini", "[db]\npassword = " + "Sup3r" + "S3cretPwd2024\n", "secret_assignment"),
+        ("conf/app.properties", "api.key=" + "k9" + "Qw7Zx2Lm\n", "secret_assignment"),
+        (
+            "src/odbc.py",
+            'CONN = "Server=db;User Id=sa;Password=' + "MyS3cret" + 'Pwd9;"\n',
+            "connection_string_password",
+        ),
+        ("src/low.py", 'PASSWORD = "' + "hunter2" * 2 + '"\n', "secret_assignment"),
+        ("src/sg.py", 'K = "SG.' + RND[:22] + "." + RND + RND[:7] + '"\n', "sendgrid_key"),
+        ("src/hf.py", 'T = "hf_' + RND.replace("=", "a") + '"\n', "huggingface_token"),
+        (
+            "src/az.py",
+            'C = "AccountName=x;AccountKey=' + "Zm9vYmFyYmF6cXV4" * 5 + 'Ab1=="\n',
+            "azure_storage_key",
+        ),
+        (
+            "src/sas.py",
+            'U = "https://a.blob.core.windows.net/c/f?sv=2022-11-02&sig=' + RND + '"\n',
+            "azure_sas",
+        ),
+        ("src/pk.py", 'KEY = "-----BEGIN " + "RSA PRIVATE KEY' + '-----\\nMIIE"\n', "private_key"),
+        (
+            "src/slack.py",
+            "U = 'https://hooks.slack.com/services/T0" + "ABCDEF/B0ABCDEF/" + RND + "'\n",
+            "slack_webhook",
+        ),
+        ("src/c.py", 'COOKIES = {"sessionid": "' + RND[:28] + '"}\n', "secret_assignment"),
+    ],
+)
+def test_secret_formats_from_review(name: str, text: str, code: str) -> None:
+    assert code in _codes({name: text.encode()})
+
+
+def test_secret_hidden_by_encoding_is_found() -> None:
+    aws = "AKIA" + "QX7Z" * 4
+    assert "aws_access_key" in _codes({"data/blob.txt": b"\0" + f"key={aws}\n".encode()})
+    assert "aws_access_key" in _codes({"cfg.json": ('{"k": "' + aws + '"}').encode("utf-16")})  # with BOM
+    assert "aws_access_key" in _codes({"cfg.json": ('{"k": "' + aws + '"}').encode("utf-16-le")})  # no BOM
+    assert "aws_access_key" in _codes({"img.png": b"\x89PNG\0\0" + aws.encode() + b"\0\xff"})
+
+
+def test_oversized_files_are_reported_not_skipped() -> None:
+    from jane_registry.secrets import oversized_files
+
+    limits = SecretScanLimits(max_scan_bytes_per_file=1024)
+    files = {"small.py": b"x" * 1024, "src/pad.py": b"#" * 1025}
+    assert oversized_files(files, limits) == ["src/pad.py"]
+
+
+def test_secret_scan_stops_after_max_findings() -> None:
+    limits = SecretScanLimits(max_findings_per_file=3)
+    text = "".join(f"password = Zq{i:06d}x\n" for i in range(100)).encode()
+    assert len(scan_files({"a.ini": text}, limits)) == 3
+
+
+def test_package_paths_reject_dot_segments_and_case_duplicates() -> None:
+    from jane_registry.archive import check_package_path, check_unique_paths
+
+    for bad in ["src/./main.py", "./a.py", "a/."]:
+        with pytest.raises(ArchiveError):
+            check_package_path(bad)
+    check_package_path("src/.hidden/x.py")  # dot files and directories stay valid
+    with pytest.raises(ArchiveError, match="letter case"):
+        check_unique_paths(["tests/Readme.txt", "tests/README.txt"])
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("tests/Readme.txt", b"1")
+        zf.writestr("tests/README.txt", b"2")
+    with pytest.raises(ArchiveError, match="letter case"):
+        read_archive(buf.getvalue(), LIMITS)
+
+
 # ------------------------------------------------------------------------------------ profiles
 def test_parse_profiles_accepts_all_documented_shapes() -> None:
     assert set(parse_profiles(TEST_PROFILE)) == {"python-extractor@1"}

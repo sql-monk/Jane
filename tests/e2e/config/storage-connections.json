@@ -1,0 +1,17 @@
+{
+  "connections": [
+    {
+      "connection_id": "raw-files",
+      "kind": "filesystem",
+      "title": "e2e: RAW and documents on the storage volume",
+      "params": { "base_path": "/var/lib/jane/storage" }
+    },
+    {
+      "connection_id": "results-pg",
+      "kind": "postgresql",
+      "title": "e2e: results in the stack PostgreSQL",
+      "params": { "host": "postgres", "port": 5432, "database": "jane", "schema": "e2e_results", "sslmode": "disable" },
+      "secret_refs": { "username": "env:JANE_SECRET_E2E_PG_USER", "password": "env:JANE_SECRET_E2E_PG_PASSWORD" }
+    }
+  ]
+}

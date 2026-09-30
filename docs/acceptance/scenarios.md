@@ -58,13 +58,13 @@ Docker-сокет із групою, визначеною автоматично
 | S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | **10 Docker e2e пройшли на гілці WP-13** (`test_m2_discovery.py`) |
 | S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage | ще не реалізовано в WP-13 |
 | S-M2-05a | Невідома сторінка: асистент викликає LLM лише з прапорцем (без оркестратора) | 11 | testsite, assistant, llm, postgres | **реалізовано, проходить** (LLM — З) |
-| S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, llm, assistant | ще не реалізовано в WP-13 |
+| S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, runtime, storage, llm | **пройдено на гілці `wp/13-llm-routing`** (`test_m2_llm_routing.py`; LLM — З, архіви пакетів — `package-host` Т); сторінки з ін'єкцією на testsite немає |
 | S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator | ще не реалізовано в WP-13 |
 | S-M2-07 | Проблемні приклади → нова версія → тести → активація → відкат | 6 | orchestrator, assistant, llm, registry, runtime | ще не реалізовано в WP-13 |
 | S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, усі сховища | **1 Docker e2e пройшов на гілці WP-13**; незалежний повтор пройшов |
 | S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці | **1 Docker e2e пройшов на гілці WP-13** (кількість сторінок); темп ще не виміряно |
 | S-M2-10 | Адмінка на реальному API (Playwright) | 6, 7 (UI) | admin, усі API | WP-12 частково перевірив реальні API; повний Caddy прогін відкритий |
-| S-M2-11 | Ланцюжок з умовами `when` і LLM-етапом | 2 | orchestrator, runtime, storage, llm | ще не реалізовано в WP-13 |
+| S-M2-11 | Ланцюжок з умовами `when` і LLM-етапом | 2 | orchestrator, web-collector, runtime, storage, llm | **пройдено на гілці `wp/13-llm-routing`** (`test_m2_llm_routing.py`; LLM — З, архіви пакетів — `package-host` Т) |
 | R-01 | Kill воркера оркестратора посеред ланцюжка | 8 | orchestrator ×2, виконавці | чекає WP-09 |
 | R-02 | Kill і рестарт кожного сервісу; повтор після рестарту — дубль | 8 | storage, handler-runtime (далі — усі) | **реалізовано для storage і runtime, проходить** |
 | R-03 | Розрив мережі між оркестратором і виконавцем | 8 | orchestrator, виконавці | чекає WP-09 |
@@ -188,6 +188,31 @@ LLM — **З**: вбудований детермінований провайд
 показує матеріали. Після ввімкнення прапорця й повторного прогону виклики є, вони прив'язані до цих
 матеріалів, облік витрат ведеться. Вміст сторінки з ін'єкцією не змінює поведінки.
 
+`tests/e2e/test_m2_llm_routing.py::test_s_m2_05_unknown_pages_reach_llm_only_after_the_flag_is_enabled`.
+Реальні orchestrator, web-collector, handler-runtime, storage, llm (шлюз і LLM-обробник), testsite.
+Завдання: `collect` (2 товари й усі 3 сторінки `page_types: unknown`) → `extract-products` (приклад
+екстрактора SDK, `bindings: */product/*`, `when` HTML) → `store-products`; окремий етап `unknown-pages`
+(LLM-пакет-фікстура `e2e.llm-page-triage`) бере `select: unmatched_materials`. Прапорець задано лише на
+джерелі, завдання його успадковує.
+
+1. `POST /v1/task-validations` → `effective_forward_unknown_to_llm: false`. Прогін 1: товари
+   екстраговано, етап `unknown-pages` не має жодного елемента, `GET /v1/unknown-materials` оркестратора
+   показує рівно 3 невідомі сторінки з `forwarded_to_llm: false`. `GET /v1/usage` шлюзу: 0 запитів у
+   scope джерела, загальний лічильник не змінився, `Run.costs.llm` відсутні.
+2. `GET` + `PUT /v1/sources/{id}` (`If-Match`) вмикає прапорець; перевірка завдання → `true`.
+3. Прогін 2: ті самі 3 матеріали (нові спостереження) мають `forwarded_to_llm: true` і рівно 3 елементи
+   етапу `unknown-pages` (`success`). Для кожного `GET /v1/invocations/{id}` LLM-обробника показує вхід
+   з цим `material_id`, дайджест пакета, сутність `page_triage` з ключем `material_id` і вартість.
+   Trace матеріалу: у прогоні 1 етапів немає (лише реєстрація), у прогоні 2 — `unknown-pages`.
+4. Облік: `GET /v1/usage?scope_type=source` — рівно 3 запити, токени й вартість > 0, `purpose: handler`;
+   `Run.costs.llm` > 0.
+
+LLM — **З** (провайдер `fake` з ненульовими цінами, скрипти — `tests/e2e/config/llm-seed.yaml`). Архів
+LLM-пакета — через `package-host` (**Т**). Асистент у цьому маршруті не бере участі: оркестратор
+передає невідомі матеріали етапу `unmatched_materials`; шлях через асистента — S-M2-05a.
+**Сторінки з ін'єкцією testsite не має** (див. `tests/fixtures/testsite/README.md`), тож цю частину
+e2e не перевіряє; доказ поки що — `services/llm/tests/test_injection.py` (WP-10), запит — у звіті WP-13.
+
 ### S-M2-06. Нове джерело через асистента
 `POST /v1/onboarding-sessions` (лише назва testsite; пошуковий провайдер — **З**, LLM — **З** WP-10) →
 адаптивна вибірка через реальний колектор → кілька пропозицій з охопленням, вартістю й ризиками →
@@ -232,6 +257,37 @@ Playwright-сценарії WP-12 проганяються проти стеку
 DAG з `when` (за `material.format.media_type` і `result.status`) і LLM-обробником на проблемних результатах
 (**З**: фейковий провайдер). Гілки виконуються лише за умов, результати LLM валідуються схемою й
 зберігаються.
+
+`tests/e2e/test_m2_llm_routing.py::test_s_m2_11_conditional_branches_and_llm_on_problem_results`.
+Реальні orchestrator, web-collector, handler-runtime, storage, llm, testsite. Вхід: 4 HTML-сторінки
+товарів (`phone-alpha`, `phone-beta` — InStock; `phone-gamma` — OutOfStock; `phone-zeta` — PreOrder) і
+JSON `/api/v1/products/phone-alpha`. DAG:
+
+```text
+collect ─┬─ store-raw-html   when media_type = text/html          → files
+         ├─ store-raw-json   when media_type = application/json   → PostgreSQL
+         └─ extract-products when media_type = text/html (bindings: */product/*, */api/v1/products/*)
+              ├─ store-products   select output,   when result.status = success       → PostgreSQL
+              └─ analyze-problems select problems, when result.status = unrecognized  (LLM)
+                   └─ store-triage select output,  when result.status = success       → PostgreSQL
+```
+
+Екстрактор — пакет-фікстура `e2e.instock-product-extractor`: розпізнає лише пропозиції `InStock`, інші
+дають `unrecognized` (`unknown-availability`) з частковою карткою. LLM-пакет — `e2e.llm-page-triage`
+(вихід за `output_schema`, сутність `page_triage`). Скрипт фейкового провайдера для `phone-gamma` дає
+валідний вихід, для `phone-zeta` — вихід поза схемою.
+
+Перевірки: HTML → files (4 об'єкти `text/html`), JSON → PostgreSQL (1 об'єкт `application/json`);
+JSON прив'язано до екстрактора, але `when` за media type його не пропускає; невідомих матеріалів
+немає. `store-products` отримав лише `success` (alpha, beta), `analyze-problems` — лише
+`unrecognized` (gamma, zeta). LLM для gamma: `success`, сутність `page_triage` записано в PostgreSQL і
+прочитано через `storage.v1`; для zeta: `failed/schema_mismatch` з `validation_errors`, `store-triage`
+не виконано. Trace gamma: `store-raw-html` → `extract-products` (`unrecognized`, дайджест екстрактора)
+→ `analyze-problems` (дайджест LLM-пакета, вихід `page_triage`) → `store-triage` (`results-pg`); trace
+JSON — лише `store-raw-json`. Група проблем екстрактора `unknown-availability` має `count: 2`; облік
+LLM у scope джерела й `Run.costs.llm` > 0.
+
+LLM — **З**, архіви пакетів-фікстур — `package-host` (**Т**; реальний registry тут не перевіряється).
 
 ## Надійність
 

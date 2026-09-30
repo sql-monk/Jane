@@ -3,7 +3,7 @@
     uv run --no-project python scripts/dev.py <command> [args]
 
 Commands: check, lint, fmt, types, unit, contract, test, integration, isolation, web,
-          up, down, ps, logs, env, new-service, hooks, testsite, gen-client, sync.
+          e2e, up, down, ps, logs, env, new-service, hooks, testsite, gen-client, sync.
 """
 
 from __future__ import annotations
@@ -153,6 +153,11 @@ def cmd_isolation(ns: argparse.Namespace) -> int:
     return 0 if pytest_ok(code) else code
 
 
+def cmd_e2e(ns: argparse.Namespace) -> int:
+    code = run(uv_run("pytest", "tests/e2e", "-m", "e2e", *ns.pytest_args)).returncode
+    return 0 if pytest_ok(code) else code
+
+
 def web_packages() -> list[Path]:
     web = ROOT / "web"
     return sorted(p for p in web.glob("*") if (p / "package.json").is_file()) if web.is_dir() else []
@@ -169,14 +174,15 @@ def cmd_web(_: argparse.Namespace) -> int:
         print("corepack not found (Node.js 24 ships it)", file=sys.stderr)
         return 1
     for pkg in packages:
-        pnpm = [corepack, "pnpm", "--dir", str(pkg.relative_to(ROOT))]
+        pnpm = [corepack, "pnpm"]
         for args in (
             ["install", "--frozen-lockfile"],
             ["run", "--if-present", "lint"],
             ["run", "--if-present", "typecheck"],
             ["run", "--if-present", "test"],
+            ["run", "--if-present", "build"],
         ):
-            code = run([*pnpm, *args]).returncode
+            code = run([*pnpm, *args], cwd=pkg).returncode
             if code:
                 return code
     return 0
@@ -232,7 +238,25 @@ PORT_VARS = {
     "s3": ("JANE_PORT_S3", 8333),
     "testsite": ("JANE_PORT_TESTSITE", 8080),
     "proxy": ("JANE_PORT_PROXY", 8080),
+    "storage": ("JANE_PORT_STORAGE", 8000),
+    "handler-runtime": ("JANE_PORT_HANDLER_RUNTIME", 8000),
+    "web-collector": ("JANE_PORT_WEB_COLLECTOR", 8101),
+    "telegram-collector": ("JANE_PORT_TELEGRAM_COLLECTOR", 8102),
+    "orchestrator": ("JANE_PORT_ORCHESTRATOR", 8000),
+    "registry": ("JANE_PORT_REGISTRY", 8000),
+    "llm": ("JANE_PORT_LLM", 8110),
+    "assistant": ("JANE_PORT_ASSISTANT", 8000),
 }
+
+PG_SERVICE_DATABASES = {
+    "handler-runtime": ("jane_handler_runtime", "JANE_PG_HANDLER_RUNTIME_PASSWORD"),
+    "orchestrator": ("jane_orchestrator", "JANE_PG_ORCHESTRATOR_PASSWORD"),
+    "registry": ("jane_registry", "JANE_PG_REGISTRY_PASSWORD"),
+    "llm": ("jane_llm", "JANE_PG_LLM_PASSWORD"),
+    "assistant": ("jane_assistant", "JANE_PG_ASSISTANT_PASSWORD"),
+    "storage-results": ("jane_storage_results", "JANE_PG_STORAGE_RESULTS_PASSWORD"),
+}
+DEFAULT_STACK_SERVICES = ("postgres", "sqlserver", "mongodb", "minio", "s3", "testsite", "proxy")
 
 
 def load_or_create_credentials(project: str) -> dict[str, str]:
@@ -240,7 +264,12 @@ def load_or_create_credentials(project: str) -> dict[str, str]:
     if path.is_file():
         data = json.loads(path.read_text(encoding="utf-8"))
         if "env" in data:
-            return dict(data["env"])
+            creds = dict(data["env"])
+            if missing := [key for _, key in PG_SERVICE_DATABASES.values() if key not in creds]:
+                creds.update({key: secrets.token_urlsafe(24) for key in missing})
+                data["env"] = creds
+                path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            return creds
     creds = {
         "JANE_PG_USER": "jane",
         "JANE_PG_DB": "jane",
@@ -253,6 +282,7 @@ def load_or_create_credentials(project: str) -> dict[str, str]:
         "JANE_S3_ACCESS_KEY": "jane-" + secrets.token_hex(4),
         "JANE_S3_SECRET_KEY": secrets.token_urlsafe(24),
     }
+    creds.update({key: secrets.token_urlsafe(24) for _, key in PG_SERVICE_DATABASES.values()})
     STACK_DIR.mkdir(exist_ok=True)
     path.write_text(
         json.dumps({"project": project, "env": creds, "services": {}}, indent=2), encoding="utf-8"
@@ -338,16 +368,52 @@ def describe(project: str, env: dict[str, str]) -> dict[str, dict[str, object]]:
         }
     if ports["proxy"]:
         services["proxy"] = {"host": host, "port": ports["proxy"], "url": f"http://{host}:{ports['proxy']}"}
+    for name in (
+        "storage",
+        "handler-runtime",
+        "web-collector",
+        "telegram-collector",
+        "orchestrator",
+        "registry",
+        "llm",
+        "assistant",
+    ):
+        if port := ports[name]:
+            services[name] = {"host": host, "port": port, "url": f"http://{host}:{port}"}
+    if pg_port := ports["postgres"]:
+        for name, (database, password_key) in PG_SERVICE_DATABASES.items():
+            services[f"db-{name}"] = {
+                "host": host,
+                "port": pg_port,
+                "endpoint": f"postgresql://{host}:{pg_port}/{database}",
+                "db_user": database,
+                "db_password": env[password_key],
+                "db_name": database,
+                "db_dsn": f"postgresql://{database}:{env[password_key]}@{host}:{pg_port}/{database}",
+            }
     return services
 
 
 def cmd_up(ns: argparse.Namespace) -> int:
     project = ns.project or default_project()
     env = load_or_create_credentials(project)
+    admin_dist = ROOT / "web" / "admin" / "dist"
+    if admin_dist.is_dir():
+        env["JANE_ADMIN_DIST_PATH"] = str(admin_dist)
     args = ["up", "-d", "--wait", "--wait-timeout", str(ns.wait_timeout)]
     if not ns.no_build:
         args.append("--build")
-    code = compose(project, env, *args, *ns.services).returncode
+    selected = list(ns.services) or list(DEFAULT_STACK_SERVICES)
+    if "pg-provision" in selected:
+        selected.remove("pg-provision")
+        if "postgres" not in selected:
+            selected.append("postgres")
+    code = compose(project, env, *args, *selected).returncode
+    db_apps = set(PG_SERVICE_DATABASES) - {"storage-results"}
+    if code == 0 and "postgres" in selected and not (db_apps | {"storage"}) & set(selected):
+        # `up --wait` treats a successful one-shot target as a failure. For infrastructure-only
+        # starts, wait for postgres first, then run the idempotent provisioner to completion.
+        code = compose(project, env, "run", "--rm", "--no-deps", "pg-provision").returncode
     services = describe(project, env)
     stack_file(project).write_text(
         json.dumps(
@@ -376,11 +442,12 @@ def cmd_down(ns: argparse.Namespace) -> int:
         "JANE_MONGO_PASSWORD",
         "JANE_MINIO_SECRET_KEY",
         "JANE_S3_SECRET_KEY",
+        *(key for _, key in PG_SERVICE_DATABASES.values()),
     ):
         env.setdefault(var, "unused")
     # -v also removes locally built images (<project>-testsite) so they do not pile up.
     args = ["down", "--remove-orphans"] + (["-v", "--rmi", "local"] if ns.volumes else [])
-    code = compose(project, env, *args).returncode
+    code = compose(project, env, "--profile", "*", *args).returncode
     if ns.volumes and code == 0 and path.is_file():
         path.unlink()
     return code
@@ -395,12 +462,14 @@ def _stack_env(project: str) -> dict[str, str]:
 
 def cmd_ps(ns: argparse.Namespace) -> int:
     project = ns.project or default_project()
-    return compose(project, _stack_env(project), "ps").returncode
+    return compose(project, _stack_env(project), "--profile", "*", "ps").returncode
 
 
 def cmd_logs(ns: argparse.Namespace) -> int:
     project = ns.project or default_project()
-    return compose(project, _stack_env(project), "logs", "--tail", str(ns.tail), *ns.services).returncode
+    return compose(
+        project, _stack_env(project), "--profile", "*", "logs", "--tail", str(ns.tail), *ns.services
+    ).returncode
 
 
 def cmd_env(ns: argparse.Namespace) -> int:
@@ -564,6 +633,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     p = add("integration", cmd_integration, "integration tests (need `just up`)", True)
     p.add_argument("--project", help="compose project of the stack (default: unique per checkout)")
     add("isolation", cmd_isolation, "sandbox isolation tests (Linux only)", True)
+    add("e2e", cmd_e2e, "end-to-end acceptance tests (Docker)", True)
     add("web", cmd_web, "pnpm install/lint/typecheck/test for web/* (if present)")
     add("check", cmd_check, "lint + types + unit + contract (+ web)", True)
     p = add("test", cmd_test, "tests of one service/library", True)

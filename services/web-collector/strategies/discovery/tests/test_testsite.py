@@ -7,108 +7,28 @@ once, with navigation documents (sitemaps, feeds, API pages) not emitted.
 
 from __future__ import annotations
 
-from collections import Counter
 from typing import Any
 from urllib.parse import urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
 
-from jane_web_collector.testing import FAST_LIMITS, Site, drain, errors, start, wait_done, web_rules
+from jane_web_collector.testing import Site, errors
 
-ITEMS = {"value": "main li a"}
-"""Item links of testsite category and search pages (the site navigation is outside ``<main>``)."""
-
-
-# ------------------------------------------------------------------------------------------ strategies
-def sitemap(site: Site, **extra: Any) -> dict[str, Any]:
-    return {"type": "sitemap", "strategy_id": "sitemap", "urls": [site.url("/sitemap.xml")], **extra}
-
-
-def rss(site: Site) -> dict[str, Any]:
-    return {"type": "feed", "strategy_id": "feed", "urls": [site.url("/feeds/news.rss")]}
-
-
-def categories(site: Site, **extra: Any) -> dict[str, Any]:
-    starts = [site.url(f"/catalog/{c}/") for c in ("phones", "laptops", "accessories")]
-    return {
-        "type": "listing",
-        "strategy_id": "categories",
-        "start_urls": starts,
-        "item_links": ITEMS,
-        **extra,
-    }
-
-
-def search(site: Site) -> dict[str, Any]:
-    return {
-        "type": "listing",
-        "strategy_id": "search",
-        "start_urls": [site.url("/search?q=phone")],
-        "search": {"url_template": site.url("/search?q={query}"), "queries": ["cable"]},
-        "item_links": ITEMS,
-    }
-
-
-def archive(site: Site, **extra: Any) -> dict[str, Any]:
-    return {
-        "type": "url_template",
-        "strategy_id": "archive",
-        "template": site.url("/archive/{n}"),
-        "variables": {"n": {"range": {"start": 1, "end": 50}}},
-        "stop_after_consecutive_misses": 2,
-        **extra,
-    }
-
-
-def api(site: Site, **pagination: Any) -> dict[str, Any]:
-    return {
-        "type": "api_feed",
-        "strategy_id": "api",
-        "url": site.url("/api/v1/products"),
-        "items_path": "$.items",
-        "url_path": "$.url",
-        "pagination": pagination or {"type": "next_url", "next_url_path": "$.next"},
-    }
-
-
-def seeds_and_recursion(site: Site) -> list[dict[str, Any]]:
-    return [{"type": "seed_list", "urls": [site.url("/")]}, {"type": "recursive"}]
-
-
-# ------------------------------------------------------------------------------------------ helpers
-def collect(
-    client: TestClient, site: Site, strategies: list[dict[str, Any]], limits: dict[str, Any] | None = None
-) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    rules = web_rules(site, strategies=strategies)
-    cid = start(
-        client, {"source_kind": "web", "source_id": "wp03", "rules": rules, "limits": limits or FAST_LIMITS}
-    )
-    materials = drain(client, cid)
-    view = wait_done(client, cid)
-    assert view["status"] == "succeeded", view
-    return materials, view
-
-
-def assert_exactly(site: Site, materials: list[dict[str, Any]], paths: set[str]) -> None:
-    canon = [m["locator"]["canonical_url"] for m in materials]
-    duplicates = {u: n for u, n in Counter(canon).items() if n > 1}
-    assert duplicates == {}, duplicates
-    got, want = set(canon), site.canonical(paths)
-    assert got == want, {"missing": sorted(want - got), "unexpected": sorted(got - want)}
-    for m in materials:
-        assert urlsplit(m["locator"]["final_url"]).hostname == site.host
-
-
-def by_strategy(materials: list[dict[str, Any]]) -> Counter[str]:
-    return Counter(m["discovery"]["strategy"] for m in materials)
-
-
-def union(expected_sets: dict[str, set[str]], *names: str) -> set[str]:
-    out: set[str] = set()
-    for name in names:
-        out |= expected_sets[name]
-    return out
+from .helpers import (
+    api,
+    archive,
+    assert_exactly,
+    by_strategy,
+    categories,
+    collect,
+    cursor_stats,
+    rss,
+    search,
+    seeds_and_recursion,
+    sitemap,
+    union,
+)
 
 
 # ------------------------------------------------------------------------------------------ alone
@@ -121,7 +41,7 @@ def test_sitemap_index_with_gzip_alone(
     # the index and every listed sitemap (the .gz one too) were read exactly once, none emitted as material
     for path in ["/sitemap.xml", "/sitemaps/products.xml", "/sitemaps/news.xml.gz", "/sitemaps/pages.xml"]:
         assert site.requests[path] == 1, path
-    cursor = client.get("/v1/states/wp03").json()["cursors"]["sitemap"]["stats"]
+    cursor = cursor_stats(client, "wp03", "sitemap")
     assert cursor["documents"] == 4 and cursor["gzip_documents"] == 1
     assert cursor["urls"] == len(expected_sets["sitemap"])
 
@@ -130,7 +50,7 @@ def test_sitemap_found_through_robots_txt(
     client: TestClient, site: Site, expected_sets: dict[str, set[str]]
 ) -> None:
     """No ``urls``: the ``Sitemap:`` line of robots.txt of the origin of the rules (here the seed list)."""
-    strategies = [
+    strategies: list[dict[str, Any]] = [
         {"type": "sitemap", "strategy_id": "sitemap"},
         {"type": "seed_list", "urls": [site.url("/")]},
     ]
@@ -187,7 +107,10 @@ def test_feed_autodiscovery_on_seed_pages(
     client: TestClient, site: Site, expected_sets: dict[str, set[str]]
 ) -> None:
     """No ``urls``: feeds announced on the seed pages of other strategies (depth 0)."""
-    strategies = [{"type": "seed_list", "urls": [site.url("/")]}, {"type": "feed", "strategy_id": "feed"}]
+    strategies: list[dict[str, Any]] = [
+        {"type": "seed_list", "urls": [site.url("/")]},
+        {"type": "feed", "strategy_id": "feed"},
+    ]
     materials, _ = collect(client, site, strategies)
     assert_exactly(site, materials, expected_sets["feeds"] | {"/"})
     assert by_strategy(materials) == {"seed_list": 1, "feed": len(expected_sets["feeds"])}
@@ -288,7 +211,7 @@ def test_each_strategy_combined_with_recursion(
 
 
 def test_all_strategies_together(client: TestClient, site: Site, expected_sets: dict[str, set[str]]) -> None:
-    strategies = [
+    strategies: list[dict[str, Any]] = [
         *seeds_and_recursion(site),
         sitemap(site),
         rss(site),
@@ -324,7 +247,14 @@ def test_recursion_without_seeds_follows_sitemap_pages(
 def test_all_strategies_without_recursion(
     client: TestClient, site: Site, expected_sets: dict[str, set[str]]
 ) -> None:
-    strategies = [sitemap(site), rss(site), categories(site), search(site), archive(site), api(site)]
+    strategies: list[dict[str, Any]] = [
+        sitemap(site),
+        rss(site),
+        categories(site),
+        search(site),
+        archive(site),
+        api(site),
+    ]
     materials, _ = collect(client, site, strategies)
     names = ("sitemap", "feeds", "categories", "search:phone", "search:cable", "api", "template:/archive/{n}")
     assert_exactly(site, materials, union(expected_sets, *names))

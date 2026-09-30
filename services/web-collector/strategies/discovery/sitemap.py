@@ -91,7 +91,8 @@ def parse_sitemap(body: bytes, base: str, *, max_bytes: int, max_entries: int) -
     """Parse one sitemap file. Raises ``UnsafeDocument`` for XML with DTD entity declarations."""
     decoded = maybe_gunzip(body, max_bytes)
     doc = SitemapDocument(compressed=decoded.compressed, truncated=decoded.truncated)
-    root = parse_xml(decoded.data, base_url=base)
+    markup = decoded.data.lstrip(b"\xef\xbb\xbf \t\r\n").startswith(b"<")
+    root = parse_xml(decoded.data, base_url=base) if markup else None
     if root is not None:
         name = localname(root)
         if name == "urlset":
@@ -101,7 +102,7 @@ def parse_sitemap(body: bytes, base: str, *, max_bytes: int, max_entries: int) -
         elif name in {"rss", "RDF", "feed"}:
             entries, doc.dropped = parse_feed(root, base, max_entries)
             doc.kind, doc.urls = "feed", [SitemapEntry(e.link, e.lastmod) for e in entries]
-    elif decoded.data.strip():
+    elif not markup and decoded.data.strip():  # plain-text sitemap: one URL per line
         text = decoded.data.decode("utf-8", errors="replace")
         lines = [line.strip() for line in text.splitlines()]
         doc.kind = "text"

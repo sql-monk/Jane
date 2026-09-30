@@ -1,0 +1,3 @@
+- Запуск: `uv run --package jane-registry python -m jane_registry` (PostgreSQL + MinIO або `JANE_REGISTRY_DB=memory JANE_REGISTRY_BLOB=filesystem`; див. README.md).
+- Тести: `just test registry`; на PostgreSQL + MinIO — `just up --project jane-wp05 postgres minio` і `just integration --project jane-wp05 services/registry`.
+- Контракт: `contracts/openapi/registry.v1.yaml` (+ `common.yaml`); канонічний архів — README «Канонічний архів»; пакети — скіл `jane-handler-package`.

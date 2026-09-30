@@ -247,3 +247,16 @@ WP-04 прийнято після повторного рев'ю: `just test tel
   критерію 9: виконання LLM-пакета з registry, архіви решти storage-пакетів, форки інших типів; для R-04 —
   повтор під час виконання, після рестарту й на іншому екземплярі колекторів і LLM.
 - Локальна гілка `backup/wp13-pre-rebase-91c3924` (резервна копія автора перед rebase) лишилась — видаляє людина.
+
+## Передача справ (2026-09-30, сесія 3)
+Координатор зупинився через ліміт. Агентам надіслано вказівку: зупинитись, прибрати Docker, закомітити WIP і дописати розділ «Передача (незавершено)» у звіт. Перед продовженням перевір `git log` і `git status` у кожному worktree.
+
+| Робота | Гілка / worktree | Стан | Наступний крок |
+|---|---|---|---|
+| WP-14 фаза 1 | `wp/14-limit-profiles-ops` `832da64`, `agent-a842dd5f8e60fb46d` | готово | незалежне рев'ю → злиття. Фаза 2: `deploy/profiles/harness/limits_harness.py run --profile dev-laptop` (×3) і `--profile ci` на вільній машині. Знахідки й запити (LIMITS_FILE у 5 сервісах, `build_archive` deflate, лімітер WP-02) — у WP-14.md |
+| WP-13 S-M2-06 + S-M2-07 | `wp/13-assistant-flows`, `.claude/worktrees/agent-a0e92a14024286bef` | зупинено (WIP) | див. розділ передачі в WP-13.md гілки; дороблення → рев'ю |
+| WP-13 R-01/R-03/R-08 | `wp/13-reliability`, `.claude/worktrees/agent-a390efc373f81d058` | зупинено (WIP) | те саме |
+| WP-07b secret_refs у storage | `wp/07b-secret-policy`, `.claude/worktrees/agent-ab8874eb8ecc3787e` | зупинено (WIP) | доробити → env allowlist у `infra/compose.yaml` (WP-01) і `tests/e2e/compose.e2e.yaml` (WP-13) → інтеграційний `just e2e` → рев'ю; далі WP-02b (web-collector, та сама вразливість) |
+
+Далі за WP-13: S-M2-04 (використати пакети `examples/packages/examples.testsite-*` з WP-14), R-07, решта R-04/R-06, потім критерії 1–12 на одній ревізії `main`. Потім M3: WP-14 фаза 2, фінальне рев'ю.
+Процес: рев'ю wp-reviewer обов'язкове перед злиттям (класифікатор блокує злиття без нього); push у `main` робить людина; CI — `gh run list`.

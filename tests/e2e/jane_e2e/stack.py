@@ -17,6 +17,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import subprocess
 import sys
 from collections.abc import Iterable, Mapping, Sequence
@@ -99,10 +100,9 @@ SERVICES: dict[str, ServiceSpec] = {
         ServiceSpec(
             "telegram-collector",
             "WP-04",
-            8000,
+            8102,
             "app",
             ("services/telegram-collector/Dockerfile",),
-            compose=False,
         ),
         ServiceSpec("registry", "WP-05", 8000, "app", ("services/registry/Dockerfile",), compose=False),
         ServiceSpec(
@@ -220,12 +220,20 @@ class E2EStack:
             "JANE_E2E_DOCKER_GID": os.environ.get("JANE_E2E_DOCKER_GID", ""),
             "COMPOSE_PROFILES": ",".join(self.available_apps()),
             "JANE_E2E_PACKAGES_DIR": self.packages_dir.as_posix(),
+            "JANE_E2E_TELEGRAM_RECORDINGS_DIR": self.telegram_recordings_dir.as_posix(),
         }
 
     @property
     def packages_dir(self) -> Path:
         """Archives of local packages served by the ``package-host`` stand-in (``<id>/<version>.zip``)."""
         path = STACK_DIR / f"e2e-packages-{self.project}"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @property
+    def telegram_recordings_dir(self) -> Path:
+        """Writable host directory mounted into the recorded Telegram backend for S-M2-02."""
+        path = STACK_DIR / f"e2e-telegram-recordings-{self.project}"
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -478,4 +486,7 @@ class E2EStack:
         if volumes:
             self._run(["docker", "image", "rm", "-f", self.sandbox_image], check=False)
             self.stack_file.unlink(missing_ok=True)
+            recordings = self.telegram_recordings_dir.resolve()
+            if recordings.is_relative_to(STACK_DIR.resolve()):
+                shutil.rmtree(recordings)
         self._started.clear()

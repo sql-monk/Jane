@@ -111,8 +111,11 @@ test.describe("real orchestrator: sources, tasks, schedules, limits, connections
     await expect(admin.getByRole("region", { name: "Елементи запуску" })).toBeVisible();
     await admin.getByRole("button", { name: "Скасувати запуск" }).click();
     await admin.getByLabel("Причина: Скасувати запуск").fill("e2e stop test run");
-    const cancelled = await captureRequest(admin, "POST", /\/api\/orchestrator\/v1\/runs\/run_[^/]+\/cancel/, () =>
-      admin.getByRole("button", { name: "Скасувати", exact: true }).click(),
+    const cancelled = await captureRequest(
+      admin,
+      "POST",
+      /\/api\/orchestrator\/v1\/runs\/run_[^/]+\/cancel/,
+      () => admin.getByRole("button", { name: "Скасувати", exact: true }).click(),
     );
     expect(cancelled.body).toEqual({ reason: "e2e stop test run" });
     await expect(admin.getByRole("alert")).toHaveCount(0);

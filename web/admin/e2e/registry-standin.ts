@@ -1,5 +1,5 @@
 // Contract-shaped stand-in of the package registry (registry.v1) for hybrid runs of the REAL handler-runtime:
-// WP-05 (registry) is not in main yet, and handler-runtime loads packages for `POST /v1/test-runs` from the
+// For isolated runtime runs only: handler-runtime loads packages for `POST /v1/test-runs` from the
 // registry (`GET /v1/packages/{id}/versions/{v}/archive`, ETag = digest). The stand-in serves ONE real package
 // directory (the extractor SDK example by default) through the read operations of registry.v1 the admin and the
 // runtime use. The manifest is validated against contracts/schemas/package-manifest.schema.json before serving.

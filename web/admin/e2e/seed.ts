@@ -2,11 +2,56 @@
 // (handler.v1 of storage) with unique identifiers, so it does not depend on contract example data or on
 // what else is stored.
 import { createHash } from "node:crypto";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
 import type { APIRequestContext } from "@playwright/test";
 import { API_KEY } from "./fixtures";
 
 export function uniqueId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/** Publish an SDK example into the real registry for the real handler-runtime UI scenario. */
+export async function publishExtractorPackage(
+  request: APIRequestContext,
+  registryUrl: string,
+  packageDir: string,
+): Promise<{ package_id: string; version: string; digest: string; manifest: Record<string, unknown> }> {
+  const manifest = JSON.parse(readFileSync(path.join(packageDir, "jane-package.json"), "utf8")) as Record<
+    string,
+    unknown
+  >;
+  const packageId = uniqueId("e2e-extractor");
+  manifest["package_id"] = packageId;
+  const files: Record<string, { encoding: "base64"; data: string }> = {};
+  function collect(dir: string) {
+    for (const name of readdirSync(dir).sort()) {
+      if (name.startsWith(".") || name === "__pycache__") continue;
+      const full = path.join(dir, name);
+      if (statSync(full).isDirectory()) collect(full);
+      else {
+        const relative = path.relative(packageDir, full).split(path.sep).join("/");
+        if (relative !== "jane-package.json")
+          files[relative] = { encoding: "base64", data: readFileSync(full).toString("base64") };
+      }
+    }
+  }
+  collect(packageDir);
+  const headers = { Authorization: `Bearer ${API_KEY}`, "Idempotency-Key": uniqueId("registry") };
+  const created = await request.post(`${registryUrl}/v1/packages`, {
+    headers,
+    data: { package_id: packageId, kind: "extractor", title: manifest["title"] },
+  });
+  if (created.status() !== 201)
+    throw new Error(`registry create: HTTP ${created.status()} ${await created.text()}`);
+  const published = await request.post(`${registryUrl}/v1/packages/${packageId}/versions`, {
+    headers: { ...headers, "Idempotency-Key": uniqueId("publish") },
+    data: { manifest, files },
+  });
+  if (published.status() !== 201)
+    throw new Error(`registry publish: HTTP ${published.status()} ${await published.text()}`);
+  const version = (await published.json()) as { version: string; digest: string };
+  return { package_id: packageId, version: version.version, digest: version.digest, manifest };
 }
 
 const sha256 = (text: string): string => createHash("sha256").update(text, "utf8").digest("hex");

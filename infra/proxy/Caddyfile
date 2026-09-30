@@ -5,8 +5,39 @@
 }
 
 :8080 {
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' {$JANE_CSP_CONNECT_SRC:}; frame-ancestors 'none'; base-uri 'self'; form-action 'self' {$JANE_CSP_FORM_ACTION:}; object-src 'none'"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+	}
+
 	handle /_proxy/health {
 		respond "ok" 200
+	}
+
+	handle_path /api/storage/* {
+		reverse_proxy storage:8000
+	}
+	handle_path /api/handler-runtime/* {
+		reverse_proxy handler-runtime:8000
+	}
+	handle_path /api/web-collector/* {
+		reverse_proxy web-collector:8101
+	}
+	handle_path /api/orchestrator/* {
+		reverse_proxy orchestrator:8000
+	}
+	handle_path /api/llm/* {
+		reverse_proxy llm:8110
+	}
+	handle_path /api/assistant/* {
+		reverse_proxy assistant:8000
+	}
+	handle_path /api/registry/* {
+		reverse_proxy registry:8000
+	}
+	handle_path /api/telegram-collector/* {
+		reverse_proxy telegram-collector:8000
 	}
 
 	# Test site under a prefix; it rewrites its links from X-Forwarded-Prefix.
@@ -16,12 +47,15 @@
 		}
 	}
 
-	# Services join here when they get a compose entry, e.g. (WP-13 / service owners):
-	#   handle_path /api/web-collector/* {
-	#   	reverse_proxy web-collector:8000
-	#   }
+	handle /config.json {
+		root * /srv/config
+		header Cache-Control "no-store"
+		file_server
+	}
 
 	handle {
-		respond "Jane dev proxy: unknown route" 404
+		root * /srv/admin
+		try_files {path} /index.html
+		file_server
 	}
 }

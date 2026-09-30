@@ -124,3 +124,46 @@ jobs:
       - name: Tear down
         if: always()
         run: just down -v
+
+  adapters:
+    needs: contract
+    if: github.event_name != 'push' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        adapter: [sqlserver, mongodb, minio, s3]
+    env:
+      JANE_COMPOSE_PROJECT: jane-adapter-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.adapter }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv tool install "rust-just==${JUST_VERSION}"
+      - run: uv sync --all-packages --locked
+      - run: just up ${{ matrix.adapter }}
+      - run: just integration services/storage/adapters/${{ matrix.adapter }}/tests -v
+      - name: Stack logs on failure
+        if: failure()
+        run: just logs
+      - name: Tear down
+        if: always()
+        run: just down -v
+
+  e2e:
+    needs: contract
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    env:
+      JANE_E2E_PROJECT: jane-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv tool install "rust-just==${JUST_VERSION}"
+      - run: uv sync --all-packages --locked
+      - run: just e2e -v

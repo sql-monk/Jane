@@ -98,13 +98,103 @@ services:
 
   proxy:
     image: ${JANE_IMAGE_PROXY:-caddy:2-alpine}
-    volumes: ["./proxy/Caddyfile:/etc/caddy/Caddyfile:ro"]
+    volumes:
+      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${JANE_ADMIN_DIST_PATH:-./proxy/empty}:/srv/admin:ro
+      - ${JANE_ADMIN_CONFIG_PATH:-./proxy/admin-config.json}:/srv/config/config.json:ro
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_PROXY:-}:8080"]
+    environment:
+      JANE_CSP_CONNECT_SRC: ${JANE_CSP_CONNECT_SRC:-}
+      JANE_CSP_FORM_ACTION: ${JANE_CSP_FORM_ACTION:-}
     depends_on:
       testsite: { condition: service_healthy }
     healthcheck:
       <<: *healthcheck
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/_proxy/health"]
+
+  # Application services are opt-in: `just up storage assistant` starts only those profiles.
+  storage:
+    profiles: ["storage"]
+    build: { context: .., dockerfile: services/storage/Dockerfile }
+    environment:
+      JANE_STORAGE_CONNECTIONS_FILE: /cfg/storage-connections.json
+      JANE_STORAGE_LOG_FORMAT: json
+      JANE_SECRET_DEV_PG_USER: ${JANE_PG_USER:-jane}
+      JANE_SECRET_DEV_PG_PASSWORD: ${JANE_PG_PASSWORD:?run `just up`}
+    volumes:
+      - storage-data:/var/lib/jane/storage
+      - ./config/storage-connections.json:/cfg/storage-connections.json:ro
+    ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_STORAGE:-}:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
+
+  handler-runtime:
+    profiles: ["handler-runtime"]
+    build: { context: .., dockerfile: services/handler-runtime/Dockerfile }
+    environment:
+      JANE_HANDLER_RUNTIME_STATE_DSN: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?run `just up`}@postgres:5432/${JANE_PG_DB:-jane}
+      JANE_HANDLER_RUNTIME_LOG_FORMAT: json
+    volumes:
+      - ${JANE_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+    group_add: ["${JANE_DOCKER_GID:-0}"]
+    ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_HANDLER_RUNTIME:-}:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
+
+  web-collector:
+    profiles: ["web-collector"]
+    build: { context: .., dockerfile: services/web-collector/Dockerfile }
+    volumes: ["web-collector-data:/var/lib/jane-web-collector"]
+    ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_WEB_COLLECTOR:-}:8101"]
+
+  orchestrator:
+    profiles: ["orchestrator"]
+    build: { context: .., dockerfile: services/orchestrator/Dockerfile }
+    environment:
+      JANE_ORCHESTRATOR_DATABASE_URL: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?run `just up`}@postgres:5432/${JANE_PG_DB:-jane}
+    ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_ORCHESTRATOR:-}:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  llm:
+    profiles: ["llm"]
+    build: { context: .., dockerfile: services/llm/Dockerfile }
+    environment:
+      JANE_LLM_STORE: postgres
+      JANE_LLM_DATABASE_URL: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?run `just up`}@postgres:5432/${JANE_PG_DB:-jane}
+      JANE_LLM_FAKE_PROVIDER_ENABLED: "true"
+      JANE_LLM_LOG_FORMAT: json
+    ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_LLM:-}:8110"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8110/v1/health', timeout=2)"]
+
+  assistant:
+    profiles: ["assistant"]
+    build: { context: .., dockerfile: services/assistant/Dockerfile }
+    environment:
+      JANE_ASSISTANT_STATE_DSN: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?run `just up`}@postgres:5432/${JANE_PG_DB:-jane}
+      JANE_ASSISTANT_LLM_URL: http://llm:8110
+      JANE_ASSISTANT_HANDLER_RUNTIME_URL: http://handler-runtime:8000
+      JANE_ASSISTANT_STORAGE_URL: http://storage:8000
+      JANE_ASSISTANT_COLLECTOR_WEB_URL: http://web-collector:8101
+      JANE_ASSISTANT_ORCHESTRATOR_URL: http://orchestrator:8000
+      JANE_ASSISTANT_LOG_FORMAT: json
+    ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_ASSISTANT:-}:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      llm: { condition: service_healthy }
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
 
 volumes:
   postgres-data:
@@ -112,3 +202,5 @@ volumes:
   mongodb-data:
   minio-data:
   s3-data:
+  storage-data:
+  web-collector-data:

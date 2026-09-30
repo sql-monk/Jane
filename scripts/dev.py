@@ -3,7 +3,7 @@
     uv run --no-project python scripts/dev.py <command> [args]
 
 Commands: check, lint, fmt, types, unit, contract, test, integration, isolation, web,
-          up, down, ps, logs, env, new-service, hooks, testsite, gen-client, sync.
+          e2e, up, down, ps, logs, env, new-service, hooks, testsite, gen-client, sync.
 """
 
 from __future__ import annotations
@@ -153,6 +153,11 @@ def cmd_isolation(ns: argparse.Namespace) -> int:
     return 0 if pytest_ok(code) else code
 
 
+def cmd_e2e(ns: argparse.Namespace) -> int:
+    code = run(uv_run("pytest", "tests/e2e", "-m", "e2e", *ns.pytest_args)).returncode
+    return 0 if pytest_ok(code) else code
+
+
 def web_packages() -> list[Path]:
     web = ROOT / "web"
     return sorted(p for p in web.glob("*") if (p / "package.json").is_file()) if web.is_dir() else []
@@ -169,14 +174,14 @@ def cmd_web(_: argparse.Namespace) -> int:
         print("corepack not found (Node.js 24 ships it)", file=sys.stderr)
         return 1
     for pkg in packages:
-        pnpm = [corepack, "pnpm", "--dir", str(pkg.relative_to(ROOT))]
+        pnpm = [corepack, "pnpm"]
         for args in (
             ["install", "--frozen-lockfile"],
             ["run", "--if-present", "lint"],
             ["run", "--if-present", "typecheck"],
             ["run", "--if-present", "test"],
         ):
-            code = run([*pnpm, *args]).returncode
+            code = run([*pnpm, *args], cwd=pkg).returncode
             if code:
                 return code
     return 0
@@ -344,6 +349,9 @@ def describe(project: str, env: dict[str, str]) -> dict[str, dict[str, object]]:
 def cmd_up(ns: argparse.Namespace) -> int:
     project = ns.project or default_project()
     env = load_or_create_credentials(project)
+    admin_dist = ROOT / "web" / "admin" / "dist"
+    if admin_dist.is_dir():
+        env["JANE_ADMIN_DIST_PATH"] = str(admin_dist)
     args = ["up", "-d", "--wait", "--wait-timeout", str(ns.wait_timeout)]
     if not ns.no_build:
         args.append("--build")
@@ -564,6 +572,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     p = add("integration", cmd_integration, "integration tests (need `just up`)", True)
     p.add_argument("--project", help="compose project of the stack (default: unique per checkout)")
     add("isolation", cmd_isolation, "sandbox isolation tests (Linux only)", True)
+    add("e2e", cmd_e2e, "end-to-end acceptance tests (Docker)", True)
     add("web", cmd_web, "pnpm install/lint/typecheck/test for web/* (if present)")
     add("check", cmd_check, "lint + types + unit + contract (+ web)", True)
     p = add("test", cmd_test, "tests of one service/library", True)

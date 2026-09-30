@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import sys
+from argparse import Namespace
 from pathlib import Path
 from types import ModuleType
 
@@ -64,6 +65,36 @@ def test_default_project_is_valid_and_stable(monkeypatch: pytest.MonkeyPatch) ->
     assert name == dev.default_project()
     monkeypatch.setenv("JANE_COMPOSE_PROJECT", "jane-custom")
     assert dev.default_project() == "jane-custom"
+
+
+def test_web_runs_corepack_from_each_package(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    package = tmp_path / "web" / "admin"
+    package.mkdir(parents=True)
+    (package / "package.json").write_text('{"packageManager":"pnpm@11.27.1"}', encoding="utf-8")
+    monkeypatch.setattr(dev, "web_packages", lambda: [package])
+    monkeypatch.setattr(dev.shutil, "which", lambda name: "corepack" if name == "corepack" else None)
+    calls: list[tuple[list[str], Path]] = []
+
+    def fake_run(cmd: list[str], *, cwd: Path, **_: object) -> subprocess.CompletedProcess[str]:
+        calls.append((cmd, cwd))
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(dev, "run", fake_run)
+    assert dev.cmd_web(Namespace()) == 0
+    assert len(calls) == 4
+    assert all(cwd == package and cmd[:2] == ["corepack", "pnpm"] for cmd, cwd in calls)
+
+
+def test_e2e_runs_only_acceptance_suite(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[str] = []
+
+    def fake_run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+        seen.extend(cmd)
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(dev, "run", fake_run)
+    assert dev.cmd_e2e(Namespace(pytest_args=["-v"])) == 0
+    assert seen[-5:] == ["pytest", "tests/e2e", "-m", "e2e", "-v"]
 
 
 def test_devstack_uses_the_same_default_project(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

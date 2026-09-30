@@ -12,7 +12,7 @@
 | 05 | Репозиторій обробників | 1 | active | `wp/05-registry` | агент / wp-reviewer | виправлення після рев'ю 1 (lease ключів/job, secret_detected) |
 | 06 | Runtime обробників і SDK | 1 | accepted | `wp/06-handler-runtime` | агент / wp-reviewer (2 раунди) | злито `e59aa86` |
 | 07 | Збереження: ядро + files + PostgreSQL | 1 | accepted | `wp/07-storage-core` | агент / wp-reviewer (2 раунди) | злито `6f57834` |
-| 08 | Адаптери збереження | 1 | review | `wp/08-storage-adapters` | агент / wp-reviewer | рев'ю 2 |
+| 08 | Адаптери збереження | 1 | active | `wp/08-storage-adapters` | агент / wp-reviewer | фінальне виправлення після рев'ю 2 (відкат новішого знімка s3), перевірка координатором |
 | 09 | Оркестратор | 1 | active | `wp/09-orchestrator` | агент / wp-reviewer | виправлення після рев'ю 1 (cancelling, retries, overlap) |
 | 10 | LLM-шлюз і LLM-обробник | 1 | accepted | `wp/10-llm` | агент / wp-reviewer (2 раунди) | злито `00870c2` |
 | 11 | Асистент джерел | 1 | accepted | `wp/11-assistant` | агент / wp-reviewer (2 раунди) | злито `7dc7074` |
@@ -89,3 +89,4 @@
 - 2026-09-27 — WP-05 повернуто після рев'ю 1 (відновлення ключів/job після падіння, прогалини secret_detected); рішення: `registry:approve` для `auto_changes_allowed` false→true. WP-10 — рев'ю 2.
 | WP-11 | WP-01 | перенести PostgreSQL-реалізації `JobStore`/`IdempotencyStore` (з lease) у jane-kit — зараз дубльовані в handler-runtime, assistant, registry, llm | після M2, окреме доручення |
 - 2026-09-30 — WP-10 і WP-11 прийнято (2 раунди) і злито; main `just check` зелений, gitleaks 0. Третій ліміт сесії перервав WP-02, 04, 05, 08, 09, 12, 13 — відновлено.
+- 2026-09-30 — WP-08 рев'ю 2: виправлення п.1 внесло відкат новішого підтвердженого знімка в s3/minio — фінальне виправлення, перевіряє координатор скриптом рецензента.

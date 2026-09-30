@@ -6,6 +6,7 @@ Run: ``uv run --all-packages pytest deploy/profiles -q``. The measurements thems
 
 from __future__ import annotations
 
+import argparse
 import importlib
 import json
 import threading
@@ -47,6 +48,80 @@ def test_every_measured_profile_has_complete_thresholds() -> None:
         plan = lh.plan(name)
         assert set(plan["scenarios"]) == set(lh.SCENARIOS)
         assert plan["estimated_minutes_per_repetition"] > 0
+
+
+@pytest.mark.parametrize("cleanup_fails", [False, True])
+def test_harness_reports_startup_failure_and_bounded_cleanup(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, cleanup_fails: bool
+) -> None:
+    """Run the real harness orchestration with a failing Stack boundary, without Docker."""
+    project = "jane-limits-startup-test"
+    stack_file = tmp_path / "stack.json"
+    executors_file = tmp_path / "executors.json"
+    recordings_dir = tmp_path / "recordings"
+    calls: list[tuple[str, Any]] = []
+
+    class FailingStack:
+        def __init__(self, project: str, profile: str) -> None:
+            self.project = project
+
+        def up(self, services: list[str]) -> None:
+            stack_file.write_text("{}", encoding="utf-8")
+            executors_file.write_text("[]", encoding="utf-8")
+            recordings_dir.mkdir()
+            raise RuntimeError("synthetic startup failure")
+
+        def compose(self, *args: str, timeout: int) -> None:
+            calls.append(("compose", (args, timeout)))
+            if cleanup_fails:
+                raise TimeoutError("synthetic cleanup timeout")
+
+        def run(self, cmd: list[str], *, check: bool, timeout: int) -> None:
+            calls.append(("run", (cmd, check, timeout)))
+
+    monkeypatch.setattr(jane_stack, "Stack", FailingStack)
+    monkeypatch.setattr(jane_stack, "stack_file", lambda _project: stack_file)
+    monkeypatch.setattr(jane_stack, "executors_file", lambda _project: executors_file)
+    monkeypatch.setattr(jane_stack, "recordings_dir", lambda _project: recordings_dir)
+    monkeypatch.setattr(lh, "ROOT", tmp_path)
+    monkeypatch.setattr(lh, "OUT_ROOT", tmp_path / ".jane" / "limits")
+    monkeypatch.setattr(
+        lh,
+        "environment",
+        lambda profile, project: {
+            "profile": profile,
+            "project": project,
+            "measured_at": "2026-09-30T00:00:00Z",
+            "git_sha": "test-sha",
+            "git_dirty": False,
+            "docker": {"ServerVersion": "test", "OperatingSystem": "test", "NCPU": 1, "MemTotal": 1024},
+            "foreign_containers": 0,
+        },
+    )
+    ns = argparse.Namespace(
+        profile="ci", project=project, only=None, repeat=None, no_up=False, allow_busy=False, keep=False
+    )
+
+    assert lh.run(ns) == 1
+    run_dir = next((tmp_path / ".jane" / "limits").iterdir())
+    assert (run_dir / "environment.json").is_file()
+    assert "**Verdict: fail**" in (run_dir / "summary.md").read_text(encoding="utf-8")
+    result = json.loads((run_dir / "results.json").read_text(encoding="utf-8"))
+    assert result["summary"]["verdict"] == "fail"
+    assert result["results"][0]["id"] == "startup"
+    assert "synthetic startup failure" in result["results"][0]["error"]
+    assert calls[0] == (
+        "compose",
+        (("--profile", "*", "down", "--remove-orphans", "-v", "--rmi", "local"), 180),
+    )
+    if cleanup_fails:
+        assert "synthetic cleanup timeout" in result["results"][0]["metrics"]["cleanup_errors"][0]
+        assert stack_file.exists() and executors_file.exists() and recordings_dir.exists()
+        assert len(calls) == 1
+    else:
+        assert result["results"][0]["metrics"]["cleanup_errors"] == []
+        assert not stack_file.exists() and not executors_file.exists() and not recordings_dir.exists()
+        assert calls[1][1][-1] == 30
 
 
 def test_dev_laptop_sandbox_wall_time_covers_the_observed_docker_desktop_cold_start() -> None:

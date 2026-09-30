@@ -83,16 +83,17 @@ uv run --all-packages python deploy/profiles/harness/limits_harness.py evaluate 
 
 ## Як профіль `ci` застосовується в CI
 
-Зараз `.github/workflows/ci.yml` (власник WP-01) профілів не використовує: job `e2e` бере накладку WP-13 з
-типовими лімітами сервісів, `stack` — `just up` без застосунків. Щоб `ci` став перевіреним профілем CI,
-потрібен окремий job (запит до WP-01 у звіті WP-14), наприклад:
+У `.github/workflows/ci.yml` окремий job `limits` запускається лише вручну через `workflow_dispatch` на
+власному `ubuntu-24.04` runner. Він вимірює профіль `ci` на вільному Docker-хості; `e2e` й `stack` лишаються
+окремими перевірками зі своїми налаштуваннями. Після запуску скачайте артефакт
+`limits-ci-<run_id>-<run_attempt>` і перенесіть `summary.md` та рішення у звіт WP-14. Конфігурація job:
 
 ```yaml
   limits:
     needs: contract
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -100,16 +101,23 @@ uv run --all-packages python deploy/profiles/harness/limits_harness.py evaluate 
           version: ${{ env.UV_VERSION }}
           enable-cache: true
       - run: uv sync --all-packages --locked
-      - run: uv run --all-packages python deploy/profiles/harness/limits_harness.py run --profile ci
+      - run: >-
+          uv run --all-packages --locked python deploy/profiles/harness/limits_harness.py
+          run --profile ci --project jane-limits-ci-${{ github.run_id }}-${{ github.run_attempt }}
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: limits-ci-${{ github.run_id }}
+          name: limits-ci-${{ github.run_id }}-${{ github.run_attempt }}
           path: .jane/limits/
+          include-hidden-files: true
 ```
 
-На GitHub runner сторонніх контейнерів немає, тож умова вільного хоста виконується сама. Для нічного прогону
-в `on:` треба додати `schedule` (зараз лише push, pull_request, workflow_dispatch). Застосування профілю поза harness — через
+Новий GitHub runner зазвичай не має сторонніх контейнерів, але harness перевіряє це сам і відмовляється від
+вимірювання на зайнятому хості. Job завантажує створений прихований каталог `.jane/limits/` після збоїв
+сценаріїв або старту стеку. Для помилки старту каталог містить `environment.json`, `results.json` і
+`summary.md` з вердиктом `fail` та станом прибирання. Додавання job саме по собі ще не підтверджує пороги:
+потрібні результати реального прогону.
+Застосування профілю поза harness — через
 `stack.py up --profile ci`: оркестратор і колектори читають `deploy/profiles/ci.json`, решта сервісів
 отримує значення в запитах оркестратора. Якщо `tests/e2e` мають працювати під профілем `ci`, накладка
 WP-13 має монтувати `deploy/profiles/ci.json` так само (запит до WP-13).

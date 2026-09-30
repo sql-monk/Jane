@@ -167,3 +167,29 @@ jobs:
       - run: uv tool install "rust-just==${JUST_VERSION}"
       - run: uv sync --all-packages --locked
       - run: just e2e -v
+
+  # WP-14 profile measurements need their own clean Docker host.
+  limits:
+    needs: contract
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --locked
+      - name: Measure ci limits profile
+        run: >-
+          uv run --all-packages --locked python
+          deploy/profiles/harness/limits_harness.py run --profile ci
+          --project jane-limits-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Upload limits evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: limits-ci-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .jane/limits/
+          include-hidden-files: true

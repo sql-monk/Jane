@@ -32,6 +32,7 @@ import importlib
 import json
 import math
 import platform
+import shutil
 import subprocess
 import sys
 import threading
@@ -58,6 +59,7 @@ OUT_ROOT = ROOT / ".jane" / "limits"
 PROBE_HOST = "probe-site:8080"  # as the services see the probe site inside the compose network
 SCENARIOS = ("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8")
 TITLES = {
+    "startup": "stack startup",
     "L1": "rate: one collection, one host",
     "L2": "rate: two collections, one host",
     "L3": "parallel requests per host",
@@ -905,6 +907,33 @@ def markdown(env: Mapping[str, Any], results: Sequence[Mapping[str, Any]], summa
     return "\n".join(lines) + "\n"
 
 
+def cleanup_failed_start(stack: jane_stack.Stack) -> list[str]:
+    """Bound Docker cleanup after a partial ``up``; keep stack metadata if Compose down fails."""
+    try:
+        stack.compose("--profile", "*", "down", "--remove-orphans", "-v", "--rmi", "local", timeout=180)
+    except Exception as exc:
+        return [f"compose down: {type(exc).__name__}: {exc}"]
+    errors: list[str] = []
+    try:
+        stack.run(
+            ["docker", "image", "rm", "-f", jane_stack.sandbox_image(stack.project)], check=False, timeout=30
+        )
+    except Exception as exc:
+        errors.append(f"sandbox image: {type(exc).__name__}: {exc}")
+    for path in (jane_stack.stack_file(stack.project), jane_stack.executors_file(stack.project)):
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as exc:
+            errors.append(f"{path.name}: {type(exc).__name__}: {exc}")
+    try:
+        shutil.rmtree(jane_stack.recordings_dir(stack.project), ignore_errors=False)
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        errors.append(f"recordings: {type(exc).__name__}: {exc}")
+    return errors
+
+
 def run(ns: argparse.Namespace) -> int:
     th = load_thresholds(ns.profile)
     project = ns.project or f"jane-limits-{ns.profile}"
@@ -921,7 +950,27 @@ def run(ns: argparse.Namespace) -> int:
         return 2
     write_json(out / "environment.json", env)
     if not ns.no_up:
-        stack.up([*jane_stack.DEFAULT_SERVICES, "probe-site"])
+        try:
+            stack.up([*jane_stack.DEFAULT_SERVICES, "probe-site"])
+        except Exception as exc:
+            cleanup_errors = cleanup_failed_start(stack)
+            reason = f"{type(exc).__name__}: {(str(exc).splitlines() or ['no details'])[0][:300]}"
+            startup_result = {
+                "id": "startup",
+                "repetition": 0,
+                "verdict": "error",
+                "error": reason,
+                "metrics": {"cleanup_errors": cleanup_errors},
+            }
+            startup_results = [startup_result]
+            summary = summarize(startup_results)
+            write_json(
+                out / "results.json", {"environment": env, "summary": summary, "results": startup_results}
+            )
+            (out / "summary.md").write_text(markdown(env, startup_results, summary), encoding="utf-8")
+            print(f"startup failed: {reason}; cleanup errors: {cleanup_errors}", file=sys.stderr)
+            print(f"verdict: {summary['verdict']}   results: {out.relative_to(ROOT).as_posix()}")
+            return 1
     sampler = ResourceSampler(
         project, float(th["resources"]["sample_interval_s"]), out / "raw" / "resources.jsonl"
     )

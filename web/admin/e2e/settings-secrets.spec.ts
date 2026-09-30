@@ -73,7 +73,7 @@ test.describe("connections, LLM, limits and secrets @mock", () => {
       .getByRole("button", { name: "Перевірити" })
       .click();
     const result = admin.getByLabel("Результат перевірки підключення");
-    await expect(result).toContainText("environment variable RESULTS_PG_PASSWORD is not set");
+    await expect(result).toContainText("Перевірка підключення не вдалася");
     await expect(result.getByRole("table", { name: "Розв'язання секретів" })).toContainText("password");
   });
 

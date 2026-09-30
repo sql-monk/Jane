@@ -465,11 +465,9 @@ function ValidationView({ validation }: { validation: TaskValidation }) {
       {[
         ...validation.errors.map((e) => ["error", e] as const),
         ...(validation.warnings ?? []).map((w) => ["warning", w] as const),
-      ].map(([level, item], i) => (
+      ].map(([level], i) => (
         <p key={i} className={level === "error" ? "error-inline" : "warn-inline"}>
-          {level === "error" ? "Помилка" : "Попередження"}:{" "}
-          {item.pointer ? <code>{item.pointer}</code> : null} {item.code ? `[${item.code}]` : ""}{" "}
-          {item.message}
+          {level === "error" ? "Помилка" : "Попередження"}: Перевірте конфігурацію завдання.
         </p>
       ))}
     </div>

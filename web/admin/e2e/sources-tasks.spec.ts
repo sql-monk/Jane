@@ -129,7 +129,7 @@ test.describe("sources, crawl strategies, tasks, schedules, chains @mock", () =>
       admin.getByRole("button", { name: "Перевірити в оркестраторі" }).click(),
     );
     expect(body["task_id"]).toBe("shop-catalog");
-    await expect(admin.getByLabel("Результат перевірки")).toContainText("unknown_flag_off");
+    await expect(admin.getByLabel("Результат перевірки")).toContainText("Перевірте конфігурацію завдання");
     await expect(admin.getByLabel("Результат перевірки")).toContainText(
       "Ефективне «Передавати в LLM невідомі сторінки»: ні",
     );

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useApi } from "../app/context";
 import { unwrap } from "../api/client";
+import { safeProblemCode } from "../api/problem";
 import { TERMINAL_JOB_STATUSES, pollDelay, useCursorList } from "../api/hooks";
 import { useConfig } from "../app/context";
 import type { JobStatus, Run, StageItem } from "../api/types";
@@ -171,9 +172,7 @@ export function RunPage() {
               ["Версія конфігурації", data.task_etag ?? "—"],
             ]}
           />
-          {data.error ? (
-            <ErrorBox error={new Error(`${data.error.title} (${data.error.code})`)} title="Помилка запуску" />
-          ) : null}
+          {data.error ? <ErrorBox error={data.error} title="Помилка запуску" /> : null}
           <Tabs<RunTab>
             tabs={[
               ["progress", "Прогрес етапів"],
@@ -272,7 +271,7 @@ function RunItems({ runId }: { runId: string }) {
           { header: "Результат", cell: (i) => <Status value={i.result_status ?? null} /> },
           { header: "Спроби", cell: (i) => i.attempts },
           { header: "Пакет", cell: (i) => refLabel(i.handler) },
-          { header: "Помилка", cell: (i) => (i.error ? `${i.error.code}: ${i.error.title}` : "—") },
+          { header: "Помилка", cell: (i) => (i.error ? "Помилка елемента" : "—") },
         ]}
       />
       <LoadMore hasMore={list.hasMore} loading={list.loadingMore} onClick={list.loadMore} />
@@ -309,11 +308,11 @@ function CollectorErrors({ run }: { run: Run }) {
         rows={errors.data?.items ?? []}
         rowKey={(e, i) => `${e.url ?? ""}-${i}`}
         columns={[
-          { header: "URL / повідомлення", cell: (e) => e.url ?? "—" },
-          { header: "Код", cell: (e) => <code>{e.code}</code> },
+          { header: "URL / повідомлення", cell: () => "—" },
+          { header: "Код", cell: (e) => <code>{safeProblemCode(e.code)}</code> },
           { header: "HTTP", cell: (e) => e.http_status ?? "—" },
           { header: "Спроби", cell: (e) => e.attempts ?? "—" },
-          { header: "Повідомлення", cell: (e) => e.message ?? "—" },
+          { header: "Повідомлення", cell: () => "Помилка збору" },
           { header: "Коли", cell: (e) => formatDate(e.at) },
         ]}
       />

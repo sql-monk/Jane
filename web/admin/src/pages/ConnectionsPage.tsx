@@ -107,7 +107,6 @@ function ExecutorsSync({ executors }: { executors: PlatformConnection["executors
       {executors.map((e) => (
         <li key={e.executor}>
           {e.executor}: <Status value={e.sync_status} />{" "}
-          {e.message ? <span className="muted">{e.message}</span> : null}
         </li>
       ))}
     </ul>
@@ -353,7 +352,7 @@ function ConnectionEditor({ connectionId, onDone }: { connectionId: string | nul
           <p>
             {test.executor}: <Status value={test.result.ok ? "ok" : "failed"} />{" "}
             {test.result.latency_ms !== undefined ? `${test.result.latency_ms} мс` : ""}{" "}
-            {test.result.message ?? ""}
+            {test.result.ok ? "Підключення працює" : "Перевірка підключення не вдалася"}
           </p>
           <Table
             label="Розв'язання секретів"

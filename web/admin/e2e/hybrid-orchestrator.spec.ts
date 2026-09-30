@@ -97,6 +97,24 @@ test.describe("real orchestrator: sources, tasks, schedules, limits, connections
     await expect(admin.getByRole("table", { name: "Ефективні ліміти" })).toContainText(
       "queue.max_queue_depth",
     );
+    await admin.getByRole("tab", { name: "Запуски" }).click();
+    await admin.getByLabel("Причина").fill("e2e test-mode run");
+    await admin.getByLabel("Тестовий режим (без запису в робочі дані)").check();
+    const started = await captureRequest(admin, "POST", `/api/orchestrator/v1/tasks/${taskId}/runs`, () =>
+      admin.getByRole("button", { name: "Запустити" }).click(),
+    );
+    expect(started.request.headers()["idempotency-key"]).toBeTruthy();
+    expect(started.body).toEqual({ reason: "e2e test-mode run", test_mode: true });
+    await expect(admin).toHaveURL(/\/runs\/run_/);
+    await expect(admin.getByText("так (без запису в робочі дані)")).toBeVisible();
+    await admin.getByRole("tab", { name: "Елементи й помилки" }).click();
+    await expect(admin.getByRole("region", { name: "Елементи запуску" })).toBeVisible();
+    await admin.getByRole("button", { name: "Скасувати запуск" }).click();
+    await admin.getByLabel("Причина: Скасувати запуск").fill("e2e stop test run");
+    const cancelled = await captureRequest(admin, "POST", /\/api\/orchestrator\/v1\/runs\/run_[^/]+\/cancel/, () =>
+      admin.getByRole("button", { name: "Скасувати", exact: true }).click(),
+    );
+    expect(cancelled.body).toEqual({ reason: "e2e stop test run" });
     await expect(admin.getByRole("alert")).toHaveCount(0);
   });
 

@@ -35,7 +35,7 @@ test.describe("runs, progress, costs, cancellation, reprocessing, materials, res
     await admin.goto(`/runs/${RUN}`);
     await admin.getByRole("tab", { name: "Помилки колектора" }).click();
     const errors = admin.getByRole("table", { name: "Помилки колектора" });
-    await expect(errors).toContainText("disallowed by robots.txt");
+    await expect(errors).toContainText("Помилка збору");
     await expect(errors).toContainText("source_unavailable");
   });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { JsonView, Status } from "./ui";
+import { ErrorBox, JsonView, Status } from "./ui";
+import { ApiError } from "../api/problem";
 import { TestReportView } from "./JobPanel";
 import { UnifiedDiff } from "./UnifiedDiff";
 import { DagView } from "./DagView";
@@ -11,6 +12,28 @@ import { openapiExample } from "../test/contracts";
 const FAKE_PASSWORD = ["hunter2", "SECRET"].join("-");
 
 describe("components", () => {
+  it("ErrorBox does not render any untrusted Problem fields or generic Error.message", () => {
+    const secret = ["pg-password", "LEAK-1"].join("-");
+    const problem = {
+      type: "urn:jane:problem:validation_failed",
+      title: secret,
+      status: 422,
+      code: "validation_failed",
+      detail: secret,
+      trace_id: secret,
+      errors: [{ pointer: secret, message: secret }],
+      details: { message: secret },
+    };
+    const { rerender } = render(<ErrorBox error={new ApiError(422, problem)} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("validation_failed");
+    expect(screen.getByRole("alert")).toHaveTextContent("HTTP 422");
+    expect(screen.getByRole("alert").textContent).not.toContain(secret);
+    rerender(<ErrorBox error={new ApiError(422, { ...problem, code: `leaked_${secret}` })} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("unknown_error");
+    expect(screen.getByRole("alert").textContent).not.toContain(secret);
+    rerender(<ErrorBox error={new Error(secret)} />);
+    expect(screen.getByRole("alert").textContent).not.toContain(secret);
+  });
   it("JsonView never renders secret values", () => {
     render(
       <JsonView value={{ params: { password: FAKE_PASSWORD }, secret_refs: { token: "env:TG_TOKEN" } }} />,

@@ -71,16 +71,9 @@ export function JobPanel({
         <p className="muted">
           Прогрес: {data.progress.completed ?? 0}
           {data.progress.total ? ` / ${data.progress.total}` : ""} {data.progress.unit ?? ""}
-          {data.progress.message ? ` — ${data.progress.message}` : ""}
         </p>
       ) : null}
-      {data?.error ? (
-        <ErrorBox
-          error={new Error(`${data.error.title} (${data.error.code})`)}
-          title="Job завершився з помилкою"
-        />
-      ) : null}
-      {data?.error?.details ? <JsonView value={data.error.details} compact /> : null}
+      {data?.error ? <ErrorBox error={data.error} title="Job завершився з помилкою" /> : null}
       {data?.finished_at ? <p className="muted">Завершено: {formatDate(data.finished_at)}</p> : null}
       {data?.result ? renderResult ? renderResult(data.result) : <JsonView value={data.result} /> : null}
     </div>

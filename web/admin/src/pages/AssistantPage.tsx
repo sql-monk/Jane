@@ -318,9 +318,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
               ["Створено", formatDate(s.created_at)],
             ]}
           />
-          {s.error ? (
-            <ErrorBox error={new Error(`${s.error.title} (${s.error.code})`)} title="Помилка сесії" />
-          ) : null}
+          {s.error ? <ErrorBox error={s.error} title="Помилка сесії" /> : null}
           {s.status === "needs_disambiguation" && s.candidates?.length ? (
             <div aria-label="Кандидати">
               <h3>Уточніть джерело</h3>
@@ -358,7 +356,6 @@ function SessionView({ sessionId }: { sessionId: string }) {
               Вибірка: {s.sample.materials ?? 0} матеріалів, {s.sample.distinct_types ?? 0} типів, впевненість{" "}
               {s.sample.confidence !== undefined ? `${Math.round(s.sample.confidence * 100)}%` : "—"}
               {s.sample.sufficient === false ? " — вибірки недостатньо" : ""}
-              {s.sample.message ? `: ${s.sample.message}` : ""}
             </Notice>
           ) : null}
           {s.analysis ? (

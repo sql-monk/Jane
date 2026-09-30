@@ -9,7 +9,9 @@ export class ApiError extends Error {
   readonly problem: Problem;
 
   constructor(status: number, problem: Problem) {
-    super(problem.detail ? `${problem.title}: ${problem.detail}` : problem.title);
+    // A service may accidentally include credentials in title/detail. Keep the raw Problem for
+    // code-based decisions, but never put untrusted prose into Error.message (or the UI).
+    super("Запит не виконано");
     this.name = "ApiError";
     this.status = status;
     this.problem = problem;
@@ -52,7 +54,45 @@ export function toProblem(status: number, body: unknown, statusText = ""): Probl
 }
 
 export function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
-  if (error instanceof Error) return error.message;
-  return String(error);
+  return error instanceof ApiError ? "Запит не виконано" : "Операцію не виконано";
+}
+
+// Only codes from contracts/schemas/common/problem.schema.json are safe to show. A syntactically
+// valid but unknown code may still contain a credential, so it must not be reflected into the DOM.
+const KNOWN_CODES = new Set([
+  "bad_request",
+  "validation_failed",
+  "unauthenticated",
+  "forbidden",
+  "not_found",
+  "method_not_allowed",
+  "conflict",
+  "version_exists",
+  "precondition_failed",
+  "precondition_required",
+  "idempotency_key_reused",
+  "idempotency_in_progress",
+  "payload_too_large",
+  "unsupported_media_type",
+  "limit_exceeded",
+  "rate_limited",
+  "budget_exhausted",
+  "job_not_cancellable",
+  "secret_detected",
+  "dependency_not_allowed",
+  "digest_mismatch",
+  "schema_mismatch",
+  "out_of_scope",
+  "access_denied_by_policy",
+  "upstream_conflict",
+  "source_unavailable",
+  "upstream_unavailable",
+  "internal_error",
+  "not_implemented",
+  "service_unavailable",
+  "timeout",
+]);
+
+export function safeProblemCode(value: unknown): string {
+  return typeof value === "string" && KNOWN_CODES.has(value) ? value : "unknown_error";
 }

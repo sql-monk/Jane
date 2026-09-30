@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ApiError, errorMessage } from "../api/problem";
+import { ApiError, errorMessage, safeProblemCode } from "../api/problem";
 import { redactSecrets } from "../lib/secrets";
 
 export function Page({
@@ -53,6 +53,10 @@ export function Loading({ what = "Завантаження" }: { what?: string }
 export function ErrorBox({ error, title }: { error: unknown; title?: string }) {
   if (!error) return null;
   const problem = error instanceof ApiError ? error.problem : null;
+  const httpStatus =
+    error instanceof ApiError && Number.isInteger(error.status) && error.status >= 400 && error.status <= 599
+      ? error.status
+      : null;
   return (
     <div className="error-box" role="alert">
       <strong>{title ?? "Помилка"}</strong>
@@ -60,20 +64,10 @@ export function ErrorBox({ error, title }: { error: unknown; title?: string }) {
       {problem ? (
         <span className="muted">
           {" "}
-          (<code>{problem.code}</code>, HTTP {problem.status}
-          {problem.trace_id ? `, trace ${problem.trace_id}` : ""})
+          (<code>{safeProblemCode(problem.code)}</code>
+          {httpStatus ? `, HTTP ${httpStatus}` : ""})
         </span>
       ) : null}
-      {problem?.errors?.length ? (
-        <ul>
-          {problem.errors.map((e, i) => (
-            <li key={i}>
-              {e.pointer ? <code>{e.pointer}</code> : null} {e.message}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {problem?.details ? <JsonView value={problem.details} compact /> : null}
     </div>
   );
 }

@@ -4,6 +4,7 @@ templates, API pagination, registration in the core registry."""
 from __future__ import annotations
 
 import gzip
+import json
 import time
 import zlib
 from datetime import UTC, datetime
@@ -12,9 +13,11 @@ from types import ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
 
 from jane_contracts.discovery import DiscoveryStrategy
 from jane_web_collector.discovery import Registry
+from jane_web_collector.testing import REPO_ROOT
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
 MiB = 1024 * 1024
@@ -49,6 +52,19 @@ def test_package_registers_every_wp03_strategy(discovery: ModuleType) -> None:
         assert isinstance(instance, DiscoveryStrategy)
         assert instance.snapshot() == {}
         instance.restore({})
+
+
+@pytest.mark.parametrize("name", ["web-shop.json", "web-news-feeds-templates-api.json"])
+def test_contract_examples_are_supported(client: TestClient, name: str) -> None:
+    """The collector-rules examples of the contract validate and are executable with this package
+    (``llm_explore`` is dropped: ADR-0010 keeps it unsupported by design)."""
+    rules = json.loads(
+        (REPO_ROOT / "contracts/examples/schemas/collector-rules" / name).read_text(encoding="utf-8")
+    )
+    rules["strategies"] = [s for s in rules["strategies"] if s["type"] != "llm_explore"]
+    report = client.post("/v1/rules/validations", json=rules).json()
+    assert report["valid"] is True and report["supported"] is True, report
+    assert {s["type"] for s in rules["strategies"]} - {"seed_list", "recursive"}
 
 
 # ------------------------------------------------------------------------------------------ gzip

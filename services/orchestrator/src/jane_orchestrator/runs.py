@@ -413,8 +413,14 @@ class Runs:
 
         Returns ``True`` only for the caller that actually changed the state (several workers or reapers may
         race for the same run): only that caller counts the metric and cancels the collection."""
+        # Acquire the row lock before evaluating clock_timestamp() in UPDATE. A blocked UPDATE can
+        # otherwise evaluate its SET expressions before waiting and persist a pre-transition time.
+        row = conn.execute("SELECT status FROM runs WHERE run_id = %s FOR UPDATE", (run_id,)).fetchone()
+        if row is None or row["status"] in TERMINAL_RUN:
+            return False
         cur = conn.execute(
-            "UPDATE runs SET status = 'failed', error = %s, finished_at = now(), updated_at = now()"
+            "UPDATE runs SET status = 'failed', error = %s, finished_at = clock_timestamp(),"
+            " updated_at = clock_timestamp()"
             " WHERE run_id = %s AND status NOT IN ('succeeded', 'failed', 'cancelled')",
             (Jsonb(dict(problem)), run_id),
         )
@@ -447,8 +453,8 @@ class Runs:
             else:
                 status = "succeeded"
             conn.execute(
-                "UPDATE runs SET status = %s, error = coalesce(error, feed_error), finished_at = now(),"
-                " updated_at = now() WHERE run_id = %s",
+                "UPDATE runs SET status = %s, error = coalesce(error, feed_error),"
+                " finished_at = clock_timestamp(), updated_at = clock_timestamp() WHERE run_id = %s",
                 (status, run_id),
             )
         self.core.metrics.inc("runs", status=status)

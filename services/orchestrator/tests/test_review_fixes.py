@@ -11,6 +11,8 @@ import pytest
 from orch_support import Neighbours, catalog_task, items_by_stage, source_doc, wait_until
 from test_done_when import post, start, wait_run, worker_process
 
+from jane_orchestrator.runs import problem
+
 pytestmark = pytest.mark.integration
 
 
@@ -159,6 +161,135 @@ def test_parallel_runs_limit_holds_with_many_workers(
             order = conn.execute("SELECT run_id FROM runs ORDER BY seq").fetchall()
             by_start = conn.execute("SELECT run_id FROM runs ORDER BY started_at").fetchall()
         assert order == by_start  # FIFO
+
+
+def test_queue_start_timestamp_is_after_prior_run_finished_while_waiting_for_lock(
+    make_client: Any, neighbours: Neighbours, db_dsn: str
+) -> None:
+    """A queued transition may begin its transaction before the previous run finishes.
+
+    The advisory lock still serializes the statuses; started_at must record the actual transition,
+    not the earlier transaction start, or the run intervals falsely overlap.
+    """
+    api = make_client(run_workers=False)
+    engine = api.app.state.engine
+    assert post(api, "/v1/sources", source_doc()).status_code == 201
+    assert (
+        post(api, "/v1/tasks", catalog_task(schedule={"type": "manual", "overlap": "queue"})).status_code
+        == 201
+    )
+    first, second = start(api, "shop-catalog"), start(api, "shop-catalog")
+    with psycopg.connect(db_dsn) as conn:
+        conn.execute(
+            "UPDATE runs SET status = 'running', started_at = clock_timestamp(), feed_done = true"
+            " WHERE run_id = %s",
+            (first,),
+        )
+    claimed = engine.claim_feed("timestamp-test")
+    assert claimed is not None and claimed["run_id"] == second
+
+    errors: list[BaseException] = []
+
+    def begin_next() -> None:
+        try:
+            engine.process_feed(claimed, "timestamp-test")
+        except BaseException as exc:
+            errors.append(exc)
+
+    lock_key = "jane-run-start:shop-catalog"
+    with psycopg.connect(db_dsn, autocommit=True) as gate:
+        gate.execute("SELECT pg_advisory_lock(hashtext(%s))", (lock_key,))
+        thread = threading.Thread(target=begin_next, daemon=True)
+        thread.start()
+        try:
+
+            def blocked_on_advisory_lock() -> bool:
+                with psycopg.connect(db_dsn) as observer:
+                    row = observer.execute(
+                        "SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid"
+                        " WHERE a.datname = current_database() AND l.locktype = 'advisory' AND NOT l.granted"
+                    ).fetchone()
+                    return bool(row and row[0])
+
+            wait_until(blocked_on_advisory_lock, 10)
+            with psycopg.connect(db_dsn) as conn:
+                row = conn.execute(
+                    "UPDATE runs SET status = 'succeeded', finished_at = clock_timestamp()"
+                    " WHERE run_id = %s RETURNING finished_at",
+                    (first,),
+                ).fetchone()
+                assert row is not None
+                first_finished = row[0]
+        finally:
+            gate.execute("SELECT pg_advisory_unlock(hashtext(%s))", (lock_key,))
+            thread.join(30)
+
+    assert not thread.is_alive()
+    assert not errors, errors
+    with psycopg.connect(db_dsn) as conn:
+        row = conn.execute("SELECT started_at FROM runs WHERE run_id = %s", (second,)).fetchone()
+    assert row is not None and row[0] is not None
+    assert row[0] > first_finished
+
+
+@pytest.mark.parametrize("ending", ["success", "failure"])
+def test_run_finish_timestamp_is_after_row_lock_wait(
+    make_client: Any, neighbours: Neighbours, db_dsn: str, ending: str
+) -> None:
+    """A finish transaction can wait for a row lock before its terminal status becomes visible."""
+    api = make_client(run_workers=False)
+    engine = api.app.state.engine
+    assert post(api, "/v1/sources", source_doc()).status_code == 201
+    assert post(api, "/v1/tasks", catalog_task()).status_code == 201
+    run_id = start(api, "shop-catalog")
+    with psycopg.connect(db_dsn) as conn:
+        conn.execute(
+            "UPDATE runs SET status = 'running', started_at = clock_timestamp(), feed_done = true"
+            " WHERE run_id = %s",
+            (run_id,),
+        )
+
+    errors: list[BaseException] = []
+
+    def finish() -> None:
+        try:
+            if ending == "success":
+                assert engine.runs.maybe_finish(run_id) == "succeeded"
+            else:
+                with engine.core.db.tx() as conn:
+                    assert engine.runs.fail_run(conn, run_id, problem("test_failure", "forced failure"))
+        except BaseException as exc:
+            errors.append(exc)
+
+    with psycopg.connect(db_dsn) as gate:
+        gate.execute("SELECT run_id FROM runs WHERE run_id = %s FOR UPDATE", (run_id,))
+        thread = threading.Thread(target=finish, daemon=True)
+        thread.start()
+        try:
+
+            def blocked_on_row_lock() -> bool:
+                with psycopg.connect(db_dsn) as observer:
+                    row = observer.execute(
+                        "SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid"
+                        " WHERE a.datname = current_database() AND NOT l.granted"
+                        " AND l.locktype IN ('transactionid', 'tuple')"
+                    ).fetchone()
+                    return bool(row and row[0])
+
+            wait_until(blocked_on_row_lock, 10)
+            row = gate.execute("SELECT clock_timestamp()").fetchone()
+            assert row is not None
+            marker = row[0]
+        finally:
+            gate.commit()
+            thread.join(30)
+
+    assert not thread.is_alive()
+    assert not errors, errors
+    with psycopg.connect(db_dsn) as conn:
+        row = conn.execute("SELECT status, finished_at FROM runs WHERE run_id = %s", (run_id,)).fetchone()
+    assert row is not None and row[0] == ("succeeded" if ending == "success" else "failed")
+    assert row[1] > marker
 
 
 def test_run_timeout_after_feed_is_done(make_client: Any, neighbours: Neighbours, db_dsn: str) -> None:

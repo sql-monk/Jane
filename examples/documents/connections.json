@@ -1,0 +1,28 @@
+{
+  "connections": [
+    {
+      "connection_id": "raw-files",
+      "kind": "filesystem",
+      "title": "Приклади: RAW на томі storage",
+      "params": {
+        "base_path": "/var/lib/jane/storage"
+      }
+    },
+    {
+      "connection_id": "results-pg",
+      "kind": "postgresql",
+      "title": "Приклади: сутності в PostgreSQL стеку",
+      "params": {
+        "host": "postgres",
+        "port": 5432,
+        "database": "jane_storage_results",
+        "schema": "public",
+        "sslmode": "disable"
+      },
+      "secret_refs": {
+        "username": "env:JANE_SECRET_DEV_PG_USER",
+        "password": "env:JANE_SECRET_DEV_PG_PASSWORD"
+      }
+    }
+  ]
+}

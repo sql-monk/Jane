@@ -1,0 +1,67 @@
+{
+  "schema_version": "1",
+  "package_id": "harness.sandbox-probe",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "Limits harness: sandbox probe",
+  "description": "Службовий пакет WP-14 для вимірювання пісочниці: затримка sleep_ms і виділення alloc_mb; завжди empty.",
+  "tags": [
+    "harness",
+    "limits"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_harness_probe.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "probe",
+        "schema": "schemas/probe.schema.json",
+        "key_fields": [
+          "id"
+        ]
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "no-sleep-empty",
+      "input": {
+        "file": "tests/page/page.html",
+        "media_type": "text/html",
+        "url": "http://probe-site:8080/s/test/p/1"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "WP-14"
+    ],
+    "created_at": "2026-09-30T00:00:00Z",
+    "change_summary": "Sandbox probe of the limits harness."
+  }
+}

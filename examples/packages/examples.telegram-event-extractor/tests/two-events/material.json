@@ -1,0 +1,38 @@
+{
+  "material_id": "tg:-1009000000001:3",
+  "observation_id": "obs_example_tg_0003",
+  "source": {
+    "source_id": "telegram-events",
+    "kind": "telegram",
+    "name": "Jane events example"
+  },
+  "locator": {
+    "telegram": {
+      "channel_id": "-1009000000001",
+      "channel_username": "jane_events_example",
+      "message_id": 3
+    }
+  },
+  "fetched_at": "2026-09-30T10:00:00Z",
+  "published_at": "2026-09-30T09:00:00Z",
+  "format": {
+    "media_type": "text/plain",
+    "charset": "utf-8",
+    "content_kind": "message"
+  },
+  "revision": {
+    "content_sha256": "9f32d4c84d2ce0427e94cb2d505277a7f8d73bea0fbb728716a858296057e1e8",
+    "sequence": 1790758803
+  },
+  "content_file": "tests/two-events/message.txt",
+  "content": {
+    "kind": "inline",
+    "media_type": "text/plain",
+    "encoding": "utf-8",
+    "data": ""
+  },
+  "collector": {
+    "name": "telegram-collector",
+    "version": "0.1.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "examples.telegram-event-extractor params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "markers": {
+      "description": "Слова на початку рядка, що позначають анонс події.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1,
+      "default": ["Подія", "Event"]
+    }
+  }
+}

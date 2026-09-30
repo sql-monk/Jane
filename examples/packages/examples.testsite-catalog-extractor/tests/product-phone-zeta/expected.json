@@ -1,0 +1,12 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "sku": "phone-zeta",
+        "availability": "preorder",
+        "category": "phones"
+      }
+    }
+  ]
+}

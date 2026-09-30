@@ -1,0 +1,90 @@
+{
+  "task_id": "testsite-price-check",
+  "title": "Перевірка цін і наявності testsite за розкладом",
+  "description": "Критерій 5 ТЗ §12: окреме завдання; читає лише задані URL і оновлює тільки price та availability (completeness: partial).",
+  "input": {
+    "source_id": "testsite-shop",
+    "urls": [
+      "http://testsite:8080/product/phone-alpha",
+      "http://testsite:8080/product/phone-gamma",
+      "http://testsite:8080/product/phone-zeta",
+      "http://testsite:8080/product/laptop-four"
+    ]
+  },
+  "stages": [
+    {
+      "stage_id": "collect",
+      "kind": "collect",
+      "collector": {
+        "collector": "web",
+        "mode": "full"
+      }
+    },
+    {
+      "stage_id": "extract-price",
+      "kind": "handler",
+      "handler": {
+        "package_id": "examples.testsite-price-extractor",
+        "version": "1.0.0",
+        "digest": "sha256:d143e1e9b7a4f3f2ea28886cc6fd37c29cb9915fce772d1a84b1ea6ea6bfa2f9"
+      },
+      "inputs": [
+        {
+          "from": "collect",
+          "when": {
+            "field": "material.format.media_type",
+            "op": "eq",
+            "value": "text/html"
+          }
+        }
+      ],
+      "bindings": [
+        {
+          "url_patterns": [
+            {
+              "value": "*/product/*"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage_id": "store-price",
+      "kind": "handler",
+      "handler": {
+        "package_id": "jane.storage-postgresql",
+        "version": "1.0.0",
+        "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+      },
+      "connections": {
+        "target": "results-pg"
+      },
+      "inputs": [
+        {
+          "from": "extract-price",
+          "select": "output",
+          "when": {
+            "field": "result.status",
+            "op": "eq",
+            "value": "success"
+          }
+        }
+      ]
+    }
+  ],
+  "schedule": {
+    "type": "interval",
+    "interval_seconds": 3600,
+    "overlap": "skip"
+  },
+  "limits": {
+    "crawl": {
+      "max_pages_per_run": 20
+    }
+  },
+  "forward_unknown_to_llm": false,
+  "labels": {
+    "example": "wp14-catalog",
+    "kind": "price-check"
+  }
+}

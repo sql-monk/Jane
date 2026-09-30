@@ -1,0 +1,21 @@
+{
+  "source_id": "telegram-events",
+  "kind": "telegram",
+  "title": "Канал подій (записаний Telegram)",
+  "description": "Приклад WP-14: канал jane_events_example на записаному backend Telegram Collector (замінник зовнішнього сервісу). Для реального каналу див. examples/README.md.",
+  "locator": {
+    "telegram_username": "jane_events_example"
+  },
+  "collector_rules": {
+    "package_id": "examples.telegram-rules",
+    "version": "1.0.0",
+    "digest": "sha256:cc734c10a59bb73d2dda0fc1c1c8fdb228c56a993aa43c39eb78067d68332eba"
+  },
+  "forward_unknown_to_llm": false,
+  "expected_entity_types": [
+    "event"
+  ],
+  "labels": {
+    "example": "wp14-telegram"
+  }
+}

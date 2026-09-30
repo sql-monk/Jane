@@ -1,0 +1,25 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "sku": "phone-alpha",
+        "title": "Phone Alpha",
+        "price": {
+          "amount": 299.0,
+          "currency": "UAH"
+        },
+        "availability": "in_stock",
+        "category": "phones",
+        "url": "http://testsite:8080/product/phone-alpha"
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "sku": "phone-alpha"
+        }
+      }
+    }
+  ]
+}

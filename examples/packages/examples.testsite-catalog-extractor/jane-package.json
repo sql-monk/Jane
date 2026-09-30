@@ -1,0 +1,134 @@
+{
+  "schema_version": "1",
+  "package_id": "examples.testsite-catalog-extractor",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "Jane test site: full product cards",
+  "description": "Екстрактор прикладу «повний каталог»: sku, назва, ціна, наявність, категорія, URL (completeness: full).",
+  "tags": [
+    "examples",
+    "testsite",
+    "products",
+    "catalog"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_example_catalog.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "product",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "sku"
+        ],
+        "description": "Повна картка товару"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "product-phone-alpha",
+      "input": {
+        "file": "tests/product-phone-alpha/page.html",
+        "media_type": "text/html",
+        "url": "http://testsite:8080/product/phone-alpha"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-phone-alpha/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "product-phone-zeta-preorder",
+      "input": {
+        "file": "tests/product-phone-zeta/page.html",
+        "media_type": "text/html",
+        "url": "http://testsite:8080/product/phone-zeta"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-phone-zeta/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "product-laptop-four-out-of-stock",
+      "input": {
+        "file": "tests/product-laptop-four/page.html",
+        "media_type": "text/html",
+        "url": "http://testsite:8080/product/laptop-four"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-laptop-four/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "category-page-empty",
+      "input": {
+        "file": "tests/category-phones/page.html",
+        "media_type": "text/html",
+        "url": "http://testsite:8080/catalog/phones/"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "unknown-page-empty",
+      "input": {
+        "file": "tests/unknown-faq/page.html",
+        "media_type": "text/html",
+        "url": "http://testsite:8080/pages/faq"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "product-without-price-unrecognized",
+      "input": {
+        "file": "tests/product-no-price/page.html",
+        "media_type": "text/html",
+        "url": "http://testsite:8080/product/phone-omega"
+      },
+      "expected_status": "unrecognized",
+      "origin": "problem_sample"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "WP-14"
+    ],
+    "created_at": "2026-09-30T00:00:00Z",
+    "change_summary": "Full product cards for the reproducible catalog example."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "url_patterns": [
+      "/product/*"
+    ]
+  }
+}

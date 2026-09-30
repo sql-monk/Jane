@@ -1,0 +1,100 @@
+{
+  "schema_version": "1",
+  "package_id": "examples.telegram-event-extractor",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "Telegram channel: events from announcement lines",
+  "description": "Екстрактор прикладу «події з Telegram»: рядки «Подія: назва | дата [час] | місце» стають сутностями event; редагування повідомлення оновлює подію.",
+  "tags": [
+    "examples",
+    "telegram",
+    "events"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_example_events.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/plain"
+    ],
+    "content_kinds": [
+      "message"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "event",
+        "schema": "schemas/event.schema.json",
+        "key_fields": [
+          "event_id"
+        ],
+        "description": "Подія з анонсу в каналі"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "lecture",
+      "input": {
+        "material": "tests/lecture/material.json"
+      },
+      "expected_status": "success",
+      "expected": "tests/lecture/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "two-events",
+      "input": {
+        "material": "tests/two-events/material.json"
+      },
+      "expected_status": "success",
+      "expected": "tests/two-events/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "announcement-empty",
+      "input": {
+        "material": "tests/announcement/material.json"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "broken-line-unrecognized",
+      "input": {
+        "material": "tests/broken/material.json"
+      },
+      "expected_status": "unrecognized",
+      "origin": "problem_sample"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "WP-14"
+    ],
+    "created_at": "2026-09-30T00:00:00Z",
+    "change_summary": "Rule-based events of the reproducible Telegram example."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "telegram"
+    ]
+  }
+}

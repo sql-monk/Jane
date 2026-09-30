@@ -1,0 +1,91 @@
+{
+  "task_id": "telegram-events",
+  "title": "Події з Telegram-каналу",
+  "description": "Історія, нові й відредаговані повідомлення → RAW у files, події в PostgreSQL; редагування оновлює подію.",
+  "input": {
+    "source_id": "telegram-events"
+  },
+  "stages": [
+    {
+      "stage_id": "collect",
+      "kind": "collect",
+      "collector": {
+        "collector": "telegram",
+        "mode": "incremental"
+      }
+    },
+    {
+      "stage_id": "store-raw",
+      "kind": "handler",
+      "handler": {
+        "package_id": "jane.storage-files",
+        "version": "1.0.0",
+        "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+      },
+      "connections": {
+        "target": "raw-files"
+      },
+      "inputs": [
+        {
+          "from": "collect"
+        }
+      ]
+    },
+    {
+      "stage_id": "extract-events",
+      "kind": "handler",
+      "handler": {
+        "package_id": "examples.telegram-event-extractor",
+        "version": "1.0.0",
+        "digest": "sha256:37143cc4a36963d4825aac6fd7cac108f1479005af26ab24309d499859f17d55"
+      },
+      "inputs": [
+        {
+          "from": "collect",
+          "when": {
+            "field": "material.format.media_type",
+            "op": "eq",
+            "value": "text/plain"
+          }
+        }
+      ]
+    },
+    {
+      "stage_id": "store-events",
+      "kind": "handler",
+      "handler": {
+        "package_id": "jane.storage-postgresql",
+        "version": "1.0.0",
+        "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+      },
+      "connections": {
+        "target": "results-pg"
+      },
+      "inputs": [
+        {
+          "from": "extract-events",
+          "select": "output",
+          "when": {
+            "field": "result.status",
+            "op": "eq",
+            "value": "success"
+          }
+        }
+      ]
+    }
+  ],
+  "schedule": {
+    "type": "interval",
+    "interval_seconds": 900,
+    "overlap": "skip"
+  },
+  "limits": {
+    "telegram": {
+      "max_messages_per_run": 500
+    }
+  },
+  "forward_unknown_to_llm": false,
+  "labels": {
+    "example": "wp14-telegram"
+  }
+}

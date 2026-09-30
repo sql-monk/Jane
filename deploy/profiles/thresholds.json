@@ -1,0 +1,25 @@
+{
+  "comment": "Pass/fail thresholds of the limits harness (deploy/profiles/harness/limits_harness.py) per profile; described in docs/operations/limits-validation.md. Limits under test come from deploy/profiles/<profile>.json.",
+  "dev-laptop": {
+    "machine": { "max_foreign_containers": 0, "repeat": 3 },
+    "rate": { "pages": 30, "gap_tolerance_fraction": 0.1, "gap_tolerance_abs_s": 0.02, "min_efficiency": 0.6 },
+    "shared_host": { "pages_per_collection": 15 },
+    "parallel": { "pages": 12, "slow_ms": 2000 },
+    "retries": { "flaky_pages": 3, "failures_per_path": 2, "retry_after_s": 2, "timeout_extra_ms": 3000 },
+    "backpressure": { "pages": 60, "max_unacked": 5, "hold_s": 8 },
+    "sandbox": { "cold_starts": 5, "cold_start_p95_max_fraction_of_wall_time": 0.5, "parallel_sleep_ms": 4000, "memory_overshoot_mb": 256 },
+    "resources": { "sample_interval_s": 5, "memory_total_peak_mib": 6144 },
+    "e2e": { "catalog_run_max_s": 300, "price_check_run_max_s": 120 }
+  },
+  "ci": {
+    "machine": { "max_foreign_containers": 0, "repeat": 1 },
+    "rate": { "pages": 200, "gap_tolerance_fraction": 0.2, "gap_tolerance_abs_s": 0.005, "min_efficiency": 0.5 },
+    "shared_host": { "pages_per_collection": 100 },
+    "parallel": { "pages": 12, "slow_ms": 2000 },
+    "retries": { "flaky_pages": 3, "failures_per_path": 2, "retry_after_s": 2, "timeout_extra_ms": 3000 },
+    "backpressure": { "pages": 60, "max_unacked": 5, "hold_s": 8 },
+    "sandbox": { "cold_starts": 5, "cold_start_p95_max_fraction_of_wall_time": 0.5, "parallel_sleep_ms": 4000, "memory_overshoot_mb": 256 },
+    "resources": { "sample_interval_s": 5, "memory_total_peak_mib": 10240 },
+    "e2e": { "catalog_run_max_s": 180, "price_check_run_max_s": 90 }
+  }
+}

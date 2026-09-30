@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import re
 import sqlite3
 import time
@@ -104,10 +105,15 @@ def build_app(settings: Settings | None = None) -> FastAPI:
 
     app.state.health.add("state_store", state_check)
 
+    # Retry-After of a busy state store: one full lock wait (JANE_TELEGRAM_COLLECTOR_STATE_BUSY_TIMEOUT_MS)
+    busy_retry_after = max(1, math.ceil(settings.state_busy_timeout_ms / 1000))
+
     async def state_busy(request: Request, exc: Exception) -> JSONResponse:
         # another instance held the SQLite lock longer than state_busy_timeout_ms: retryable, not a 500
         log.warning("state store busy", extra={"path": request.url.path, "error": str(exc)})
-        err = JaneError("state store is busy, retry", code="service_unavailable", retry_after_seconds=1)
+        err = JaneError(
+            "state store is busy, retry", code="service_unavailable", retry_after_seconds=busy_retry_after
+        )
         return problem_response(err.to_problem(instance=request.url.path), err.headers)
 
     app.add_exception_handler(sqlite3.OperationalError, state_busy)

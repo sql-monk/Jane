@@ -16,7 +16,7 @@ import json
 import sqlite3
 import threading
 import time
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -242,18 +242,25 @@ class StateStore:
     def finish_if_owner(
         self, collection_id: str, owner: str, status: str, finished_at: str, result: Any = None
     ) -> bool:
-        """Terminal status written only by the current owner (a run that lost its lease must not overwrite it)."""
-        with self.tx() as db:
-            row = db.execute(
-                "SELECT owner, status FROM collections WHERE collection_id = ?", (collection_id,)
-            ).fetchone()
-            if row is None or row[0] != owner or row[1] not in ACTIVE:
-                return False
-            self.finish(db, collection_id, status, finished_at, result)
-            return True
+        """Terminal status written only by the holder of a valid lease (fenced like every other run write)."""
+        try:
+            with self.tx((collection_id, owner)) as db:
+                if (
+                    db.execute(
+                        f"SELECT 1 FROM collections WHERE collection_id = ? AND status IN {ACTIVE}",  # noqa: S608
+                        (collection_id,),
+                    ).fetchone()
+                    is None
+                ):
+                    return False
+                self.finish(db, collection_id, status, finished_at, result)
+                return True
+        except LeaseLost:
+            return False
 
-    def set_paused(self, collection_id: str, paused: bool) -> None:
-        with self.tx() as db:
+    def set_paused(self, collection_id: str, paused: bool, fence: Fence) -> None:
+        """Backpressure flag of a run: written only under the run's lease (:class:`LeaseLost` otherwise)."""
+        with self.tx(fence) as db:
             db.execute(
                 "UPDATE collections SET paused = ? WHERE collection_id = ?", (int(paused), collection_id)
             )
@@ -484,6 +491,26 @@ class StateStore:
                 "INSERT INTO jobs(job_id, body) VALUES (?, ?) ON CONFLICT(job_id) DO UPDATE SET body = excluded.body",
                 (job_id, body),
             )
+
+    def update_job(
+        self, job_id: str, decide: Callable[[str | None, str | None, str | None], str | None]
+    ) -> None:
+        """Read the collection's ``(owner, status)`` and the stored job and write ``decide(...)`` (``None`` =
+        keep) in one ``BEGIN IMMEDIATE`` transaction: no other instance can claim the lease in between."""
+        with self.tx() as db:
+            row = db.execute(
+                "SELECT owner, status FROM collections WHERE collection_id = ?", (job_id,)
+            ).fetchone()
+            current = db.execute("SELECT body FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
+            body = decide(
+                row[0] if row else None, str(row[1]) if row else None, str(current[0]) if current else None
+            )
+            if body is not None:
+                db.execute(
+                    "INSERT INTO jobs(job_id, body) VALUES (?, ?) "
+                    "ON CONFLICT(job_id) DO UPDATE SET body = excluded.body",
+                    (job_id, body),
+                )
 
     def idem_begin(self, key: str, fingerprint: str, ttl_s: float) -> sqlite3.Row | None:
         now = time.time()

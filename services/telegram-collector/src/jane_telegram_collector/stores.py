@@ -28,10 +28,6 @@ class SqliteJobStore:
         self.state = state
         self.instance_id = instance_id
 
-    def _foreign(self, job: Job) -> bool:
-        owner, _ = self.state.lease(job.job_id)
-        return owner is not None and owner != self.instance_id
-
     async def create(self, job: Job) -> None:
         existing = self.state.get_job(job.job_id)
         if existing is not None:  # resumed after a restart: keep the original creation data
@@ -54,23 +50,28 @@ class SqliteJobStore:
         return Job.model_validate_json(body) if body else None
 
     async def save(self, job: Job) -> None:
-        if job.status != JobStatus.CANCELLING and self._foreign(job):
-            return  # a run that lost its lease must not overwrite the new owner's job
-        if job.status in TERMINAL_STATUSES:
-            collection = self.state.get_status(job.job_id)
-            if collection is not None and collection != job.status.value:
-                if collection not in {s.value for s in TERMINAL_STATUSES}:
-                    return
-                job = job.model_copy(update={"status": JobStatus(collection)})
-        elif job.status != JobStatus.CANCELLING:
-            current = await self.get(job.job_id)
-            if current is not None and current.status == JobStatus.CANCELLING:
-                # progress of a run whose cancellation was requested elsewhere keeps the cancellation visible
-                job = job.model_copy(
-                    update={"status": JobStatus.CANCELLING, "cancellation": current.cancellation}
-                )
-        job = job.model_copy(update={"updated_at": datetime.now(UTC)})
-        self.state.put_job(job.job_id, job.model_dump_json())
+        terminal = {s.value for s in TERMINAL_STATUSES}
+
+        def decide(owner: str | None, collection: str | None, current_body: str | None) -> str | None:
+            # evaluated inside one write transaction together with the collection row (atomic guard)
+            updated = job
+            if updated.status != JobStatus.CANCELLING and owner is not None and owner != self.instance_id:
+                return None  # a run that lost its lease must not overwrite the new owner's job
+            if updated.status in TERMINAL_STATUSES:
+                if collection is not None and collection != updated.status.value:
+                    if collection not in terminal:
+                        return None
+                    updated = updated.model_copy(update={"status": JobStatus(collection)})
+            elif updated.status != JobStatus.CANCELLING and current_body is not None:
+                current = Job.model_validate_json(current_body)
+                if current.status == JobStatus.CANCELLING:
+                    # progress of a run whose cancellation was requested elsewhere keeps the cancellation visible
+                    updated = updated.model_copy(
+                        update={"status": JobStatus.CANCELLING, "cancellation": current.cancellation}
+                    )
+            return updated.model_copy(update={"updated_at": datetime.now(UTC)}).model_dump_json()
+
+        self.state.update_job(job.job_id, decide)
 
 
 class SqliteIdempotencyStore:

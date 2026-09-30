@@ -26,7 +26,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
 
 from jane_kit.errors import FieldError, JaneError, ValidationFailed
 
@@ -38,6 +37,7 @@ __all__ = [
     "ConnectionPolicy",
     "check_params",
     "connection_etag",
+    "parse_host",
     "resolve_account",
     "resolved_map",
 ]
@@ -51,10 +51,28 @@ _SECRET_KEY = re.compile(
 _SECRET_VALUE = re.compile(r"^(bearer|basic)\s+\S+|-----BEGIN [A-Z ]*PRIVATE KEY-----", re.I)
 
 
-def _host(value: str) -> str:
-    text = value.strip()
-    parts = urlsplit(text if "://" in text else f"//{text}")
-    return (parts.hostname or "").lower()
+_LABEL = r"(?!-)[A-Za-z0-9-]{1,63}(?<!-)"
+_HOST_VALUE = re.compile(
+    rf"^(?:(?P<scheme>[a-z][a-z0-9+.-]{{0,15}})://)?(?P<host>{_LABEL}(?:\.{_LABEL})*)(?::(?P<port>[0-9]{{1,5}}))?/?$",
+    re.ASCII,
+)
+
+
+def parse_host(value: object) -> tuple[str, int | None] | None:
+    """Strict ``hostname[:port]`` or ``scheme://hostname[:port]`` -> ``(host, port)``; anything else -> ``None``.
+
+    No userinfo (``@``), backslashes, paths, queries, whitespace or control characters: URL parsers disagree
+    on such values (``evil.test<backslash>@allowed.test``), so they are rejected instead of being "normalized".
+    """
+    if not isinstance(value, str) or len(value) > 300:
+        return None
+    m = _HOST_VALUE.fullmatch(value)
+    if m is None:
+        return None
+    port = int(m.group("port")) if m.group("port") else None
+    if port is not None and not 0 < port < 65536:
+        return None
+    return m.group("host").lower(), port
 
 
 @dataclass(frozen=True)
@@ -85,10 +103,15 @@ class ConnectionPolicy:
         return "unknown secret reference scheme"
 
     def host_error(self, value: Any) -> str | None:
-        allowed = {h.lower() for h in self.host_allowlist}
-        if not isinstance(value, str) or _host(value) not in allowed:
-            return f"host must be one of the allowed Telegram hosts {sorted(allowed)}"
-        return None
+        parsed = parse_host(value)
+        if parsed is None:
+            return "host must be a plain hostname[:port] or scheme://hostname[:port]"
+        host, port = parsed
+        for entry in self.host_allowlist:
+            allowed = parse_host(entry)
+            if allowed is not None and allowed[0] == host and allowed[1] in (None, port):
+                return None
+        return f"host must be one of the allowed Telegram hosts {sorted(self.host_allowlist)}"
 
     def violations(self, doc: Mapping[str, Any]) -> list[FieldError]:
         errors = []

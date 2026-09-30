@@ -378,6 +378,22 @@ def test_connection_policy_rejects_exfiltration(
             "/params/server",
             "host_not_allowed",
         ),
+        # values that URL parsers read differently must not pass as the allow-listed host
+        *(
+            ({"params": {"api_id": 1, "proxy_host": value}}, "/params/proxy_host", "host_not_allowed")
+            for value in (
+                "evil.example.org\\@proxy.internal.test",
+                "evil.example.org@proxy.internal.test",
+                "http://evil.example.org\\@proxy.internal.test",
+                "proxy.internal.test/../evil",
+                "proxy.internal.test evil.example.org",
+                "proxy.internal.test\t",
+                "proxy.internal.test\x00.evil.example.org",
+                "proxy.internal.test.",
+                "proxy.internal.test:99999",
+                "proxy.internal.test?x=1",
+            )
+        ),
     ]
     with TestClient(build_app(settings)) as c:
         for overrides, pointer, code in rejected:

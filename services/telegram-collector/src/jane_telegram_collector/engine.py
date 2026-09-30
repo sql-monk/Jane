@@ -112,7 +112,8 @@ class Engine:
             self.state.release(cid, self.settings.instance_id)
 
     async def _resume_loop(self) -> None:
-        interval = max(0.5, self.settings.lease_seconds / 3)
+        # an expired lease is taken over at most one heartbeat interval later (JANE_TELEGRAM_COLLECTOR_HEARTBEAT_INTERVAL_MS)
+        interval = self.settings.heartbeat_interval_ms / 1000
         while True:
             try:
                 await self.resume_pending()

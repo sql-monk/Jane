@@ -232,6 +232,89 @@ def test_stalled_owner_is_fenced_out(service_factory: ServiceFactory, tmp_path: 
     assert "lease lost" in a.log(), a.log()[-3000:]
 
 
+def wait_log(svc: Any, text: str, timeout: float = 30) -> None:
+    deadline = time.monotonic() + timeout
+    while text not in svc.log():
+        if time.monotonic() > deadline:
+            raise AssertionError(f"{text!r} not in the log")
+        time.sleep(0.1)
+
+
+def freeze_owner_on_backpressure(a: Any, b: Any, api_a: httpx.Client, state_key: str) -> str:
+    """Start a collection on A, freeze A while it waits for the consumer; B takes the collection over."""
+    cid = start_slow(api_a, state_key, {"queue": {"max_unacked_materials": 10}})
+    # frozen outside a write transaction (a process frozen inside one blocks the SQLite file for everybody)
+    wait_for(api_a, cid, lambda v: v["paused_by_backpressure"])
+    time.sleep(0.3)
+    a.suspend()
+    wait_log(b, '"resuming collection"')
+    return cid
+
+
+def test_stale_owner_does_not_touch_the_new_owners_paused_flag(
+    service_factory: ServiceFactory, tmp_path: Path
+) -> None:
+    """Review 1: A wakes up while B (the new owner) is paused by backpressure: the flag stays B's."""
+    make_channel(tmp_path / "recordings", 60)
+    a = service_factory(**SLOW_READ)
+    b = service_factory(**SLOW_READ)
+    a.start()
+    b.start()
+    with a.client() as api_a, b.client() as api_b:
+        cid = freeze_owner_on_backpressure(a, b, api_a, "flag")
+        # B continues and stops at the same full buffer (nobody consumes yet)
+        before = wait_for(api_b, cid, lambda v: v["paused_by_backpressure"] and v["stats"]["unacked"] == 10)
+        a.resume()
+        wait_log(a, "lease lost")
+        time.sleep(1.5)  # A has run its heartbeat and its backpressure loop after waking up
+        after = api_b.get(f"/v1/collections/{cid}").json()
+        assert before["paused_by_backpressure"] is True
+        assert after["paused_by_backpressure"] is True, "stale owner cleared the new owner's paused flag"
+        assert after["status"] == "running" and after["stats"]["unacked"] == 10
+        items = drain(api_b, cid, limit=7, timeout=60)
+        view = wait_done(api_b, cid)
+        job = api_b.get(f"/v1/jobs/{cid}").json()
+    assert view["status"] == "succeeded" and job["status"] == "succeeded"
+    assert view["paused_by_backpressure"] is False
+    assert view["stats"]["emitted"] == 60
+    assert_each_message_once(items, 60)
+
+
+def test_stalled_owner_wakes_while_the_new_owner_works(
+    service_factory: ServiceFactory, tmp_path: Path
+) -> None:
+    """Review 1: A is unfrozen in the middle of B's run (B reading and emitting): A writes nothing more."""
+    make_channel(tmp_path / "recordings", 120)
+    a = service_factory(**SLOW_READ)
+    b = service_factory(**SLOW_READ)
+    a.start()
+    b.start()
+    received: list[dict[str, Any]] = []
+    with a.client() as api_a, b.client() as api_b:
+        cid = freeze_owner_on_backpressure(a, b, api_a, "wake")
+        after: str | None = None
+        resumed = False
+        deadline = time.monotonic() + 90
+        while time.monotonic() < deadline:
+            body_ = page(api_b, cid, after, limit=5, wait_ms=2000)
+            received += body_["items"]
+            after = body_["next_cursor"] or after
+            if not resumed and len({m["observation_id"] for m in received}) >= 40:
+                view = api_b.get(f"/v1/collections/{cid}").json()
+                assert view["status"] == "running" and view["stats"]["emitted"] < 120
+                a.resume()  # B is still reading the channel
+                resumed = True
+            if body_["end_of_stream"]:
+                break
+        assert resumed
+        view = wait_done(api_b, cid)
+        job = api_b.get(f"/v1/jobs/{cid}").json()
+    assert view["status"] == "succeeded" and job["status"] == "succeeded"
+    assert view["stats"]["emitted"] == 120
+    assert_each_message_once(received, 120)
+    assert "lease lost" in a.log(), a.log()[-3000:]
+
+
 def test_cancellation_through_another_instance(service_factory: ServiceFactory, tmp_path: Path) -> None:
     make_channel(tmp_path / "recordings", 40)
     a = service_factory()

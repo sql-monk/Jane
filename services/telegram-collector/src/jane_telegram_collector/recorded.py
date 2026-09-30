@@ -49,6 +49,12 @@ from .client import (
 __all__ = ["RecordedClient", "RecordedClientFactory", "Recording"]
 
 
+_FILE_RETRIES = 50
+_FILE_RETRY_DELAY_S = 0.02
+"""Recorded backend only: a recording rewritten by another process may be locked for a moment on Windows
+(``os.replace`` / read); up to 1 s of retries. Not an operational limit of the collector."""
+
+
 def _parse_ts(value: str | None) -> datetime | None:
     if not value:
         return None
@@ -62,22 +68,22 @@ def _ts(value: datetime) -> str:
 def _write_json(path: Path, data: Any) -> None:
     tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
-    for _ in range(50):  # Windows: the reader may hold the file for a moment
+    for _ in range(_FILE_RETRIES):  # Windows: the reader may hold the file for a moment
         try:
             os.replace(tmp, path)
             return
         except PermissionError:
-            time.sleep(0.02)
+            time.sleep(_FILE_RETRY_DELAY_S)
     os.replace(tmp, path)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    for _ in range(50):
+    for _ in range(_FILE_RETRIES):
         try:
             data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
             return data
         except (PermissionError, json.JSONDecodeError):
-            time.sleep(0.02)
+            time.sleep(_FILE_RETRY_DELAY_S)
     data = json.loads(path.read_text(encoding="utf-8"))
     return data
 

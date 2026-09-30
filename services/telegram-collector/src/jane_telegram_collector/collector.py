@@ -255,7 +255,8 @@ class TelegramRun:
         limit = self.limits.queue.max_unacked_materials
         if self.state.unacked_count(self.collection_id) < limit:
             return
-        self.state.set_paused(self.collection_id, True)
+        # the flag belongs to the lease holder: a run that lost its lease must not touch the new owner's flag
+        self.state.set_paused(self.collection_id, True, self.fence)
         event = self.deps.ack_events.setdefault(self.collection_id, asyncio.Event())
         try:
             while self.state.unacked_count(self.collection_id) >= limit and not self.cancelled:
@@ -264,8 +265,12 @@ class TelegramRun:
                     await asyncio.wait_for(
                         event.wait(), timeout=self.limits.collector.backpressure_poll_ms / 1000
                     )
-        finally:
-            self.state.set_paused(self.collection_id, False)
+        except BaseException:
+            # interrupted (lease lost, cancelled, shutdown): clear the flag only while still the owner
+            with contextlib.suppress(LeaseLost):
+                self.state.set_paused(self.collection_id, False, self.fence)
+            raise
+        self.state.set_paused(self.collection_id, False, self.fence)  # LeaseLost here stops the run
 
     # ------------------------------------------------------------------ heartbeat
     async def _beat(self) -> None:
@@ -334,6 +339,8 @@ class TelegramRun:
 
     async def _execute(self) -> dict[str, Any]:
         where: str | None = None
+        # a previous owner killed while paused leaves the flag set; the new owner decides it anew
+        self.state.set_paused(self.collection_id, False, self.fence)
         try:
             client = await self._open()
             try:

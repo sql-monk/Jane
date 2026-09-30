@@ -1,0 +1,8 @@
+[
+  {
+    "title": "Jane test site",
+    "url": "http://testsite:8080/",
+    "description": "e2e: deterministic shop and news site (static search provider - substitute of a web search)",
+    "aliases": ["testsite", "jane testsite"]
+  }
+]

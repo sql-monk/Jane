@@ -61,5 +61,51 @@ services:
       <<: *e2e-health
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
 
+  llm:
+    profiles: ["llm"]
+    build:
+      context: ..
+      dockerfile: services/llm/Dockerfile
+    environment:
+      JANE_LLM_STORE: postgres
+      JANE_LLM_DATABASE_URL: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?set by tests/e2e}@postgres:5432/${JANE_PG_DB:-jane}
+      # SUBSTITUTE of the external LLM: deterministic provider `fake` (real Anthropic - not verified).
+      JANE_LLM_FAKE_PROVIDER_ENABLED: "true"
+      JANE_LLM_SEED_FILE: /cfg/llm-seed.yaml
+      JANE_LLM_LOG_FORMAT: json
+    volumes:
+      - ../tests/e2e/config/llm-seed.yaml:/cfg/llm-seed.yaml:ro
+    ports: ["${JANE_BIND:-127.0.0.1}::8110"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      <<: *e2e-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8110/v1/health', timeout=2)"]
+
+  assistant:
+    profiles: ["assistant"]
+    build:
+      context: ..
+      dockerfile: services/assistant/Dockerfile
+    environment:
+      JANE_ASSISTANT_STATE_DSN: postgresql://${JANE_PG_USER:-jane}:${JANE_PG_PASSWORD:?set by tests/e2e}@postgres:5432/${JANE_PG_DB:-jane}
+      JANE_ASSISTANT_LLM_URL: http://llm:8110
+      JANE_ASSISTANT_HANDLER_RUNTIME_URL: http://handler-runtime:8000
+      JANE_ASSISTANT_STORAGE_URL: http://storage:8000
+      # Neighbours not merged yet (registry, collectors, orchestrator) are added with their WPs.
+      # SUBSTITUTE of a web search provider: static list with the test site.
+      JANE_ASSISTANT_SEARCH_PROVIDER: static
+      JANE_ASSISTANT_SEARCH_STATIC_FILE: /cfg/assistant-search.json
+      JANE_ASSISTANT_LOG_FORMAT: json
+    volumes:
+      - ../tests/e2e/config/assistant-search.json:/cfg/assistant-search.json:ro
+    ports: ["${JANE_BIND:-127.0.0.1}::8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      llm: { condition: service_healthy }
+    healthcheck:
+      <<: *e2e-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
+
 volumes:
   storage-data:

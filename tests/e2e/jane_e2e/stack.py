@@ -103,8 +103,10 @@ SERVICES: dict[str, ServiceSpec] = {
         ServiceSpec(
             "orchestrator", "WP-09", 8000, "app", ("services/orchestrator/Dockerfile",), compose=False
         ),
-        ServiceSpec("llm", "WP-10", 8000, "app", ("services/llm/Dockerfile",), compose=False),
-        ServiceSpec("assistant", "WP-11", 8000, "app", ("services/assistant/Dockerfile",), compose=False),
+        ServiceSpec("llm", "WP-10", 8110, "app", ("services/llm/Dockerfile",), depends=("postgres",)),
+        ServiceSpec(
+            "assistant", "WP-11", 8000, "app", ("services/assistant/Dockerfile",), depends=("postgres", "llm")
+        ),
         ServiceSpec("admin", "WP-12", 8080, "app", ("web/admin/package.json",), compose=False),
         # Adapters live inside the storage image; they are "available" when their package is merged.
         ServiceSpec(

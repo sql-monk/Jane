@@ -132,6 +132,11 @@ HTTP-перенаправлення не виконуються. Змінні HT
 Для підключень `s3`/`minio` з власним `params.endpoint` політика вимагає
 `params.addressing_style: path` (`minio` використовує `path` типово). Значення `auto` або `virtual`
 може спрямувати запит із секретами до `<bucket>.<endpoint host>`, якого немає в allowlist.
+Без власного S3 endpoint allowlist також звіряється з фактичним host, який формує botocore для
+`bucket`/`region`/`addressing_style`. Наприклад, `us-east-1` з `auto` і bucket `outside` використовує
+`outside.s3.amazonaws.com:443`, а з `path` — `s3.amazonaws.com:443`; запис
+`s3.us-east-1.amazonaws.com:443` не дозволяє жоден із цих host. Перевірка формує запит без мережевого
+виклику та враховує також AWS endpoint, заданий через середовище процесу.
 
 ## Адаптери
 

@@ -13,7 +13,7 @@ restricts both ends:
 * every network address the adapter of the connection contacts — only hosts from
   ``JANE_STORAGE_CONNECTION_HOST_ALLOWLIST`` (``hostname`` = any port, ``hostname:port`` = that port; default
   empty, so every connection with a network address is rejected). :data:`KIND_ADDRESSES` knows the address
-  parameters of the built-in adapters, including their defaults (``localhost``, the AWS regional endpoint) and
+  parameters of the built-in adapters, including their defaults (``localhost``, the actual botocore S3 bucket host) and
   hosts inside URIs; :data:`GENERIC_ADDRESS_KEYS` are checked for every kind, so an adapter unknown to the
   core cannot take a host from them unchecked.
 
@@ -172,27 +172,74 @@ def _endpoint(params: Mapping[str, Any]) -> list[Address]:
     return _url(params["endpoint"], "/params/endpoint", schemes=frozenset({"http", "https"}))
 
 
-def _s3(params: Mapping[str, Any]) -> list[Address]:
-    """``params.endpoint``; without it AWS: ``https://s3.<region>.amazonaws.com``.
+class _S3HostCaptured(Exception):
+    def __init__(self, url: str) -> None:
+        self.url = url
 
-    A custom endpoint is safe with path addressing only: virtual/auto may send credentials to a
-    bucket-prefixed host which differs from the allow-listed endpoint host.
-    """
-    if params.get("endpoint"):
-        if params.get("addressing_style", "auto") != "path":
-            raise AddressError("/params/addressing_style", "custom S3 endpoint requires path addressing")
-        return _endpoint(params)
+
+def _s3_request_address(params: Mapping[str, Any], *, default_style: str) -> Address:
+    """Resolve botocore's real bucket URL without allowing the probe to use the network."""
+    import boto3  # type: ignore[import-untyped]
+    from botocore.config import Config  # type: ignore[import-untyped]
+
+    endpoint = params.get("endpoint") or None
+    pointer = "/params/endpoint" if endpoint else "/params/region"
+    if endpoint:
+        _endpoint(params)  # strict URL validation before botocore sees untrusted input
     region = params.get("region") or "us-east-1"
     if not isinstance(region, str) or not _REGION.fullmatch(region):
         raise AddressError("/params/region", "must be an AWS region name")
-    return [Address("/params/region", f"s3.{region}.amazonaws.com", 443)]
+    style = params.get("addressing_style", default_style)
+    if style not in {"auto", "path", "virtual"}:
+        raise AddressError("/params/addressing_style", "must be auto, path or virtual")
+    bucket = params.get("bucket")
+    if not isinstance(bucket, str) or not bucket:
+        raise AddressError("/params/bucket", "must name a bucket")
+
+    def capture(request: Any, **_kwargs: Any) -> None:
+        raise _S3HostCaptured(str(request.url))
+
+    def block_network(*_args: Any, **_kwargs: Any) -> None:
+        raise RuntimeError("S3 policy probe may not use the network")
+
+    try:
+        client = boto3.session.Session().client(
+            "s3",
+            endpoint_url=endpoint,
+            region_name=region,
+            aws_access_key_id="policy-probe",
+            aws_secret_access_key="policy-probe",  # noqa: S106 - never sent; HTTP transport is disabled
+            config=Config(s3={"addressing_style": style}, retries={"total_max_attempts": 1}),
+        )
+        try:
+            client._endpoint.http_session.send = block_network  # fail-closed probe
+            client.meta.events.register_first("before-send.s3", capture)
+            try:
+                client.head_bucket(Bucket=bucket)
+            except _S3HostCaptured as captured:
+                addresses = _url(captured.url, pointer, schemes=frozenset({"http", "https"}))
+                return addresses[0]
+            raise AddressError(pointer, "cannot determine S3 request host")
+        finally:
+            client.close()
+    except AddressError:
+        raise
+    except Exception:
+        raise AddressError(pointer, "cannot determine S3 request host") from None
+
+
+def _s3(params: Mapping[str, Any]) -> list[Address]:
+    """Actual botocore bucket host for AWS or a custom endpoint (never a guessed regional host)."""
+    if params.get("endpoint") and params.get("addressing_style", "auto") != "path":
+        raise AddressError("/params/addressing_style", "custom S3 endpoint requires path addressing")
+    return [_s3_request_address(params, default_style="auto")]
 
 
 def _minio(params: Mapping[str, Any]) -> list[Address]:
     """``params.endpoint`` (the adapter refuses to open without one)."""
     if params.get("endpoint") and params.get("addressing_style", "path") != "path":
         raise AddressError("/params/addressing_style", "custom MinIO endpoint requires path addressing")
-    return _endpoint(params) if params.get("endpoint") else []
+    return [_s3_request_address(params, default_style="path")] if params.get("endpoint") else []
 
 
 @dataclass(frozen=True)

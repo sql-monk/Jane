@@ -100,6 +100,8 @@ def _env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PGPASSWORD", FOREIGN)
     monkeypatch.setenv("JANE_SECRET_PG_USER", USER)
     monkeypatch.setenv("JANE_SECRET_PG_PASSWORD", PASSWORD)
+    for name in ("AWS_ENDPOINT_URL", "AWS_ENDPOINT_URL_S3", "AWS_S3_US_EAST_1_REGIONAL_ENDPOINT"):
+        monkeypatch.delenv(name, raising=False)
 
 
 def pg(**overrides: Any) -> dict[str, Any]:
@@ -306,7 +308,7 @@ def test_put_rejects_exfiltrating_connections(tmp_path: Path, secrets_dir: Path,
                 {"endpoint": "http://minio.internal.test:9000", "bucket": "b", "addressing_style": "path"},
             ),
             other("minio", {"bucket": "b"}),  # no endpoint: the adapter refuses to open, nothing is contacted
-            other("s3", {"bucket": "b", "region": "eu-central-1"}),
+            other("s3", {"bucket": "b", "region": "eu-central-1", "addressing_style": "path"}),
             other("filesystem", {"base_path": str(tmp_path / "files")}),
         ]
         for doc in allowed:
@@ -453,7 +455,7 @@ def test_policy_settings_from_environment(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert policy.ref_error("env:JANE_SECRET_PG") is not None
     assert policy.ref_error(f"file:{tmp_path / 'x'}") == "file: references are disabled"
     assert policy.violations(other("postgresql", {"host": "postgres"})) == []
-    assert policy.violations(other("minio", {"endpoint": "https://minio:9443"})) == []
+    assert policy.violations(other("minio", {"endpoint": "https://minio:9443", "bucket": "bucket"})) == []
     assert [e.code for e in policy.violations(other("postgresql", {"host": "postgres", "port": 6432}))] == [
         "host_not_allowed"
     ]
@@ -473,8 +475,20 @@ def test_policy_settings_from_environment(monkeypatch: pytest.MonkeyPatch, tmp_p
         ("mongodb", {"host": "mongodb:27018"}, ["mongodb:27018"]),
         ("mongodb", {"host": "mongodb://a:1,b/x?tls=true", "port": 27020}, ["a:1", "b:27020"]),
         ("mongodb", {"host": "mongodb+srv://cluster.example.org/x"}, ["cluster.example.org"]),
-        ("s3", {"bucket": "b"}, ["s3.us-east-1.amazonaws.com:443"]),
-        ("s3", {"bucket": "b", "region": "eu-central-1"}, ["s3.eu-central-1.amazonaws.com:443"]),
+        ("s3", {"bucket": "outside"}, ["outside.s3.amazonaws.com:443"]),
+        ("s3", {"bucket": "outside", "addressing_style": "path"}, ["s3.amazonaws.com:443"]),
+        ("s3", {"bucket": "outside", "addressing_style": "virtual"}, ["outside.s3.amazonaws.com:443"]),
+        ("s3", {"bucket": "my.bucket"}, ["s3.amazonaws.com:443"]),
+        (
+            "s3",
+            {"bucket": "outside", "region": "eu-central-1"},
+            ["outside.s3.eu-central-1.amazonaws.com:443"],
+        ),
+        (
+            "s3",
+            {"bucket": "outside", "region": "eu-central-1", "addressing_style": "path"},
+            ["s3.eu-central-1.amazonaws.com:443"],
+        ),
         ("s3", {"bucket": "b", "endpoint": "http://s3:8333", "addressing_style": "path"}, ["s3:8333"]),
         ("minio", {"bucket": "b", "endpoint": "https://minio"}, ["minio:443"]),
         ("minio", {"bucket": "b"}, []),
@@ -490,6 +504,73 @@ def test_network_addresses_of_the_adapters(kind: str, params: dict[str, Any], ex
     found, problems = network_addresses(kind, params)
     assert problems == []
     assert [str(a) for a in found] == expected
+
+
+@pytest.mark.parametrize(
+    ("params", "actual_host"),
+    [
+        ({"bucket": "outside"}, "outside.s3.amazonaws.com:443"),
+        ({"bucket": "outside", "addressing_style": "virtual"}, "outside.s3.amazonaws.com:443"),
+        ({"bucket": "outside", "addressing_style": "path"}, "s3.amazonaws.com:443"),
+        ({"bucket": "outside", "region": "eu-central-1"}, "outside.s3.eu-central-1.amazonaws.com:443"),
+        (
+            {"bucket": "outside", "region": "eu-central-1", "addressing_style": "path"},
+            "s3.eu-central-1.amazonaws.com:443",
+        ),
+        ({"bucket": "my.bucket"}, "s3.amazonaws.com:443"),
+    ],
+)
+def test_aws_s3_allowlist_checks_actual_bucket_host(params: dict[str, Any], actual_host: str) -> None:
+    assert ConnectionPolicy(host_allowlist=[actual_host]).host_violations("s3", params) == []
+    guessed_region_host = f"s3.{params.get('region', 'us-east-1')}.amazonaws.com:443"
+    if guessed_region_host != actual_host:
+        problems = ConnectionPolicy(host_allowlist=[guessed_region_host]).host_violations("s3", params)
+        assert [(problem.pointer, problem.code) for problem in problems] == [
+            ("/params/region", "host_not_allowed")
+        ]
+
+
+def test_s3_policy_probe_never_contacts_endpoint(listener: Listener) -> None:
+    params = {
+        "bucket": "outside",
+        "endpoint": f"http://127.0.0.1:{listener.port}",
+        "addressing_style": "path",
+    }
+    found, problems = network_addresses("s3", params)
+    assert problems == []
+    assert [str(address) for address in found] == [f"127.0.0.1:{listener.port}"]
+    listener.wait(1, timeout=0.2)
+    assert listener.received == []
+
+
+def test_aws_s3_environment_endpoint_override_is_checked(
+    monkeypatch: pytest.MonkeyPatch, listener: Listener
+) -> None:
+    monkeypatch.setenv("AWS_ENDPOINT_URL_S3", f"http://127.0.0.1:{listener.port}")
+    problems = ConnectionPolicy(host_allowlist=["s3.amazonaws.com:443"]).host_violations(
+        "s3", {"bucket": "outside"}
+    )
+    assert [(problem.pointer, problem.code) for problem in problems] == [
+        ("/params/region", "host_not_allowed")
+    ]
+    listener.wait(1, timeout=0.2)
+    assert listener.received == []
+
+
+def test_s3_policy_probe_never_uses_aws_metadata_credentials(
+    monkeypatch: pytest.MonkeyPatch, listener: Listener, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "")
+    monkeypatch.setenv("AWS_CONFIG_FILE", str(tmp_path / "missing-config"))
+    monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(tmp_path / "missing-credentials"))
+    monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "false")
+    monkeypatch.setenv("AWS_EC2_METADATA_SERVICE_ENDPOINT", f"http://127.0.0.1:{listener.port}")
+    found, problems = network_addresses("s3", {"bucket": "outside"})
+    assert problems == []
+    assert [str(address) for address in found] == ["outside.s3.amazonaws.com:443"]
+    listener.wait(1, timeout=0.2)
+    assert listener.received == []
 
 
 def test_parse_host_port() -> None:

@@ -152,3 +152,6 @@ WP-04 прийнято після повторного рев'ю: `just test tel
   для WP-13/M2.
 - WP-03 після синхронізації з WP-02a прийнято незалежним рев'юером: 69 тестів пакета, `just check`
   (626 unit, 70 contract passed / 3 skipped, 40 web), власність шляхів без порушень. Злито в `main`.
+- WP-00a і WP-12a прийнято разом: OpenAPI уточнює зарезервовані опції `api_feed` і JSON-вміст Storage;
+  типи адмінки перегенеровано. Contract-guardian: 0 breaking / 0 warnings; незалежні рев'юери
+  підтвердили `just check` на спільній гілці (557 unit, 70 contract / 3 skipped, 40 web). Злито в `main`.

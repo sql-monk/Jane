@@ -885,6 +885,8 @@ export interface operations {
           "application/octet-stream": string;
           /** @example <html><head><title>Kettle A-100</title></head></html> */
           "text/html": string;
+          /** @example {} */
+          "application/json": unknown;
         };
       };
       401: components["responses"]["Unauthenticated"];

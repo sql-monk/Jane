@@ -378,6 +378,7 @@ def test_connection_policy_rejects_exfiltration(
             "/params/server",
             "host_not_allowed",
         ),
+        ({"secret_refs": {"session": "env:JANE_SECRET_"}}, "/secret_refs/session", "secret_ref_not_allowed"),
         # values that URL parsers read differently must not pass as the allow-listed host
         *(
             ({"params": {"api_id": 1, "proxy_host": value}}, "/params/proxy_host", "host_not_allowed")

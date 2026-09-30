@@ -84,7 +84,12 @@ class ConnectionPolicy:
     def ref_error(self, ref: str) -> str | None:
         """Why a secret reference is not allowed (``None`` if allowed)."""
         if ref.startswith("env:"):
-            if not self.env_prefix or not ref[4:].startswith(self.env_prefix):
+            name = ref[4:]
+            if (
+                not self.env_prefix
+                or not name.startswith(self.env_prefix)
+                or len(name) == len(self.env_prefix)
+            ):
                 return f"env: references must name variables starting with {self.env_prefix!r}"
             return None
         if ref.startswith("file:"):

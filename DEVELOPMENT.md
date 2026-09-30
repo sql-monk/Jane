@@ -30,6 +30,7 @@
 | `just integration [--project <ім'я>]` | тести `@pytest.mark.integration` проти стеку цього checkout (або названого проєкту; потрібен `just up`) |
 | `just isolation` | тести `@pytest.mark.isolation` (лише Linux; WP-06) |
 | `just up [сервіси]` / `just down [-v]` | dev-стек з унікальним compose-проєктом, див. [infra/README.md](infra/README.md) |
+| `just e2e [-v]` | наскрізні сценарії `tests/e2e/`; окремий compose-проєкт, автоматичне прибирання |
 | `just env` / `just ps` / `just logs [сервіс]` | адреси й згенеровані облікові дані / стан / журнали стеку |
 | `just new-service <ім'я>` | `services/<ім'я>/` із `templates/service/` + `uv lock` |
 | `just testsite` | тестовий сайт на `http://127.0.0.1:8080` ([опис і очікувані URL](tests/fixtures/testsite/README.md)) |

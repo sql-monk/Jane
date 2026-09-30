@@ -1,0 +1,32 @@
+[project]
+name = "jane-storage-mongodb"
+version = "0.1.0"
+description = "MongoDB adapter of the Jane storage handler (entities with history, RAW objects in chunks; no replica set needed)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "jane-storage",
+    "jane-contracts",
+    # AsyncMongoClient (the native asyncio API of PyMongo) is GA since 4.13.
+    "pymongo>=4.13",
+]
+
+# Registration in the storage core (see services/storage/README.md, "Адаптери").
+[project.entry-points."jane.storage.adapters"]
+mongodb = "jane_storage_mongodb:MongoAdapter"
+
+[project.entry-points."jane.storage.packages"]
+"jane.storage-mongodb" = "jane_storage_mongodb:package_dir"
+
+[tool.uv.sources]
+# A path (not workspace) source: uv does not treat a project nested in another member as a workspace
+# member when building it, see services/storage/README.md.
+jane-storage = { path = "../..", editable = true }
+jane-contracts = { path = "../../../../contracts/python", editable = true }
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jane_storage_mongodb"]

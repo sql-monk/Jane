@@ -1,0 +1,32 @@
+[project]
+name = "jane-storage-s3"
+version = "0.1.0"
+description = "S3 adapter of the Jane storage handler (RAW objects, entities and history as JSON documents with conditional writes)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "jane-storage",
+    "jane-contracts",
+    # IfNoneMatch / IfMatch on PutObject (conditional writes) need botocore >= 1.35.66.
+    "boto3>=1.35.66",
+]
+
+# Registration in the storage core (see services/storage/README.md, "Адаптери").
+[project.entry-points."jane.storage.adapters"]
+s3 = "jane_storage_s3:S3Adapter"
+
+[project.entry-points."jane.storage.packages"]
+"jane.storage-s3" = "jane_storage_s3:package_dir"
+
+[tool.uv.sources]
+# A path (not workspace) source: uv does not treat a project nested in another member as a workspace
+# member when building it, see services/storage/README.md.
+jane-storage = { path = "../..", editable = true }
+jane-contracts = { path = "../../../../contracts/python", editable = true }
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jane_storage_s3"]

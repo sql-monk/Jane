@@ -110,7 +110,7 @@ SERVICES: dict[str, ServiceSpec] = {
             "app",
             ("services/telegram-collector/Dockerfile",),
         ),
-        ServiceSpec("registry", "WP-05", 8000, "app", ("services/registry/Dockerfile",), compose=False),
+        ServiceSpec("registry", "WP-05", 8000, "app", ("services/registry/Dockerfile",)),
         ServiceSpec(
             "orchestrator", "WP-09", 8000, "app", ("services/orchestrator/Dockerfile",), depends=("postgres",)
         ),
@@ -228,8 +228,11 @@ class E2EStack:
         return {
             "JANE_E2E_PROJECT": self.project,
             "JANE_E2E_SANDBOX_IMAGE": self.sandbox_image,
-            "JANE_E2E_DOCKER_SOCKET": os.environ.get("JANE_E2E_DOCKER_SOCKET", "/var/run/docker.sock"),
-            "JANE_E2E_DOCKER_GID": os.environ.get("JANE_E2E_DOCKER_GID", ""),
+            "JANE_DOCKER_SOCKET": os.environ.get("JANE_E2E_DOCKER_SOCKET", "/var/run/docker.sock"),
+            "JANE_DOCKER_GID": os.environ.get("JANE_E2E_DOCKER_GID", ""),
+            "JANE_STORAGE_CONNECTIONS_FILE_HOST": (
+                self.root / "tests" / "e2e" / "config" / "storage-connections.json"
+            ).resolve().as_posix(),
             "COMPOSE_PROFILES": ",".join(self.available_apps()),
             "JANE_E2E_PACKAGES_DIR": self.packages_dir.as_posix(),
             "JANE_E2E_TELEGRAM_RECORDINGS_DIR": self.telegram_recordings_dir.as_posix(),
@@ -342,12 +345,12 @@ class E2EStack:
         if not self._image_exists(self.sandbox_image):
             cli = [sys.executable, "-m", "jane_handler_runtime.cli"]
             self._run([*cli, "build-image", "--tag", self.sandbox_image], timeout=1800)
-        if not env["JANE_E2E_DOCKER_GID"]:
-            env["JANE_E2E_DOCKER_GID"] = self._docker_socket_gid()
+        if not env["JANE_DOCKER_GID"]:
+            env["JANE_DOCKER_GID"] = self._docker_socket_gid()
 
     def _docker_socket_gid(self) -> str:
         """Group of the docker socket *as seen inside a container* (0 on Docker Desktop, docker gid on Linux)."""
-        sock = self.env()["JANE_E2E_DOCKER_SOCKET"]
+        sock = self.env()["JANE_DOCKER_SOCKET"]
         r = self._run(
             [
                 "docker",

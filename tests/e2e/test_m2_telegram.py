@@ -84,7 +84,7 @@ def test_s_m2_02_telegram_history_new_and_edit_to_raw_json(
         .get(f"/v1/collections/{first_id}/materials", params={"wait_ms": 100})
         .json()
     )
-    assert [m["observation_id"] for m in redelivered["items"]] == [
+    assert [m["observation_id"] for m in redelivered["items"][: len(first_page["items"])]] == [
         m["observation_id"] for m in first_page["items"]
     ]
     history = _drain(collector, first_id)

@@ -1,15 +1,15 @@
-# Jane e2e overlay (WP-13): application services on top of infra/compose.yaml.
+# Jane e2e overlay (WP-13): test configuration for application services in infra/compose.yaml.
 #
 #   docker compose -f infra/compose.yaml -f tests/e2e/compose.e2e.yaml -p <unique> up -d --wait <services>
 #
 # Used by tests/e2e (jane_e2e.stack.E2EStack), which sets a unique project, generated credentials and:
 #   COMPOSE_PROFILES        application services present in this checkout (profile name == service name);
 #   JANE_E2E_SANDBOX_IMAGE  image of runtime profile python-extractor@1 (built by `jane-handler-runtime build-image`);
-#   JANE_E2E_DOCKER_SOCKET  docker API socket for handler-runtime sandboxes (default /var/run/docker.sock);
-#   JANE_E2E_DOCKER_GID     group of that socket inside containers (0 on Docker Desktop, docker gid on Linux).
+#   JANE_DOCKER_SOCKET      docker API socket for handler-runtime sandboxes (default /var/run/docker.sock);
+#   JANE_DOCKER_GID         group of that socket inside containers (0 on Docker Desktop, docker gid on Linux).
 #
 # NOTE: with several -f files compose resolves relative paths against the FIRST file (infra/), hence `..`.
-# A service joins this file when its WP is merged into main; until then tests skip with the reason.
+# A service joins the base compose when its WP is merged into main; until then tests skip with the reason.
 # Host ports are chosen by Docker (127.0.0.1 only); `docker compose port` / E2EStack.url() read them.
 
 x-e2e-health: &e2e-health
@@ -20,103 +20,36 @@ x-e2e-health: &e2e-health
 
 services:
   storage:
-    profiles: ["storage"]
-    build:
-      context: ..
-      dockerfile: services/storage/Dockerfile
     environment:
-      JANE_STORAGE_CONNECTIONS_FILE: /cfg/storage-connections.json
-      JANE_STORAGE_LOG_FORMAT: json
       # Secret values only through secret_refs (ADR-0006); names use the JANE_SECRET_ prefix.
       JANE_SECRET_E2E_STORAGE_RESULTS_USER: jane_storage_results
       JANE_SECRET_E2E_STORAGE_RESULTS_PASSWORD: ${JANE_PG_STORAGE_RESULTS_PASSWORD:?set by tests/e2e}
-    volumes:
-      - storage-data:/var/lib/jane/storage
-      - ../tests/e2e/config/storage-connections.json:/cfg/storage-connections.json:ro
-    ports: ["${JANE_BIND:-127.0.0.1}::8000"]
-    depends_on:
-      postgres: { condition: service_healthy }
-    healthcheck:
-      <<: *e2e-health
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
 
   handler-runtime:
-    profiles: ["handler-runtime"]
-    build:
-      context: ..
-      dockerfile: services/handler-runtime/Dockerfile
     environment:
       JANE_HANDLER_RUNTIME_PROFILE_IMAGES: '{"python-extractor@1": "${JANE_E2E_SANDBOX_IMAGE:?set by tests/e2e}"}'
       JANE_HANDLER_RUNTIME_SANDBOX_LABELS: '{"io.jane.e2e-project": "${JANE_E2E_PROJECT:-jane-e2e}"}'
-      # Shared state of several instances (idempotency keys, jobs, results) in the service's own schema.
-      JANE_HANDLER_RUNTIME_STATE_DSN: postgresql://jane_handler_runtime:${JANE_PG_HANDLER_RUNTIME_PASSWORD:?set by tests/e2e}@postgres:5432/jane_handler_runtime
-      JANE_HANDLER_RUNTIME_LOG_FORMAT: json
-      # Packages without package_archive (orchestrated stages) come from here. Until WP-05 is merged this is
-      # the STAND-IN `package-host` serving archives of LOCAL packages (tests/e2e/jane_e2e/package_host.py).
+      # Packages without package_archive (orchestrated stages) come from a local archive stand-in.
       JANE_HANDLER_RUNTIME_REGISTRY_URL: http://package-host:8080
-    volumes:
-      - ${JANE_E2E_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
-    group_add: ["${JANE_E2E_DOCKER_GID:-0}"]
-    ports: ["${JANE_BIND:-127.0.0.1}::8000"]
-    depends_on:
-      postgres: { condition: service_healthy }
-    healthcheck:
-      <<: *e2e-health
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
 
   llm:
-    profiles: ["llm"]
-    build:
-      context: ..
-      dockerfile: services/llm/Dockerfile
     environment:
-      JANE_LLM_STORE: postgres
-      JANE_LLM_DATABASE_URL: postgresql://jane_llm:${JANE_PG_LLM_PASSWORD:?set by tests/e2e}@postgres:5432/jane_llm
       # SUBSTITUTE of the external LLM: deterministic provider `fake` (real Anthropic - not verified).
-      JANE_LLM_FAKE_PROVIDER_ENABLED: "true"
       JANE_LLM_SEED_FILE: /cfg/llm-seed.yaml
-      JANE_LLM_LOG_FORMAT: json
     volumes:
       - ../tests/e2e/config/llm-seed.yaml:/cfg/llm-seed.yaml:ro
-    ports: ["${JANE_BIND:-127.0.0.1}::8110"]
-    depends_on:
-      postgres: { condition: service_healthy }
-    healthcheck:
-      <<: *e2e-health
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8110/v1/health', timeout=2)"]
 
   assistant:
-    profiles: ["assistant"]
-    build:
-      context: ..
-      dockerfile: services/assistant/Dockerfile
     environment:
-      JANE_ASSISTANT_STATE_DSN: postgresql://jane_assistant:${JANE_PG_ASSISTANT_PASSWORD:?set by tests/e2e}@postgres:5432/jane_assistant
-      JANE_ASSISTANT_LLM_URL: http://llm:8110
-      JANE_ASSISTANT_HANDLER_RUNTIME_URL: http://handler-runtime:8000
-      JANE_ASSISTANT_STORAGE_URL: http://storage:8000
-      # Neighbours not merged yet (registry, telegram collector) are added with their WPs.
       # SUBSTITUTE of a web search provider: static list with the test site.
       JANE_ASSISTANT_SEARCH_PROVIDER: static
       JANE_ASSISTANT_SEARCH_STATIC_FILE: /cfg/assistant-search.json
-      JANE_ASSISTANT_LOG_FORMAT: json
     volumes:
       - ../tests/e2e/config/assistant-search.json:/cfg/assistant-search.json:ro
-    ports: ["${JANE_BIND:-127.0.0.1}::8000"]
-    depends_on:
-      postgres: { condition: service_healthy }
-      llm: { condition: service_healthy }
-    healthcheck:
-      <<: *e2e-health
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
 
   web-collector:
-    profiles: ["web-collector"]
-    build:
-      context: ..
-      dockerfile: services/web-collector/Dockerfile
     environment:
-      # Local rules packages (<package_id>/<version>/jane-package.json + rules.json) until WP-05 is merged.
+      # Local rules packages (<package_id>/<version>/jane-package.json + rules.json).
       JANE_WEB_COLLECTOR_RULES_DIR: /cfg/rules
       JANE_WEB_COLLECTOR_LOG_FORMAT: json
       # Shorter lease than the default (30 s) so that take-over after a kill fits the e2e time budget;
@@ -125,11 +58,7 @@ services:
       JANE_WEB_COLLECTOR_HEARTBEAT_INTERVAL_MS: ${JANE_E2E_COLLECTOR_HEARTBEAT_MS:-2000}
       JANE_WEB_COLLECTOR_STATE_BUSY_TIMEOUT_MS: ${JANE_E2E_COLLECTOR_BUSY_TIMEOUT_MS:-5000}
     volumes:
-      # One state directory for every replica (SQLite WAL on one Docker host): the documented way to run
-      # several instances of the collector (services/web-collector/README.md).
-      - web-collector-state:/var/lib/jane-web-collector
       - ../tests/e2e/config/rules:/cfg/rules:ro
-    ports: ["${JANE_BIND:-127.0.0.1}::8101"]
     depends_on:
       testsite: { condition: service_healthy }
     healthcheck:
@@ -137,13 +66,7 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8101/v1/health', timeout=2)"]
 
   orchestrator:
-    profiles: ["orchestrator"]
-    build:
-      context: ..
-      dockerfile: services/orchestrator/Dockerfile
     environment:
-      # Own database of the service (created by the e2e harness before start).
-      JANE_ORCHESTRATOR_DATABASE_URL: postgresql://jane_orchestrator:${JANE_PG_ORCHESTRATOR_PASSWORD:?set by tests/e2e}@postgres:5432/jane_orchestrator
       JANE_ORCHESTRATOR_EXECUTORS: >-
         [{"executor": "web-collector", "role": "collector", "base_url": "http://web-collector:8101",
           "capabilities": {"collector": "web"}, "sync_connections": false},
@@ -157,15 +80,26 @@ services:
       JANE_ORCHESTRATOR_LIMITS__ENGINE__LEASE_MS: ${JANE_E2E_ORCHESTRATOR_LEASE_MS:-8000}
       JANE_ORCHESTRATOR_LIMITS__ENGINE__HEARTBEAT_MS: ${JANE_E2E_ORCHESTRATOR_HEARTBEAT_MS:-2000}
       JANE_ORCHESTRATOR_LOG_FORMAT: json
-    ports: ["${JANE_BIND:-127.0.0.1}::8000"]
-    depends_on:
-      postgres: { condition: service_healthy }
     healthcheck:
       <<: *e2e-health
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
 
-  # STAND-IN (Т) for the registry (WP-05): only GET /v1/packages/{id}/versions/{v}/archive of LOCAL packages
-  # written by the harness to JANE_E2E_PACKAGES_DIR. Replaced by the real registry when WP-05 is merged.
+  registry:
+    healthcheck:
+      <<: *e2e-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
+
+  telegram-collector:
+    environment:
+      JANE_TELEGRAM_COLLECTOR_CLIENT_BACKEND: recorded
+      JANE_TELEGRAM_COLLECTOR_RECORDINGS_DIR: /cfg/recordings
+    volumes:
+      - ${JANE_E2E_TELEGRAM_RECORDINGS_DIR:?set by tests/e2e}:/cfg/recordings:ro
+    healthcheck:
+      <<: *e2e-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8102/v1/health', timeout=2)"]
+
+  # Local package archive stand-in for reproducible WP-13 fixture packages.
   package-host:
     profiles: ["package-host"]
     image: ${JANE_IMAGE_PYTHON:-python:3.12-slim}
@@ -177,7 +111,3 @@ services:
     healthcheck:
       <<: *e2e-health
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/v1/health', timeout=2)"]
-
-volumes:
-  storage-data:
-  web-collector-state:

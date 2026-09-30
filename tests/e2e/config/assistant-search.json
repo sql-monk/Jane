@@ -4,5 +4,11 @@
     "url": "http://testsite:8080/",
     "description": "e2e: deterministic shop and news site (static search provider - substitute of a web search)",
     "aliases": ["testsite", "jane testsite"]
+  },
+  {
+    "title": "Testsite mirror (staging)",
+    "url": "http://testsite-mirror.example.test/",
+    "description": "e2e: a second match for the same name, so that S-M2-06 has to ask the user (never fetched)",
+    "aliases": ["testsite mirror"]
   }
 ]

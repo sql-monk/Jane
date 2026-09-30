@@ -35,7 +35,13 @@ services:
       JANE_SECRET_E2E_S3_SECRET_KEY: ${JANE_S3_SECRET_KEY:?set by tests/e2e}
 
   handler-runtime:
+    volumes:
+      # Stored RAW of the files adapter is referenced as file:///var/lib/jane/storage/... (persistent ContentRef);
+      # ADR-0004 allows file:// only on one node with a shared volume, so the runtime reads it read-only
+      # (reprocessing of stored RAW, S-M2-07).
+      - storage-data:/var/lib/jane/storage:ro
     environment:
+      JANE_HANDLER_RUNTIME_BLOB_ROOTS: '["/var/lib/jane/storage"]'
       JANE_HANDLER_RUNTIME_PROFILE_IMAGES: '{"python-extractor@1": "${JANE_E2E_SANDBOX_IMAGE:?set by tests/e2e}"}'
       JANE_HANDLER_RUNTIME_SANDBOX_LABELS: '{"io.jane.e2e-project": "${JANE_E2E_PROJECT:-jane-e2e}"}'
       # M1 uses the local package-host; registry acceptance opts into the real service.
@@ -45,6 +51,9 @@ services:
     environment:
       # SUBSTITUTE of the external LLM: deterministic provider `fake` (real Anthropic - not verified).
       JANE_LLM_SEED_FILE: /cfg/llm-seed.yaml
+      # S-M2-06 classifies 54 name-only and 16 hinted pages, then S-M2-07 improves a package in one
+      # shared module stack. The production default of 60 calls/minute rejects the second onboarding.
+      JANE_LLM_LIMITS__LLM__MAX_REQUESTS_PER_MINUTE: ${JANE_E2E_LLM_MAX_REQUESTS_PER_MINUTE:-120}
       # LLM packages of orchestrated stages (no package_archive) come from the same local archive stand-in.
       JANE_LLM_REGISTRY_URL: http://package-host:8080
     volumes:
@@ -55,6 +64,19 @@ services:
       # SUBSTITUTE of a web search provider: static list with the test site.
       JANE_ASSISTANT_SEARCH_PROVIDER: static
       JANE_ASSISTANT_SEARCH_STATIC_FILE: /cfg/assistant-search.json
+      # Neighbours of onboarding and improvement (S-M2-06/07); a scenario starts only those it needs.
+      JANE_ASSISTANT_REGISTRY_URL: http://registry:8000
+      JANE_ASSISTANT_COLLECTOR_WEB_URL: http://web-collector:8101
+      JANE_ASSISTANT_ORCHESTRATOR_URL: http://orchestrator:8000
+      JANE_ASSISTANT_DEFAULT_STORAGE_PACKAGE: jane.storage-postgresql@1.0.0
+      JANE_ASSISTANT_DEFAULT_STORAGE_CONNECTION: results-pg
+      # One material per classification request: the fake LLM answers by the content of the request, so a
+      # scripted answer can classify exactly that material (tests/e2e/config/llm-seed.yaml). The pool the
+      # diversity selection picks from stays ~10 materials (batch x poll_page_factor).
+      # The assistant passes this limit with every LLM request; keep it aligned with the e2e gateway limit.
+      JANE_ASSISTANT_LIMITS__LLM__MAX_REQUESTS_PER_MINUTE: ${JANE_E2E_LLM_MAX_REQUESTS_PER_MINUTE:-120}
+      JANE_ASSISTANT_LIMITS__ONBOARDING__SAMPLE_BATCH_SIZE: "1"
+      JANE_ASSISTANT_LIMITS__ONBOARDING__POLL_PAGE_FACTOR: "10"
     volumes:
       - ../tests/e2e/config/assistant-search.json:/cfg/assistant-search.json:ro
 
@@ -94,6 +116,10 @@ services:
       JANE_ORCHESTRATOR_LIMITS__ENGINE__LEASE_MS: ${JANE_E2E_ORCHESTRATOR_LEASE_MS:-8000}
       JANE_ORCHESTRATOR_LIMITS__ENGINE__HEARTBEAT_MS: ${JANE_E2E_ORCHESTRATOR_HEARTBEAT_MS:-2000}
       JANE_ORCHESTRATOR_LOG_FORMAT: json
+      # Extra executors from a file: none by default; S-M2-06/07 add the real registry (activations, routing).
+      JANE_ORCHESTRATOR_EXECUTORS_FILE: /cfg/orchestrator/${JANE_E2E_ORCHESTRATOR_EXTRA_EXECUTORS:-executors-none.json}
+    volumes:
+      - ../tests/e2e/config/orchestrator:/cfg/orchestrator:ro
     healthcheck:
       <<: *e2e-health
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]

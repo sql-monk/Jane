@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "E2E page triage output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["page_triages"],
+  "properties": {
+    "page_triages": {
+      "type": "array",
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["page_type", "summary"],
+        "properties": {
+          "page_type": { "type": "string", "enum": ["product", "event", "job", "faq", "other"] },
+          "summary": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "suggested_fix": { "type": "string", "maxLength": 500 }
+        }
+      }
+    }
+  }
+}

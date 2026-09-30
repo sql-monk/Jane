@@ -1,6 +1,62 @@
 # e2e seed of the LLM gateway (JANE_LLM_SEED_FILE). The external LLM is replaced by the built-in deterministic
 # provider `fake` (JANE_LLM_FAKE_PROVIDER_ENABLED=true) - a SUBSTITUTE of an external system, see
 # docs/acceptance/matrix.md. The assistant's model aliases point at it.
+#
+# S-M2-05 / S-M2-11: the LLM package tests/e2e/packages/e2e.llm-page-triage uses the alias `e2e-triage` ->
+# provider `e2e-fake` (kind fake, non-zero prices so that cost accounting is visible). Its answers are scripted
+# in the connection below (fake provider: first `when_data_contains` match of the data channel -> `output`;
+# no match -> the minimal value valid for the output schema). No secrets: the fake provider needs none.
+connections:
+  - connection_id: e2e-fake-scripts
+    kind: llm_provider
+    title: "e2e: scripted answers of the fake LLM provider (S-M2-05, S-M2-11)"
+    params:
+      provider: fake
+      responses:
+        # S-M2-11: problem result of the extractor (OutOfStock offer) -> valid triage, stored by the task.
+        - when_data_contains: "<h1>Phone Gamma</h1>"
+          output:
+            page_triages:
+              - page_type: product
+                summary: "Product card with an out-of-stock offer; the extractor handles in-stock offers only."
+                suggested_fix: "Map schema.org OutOfStock to availability out_of_stock."
+        # S-M2-11: output that violates the package output schema (page_type is not in the enum) - the
+        # gateway must reject it (valid=false) and the task must not store it.
+        - when_data_contains: "<h1>Phone Zeta</h1>"
+          output:
+            page_triages:
+              - page_type: preorder
+                summary: "Product card with a pre-order offer."
+        # S-M2-05: unknown pages of the test site (page_types: unknown).
+        - when_data_contains: "<h1>Spring meetup</h1>"
+          output:
+            page_triages:
+              - page_type: event
+                summary: "Event announcement with a date, a place and free entrance."
+                suggested_fix: "An event extractor bound to /pages/event-*."
+        - when_data_contains: "<h1>Careers</h1>"
+          output:
+            page_triages:
+              - page_type: job
+                summary: "Job posting for a warehouse operator."
+        - when_data_contains: "<h1>FAQ</h1>"
+          output:
+            page_triages:
+              - page_type: faq
+                summary: "Questions and answers about delivery and returns."
+
+providers:
+  - provider_id: e2e-fake
+    kind: fake
+    connection_id: e2e-fake-scripts
+    enabled: true
+    models:
+      - model_id: fake-deterministic-1
+        max_context_tokens: 128000
+        supports_structured_output: true
+        pricing: {input_per_mtok: 1, output_per_mtok: 4, currency: USD}
+
 model_aliases:
   - {alias: cheap, provider_id: fake, model_id: fake-deterministic-1}
   - {alias: strong, provider_id: fake, model_id: fake-deterministic-1}
+  - {alias: e2e-triage, provider_id: e2e-fake, model_id: fake-deterministic-1}

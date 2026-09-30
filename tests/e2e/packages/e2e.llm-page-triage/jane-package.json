@@ -1,0 +1,42 @@
+{
+  "schema_version": "1",
+  "package_id": "e2e.llm-page-triage",
+  "version": "1.0.0",
+  "kind": "llm",
+  "title": "E2E fixture: LLM page triage",
+  "description": "Фікстура WP-13 для S-M2-05 і S-M2-11: LLM-пакет, що класифікує сторінку (невідому або з проблемним результатом екстрактора) і пояснює, чого бракує. Вихід валідується схемою; на кожен матеріал — сутність page_triage з ключем material_id. У стеку e2e модель — детермінований фейковий провайдер (псевдонім e2e-triage, скрипти в tests/e2e/config/llm-seed.yaml).",
+  "tags": ["e2e", "llm", "triage"],
+  "entry": {
+    "executor": "llm",
+    "instructions": "prompts/instructions.md",
+    "output_schema": "schemas/output.schema.json",
+    "model": "e2e-triage",
+    "temperature": 0,
+    "max_output_tokens": 512
+  },
+  "input": {
+    "accepts": ["material", "data"],
+    "media_types": ["text/*"]
+  },
+  "output": {
+    "entities": [
+      {
+        "entity_type": "page_triage",
+        "schema": "schemas/page_triage.schema.json",
+        "key_fields": ["material_id"],
+        "description": "Класифікація сторінки; ключ — ідентифікатор матеріалу."
+      }
+    ],
+    "data_schema": "schemas/output.schema.json"
+  },
+  "required_connections": [],
+  "provenance": {
+    "created_by": "human",
+    "authors": ["WP-13"],
+    "created_at": "2026-09-30T00:00:00Z",
+    "change_summary": "E2E fixture for S-M2-05 and S-M2-11."
+  },
+  "bindings_hint": {
+    "source_kinds": ["web"]
+  }
+}

@@ -145,6 +145,27 @@ def validate_rules(schemas: ContractSchemas, registry: Registry, rules: Any) -> 
     has_depth = "max_depth" in ((rules.get("limits") or {}).get("crawl") or {})
     for i, strategy in enumerate(rules.get("strategies") or []):
         kind = strategy.get("type")
+        if kind == "api_feed":
+            # The v1 schema describes these options, but DiscoveryContext.fetch only accepts GET
+            # and a strategy can propose URLs, not inline JSON Materials. Reject before a job is queued.
+            if strategy.get("method", "GET") == "POST":
+                supported = False
+                warnings.append(
+                    FieldError(
+                        pointer=f"/strategies/{i}/method",
+                        code="unsupported_strategy",
+                        message="api_feed method=POST is not executed by this collector",
+                    )
+                )
+            if strategy.get("emit_items_as_materials") is True:
+                supported = False
+                warnings.append(
+                    FieldError(
+                        pointer=f"/strategies/{i}/emit_items_as_materials",
+                        code="unsupported_strategy",
+                        message="api_feed cannot emit JSON items as separate Materials in this collector",
+                    )
+                )
         if kind in RESERVED_TYPES:
             supported = False
             warnings.append(

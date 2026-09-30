@@ -383,7 +383,7 @@ export interface components {
     };
     RulesValidation: {
       valid: boolean;
-      /** @description false — правила валідні за схемою, але ця реалізація колектора не підтримує якусь стратегію. */
+      /** @description false — правила валідні за схемою, але ця реалізація колектора не виконує стратегію або її опцію (зокрема api_feed POST чи emit_items_as_materials=true). Попередження містять точні JSON Pointer; запуск збору з такими правилами повертає 422 validation_failed. */
       supported?: boolean;
       errors: components["schemas"]["FieldError"][];
       warnings?: components["schemas"]["FieldError"][];
@@ -754,18 +754,19 @@ export interface components {
       /** @constant */
       type: "url_template";
     });
-    /** @description Перелік матеріалів із документованого API або JSON-каналу сайту. */
+    /** @description Перелік матеріалів із документованого API або JSON-каналу сайту. Web Collector v1 виконує GET, якщо стратегія api_feed зареєстрована. POST і emit_items_as_materials: true зарезервовані: правила з ними валідні за схемою, але /v1/rules/validations повертає valid: true, supported: false, а запуск збору відхиляється HTTP 422 validation_failed. */
     ApiFeedStrategy: {
       /** @constant */
       type: "api_feed";
       /** Format: uri */
       url: string;
       /**
+       * @description GET — типовий виконуваний метод. POST зарезервований у Web Collector v1: schema-valid, але supported: false; збір відхиляється validation_failed.
        * @default GET
        * @enum {string}
        */
       method?: "GET" | "POST";
-      /** @description Тіло для POST (JSON). */
+      /** @description JSON-тіло для POST; опція зарезервована разом із POST і не виконується Web Collector v1. */
       body?: unknown;
       /** @description JSONPath до масиву елементів, наприклад '$.items'. */
       items_path: string;
@@ -773,7 +774,7 @@ export interface components {
       url_path: string;
       lastmod_path?: string;
       /**
-       * @description true — кожен елемент JSON також видається як окремий матеріал (application/json).
+       * @description true — зарезервована опція видачі кожного елемента JSON як окремого матеріалу (application/json). Web Collector v1 її не виконує: schema-valid, але supported: false; збір відхиляється validation_failed.
        * @default false
        */
       emit_items_as_materials?: boolean;

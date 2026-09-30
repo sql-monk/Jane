@@ -305,6 +305,9 @@ paths:
               schema:
                 type: string
               example: '<html><head><title>Kettle A-100</title></head></html>'
+            application/json:
+              schema: {}
+              example: {}
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '404':

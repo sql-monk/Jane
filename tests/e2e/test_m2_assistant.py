@@ -4,8 +4,8 @@
   -> adaptive sampling through the real Web Collector -> analysis -> several collection plans with coverage,
   cost and risks -> a new extractor generated, tested in the real runtime and published to the real registry
   (provenance ``llm``) -> the source and the task are created in the orchestrator -> a run stores entities.
-  The full chain runs with the user's crawl hints (entry pages of the sections); with the name ONLY the
-  sample settles on the first two product pages - a WP-11 defect, kept as a strict xfail.
+  The full chain runs with the user's crawl hints (entry pages of the sections). The name-only path
+  checks whether the real collector yields the main material types and testable extractor plans.
 * S-M2-07 (criterion 6): a human-written extractor leaves part of the pages ``unrecognized`` -> problem group
   in the orchestrator -> improvement run -> a new version in the registry (provenance ``llm``) that passes the
   old and the new tests and the tests of every binding -> automatic activation in the task stages ->
@@ -291,10 +291,6 @@ SECTION_PAGES = (
 )
 
 
-class SamplingStopsEarly(AssertionError):
-    """The known WP-11 defect: the sample settles on one material type (see docs/delivery/WP-13.md)."""
-
-
 def onboard_by_name(assistant: JaneClient, body: dict[str, Any]) -> dict[str, Any]:
     """``startOnboarding`` by the site NAME -> two search candidates -> the user picks the test site -> the
     session after adaptive sampling (real Web Collector), analysis and extractor preparation."""
@@ -330,8 +326,7 @@ def check_sample_and_proposals(session: dict[str, Any]) -> None:
     counts = {t["type"]: t["count"] for t in (session.get("analysis") or {}).get("material_types") or []}
     note("S-M2-06", "material types", counts)
     assert sample["sufficient"] is True and sample["confidence"] >= 0.8, sample
-    if sample["distinct_types"] < 2:
-        raise SamplingStopsEarly(f"the sample has one material type: {sample} {session.get('analysis')}")
+    assert sample["distinct_types"] >= 2, (sample, session.get("analysis"))
     analysis = session["analysis"]
     assert analysis["source_kind"] == "web" and "sitemap" in analysis["discovery_methods"], analysis
     types = {t["type"]: t for t in analysis["material_types"]}
@@ -375,20 +370,16 @@ def check_sample_and_proposals(session: dict[str, Any]) -> None:
 
 
 @pytest.mark.criteria(4)
-@pytest.mark.xfail(
-    strict=True,
-    raises=SamplingStopsEarly,
-    reason=(
-        "WP-11 defect: adaptive sampling stops after the first two materials of one type "
-        "(sitemap products come first; Good-Turing coverage of n=2 is 1.0) - see docs/delivery/WP-13.md"
-    ),
-)
 def test_s_m2_06_name_only_sample_distinguishes_material_types(flows: Flows) -> None:
     """Only the site's name (ТЗ §8): the sample must be diverse enough to tell the material types apart, and
     the extractor made from it must pass its tests. Runs before any package exists in the registry and stops
     before acceptance (publishes nothing)."""
     session = onboard_by_name(flows["assistant"], {"query": "testsite"})
     check_sample_and_proposals(session)
+    counts = {t["type"]: t["count"] for t in session["analysis"]["material_types"]}
+    # The testsite sitemap contains products, category pages and articles. A single
+    # negative page does not establish that the main material types were distinguished.
+    assert all(counts.get(kind, 0) >= 2 for kind in ("product", "category", "article")), counts
 
 
 @pytest.mark.criteria(4)

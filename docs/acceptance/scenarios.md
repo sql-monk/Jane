@@ -61,7 +61,7 @@ Docker-сокет із групою, визначеною автоматично
 | S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage | ще не реалізовано в WP-13 |
 | S-M2-05a | Невідома сторінка: асистент викликає LLM лише з прапорцем (без оркестратора) | 11 | testsite, assistant, llm, postgres | **реалізовано, проходить** (LLM — З) |
 | S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, runtime, storage, llm | **пройдено на гілці `wp/13-llm-routing`** (`test_m2_llm_routing.py`; LLM — З, архіви пакетів — `package-host` Т); сторінки з ін'єкцією на testsite немає |
-| S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator, storage | **пройдено на гілці `wp/13-assistant-flows`** з назвою й підказкою обходу (`test_m2_assistant.py`; LLM і пошук — З); лише з назвою — `xfail(strict)`: дефект WP-11 (вибірка зупиняється на двох товарах) |
+| S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator, storage | **пройдено на гілці `wp/13-assistant-flows`** з назвою й підказкою обходу (`test_m2_assistant.py`; LLM і пошук — З), активація й 17 сутностей; лише з назвою — **відкрито**, тест без `xfail` падає: product ×17, article ×1, category немає |
 | S-M2-07 | Проблемні приклади → нова версія → тести → активація → відкат | 6 | orchestrator, assistant, llm, registry, runtime, storage, web-collector | **пройдено на гілці `wp/13-assistant-flows`** (`test_m2_assistant.py`; LLM — З) |
 | S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, усі сховища | **1 Docker e2e пройшов на `main` `1306ad3`** (`just e2e`, CI `36694741989`); S3 — З |
 | S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці | **1 Docker e2e пройшов на `main` `1306ad3`** (кількість сторінок; `just e2e`, CI `36694741989`); темп ще не виміряно |
@@ -260,10 +260,11 @@ PostgreSQL, MinIO. S-M2-06 іде першим, поки в registry немає 
    в реальному runtime за посиланням (архів із registry). В оркестраторі — джерело й завдання
    `collect → extract-product → store-product`; прогін дає 17 сутностей `product` (усі товари sitemap) у
    PostgreSQL через `storage.v1`.
-2. `test_s_m2_06_name_only_sample_distinguishes_material_types` — лише назва: вибірка має розрізняти типи
-   матеріалів, а екстрактор — пройти тести. **`xfail(strict=True)`**: вибірка зупиняється на перших двох
-   сторінках товарів (`materials: 2, distinct_types: 1, confidence: 0.95, sufficient: true`), без негативного
-   прикладу згенерований екстрактор не отримує тестів — дефект WP-11 (запит у звіті WP-13). Тест зупиняється
+2. `test_s_m2_06_name_only_sample_distinguishes_material_types` — лише назва: вибірка має розрізняти
+   основні типи testsite (`product`, `category`, `article`: щонайменше по два приклади), а екстрактор — пройти
+   тести. Після WP-11b тест **без `xfail` падає**: `materials: 18, distinct_types: 2, confidence: 0.8946,
+   sufficient: true`, але типи — product ×17, article ×1, category немає. Попередній збій на двох товарах
+   виправлено, та поточна умова достатності ще передчасна (запит WP-11c у звіті WP-13). Тест зупиняється
    до `acceptance` і нічого не публікує.
 
 LLM — **З**: відповіді фейкового провайдера WP-10 задано скриптами (`tests/e2e/config/llm-seed.yaml`,

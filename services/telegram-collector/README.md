@@ -28,7 +28,7 @@ Docker (контекст — корінь репозиторію):
 docker build -f services/telegram-collector/Dockerfile -t jane-telegram-collector .
 docker build -f services/telegram-collector/Dockerfile --build-arg EXTRAS="--extra telethon" -t jane-telegram-collector .
 docker run -p 8102:8102 -v tgstate:/var/lib/jane-telegram-collector \
-  -e JANE_TELEGRAM_COLLECTOR_CLIENT_BACKEND=telethon -e TG_SESSION=... -e TG_API_HASH=... jane-telegram-collector
+  -e JANE_TELEGRAM_COLLECTOR_CLIENT_BACKEND=telethon -e JANE_SECRET_TG_SESSION=... -e JANE_SECRET_TG_API_HASH=... jane-telegram-collector
 ```
 
 `HEALTHCHECK` — `GET /v1/health` (перевірка сховища стану). Журнали — JSON у stdout; метрики — `GET /metrics`.
@@ -58,6 +58,9 @@ just test telegram-collector          # усе: unit, сценарії на сп
 | `RULES_DIR` | — | локальні пакети правил для `rules_ref` без репозиторію |
 | `REGISTRY_URL` / `REGISTRY_TOKEN_ENV` | — | `registry.v1` для `rules_ref`; ім'я змінної з токеном (не значення) |
 | `CONTRACTS_DIR` | `JANE_CONTRACTS_DIR` або `contracts/` checkout | схеми для валідації |
+| `SECRET_ENV_PREFIX` | `JANE_SECRET_` | `env:`-посилання `secret_refs` — лише змінні з цим префіксом |
+| `SECRET_FILES_DIR` | `/run/secrets` | `file:`-посилання — лише всередині цього каталогу |
+| `TELEGRAM_HOST_ALLOWLIST` | `[]` | дозволені хости в хостових `params` підключення |
 | `LEASE_SECONDS` | `30` | lease збору; без heartbeat довше — збір перехоплює інший екземпляр |
 | `HEARTBEAT_INTERVAL_MS` | `5000` | як часто власник продовжує lease і перевіряє скасування |
 | `STATE_BUSY_TIMEOUT_MS` | `10000` | скільки запис чекає блокування SQLite іншим процесом |
@@ -152,12 +155,24 @@ just test telegram-collector          # усе: unit, сценарії на сп
 `PUT /v1/connections/{id}` з `kind: telegram_account` (ADR-0006). Секрети — лише `secret_refs`
 (`env:VAR`, `file:/run/secrets/x`), їх розв'язує колектор у своєму середовищі безпосередньо перед відкриттям
 клієнта; значення не зберігаються й не повертаються. Секретоподібні `params` → 422 `secret_detected`.
-`POST /v1/connections/{id}/test` показує `secrets_resolved`. Для `telethon`:
+`POST /v1/connections/{id}/test` показує `secrets_resolved`.
+
+**Політика секретів (захист від витоку; рішення координатора, як у WP-10 `services/llm`).** Підключення
+визначає, *куди* піде розв'язаний секрет, тому колектор обмежує: `env:`-посилання — лише змінні з префіксом
+`JANE_TELEGRAM_COLLECTOR_SECRET_ENV_PREFIX` (типово `JANE_SECRET_`, тобто не `PGPASSWORD`); `file:` — лише
+всередині `JANE_TELEGRAM_COLLECTOR_SECRET_FILES_DIR` (типово `/run/secrets`, після розв'язання шляху, без `..`);
+`vault:` вимкнено; хостові `params` (`server`, `host`, `proxy_host`, `proxy`, `api_base`, `dc_address`) — лише
+хости з `JANE_TELEGRAM_COLLECTOR_TELEGRAM_HOST_ALLOWLIST` (JSON-список; типово порожній — такі параметри
+відхиляються; адаптер Telethon їх не використовує). Порушення — 422 при `PUT /v1/connections`
+(`secret_ref_not_allowed` / `host_not_allowed`); підключення, збережене в обхід API, не отримує секретів
+і відхиляється (422) при старті збору чи `/v1/fetches`. Тест: `test_connection_policy_rejects_exfiltration`.
+
+Для `telethon`:
 
 ```json
 {"connection_id": "tg-main", "kind": "telegram_account",
  "params": {"api_id": 123456},
- "secret_refs": {"api_hash": "env:TG_API_HASH", "session": "env:TG_SESSION"}}
+ "secret_refs": {"api_hash": "env:JANE_SECRET_TG_API_HASH", "session": "env:JANE_SECRET_TG_SESSION"}}
 ```
 
 `session` — Telethon `StringSession` уже авторизованого облікового запису (створюється поза сервісом;

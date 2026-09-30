@@ -157,7 +157,7 @@ def account(conn_id: str = "tg-main", **secret_refs: str) -> dict[str, object]:
         "title": "Collector account",
         "params": {"api_id": 12345},
         "secret_refs": secret_refs
-        or {"session": "env:JANE_TEST_TG_SESSION", "api_hash": "env:JANE_TEST_TG_API_HASH"},
+        or {"session": "env:JANE_SECRET_TEST_TG_SESSION", "api_hash": "env:JANE_SECRET_TEST_TG_API_HASH"},
     }
 
 
@@ -165,8 +165,8 @@ def test_account_secrets_are_resolved_only_in_the_collector(
     client: TestClient, channel: Recording, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     channel.set("required_secrets", ["session", "api_hash"])
-    monkeypatch.delenv("JANE_TEST_TG_SESSION", raising=False)
-    monkeypatch.setenv("JANE_TEST_TG_API_HASH", "hash-value-not-a-real-secret")
+    monkeypatch.delenv("JANE_SECRET_TEST_TG_SESSION", raising=False)
+    monkeypatch.setenv("JANE_SECRET_TEST_TG_API_HASH", "hash-value-not-a-real-secret")
     put = client.put("/v1/connections/tg-main", json=account())
     assert put.status_code == 201
     assert "hash-value" not in put.text
@@ -182,7 +182,7 @@ def test_account_secrets_are_resolved_only_in_the_collector(
     assert r.json()["errors"][0]["pointer"] == "/rules/account_connection_id"
     assert "session" in r.json()["errors"][0]["message"]
 
-    monkeypatch.setenv("JANE_TEST_TG_SESSION", "session-value-not-a-real-secret")
+    monkeypatch.setenv("JANE_SECRET_TEST_TG_SESSION", "session-value-not-a-real-secret")
     assert client.post("/v1/connections/tg-main/test").json()["ok"] is True
     cid = start(client, {"source_kind": "telegram", "rules": rules, "state_key": "acc"})
     items = drain(client, cid)
@@ -195,8 +195,8 @@ def test_session_rejected_by_telegram_fails_the_collection(
     client: TestClient, channel: Recording, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     channel.set("required_secrets", ["session"])
-    client.put("/v1/connections/tg-bad", json=account("tg-bad", api_hash="env:JANE_TEST_TG_API_HASH"))
-    monkeypatch.setenv("JANE_TEST_TG_API_HASH", "x")
+    client.put("/v1/connections/tg-bad", json=account("tg-bad", api_hash="env:JANE_SECRET_TEST_TG_API_HASH"))
+    monkeypatch.setenv("JANE_SECRET_TEST_TG_API_HASH", "x")
     cid = start(
         client,
         {
@@ -333,3 +333,90 @@ def test_cancel_a_running_collection(client: TestClient, channel: Recording) -> 
     # the state_key is free again
     cid = start(client, body("c"))
     assert wait_done(client, cid)["status"] == "succeeded"
+
+
+# ---------------------------------------------------------------- secret policy (coordinator decision, as WP-10)
+
+
+def test_connection_policy_rejects_exfiltration(
+    tmp_path: Path, channel: Recording, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    secrets_dir = tmp_path / "secrets"
+    secrets_dir.mkdir()
+    (secrets_dir / "session").write_text("session-from-file", encoding="utf-8")
+    (tmp_path / "outside").write_text("not-for-telegram", encoding="utf-8")
+    monkeypatch.setenv("PGPASSWORD", "db-password-not-for-telegram")
+    monkeypatch.setenv("JANE_SECRET_TG_SESSION", "session-from-env")
+    settings = make_settings(
+        tmp_path, secret_files_dir=secrets_dir, telegram_host_allowlist=["proxy.internal.test"]
+    )
+    rules = telegram_rules(USERNAME, account_connection_id="tg")
+
+    def conn(**overrides: object) -> dict[str, object]:
+        return {"connection_id": "tg", "kind": "telegram_account", "params": {"api_id": 1}, **overrides}
+
+    rejected = [
+        ({"secret_refs": {"session": "env:PGPASSWORD"}}, "/secret_refs/session", "secret_ref_not_allowed"),
+        (
+            {"secret_refs": {"session": f"file:{secrets_dir / '..' / 'outside'}"}},
+            "/secret_refs/session",
+            "secret_ref_not_allowed",
+        ),
+        (
+            {"secret_refs": {"session": "vault:kv/tg#session"}},
+            "/secret_refs/session",
+            "secret_ref_not_allowed",
+        ),
+        (
+            {"params": {"api_id": 1, "proxy_host": "evil.example.org"}},
+            "/params/proxy_host",
+            "host_not_allowed",
+        ),
+        (
+            {"params": {"api_id": 1, "server": "https://evil.example.org:443"}},
+            "/params/server",
+            "host_not_allowed",
+        ),
+    ]
+    with TestClient(build_app(settings)) as c:
+        for overrides, pointer, code in rejected:
+            r = c.put("/v1/connections/tg", json=conn(**overrides))
+            assert r.status_code == 422, (overrides, r.text)
+            assert r.json()["errors"][0]["pointer"] == pointer
+            assert r.json()["errors"][0]["code"] == code
+        assert c.get("/v1/connections/tg").status_code == 404
+
+        # allowed: prefixed env variable, file inside the secrets directory, allow-listed host
+        ok = conn(
+            params={"api_id": 1, "proxy_host": "proxy.internal.test"},
+            secret_refs={
+                "session": "env:JANE_SECRET_TG_SESSION",
+                "api_hash": f"file:{secrets_dir / 'session'}",
+            },
+        )
+        assert c.put("/v1/connections/tg", json=ok).status_code == 201
+        assert c.post("/v1/connections/tg/test").json()["secrets_resolved"] == {
+            "session": True,
+            "api_hash": True,
+        }
+        cid = start(c, {"source_kind": "telegram", "rules": rules, "state_key": "pol"})
+        assert len(drain(c, cid)) == 25
+
+        # a connection stored bypassing the API gets no secrets and is rejected when used
+        store = c.app.state.store  # type: ignore[attr-defined]
+        store.put_connection("tg", conn(secret_refs={"session": "env:PGPASSWORD"}), '"x"')
+        assert c.post("/v1/connections/tg/test").json()["secrets_resolved"] == {"session": False}
+        r = c.post(
+            "/v1/collections",
+            json={"source_kind": "telegram", "rules": rules, "state_key": "pol2"},
+            headers={"Idempotency-Key": "pol-2"},
+        )
+        assert r.status_code == 422
+        assert r.json()["errors"][0]["code"] == "secret_ref_not_allowed"
+        assert "db-password" not in r.text
+        one = {
+            "source_kind": "telegram",
+            "rules": rules,
+            "telegram": {"channel_username": USERNAME, "message_id": 1},
+        }
+        assert c.post("/v1/fetches", json=one).status_code == 422

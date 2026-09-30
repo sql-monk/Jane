@@ -60,6 +60,7 @@ class Engine:
         self.runner = runner
         self.platform = platform_layers(settings)
         self.transit = TransitStore(settings.transit_dir) if settings.transit_dir else None
+        self.policy = settings.connection_policy()
         self.rules_loader = RulesLoader(
             rules_dir=settings.rules_dir,
             registry_url=settings.registry_url,
@@ -219,7 +220,7 @@ class Engine:
                 f"connection {conn_id} is not known to this collector",
                 errors=[FieldError(pointer=where, message="unknown connection (PUT /v1/connections/{id})")],
             )
-        return resolve_account(found[0], where)
+        return resolve_account(found[0], where, self.policy)
 
     # ------------------------------------------------------------------ collections
     async def start_collection(self, payload: dict[str, Any]) -> Job:

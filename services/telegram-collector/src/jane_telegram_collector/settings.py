@@ -28,6 +28,8 @@ from jane_kit.idempotency import IdempotencyLimits
 from jane_kit.jobs import JobLimits
 from jane_kit.pagination import PageLimits
 
+from .connections import ConnectionPolicy
+
 ENV_PREFIX = "JANE_TELEGRAM_COLLECTOR_"
 LIMITS_ENV_PREFIX = f"{ENV_PREFIX}LIMITS__"
 
@@ -59,12 +61,26 @@ class Settings(JaneSettings):
     """Name of the environment variable holding the bearer token for the registry (never the value)."""
     contracts_dir: Path | None = None
     """``contracts/`` with the JSON Schemas; default: ``JANE_CONTRACTS_DIR`` or the checkout's contracts."""
+    secret_env_prefix: str = "JANE_SECRET_"  # noqa: S105 - a variable-name prefix, not a secret
+    """``env:`` secret references may name only variables with this prefix."""
+    secret_files_dir: Path | None = Path("/run/secrets")
+    """``file:`` secret references must point inside this directory (unset: ``file:`` disabled)."""
+    telegram_host_allowlist: list[str] = Field(default_factory=list)
+    """Hosts allowed in host-like connection params (``server``, ``proxy_host``...); default: none."""
     lease_seconds: int = Field(default=30, ge=2)
     """A running collection is owned by one instance; after this long without a heartbeat another takes it."""
     heartbeat_interval_ms: int = Field(default=5_000, ge=50)
     """How often the owner renews the lease and checks for cancellation requested through other instances."""
     state_busy_timeout_ms: int = Field(default=10_000, ge=1)
     """How long a write waits for another process holding the SQLite lock."""
+
+    def connection_policy(self) -> ConnectionPolicy:
+
+        return ConnectionPolicy(
+            env_prefix=self.secret_env_prefix,
+            files_dir=self.secret_files_dir,
+            host_allowlist=tuple(self.telegram_host_allowlist),
+        )
 
     @model_validator(mode="after")
     def _lease_rules(self) -> Settings:

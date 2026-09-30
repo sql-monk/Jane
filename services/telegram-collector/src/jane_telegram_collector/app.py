@@ -69,6 +69,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     state = StateStore(settings.state_dir / "state.db", busy_timeout_ms=settings.state_busy_timeout_ms)
     schemas = ContractSchemas.locate(settings.contracts_dir)
     factory = load_factory(settings)
+    policy = settings.connection_policy()
     runner = JobRunner(store=SqliteJobStore(state, settings.instance_id), limits=limits.jobs)
     idem_store = SqliteIdempotencyStore(state)
     engine = Engine(settings, resolved, state, factory, schemas, runner)
@@ -293,7 +294,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                 "connection_id in the body differs from the path",
                 errors=[FieldError(pointer="/connection_id", message="must equal the path parameter")],
             )
-        check_params(payload)
+        check_params(payload, policy)
         current = state.get_connection(connection_id)
         if if_match is not None and (current is None or current[1] != if_match):
             raise JaneError("If-Match does not match the current ETag", code="precondition_failed")
@@ -313,7 +314,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         if found is None:
             raise NotFound(f"connection {connection_id} not found")
         started = time.perf_counter()
-        secrets = resolved_map(found[0])
+        secrets = resolved_map(found[0], policy)
         ok = all(secrets.values())
         body: dict[str, Any] = {
             "ok": ok,

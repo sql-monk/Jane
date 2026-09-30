@@ -110,12 +110,12 @@ def test_every_operation_matches_the_contract(
     assert api.get("/v1/states/never-used").status_code == 404
 
     # connections
-    monkeypatch.setenv("JANE_TEST_TG_SESSION", "x")
+    monkeypatch.setenv("JANE_SECRET_TEST_TG_SESSION", "x")
     conn = {
         "connection_id": "tg-main",
         "kind": "telegram_account",
         "params": {"api_id": 12345},
-        "secret_refs": {"session": "env:JANE_TEST_TG_SESSION"},
+        "secret_refs": {"session": "env:JANE_SECRET_TEST_TG_SESSION"},
     }
     created = api.put("/v1/connections/tg-main", json=conn)
     assert created.status_code == 201

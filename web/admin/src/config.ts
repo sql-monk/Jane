@@ -126,3 +126,11 @@ export function serviceBaseUrl(config: AdminConfig, service: ServiceKey | { exec
   const name = typeof service === "string" ? config.services[service] : service.executor;
   return `${config.api_base}/${name}`;
 }
+
+/** Absolute form of a base URL (relative prefixes are resolved against the page origin). */
+export function absoluteUrl(
+  base: string,
+  origin: string = globalThis.location?.origin ?? "http://localhost",
+): string {
+  return new URL(base, origin.endsWith("/") ? origin : `${origin}/`).toString().replace(/\/+$/, "");
+}

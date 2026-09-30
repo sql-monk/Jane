@@ -139,4 +139,6 @@ async function main() {
   console.log(`gen-api: wrote ${files.size} files to ${path.relative(appRoot, outDir)}`);
 }
 
-await main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  await main();
+}

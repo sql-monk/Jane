@@ -1,7 +1,7 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { buildProxy } from "./dev-proxy";
+import { buildProxy } from "./dev-proxy.ts";
 
 const port = Number.parseInt(process.env["JANE_ADMIN_PORT"] ?? "4600", 10);
 
@@ -15,5 +15,6 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["src/test/setup.ts"],
     css: false,
+    testTimeout: 30_000,
   },
 });

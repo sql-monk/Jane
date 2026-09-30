@@ -299,7 +299,7 @@ export function ReasonAction({
         {confirmLabel ?? "Підтвердити"}
       </button>
       <button type="button" className="btn" onClick={() => setOpen(false)}>
-        Скасувати
+        Назад
       </button>
     </span>
   );

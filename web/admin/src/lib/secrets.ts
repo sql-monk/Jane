@@ -13,7 +13,7 @@ const SECRET_KEY =
   /(^|_)(pass|password|passwd|passphrase|pwd|secret|token|api_?key|apikey|private_?key|credentials?|authorization|cookie|session_?key|access_?key|secret_?key|client_?secret|dsn|connection_?string)($|_)/i;
 
 /** Contract fields that match the pattern but are not secrets (robots.txt user-agent token). */
-const NOT_SECRET_KEYS = new Set(["user_agent_token"]);
+const NOT_SECRET_KEYS = new Set(["user_agent_token", "secret_refs"]);
 
 function normaliseKey(key: string): string {
   return key

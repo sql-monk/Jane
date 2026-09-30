@@ -1,7 +1,7 @@
 // Typed API clients generated from contracts (openapi-fetch over src/api/generated/*).
 import createClient, { type Client, type Middleware } from "openapi-fetch";
 import type { AdminConfig } from "../config";
-import { serviceBaseUrl } from "../config";
+import { absoluteUrl, serviceBaseUrl } from "../config";
 import type { paths as OrchestratorPaths } from "./generated/orchestrator";
 import type { paths as RegistryPaths } from "./generated/registry";
 import type { paths as StoragePaths } from "./generated/storage";
@@ -50,7 +50,7 @@ const EXECUTOR_NAME = /^[a-z0-9][a-z0-9._-]{0,98}$/;
 export function createApiClients(config: AdminConfig, hooks: AuthHooks): ApiClients {
   const middleware = authMiddleware(hooks);
   function make<P extends object>(baseUrl: string): Client<P> {
-    const client = createClient<P>({ baseUrl });
+    const client = createClient<P>({ baseUrl: absoluteUrl(baseUrl) });
     client.use(middleware);
     return client;
   }

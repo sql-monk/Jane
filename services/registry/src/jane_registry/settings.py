@@ -80,10 +80,12 @@ class PackageLimits(Limits):
 
 class SecretScanLimits(Limits):
     max_scan_bytes_per_file: int = Field(default=2 * 1024 * 1024, ge=1024)
-    """Bytes of each file that are scanned; larger files are scanned up to this size and reported as a
-    warning in the logs (the publish still fails on a finding in the scanned part)."""
+    """Largest file the secret scanner reads; a package with a larger file is rejected with
+    422 ``limit_exceeded`` (it is never accepted unscanned)."""
     min_entropy_token_length: int = Field(default=32, ge=8)
     """Shortest quoted/assigned token checked for high entropy."""
+    max_findings_per_file: int = Field(default=20, ge=1)
+    """Findings reported per file (one is enough to reject; the cap keeps responses and scans small)."""
     entropy_threshold: float = Field(default=4.3, gt=0)
     """Shannon entropy (bits per character) above which a mixed-alphabet token counts as a secret."""
 
@@ -124,6 +126,19 @@ class BlobLimits(Limits):
     """Attempts of one S3 request (botocore standard retry mode)."""
 
 
+class RecoveryLimits(Limits):
+    """Recovery after an instance crash (several instances share PostgreSQL)."""
+
+    in_progress_lease_ms: int = Field(default=120_000, ge=1000)
+    """An ``Idempotency-Key`` claimed by a request that has not finished is released after this lease, so a
+    retry on another instance is not blocked by a crashed one."""
+    job_lease_ms: int = Field(default=60_000, ge=1000)
+    """A running job belongs to its instance while the instance renews this lease; an expired lease makes
+    the job ``failed`` with a retryable error."""
+    job_heartbeat_ms: int = Field(default=15_000, ge=100)
+    """How often an instance renews the leases of its running jobs (must be below ``job_lease_ms``)."""
+
+
 class ServiceLimits(Limits):
     """Limits of the registry. Contract names (``limits.schema.json``) where the limit exists there."""
 
@@ -137,6 +152,7 @@ class ServiceLimits(Limits):
     profiles: ProfileLimits = ProfileLimits()
     db: DbLimits = DbLimits()
     blob: BlobLimits = BlobLimits()
+    recovery: RecoveryLimits = RecoveryLimits()
 
 
 def resolve_service_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLimits[ServiceLimits]:

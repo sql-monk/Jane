@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -15,9 +16,17 @@ from fastapi import Depends, FastAPI, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from jane_kit.errors import FieldError, JaneError, ValidationFailed
+from jane_kit.errors import FieldError, Forbidden, JaneError, ValidationFailed
 from jane_kit.idempotency import IdempotencyStore, InMemoryIdempotencyStore, StoredResponse, idempotent
-from jane_kit.jobs import InMemoryJobStore, JobContext, JobRunner, JobStore, accepted, jobs_router
+from jane_kit.jobs import (
+    TERMINAL_STATUSES,
+    InMemoryJobStore,
+    JobCancelRequest,
+    JobContext,
+    JobRunner,
+    JobStore,
+    accepted,
+)
 from jane_kit.pagination import clamp_limit, decode_cursor, encode_cursor
 from jane_kit.service import create_app
 
@@ -144,7 +153,10 @@ def build_components(settings: Settings, limits: ServiceLimits) -> Components:
                 "JANE_REGISTRY_DB_URL is required for db=postgres (or set JANE_REGISTRY_DB=memory)"
             )
         pg = PostgresStore(settings.db_url.get_secret_value(), settings.db_schema, limits.db)
-        store, idem, jobs = pg, PostgresIdempotencyStore(pg), PostgresJobStore(pg, limits.jobs)
+        rec = limits.recovery
+        store = pg
+        idem = PostgresIdempotencyStore(pg, rec.in_progress_lease_ms / 1000)
+        jobs = PostgresJobStore(pg, limits.jobs, settings.instance_id, rec.job_lease_ms / 1000)
     else:
         store, idem, jobs = (
             MemoryStore(),
@@ -194,11 +206,16 @@ def build_app(settings: Settings | None = None, components: Components | None = 
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await comp.store.open()
         if isinstance(comp.blobs, S3BlobStore) and settings.s3_create_bucket:
-            import asyncio
-
             await asyncio.to_thread(comp.blobs.ensure_bucket)
         if settings.auth_mode == "none":
             log.warning("auth_mode=none: every caller has every scope (local use only)")
+        heartbeat: asyncio.Task[None] | None = None
+        sweep = getattr(comp.jobs, "sweep", None)
+        if sweep is not None:
+            reaped = await sweep()
+            if reaped:
+                log.warning("jobs of stopped instances marked failed", extra={"jobs": reaped})
+            heartbeat = asyncio.create_task(_heartbeat(), name="registry-job-heartbeat")
         log.info(
             "registry started",
             extra={"limits": resolved.effective(), "store": comp.store.name, "blob": comp.blobs.name},
@@ -206,8 +223,20 @@ def build_app(settings: Settings | None = None, components: Components | None = 
         try:
             yield
         finally:
+            if heartbeat is not None:
+                heartbeat.cancel()
+                await asyncio.gather(heartbeat, return_exceptions=True)
             await runner.shutdown()
             await comp.store.close()
+
+    async def _heartbeat() -> None:
+        beat = getattr(comp.jobs, "heartbeat", None)
+        while beat is not None:
+            await asyncio.sleep(limits.recovery.job_heartbeat_ms / 1000)
+            try:
+                await beat()
+            except Exception:
+                log.exception("job lease renewal failed")
 
     app = create_app(
         settings,
@@ -238,7 +267,25 @@ def build_app(settings: Settings | None = None, components: Components | None = 
     read = Depends(auth.require("registry:read"))
     write = auth.require("registry:write")
     approve = auth.require("registry:approve")
-    app.include_router(jobs_router(runner), dependencies=[read])
+
+    # /v1/jobs (common.yaml Job, JobCancel): reading needs registry:read, cancelling registry:write
+    @app.get("/v1/jobs/{job_id}", tags=["jobs"], operation_id="getJob", dependencies=[read])
+    async def get_job(job_id: str) -> JSONResponse:
+        return JSONResponse((await runner.get(job_id)).wire())
+
+    @app.post("/v1/jobs/{job_id}/cancel", tags=["jobs"], operation_id="cancelJob")
+    async def cancel_job(
+        job_id: str,
+        request: Request,
+        principal: Principal = Depends(write),  # noqa: B008
+    ) -> JSONResponse:
+        raw = await _json_body(request)
+        body = _parse(JobCancelRequest, raw) if raw is not None else None
+        before = await runner.get(job_id)
+        if before.status in TERMINAL_STATUSES:
+            return JSONResponse(before.wire(), status_code=200)
+        job = await runner.cancel(job_id, reason=body.reason if body else None, requested_by=principal.name)
+        return JSONResponse(job.wire(), status_code=202)
 
     @app.middleware("http")
     async def body_limit(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
@@ -323,6 +370,13 @@ def build_app(settings: Settings | None = None, components: Components | None = 
             )
         patch = _parse(PackagePatch, body)
         changes = patch.model_dump(exclude_unset=True)
+        if changes.get("auto_changes_allowed") is True and "registry:approve" not in principal.scopes:
+            current = await service.package(package_id)
+            if not current.auto_changes_allowed:
+                raise Forbidden(
+                    "allowing automatic changes of a package needs the registry:approve scope",
+                    title="Scope registry:approve is required",
+                )
         if not changes:
             pkg = await service.package(package_id)
         else:
@@ -552,7 +606,7 @@ def build_app(settings: Settings | None = None, components: Components | None = 
 
             async def work(ctx: JobContext) -> dict[str, Any]:
                 await ctx.progress(0, 2, unit="steps", message="merging")
-                version = await service.port(plan, principal)
+                version = await service.port(plan, principal, before_publish=ctx.check_cancelled)
                 await ctx.progress(2, 2, unit="steps", message=f"published {version.version}")
                 return version_wire(version)
 

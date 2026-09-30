@@ -26,7 +26,7 @@ from typing import Any
 import httpx
 
 from .archive import MANIFEST_NAME, ArchiveError, ArchiveLimits, digest_of, is_canonical, read_archive
-from .secrets import scan_files
+from .secrets import oversized_files, scan_files
 from .settings import PackageLimits, SecretScanLimits
 from .validation import ContractSchemas, PackageValidator, find_contracts_dir
 
@@ -53,7 +53,7 @@ def export_package(
     out: Path,
     *,
     with_dependencies: bool = True,
-    max_packages: int = 100,
+    max_packages: int,
 ) -> list[dict[str, Any]]:
     """Download and verify; returns the index entries (also written to ``out/jane-export.json``)."""
     out.mkdir(parents=True, exist_ok=True)
@@ -194,7 +194,13 @@ def verify_archive(
         missing = [p for _, p in PackageValidator.referenced_paths(manifest) if p not in files]
         report.checks["referenced_files"] = not missing
         report.errors.extend(f"referenced file is missing: {p}" for p in missing)
-    findings = scan_files(files, secret_limits or SecretScanLimits())
+    slimits = secret_limits or SecretScanLimits()
+    too_big = oversized_files(files, slimits)
+    report.checks["scan_limit"] = not too_big
+    report.errors.extend(
+        f"{p}: larger than secrets.max_scan_bytes_per_file, cannot be scanned" for p in too_big
+    )
+    findings = scan_files(files, slimits)
     report.checks["secrets"] = not findings
     report.errors.extend(f"{f.path}: {f.message}" for f in findings)
     return report

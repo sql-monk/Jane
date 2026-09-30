@@ -11,7 +11,7 @@ import hashlib
 import json
 import logging
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -32,6 +32,7 @@ from .archive import (
     ArchiveLimits,
     canonical_archive,
     check_package_path,
+    check_unique_paths,
     digest_of,
     manifest_bytes,
     read_archive,
@@ -41,7 +42,7 @@ from .blobs import BlobStore
 from .diffing import diff_files, diff_manifest
 from .merge import merge_packages
 from .profiles import ProfileSource, check_dependencies
-from .secrets import scan_files
+from .secrets import oversized_files, scan_files
 from .semver import SemVer, max_version
 from .settings import ServiceLimits
 from .store import (
@@ -308,6 +309,19 @@ class RegistryService:
         return manifest, files
 
     def _check_sizes(self, files: Mapping[str, bytes]) -> None:
+        try:
+            check_unique_paths(list(files))
+        except ArchiveError as exc:
+            raise ValidationFailed(
+                str(exc),
+                errors=[
+                    FieldError(
+                        pointer="/files/" + (exc.path or "").replace("~", "~0").replace("/", "~1"),
+                        code="duplicate_path",
+                        message=str(exc),
+                    )
+                ],
+            ) from exc
         p = self.limits.packages
         if len(files) > p.max_files:
             raise LimitExceeded(
@@ -429,6 +443,11 @@ class RegistryService:
         if semantic:
             raise ValidationFailed("package is not valid", errors=_issues_to_errors(semantic))
         created_by = str(manifest["provenance"]["created_by"])
+        if principal.actor == "llm" and created_by != "llm" and not created_package:
+            raise Forbidden(
+                "an llm caller can only publish versions with provenance.created_by = llm",
+                title="Provenance does not match the caller",
+            )
         if created_by == "llm" and not pkg.auto_changes_allowed:
             raise Forbidden(
                 "automatic changes are forbidden for this package (auto_changes_allowed=false)",
@@ -437,6 +456,20 @@ class RegistryService:
         version = str(manifest["version"])
         if not created_package and await self.store.get_version(pkg.package_id, version) is not None:
             raise version_exists(version)
+        too_big = oversized_files(files, self.limits.secrets)
+        if too_big:
+            limit = self.limits.secrets.max_scan_bytes_per_file
+            raise LimitExceeded(
+                f"{len(too_big)} file(s) larger than secrets.max_scan_bytes_per_file={limit} cannot be scanned",
+                details={"path": "secrets.max_scan_bytes_per_file", "limit": limit},
+                errors=[
+                    FieldError(
+                        pointer="/files/" + p.replace("~", "~0").replace("/", "~1"),
+                        message="too large to scan",
+                    )
+                    for p in too_big
+                ],
+            )
         findings = scan_files(files, self.limits.secrets)
         if findings:
             log.warning(
@@ -714,7 +747,12 @@ class RegistryService:
             requested_by=principal.name,
         )
 
-    async def port(self, plan: PortPlan, principal: Principal) -> VersionRecord:
+    async def port(
+        self,
+        plan: PortPlan,
+        principal: Principal,
+        before_publish: Callable[[], Awaitable[None]] | None = None,
+    ) -> VersionRecord:
         base_v = await self.version(plan.parent_id, plan.merge_base)
         theirs_v = await self.version(plan.parent_id, plan.parent_version)
         ours_v = await self.version(plan.fork.package_id, plan.base_version)
@@ -741,7 +779,7 @@ class RegistryService:
         manifest["version"] = plan.new_version
         manifest["fork_of"] = dict(plan.fork.fork_of or {})
         manifest["provenance"] = {
-            "created_by": "human",
+            "created_by": principal.actor,
             "based_on": {
                 "package_id": plan.fork.package_id,
                 "version": ours_v.version,
@@ -754,6 +792,8 @@ class RegistryService:
             "upstream_port": {"parent_version": plan.parent_version, "requested_by": plan.requested_by},
         }
         fork = await self.package(plan.fork.package_id)
+        if before_publish is not None:
+            await before_publish()  # e.g. a cancellation requested on another instance
         return await self.publish(
             fork, manifest, result.files, principal, from_zip=False, ported_parent_version=plan.parent_version
         )

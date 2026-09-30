@@ -26,12 +26,16 @@ from jane_kit.errors import Forbidden, Unauthenticated
 __all__ = ["ALL_SCOPES", "ApiKey", "Authenticator", "Principal"]
 
 ALL_SCOPES = frozenset({"registry:read", "registry:write", "registry:approve"})
+ACTORS = frozenset({"human", "llm", "import"})
 
 
 @dataclass(frozen=True)
 class Principal:
     name: str
     scopes: frozenset[str]
+    actor: str = "human"
+    """``provenance.created_by`` of what this caller creates: ``human`` (default), ``llm`` (the assistant's
+    key) or ``import``. An ``llm`` caller can only publish ``created_by: llm`` versions."""
 
 
 @dataclass(frozen=True)
@@ -39,11 +43,18 @@ class ApiKey:
     name: str
     sha256: str
     scopes: frozenset[str]
+    actor: str = "human"
 
 
 def load_api_keys(path: Path) -> list[ApiKey]:
     doc = json.loads(path.read_text(encoding="utf-8"))
-    return [ApiKey(str(k["name"]), str(k["sha256"]).lower(), frozenset(k.get("scopes") or [])) for k in doc]
+    keys = []
+    for k in doc:
+        actor = str(k.get("actor", "human"))
+        if actor not in ACTORS:
+            raise ValueError(f"api key {k.get('name')!r}: actor must be one of {sorted(ACTORS)}")
+        keys.append(ApiKey(str(k["name"]), str(k["sha256"]).lower(), frozenset(k.get("scopes") or []), actor))
+    return keys
 
 
 class Authenticator:
@@ -63,7 +74,7 @@ class Authenticator:
         digest = hashlib.sha256(token.strip().encode()).hexdigest()
         for key in self.keys:
             if hmac.compare_digest(key.sha256, digest):
-                return Principal(key.name, key.scopes)
+                return Principal(key.name, key.scopes, key.actor)
         raise Unauthenticated("invalid token", headers={"WWW-Authenticate": "Bearer"})
 
     def require(self, scope: str) -> Callable[[Request], Coroutine[Any, Any, Principal]]:

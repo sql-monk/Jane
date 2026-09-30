@@ -24,7 +24,7 @@ from jane_kit.service import run
 from .app import build_app
 from .archive import ArchiveError, canonical_archive, digest_of, files_from_dir
 from .export import ExportError, export_package, verify_archive
-from .settings import Settings
+from .settings import Settings, resolve_service_limits
 
 
 def _serve() -> int:
@@ -48,6 +48,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     exp.add_argument("--no-dependencies", action="store_true")
     exp.add_argument("--token-env", default=None, help="environment variable holding a bearer token")
     exp.add_argument("--timeout-ms", type=int, default=30_000, help="HTTP timeout (default 30000)")
+    exp.add_argument(
+        "--max-packages",
+        type=int,
+        default=100,
+        help="upper bound of the dependency closure to download (default 100)",
+    )
     ver = sub.add_parser("verify", help="verify an exported archive offline")
     ver.add_argument("archive", type=Path)
     ver.add_argument("--digest", default=None)
@@ -69,7 +75,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             with httpx.Client(base_url=ns.registry, headers=headers, timeout=ns.timeout_ms / 1000) as client:
                 entries = export_package(
-                    client, pid, version, ns.out, with_dependencies=not ns.no_dependencies
+                    client,
+                    pid,
+                    version,
+                    ns.out,
+                    with_dependencies=not ns.no_dependencies,
+                    max_packages=ns.max_packages,
                 )
         except (ExportError, httpx.HTTPError) as exc:
             print(f"export failed: {exc}", file=sys.stderr)
@@ -78,7 +89,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"{e['package_id']}@{e['version']}  {e['digest']}  {ns.out / e['file']}")
         return 0
     if ns.cmd == "verify":
-        report = verify_archive(ns.archive, expected_digest=ns.digest, contracts=ns.contracts)
+        # limits of `verify` are the registry's configured limits (JANE_REGISTRY_LIMITS__PACKAGES__*, __SECRETS__*)
+        limits = resolve_service_limits(Settings()).limits
+        report = verify_archive(
+            ns.archive,
+            expected_digest=ns.digest,
+            contracts=ns.contracts,
+            package_limits=limits.packages,
+            secret_limits=limits.secrets,
+        )
         print(json.dumps(report.wire(), indent=2, ensure_ascii=False))
         return 0 if report.ok else 1
     try:

@@ -37,6 +37,7 @@ __all__ = [
     "ArchiveLimits",
     "canonical_archive",
     "check_package_path",
+    "check_unique_paths",
     "digest_of",
     "files_from_dir",
     "is_canonical",
@@ -72,9 +73,19 @@ class ArchiveLimits:
 
 
 def check_package_path(name: str) -> str:
-    if not PACKAGE_PATH_RE.match(name) or name.endswith("/") or "//" in name:
+    if not PACKAGE_PATH_RE.match(name) or name.endswith("/") or "//" in name or "." in name.split("/"):
         raise ArchiveError(f"invalid package path {name!r}", path=name)
     return name
+
+
+def check_unique_paths(names: list[str]) -> None:
+    """Paths that differ only in letter case would collide on Windows/macOS file systems."""
+    seen: dict[str, str] = {}
+    for name in names:
+        folded = name.casefold()
+        if folded in seen and seen[folded] != name:
+            raise ArchiveError(f"paths differ only in letter case: {seen[folded]!r} and {name!r}", path=name)
+        seen[folded] = name
 
 
 def digest_of(data: bytes) -> str:
@@ -138,6 +149,7 @@ def read_archive(data: bytes, limits: ArchiveLimits) -> dict[str, bytes]:
             if len(content) != info.file_size:
                 raise ArchiveError(f"size mismatch for {name}", path=name)
             files[name] = content
+    check_unique_paths(list(files))
     return files
 
 

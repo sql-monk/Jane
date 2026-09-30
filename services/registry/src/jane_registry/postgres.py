@@ -21,8 +21,9 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Json, Jsonb
 from psycopg_pool import ConnectionPool
 
+from jane_kit.errors import JaneError
 from jane_kit.idempotency import IdempotencyRecord, StoredResponse
-from jane_kit.jobs import Job, JobLimits
+from jane_kit.jobs import Job, JobLimits, JobStatus
 
 from .settings import DbLimits
 from .store import (
@@ -115,6 +116,9 @@ CREATE TABLE IF NOT EXISTS registry_jobs (
     finished_at timestamptz,
     updated_at timestamptz NOT NULL
 );
+ALTER TABLE registry_idempotency ADD COLUMN IF NOT EXISTS lease_until timestamptz;
+ALTER TABLE registry_jobs ADD COLUMN IF NOT EXISTS owner text;
+ALTER TABLE registry_jobs ADD COLUMN IF NOT EXISTS lease_until timestamptz;
 """
 
 _PKG_COLS = (
@@ -534,17 +538,24 @@ class _SyncStore:
 class _SyncIdempotency:
     """``IdempotencyStore`` on ``registry_idempotency`` (``INSERT ... ON CONFLICT DO NOTHING``)."""
 
-    def __init__(self, store: _SyncStore) -> None:
+    def __init__(self, store: _SyncStore, lease_s: float) -> None:
         self.store = store
+        self.lease_s = lease_s
 
     def begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
         expires = datetime.now(UTC) + timedelta(seconds=ttl_s)
         with self.store.tx() as conn:
-            conn.execute("DELETE FROM registry_idempotency WHERE key = %s AND expires_at <= now()", (key,))
+            # expired keys and in-progress claims of a crashed instance (lease over) can be claimed again
+            conn.execute(
+                "DELETE FROM registry_idempotency WHERE key = %s AND (expires_at <= now() "
+                "OR (state = 'in_progress' AND lease_until IS NOT NULL AND lease_until <= now()))",
+                (key,),
+            )
             cur = conn.execute(
-                "INSERT INTO registry_idempotency (key, fingerprint, state, expires_at) VALUES (%s, %s, 'in_progress', %s) "
+                "INSERT INTO registry_idempotency (key, fingerprint, state, expires_at, lease_until) "
+                "VALUES (%s, %s, 'in_progress', %s, now() + make_interval(secs => %s)) "
                 "ON CONFLICT (key) DO NOTHING RETURNING key",
-                (key, fingerprint, expires),
+                (key, fingerprint, expires, self.lease_s),
             )
             if cur.fetchone() is not None:
                 return None
@@ -574,11 +585,19 @@ class _SyncIdempotency:
 
 
 class _SyncJobs:
-    """``JobStore`` on ``registry_jobs``; finished jobs older than ``job_retention_seconds`` are purged."""
+    """``JobStore`` on ``registry_jobs``; finished jobs older than ``job_retention_seconds`` are purged.
 
-    def __init__(self, store: _SyncStore, limits: JobLimits) -> None:
+    Every unfinished job has an ``owner`` (the instance running it) and a ``lease_until`` that the owner renews
+    (:meth:`heartbeat`). A job whose lease expired belongs to a crashed instance: reading it (or the sweep on
+    start) turns it into ``failed`` with a retryable ``service_unavailable`` error (``cancelling`` ->
+    ``cancelled``), so clients never wait on it forever.
+    """
+
+    def __init__(self, store: _SyncStore, limits: JobLimits, owner: str, lease_s: float) -> None:
         self.store = store
         self.limits = limits
+        self.owner = owner
+        self.lease_s = lease_s
 
     def create(self, job: Job) -> None:
         with self.store.tx() as conn:
@@ -587,12 +606,68 @@ class _SyncJobs:
                 (self.limits.job_retention_seconds,),
             )
             conn.execute(
-                "INSERT INTO registry_jobs (job_id, doc, finished_at, updated_at) VALUES (%s, %s, %s, now())",
-                (job.job_id, Jsonb(job.model_dump(mode="json")), job.finished_at),
+                "INSERT INTO registry_jobs (job_id, doc, finished_at, updated_at, owner, lease_until) "
+                "VALUES (%s, %s, %s, now(), %s, now() + make_interval(secs => %s))",
+                (job.job_id, Jsonb(job.model_dump(mode="json")), job.finished_at, self.owner, self.lease_s),
             )
+
+    @staticmethod
+    def _orphaned(job: Job) -> Job:
+        now = datetime.now(UTC)
+        if job.status == JobStatus.CANCELLING:
+            return job.model_copy(
+                update={"status": JobStatus.CANCELLED, "finished_at": now, "updated_at": now}
+            )
+        err = JaneError(
+            "the registry instance running this job stopped (job lease expired); retry the request",
+            code="service_unavailable",
+            retryable=True,
+        )
+        return job.model_copy(
+            update={
+                "status": JobStatus.FAILED,
+                "finished_at": now,
+                "updated_at": now,
+                "error": err.to_problem(),
+            }
+        )
+
+    def _reap(self, conn: Any, job_id: str | None) -> list[Job]:
+        cur = conn.execute(
+            "SELECT job_id, doc FROM registry_jobs WHERE finished_at IS NULL AND lease_until IS NOT NULL "
+            "AND lease_until <= now() AND (%s::text IS NULL OR job_id = %s) FOR UPDATE SKIP LOCKED",
+            (job_id, job_id),
+        )
+        reaped = []
+        for row in cur.fetchall():
+            job = self._orphaned(Job.model_validate(row["doc"]))
+            conn.execute(
+                "UPDATE registry_jobs SET doc = %s, finished_at = %s, updated_at = now(), lease_until = NULL "
+                "WHERE job_id = %s",
+                (Jsonb(job.model_dump(mode="json")), job.finished_at, job.job_id),
+            )
+            reaped.append(job)
+        return reaped
+
+    def sweep(self) -> int:
+        """Fail every job whose owner stopped renewing its lease (run on start)."""
+        with self.store.tx() as conn:
+            return len(self._reap(conn, None))
+
+    def heartbeat(self) -> int:
+        with self.store.tx() as conn:
+            cur = conn.execute(
+                "UPDATE registry_jobs SET lease_until = now() + make_interval(secs => %s) "
+                "WHERE owner = %s AND finished_at IS NULL",
+                (self.lease_s, self.owner),
+            )
+            return int(cur.rowcount or 0)
 
     def get(self, job_id: str) -> Job | None:
         with self.store.tx() as conn:
+            reaped = self._reap(conn, job_id)
+            if reaped:
+                return reaped[0]
             cur = conn.execute("SELECT doc FROM registry_jobs WHERE job_id = %s", (job_id,))
             row = cur.fetchone()
         return Job.model_validate(row["doc"]) if row else None
@@ -601,8 +676,9 @@ class _SyncJobs:
         job = job.model_copy(update={"updated_at": datetime.now(UTC)})
         with self.store.tx() as conn:
             conn.execute(
-                "UPDATE registry_jobs SET doc = %s, finished_at = %s, updated_at = now() WHERE job_id = %s",
-                (Jsonb(job.model_dump(mode="json")), job.finished_at, job.job_id),
+                "UPDATE registry_jobs SET doc = %s, finished_at = %s, updated_at = now(), "
+                "lease_until = CASE WHEN %s::timestamptz IS NULL THEN lease_until ELSE NULL END WHERE job_id = %s",
+                (Jsonb(job.model_dump(mode="json")), job.finished_at, job.finished_at, job.job_id),
             )
 
 
@@ -678,8 +754,8 @@ class PostgresStore:
 class PostgresIdempotencyStore:
     """``IdempotencyStore`` on ``registry_idempotency`` (``INSERT ... ON CONFLICT DO NOTHING``)."""
 
-    def __init__(self, store: PostgresStore) -> None:
-        self.sync = _SyncIdempotency(store.sync)
+    def __init__(self, store: PostgresStore, in_progress_lease_s: float) -> None:
+        self.sync = _SyncIdempotency(store.sync, in_progress_lease_s)
 
     async def begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
         return await asyncio.to_thread(self.sync.begin, key, fingerprint, ttl_s)
@@ -694,8 +770,14 @@ class PostgresIdempotencyStore:
 class PostgresJobStore:
     """``JobStore`` on ``registry_jobs``; finished jobs older than ``job_retention_seconds`` are purged."""
 
-    def __init__(self, store: PostgresStore, limits: JobLimits) -> None:
-        self.sync = _SyncJobs(store.sync, limits)
+    def __init__(self, store: PostgresStore, limits: JobLimits, owner: str, lease_s: float) -> None:
+        self.sync = _SyncJobs(store.sync, limits, owner, lease_s)
+
+    async def sweep(self) -> int:
+        return await asyncio.to_thread(self.sync.sweep)
+
+    async def heartbeat(self) -> int:
+        return await asyncio.to_thread(self.sync.heartbeat)
 
     async def create(self, job: Job) -> None:
         await asyncio.to_thread(self.sync.create, job)

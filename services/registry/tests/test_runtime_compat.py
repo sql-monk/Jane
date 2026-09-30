@@ -107,7 +107,7 @@ def test_exported_sdk_example_runs_in_runtime_cli(backend: Any, tmp_path: Path, 
             headers={"Content-Type": "application/zip", "Idempotency-Key": f"p-{pid}"},
         )
         assert r.status_code == 201, r.text
-        export_package(c, pid, version, out)
+        export_package(c, pid, version, out, max_packages=10)
     # ---- no registry from here on
     archive = out / f"{pid}-{version}.zip"
     assert digest_of(archive.read_bytes()) == r.json()["digest"]

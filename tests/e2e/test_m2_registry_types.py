@@ -564,10 +564,11 @@ def test_storage_fork_pinned_in_a_task_runs_that_fork(r9: Registry9, run_id: str
     )
     error = item.get("error") or {}
     executor = (error.get("details") or {}).get("executor")
-    if item["status"] == "failed" and (error.get("code"), error.get("status"), executor) == (
+    if item["status"] == "failed" and (error.get("code"), error.get("status"), executor, error.get("detail")) == (
         "not_found",
         404,
         "storage",
+        f"{fork_ref['package_id']}@{fork_ref['version']}",
     ):
         raise ProductDefect(f"storage does not know the registry fork: {error.get('detail')}")
     assert item["status"] == "completed", item

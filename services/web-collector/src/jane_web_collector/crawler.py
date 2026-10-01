@@ -36,7 +36,8 @@ from jane_kit.jobs import JobCancelledError, JobContext
 from .connections import ConnectionPolicy, auth_headers
 from .discovery.links import extract_hrefs, html_meta, is_html, parse_html
 from .discovery.registry import Registry
-from .fetcher import Fetcher, FetchError, HostLimiter, HttpResult
+from .fetcher import Fetcher, FetchError, HttpResult
+from .host_limits import HostLimiter
 from .materials import Delivery, MaterialTooLarge, TransitStore, build_material, new_observation_id, rfc3339
 from .robots import RobotsCache
 from .settings import ServiceLimits, to_contract
@@ -89,6 +90,8 @@ class RunDeps:
     heartbeat_seconds: float
     user_agent: str
     version: str
+    host_limiter: HostLimiter
+    """Per-host limits of the whole process, shared by every run and one-shot fetch."""
     connection_policy: ConnectionPolicy = field(default_factory=ConnectionPolicy)
     ack_events: dict[str, asyncio.Event] = field(default_factory=dict)
 
@@ -189,15 +192,16 @@ class CrawlRun:
             found = self.state.get_connection(fetch_cfg["connection_id"])
             if found is not None:
                 creds = auth_headers(found[0], deps.connection_policy)
-        self.limiter = HostLimiter(self.limits)
+        # per-host limits are shared with every other collection and fetch of this process (WP-02c)
+        self.host_session = deps.host_limiter.session(self.limits)
         self.robots_fetcher = Fetcher(
-            deps.client, self.limits, self.limiter, user_agent=user_agent, headers=headers
+            deps.client, self.limits, self.host_session, user_agent=user_agent, headers=headers
         )
         self.robots = RobotsCache(self._fetch_robots, token, self.limits.collector.robots_cache_ttl_seconds)
         self.fetcher = Fetcher(
             deps.client,
             self.limits,
-            self.limiter,
+            self.host_session,
             user_agent=user_agent,
             headers=headers,
             auth_headers=creds,
@@ -868,6 +872,7 @@ class CrawlRun:
         finally:
             heartbeat.cancel()
             await asyncio.gather(heartbeat, return_exceptions=True)
+            self.host_session.close()  # this run's per-host limits stop applying to the hosts it used
 
     async def _execute(self) -> dict[str, Any]:
         # URLs left in flight by a previous owner (killed or stalled instance) go back to the queue

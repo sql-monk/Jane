@@ -164,7 +164,9 @@ LLM, storage та правил перевіряє продовження `tests/
 6. **Storage.** Етапи `jane.storage-files`/`jane.storage-postgresql` фіксують дайджести registry, storage
    звіряє їх зі своїм пакетом (trace). Повторна публікація 1.0.0 — 409 `version_exists`. Етап із
    дайджестом батьківської 1.1.0 (RAW як JSON) для версії 1.0.0 — `digest_mismatch`, запису немає.
-   Зафіксоване завдання після появи 1.1.0 і далі пише `.html`. Форк незмінний до `upstream-ports`;
+   Зафіксоване завдання після появи 1.1.0 і далі пише `.html`; доки storage у завданні не виконує пакети
+   з registry, цей крок версій не розрізняє (доказ фіксації — `digest_mismatch` і `package_archive`).
+   Форк незмінний до `upstream-ports`;
    версії форку, передані як `package_archive`, пишуть `.html` (1.0.0) і JSON (1.1.0); підмінений архів —
    `digest_mismatch`. Етап завдання з форком storage — `xfail(strict)`: storage знає лише вбудовані
    пакети, а оркестратор не передає `package_archive` (`not_found`).

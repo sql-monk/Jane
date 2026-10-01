@@ -10,6 +10,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sqlite3
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -29,6 +31,11 @@ from jane_telegram_collector.testing import (
     telegram_rules,
     wait_done,
 )
+
+WAIT_S = float(os.environ.get("JANE_TELEGRAM_COLLECTOR_TEST_WAIT_S", "30"))
+"""How long a test waits for an event in another process (a log line, a free SQLite write lock) before it fails."""
+LOCK_PROBE_S = 1.0
+"""Busy timeout of the probe for the SQLite write lock (as ``STATE_BUSY_TIMEOUT_MS`` of the instances)."""
 
 SLOW_READ = {
     # small history pages and pacing between Telegram calls: the run takes seconds, so it can be interrupted
@@ -215,15 +222,14 @@ def test_stalled_owner_is_fenced_out(service_factory: ServiceFactory, tmp_path: 
     b.start()
     with a.client() as api_a, b.client() as api_b:
         cid = start_slow(api_a, "stall", {"queue": {"max_unacked_materials": 10}})
-        # freeze A while it waits for the consumer (outside a write transaction: a process frozen inside
-        # one would block the shared SQLite file for everybody, which no lease can fix)
+        # freeze A while it waits for the consumer: alive but frozen, no heartbeat, the lease expires,
+        # B takes the collection over
         wait_for(api_a, cid, lambda v: v["paused_by_backpressure"])
-        time.sleep(0.3)
-        a.suspend()  # alive but frozen: no heartbeat, the lease expires, B takes the collection over
+        suspend_outside_write(a)
         items = drain(api_b, cid, timeout=60)
         view = wait_done(api_b, cid)
         a.resume()  # A wakes up with a stale lease: its next write must be rejected
-        time.sleep(3)
+        wait_log(a, "lease lost", timeout=WAIT_S)  # A has run after waking up (instead of sleeping 3 s)
         after = api_b.get(f"/v1/collections/{cid}").json()
         job = api_b.get(f"/v1/jobs/{cid}").json()
     assert view["status"] == "succeeded" and after["status"] == "succeeded" and job["status"] == "succeeded"
@@ -240,14 +246,37 @@ def wait_log(svc: Any, text: str, timeout: float = 30) -> None:
         time.sleep(0.1)
 
 
+def suspend_outside_write(svc: Any) -> None:
+    """Freeze ``svc`` while it holds no write lock of the shared SQLite file.
+
+    A process frozen inside a write transaction (its heartbeat renews the lease in one every 500 ms) blocks the
+    file for every instance, which no lease can fix - a limit of the shared SQLite state, not what these tests
+    check. A fixed sleep before the freeze only made that unlikely (on a loaded machine B could not take over for
+    30 s): here the lock is probed after the freeze, and the process is unfrozen and frozen again while it is
+    held."""
+    deadline = time.monotonic() + WAIT_S
+    while True:
+        svc.suspend()
+        probe = sqlite3.connect(svc.state_dir / "state.db", timeout=LOCK_PROBE_S, isolation_level=None)
+        try:
+            probe.execute("BEGIN IMMEDIATE")
+            probe.execute("ROLLBACK")
+            return
+        except sqlite3.OperationalError as exc:  # "database is locked": frozen inside a write transaction
+            svc.resume()
+            if time.monotonic() > deadline:
+                raise AssertionError(f"not frozen outside a write transaction in {WAIT_S} s") from exc
+            time.sleep(0.05)  # let it commit; the lock is probed again after the next freeze
+        finally:
+            probe.close()
+
+
 def freeze_owner_on_backpressure(a: Any, b: Any, api_a: httpx.Client, state_key: str) -> str:
     """Start a collection on A, freeze A while it waits for the consumer; B takes the collection over."""
     cid = start_slow(api_a, state_key, {"queue": {"max_unacked_materials": 10}})
-    # frozen outside a write transaction (a process frozen inside one blocks the SQLite file for everybody)
     wait_for(api_a, cid, lambda v: v["paused_by_backpressure"])
-    time.sleep(0.3)
-    a.suspend()
-    wait_log(b, '"resuming collection"')
+    suspend_outside_write(a)
+    wait_log(b, '"resuming collection"', timeout=WAIT_S)
     return cid
 
 
@@ -283,19 +312,31 @@ def test_stale_owner_does_not_touch_the_new_owners_paused_flag(
 def test_stalled_owner_wakes_while_the_new_owner_works(
     service_factory: ServiceFactory, tmp_path: Path
 ) -> None:
-    """Review 1: A is unfrozen in the middle of B's run (B reading and emitting): A writes nothing more."""
+    """Review 1: A is unfrozen in the middle of B's run (B reading and emitting): A writes nothing more.
+
+    A wakes when 40 of 120 messages are consumed and must notice the lost lease while B still runs. Before the
+    last 20 are consumed the test waits for that (``WAIT_S``) instead of checking A's log after B's end: on a
+    loaded machine B could finish before A had run its first heartbeat after waking up."""
     make_channel(tmp_path / "recordings", 120)
     a = service_factory(**SLOW_READ)
     b = service_factory(**SLOW_READ)
     a.start()
     b.start()
     received: list[dict[str, Any]] = []
+    # with max_unacked_materials=10, B emits at most 10 beyond the acknowledged ones: below 120 until 110 are
+    # acknowledged, so B is still running while the consumer has fewer than 110
+    notice_before = 120 - 2 * 10
     with a.client() as api_a, b.client() as api_b:
         cid = freeze_owner_on_backpressure(a, b, api_a, "wake")
         after: str | None = None
-        resumed = False
+        resumed = noticed = False
         deadline = time.monotonic() + 90
         while time.monotonic() < deadline:
+            if resumed and not noticed and len({m["observation_id"] for m in received}) >= notice_before:
+                wait_log(a, "lease lost", timeout=WAIT_S)
+                view = api_b.get(f"/v1/collections/{cid}").json()
+                assert view["status"] == "running" and view["stats"]["emitted"] < 120, view
+                noticed = True
             body_ = page(api_b, cid, after, limit=5, wait_ms=2000)
             received += body_["items"]
             after = body_["next_cursor"] or after
@@ -306,7 +347,7 @@ def test_stalled_owner_wakes_while_the_new_owner_works(
                 resumed = True
             if body_["end_of_stream"]:
                 break
-        assert resumed
+        assert resumed and noticed
         view = wait_done(api_b, cid)
         job = api_b.get(f"/v1/jobs/{cid}").json()
     assert view["status"] == "succeeded" and job["status"] == "succeeded"

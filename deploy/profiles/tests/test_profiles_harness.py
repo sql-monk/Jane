@@ -146,12 +146,6 @@ def test_services_that_take_the_whole_profile_as_limits_file(service: str) -> No
         assert resolved is not None
 
 
-@pytest.mark.xfail(
-    reason="storage, handler-runtime, registry, llm, assistant reject unknown PlatformLimits groups in "
-    "LIMITS_FILE (docs/delivery/WP-14.md, requests to WP-01/05/06/07/10/11); the profile reaches them "
-    "through the orchestrator's stage limits",
-    strict=False,
-)
 @pytest.mark.parametrize("service", ["storage", "handler_runtime", "registry", "llm", "assistant"])
 def test_services_that_reject_the_whole_profile_as_limits_file(service: str) -> None:
     settings = importlib.import_module(f"jane_{service}.settings")

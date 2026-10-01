@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
+import threading
 from collections import Counter
+from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -12,6 +15,63 @@ from jane_web_collector.testing import FAST_LIMITS, Site, drain, start, wait_don
 
 ITEMS = {"value": "main li a"}
 """Item links of testsite category and search pages (the site navigation is outside ``<main>``)."""
+
+WAIT_S = float(os.environ.get("JANE_DISCOVERY_TEST_WAIT_S", "30"))
+"""How long a test waits for an event of the collector (a held request arriving) before it fails."""
+HTTP_TIMEOUT_S = float(os.environ.get("JANE_DISCOVERY_TEST_HTTP_TIMEOUT_S", "60"))
+"""Timeout of one HTTP request to a collector process (the first ``POST /v1/collections`` took 8-16 s on a loaded
+machine, beyond the former 10 s)."""
+DRAIN_S = float(os.environ.get("JANE_DISCOVERY_TEST_DRAIN_S", "300"))
+"""How long a test reads materials of a collection run by a collector process until ``end_of_stream``."""
+DONE_S = float(os.environ.get("JANE_DISCOVERY_TEST_DONE_S", "120"))
+"""How long a test waits for such a collection to reach a final status after its stream ended."""
+
+
+# ------------------------------------------------------------------------------------------ test site
+@dataclass
+class Hold:
+    """From the first request of ``path`` on, every request to the site waits for :meth:`release` (afterwards
+    requests are answered at once). The collector stands still at a known point while the test acts (kills
+    it), instead of the test polling and racing with it."""
+
+    path: str
+    arrived: threading.Event = field(default_factory=threading.Event)
+    released: threading.Event = field(default_factory=threading.Event)
+
+    def wait_arrived(self, timeout: float = WAIT_S) -> None:
+        assert self.arrived.wait(timeout), f"{self.path} was not requested within {timeout} s"
+
+    def release(self) -> None:
+        self.released.set()
+
+
+@dataclass
+class HoldingSite(Site):
+    """:class:`Site` whose requests can be held (:meth:`hold`); the ``site`` fixture serves one."""
+
+    holds: dict[str, Hold] = field(default_factory=dict)
+
+    def hold(self, path: str) -> Hold:
+        with self.lock:
+            hold = self.holds[path] = Hold(path)
+        return hold
+
+    def take_hold(self, path: str) -> Hold | None:
+        """The hold a request of ``path`` has to wait for, if any (called by the request handler)."""
+        with self.lock:
+            for held in self.holds.values():
+                if held.arrived.is_set() and not held.released.is_set():
+                    return held  # the site stands still: every request waits
+            hold = self.holds.get(path)
+            if hold is None or hold.arrived.is_set():
+                return None
+            hold.arrived.set()
+            return hold
+
+    def release_all(self) -> None:
+        with self.lock:
+            for hold in self.holds.values():
+                hold.release()
 
 
 # ------------------------------------------------------------------------------------------ strategies

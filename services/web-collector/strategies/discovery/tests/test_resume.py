@@ -22,7 +22,7 @@ import pytest
 
 from jane_web_collector.testing import ServiceFactory, drain, start, wait_done, web_rules
 
-from .helpers import HoldingSite, api, archive, categories, sitemap, union
+from .helpers import DONE_S, DRAIN_S, HTTP_TIMEOUT_S, HoldingSite, api, archive, categories, sitemap, union
 
 SLOW_LIMITS: dict[str, Any] = {
     # slow enough that the kill lands where the test wants it (~60 requests at 15 req/s)
@@ -51,7 +51,7 @@ def test_strategies_resume_after_kill(
     first = service_factory()
     first.start()
     acked: list[dict[str, Any]] = []
-    with httpx.Client(base_url=first.base, timeout=10) as client:
+    with httpx.Client(base_url=first.base, timeout=HTTP_TIMEOUT_S) as client:
         cid = start(client, body)
         hold.wait_arrived()  # from now on the collector gets no answers: nothing moves until the kill
         view = client.get(f"/v1/collections/{cid}").json()
@@ -66,9 +66,9 @@ def test_strategies_resume_after_kill(
 
     second = service_factory(state_dir=first.state_dir)
     second.start()
-    with httpx.Client(base_url=second.base, timeout=10) as client:
-        rest = drain(client, cid, timeout=120)
-        done = wait_done(client, cid, timeout=30)
+    with httpx.Client(base_url=second.base, timeout=HTTP_TIMEOUT_S) as client:
+        rest = drain(client, cid, timeout=DRAIN_S)
+        done = wait_done(client, cid, timeout=DONE_S)
     assert done["status"] == "succeeded", done
     assert done["stats"]["fetched"] > fetched_before
 

@@ -18,6 +18,13 @@ ITEMS = {"value": "main li a"}
 
 WAIT_S = float(os.environ.get("JANE_DISCOVERY_TEST_WAIT_S", "30"))
 """How long a test waits for an event of the collector (a held request arriving) before it fails."""
+HTTP_TIMEOUT_S = float(os.environ.get("JANE_DISCOVERY_TEST_HTTP_TIMEOUT_S", "60"))
+"""Timeout of one HTTP request to a collector process (the first ``POST /v1/collections`` took 8-16 s on a loaded
+machine, beyond the former 10 s)."""
+DRAIN_S = float(os.environ.get("JANE_DISCOVERY_TEST_DRAIN_S", "300"))
+"""How long a test reads materials of a collection run by a collector process until ``end_of_stream``."""
+DONE_S = float(os.environ.get("JANE_DISCOVERY_TEST_DONE_S", "120"))
+"""How long a test waits for such a collection to reach a final status after its stream ended."""
 
 
 # ------------------------------------------------------------------------------------------ test site

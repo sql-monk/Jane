@@ -238,7 +238,7 @@ def test_stalled_owner_is_fenced_out(service_factory: ServiceFactory, tmp_path: 
     assert "lease lost" in a.log(), a.log()[-3000:]
 
 
-def wait_log(svc: Any, text: str, timeout: float = 30) -> None:
+def wait_log(svc: Any, text: str, timeout: float = WAIT_S) -> None:
     deadline = time.monotonic() + timeout
     while text not in svc.log():
         if time.monotonic() > deadline:
@@ -294,7 +294,7 @@ def test_stale_owner_does_not_touch_the_new_owners_paused_flag(
         # B continues and stops at the same full buffer (nobody consumes yet)
         before = wait_for(api_b, cid, lambda v: v["paused_by_backpressure"] and v["stats"]["unacked"] == 10)
         a.resume()
-        wait_log(a, "lease lost")
+        wait_log(a, "lease lost", timeout=WAIT_S)
         time.sleep(1.5)  # A has run its heartbeat and its backpressure loop after waking up
         after = api_b.get(f"/v1/collections/{cid}").json()
         assert before["paused_by_backpressure"] is True

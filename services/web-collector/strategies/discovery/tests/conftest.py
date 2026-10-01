@@ -31,7 +31,7 @@ from jane_web_collector.testing import (
     make_settings,
 )
 
-from .helpers import WAIT_S, HoldingSite
+from .helpers import HoldingSite
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
 """``services/web-collector/strategies/discovery`` — the package under test."""
@@ -53,7 +53,9 @@ def _recording_handler(site: HoldingSite) -> type[TestSiteHandler]:
                 site.user_agents.add(self.headers.get("User-Agent", ""))
             hold = site.take_hold(self.path)
             if hold is not None:
-                hold.released.wait(WAIT_S)
+                # until the test releases it (the fixture releases every hold at teardown): a time bound here
+                # could answer the held request before a slow test has killed the collector
+                hold.released.wait()
             super().do_GET()
 
     return Recording

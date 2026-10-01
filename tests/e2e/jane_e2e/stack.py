@@ -280,9 +280,16 @@ class E2EStack:
 
     # ------------------------------------------------------------------ docker / compose
     def _run(
-        self, cmd: Sequence[str], *, check: bool = True, text: bool = True, timeout: float | None = None
+        self,
+        cmd: Sequence[str],
+        *,
+        check: bool = True,
+        text: bool = True,
+        timeout: float | None = None,
+        echo: bool = True,
     ) -> subprocess.CompletedProcess[Any]:
-        print(f"$ {' '.join(cmd)}", file=sys.stderr, flush=True)
+        if echo:  # read-only commands polled in a loop pass echo=False
+            print(f"$ {' '.join(cmd)}", file=sys.stderr, flush=True)
         r = subprocess.run(
             list(cmd),
             cwd=self.root,
@@ -405,7 +412,7 @@ class E2EStack:
     def kill(self, service: str) -> None:
         self.compose("kill", service)
 
-    def container(self, service: str, index: int = 1) -> str:
+    def container(self, service: str, index: int = 1, *, echo: bool = True) -> str:
         """Container id of one replica of a service."""
         labels = {
             "com.docker.compose.project": self.project,
@@ -413,7 +420,7 @@ class E2EStack:
             "com.docker.compose.container-number": str(index),
         }
         filters = [arg for k, v in labels.items() for arg in ("--filter", f"label={k}={v}")]
-        r = self._run(["docker", "ps", "-a", "-q", *filters])
+        r = self._run(["docker", "ps", "-a", "-q", *filters], echo=echo)
         cid = str(r.stdout).strip().splitlines()
         if not cid:
             raise StackError(f"{service}#{index}: no container")
@@ -450,9 +457,9 @@ class E2EStack:
                 raise StackError(f"{service}#{index} is not healthy: {state}")
             time.sleep(1.0)
 
-    def logs(self, service: str, index: int = 1) -> str:
+    def logs(self, service: str, index: int = 1, *, echo: bool = True) -> str:
         """Read stdout and stderr, including records from before a restart."""
-        r = self._run(["docker", "logs", self.container(service, index)])
+        r = self._run(["docker", "logs", self.container(service, index, echo=echo)], echo=echo)
         return f"{r.stdout}\n{r.stderr}"
 
     def running_with_labels(self, labels: Mapping[str, str]) -> list[str]:
@@ -460,6 +467,13 @@ class E2EStack:
         filters = [arg for k, v in labels.items() for arg in ("--filter", f"label={k}={v}")]
         r = self._run(["docker", "ps", "-q", *filters])
         return str(r.stdout).splitlines()
+
+    def running_label_values(self, labels: Mapping[str, str], key: str) -> list[str]:
+        """Value of label ``key`` of every running container that carries all ``labels`` (for instance the
+        invocation id of each active handler-runtime sandbox). Quiet: scenarios poll it."""
+        filters = [arg for k, v in labels.items() for arg in ("--filter", f"label={k}={v}")]
+        r = self._run(["docker", "ps", *filters, "--format", f'{{{{.Label "{key}"}}}}'], echo=False)
+        return [v.strip() for v in str(r.stdout).splitlines() if v.strip()]
 
     @property
     def network(self) -> str:

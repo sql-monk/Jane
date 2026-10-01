@@ -5,7 +5,9 @@ from __future__ import annotations
 import base64
 import hashlib
 import io
+import itertools
 import json
+import os
 import random
 import re
 import time
@@ -421,6 +423,9 @@ ADVERSARIAL = [
     ("c.py", lambda n: b"eyJ-" * (n // 4)),
     ("c.py", lambda n: b"bearer" + b"\n" * n + b"!"),
     ("c.py", lambda n: b"=" + b"\n" * n + b"!"),
+    # a keyword and "=" open the pre-filters of the line-anchored assignment detector, then a newline run: the
+    # review-2 ReDoS (^\s* crossing lines) again behind them is caught only with an input like this
+    ("c.yaml", lambda n: b"password=x\n" + b"\n" * n),
     ("c.yaml", lambda n: b"a." * (n // 2)),
     ("c.yaml", lambda n: b"password" * (n // 8)),  # keyword-dense line without newline
     ("LICENSE", lambda n: b"password" * (n // 8)),
@@ -447,12 +452,97 @@ def test_scanner_is_linear_on_adversarial_input(path: str, gen: Any) -> None:
     pytest.fail(f"{path}: not linear: " + "; ".join(pairs))
 
 
+SCAN_GROWTH = 16
+"""Each rung of the size ladder below is this many times larger than the previous one."""
+SCAN_RUNGS = 3
+"""Rungs below ``max_scan_bytes_per_file``: 2 MiB / 16**3 = 512 B, so a catastrophic pattern fails within seconds."""
+SCAN_GROWTH_BOUND = float(os.environ.get("JANE_REGISTRY_TEST_SCAN_GROWTH_BOUND", "6"))
+"""Allowed CPU time of one scan of the larger input over ``SCAN_GROWTH`` scans of the smaller one (the same number
+of bytes): about 1 for a linear scanner - up to about 4 on random bytes, where the larger input passes the
+keyword pre-filter of more detectors - and ``SCAN_GROWTH`` (16) for a quadratic one."""
+MAX_FILE_SCAN_UNITS = float(os.environ.get("JANE_REGISTRY_TEST_MAX_FILE_SCAN_UNITS", "16"))
+"""CPU time allowed for one scan of a ``max_scan_bytes_per_file`` file, in units of :func:`_reference_cpu`
+measured next to it. 16 units are the former bound of 2 s on an idle development laptop (a unit is 0.11-0.125 s
+there); the slowest adversarial input takes 3-4.5 units on an idle and on a loaded machine alike."""
+SCAN_CPU_FLOOR_S = 0.05
+"""Smaller CPU times are compared as this value (the thread clock of Windows advances in 15.6 ms ticks)."""
+SCAN_ATTEMPTS = 3
+"""Measurements per rung before the test fails (one can be taken while the machine changes speed)."""
+SCAN_WALL_BUDGET_MS = 3_600_000
+"""``scan_time_budget_ms`` of the measured scans (see :func:`_scan_cpu`)."""
+_REFERENCE_LINE = "def handler(item, limits):\n    value = item.get('price') or 0  # 42 units\n"
+_REFERENCE_WORD = re.compile(r"[a-z_][a-z0-9_]*")
+
+
+def _scan_cpu(path: str, inputs: list[bytes]) -> float:
+    """CPU time of this thread for scanning ``inputs`` one after another. Unlike wall time it does not grow
+    while other processes hold the CPU. The wall-time budget of a scan (``scan_time_budget_ms``, 20 s; covered by
+    ``test_scan_time_budget_is_enforced``) is lifted: a loaded machine stretched one 2 MiB scan to 13 s of wall
+    time for 2.8 s of CPU time."""
+    limits = SecretScanLimits(scan_time_budget_ms=SCAN_WALL_BUDGET_MS)
+    t0 = time.thread_time()
+    for data in inputs:
+        scan_files({path: data}, limits)
+    return time.thread_time() - t0
+
+
+def _reference_cpu(size: int) -> float:
+    """CPU time of a fixed workload of the scanner's kind (lower-casing and a regular expression over ``size``
+    characters of code, 4 times). CPU time itself is not enough: on a loaded laptop (hybrid cores, lower clock)
+    the same work takes up to 5 times more of it, so the bound on the largest file is relative to this unit."""
+    text = (_REFERENCE_LINE * (size // len(_REFERENCE_LINE) + 1))[:size]
+    t0 = time.thread_time()
+    for _ in range(4):
+        _REFERENCE_WORD.findall(text.lower())
+    return time.thread_time() - t0
+
+
 @pytest.mark.parametrize(("path", "gen"), ADVERSARIAL)
 def test_scanner_handles_the_largest_scannable_file_fast(path: str, gen: Any) -> None:
-    """A file of ``max_scan_bytes_per_file`` (2 MiB) of adversarial content is scanned well within a second
-    (a wide bound for slow CI machines; locally it is a fraction of a second)."""
-    size = SecretScanLimits().max_scan_bytes_per_file
-    assert _best_scan_time(path, gen(size), runs=1) < 2.0
+    """A file of ``max_scan_bytes_per_file`` (2 MiB) of adversarial content is scanned fast, and the scan cost
+    grows linearly up to that size (review 2: no ReDoS, no quadratic work).
+
+    No wall-clock seconds (the former bound of 2 s failed at 2.8-8.1 s on a loaded machine): CPU time of the test
+    thread, compared with CPU time measured next to it.
+
+    * growth: sizes go up by ``SCAN_GROWTH`` (512 B ... 2 MiB); on every rung one scan of the larger input may
+      cost at most ``SCAN_GROWTH_BOUND`` times ``SCAN_GROWTH`` scans of the smaller one (the same bytes). A
+      quadratic scanner (ratio 16) fails on the small rungs already, before a catastrophic pattern runs for hours
+      on 2 MiB;
+    * constant factor: the 2 MiB scan may cost at most ``MAX_FILE_SCAN_UNITS`` reference units (a linear pattern
+      that backtracks a long way at every position is linear, but slow).
+
+    Each rung is measured up to ``SCAN_ATTEMPTS`` times (the CPU time of the same work changed fivefold within
+    seconds on a loaded laptop with hybrid cores). The bounds can be changed through
+    ``JANE_REGISTRY_TEST_SCAN_GROWTH_BOUND`` and ``JANE_REGISTRY_TEST_MAX_FILE_SCAN_UNITS``."""
+    largest = SecretScanLimits().max_scan_bytes_per_file
+    sizes = [largest // SCAN_GROWTH**k for k in range(SCAN_RUNGS, -1, -1)]
+    for small, big in itertools.pairwise(sizes):
+        small_data, big_data = gen(small), gen(big)
+        top = big == largest
+        tried = []
+        for _ in range(SCAN_ATTEMPTS):
+            unit = _reference_cpu(largest) if top else 0.0
+            t_small = _scan_cpu(path, [small_data] * SCAN_GROWTH)
+            t_big = _scan_cpu(path, [big_data])
+            if top:
+                unit = max(unit, _reference_cpu(largest))  # the slower of the two units around the scan
+            if t_big > SCAN_GROWTH_BOUND * max(t_small, SCAN_CPU_FLOOR_S):
+                # the machine may have slowed down during the larger scan: the smaller side once more, after it
+                t_small = max(t_small, _scan_cpu(path, [small_data] * SCAN_GROWTH))
+            growth = t_big / max(t_small, SCAN_CPU_FLOOR_S)
+            units = t_big / max(unit, SCAN_CPU_FLOOR_S)
+            tried.append(
+                f"{SCAN_GROWTH}x{len(small_data)} B: {t_small:.3f} s, 1x{len(big_data)} B: {t_big:.3f} s, "
+                f"growth {growth:.2f}" + (f", {units:.1f} units of {unit:.3f} s" if top else "")
+            )
+            if growth <= SCAN_GROWTH_BOUND and (not top or units <= MAX_FILE_SCAN_UNITS):
+                break
+        else:
+            pytest.fail(
+                f"{path}: scan cost grows faster than linearly (growth > {SCAN_GROWTH_BOUND}) or the largest file "
+                f"takes more than {MAX_FILE_SCAN_UNITS} units: " + "; ".join(tried)
+            )
 
 
 def test_scan_time_budget_is_enforced() -> None:

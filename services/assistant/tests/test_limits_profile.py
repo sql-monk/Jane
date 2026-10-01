@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from jane_assistant.app import build_app
 from jane_assistant.settings import Settings, request_layer, resolve_service_limits
+from jane_kit.config import LimitError
 
 PROFILES = Path(__file__).resolve().parents[3] / "deploy" / "profiles"
 
@@ -67,6 +68,12 @@ def test_profile_hard_caps_bound_the_request(
     lim = resolve_service_limits(settings, *request_layer({"max_output_tokens_per_request": 100_000})).limits
     cap = doc["hard_caps"].get("llm", {}).get("max_output_tokens_per_request", 100_000)
     assert lim.llm.max_output_tokens_per_request == cap
+
+
+def test_request_limits_stay_strict_with_the_profile(settings: Settings) -> None:
+    """Only the platform file is lenient: an unknown request limit is still an error (-> 422)."""
+    with pytest.raises(LimitError, match="unknown limit"):
+        resolve_service_limits(settings, *request_layer({"max_onboarding_sample": 4}))
 
 
 def test_service_starts_with_the_profile(profile: tuple[Path, dict[str, Any]], settings: Settings) -> None:

@@ -66,6 +66,16 @@ def test_service_starts_with_the_profile(profile: tuple[Path, dict[str, Any]]) -
     assert "sandbox" not in info["defaults"]
 
 
+def test_invocation_limits_stay_strict_with_the_profile(profile: tuple[Path, dict[str, Any]]) -> None:
+    """Only the platform file is lenient: an unknown ``HandlerInvocation.limits.retries`` field is still
+    a ``LimitError`` (422 in ``/v1/invocations``)."""
+    from jane_kit.config import LimitError, LimitLayer
+
+    settings = Settings(log_format="console", limits_file=profile[0])
+    with pytest.raises(LimitError, match="unknown limit"):
+        resolve_service_limits(settings, LimitLayer("request", {"retries": {"max_attempt": 1}}))
+
+
 def test_profile_typo_still_fails_the_start(tmp_path: Path) -> None:
     from jane_kit.config import LimitError
 

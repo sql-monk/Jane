@@ -181,10 +181,14 @@ async def read_content(ref: dict[str, Any], max_bytes: int, timeout_s: float) ->
 class PackageLoader:
     """Finds LLM packages: request archive -> local directory -> registry. Caches by digest.
 
-    The cache only saves fetching and unpacking; a load gives the same answer on a cold and a warm loader. A
-    cached package is reused only for a reference to exactly its ``package_id@version`` (a digest of another
-    package or version goes the cold way and gets its ``digest_mismatch`` / ``not_found``), and a
-    ``package_archive`` of the request is always read and verified.
+    The caches only save fetching and unpacking; a load gives the same answer on a cold and a warm loader:
+
+    * ``package_archive`` of the request is read and verified every time; ``_archives`` (digest of the archive
+      bytes -> package) only skips unpacking the same bytes again;
+    * a reference without an archive reuses ``_found`` (packages found in the local directory or the registry)
+      only for exactly its ``package_id@version`` and digest. A digest of another package or version, or a
+      package seen only in some request's archive, goes the cold way and gets its ``digest_mismatch`` /
+      ``not_found``.
     """
 
     def __init__(
@@ -203,7 +207,8 @@ class PackageLoader:
         self.registry_url = registry_url
         self.registry_limits = registry_limits
         self.registry_token = registry_token
-        self._cache: dict[str, LoadedPackage] = {}
+        self._archives: dict[str, LoadedPackage] = {}
+        self._found: dict[str, LoadedPackage] = {}
 
     def _local(self, package_id: str, version: str) -> LoadedPackage | None:
         if self.packages_dir is None or not self.packages_dir.is_dir():
@@ -245,8 +250,8 @@ class PackageLoader:
             return resp.content
 
     def _cached(self, digest: str | None, package_id: str, version: str) -> LoadedPackage | None:
-        """The package cached under ``digest`` if it is ``package_id@version`` of the reference, else ``None``."""
-        pkg = self._cache.get(digest) if digest else None
+        """The package found earlier under ``digest`` if it is ``package_id@version`` of the reference."""
+        pkg = self._found.get(digest) if digest else None
         if (
             pkg is None
             or pkg.manifest.get("package_id") != package_id
@@ -263,8 +268,10 @@ class PackageLoader:
             data = await read_content(
                 archive_ref, self.limits.max_package_bytes, self.limits.content_fetch_timeout_ms / 1000
             )
-            pkg = self._cached(digest_of(data), package_id, version) or self._from_archive(data)
+            pkg = self._archives.get(digest_of(data)) or self._from_archive(data)
+            cache = self._archives
         else:
+            cache = self._found
             pkg = self._cached(wanted, package_id, version)
             if pkg is None:
                 pkg = self._local(package_id, version)
@@ -277,7 +284,7 @@ class PackageLoader:
         check_llm_manifest(pkg.manifest, ref)
         if wanted and wanted != pkg.digest:
             raise DigestMismatch(f"package digest {pkg.digest} does not match {wanted}")
-        self._cache[pkg.digest] = pkg
+        cache[pkg.digest] = pkg
         return pkg
 
     def _from_archive(self, data: bytes) -> LoadedPackage:

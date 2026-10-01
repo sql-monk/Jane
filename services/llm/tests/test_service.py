@@ -513,6 +513,27 @@ def test_loader_verifies_package_archive_also_when_the_digest_is_cached() -> Non
     assert again is ran  # the same archive reuses the unpacked package
 
 
+def test_loader_does_not_answer_a_reference_with_a_package_seen_only_in_an_archive(tmp_path: Path) -> None:
+    v101 = _version_archive(CACHE_PKG, "1.0.1")
+    pinned = {"package_id": CACHE_PKG, "version": "1.0.1", "digest": digest_of(v101)}
+    seen: list[str] = []
+    registry = _registry_archives({}, seen)  # the version is not published
+    loader = PackageLoader(
+        tmp_path,
+        "http://registry",
+        ClientLimits(),
+        limits=GatewayLimits(),
+        transport=httpx.ASGITransport(app=registry),
+    )
+    with pytest.raises(NotFound):  # cold: neither the local directory nor the registry has it
+        asyncio.run(loader.load(pinned, None))
+    assert asyncio.run(loader.load(pinned, _inline(v101))).version == "1.0.1"
+    # Warm: the request archive's package is not a lookup result, so a reference alone still gets the cold answer.
+    with pytest.raises(NotFound):
+        asyncio.run(loader.load(pinned, None))
+    assert seen == [f"/v1/packages/{CACHE_PKG}/versions/1.0.1/archive"] * 2
+
+
 @pytest.fixture
 def registry_server() -> Iterator[tuple[str, dict[tuple[str, str], bytes], list[str]]]:
     """The registry neighbour over real HTTP, for the gateway app (its loader uses ``JANE_LLM_REGISTRY_URL``)."""

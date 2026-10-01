@@ -382,3 +382,9 @@ L1 одиночний збір — 48/1 с. L1, L3–L5, L7–L8 пройшли,
   `.jane/limits-ci-36916718021/`.
 - Запущено WP-13: R-07 (`wp/13f-r07-restarts`) і критерій 9 — LLM/storage-пакети з registry та форки типів
   (`wp/13g-registry-types`).
+- WP-14b (`wp/14b-profile-followups` `1c13758`): незалежний wp-reviewer прийняв (54 passed, `check.py` — 3 профілі
+  валідні, L1 jitter незалежно підтверджено як шум за сирими журналами). Злито. Профіль монтується в усі 8 сервісів
+  стеку harness; L6 `None` був дефектом harness (читав `limits.concurrency` замість `limits.defaults.…`); бюджет LLM
+  `ci` `0/run` → `0.01/day` (асистент при 0 не робив жодного виклику, шлюз пропускав `run` без `run_id`); тайм-аут
+  провайдера llm у стеку — перекриття 120000 до рішення WP-10. Запити: WP-10 (`provider.*`), WP-11 (бюджет 0,
+  `period`, 30 с клієнта), WP-00 (приклад `PlatformLimits/ci.json` з `0/run`). Запущено повторний job `limits`.

@@ -9,8 +9,9 @@ version 1.1.0 is being tested in the runtime (a sandbox of ``<package>@1.1.0`` r
 nothing is published yet):
 
 * ``assistant`` - the assistant gets ``docker kill`` (SIGKILL) and ``docker start``;
-* ``runtime`` - handler-runtime gets ``docker kill`` while a call of the load run is also in a sandbox, stays
-  down until the assistant's job has reacted, then ``docker start``.
+* ``runtime`` - handler-runtime gets ``docker kill`` while a test-run job of the candidate has cases ahead (first
+  polled by the assistant moments ago) and a call of the load run is in a sandbox too; it stays down until the
+  assistant's job has reacted, then ``docker start``.
 
 The interrupted job must end in a state the client can act on, and a repeated improvement run (new
 ``Idempotency-Key``) must finish the cycle: exactly one new version 1.1.0 (digest, parent 1.0.0, made by the
@@ -104,7 +105,10 @@ CANDIDATE = "1.1.0"  # the scripted fix adds fields to the schema: a minor versi
 LOAD_PRODUCTS = site_paths("product")
 LOAD_EXTRACTOR = PACKAGES / "e2e.slow-product-extractor"
 # Every load call stays in its sandbox at least this long, so the runtime kill cuts one (params.delay_seconds).
-LOAD_DELAY_S = float(os.environ.get("JANE_E2E_R07_LOAD_DELAY_S", "2"))
+LOAD_DELAY_S = float(os.environ.get("JANE_E2E_R07_LOAD_DELAY_S", "3"))
+# The runtime is killed only while a test-run job of the candidate is fresh: first polled by the assistant at
+# most this long ago, so that cases of that job are still ahead (a test run has 4-6 cases, one sandbox each).
+FRESH_TEST_RUN_S = float(os.environ.get("JANE_E2E_R07_FRESH_TEST_RUN_S", "2.5"))
 LOAD_LIMITS = {"concurrency": {"max_parallel_stage_items": 1}}  # one call at a time: the load lasts
 # Retries of the load task outlast a runtime restart (attempts are spent while the runtime is down).
 LOAD_RETRIES = {
@@ -508,24 +512,34 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
     log_offset = len(access_log(stack, "handler-runtime"))
 
     first = start_improvement(flows["assistant"], case.request)
-    candidate = wait_candidate_under_test(flows, case, first)
     runtime = flows["handler-runtime"]
     load_package = f"{load.package['package_id']}@{load.package['version']}"
 
-    def running_test_runs() -> list[str] | None:
-        """Test-run jobs the assistant polls (runtime access log) that the runtime reports as running, at a
-        moment when a candidate test case and a call of the load run are both in sandboxes."""
+    first_seen: dict[str, float] = {}  # test-run job id -> when this test first saw the assistant poll it
+    candidate: set[str] = set()
+
+    def fresh_test_run() -> str | None:
+        """A test-run job the assistant polls (runtime access log), running in the runtime and first polled at
+        most ``FRESH_TEST_RUN_S`` ago, at a moment when a candidate test case and a load call are in sandboxes."""
         job = job_of(flows["assistant"], "assistant", first)
         assert job["status"] not in TERMINAL_JOB_STATES, job  # the job left the window before the fault
-        if not (candidate_sandboxes(stack, case.package_id) and sandboxes(stack, load_package)):
+        now = time.monotonic()
+        for j in polled_jobs(stack, "handler-runtime", log_offset):
+            first_seen.setdefault(j, now)
+        candidate.clear()
+        candidate.update(candidate_sandboxes(stack, case.package_id))
+        if not (candidate and sandboxes(stack, load_package)):
             return None
-        polled = polled_jobs(stack, "handler-runtime", log_offset)
-        return [j for j in polled if job_of(runtime, "handler", j)["status"] == "running"] or None
+        fresh = [j for j, seen in first_seen.items() if now - seen <= FRESH_TEST_RUN_S]
+        return next((j for j in fresh if job_of(runtime, "handler", j)["status"] == "running"), None)
 
-    test_runs = wait_for("a candidate test-run and a load call running in the runtime", running_test_runs)
+    target = wait_for("a fresh candidate test-run and a load call in the runtime", fresh_test_run)
     stack.kill_instance("handler-runtime", 1)
     killed_at = time.monotonic()
     load_at_fault = run_view(flows["orchestrator"], load.run)["status"]
+    # every test-run job the assistant polled before the kill (the log of the dead container is still readable)
+    test_runs = polled_jobs(stack, "handler-runtime", log_offset)
+    assert version_numbers(registry, case.package_id) == ["1.0.0"]  # killed before the publication
     # Calls the dead runtime never finished: it removes every sandbox it has read, so the ones still there were
     # in flight at the kill (operational: Docker labels of the sandboxes).
     cut_load = sorted(sandboxes(stack, load_package, include_stopped=True))
@@ -537,6 +551,7 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
             "job": first,
             "candidate sandboxes": sorted(candidate),
             "test-run jobs": test_runs,
+            "fresh test-run at the kill": target,
             "load": load_at_fault,
             "sandboxes left by the dead runtime": {"load": cut_load, "candidate": cut_candidate},
         },
@@ -560,6 +575,9 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
     restarted_at = time.monotonic()
     runtime = flows.reconnect("handler-runtime")
     right_after = {j: job_of(runtime, "handler", j)["status"] for j in test_runs}
+    # test runs the kill cut: those that had not succeeded before it (a cut one may only end failed/cancelled)
+    cut_test_runs = [j for j, status in right_after.items() if status != "succeeded"]
+    assert target in cut_test_runs, right_after  # the fresh one had cases ahead: the kill cut it
     assert version_numbers(registry, case.package_id) == ["1.0.0"]  # the interrupted job published nothing
 
     # recovery: the improvement is started again (a new Idempotency-Key)
@@ -573,7 +591,7 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
 
     # the runtime's own record of the test-run jobs the kill interrupted (read again at the end)
     OBSERVED["runtime_test_run_after_restart"] = {
-        "jobs": {j: job_brief(job_of(runtime, "handler", j)) for j in test_runs},
+        "jobs": {j: job_brief(job_of(runtime, "handler", j)) for j in cut_test_runs},
         "right_after_restart": right_after,
         "seconds_after_restart": round(time.monotonic() - restarted_at, 1),
     }

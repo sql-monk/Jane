@@ -339,3 +339,9 @@ L1 одиночний збір — 48/1 с. L1, L3–L5, L7–L8 пройшли,
 | WP-13 S-M2-04 | `wp/13e-price-check`, `.claude/worktrees/wp13e` | критерій 5: каталог і перевірка цін на прикладах WP-14 |
 
 Після інтеграції: повний `just e2e`, `just check`, CI (`workflow_dispatch`) і повторний профіль `ci`.
+- WP-13 S-M2-04 (критерій 5): `wp/13e-price-check` `e70c16d` — автор 3/3 Docker e2e, незалежний wp-reviewer
+  прийняв (1 passed, статика, 7 файлів / 0 поза власністю). Злито в інтеграційну гілку `5d57bb4`.
+  Зміна ціни на testsite — **Т** (оверлей `PUT /_e2e/products/{slug}`), запит до WP-01 на штатний механізм.
+  Некритичні зауваження рецензента: перевірка `field_orders` умовна (поле необов'язкове за контрактом),
+  `task_etag in (None, …)` слабка. `just check` автора впав лише на відомих часово-чутливих unit-тестах
+  (registry scanner, discovery `test_resume`, web-collector `test_contract`) — доручено `wp/05a-timing-tests`.

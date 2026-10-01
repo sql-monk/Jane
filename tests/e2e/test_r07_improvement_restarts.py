@@ -5,8 +5,8 @@ Each scenario prepares S-M2-07 anew (``jane_e2e.assistant.prepare_improvable``: 
 registry, two bindings, a run that leaves out-of-stock and pre-order cards ``unrecognized``), starts a load run of
 another task (19 product pages extracted one at a time by the fixture ``e2e.slow-product-extractor`` with a
 ``delay_seconds``, published to the registry under its own id) and then an improvement run. While the candidate
-version 1.1.0 is being tested in the runtime (``FaultWindow``: a test-run job of the candidate started moments ago
-and has cases ahead; the LLM has answered, nothing is published yet):
+version 1.1.0 has a fresh running test-run job in the runtime (``FaultWindow``: the assistant has polled it;
+the LLM has answered, nothing is published yet):
 
 * ``assistant`` - the assistant gets ``docker kill`` (SIGKILL) and ``docker start``;
 * ``runtime`` - handler-runtime gets ``docker kill`` at such a moment when a call of the load run is in a sandbox
@@ -19,7 +19,7 @@ is checked by execution: runs of the tasks, the ``HandlerResult.handler`` the ru
 and the stored entities. The load run must finish with every effect once.
 
 What the services do with the interrupted jobs and the cut load call is recorded in ``OBSERVED`` and asserted
-by the last three tests, ``xfail(strict=True)`` while the defects they reproduce are open
+by the last three tests, with ``pytest.xfail`` only for the exact defects they reproduce
 (docs/delivery/WP-13.md, R-07).
 
 Real services: assistant, LLM gateway, registry, web-collector, handler-runtime, orchestrator, storage,
@@ -106,7 +106,7 @@ LOAD_EXTRACTOR = PACKAGES / "e2e.slow-product-extractor"
 # Every load call stays in its sandbox at least this long, so the runtime kill cuts one (params.delay_seconds).
 LOAD_DELAY_S = float(os.environ.get("JANE_E2E_R07_LOAD_DELAY_S", "5"))
 # The runtime is killed only while a test-run job of the candidate is fresh: first polled by the assistant at
-# most this long ago, so that cases of that job are still ahead (a test run has 4-6 cases, one sandbox each).
+# most this long ago. This does not guarantee a candidate sandbox is active at the kill.
 FRESH_TEST_RUN_S = float(os.environ.get("JANE_E2E_R07_FRESH_TEST_RUN_S", "2.5"))
 # How much of the runtime log the probe reads per poll (``docker logs --since``; tolerates a skewed engine clock).
 RECENT_LOG = "30s"
@@ -294,7 +294,12 @@ def finish_load(flows: Flows, load: Load, scenario: str, *, may_fail: bool = Fal
     # items that needed more than one attempt: "<stage> x<attempts>" -> number of items
     retried = dict(Counter(f"{i['stage_id']} x{i['attempts']}" for i in items if i["attempts"] > 1))
     failed = [
-        {"stage": i["stage_id"], "attempts": i["attempts"], "error": (i.get("error") or {}).get("code")}
+        {
+            "item_id": i["item_id"],
+            "stage": i["stage_id"],
+            "attempts": i["attempts"],
+            "error": (i.get("error") or {}).get("code"),
+        }
         for i in items
         if i["status"] == "failed"
     ]
@@ -317,12 +322,12 @@ def finish_load(flows: Flows, load: Load, scenario: str, *, may_fail: bool = Fal
 
 # ---------------------------------------------------------------------------- the fault window
 class FaultWindow:
-    """Finds the moment for the fault: the improvement job tests its candidate, a test run has cases ahead.
+    """Finds the moment for the fault: the improvement job has a fresh running candidate test-run.
 
     The candidate is tested only after the LLM answered, and published only after all its test runs passed. A
     test-run job of the runtime that the assistant polls (operational: runtime access log) and that the runtime
-    reports ``running`` within ``FRESH_TEST_RUN_S`` of its first poll still has cases ahead (4-6 per run, one
-    sandbox each), so a fault right then lands before the publication. Jobs polled before the window was
+    reports ``running`` within ``FRESH_TEST_RUN_S`` of its first poll puts the fault before publication.
+    It does not prove a sandbox is active at that instant or that more cases remain. Jobs polled before the window was
     created never count."""
 
     def __init__(self, flows: Flows) -> None:
@@ -590,7 +595,7 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
     right_after = {j: job_of(runtime, "handler", j)["status"] for j in test_runs}
     # test runs the kill cut: those that had not succeeded before it (a cut one may only end failed/cancelled)
     cut_test_runs = [j for j, status in right_after.items() if status != "succeeded"]
-    assert target in cut_test_runs, right_after  # the fresh one had cases ahead: the kill cut it
+    assert target in cut_test_runs, right_after  # the fresh job had not succeeded when the runtime died
     assert version_numbers(registry, case.package_id) == ["1.0.0"]  # the interrupted job published nothing
 
     # recovery: the improvement is started again (a new Idempotency-Key)
@@ -614,14 +619,6 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
 
 # ---------------------------------------------------------------------------- what happens to the interrupted job
 @pytest.mark.criteria(8)
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "WP-11: the default instance id 'hostname-pid' is the same after a container restart (python is PID 1), "
-        "so the restarted assistant renews the lease of the dead job by its heartbeat; the job stays 'running' "
-        "(docs/delivery/WP-13.md, R-07)"
-    ),
-)
 def test_r_07_job_of_killed_assistant_fails_after_its_lease() -> None:
     """The README of WP-11: an instance killed with a job running -> after the lease the job is ``failed``
     (``service_unavailable``, retryable), so a client knows it must start the improvement again.
@@ -631,19 +628,19 @@ def test_r_07_job_of_killed_assistant_fails_after_its_lease() -> None:
     observed = OBSERVED.get("assistant_job_after_kill")
     if observed is None:
         pytest.skip("the assistant-kill scenario did not reach the observation")
+    if (
+        observed["status"] == "running"
+        and observed["error"] is None
+        and observed["cancellation"] is None
+        and len(observed["instance ids (start before, after the restart)"]) == 2
+        and len(set(observed["instance ids (start before, after the restart)"])) == 1
+    ):
+        pytest.xfail("WP-11: restarted assistant renews the dead job lease with the same instance id")
     assert observed["status"] == "failed", observed
     assert observed["error"] is not None and observed["error"]["code"] == "service_unavailable", observed
 
 
 @pytest.mark.criteria(8)
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "WP-09 (+WP-00): a retry of a delivery carries context.attempt + 1 under the same Idempotency-Key, so the "
-        "runtime that still holds the key of the cut call answers 422 idempotency_key_reused (not retryable) and "
-        "the item fails (docs/delivery/WP-13.md, R-07)"
-    ),
-)
 def test_r_07_load_call_cut_by_a_runtime_kill_completes_after_the_restart() -> None:
     """Criterion 8: a call cut by the kill of the executor is delivered again with the same ``delivery_key``
     after the restart and completes (once the dead claim is released, ``state.in_progress_lease_ms``).
@@ -657,17 +654,19 @@ def test_r_07_load_call_cut_by_a_runtime_kill_completes_after_the_restart() -> N
         pytest.skip("the runtime-restart scenario did not reach the observation")
     if not (observed["in flight"] or observed["cut calls"]):
         pytest.skip("no call of the load run was in flight at the kill")
+    failed = observed["failed"]
+    if (
+        len(failed) == 1
+        and failed[0]["item_id"] in observed["in flight"]
+        and failed[0]["stage"] == "extract-products"
+        and failed[0]["attempts"] > 1
+        and failed[0]["error"] == "idempotency_key_reused"
+    ):
+        pytest.xfail("WP-09 (+WP-00): the cut delivery is retried with a changed body and rejected as 422")
     assert observed["failed"] == [], observed
 
 
 @pytest.mark.criteria(8)
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "WP-06: jobs in the runtime's PostgreSQL state have no owner or lease; a job of a killed instance stays "
-        "'running' after the restart (docs/delivery/WP-13.md, R-07)"
-    ),
-)
 def test_r_07_runtime_test_run_cut_by_a_kill_becomes_terminal() -> None:
     """A test-run job of handler-runtime cut by a kill of its instance must end (``failed`` or ``cancelled``)
     after the restart, otherwise a client that polls it (the assistant waits up to
@@ -679,4 +678,12 @@ def test_r_07_runtime_test_run_cut_by_a_kill_becomes_terminal() -> None:
     if observed is None:
         pytest.skip("the runtime-restart scenario did not reach the observation")
     statuses = {j: o["status"] for j, o in observed["jobs"].items()}
+    if statuses and all(
+        status == "running"
+        and observed["jobs"][job_id]["error"] is None
+        and observed["jobs"][job_id]["cancellation"] is None
+        and observed["right_after_restart"].get(job_id) == "running"
+        for job_id, status in statuses.items()
+    ):
+        pytest.xfail("WP-06: test-run jobs of the killed runtime remain running after restart")
     assert statuses and all(s in TERMINAL_JOB_STATES for s in statuses.values()), observed

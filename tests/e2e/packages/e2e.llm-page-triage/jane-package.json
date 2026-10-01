@@ -30,11 +30,34 @@
     "data_schema": "schemas/output.schema.json"
   },
   "required_connections": [],
+  "tests": [
+    {
+      "name": "out-of-stock-product",
+      "input": {
+        "file": "tests/out-of-stock/page.html",
+        "media_type": "text/html",
+        "url": "http://testsite:8080/product/phone-gamma"
+      },
+      "expected_status": "success",
+      "expected": "tests/out-of-stock/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "prompt-injection-is-data",
+      "input": {
+        "file": "tests/injection/page.html",
+        "media_type": "text/html"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
   "provenance": {
     "created_by": "human",
     "authors": ["WP-13"],
     "created_at": "2026-09-30T00:00:00Z",
-    "change_summary": "E2E fixture for S-M2-05 and S-M2-11."
+    "change_summary": "E2E fixture for S-M2-05 and S-M2-11; tests make it publishable to the registry (criterion 9)."
   },
   "bindings_hint": {
     "source_kinds": ["web"]

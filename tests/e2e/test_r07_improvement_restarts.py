@@ -3,15 +3,14 @@
 
 Each scenario prepares S-M2-07 anew (``jane_e2e.assistant.prepare_improvable``: extractor 1.0.0 in the real
 registry, two bindings, a run that leaves out-of-stock and pre-order cards ``unrecognized``), starts a load run of
-another task (19 product pages extracted one at a time by the fixture ``e2e.slow-product-extractor`` with a short
+another task (19 product pages extracted one at a time by the fixture ``e2e.slow-product-extractor`` with a
 ``delay_seconds``, published to the registry under its own id) and then an improvement run. While the candidate
-version 1.1.0 is being tested in the runtime (a sandbox of ``<package>@1.1.0`` runs, the LLM has answered,
-nothing is published yet):
+version 1.1.0 is being tested in the runtime (``FaultWindow``: a test-run job of the candidate started moments ago
+and has cases ahead; the LLM has answered, nothing is published yet):
 
 * ``assistant`` - the assistant gets ``docker kill`` (SIGKILL) and ``docker start``;
-* ``runtime`` - handler-runtime gets ``docker kill`` while a test-run job of the candidate has cases ahead (first
-  polled by the assistant moments ago) and a call of the load run is in a sandbox too; it stays down until the
-  assistant's job has reacted, then ``docker start``.
+* ``runtime`` - handler-runtime gets ``docker kill`` at such a moment when a call of the load run is in a sandbox
+  too; it stays down until the assistant's job has reacted, then ``docker start``.
 
 The interrupted job must end in a state the client can act on, and a repeated improvement run (new
 ``Idempotency-Key``) must finish the cycle: exactly one new version 1.1.0 (digest, parent 1.0.0, made by the
@@ -317,22 +316,40 @@ def finish_load(flows: Flows, load: Load, scenario: str, *, may_fail: bool = Fal
 
 
 # ---------------------------------------------------------------------------- the fault window
-def wait_candidate_under_test(flows: Flows, case: Improvable, job_id: str) -> set[str]:
-    """The improvement job is between the LLM answer and the publication: a candidate sandbox runs."""
-    stack, assistant, registry = flows.stack, flows["assistant"], flows["registry"]
+class FaultWindow:
+    """Finds the moment for the fault: the improvement job tests its candidate, a test run has cases ahead.
 
-    def probe() -> set[str] | None:
-        if (sandboxes := candidate_sandboxes(stack, case.package_id)) and (
-            job_of(assistant, "assistant", job_id)["status"] == "running"
-        ):
-            return sandboxes
-        job = job_of(assistant, "assistant", job_id)
-        assert job["status"] not in TERMINAL_JOB_STATES, job  # finished before the fault: no window
-        return None
+    The candidate is tested only after the LLM answered, and published only after all its test runs passed. A
+    test-run job of the runtime that the assistant polls (operational: runtime access log) and that the runtime
+    reports ``running`` within ``FRESH_TEST_RUN_S`` of its first poll still has cases ahead (4-6 per run, one
+    sandbox each), so a fault right then lands before the publication. Jobs polled before the window was
+    created never count."""
 
-    sandboxes = wait_for("candidate test case running in a sandbox", probe)
-    assert version_numbers(registry, case.package_id) == ["1.0.0"]  # nothing published yet
-    return sandboxes
+    def __init__(self, flows: Flows) -> None:
+        self.flows = flows
+        self.log_offset = len(access_log(flows.stack, "handler-runtime"))
+        self.first_seen = dict.fromkeys(polled_jobs(flows.stack, "handler-runtime", since=RECENT_LOG), 0.0)
+
+    def wait(self, job_id: str, also: Callable[[], bool] | None = None) -> str:
+        """The fresh running test-run job, at a moment when ``also()`` holds too."""
+        stack, runtime = self.flows.stack, self.flows["handler-runtime"]
+
+        def probe() -> str | None:
+            job = job_of(self.flows["assistant"], "assistant", job_id)
+            assert job["status"] not in TERMINAL_JOB_STATES, job  # the job left the window before the fault
+            now = time.monotonic()
+            for j in polled_jobs(stack, "handler-runtime", since=RECENT_LOG):
+                self.first_seen.setdefault(j, now)
+            fresh = [j for j, seen in self.first_seen.items() if now - seen <= FRESH_TEST_RUN_S]
+            if not fresh or (also is not None and not also()):
+                return None
+            return next((j for j in fresh if job_of(runtime, "handler", j)["status"] == "running"), None)
+
+        return wait_for("a fresh test run of the candidate in the runtime", probe)
+
+    def polled(self) -> list[str]:
+        """Every test-run job polled since the window was created (a dead runtime container's log is readable)."""
+        return polled_jobs(self.flows.stack, "handler-runtime", self.log_offset)
 
 
 # ---------------------------------------------------------------------------- the recovered cycle
@@ -450,17 +467,25 @@ def test_r_07_assistant_killed_while_candidate_is_tested_rerun_publishes_exactly
     case = prepare_improvable(flows, f"e2e-{run_id}", scenario)
     load = start_load(flows, f"e2e-{run_id}")
     llm_before = improvement_requests(flows)
+    window = FaultWindow(flows)
 
     first = start_improvement(flows["assistant"], case.request)
-    candidate = wait_candidate_under_test(flows, case, first)
+    target = window.wait(first)
+    candidate = candidate_sandboxes(stack, case.package_id)
     stack.kill_instance("assistant", 1)
     killed_at = time.monotonic()
     load_at_fault = run_view(flows["orchestrator"], load.run)["status"]
     note(
         scenario,
         "assistant killed",
-        {"job": first, "candidate sandboxes": sorted(candidate), "load": load_at_fault},
+        {
+            "job": first,
+            "fresh test-run at the kill": target,
+            "candidate sandboxes": sorted(candidate),
+            "load": load_at_fault,
+        },
     )
+    assert version_numbers(registry, case.package_id) == ["1.0.0"]  # killed before the publication
     assert load_at_fault == "running"  # the fault happens under load
     assert improvement_requests(flows) == llm_before + 1  # the LLM step of the killed job was done
 
@@ -513,42 +538,19 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
     case = prepare_improvable(flows, f"e2e-{run_id}", scenario)
     load = start_load(flows, f"e2e-{run_id}")
     llm_before = improvement_requests(flows)
-    log_offset = len(access_log(stack, "handler-runtime"))
-    # test-run jobs polled before the improvement starts (scenarios before this one) are never fresh
-    first_seen: dict[str, float] = dict.fromkeys(polled_jobs(stack, "handler-runtime", since=RECENT_LOG), 0.0)
-
-    first = start_improvement(flows["assistant"], case.request)
-    runtime = flows["handler-runtime"]
+    window = FaultWindow(flows)
     load_package = f"{load.package['package_id']}@{load.package['version']}"
 
-    candidate: set[str] = set()  # candidate sandboxes at the moment of the kill
-    in_flight: list[str] = []  # extraction items of the load run being executed at the moment of the kill
-
-    def fresh_test_run() -> str | None:
-        """A test-run job the assistant polls (recent runtime access log), running in the runtime and first
-        polled at most ``FRESH_TEST_RUN_S`` ago, at a moment when a call of the load run is in a sandbox."""
-        job = job_of(flows["assistant"], "assistant", first)
-        assert job["status"] not in TERMINAL_JOB_STATES, job  # the job left the window before the fault
-        now = time.monotonic()
-        for j in polled_jobs(stack, "handler-runtime", since=RECENT_LOG):
-            first_seen.setdefault(j, now)
-        fresh = [j for j, seen in first_seen.items() if now - seen <= FRESH_TEST_RUN_S]
-        if not fresh or not sandboxes(stack, load_package):
-            return None
-        target = next((j for j in fresh if job_of(runtime, "handler", j)["status"] == "running"), None)
-        if target is not None:
-            candidate.clear()
-            candidate.update(candidate_sandboxes(stack, case.package_id))
-            items = list_items(flows["orchestrator"], load.run, "extract-products")
-            in_flight[:] = [i["item_id"] for i in items if i["status"] == "running"]
-        return target
-
-    target = wait_for("a fresh candidate test-run and a load call in the runtime", fresh_test_run)
+    first = start_improvement(flows["assistant"], case.request)
+    # ... and a call of the load run is in a sandbox at the same moment
+    target = window.wait(first, also=lambda: bool(sandboxes(stack, load_package)))
+    candidate = candidate_sandboxes(stack, case.package_id)
+    items = list_items(flows["orchestrator"], load.run, "extract-products")
+    in_flight = [i["item_id"] for i in items if i["status"] == "running"]  # load calls just before the kill
     stack.kill_instance("handler-runtime", 1)
     killed_at = time.monotonic()
     load_at_fault = run_view(flows["orchestrator"], load.run)["status"]
-    # every test-run job the assistant polled before the kill (the log of the dead container is still readable)
-    test_runs = polled_jobs(stack, "handler-runtime", log_offset)
+    test_runs = window.polled()
     assert version_numbers(registry, case.package_id) == ["1.0.0"]  # killed before the publication
     # Calls the dead runtime never finished: it removes every sandbox it has read, so the ones still there were
     # in flight at the kill (operational: Docker labels of the sandboxes).

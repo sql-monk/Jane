@@ -203,3 +203,33 @@ def test_info_publishes_platform_limits() -> None:
         "defaults": {"transfer": {"job_retention_seconds": 3600}},
         "hard_caps": {"transfer": {"job_retention_seconds": 3600}},
     }
+
+
+def test_start_logs_limits_of_a_shared_profile_that_the_service_ignores(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    profile = LimitLayer(
+        "platform",
+        {"transfer": {"job_retention_seconds": 7200}, "sandbox": {"memory_mb": 512}},
+        hard_caps={"llm": {"max_output_tokens_per_request": 16_000}},
+        name="ci",
+        profile="ci",
+        shared=True,
+    )
+    resolved = resolve_limits(JobLimits, profile)
+    app = create_app(JaneSettings(), configure_logs=False, limits=resolved)
+    with caplog.at_level(logging.INFO, logger="jane.service"), TestClient(app) as client:
+        info = client.get("/v1/info").json()["limits"]
+    assert info == {"defaults": {"transfer": {"job_retention_seconds": 7200}}, "profile": "ci"}
+    [record] = [r for r in caplog.records if "applied partially" in r.getMessage()]
+    assert record.__dict__["profile"] == "ci"
+    assert record.__dict__["ignored"] == ["sandbox.memory_mb"]
+    assert record.__dict__["ignored_hard_caps"] == ["llm.max_output_tokens_per_request"]
+
+
+def test_start_does_not_log_ignored_limits_when_there_are_none(caplog: pytest.LogCaptureFixture) -> None:
+    resolved = resolve_limits(JobLimits, LimitLayer("platform", {"max_concurrent_jobs": 2}, shared=True))
+    app = create_app(JaneSettings(), configure_logs=False, limits=resolved)
+    with caplog.at_level(logging.INFO, logger="jane.service"), TestClient(app):
+        pass
+    assert not [r for r in caplog.records if "applied partially" in r.getMessage()]

@@ -117,5 +117,8 @@ class ServiceLimits(Limits):
 
 def resolve_service_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLimits[ServiceLimits]:
     """Defaults <- platform file (``..._LIMITS_FILE``) <- ``JANE_STORAGE_LIMITS__*`` <- ``extra``
-    (request layer from ``HandlerInvocation.limits``)."""
+    (request layer from ``HandlerInvocation.limits``).
+
+    The platform file may be a whole platform profile (``deploy/profiles/<profile>.json``): contract limits
+    storage does not have are ignored (``ResolvedLimits.ignored``, start-up log); typos fail."""
     return resolve_limits(ServiceLimits, *settings.platform_layers(f"{ENV_PREFIX}LIMITS__"), *extra)

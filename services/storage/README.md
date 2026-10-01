@@ -90,7 +90,9 @@ entities = httpx.get(
 ## Конфігурація й ліміти
 
 Змінні середовища з префіксом `JANE_STORAGE_`; ліміти — `JANE_STORAGE_LIMITS__<група>__<поле>` або файл
-`JANE_STORAGE_LIMITS_FILE` (форма `PlatformLimits`), стелі — `JANE_STORAGE_LIMITS__HARD_CAPS__…`. Ліміти з
+`JANE_STORAGE_LIMITS_FILE` (форма `PlatformLimits`; можна дати цілий профіль `deploy/profiles/<профіль>.json` —
+ліміти контракту, яких storage не має, ігноруються й перелічуються в журналі старту, опечатка чи некоректне
+значення — помилка старту; див. README jane-kit), стелі — `JANE_STORAGE_LIMITS__HARD_CAPS__…`. Ліміти з
 `HandlerInvocation.limits` (`retries`, `timeouts.sync_response_max_ms`, `timeouts.request_timeout_ms`) діють у межах
 стель. Типові значення:
 

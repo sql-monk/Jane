@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import re
 import sys
 from pathlib import Path
@@ -14,7 +15,7 @@ from fastapi.testclient import TestClient
 from pydantic import Field
 
 from jane_kit.codegen import generate_client
-from jane_kit.config import JaneSettings, LimitLayer, Limits, resolve_limits
+from jane_kit.config import CONTRACT_LIMIT_PATHS, JaneSettings, LimitLayer, Limits, load_layer, resolve_limits
 from jane_kit.contracts import OpenAPISpec, build_mock_app, contracts_dir, find_specs
 from jane_kit.errors import KNOWN_CODES, JaneError, NotFound
 from jane_kit.jobs import Job, JobCancellation, JobProgress, JobStatus
@@ -122,6 +123,36 @@ def test_effective_limits_match_schema() -> None:
     )
     schema = (CONTRACTS / "schemas/common/limits.schema.json").resolve().as_uri() + "#/$defs/EffectiveLimits"
     COMMON.validate_at(schema, r.effective(), "EffectiveLimits")
+
+
+def _schema_leaves(node: dict[str, Any], defs: dict[str, Any], prefix: str = "") -> set[str]:
+    if "$ref" in node:
+        node = defs[node["$ref"].rsplit("/", 1)[-1]]
+    if "properties" not in node:
+        return {prefix.removesuffix(".")}
+    return set().union(*(_schema_leaves(v, defs, f"{prefix}{k}.") for k, v in node["properties"].items()))
+
+
+def test_contract_limit_paths_match_limits_schema() -> None:
+    """``CONTRACT_LIMIT_PATHS`` (what a shared platform profile may contain) is a copy of the schema."""
+    schema = json.loads((CONTRACTS / "schemas/common/limits.schema.json").read_text(encoding="utf-8"))
+    assert _schema_leaves(schema, schema["$defs"]) == CONTRACT_LIMIT_PATHS
+
+
+PLATFORM_EXAMPLES = sorted((CONTRACTS / "examples/schemas/common/limits@PlatformLimits").glob("*.json"))
+
+
+@pytest.mark.parametrize("example", PLATFORM_EXAMPLES, ids=[p.stem for p in PLATFORM_EXAMPLES])
+def test_every_contract_platform_limits_example_is_a_valid_shared_layer(example: Path) -> None:
+    """A service with almost no contract limits takes any contract-valid profile: the rest is ignored."""
+    from jane_kit.config import _flatten
+    from jane_kit.jobs import JobLimits
+
+    doc = json.loads(example.read_text(encoding="utf-8"))
+    r = resolve_limits(JobLimits, load_layer(example))
+    assert r.limits.job_retention_seconds == doc["defaults"]["transfer"]["job_retention_seconds"]
+    assert set(r.ignored) == set(_flatten(doc["defaults"])) - {"transfer.job_retention_seconds"}
+    assert set(r.ignored_hard_caps) == set(_flatten(doc.get("hard_caps", {})))
 
 
 @pytest.mark.parametrize("spec_path", SPECS, ids=[p.name for p in SPECS])

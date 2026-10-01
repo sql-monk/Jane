@@ -121,7 +121,7 @@ just down -v --project jane-wp10
 | `JANE_LLM_REGISTRY_URL` / `JANE_LLM_REGISTRY_TOKEN` | — | репозиторій обробників для пакетів за `handler` (архів `…/archive`) |
 | `JANE_LLM_LOG_LEVEL` / `JANE_LLM_LOG_FORMAT` | `INFO` / `json` | журнали |
 | `JANE_LLM_AUTH_MODE` | `none` | значення для `/v1/info` (перевірка токенів у цьому WP не реалізована, див. звіт) |
-| `JANE_LLM_LIMITS_FILE` | — | файл `PlatformLimits` (`defaults`, `hard_caps`) |
+| `JANE_LLM_LIMITS_FILE` | — | файл `PlatformLimits` (`defaults`, `hard_caps`), зокрема цілий профіль `deploy/profiles/<профіль>.json`: ліміти контракту, яких сервіс не має, ігноруються (перелік — у журналі старту), опечатка чи некоректне значення — помилка старту. Увага: `timeouts.connect_timeout_ms`, `timeouts.request_timeout_ms` і `retries` профілю діють і на виклики провайдерів (`provider.*` оголошені як ці поля контракту), тобто замінюють типові 120 с тайм-ауту запиту |
 | `JANE_LLM_LIMITS__<ГРУПА>__<ПАРАМЕТР>` | — | перевизначення, напр. `JANE_LLM_LIMITS__LLM__BUDGET__AMOUNT=5` |
 | `JANE_LLM_LIMITS__HARD_CAPS__…` | — | жорсткі стелі платформи |
 

@@ -48,7 +48,8 @@ def create_app(
     """Build a FastAPI app. ``app.state.health`` and ``app.state.metrics`` are ready to extend.
 
     ``limits`` (the service's resolved platform limits) is published in ``/v1/info`` as ``limits``
-    (``PlatformLimits``: contract-mapped defaults and hard caps, WP-00 ``ServiceInfo``).
+    (``PlatformLimits``: contract-mapped defaults and hard caps, WP-00 ``ServiceInfo``); limits of a shared
+    platform profile that the service does not have (``ResolvedLimits.ignored``) are logged at start.
     """
     if configure_logs:
         configure_logging(
@@ -60,6 +61,15 @@ def create_app(
         logging.getLogger("jane.service").info(
             "service starting", extra={"version": version, "port": settings.port}
         )
+        if limits is not None and (limits.ignored or limits.ignored_hard_caps):
+            logging.getLogger("jane.service").info(
+                "platform limits profile applied partially: limits this service does not have are ignored",
+                extra={
+                    "profile": limits.profile,
+                    "ignored": sorted(limits.ignored),
+                    "ignored_hard_caps": sorted(limits.ignored_hard_caps),
+                },
+            )
         if lifespan is None:
             yield
         else:

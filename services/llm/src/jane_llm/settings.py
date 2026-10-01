@@ -129,5 +129,9 @@ class ServiceLimits(Limits):
 
 def resolve_service_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLimits[ServiceLimits]:
     """Defaults <- platform file (``JANE_LLM_LIMITS_FILE``) <- ``JANE_LLM_LIMITS__*`` <- ``extra``
-    (request layer in autonomous mode)."""
+    (request layer in autonomous mode).
+
+    The platform file may be a whole platform profile (``deploy/profiles/<profile>.json``): contract limits
+    this service does not have are ignored (``ResolvedLimits.ignored``, start-up log); typos fail. Its
+    ``timeouts.*`` and ``retries`` reach ``provider`` (declared as those contract fields)."""
     return resolve_limits(ServiceLimits, *settings.platform_layers(f"{ENV_PREFIX}LIMITS__"), *extra)

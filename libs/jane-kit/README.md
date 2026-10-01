@@ -66,6 +66,24 @@ resolved.effective()  # {"limits": {...}, "provenance": {"crawl.max_depth": "tas
 (`PlatformLimits`: `defaults` і `hard_caps`). Специфічні для сервісу ліміти лишаються внутрішніми, бо схема
 контракту строга. Ефективні ліміти з походженням для джерела/завдання/етапу рахує лише оркестратор.
 
+**Один профіль на всі сервіси** (ТЗ §12, критерій 13). Файл платформи (`<ПРЕФІКС>LIMITS_FILE`, `load_layer(...,
+"platform")`) — це спільний шар (`LimitLayer.shared`): у нього можна покласти цілий профіль
+`deploy/profiles/<профіль>.json`. Для такого шару:
+
+- шлях контракту (`timeouts.request_timeout_ms`) потрапляє в усі поля моделі, що його оголошують через
+  `contract_field` (наприклад `client.request_timeout_ms`), або в неоголошене поле за тим самим шляхом;
+- шлях контракту, якого сервіс не моделює (`sandbox.memory_mb` для storage), ігнорується й записується в
+  `ResolvedLimits.ignored` / `ignored_hard_caps`; `create_app(limits=...)` пише їх у журнал старту
+  (`platform limits profile applied partially`, поля `profile`, `ignored`, `ignored_hard_caps`);
+- шлях моделі сервісу (`jobs.max_concurrent_jobs`) теж приймається, як і раніше;
+- шлях, невідомий і моделі, і контракту (опечатка), `null`, некоректне значення чи тип поля, яке сервіс моделює,
+  та одне поле двічі з різними значеннями (`transfer.job_retention_seconds` і `jobs.job_retention_seconds`) —
+  `LimitError`, тобто сервіс не стартує.
+
+Решта шарів (змінні `<ПРЕФІКС>LIMITS__*`, джерело, завдання, запит) приймають лише шляхи моделі: невідоме поле
+запиту — далі `LimitError` (→ 422 / `limit_exceeded` у сервісі). Перелік шляхів контракту — `CONTRACT_LIMIT_PATHS`
+(копія `limits.schema.json`, бо сервіси працюють і без `contracts/`; рівність перевіряє контрактний тест).
+
 Типові значення лімітів самої бібліотеки:
 
 | Модель | Параметр | Типово |

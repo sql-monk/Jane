@@ -7,6 +7,7 @@ replays channels from JSON files; tests post and edit messages by rewriting the 
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,15 @@ from jane_telegram_collector.testing import (
     make_channel,
     make_settings,
 )
+
+START_S = float(os.environ.get("JANE_TELEGRAM_COLLECTOR_TEST_START_S", "120"))
+"""How long a collector process may take to answer ``/v1/health`` (``ServiceProcess.start`` waits 30 s, which
+a loaded machine exceeded: "service did not become healthy" in a full ``just check``)."""
+
+
+class _Process(ServiceProcess):
+    def start(self, timeout: float = START_S) -> None:
+        super().start(timeout)
 
 
 @pytest.fixture
@@ -76,7 +86,7 @@ def service_factory(tmp_path: Path) -> Iterator[ServiceFactory]:
             JANE_TELEGRAM_COLLECTOR_STATE_BUSY_TIMEOUT_MS="1000",
             **env_overrides,
         )
-        svc = ServiceProcess(port=port, state_dir=state_dir, env=env)
+        svc = _Process(port=port, state_dir=state_dir, env=env)
         started.append(svc)
         return svc
 

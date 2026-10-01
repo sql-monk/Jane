@@ -462,9 +462,11 @@ class E2EStack:
                 raise StackError(f"{service}#{index} is not healthy: {state}")
             time.sleep(1.0)
 
-    def logs(self, service: str, index: int = 1, *, echo: bool = True) -> str:
-        """Read stdout and stderr, including records from before a restart."""
-        r = self._run(["docker", "logs", self.container(service, index, echo=echo)], echo=echo)
+    def logs(self, service: str, index: int = 1, *, echo: bool = True, since: str | None = None) -> str:
+        """Read stdout and stderr, including records from before a restart; ``since`` (``docker logs --since``,
+        e.g. ``15s``) keeps only the recent ones for scenarios that poll a long log."""
+        recent = ["--since", since] if since else []
+        r = self._run(["docker", "logs", *recent, self.container(service, index, echo=echo)], echo=echo)
         return f"{r.stdout}\n{r.stderr}"
 
     def running_with_labels(self, labels: Mapping[str, str]) -> list[str]:

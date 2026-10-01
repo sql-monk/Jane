@@ -105,10 +105,12 @@ CANDIDATE = "1.1.0"  # the scripted fix adds fields to the schema: a minor versi
 LOAD_PRODUCTS = site_paths("product")
 LOAD_EXTRACTOR = PACKAGES / "e2e.slow-product-extractor"
 # Every load call stays in its sandbox at least this long, so the runtime kill cuts one (params.delay_seconds).
-LOAD_DELAY_S = float(os.environ.get("JANE_E2E_R07_LOAD_DELAY_S", "3"))
+LOAD_DELAY_S = float(os.environ.get("JANE_E2E_R07_LOAD_DELAY_S", "5"))
 # The runtime is killed only while a test-run job of the candidate is fresh: first polled by the assistant at
 # most this long ago, so that cases of that job are still ahead (a test run has 4-6 cases, one sandbox each).
 FRESH_TEST_RUN_S = float(os.environ.get("JANE_E2E_R07_FRESH_TEST_RUN_S", "2.5"))
+# How much of the runtime log the probe reads per poll (``docker logs --since``; tolerates a skewed engine clock).
+RECENT_LOG = "30s"
 LOAD_LIMITS = {"concurrency": {"max_parallel_stage_items": 1}}  # one call at a time: the load lasts
 # Retries of the load task outlast a runtime restart (attempts are spent while the runtime is down).
 LOAD_RETRIES = {
@@ -199,10 +201,11 @@ def candidate_sandboxes(stack: E2EStack, package_id: str) -> set[str]:
     return sandboxes(stack, f"{package_id}@{CANDIDATE}")
 
 
-def log_records(stack: E2EStack, service: str, msg: str) -> list[dict[str, Any]]:
-    """JSON log records ``msg`` of one service (jane-kit JSON logs), including those before a restart."""
+def log_records(stack: E2EStack, service: str, msg: str, since: str | None = None) -> list[dict[str, Any]]:
+    """JSON log records ``msg`` of one service (jane-kit JSON logs), including those before a restart; ``since``
+    keeps only recent ones (``docker logs --since``)."""
     out = []
-    for line in stack.logs(service, echo=False).splitlines():
+    for line in stack.logs(service, echo=False, since=since).splitlines():
         line = line.strip()
         if not line.startswith("{"):
             continue
@@ -215,9 +218,9 @@ def log_records(stack: E2EStack, service: str, msg: str) -> list[dict[str, Any]]
     return out
 
 
-def access_log(stack: E2EStack, service: str) -> list[dict[str, Any]]:
+def access_log(stack: E2EStack, service: str, since: str | None = None) -> list[dict[str, Any]]:
     """jane-kit access-log records (``request``: method, path, status) of one service."""
-    return log_records(stack, service, "request")
+    return log_records(stack, service, "request", since)
 
 
 def configured_limits(stack: E2EStack, service: str) -> dict[str, Any]:
@@ -227,10 +230,11 @@ def configured_limits(stack: E2EStack, service: str) -> dict[str, Any]:
     return dict(records[-1]["limits"]["limits"])
 
 
-def polled_jobs(stack: E2EStack, service: str, offset: int) -> list[str]:
-    """Ids of the jobs polled (``GET /v1/jobs/{id}``) on ``service`` since access-log record ``offset``."""
+def polled_jobs(stack: E2EStack, service: str, offset: int = 0, since: str | None = None) -> list[str]:
+    """Ids of the jobs polled (``GET /v1/jobs/{id}``) on ``service`` since access-log record ``offset`` (or in the
+    last ``since``, e.g. ``15s``)."""
     ids: list[str] = []
-    for record in access_log(stack, service)[offset:]:
+    for record in access_log(stack, service, since)[offset:]:
         m = JOB_PATH.match(str(record.get("path", "")))
         if record.get("method") == "GET" and m and m["job_id"] not in ids:
             ids.append(m["job_id"])
@@ -510,28 +514,30 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
     load = start_load(flows, f"e2e-{run_id}")
     llm_before = improvement_requests(flows)
     log_offset = len(access_log(stack, "handler-runtime"))
+    # test-run jobs polled before the improvement starts (scenarios before this one) are never fresh
+    first_seen: dict[str, float] = dict.fromkeys(polled_jobs(stack, "handler-runtime", since=RECENT_LOG), 0.0)
 
     first = start_improvement(flows["assistant"], case.request)
     runtime = flows["handler-runtime"]
     load_package = f"{load.package['package_id']}@{load.package['version']}"
 
-    first_seen: dict[str, float] = {}  # test-run job id -> when this test first saw the assistant poll it
-    candidate: set[str] = set()
+    candidate: set[str] = set()  # candidate sandboxes at the moment of the kill
 
     def fresh_test_run() -> str | None:
-        """A test-run job the assistant polls (runtime access log), running in the runtime and first polled at
-        most ``FRESH_TEST_RUN_S`` ago, at a moment when a candidate test case and a load call are in sandboxes."""
+        """A test-run job the assistant polls (recent runtime access log), running in the runtime and first
+        polled at most ``FRESH_TEST_RUN_S`` ago, at a moment when a call of the load run is in a sandbox."""
         job = job_of(flows["assistant"], "assistant", first)
         assert job["status"] not in TERMINAL_JOB_STATES, job  # the job left the window before the fault
         now = time.monotonic()
-        for j in polled_jobs(stack, "handler-runtime", log_offset):
+        for j in polled_jobs(stack, "handler-runtime", since=RECENT_LOG):
             first_seen.setdefault(j, now)
+        fresh = [j for j, seen in first_seen.items() if now - seen <= FRESH_TEST_RUN_S]
+        if not fresh or not sandboxes(stack, load_package):
+            return None
+        target = next((j for j in fresh if job_of(runtime, "handler", j)["status"] == "running"), None)
         candidate.clear()
         candidate.update(candidate_sandboxes(stack, case.package_id))
-        if not (candidate and sandboxes(stack, load_package)):
-            return None
-        fresh = [j for j, seen in first_seen.items() if now - seen <= FRESH_TEST_RUN_S]
-        return next((j for j in fresh if job_of(runtime, "handler", j)["status"] == "running"), None)
+        return target
 
     target = wait_for("a fresh candidate test-run and a load call in the runtime", fresh_test_run)
     stack.kill_instance("handler-runtime", 1)

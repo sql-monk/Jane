@@ -68,7 +68,7 @@ uv run --all-packages python deploy/profiles/stack.py down --project jane-exampl
 1. `stack.py up` — `infra/compose.yaml` (WP-01) + [`deploy/profiles/compose.stack.yaml`](../deploy/profiles/compose.stack.yaml):
    testsite, registry (PostgreSQL + MinIO), storage, handler-runtime (образ пісочниці
    `<проєкт>-python-extractor:1`), web-collector, orchestrator і з `--telegram` telegram-collector на
-   записаному backend. Профіль лімітів `dev-laptop` отримують оркестратор і колектори (див.
+   записаному backend. Профіль лімітів `dev-laptop` отримують як `LIMITS_FILE` усі сервіси стеку (див.
    [профілі](../deploy/profiles/README.md)). Перший запуск збирає образи (кілька хвилин).
 2. `demo`:
    - **publish** — створює пакети в registry, публікує канонічні архіви (`application/zip`), перевіряє

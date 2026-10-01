@@ -35,11 +35,14 @@
 3. Перевірте `GET /v1/health`, `GET /v1/info` (можливості, ліміти й стелі), `GET /metrics`. Через Caddy ті самі
    шляхи доступні як `http://<proxy>/api/<сервіс>/v1/...` (незапущений сервіс → 502, невідомий → 404).
 4. Ліміти сервісу — типові значення з README сервісу, `<ПРЕФІКС>_LIMITS__<ГРУПА>__<ПОЛЕ>` або
-   `<ПРЕФІКС>_LIMITS_FILE`. Увесь профіль `deploy/profiles/<profile>.json` як `LIMITS_FILE` зараз приймають
-   **лише** orchestrator, web-collector і telegram-collector; storage, handler-runtime, registry, llm і assistant
-   не стартують з повним `PlatformLimits` (невідомі групи → `LimitError`; запит власникам у звіті WP-14).
-   Цим сервісам значення профілю приходять у запитах оркестратора (ліміти етапу), а автономно — їхні
-   типові значення або окремі змінні середовища.
+   `<ПРЕФІКС>_LIMITS_FILE`. Увесь профіль `deploy/profiles/<profile>.json` як `LIMITS_FILE` приймає **кожен**
+   сервіс (storage, handler-runtime, registry, llm, assistant — з WP-01b): ліміти, яких сервіс не має,
+   ігноруються з рядком журналу старту, опечатка — помилка старту (колектори поки ігнорують і опечатки,
+   запит WP-01b до WP-02/WP-04); `GET /v1/info` → `limits.profile`.
+   orchestrator бере файл лише для першого заповнення документа лімітів у БД. Змінні
+   `<ПРЕФІКС>_LIMITS__<ГРУПА>__<ПОЛЕ>` перекривають файл. Для llm профіль задає й тайм-аут виклику провайдера
+   (`provider.request_timeout_ms` = `timeouts.request_timeout_ms` профілю, 30 с): для реальної моделі перекрийте
+   `JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS` (стек профілю — 120 000, див. `deploy/profiles/README.md`).
 
 ## Спільний запуск (ланцюжок)
 

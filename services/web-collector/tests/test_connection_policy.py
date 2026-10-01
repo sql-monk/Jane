@@ -11,7 +11,8 @@ from fastapi.testclient import TestClient
 from jane_kit.errors import ServiceUnavailable, ValidationFailed
 from jane_web_collector.app import build_app
 from jane_web_collector.connections import ConnectionPolicy, auth_headers
-from jane_web_collector.fetcher import Fetcher, FetchError, HostLimiter
+from jane_web_collector.fetcher import Fetcher, FetchError
+from jane_web_collector.host_limits import HostLimiter
 from jane_web_collector.rules import RulesLoader
 from jane_web_collector.settings import Rate, Retries, ServiceLimits
 from jane_web_collector.testing import Site, make_settings, web_rules

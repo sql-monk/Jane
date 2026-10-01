@@ -20,10 +20,10 @@ import httpx
 from jane_kit.errors import FieldError, ValidationFailed
 
 from .connections import ConnectionPolicy, header_name_safe, header_value_safe, is_safe_rule_header
-from .host_limits import HostLimiter, HostSession
+from .host_limits import HostSession
 from .settings import ServiceLimits, Timeouts
 
-__all__ = ["FetchError", "Fetcher", "HostLimiter", "HostSession", "HttpResult", "build_client"]
+__all__ = ["FetchError", "Fetcher", "HttpResult", "build_client"]
 
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})

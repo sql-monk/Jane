@@ -234,3 +234,34 @@ def test_cancelled_collection_releases_the_host(api: TestClient, timed: TimedSit
     fetch_s = time.monotonic() - began
     assert fetch_s < interval * 0.6, f"the cancelled collection still limits the host: {fetch_s:.2f} s"
     assert len(timed.requests("/a/")) < 20
+
+
+@pytest.mark.parametrize("level", ["request", "rules"])
+def test_one_shot_fetch_keeps_its_own_stricter_rate(api: TestClient, timed: TimedSite, level: str) -> None:
+    """``POST /v1/fetches`` takes its per-host limits from its own effective limits (platform -> ``rules.limits``
+    -> request ``limits``), not only from the platform: its robots.txt and its page are one interval of the
+    stricter value apart, although the platform allows 5 rps (review 1 of WP-02c)."""
+    interval = 2.0
+    strict = {"rate": {"requests_per_second_per_host": 1 / interval, "min_delay_ms_per_host": 0}}
+    url = timed.base + "/strict"
+    body: dict[str, Any] = {"source_kind": "web", "url": url}
+    if level == "request":
+        body["limits"] = strict
+    else:
+        body["rules"] = {
+            "collector": "web",
+            "scope": {"allowed_domains": [timed.host]},
+            "strategies": [{"type": "seed_list", "strategy_id": "seeds", "urls": [url]}],
+            "limits": strict,
+        }
+    r = api.post("/v1/fetches", json=body)
+    assert r.status_code == 200, r.text
+    robots, page = timed.requests("/robots.txt"), timed.requests("/strict")
+    assert len(robots) == len(page) == 1
+    gap = page[0] - robots[0]
+    print(f"fetch with {level} limits: robots.txt -> page {gap:.3f} s (own interval {interval} s)")
+    # a lower bound (load only lengthens it); the platform interval would give ~0.2 s
+    assert gap >= SPAN_FRACTION * interval, (
+        f"the fetch ignored its {level} limits: robots.txt -> page {gap:.3f} s, "
+        f"own interval {interval} s, platform {INTERVAL} s"
+    )

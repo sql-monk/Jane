@@ -522,6 +522,7 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
     load_package = f"{load.package['package_id']}@{load.package['version']}"
 
     candidate: set[str] = set()  # candidate sandboxes at the moment of the kill
+    in_flight: list[str] = []  # extraction items of the load run being executed at the moment of the kill
 
     def fresh_test_run() -> str | None:
         """A test-run job the assistant polls (recent runtime access log), running in the runtime and first
@@ -535,8 +536,11 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
         if not fresh or not sandboxes(stack, load_package):
             return None
         target = next((j for j in fresh if job_of(runtime, "handler", j)["status"] == "running"), None)
-        candidate.clear()
-        candidate.update(candidate_sandboxes(stack, case.package_id))
+        if target is not None:
+            candidate.clear()
+            candidate.update(candidate_sandboxes(stack, case.package_id))
+            items = list_items(flows["orchestrator"], load.run, "extract-products")
+            in_flight[:] = [i["item_id"] for i in items if i["status"] == "running"]
         return target
 
     target = wait_for("a fresh candidate test-run and a load call in the runtime", fresh_test_run)
@@ -559,6 +563,7 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
             "test-run jobs": test_runs,
             "fresh test-run at the kill": target,
             "load": load_at_fault,
+            "load items running just before the kill": in_flight,
             "sandboxes left by the dead runtime": {"load": cut_load, "candidate": cut_candidate},
         },
     )
@@ -593,7 +598,7 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
     assert improvement_requests(flows) == llm_before + 2  # one LLM answer per job, nothing replayed
     check_activation_and_rollback(flows, case, new, scenario)
     load_result = finish_load(flows, load, scenario, may_fail=True)
-    OBSERVED["load_after_runtime_restart"] = {"cut calls": cut_load, **load_result}
+    OBSERVED["load_after_runtime_restart"] = {"in flight": in_flight, "cut calls": cut_load, **load_result}
 
     # the runtime's own record of the test-run jobs the kill interrupted (read again at the end)
     OBSERVED["runtime_test_run_after_restart"] = {
@@ -643,11 +648,12 @@ def test_r_07_load_call_cut_by_a_runtime_kill_completes_after_the_restart() -> N
 
     Repro: ``R-07/runtime`` above - SIGKILL of handler-runtime while a sync extraction call of the load run is
     in its sandbox (``e2e.slow-product-extractor``, ``delay_seconds``), start; the orchestrator retries the item
-    with ``context.attempt`` increased while the key is still claimed."""
+    with ``context.attempt`` increased while the key is still claimed. "In flight": an extraction item of the
+    load run ``running`` just before the kill, or a load sandbox the dead runtime left behind."""
     observed = OBSERVED.get("load_after_runtime_restart")
     if observed is None:
         pytest.skip("the runtime-restart scenario did not reach the observation")
-    if not observed["cut calls"]:
+    if not (observed["in flight"] or observed["cut calls"]):
         pytest.skip("no call of the load run was in flight at the kill")
     assert observed["failed"] == [], observed
 

@@ -423,6 +423,9 @@ ADVERSARIAL = [
     ("c.py", lambda n: b"eyJ-" * (n // 4)),
     ("c.py", lambda n: b"bearer" + b"\n" * n + b"!"),
     ("c.py", lambda n: b"=" + b"\n" * n + b"!"),
+    # a keyword and "=" open the pre-filters of the line-anchored assignment detector, then a newline run: the
+    # review-2 ReDoS (^\s* crossing lines) again behind them is caught only with an input like this
+    ("c.yaml", lambda n: b"password=x\n" + b"\n" * n),
     ("c.yaml", lambda n: b"a." * (n // 2)),
     ("c.yaml", lambda n: b"password" * (n // 8)),  # keyword-dense line without newline
     ("LICENSE", lambda n: b"password" * (n // 8)),
@@ -465,14 +468,18 @@ SCAN_CPU_FLOOR_S = 0.05
 """Smaller CPU times are compared as this value (the thread clock of Windows advances in 15.6 ms ticks)."""
 SCAN_ATTEMPTS = 3
 """Measurements per rung before the test fails (one can be taken while the machine changes speed)."""
+SCAN_WALL_BUDGET_MS = 3_600_000
+"""``scan_time_budget_ms`` of the measured scans (see :func:`_scan_cpu`)."""
 _REFERENCE_LINE = "def handler(item, limits):\n    value = item.get('price') or 0  # 42 units\n"
 _REFERENCE_WORD = re.compile(r"[a-z_][a-z0-9_]*")
 
 
 def _scan_cpu(path: str, inputs: list[bytes]) -> float:
     """CPU time of this thread for scanning ``inputs`` one after another. Unlike wall time it does not grow
-    while other processes hold the CPU."""
-    limits = SecretScanLimits()
+    while other processes hold the CPU. The wall-time budget of a scan (``scan_time_budget_ms``, 20 s; covered by
+    ``test_scan_time_budget_is_enforced``) is lifted: a loaded machine stretched one 2 MiB scan to 13 s of wall
+    time for 2.8 s of CPU time."""
+    limits = SecretScanLimits(scan_time_budget_ms=SCAN_WALL_BUDGET_MS)
     t0 = time.thread_time()
     for data in inputs:
         scan_files({path: data}, limits)
@@ -505,7 +512,8 @@ def test_scanner_handles_the_largest_scannable_file_fast(path: str, gen: Any) ->
     * constant factor: the 2 MiB scan may cost at most ``MAX_FILE_SCAN_UNITS`` reference units (a linear pattern
       that backtracks a long way at every position is linear, but slow).
 
-    Each rung is measured up to ``SCAN_ATTEMPTS`` times. The bounds can be changed through
+    Each rung is measured up to ``SCAN_ATTEMPTS`` times (the CPU time of the same work changed fivefold within
+    seconds on a loaded laptop with hybrid cores). The bounds can be changed through
     ``JANE_REGISTRY_TEST_SCAN_GROWTH_BOUND`` and ``JANE_REGISTRY_TEST_MAX_FILE_SCAN_UNITS``."""
     largest = SecretScanLimits().max_scan_bytes_per_file
     sizes = [largest // SCAN_GROWTH**k for k in range(SCAN_RUNGS, -1, -1)]
@@ -519,6 +527,9 @@ def test_scanner_handles_the_largest_scannable_file_fast(path: str, gen: Any) ->
             t_big = _scan_cpu(path, [big_data])
             if top:
                 unit = max(unit, _reference_cpu(largest))  # the slower of the two units around the scan
+            if t_big > SCAN_GROWTH_BOUND * max(t_small, SCAN_CPU_FLOOR_S):
+                # the machine may have slowed down during the larger scan: the smaller side once more, after it
+                t_small = max(t_small, _scan_cpu(path, [small_data] * SCAN_GROWTH))
             growth = t_big / max(t_small, SCAN_CPU_FLOOR_S)
             units = t_big / max(unit, SCAN_CPU_FLOOR_S)
             tried.append(

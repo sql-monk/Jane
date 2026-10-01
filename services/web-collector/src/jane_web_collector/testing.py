@@ -35,6 +35,7 @@ from .urls import Normalizer
 __all__ = [
     "FAST_LIMITS",
     "REPO_ROOT",
+    "START_TIMEOUT_S",
     "ServiceFactory",
     "ServiceProcess",
     "Site",
@@ -73,6 +74,11 @@ def start_timeout_s() -> float:
 def wait_timeout_s() -> float:
     """Upper bound for an awaited event in a test (``JANE_WEB_COLLECTOR_TEST_WAIT_S``)."""
     return _seconds_from_env(WAIT_TIMEOUT_ENV, DEFAULT_WAIT_TIMEOUT_S)
+
+
+START_TIMEOUT_S = start_timeout_s()
+"""Default of :meth:`ServiceProcess.start`, read once at import (a plain ``float`` default keeps subclasses that
+override ``start(timeout: float = ...)``, such as the WP-03 fixture, type-compatible)."""
 
 
 FAST_LIMITS: dict[str, Any] = {
@@ -211,9 +217,8 @@ class ServiceProcess:
     def base(self) -> str:
         return f"http://127.0.0.1:{self.port}"
 
-    def start(self, timeout: float | None = None) -> None:
-        """Start the process and wait for ``/v1/health`` (``timeout`` defaults to :func:`start_timeout_s`)."""
-        timeout = start_timeout_s() if timeout is None else timeout
+    def start(self, timeout: float = START_TIMEOUT_S) -> None:
+        """Start the process and wait for ``/v1/health`` (``timeout`` defaults to ``START_TIMEOUT_S``)."""
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.log_path = self.state_dir.parent / f"service-{time.time_ns()}.log"
         with self.log_path.open("wb") as log:

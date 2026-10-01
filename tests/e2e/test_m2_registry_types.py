@@ -359,13 +359,6 @@ def test_llm_package_from_registry_runs_in_tasks_and_its_fork_stays_pinned(
     assert triaged(r9, *fork_task, fork_v1_ref) == TRIAGE_V1
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=ProductDefect,
-    reason="LLM gateway (WP-10): PackageLoader.load returns a package cached by digest before comparing "
-    "package_id/version with the reference, so after version X was loaded once a reference to another "
-    "version with X's digest executes X instead of digest_mismatch (cold cache: 422)",
-)
 def test_llm_refuses_a_digest_of_another_version_also_after_caching_it(r9: Registry9, run_id: str) -> None:
     registry, llm = r9["registry"], r9["llm"]
     manifest, files = r9.sources[TRIAGE]

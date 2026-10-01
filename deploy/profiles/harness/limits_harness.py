@@ -260,6 +260,19 @@ def parse_mib(value: str | None) -> float | None:
     return None
 
 
+def runtime_profile_checks(info: Mapping[str, Any], profile_name: str, cap: int) -> list[m.Check]:
+    """L6 warnings from handler-runtime ``GET /v1/info``: ``limits`` there is a ``PlatformLimits`` document
+    (WP-00 ``ServiceInfo``; values under ``defaults``). The runtime must run with the profile of the stack
+    (its ``LIMITS_FILE``), so its own ``max_parallel_invocations`` is the profile's."""
+    limits = info.get("limits") or {}
+    defaults = limits.get("defaults") or {}
+    service_cap = (defaults.get("concurrency") or {}).get("max_parallel_invocations")
+    return [
+        m.check("runtime limits profile = profile", limits.get("profile"), "==", profile_name, "warning"),
+        m.check("runtime max_parallel_invocations = profile", service_cap, "==", cap, "warning"),
+    ]
+
+
 # ============================================================================================ scenarios
 class Harness:
     """Scenarios against one stack. ``urls``/``probe_host``/``profile``/``thresholds`` default to the stack
@@ -738,7 +751,7 @@ class Harness:
         # parallel sandboxes: count running containers with the stack's sandbox label while jobs run
         cap = int(self.d["concurrency"]["max_parallel_invocations"])
         info = self.runtime.call("GET", "/v1/info").json()
-        service_cap = ((info.get("limits") or {}).get("concurrency") or {}).get("max_parallel_invocations")
+        profile_checks = runtime_profile_checks(info, self.profile_name, cap)
         bodies = [
             self.invocation({"sleep_ms": int(th["parallel_sleep_ms"])}, mode="async") for _ in range(2 * cap)
         ]
@@ -762,9 +775,7 @@ class Harness:
             t.join()
         rows.append({"case": "parallel", "samples": samples, "statuses": [r.get("status") for r in results]})
         checks.append(m.check("parallel sandboxes", max(samples or [0]), "<=", cap))
-        checks.append(
-            m.check("runtime max_parallel_invocations = profile", service_cap, "==", cap, "warning")
-        )
+        checks += profile_checks
         checks.append(
             m.check(
                 "parallel invocations finished",
@@ -780,7 +791,8 @@ class Harness:
                 "cold_start_s": cold,
                 "cold_start_p95_s": p95,
                 "max_parallel_sandboxes": max(samples or [0]),
-                "runtime_service_cap": service_cap,
+                "runtime_profile": profile_checks[0]["value"],
+                "runtime_service_cap": profile_checks[1]["value"],
             },
             "checks": checks,
         }

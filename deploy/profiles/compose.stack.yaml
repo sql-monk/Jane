@@ -1,14 +1,17 @@
-# Jane full chain with one limits profile applied through the orchestrator and the collectors (WP-14).
+# Jane full chain with one limits profile applied to every service (WP-14).
 #
 #   uv run --all-packages python deploy/profiles/stack.py up --profile dev-laptop     # recommended
 #   docker compose -f infra/compose.yaml -f deploy/profiles/compose.stack.yaml -p <unique> up -d --wait <services>
 #
 # The base file (WP-01) describes the services; this overlay only wires them into one working chain:
 #   * JANE_PROFILE_FILE - host path of deploy/profiles/<profile>.json (PlatformLimits), mounted read-only as the
-#     LIMITS_FILE of the services that accept the whole document: the orchestrator (seeds its platform document
-#     on first start and passes effective stage limits to every executor call) and both collectors. storage,
-#     handler-runtime, registry, llm and assistant refuse to start with a full PlatformLimits file (unknown
-#     groups -> LimitError, see docs/delivery/WP-14.md); they get the profile values through the orchestrator;
+#     LIMITS_FILE of every application service. The orchestrator seeds its platform document from it on first
+#     start and passes effective stage limits to every executor call; the collectors, storage, handler-runtime,
+#     registry, llm and assistant take the limits they model from it as their own (standalone) limits and
+#     ignore the rest (WP-01b; the ignored paths are logged at start, `/v1/info` -> `limits.profile`);
+#   * JANE_LLM_PROVIDER_REQUEST_TIMEOUT_MS - timeout of one LLM provider call (default 120000, the llm
+#     service's own default): the profile's timeouts.request_timeout_ms is sized for web fetches and would
+#     otherwise become the provider timeout too (see deploy/profiles/README.md);
 #   * registry -> handler-runtime profile check, handler-runtime and the collectors read packages/rules from the
 #     registry; JANE_EXECUTORS_FILE - the orchestrator's executors (only the services of this stack);
 #   * JANE_TELEGRAM_RECORDINGS_DIR - a writable copy of examples/telegram/recordings (recorded backend);
@@ -31,16 +34,25 @@ x-limits: &limits
   read_only: true
 
 services:
+  storage:
+    environment:
+      JANE_STORAGE_LIMITS_FILE: /cfg/limits/platform.json
+    volumes: [*limits]
+
   handler-runtime:
     environment:
+      JANE_HANDLER_RUNTIME_LIMITS_FILE: /cfg/limits/platform.json
       JANE_HANDLER_RUNTIME_PROFILE_IMAGES: '{"python-extractor@1": "${JANE_SANDBOX_IMAGE:?set by deploy/profiles/stack.py}"}'
       JANE_HANDLER_RUNTIME_SANDBOX_LABELS: '{"io.jane.stack": "${JANE_STACK_PROJECT:-jane-stack}"}'
       JANE_HANDLER_RUNTIME_REGISTRY_URL: http://registry:8000
+    volumes: [*limits]
 
   registry:
     environment:
+      JANE_REGISTRY_LIMITS_FILE: /cfg/limits/platform.json
       # dependencies.python of extractors is checked against the runtime's published profile.
       JANE_REGISTRY_RUNTIME_PROFILES: '["http://handler-runtime:8000/v1/info"]'
+    volumes: [*limits]
     healthcheck:
       <<: *health
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
@@ -96,6 +108,20 @@ services:
     healthcheck:
       <<: *health
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
+
+  llm:
+    environment:
+      JANE_LLM_LIMITS_FILE: /cfg/limits/platform.json
+      # provider.* of llm are declared as the contract's timeouts.* / retries, so the profile's web request
+      # timeout (30 s) would bound every model call. Until WP-10 settles that, the stack keeps the service's
+      # own provider timeout; the other provider limits (connect timeout, retries) come from the profile.
+      JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS: ${JANE_LLM_PROVIDER_REQUEST_TIMEOUT_MS:-120000}
+    volumes: [*limits]
+
+  assistant:
+    environment:
+      JANE_ASSISTANT_LIMITS_FILE: /cfg/limits/platform.json
+    volumes: [*limits]
 
   # Instrumented site of the limits harness (deploy/profiles/harness/probe_site.py): logs the arrival and
   # end of every request so request rate, per-host parallelism, timeouts and retries are measured outside

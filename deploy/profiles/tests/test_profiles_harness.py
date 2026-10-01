@@ -7,10 +7,11 @@ Run: ``uv run --all-packages pytest deploy/profiles -q``. The measurements thems
 from __future__ import annotations
 
 import argparse
+import asyncio
 import importlib
 import json
 import threading
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -27,17 +28,84 @@ from jane_extractor_sdk.testing import assert_package_tests_pass, run_local
 
 PROFILES = Path(__file__).resolve().parents[1]
 MEASURED = ("dev-laptop", "ci")
+PROFILE_NAMES = tuple(sorted(p.stem for p in PROFILES.glob("*.json") if p.name != "thresholds.json"))
+"""Every profile document of deploy/profiles; the profile tests run for each of them (single-node too)."""
+JANE_KIT_SERVICES = ("storage", "handler_runtime", "registry", "llm", "assistant")
+"""Services whose platform file is the shared jane-kit layer (WP-01b): unmodelled contract limits are ignored."""
+LIMITS_FILE_ENV = {
+    "storage": "JANE_STORAGE_LIMITS_FILE",
+    "handler-runtime": "JANE_HANDLER_RUNTIME_LIMITS_FILE",
+    "registry": "JANE_REGISTRY_LIMITS_FILE",
+    "llm": "JANE_LLM_LIMITS_FILE",
+    "assistant": "JANE_ASSISTANT_LIMITS_FILE",
+    "web-collector": "JANE_WEB_COLLECTOR_LIMITS_FILE",
+    "telegram-collector": "JANE_TELEGRAM_COLLECTOR_LIMITS_FILE",
+    "orchestrator": "JANE_ORCHESTRATOR_LIMITS_FILE",
+}
+PROFILE_MOUNT = {
+    "type": "bind",
+    "source": "${JANE_PROFILE_FILE:?set by deploy/profiles/stack.py}",
+    "target": "/cfg/limits/platform.json",
+    "read_only": True,
+}
 
 
 def ev(start: float, end: float | None = None, path: str = "/s/t/p/1", status: int = 200) -> dict[str, Any]:
     return {"start": start, "end": start + 0.01 if end is None else end, "path": path, "status": status}
 
 
+def leaves(doc: Mapping[str, Any], prefix: str = "") -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, value in doc.items():
+        if isinstance(value, Mapping):
+            out.update(leaves(value, f"{prefix}{key}."))
+        else:
+            out[f"{prefix}{key}"] = value
+    return out
+
+
+def load(profile: str) -> dict[str, Any]:
+    data: dict[str, Any] = json.loads(jane_stack.profile_path(profile).read_text(encoding="utf-8"))
+    return data
+
+
+def overlay_services() -> dict[str, Any]:
+    doc: dict[str, Any] = yaml.safe_load(jane_stack.STACK_COMPOSE.read_text(encoding="utf-8"))
+    return dict(doc["services"])
+
+
+def jane_module(module: str) -> Any:
+    """``jane_<module>`` of a service (imported dynamically: service packages ship no ``py.typed``)."""
+    return importlib.import_module(f"jane_{module}")
+
+
+def compose_default(value: str) -> str:
+    """``${VAR:-default}`` of the compose file -> ``default`` (what the stack uses when VAR is unset)."""
+    assert value.startswith("${") and ":-" in value and value.endswith("}"), value
+    return value[2:-1].split(":-", 1)[1]
+
+
 # ------------------------------------------------------------------------------------------ profiles
 def test_profiles_are_valid_platform_limits(capsys: pytest.CaptureFixture[str]) -> None:
     profile_check.main()
     out = capsys.readouterr().out
-    assert out.count("schema valid") == 3
+    assert out.count("schema valid") == len(PROFILE_NAMES) == 3
+
+
+def test_every_profile_file_is_known_to_the_stack_and_the_check() -> None:
+    assert set(PROFILE_NAMES) == set(jane_stack.PROFILES) == set(profile_check.PROFILES)
+    assert set(MEASURED) < set(PROFILE_NAMES)
+
+
+@pytest.mark.parametrize("profile", PROFILE_NAMES)
+def test_profile_defaults_fit_their_hard_caps_and_timeouts_nest(profile: str) -> None:
+    doc = load(profile)
+    defaults, caps = leaves(doc["defaults"]), leaves(doc["hard_caps"])
+    assert doc["profile"] == profile
+    assert {p: (defaults[p], cap) for p, cap in caps.items() if defaults[p] > cap} == {}
+    t = doc["defaults"]["timeouts"]
+    assert doc["defaults"]["sandbox"]["wall_time_ms"] < t["invocation_timeout_ms"] <= t["stage_timeout_ms"]
+    assert t["request_timeout_ms"] <= t["stage_timeout_ms"] <= t["run_timeout_ms"]
 
 
 def test_every_measured_profile_has_complete_thresholds() -> None:
@@ -134,40 +202,87 @@ def test_dev_laptop_sandbox_wall_time_covers_the_observed_docker_desktop_cold_st
     assert sandbox["wall_time_ms"] <= profile["hard_caps"]["sandbox"]["wall_time_ms"]
 
 
-@pytest.mark.parametrize("service", ["orchestrator", "web_collector", "telegram_collector"])
-def test_services_that_take_the_whole_profile_as_limits_file(service: str) -> None:
-    settings = importlib.import_module(f"jane_{service}.settings")
-    for name in jane_stack.PROFILES:
-        resolved = settings.resolve_service_limits(
-            settings.Settings.model_construct().model_copy(
-                update={"limits_file": jane_stack.profile_path(name)}
-            )
-        )
-        assert resolved is not None
-
-
-@pytest.mark.parametrize("service", ["storage", "handler_runtime", "registry", "llm", "assistant"])
-def test_services_that_reject_the_whole_profile_as_limits_file(service: str) -> None:
-    settings = importlib.import_module(f"jane_{service}.settings")
-    settings.resolve_service_limits(
-        settings.Settings.model_construct().model_copy(
-            update={"limits_file": jane_stack.profile_path("dev-laptop")}
-        )
+@pytest.mark.parametrize("profile", PROFILE_NAMES)
+@pytest.mark.parametrize("name", ["orchestrator", "web_collector", "telegram_collector", *JANE_KIT_SERVICES])
+def test_every_service_takes_the_whole_profile_as_limits_file(name: str, profile: str) -> None:
+    """One profile for every service (criterion 13): the whole document is a valid ``LIMITS_FILE`` and each
+    service applies the contract limits it models with the profile's values (as ``/v1/info`` publishes)."""
+    settings = importlib.import_module(f"jane_{name}.settings")
+    path = jane_stack.profile_path(profile)
+    resolved = settings.resolve_service_limits(
+        settings.Settings.model_construct().model_copy(update={"limits_file": path})
     )
+    if name == "orchestrator":
+        # the file seeds the platform document of its DB (schema-checked like check.py); own limits: env only
+        assert resolved.profile is None
+        return
+    wanted = leaves(load(profile)["defaults"])
+    applied = leaves(resolved.platform_limits()["defaults"])
+    assert resolved.profile == profile
+    assert applied and {p: applied[p] for p in applied} == {p: wanted.get(p) for p in applied}
+    if name in JANE_KIT_SERVICES:  # the collectors drop unmodelled groups silently (translate_layer)
+        assert set(resolved.ignored) == set(wanted) - set(applied)
+
+
+@pytest.mark.parametrize("profile", PROFILE_NAMES)
+def test_assistant_reaches_the_fake_llm_within_the_profile_budget(
+    profile: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With the profile mounted the assistant's own budget check (``spent >= budget.amount``) and the gateway's
+    (``spent + estimate <= limit``) must both let a call to the free fake model through; ``amount: 0`` did not.
+    Real llm service (fake provider, memory store) as the assistant's neighbour, both with the stack's env."""
+    from fastapi.testclient import TestClient
+
+    assistant_llm, assistant, llm = (
+        jane_module(n) for n in ("assistant.llm", "assistant.settings", "llm.settings")
+    )
+    path = jane_stack.profile_path(profile)
+    key = "JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS"
+    monkeypatch.setenv(key, compose_default(overlay_services()["llm"]["environment"][key]))
+    budget = load(profile)["defaults"]["llm"]["budget"]
+    assert budget["amount"] > 0
+    limits = assistant.resolve_service_limits(
+        assistant.Settings.model_construct().model_copy(update={"limits_file": path})
+    )
+    assert limits.limits.llm.budget.model_dump() == budget
+
+    class Gateway:
+        """``LlmClient.complete`` over the in-process llm app (transport only, the service itself is real)."""
+
+        def __init__(self, client: TestClient) -> None:
+            self.client = client
+
+        async def complete(self, request: Mapping[str, Any], key: str) -> dict[str, Any]:
+            r = self.client.post("/v1/completions", json=dict(request), headers={"Idempotency-Key": key})
+            assert r.status_code == 200, r.text
+            body: dict[str, Any] = r.json()
+            return body
+
+    settings = llm.Settings(log_format="console", store="memory", limits_file=path)
+    app = jane_module("llm.app").build_app(settings, store=jane_module("llm.store").MemoryStore())
+    schema = {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]}
+    with TestClient(app) as client:
+        assert client.get("/v1/info").json()["limits"]["defaults"]["llm"]["budget"] == budget
+        session = assistant_llm.LlmSession(
+            Gateway(client), limits.limits.llm, "onboarding", f"profile-{profile}"
+        )
+        data = [assistant_llm.part("page", "x")]
+        output = asyncio.run(session.ask("probe", "Answer with the schema.", data, schema, model="default"))
+    assert set(output) == {"ok"} and session.calls == 1 and session.spent == 0
 
 
 # ------------------------------------------------------------------------------------------ stack
-def test_stack_overlay_applies_the_profile_where_it_is_accepted() -> None:
-    doc = yaml.safe_load(jane_stack.STACK_COMPOSE.read_text(encoding="utf-8"))
-    services = doc["services"]
-    for name, var in (
-        ("orchestrator", "JANE_ORCHESTRATOR_LIMITS_FILE"),
-        ("web-collector", "JANE_WEB_COLLECTOR_LIMITS_FILE"),
-        ("telegram-collector", "JANE_TELEGRAM_COLLECTOR_LIMITS_FILE"),
-    ):
-        assert services[name]["environment"][var] == "/cfg/limits/platform.json"
-    for name in ("storage", "handler-runtime", "registry"):
-        assert not any("LIMITS_FILE" in k for k in (services.get(name) or {}).get("environment", {}))
+def test_stack_overlay_applies_the_profile_to_every_service() -> None:
+    services = overlay_services()
+    assert set(LIMITS_FILE_ENV) == jane_stack.APP_SERVICES
+    for name, var in LIMITS_FILE_ENV.items():
+        assert services[name]["environment"][var] == PROFILE_MOUNT["target"], name
+        mounts = [
+            v
+            for v in services[name]["volumes"]
+            if isinstance(v, dict) and v["target"] == PROFILE_MOUNT["target"]
+        ]
+        assert mounts == [PROFILE_MOUNT], name
     assert (
         services["orchestrator"]["environment"]["JANE_ORCHESTRATOR_EXECUTORS_FILE"] == "/cfg/executors.json"
     )
@@ -182,6 +297,63 @@ def test_stack_overlay_applies_the_profile_where_it_is_accepted() -> None:
         == "http://registry:8000"
     )
     assert services["probe-site"]["profiles"] == ["limits-probe"]
+
+
+@pytest.mark.parametrize("profile", PROFILE_NAMES)
+def test_stack_llm_keeps_its_provider_timeout_and_the_profile_keeps_its_web_timeout(
+    profile: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The profile's ``timeouts.request_timeout_ms`` is sized for web fetches; llm declares its provider timeout
+    as that contract field, so the stack overrides only ``provider.request_timeout_ms`` (to the service's own
+    default) and every other service keeps the profile's value (request to WP-10 in docs/delivery/WP-14.md)."""
+    llm = jane_module("llm.settings")
+    key = "JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS"
+    override = int(compose_default(overlay_services()["llm"]["environment"][key]))
+    assert override == llm.ServiceLimits().provider.request_timeout_ms == 120_000
+    doc = load(profile)
+    web_timeout = doc["defaults"]["timeouts"]["request_timeout_ms"]
+    assert web_timeout < override
+    path = jane_stack.profile_path(profile)
+    llm_settings = llm.Settings.model_construct().model_copy(update={"limits_file": path})
+    assert llm.resolve_service_limits(llm_settings).limits.provider.request_timeout_ms == web_timeout
+    monkeypatch.setenv(key, str(override))
+    resolved = llm.resolve_service_limits(llm_settings)
+    assert resolved.limits.provider.request_timeout_ms == override
+    assert resolved.limits.provider.connect_timeout_ms == doc["defaults"]["timeouts"]["connect_timeout_ms"]
+    assert resolved.profile == profile
+    for name in ("storage", "handler_runtime", "assistant", "web_collector"):
+        settings = jane_module(f"{name}.settings")
+        applied = settings.resolve_service_limits(
+            settings.Settings.model_construct().model_copy(update={"limits_file": path})
+        ).platform_limits()["defaults"]
+        assert applied.get("timeouts", {}).get("request_timeout_ms", web_timeout) == web_timeout, name
+
+
+@pytest.mark.parametrize("profile", PROFILE_NAMES)
+def test_runtime_info_with_the_profile_passes_the_l6_profile_checks(profile: str, tmp_path: Path) -> None:
+    """L6 reads ``max_parallel_invocations`` from handler-runtime ``/v1/info`` (``limits.defaults``, a
+    ``PlatformLimits`` document). CI run 36908333153 read ``limits.concurrency`` and got ``None``. Here the real
+    runtime app (subprocess backend, no Docker) runs with the profile as its ``LIMITS_FILE``, like the stack."""
+    from fastapi.testclient import TestClient
+
+    settings = jane_module("handler_runtime.settings").Settings(
+        log_format="console",
+        sandbox_backend="subprocess",
+        allow_unsafe_subprocess=True,
+        package_cache_dir=tmp_path / "cache",
+        limits_file=jane_stack.profile_path(profile),
+    )
+    cap = load(profile)["defaults"]["concurrency"]["max_parallel_invocations"]
+    with TestClient(jane_module("handler_runtime.app").build_app(settings)) as client:
+        info = client.get("/v1/info").json()
+    checks = lh.runtime_profile_checks(info, profile, cap)
+    assert [(c["name"], c["value"], c["ok"]) for c in checks] == [
+        ("runtime limits profile = profile", profile, True),
+        ("runtime max_parallel_invocations = profile", cap, True),
+    ]
+    without_profile = {"limits": {"defaults": {"concurrency": {"max_parallel_invocations": cap}}}}
+    assert [c["ok"] for c in lh.runtime_profile_checks(without_profile, profile, cap)] == [False, True]
+    assert m.verdict(lh.runtime_profile_checks({"limits": {"concurrency": {}}}, profile, cap)) == "warn"
 
 
 def test_stack_credentials_and_names_are_isolated() -> None:

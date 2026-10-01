@@ -58,7 +58,7 @@ Docker-сокет із групою, визначеною автоматично
 | S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | **1 Docker e2e пройшов на гілці WP-13** (у `main` не злито); виконання LLM-пакета й форки інших типів ще відкриті |
 | S-M2-02 | Telegram: історія, нові, редагування як ревізії → збереження | 1, 8, 12 | telegram-collector, storage | **1 passed на спільній гілці WP-01a/00a/13** (Telegram — З) |
 | S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | **10 Docker e2e пройшли на `main` `1306ad3`** (`test_m2_discovery.py`; `just e2e`, CI `36694741989`) |
-| S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage | ще не реалізовано в WP-13 |
+| S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage, registry; зміна ціни на testsite — e2e-перемикач (Т) | **3 Docker e2e поспіль пройшли на гілці `wp/13e-price-check`** (`test_m2_prices.py`); в інтеграційну гілку й `main` ще не злито |
 | S-M2-05a | Невідома сторінка: асистент викликає LLM лише з прапорцем (без оркестратора) | 11 | testsite, assistant, llm, postgres | **реалізовано, проходить** (LLM — З) |
 | S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, runtime, storage, llm | **пройдено на гілці `wp/13-llm-routing`** (`test_m2_llm_routing.py`; LLM — З, архіви пакетів — `package-host` Т); сторінки з ін'єкцією на testsite немає |
 | S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator | **2 Docker e2e пройшли на інтеграційній гілці** (лише назва та підказки обходу; LLM і пошук — З); повний `just e2e`: 33 passed, у `main` не злито |
@@ -191,6 +191,52 @@ orchestrator, storage), замінників немає. Крок 1 викона
 partial`). Після каталогу ціну змінено на testsite (або через інший набір сторінок). Перевірка цін
 оновлює лише `price` і `availability`, а `title` та інші поля лишаються. Скасування або зміна одного
 завдання не впливає на інше.
+
+`tests/e2e/test_m2_prices.py::test_s_m2_04_catalog_and_scheduled_price_check_are_separate_tasks`. Модуль
+має власний стек: реальні orchestrator, web-collector, handler-runtime, storage, registry і PostgreSQL
+(**Р**); runtime, колектор і оркестратор беруть пакети з registry. Пакети й документи — приклади WP-14 без
+змін: правила `examples.testsite-web-rules`, `examples.testsite-catalog-extractor` (`completeness: full`),
+`examples.testsite-price-extractor` (`sku`, `price`, `availability`, `completeness: partial`), джерело
+`testsite-shop`, завдання `testsite-catalog` і `testsite-price-check`. Пакети публікуються в registry
+канонічними архівами, дайджести мають збігтися з `examples/packages.lock.json`, версії погоджуються.
+Підключення `raw-files` і `results-pg` беруться з e2e (`tests/e2e/config/storage-connections.json`).
+
+Зміна ціни — **Т**. testsite не вміє змінювати ціну (запит до WP-01), тому контейнер testsite цього стеку
+запускає незмінний код `jane_testsite` через `tests/e2e/jane_e2e/testsite_prices.py` (`compose.prices.yaml`).
+Той додає службовий `PUT /_e2e/products/{slug}`: ціна, наявність або назва одного товару в пам'яті, обхідник
+його не бачить. URL товарів не змінюються, тож обидва завдання пишуть у ті самі сутності.
+
+1. **Каталог.** Ручний запуск `testsite-catalog`: 23 матеріали, 23 RAW у `raw-files`, 16 повних карток
+   (`sku`, `title`, `price`, `availability`, `category`, `url` — значення з моделі testsite), `version = 1`,
+   в історії кожної — один запис `completeness: full` від екстрактора каталогу.
+2. **Скасування каталогу.** `testsite-price-check` створено як у документі: `interval` 3600 с,
+   `next_run_at` ≈ створення + 1 год. Другий запуск каталогу скасовано, коли він уже збирав:
+   `POST /v1/runs/{id}/cancel` → 202 `cancelling` → `cancelled`. Документ, ETag і `next_run_at` перевірки
+   цін не змінилися, її запусків немає, картки ті самі.
+3. **Зміна на сайті й розклад.** На сайті змінено: `phone-alpha` — ціну 299→279 і **назву** на
+   «Phone Alpha 2027»; `phone-gamma` — ціну й наявність (OutOfStock→InStock); `laptop-four` — ціну;
+   `phone-beta`, якого немає в перевірці цін, — ціну. `PUT /v1/tasks/testsite-price-check` з `If-Match`
+   змінює лише `schedule.start_at` (зараз + 15 с), документ, ETag і `next_run_at` каталогу ті самі.
+   Запуск із `trigger: schedule` має з'явитися не пізніше ніж через 30 с після `start_at` (у прогонах —
+   через 0,03–0,88 с). Інших запусків перевірки цін немає, а `next_run_at` після нього дорівнює
+   `start_at` + 3600 с.
+4. **Часткове оновлення.** Запуск перевірки цін: 4 матеріали, 4 `success`, 4 записи, RAW не додається. Для
+   кожного з 4 товарів в історії рівно один запис цього запуску: `completeness: partial`, поля `sku`,
+   `price`, `availability` від `examples.testsite-price-extractor`; `applied_fields` містить `price` і
+   `availability`, але не `title`, `stale_fields` порожній. У стані нові `price` і `availability`, а
+   `title`, `category`, `url` лишилися від каталогу. `phone-alpha` має ціну 279 і назву «Phone Alpha», хоча
+   сторінка вже показує нову. У `field_orders` `price` походить зі спостереження перевірки, `title` — з
+   іншого. 12 карток поза перевіркою, зокрема `phone-beta`, не змінилися.
+5. **Зміна ліміту одного завдання.** `PUT` перевірки цін змінює `crawl.max_pages_per_run` з 20 на 2.
+   Ефективний ліміт `collect` перевірки цін — 2 (рівень `task`), каталогу — як і раніше 200 (`task`);
+   документ і ETag каталогу ті самі. Ручний запуск перевірки цін читає 2 сторінки й оновлює 2 товари.
+   Наступний запуск каталогу читає всі 23 сторінки (+23 RAW) і оновлює повні картки: `phone-alpha`
+   отримує нову назву, `phone-beta` — ціну 339, якої перевірка цін не бачила.
+
+Наприкінці перевіряється список запусків. Каталог: `manual` succeeded, `manual` cancelled, `manual`
+succeeded. Перевірка цін: `schedule` succeeded, `manual` succeeded. Змінні:
+`JANE_E2E_PRICE_CHECK_START_IN_S` (типово 15), `JANE_E2E_SCHEDULE_TOLERANCE_S` (30),
+`JANE_E2E_RUN_TIMEOUT_S` (600).
 
 ### S-M2-05a. Невідома сторінка: асистент і LLM-шлюз напряму
 `tests/e2e/test_m2.py::test_s_m2_05a_unknown_page_goes_to_llm_only_with_flag`. Сторінка

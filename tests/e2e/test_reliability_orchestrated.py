@@ -2,31 +2,39 @@
 partly 13).
 
 Real services: orchestrator (WP-09), web-collector (WP-02), handler-runtime (WP-06), storage (WP-07), testsite
-and PostgreSQL (WP-01). The only stand-in is ``package-host`` (Т): it serves the archive of the LOCAL example
-extractor because orchestrated stages send no ``package_archive``.
+and PostgreSQL (WP-01). The only stand-in is ``package-host`` (Т): orchestrated stages send no
+``package_archive``, so it serves the archives of LOCAL packages - the example extractor and the fixture
+``tests/e2e/packages/e2e.slow-product-extractor``, whose ``params.delay_seconds`` keeps one extraction call in
+flight for a given time.
 
-Faults are injected with Docker only: ``docker kill`` / ``docker start`` of one orchestrator replica (R-01),
-``docker network disconnect`` / ``connect`` of storage (R-03). R-01 additionally ``docker pause``-s storage for a
-few seconds: every worker thread then sits inside a storage call, so the kill always lands on held item leases
-(a worker thread holds at most one) instead of on a random moment between two calls.
+Faults are injected with Docker only: ``docker pause``/``unpause`` and ``docker kill``/``start`` of orchestrator
+replicas (R-01), ``docker network disconnect``/``connect`` of storage (R-03).
 
-Everything the scenarios check is read through the public contracts (orchestrator.v1, collector.v1,
-storage.v1). Two observations are operational, not contract fields: the orchestrator's Prometheus counter
-``jane_orchestrator_leases_reclaimed_total`` (jane-kit ``/metrics``) and its JSON log lines
-``orchestrator started`` (number of worker threads) and ``item lease reclaimed`` (which item was taken over).
+Everything the scenarios assert about the product is read through the public contracts (orchestrator.v1,
+collector.v1, storage.v1). Observations outside the contracts (operational, documented in the service
+READMEs): the orchestrator counter ``jane_orchestrator_leases_reclaimed_total`` and the jane-kit request
+counter ``jane_http_requests_total`` of handler-runtime (``/metrics``); JSON log lines ``orchestrator started``
+(worker threads, engine limits) and ``item lease reclaimed`` of the orchestrator, the jane-kit access log
+``request`` (path, status, duration, time) of handler-runtime; the Docker labels of runtime sandboxes
+(``io.jane.invocation-id``, ``io.jane.package``, ``io.jane.e2e-project``).
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import time
 from collections.abc import Callable
-from typing import Any
+from datetime import datetime
+from pathlib import Path
+from typing import Any, NamedTuple
 
 import pytest
 
-from jane_e2e.clients import JaneClient
+from jane_e2e.clients import CONTRACTS, JaneClient, spec
 from jane_e2e.orchestration import (
+    CONNECTIONS,
     RULES_REF,
     TESTSITE,
     create_source,
@@ -37,15 +45,29 @@ from jane_e2e.orchestration import (
     wait_run,
 )
 from jane_e2e.stack import E2EStack, StackError
+from jane_e2e.steps import sandbox_limits
 from jane_e2e.verify import assert_effects_once, site_paths
+from jane_extractor_sdk.package import build_archive
 
 pytestmark = [pytest.mark.e2e, pytest.mark.milestone("M2")]
 
 POLL_S = 0.2
 STORE_STAGES = frozenset({"store-raw", "store-products"})
 HANDLER_STAGES = frozenset({"store-raw", "extract-products", "store-products"})
+TERMINAL_ITEM = frozenset({"completed", "failed", "skipped", "cancelled"})
 OTHERS = ["/catalog/phones/", "/pages/faq"]  # RAW only: no binding of the extractor matches them
 LEASES_RECLAIMED = "jane_orchestrator_leases_reclaimed_total"
+HTTP_REQUESTS = "jane_http_requests_total"  # jane-kit metrics of every service
+
+PACKAGES = Path(__file__).resolve().parent / "packages"
+MANIFEST_SCHEMA = (CONTRACTS.parent / "schemas" / "package-manifest.schema.json").as_uri() + "#"
+SLOW_EXTRACTOR = "e2e.slow-product-extractor"
+SLOW_PRODUCT = "/product/phone-alpha"
+# Labels of handler-runtime sandboxes (docker_sandbox.py, sandbox.py; the project label comes from
+# JANE_HANDLER_RUNTIME_SANDBOX_LABELS in tests/e2e/compose.e2e.yaml).
+INVOCATION_LABEL = "io.jane.invocation-id"
+PACKAGE_LABEL = "io.jane.package"
+PROJECT_LABEL = "io.jane.e2e-project"
 
 
 # ---------------------------------------------------------------------------- helpers
@@ -81,20 +103,66 @@ def queue_idle(orch: JaneClient) -> bool | None:
     return True
 
 
+def connections_synced(orch: JaneClient, executor: str) -> bool | None:
+    """True when no registered connection waits to be pushed to ``executor`` (``PlatformConnection``)."""
+    for conn in CONNECTIONS:
+        r = orch.api("orchestrator").get(f"/v1/connections/{conn['connection_id']}")
+        assert r.status_code == 200, r.text
+        if any(
+            e["executor"] == executor and e["sync_status"] == "pending" for e in r.json().get("executors", [])
+        ):
+            return None
+    return True
+
+
+def effective_limits(orch: JaneClient, task_id: str, stage_id: str) -> dict[str, Any]:
+    r = orch.api("orchestrator").get(
+        "/v1/limits/effective", params={"task_id": task_id, "stage_id": stage_id}
+    )
+    assert r.status_code == 200, r.text
+    return dict(r.json()["limits"])
+
+
+_PROM_LINE = re.compile(r"^(?P<name>[A-Za-z_:][A-Za-z0-9_:]*)(?:\{(?P<labels>[^}]*)\})?\s+(?P<value>\S+)")
+_PROM_LABEL = re.compile(r'(\w+)="((?:[^"\\]|\\.)*)"')
+
+
+def prom_value(text: str, name: str, **labels: str) -> float | None:
+    """Sum of the samples ``name`` whose labels include ``labels`` (Prometheus text format); None if absent."""
+    found: float | None = None
+    for line in text.splitlines():
+        m = _PROM_LINE.match(line)
+        if m is None or m["name"] != name:
+            continue
+        sample = dict(_PROM_LABEL.findall(m["labels"] or ""))
+        if all(sample.get(k) == v for k, v in labels.items()):
+            found = (found or 0.0) + float(m["value"])
+    return found
+
+
+def metrics_text(service: JaneClient) -> str:
+    r = service.http.get("/metrics")
+    assert r.status_code == 200, r.text
+    return r.text
+
+
 def reclaimed_leases(orch: JaneClient) -> float:
     """Lease take-overs counted by one orchestrator replica since its start (jane-kit ``/metrics``)."""
-    r = orch.http.get("/metrics")
-    assert r.status_code == 200, r.text
-    for line in r.text.splitlines():
-        if line.startswith(LEASES_RECLAIMED + " "):
-            return float(line.split()[1])
-    raise AssertionError(f"{LEASES_RECLAIMED} is not exported by {orch.base_url}/metrics")
+    value = prom_value(metrics_text(orch), LEASES_RECLAIMED)
+    assert value is not None, f"{LEASES_RECLAIMED} is not exported by {orch.base_url}/metrics"
+    return value
 
 
-def log_records(stack: E2EStack, service: str, index: int) -> list[dict[str, Any]]:
-    """JSON log records of one replica (``JANE_ORCHESTRATOR_LOG_FORMAT=json``)."""
+def runtime_invocations(runtime: JaneClient, status: int) -> float:
+    """``POST /v1/invocations`` answered with ``status`` by one runtime instance since its start."""
+    text = metrics_text(runtime)
+    return prom_value(text, HTTP_REQUESTS, method="POST", route="/v1/invocations", status=str(status)) or 0.0
+
+
+def log_records(stack: E2EStack, service: str, index: int = 1, *, echo: bool = True) -> list[dict[str, Any]]:
+    """JSON log records of one replica (jane-kit JSON logs; ``JANE_ORCHESTRATOR_LOG_FORMAT=json``)."""
     out = []
-    for line in stack.logs(service, index).splitlines():
+    for line in stack.logs(service, index, echo=echo).splitlines():
         line = line.strip()
         if line.startswith("{"):
             try:
@@ -104,11 +172,29 @@ def log_records(stack: E2EStack, service: str, index: int) -> list[dict[str, Any
     return out
 
 
-def worker_threads(stack: E2EStack, index: int) -> int:
-    """Worker threads of one orchestrator replica, from its own start-up log line."""
+def log_time(record: dict[str, Any]) -> datetime:
+    """Time of a log record (``ts``, UTC); every container of the stack reads the same engine clock."""
+    return datetime.fromisoformat(str(record["ts"]))
+
+
+def started_record(stack: E2EStack, index: int) -> dict[str, Any]:
     started = [r for r in log_records(stack, "orchestrator", index) if r.get("msg") == "orchestrator started"]
     assert started, f"orchestrator#{index}: no 'orchestrator started' log line"
-    return int(started[-1]["workers"])
+    return started[-1]
+
+
+def worker_threads(stack: E2EStack, index: int) -> int:
+    """Worker threads of one orchestrator replica, from its own start-up log line."""
+    return int(started_record(stack, index)["workers"])
+
+
+def engine_limits(stack: E2EStack, index: int) -> dict[str, Any]:
+    """Effective ``engine`` limits of one orchestrator replica (lease, heartbeat, polling), from its start-up
+    log line - the e2e overlay shortens them, so the scenarios derive their timing from these values."""
+    record = started_record(stack, index)
+    engine = ((record.get("limits") or {}).get("limits") or {}).get("engine")
+    assert isinstance(engine, dict) and "lease_ms" in engine, record.get("limits")
+    return engine
 
 
 def task_with(
@@ -116,6 +202,39 @@ def task_with(
 ) -> dict[str, Any]:
     source_id = task_id = f"e2e-{run_id}-{name}"
     return m1_task(task_id, source_id, urls, extractor, limits=limits)
+
+
+def local_package(stack: E2EStack, name: str) -> dict[str, Any]:
+    """Fixture package of ``tests/e2e/packages``: manifest checked against the contract, canonical archive
+    published to the ``package-host`` stand-in (Т); returns the pinned ``PackageRef`` with its digest."""
+    package_dir = PACKAGES / name
+    manifest = json.loads((package_dir / "jane-package.json").read_text(encoding="utf-8"))
+    spec("registry").validate_at(MANIFEST_SCHEMA, manifest, f"{name}/jane-package.json")
+    archive = build_archive(package_dir)
+    stack.publish_local_package(manifest["package_id"], manifest["version"], archive)
+    return {
+        "package_id": manifest["package_id"],
+        "version": manifest["version"],
+        "digest": "sha256:" + hashlib.sha256(archive).hexdigest(),
+    }
+
+
+def slow_extraction(task: dict[str, Any], delay_s: float) -> None:
+    """``extract-products`` of an M1 task built with the slow fixture: one call lasts ``delay_s`` and the
+    runtime still answers it synchronously (``sync_response_max_ms`` above the call), so its delivery key stays
+    ``in_progress`` in the runtime for the whole call instead of turning into a stored 202 + job."""
+    [stage] = [s for s in task["stages"] if s["stage_id"] == "extract-products"]
+    wall = max(int(sandbox_limits()["sandbox"]["wall_time_ms"]), int((delay_s + 30) * 1000))
+    stage["params"] = {"delay_seconds": delay_s}
+    stage["limits"] = {
+        "sandbox": {"wall_time_ms": wall},
+        "timeouts": {"sync_response_max_ms": wall + 10_000, "invocation_timeout_ms": wall + 30_000},
+    }
+
+
+def sandbox_labels(stack: E2EStack, package: dict[str, Any]) -> dict[str, str]:
+    """Labels of the runtime sandboxes of ``package`` in this stack."""
+    return {PROJECT_LABEL: stack.project, PACKAGE_LABEL: f"{package['package_id']}@{package['version']}"}
 
 
 def backoff_ms(policy: dict[str, Any], attempt: int) -> float:
@@ -126,22 +245,23 @@ def backoff_ms(policy: dict[str, Any], attempt: int) -> float:
 
 # ---------------------------------------------------------------------------- R-01
 @pytest.mark.criteria(8)
-def test_r_01_killed_orchestrator_worker_lease_taken_over_without_double_effects(
+def test_r_01_lease_lost_during_active_call_taken_over_with_409_without_spent_attempt(
     stack: E2EStack,
     orchestrated: JaneClient,
     client: Callable[..., JaneClient],
-    extractor: dict[str, Any],
     run_id: str,
 ) -> None:
-    """R-01: two orchestrator replicas on one database; replica 1 is killed (SIGKILL) in the middle of the
-    chain while its workers hold item leases, then restarted. The run completes, every effect happens once,
-    replica 2 takes the expired leases over and the take-over does not spend retry attempts."""
-    storage = client("storage")
-    products = site_paths("product")[:8]
+    """R-01: two orchestrator replicas on one database. Replica 1 holds the lease of a long extraction call
+    and is killed (SIGKILL) while handler-runtime still executes that call, then it is restarted. Replica 2
+    takes the expired lease over and repeats the call with the same delivery key: the runtime answers 409
+    ``idempotency_in_progress`` until the orphaned call ends and then replays its result. The take-over
+    spends no retry attempt, the handler runs once and every effect happens once."""
+    storage, runtime = client("storage"), client("handler-runtime")
+    slow = local_package(stack, SLOW_EXTRACTOR)
+    products = [SLOW_PRODUCT]
     urls = [TESTSITE + p for p in products + OTHERS]
-    # a slow collection (contract limit, 2 pages/s) keeps the run in progress around the kill
-    task = task_with(run_id, "r01", extractor, urls, {"rate": {"requests_per_second_per_host": 2}})
-    # retries are available, so `attempts == 1` below means the kill did not consume any of them
+    task = task_with(run_id, "r01", slow, urls, {})
+    # retries are available, so `attempts == 1` below means the take-over did not consume any of them
     task["retries"] = {
         "max_attempts": 3,
         "initial_backoff_ms": 500,
@@ -150,89 +270,92 @@ def test_r_01_killed_orchestrator_worker_lease_taken_over_without_double_effects
         "jitter": False,
     }
     source_id, task_id = task["input"]["source_id"], task["task_id"]
+    sandbox = sandbox_labels(stack, slow)
 
     stack.scale("orchestrator", 2)
-    storage_paused = False
+    replica1, replica2 = client("orchestrator", 1), client("orchestrator", 2)
+    paused = False
     try:
-        survivor = client("orchestrator", 2)  # replica 1 dies: every call of the scenario goes to replica 2
         workers = worker_threads(stack, 1)
+        engine = engine_limits(stack, 1)
         assert workers >= 1 and worker_threads(stack, 2) == workers
-        # the counting argument below needs workers that serve this run only
-        wait_for("no other run in the orchestrator queue", lambda: queue_idle(survivor), timeout_s=300)
-        reclaimed_before = reclaimed_leases(survivor)
-        create_source(survivor, source_id)
-        create_task(survivor, task)
-        run = start_run(survivor, task_id)
+        assert engine_limits(stack, 2)["lease_ms"] == engine["lease_ms"]
+        lease_s = engine["lease_ms"] / 1000
+        # the orphaned call must outlive the kill, the lease expiry and the claim by replica 2 by a wide
+        # margin (relative to the configured lease; the fixture accepts at most 60 s)
+        delay_s = min(60.0, 3 * lease_s + 6)
+        slow_extraction(task, delay_s)
 
-        # 1. mid-chain: the run is running and part of the materials is already stored
-        def first_raw_stored() -> bool | None:
-            view = run_view(survivor, run)
-            done = view["status"] == "running" and any(
-                s["stage_id"] == "store-raw" and s.get("counts", {}).get("success", 0) >= 1
-                for s in view.get("stages", [])
-            )
-            return True if done else None
+        wait_for("no other run in the orchestrator queue", lambda: queue_idle(replica1), timeout_s=300)
+        reclaimed_before = reclaimed_leases(replica2)
+        conflicts_before = runtime_invocations(runtime, 409)
+        runtime_offset = len(log_records(stack, "handler-runtime"))
+        replica2_offset = len(log_records(stack, "orchestrator", 2))
+        create_source(replica1, source_id)
+        create_task(replica1, task)
+        limits = effective_limits(replica1, task_id, "extract-products")
+        assert limits["timeouts"]["sync_response_max_ms"] > delay_s * 1000, limits
+        assert limits["sandbox"]["wall_time_ms"] > delay_s * 1000, limits
 
-        wait_for("first RAW stored while the run is running", first_raw_stored)
+        # replica 2 stays frozen until the extraction call runs, so replica 1 is the one holding its lease
+        stack.pause_instance("orchestrator", 2)
+        paused = True
+        run = start_run(replica1, task_id)
 
-        # 2. storage paused: each worker thread that claims a storage item stays inside that call (lease
-        #    extended by heartbeats) until every thread of both replicas is there
-        stack.pause_instance("storage")
-        storage_paused = True
+        # 1. replica 1 is inside the extraction call: the sandbox of the slow package runs
+        seen: set[str] = set()  # invocation ids of every sandbox of the slow package seen running
 
-        def all_threads_in_storage_calls() -> set[str] | None:
-            running = {
-                i["item_id"]
-                for i in handler_items(survivor, run)
-                if i["stage_id"] in STORE_STAGES and i["status"] == "running"
-            }
-            assert len(running) <= 2 * workers, running  # a worker thread holds at most one item lease
-            return running if len(running) == 2 * workers else None
+        def sandbox_running() -> set[str] | None:
+            active = set(stack.running_label_values(sandbox, INVOCATION_LABEL))
+            seen.update(active)
+            return active or None
 
-        held = wait_for(f"{2 * workers} storage calls in flight", all_threads_in_storage_calls)
-        run_before_kill = run_view(survivor, run)
-        assert run_before_kill["status"] == "running", run_before_kill
+        wait_for("slow extraction running in a sandbox", sandbox_running, timeout_s=300)
+        [extract] = [i for i in list_items(replica1, run, "extract-products") if i["status"] != "skipped"]
+        assert extract["status"] == "running" and extract["attempts"] == 1, extract
 
-        # 3. SIGKILL of replica 1: it holds exactly `workers` of the `held` leases
+        # 2. replica 2 resumes; replica 1 dies (SIGKILL) with the call in flight
+        stack.unpause_instance("orchestrator", 2)
+        paused = False
         stack.kill_instance("orchestrator", 1)
-        stack.unpause_instance("storage")
-        storage_paused = False
 
-        # 4. replica 2 finishes its own calls at once; the leases of the dead replica stay `running`
-        #    until they expire (lease_ms, e2e overlay) - that set is what replica 1 held
-        def dead_replica_leases() -> set[str] | None:
-            running = {
-                i["item_id"]
-                for i in handler_items(survivor, run)
-                if i["item_id"] in held and i["status"] == "running"
-            }
-            return running if len(running) <= workers else None
+        # 3. replica 2 reclaims the expired lease of the extraction item
+        def reclaim_record() -> dict[str, Any] | None:
+            seen.update(stack.running_label_values(sandbox, INVOCATION_LABEL))
+            for r in log_records(stack, "orchestrator", 2, echo=False)[replica2_offset:]:
+                if r.get("msg") == "item lease reclaimed" and r.get("item_id") == extract["item_id"]:
+                    return r
+            return None
 
-        stale = wait_for("own calls of replica 2 finished", dead_replica_leases, timeout_s=60)
-        assert len(stale) == workers, (stale, held)
+        reclaim = wait_for("extraction lease reclaimed by replica 2", reclaim_record, timeout_s=lease_s + 120)
+        active_at_reclaim = set(stack.running_label_values(sandbox, INVOCATION_LABEL))
+        seen.update(active_at_reclaim)
 
-        # 5. take-over: replica 2 claims the expired leases and completes those items
-        def taken_over() -> list[dict[str, Any]] | None:
-            items = [i for i in handler_items(survivor, run) if i["item_id"] in held]
-            return items if all(i["status"] == "completed" for i in items) else None
+        # 4. replica 2 completes the item with the result of the orphaned call
+        def extraction_finished() -> dict[str, Any] | None:
+            seen.update(stack.running_label_values(sandbox, INVOCATION_LABEL))
+            [item] = [i for i in list_items(replica2, run, "extract-products") if i["status"] != "skipped"]
+            return item if item["status"] in TERMINAL_ITEM else None
 
-        held_items = wait_for("expired leases taken over and completed", taken_over, timeout_s=120)
-        reclaimed = reclaimed_leases(survivor) - reclaimed_before
-        reclaim_log = {
-            r["item_id"]
-            for r in log_records(stack, "orchestrator", 2)
-            if r.get("msg") == "item lease reclaimed"
-        }
+        taken_over = wait_for(
+            "extraction finished by replica 2", extraction_finished, timeout_s=delay_s + 180
+        )
 
-        # 6. restart of the killed replica; it rejoins the same queue
+        # 5. restart of the killed replica; it rejoins the same queue
         stack.start_instance("orchestrator", 1)
         stack.wait_healthy("orchestrator", 1)
-        final = wait_run(survivor, run)
+        final = wait_run(replica2, run)
         restarted_view = run_view(client("orchestrator", 1), run)
-        items = handler_items(survivor, run)  # replica 2 is removed by the scale-down below
+        items = handler_items(replica2, run)  # replica 2 is removed by the scale-down below
+        reclaimed = reclaimed_leases(replica2) - reclaimed_before
+        reclaim_log = {
+            r["item_id"]
+            for r in log_records(stack, "orchestrator", 2)[replica2_offset:]
+            if r.get("msg") == "item lease reclaimed"
+        }
     finally:
-        if storage_paused:
-            stack.unpause_instance("storage")
+        if paused:
+            stack.unpause_instance("orchestrator", 2)
         try:
             if not stack.state("orchestrator", 1).get("Running"):
                 stack.start_instance("orchestrator", 1)
@@ -240,9 +363,24 @@ def test_r_01_killed_orchestrator_worker_lease_taken_over_without_double_effects
             pass
         stack.scale("orchestrator", 1)
 
+    conflicts = runtime_invocations(runtime, 409) - conflicts_before
+    calls = [
+        r
+        for r in log_records(stack, "handler-runtime")[runtime_offset:]
+        if r.get("msg") == "request" and r.get("method") == "POST" and r.get("path") == "/v1/invocations"
+    ]
+    in_progress = [r for r in calls if r.get("status") == 409]
+    answered = [r for r in calls if r.get("status") == 200]
+    assert answered, calls
+    orphan = max(answered, key=lambda r: float(r.get("duration_ms", 0)))  # the call replica 1 left behind
     print(
-        f"\nR-01: workers/replica={workers} held={len(held)} stale(replica 1)={len(stale)} "
-        f"reclaimed={reclaimed:g} reclaim-log&held={len(reclaim_log & held)} run={final['status']}"
+        f"\nR-01: workers/replica={workers} lease={lease_s:g}s call={delay_s:g}s "
+        f"sandboxes={sorted(seen)} active at reclaim={sorted(active_at_reclaim)}"
+        f"\nR-01: reclaim(replica 2)={reclaim['ts']} 409 answers={len(in_progress)} (metric +{conflicts:g}) "
+        f"first={in_progress[0]['ts'] if in_progress else None} last={in_progress[-1]['ts'] if in_progress else None}"
+        f"\nR-01: orphaned call ended={orphan['ts']} after {orphan['duration_ms']} ms; item "
+        f"attempts={taken_over['attempts']} status={taken_over['status']}/{taken_over.get('result_status')} "
+        f"invocation={taken_over.get('invocation_id')} reclaimed={reclaimed:g} run={final['status']}"
     )
     assert final["status"] == "succeeded", final
     assert restarted_view["status"] == "succeeded", restarted_view
@@ -252,11 +390,21 @@ def test_r_01_killed_orchestrator_worker_lease_taken_over_without_double_effects
     assert stages["extract-products"].get("success") == len(products), stages
     assert stages["store-products"].get("success") == len(products), stages
 
-    # lease taken over: exactly the leases of the killed replica, by replica 2
-    assert reclaimed == workers, (reclaimed, workers)
-    assert reclaim_log & held == stale, (reclaim_log, held, stale)
-    # retries not spent on the kill: the take-over is not an attempt
-    assert all(i["attempts"] == 1 and i["result_status"] == "success" for i in held_items), held_items
+    # the lease of the call in flight was taken over by replica 2 while that call still ran in the runtime
+    assert reclaimed >= 1, reclaimed
+    assert extract["item_id"] in reclaim_log, (extract, reclaim_log)
+    assert reclaim_log <= {i["item_id"] for i in items}, (reclaim_log, items)
+    assert float(orphan["duration_ms"]) >= delay_s * 1000, orphan
+    assert log_time(reclaim) < log_time(orphan), (reclaim, orphan)
+    # the repeated call met the delivery key in progress: 409, answered before the orphaned call ended
+    assert conflicts >= 1 and in_progress, (conflicts, calls)
+    assert all(log_time(r) >= log_time(reclaim) for r in in_progress), (reclaim, in_progress)
+    assert log_time(in_progress[0]) < log_time(orphan), (in_progress[0], orphan)
+    # the handler ran once: one sandbox, and the item carries the result of exactly that invocation
+    assert seen == {taken_over.get("invocation_id")}, (seen, taken_over)
+    # the 409 did not spend an attempt; nothing else did either
+    assert taken_over["status"] == "completed" and taken_over.get("result_status") == "success", taken_over
+    assert taken_over["attempts"] == 1, taken_over
     assert all(i["status"] == "completed" for i in items), [i for i in items if i["status"] != "completed"]
     assert all(i["attempts"] == 1 for i in items), [(i["stage_id"], i["attempts"]) for i in items]
     # every effect once: one RAW object per material, one entity and one history event per product
@@ -264,79 +412,161 @@ def test_r_01_killed_orchestrator_worker_lease_taken_over_without_double_effects
 
 
 # ---------------------------------------------------------------------------- R-03
+# Delays well above the worker polling interval and the API latency, so that the bounds read by polling stay
+# decisive on a loaded host (3 s, then 6 s; jitter off to compare with exact values).
+R03_POLICY = {
+    "max_attempts": 8,
+    "initial_backoff_ms": 3000,
+    "backoff_multiplier": 2,
+    "max_backoff_ms": 12000,
+    "jitter": False,
+}
+R03_HOLD_S = 15.0  # the extraction keeps store-products back until the partition is in place
+R03_POLL_S = 0.1  # target period of the polling: the resolution of both bounds of every wait
+# The orchestrator schedules `available_at = now() + delay` with now() = start of the retry transaction, so the
+# visible `retrying` state may be shorter than the delay by the duration of that transaction.
+R03_COMMIT_TOLERANCE_MS = 250
+
+
+class Poll(NamedTuple):
+    sent: float  # time.monotonic() before the request
+    received: float  # time.monotonic() after the response
+    item: dict[str, Any] | None  # the store-products item (None until it exists)
+    running: int  # items of the run in status `running`
+
+
+class RetryWait(NamedTuple):
+    attempt: int  # the failed attempt the item waits after
+    delay_ms: float  # policy delay after that attempt
+    lower_ms: float  # proven minimum of the wait (last poll still `retrying` - first poll `retrying`)
+    upper_ms: float  # proven maximum (first poll of the next attempt - last poll before `retrying`)
+    polls: int  # polls that saw the item `retrying`
+    isolated: bool  # no item of the run was running at any of those polls
+
+
+def retry_waits(polls: list[Poll], policy: dict[str, Any]) -> list[RetryWait]:
+    """Bounds of every observed wait between a failed attempt and the claim of the next one.
+
+    A poll reads the database at some moment between ``sent`` and ``received``. With ``a`` the first and ``b``
+    the last poll that saw the item ``retrying`` after attempt ``n``, the wait began after poll ``a - 1`` was
+    sent and before ``a`` was received, and ended after ``b`` was sent and before ``b + 1`` was received.
+    """
+    waits: list[RetryWait] = []
+    retrying: list[tuple[int, dict[str, Any]]] = []
+    for n, p in enumerate(polls):
+        if p.item is not None and p.item["status"] == "retrying":
+            retrying.append((n, p.item))
+    for attempt in sorted({int(item["attempts"]) for _, item in retrying}):
+        idx = [n for n, item in retrying if item["attempts"] == attempt]
+        a, b = idx[0], idx[-1]
+        if a == 0 or b + 1 >= len(polls):
+            continue  # no poll before or after the wait: one of the bounds is unknown
+        after = polls[b + 1].item
+        assert after is not None and after["attempts"] >= attempt + 1, (attempt, after)
+        waits.append(
+            RetryWait(
+                attempt=attempt,
+                delay_ms=backoff_ms(policy, attempt),
+                lower_ms=(polls[b].sent - polls[a].received) * 1000,
+                upper_ms=(polls[b + 1].received - polls[a - 1].sent) * 1000,
+                polls=b - a + 1,
+                isolated=all(p.running == 0 for p in polls[a : b + 1]),
+            )
+        )
+    return waits
+
+
 @pytest.mark.criteria(8)
-def test_r_03_network_partition_to_storage_retried_with_backoff_without_duplicates(
+def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_duplicates(
     stack: E2EStack,
     orchestrated: JaneClient,
     client: Callable[..., JaneClient],
-    extractor: dict[str, Any],
     run_id: str,
 ) -> None:
-    """R-03: storage is disconnected from the stack network in the middle of a run and reconnected later.
-    The orchestrator retries its storage items with the configured backoff; after the partition the run
-    completes and nothing is stored twice."""
-    orch, storage = orchestrated, client("storage")
-    products = site_paths("product")[:6]
-    urls = [TESTSITE + p for p in products + OTHERS]
-    policy = {
-        "max_attempts": 8,
-        "initial_backoff_ms": 1000,
-        "backoff_multiplier": 2,
-        "max_backoff_ms": 4000,
-        "jitter": False,
-    }
-    task = task_with(run_id, "r03", extractor, urls, {"rate": {"requests_per_second_per_host": 4}})
+    """R-03: storage is disconnected from the stack network in the middle of a run - the RAW of the material
+    is already stored, its extraction still runs - and reconnected after two failed attempts of
+    ``store-products``. That storage item is then the only unfinished item of the run, so a worker and the
+    stage slot are free while it waits: frequent polling of the items API bounds each wait from both sides
+    and compares it with the configured backoff. After the partition the run completes, nothing twice."""
+    orch = orchestrated
+    slow = local_package(stack, SLOW_EXTRACTOR)
+    policy = dict(R03_POLICY)
+    products = [SLOW_PRODUCT]
+    task = task_with(run_id, "r03", slow, [TESTSITE + p for p in products], {})
+    slow_extraction(task, R03_HOLD_S)
     for stage in task["stages"]:
         if stage["stage_id"] in STORE_STAGES:
             stage["retries"] = policy
             # a call on a pooled connection to the vanished peer fails by this timeout, not by the default
-            stage["limits"] = {"timeouts": {"invocation_timeout_ms": 10_000}}
+            stage["limits"] = {"timeouts": {"invocation_timeout_ms": 5_000}}
     source_id, task_id = task["input"]["source_id"], task["task_id"]
+    engine = engine_limits(stack, 1)
+    poll_ms = float(engine["poll_interval_ms"])  # an idle worker looks for work this often
+    # half of the shortest delay must be well above the claim latency of a free worker
+    assert backoff_ms(policy, 1) / 2 > poll_ms, (policy, engine)
+
+    wait_for("no other run in the orchestrator queue", lambda: queue_idle(orch), timeout_s=300)
+    # no connection push to storage may be pending: it would occupy a worker during the partition
+    wait_for("connections synced to storage", lambda: connections_synced(orch, "storage"), timeout_s=120)
     create_source(orch, source_id)
     create_task(orch, task)
     run = start_run(orch, task_id)
 
-    def first_raw_stored() -> bool | None:
-        items = handler_items(orch, run)
-        return (
-            True if any(i["stage_id"] == "store-raw" and i["status"] == "completed" for i in items) else None
-        )
+    def raw_stored_extraction_running() -> bool | None:
+        by_stage = {i["stage_id"]: i for i in handler_items(orch, run)}
+        raw, extract = by_stage.get("store-raw"), by_stage.get("extract-products")
+        done = raw is not None and raw["status"] == "completed" and extract is not None
+        return True if done and extract is not None and extract["status"] == "running" else None
 
-    wait_for("first RAW stored", first_raw_stored)
+    wait_for("RAW stored while the extraction runs", raw_stored_extraction_running, timeout_s=300)
 
-    # (t_sent, t_received, attempts, status) of every storage item, polled while storage is unreachable
-    polls: dict[str, list[tuple[float, float, int, str]]] = {}
-    errors: list[dict[str, Any]] = []
+    polls: list[Poll] = []
+    published_before = stack.url("storage")
     stack.disconnect("storage")
     try:
-        deadline = time.monotonic() + 180
+        # the partition is in place before store-products made its first attempt
+        before = [i for i in handler_items(orch, run) if i["stage_id"] == "store-products"]
+        assert all(i["attempts"] == 0 for i in before), before
+        deadline = time.monotonic() + R03_HOLD_S + 300
         while True:
             sent = time.monotonic()
             items = handler_items(orch, run)
             received = time.monotonic()
-            for i in items:
-                if i["stage_id"] in STORE_STAGES:
-                    polls.setdefault(i["item_id"], []).append((sent, received, i["attempts"], i["status"]))
-                    if i["status"] == "retrying" and i.get("error"):
-                        errors.append(i["error"])
-            if errors and any(i["stage_id"] in STORE_STAGES and i["attempts"] >= 3 for i in items):
-                break  # at least two failed attempts separated by the backoff
-            assert time.monotonic() < deadline, (
-                "no storage item reached its third attempt during the partition"
-            )
-            assert run_view(orch, run)["status"] == "running"
-            time.sleep(POLL_S)
+            target = [i for i in items if i["stage_id"] == "store-products"]
+            assert len(target) <= 1, target
+            running = sum(1 for i in items if i["status"] == "running")
+            polls.append(Poll(sent, received, target[0] if target else None, running))
+            if target and target[0]["attempts"] >= 3:
+                break  # two failed attempts and two waits observed
+            if time.monotonic() > deadline:
+                raise AssertionError(f"store-products did not reach its third attempt: {run_view(orch, run)}")
+            time.sleep(max(0.0, R03_POLL_S - (received - sent)))
     finally:
         stack.reconnect("storage")
 
     final = wait_run(orch, run)
+    items = handler_items(orch, run)
+    # storage is read from the host only now, through its current published port: after the reconnect
+    # Docker Engine on Linux may publish it on another host port (or lose the binding - then it restarts it)
+    published_after = stack.published_url("storage")
+    storage = client("storage")
+    errors = [
+        p.item["error"]
+        for p in polls
+        if p.item is not None and p.item["status"] == "retrying" and p.item.get("error")
+    ]
+    waits = retry_waits(polls, policy)
+    latency_ms = sorted((p.received - p.sent) * 1000 for p in polls)
     print(
-        f"\nR-03: retrying errors seen={len(errors)} codes={sorted({str(e.get('code')) for e in errors})} "
-        f"max attempts during partition={max(p[2] for h in polls.values() for p in h)} run={final['status']}"
+        f"\nR-03: polls={len(polls)} poll latency ms median={latency_ms[len(latency_ms) // 2]:.0f} "
+        f"max={latency_ms[-1]:.0f}; worker poll={poll_ms:g} ms; codes={sorted({str(e.get('code')) for e in errors})} "
+        f"run={final['status']}; storage on the host {published_before} -> {published_after}"
         f"\nR-03: failure details={sorted({str(e.get('detail'))[:120] for e in errors})}"
+        "\nR-03: waits (attempt, policy delay ms, lower..upper ms, polls, isolated): "
+        f"{[(w.attempt, w.delay_ms, round(w.lower_ms), round(w.upper_ms), w.polls, w.isolated) for w in waits]}"
     )
     assert final["status"] == "succeeded", final
-    assert final["counters"]["materials"] == len(urls), final
+    assert final["counters"]["materials"] == len(products), final
 
     # the orchestrator saw the partition as a retryable failure of the storage executor
     assert errors
@@ -344,32 +574,26 @@ def test_r_03_network_partition_to_storage_retried_with_backoff_without_duplicat
     assert all(e.get("code") == "upstream_unavailable" for e in errors), errors
     assert all((e.get("details") or {}).get("executor") == "storage" for e in errors), errors
 
-    # backoff: the gap between two claims of an item is at least the policy delay. Only upper bounds of the
-    # true gap are known from polling (previous poll sent .. first poll that sees the next attempt received),
-    # so an upper bound below the delay proves a retry without backoff.
-    checked: list[tuple[int, float, float]] = []
-    for history in polls.values():
-        first_seen: dict[int, int] = {}
-        for n, (_, _, attempts, _) in enumerate(history):
-            first_seen.setdefault(attempts, n)
-        for attempt in range(1, max(first_seen) if first_seen else 1):
-            a, b = first_seen.get(attempt), first_seen.get(attempt + 1)
-            if a is None or b is None or a == 0:
-                continue
-            upper_ms = (history[b][1] - history[a - 1][0]) * 1000
-            checked.append((attempt, upper_ms, backoff_ms(policy, attempt)))
-    print(
-        f"R-03: claim gaps (attempt, upper bound ms, policy delay ms): {[(a, round(u), d) for a, u, d in checked]}"
-    )
-    assert any(attempt >= 2 for attempt, _, _ in checked), (checked, polls)
-    assert all(upper >= delay for _, upper, delay in checked), checked
+    # backoff. The API exposes neither `available_at` nor a claim history, so each wait is known only between
+    # two bounds read by polling; the causal claim is limited to what these bounds prove.
+    assert {1, 2} <= {w.attempt for w in waits}, (waits, polls)
+    for w in waits:
+        # isolated: no item of the run was running during the wait, so a worker and the stage slot were free
+        # (the queue held no other run, no connection push was pending)
+        assert w.isolated, w
+        # not claimed before the policy delay had elapsed
+        assert w.upper_ms >= w.delay_ms - R03_COMMIT_TOLERANCE_MS, w
+        # held back for at least half of the delay although a free worker looked for work every poll_ms
+        assert w.lower_ms >= w.delay_ms / 2, w
+        # and claimed within the order of the delay - the wait is not explained by something slower
+        assert w.upper_ms <= 2 * w.delay_ms + 5_000, w
 
-    # after the partition: everything completed within the policy, retried items included, nothing twice
-    items = handler_items(orch, run)
+    # after the partition: everything completed within the policy, the retried item included, nothing twice
     assert all(i["status"] == "completed" and i["result_status"] == "success" for i in items), items
-    store_attempts = [i["attempts"] for i in items if i["stage_id"] in STORE_STAGES]
-    assert max(store_attempts) >= 3 and max(store_attempts) <= policy["max_attempts"], store_attempts
-    assert_effects_once(storage, source_id, materials=len(urls), products=len(products))
+    attempts = {i["stage_id"]: i["attempts"] for i in items}
+    assert attempts["store-raw"] == 1 and attempts["extract-products"] == 1, attempts
+    assert 3 <= attempts["store-products"] <= policy["max_attempts"], attempts
+    assert_effects_once(storage, source_id, materials=len(products), products=len(products))
 
 
 # ---------------------------------------------------------------------------- R-08

@@ -1,4 +1,9 @@
-"""Parse a testsite product after an optional, task-configured delay."""
+"""Parse a testsite product after an optional, task-configured delay (``params.delay_seconds``).
+
+The delay keeps one invocation in flight long enough for the reliability scenarios: R-01 lets an
+orchestrator lease expire while the call is still running, R-03 partitions storage while the extraction
+still holds the next storage stage back.
+"""
 
 from __future__ import annotations
 
@@ -13,10 +18,9 @@ _LD_JSON = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.
 
 
 def extract(material: Material, params: dict[str, Any], ctx: Context) -> ExtractResult:
-    delay = float(params["delay_seconds"])
-    if delay:
-        print("e2e-slow-extractor-started", flush=True)
-    time.sleep(delay)
+    delay = float(params.get("delay_seconds", 0))
+    if delay > 0:
+        time.sleep(delay)
     for raw in _LD_JSON.findall(ctx.text()):
         try:
             product = json.loads(raw)

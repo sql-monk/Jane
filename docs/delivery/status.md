@@ -345,3 +345,15 @@ L1 одиночний збір — 48/1 с. L1, L3–L5, L7–L8 пройшли,
   Некритичні зауваження рецензента: перевірка `field_orders` умовна (поле необов'язкове за контрактом),
   `task_etag in (None, …)` слабка. `just check` автора впав лише на відомих часово-чутливих unit-тестах
   (registry scanner, discovery `test_resume`, web-collector `test_contract`) — доручено `wp/05a-timing-tests`.
+- WP-01b (повний профіль як `LIMITS_FILE`): `wp/01b-limits-profile-file` `99e9ddb` — незалежний wp-reviewer прийняв
+  (jane-kit + профілі 163 passed, 5 сервісів 31 passed, мутація схеми ловиться контрактним тестом, строгі рівні
+  запитів не послаблено). Злито в інтеграційну гілку `53250c7`. storage, handler-runtime, registry, llm, assistant
+  тепер стартують із профілем; 5 колишніх xfail проходять. Закриває знахідку 1 і перший запит у `WP-14.md`.
+  Відкриті запити: **WP-10** — `provider.*` llm оголошено контрактними `timeouts.*`/`retries`, тож профіль знижує
+  тайм-аут провайдера 120000→30000 мс (обхід `JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS`); вирішити, чи це
+  внутрішній ліміт llm. **WP-14 + WP-11** — профіль `ci` має `llm.budget.amount = 0`, assistant із ним не зробить
+  жодного виклику LLM; узгодити перед монтуванням профілю в assistant. **WP-14** — перейменувати
+  `test_services_that_reject_the_whole_profile_as_limits_file`, оновити `deploy/profiles/README.md` п. 3,
+  параметризувати тести профілів за всіма `deploy/profiles/*.json` (зокрема `single-node`).
+- WP-02c (спільний ліміт хоста): рев'ю 1 — changes requested (немає тесту на власні ліміти `POST /v1/fetches`);
+  код коректний (стрес-тест рецензента без порушень). Автор виправляє.

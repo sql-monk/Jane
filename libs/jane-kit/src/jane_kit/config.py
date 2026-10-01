@@ -13,10 +13,17 @@ Follows ``contracts/schemas/common/limits.schema.json`` (WP-00):
 Files: a platform file has the ``PlatformLimits`` shape ``{"profile", "defaults", "hard_caps"}``
 (TOML/JSON/YAML); other levels are plain Limits objects. Environment variables:
 ``<PREFIX>CRAWL__MAX_DEPTH=5`` (value), ``<PREFIX>HARD_CAPS__CRAWL__MAX_DEPTH=10`` (hard cap).
+
+A platform file is one profile shared by all services (ТЗ §12, criterion 13), so its layer is
+``shared``: a path of the contract (:data:`CONTRACT_LIMIT_PATHS`) goes to the model fields that declare it
+(:func:`contract_field`, or a field at the same path), a contract path no field declares is ignored and
+recorded in :attr:`ResolvedLimits.ignored`, and a path unknown to both the model and the contract (a typo)
+is still a :class:`LimitError`. Other layers (env, source, task, request) accept model paths only.
 """
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import socket
@@ -31,6 +38,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 __all__ = [
+    "CONTRACT_LIMIT_PATHS",
     "LEVELS",
     "JaneSettings",
     "LimitError",
@@ -45,6 +53,69 @@ __all__ = [
 
 LEVELS: tuple[str, ...] = ("platform", "source", "task", "stage", "request")
 """Levels of ``LimitLevel`` in the contract, least specific first (plus ``hard_cap`` in provenance)."""
+
+_CONTRACT_LIMITS: dict[str, tuple[str, ...]] = {
+    "concurrency": (
+        "max_parallel_fetches",
+        "max_parallel_fetches_per_host",
+        "max_parallel_invocations",
+        "max_parallel_runs_per_task",
+        "max_parallel_stage_items",
+    ),
+    "rate": (
+        "requests_per_second_per_host",
+        "min_delay_ms_per_host",
+        "burst_per_host",
+        "respect_crawl_delay",
+    ),
+    "crawl": (
+        "max_depth",
+        "max_pages_per_run",
+        "max_bytes_per_run",
+        "max_material_bytes",
+        "max_redirects",
+        "max_links_per_page",
+        "max_seed_urls",
+        "max_frontier_size",
+        "revisit_interval_seconds",
+    ),
+    "timeouts": (
+        "connect_timeout_ms",
+        "request_timeout_ms",
+        "invocation_timeout_ms",
+        "stage_timeout_ms",
+        "run_timeout_ms",
+        "sync_response_max_ms",
+    ),
+    "retries": ("max_attempts", "initial_backoff_ms", "max_backoff_ms", "backoff_multiplier", "jitter"),
+    "queue": ("max_queue_depth", "max_inflight_materials", "max_unacked_materials"),
+    "sandbox": ("cpu_cores", "memory_mb", "wall_time_ms", "max_output_bytes", "max_processes", "tmpfs_mb"),
+    "llm": (
+        "max_requests_per_minute",
+        "max_input_tokens_per_request",
+        "max_output_tokens_per_request",
+        "budget.amount",
+        "budget.currency",
+        "budget.period",
+        "max_improvement_attempts",
+        "max_onboarding_samples",
+    ),
+    "transfer": (
+        "inline_max_bytes",
+        "max_request_body_bytes",
+        "transit_ttl_seconds",
+        "download_url_ttl_seconds",
+        "job_retention_seconds",
+        "idempotency_ttl_seconds",
+    ),
+    "telegram": ("max_messages_per_run", "max_media_bytes", "max_flood_wait_seconds"),
+}
+
+CONTRACT_LIMIT_PATHS: frozenset[str] = frozenset(
+    f"{group}.{name}" for group, names in _CONTRACT_LIMITS.items() for name in names
+)
+"""Leaf paths of ``limits.schema.json`` (``Limits``). A copy, because services run without ``contracts/``;
+``tests/test_wp00_contracts.py`` keeps it equal to the schema."""
 
 
 class LimitError(ValueError):
@@ -80,6 +151,10 @@ class LimitLayer:
     hard_caps: Mapping[str, Any] = field(default_factory=dict)
     name: str | None = None  # e.g. source id or file name, for diagnostics
     profile: str | None = None  # PlatformLimits.profile of a platform file
+    shared: bool = False
+    """Contract-shaped document shared by all services (a platform file): contract paths map to the fields
+    that declare them, contract paths the model does not declare are ignored (``ResolvedLimits.ignored``).
+    Paths unknown to the contract and to the model are still rejected."""
 
     @property
     def label(self) -> str:
@@ -97,6 +172,10 @@ class ResolvedLimits[L: Limits]:
     """Dotted leaf path -> effective hard cap (the tightest one of all layers)."""
     profile: str | None = None
     """Name of the platform limits profile, if a PlatformLimits file declared one."""
+    ignored: dict[str, str] = field(default_factory=dict)
+    """Contract path -> label of the shared layer whose value was not applied: this service has no such limit."""
+    ignored_hard_caps: dict[str, str] = field(default_factory=dict)
+    """Same for ``hard_caps`` of shared layers."""
 
     def platform_limits(self) -> dict[str, Any]:
         """``PlatformLimits`` document for ``/v1/info`` (WP-00 ``ServiceInfo.limits``).
@@ -204,6 +283,53 @@ def _field_paths(model: type[BaseModel], prefix: str = "") -> set[str]:
     return paths
 
 
+@functools.cache
+def _shared_targets(model: type[BaseModel]) -> dict[str, tuple[str, ...]]:
+    """Contract path -> model leaves a shared layer sets with it: the fields that declare the path
+    (:func:`contract_field`) and an undeclared field at the same path."""
+    declared = _contract_paths(model)
+    out: dict[str, list[str]] = {}
+    for leaf, contract in declared.items():
+        out.setdefault(contract, []).append(leaf)
+    for leaf in sorted(_field_paths(model) - declared.keys()):
+        if leaf in CONTRACT_LIMIT_PATHS:
+            out.setdefault(leaf, []).append(leaf)
+    return {path: tuple(leaves) for path, leaves in out.items()}
+
+
+def _fit_shared(
+    flat: Mapping[str, Any], targets: Mapping[str, tuple[str, ...]], label: str
+) -> tuple[dict[str, Any], list[str]]:
+    """Leaf paths of a shared layer -> model paths; returns ``(values, ignored contract paths)``.
+
+    A contract path sets every field that declares it, or is ignored when none does; any other path is
+    taken as a model path (an unknown one is then rejected by the caller)."""
+    out: dict[str, Any] = {}
+    source: dict[str, str] = {}
+    ignored: list[str] = []
+    for path, value in flat.items():
+        if path in CONTRACT_LIMIT_PATHS:
+            leaves = targets.get(path, ())
+            if not leaves:
+                ignored.append(path)
+        else:
+            leaves = (path,)
+        for leaf in leaves:
+            if leaf in out and out[leaf] != value:
+                raise LimitError(
+                    f"{label}: {leaf} is set twice: {source[leaf]}={out[leaf]!r} and {path}={value!r}"
+                )
+            out[leaf] = value
+            source[leaf] = path
+    return out, ignored
+
+
+def _reject_nulls(label: str, *flats: Mapping[str, Any]) -> None:
+    nulls = sorted({p for flat in flats for p, v in flat.items() if v is None})
+    if nulls:
+        raise LimitError(f"{label}: null is not a limit value (omit the field to inherit): {nulls}")
+
+
 def _gt(a: Any, b: Any) -> bool:
     try:
         return bool(a > b)
@@ -221,21 +347,32 @@ def resolve_limits[L: Limits](
     ``on_exceed='clamp'`` lowers a value above a hard cap to the cap (recorded in ``clamped``,
     provenance ``hard_cap``); ``'error'`` raises :class:`LimitError` instead (useful to reject a
     request that asks for more than allowed with ``limit_exceeded``).
+
+    A ``shared`` layer (platform file) may carry limits of other services: see :attr:`LimitLayer.shared`;
+    what it set but this model lacks is listed in ``ignored`` / ``ignored_hard_caps`` of the result.
     """
     known = _field_paths(model)
     merged: dict[str, Any] = {}
     origin: dict[str, str] = {}
     caps: dict[str, tuple[Any, str]] = {}
+    ignored: dict[str, str] = {}
+    ignored_caps: dict[str, str] = {}
 
     for layer in layers:
         values = _flatten(layer.values)
         layer_caps = _flatten(layer.hard_caps)
+        if layer.shared:
+            _reject_nulls(layer.label, values, layer_caps)  # also in limits this service ignores
+            targets = _shared_targets(model)
+            values, skipped = _fit_shared(values, targets, layer.label)
+            ignored.update(dict.fromkeys(skipped, layer.label))
+            layer_caps, skipped = _fit_shared(layer_caps, targets, layer.label)
+            ignored_caps.update(dict.fromkeys(skipped, layer.label))
         unknown = (set(values) | set(layer_caps)) - known
         if unknown:
-            raise LimitError(f"{layer.label}: unknown limit(s) {sorted(unknown)} for {model.__name__}")
-        nulls = sorted(p for p, v in {**values, **layer_caps}.items() if v is None)
-        if nulls:
-            raise LimitError(f"{layer.label}: null is not a limit value (omit the field to inherit): {nulls}")
+            hint = " (not in limits.schema.json either)" if layer.shared else ""
+            raise LimitError(f"{layer.label}: unknown limit(s) {sorted(unknown)} for {model.__name__}{hint}")
+        _reject_nulls(layer.label, values, layer_caps)
         if layer_caps:  # coerce to declared types ("4" from env -> 4)
             try:
                 typed = _flatten(model.model_validate(_unflatten(layer_caps)).model_dump())
@@ -277,6 +414,8 @@ def resolve_limits[L: Limits](
         clamped=clamped,
         hard_caps={p: c for p, (c, _) in caps.items()},
         profile=profile,
+        ignored=ignored,
+        ignored_hard_caps=ignored_caps,
     )
 
 
@@ -297,8 +436,8 @@ def _read_mapping(path: Path) -> dict[str, Any]:
 
 
 def load_layer(path: str | Path, level: str = "platform", *, name: str | None = None) -> LimitLayer:
-    """Read a layer file. ``level='platform'`` expects ``PlatformLimits`` (``defaults``/``hard_caps``/``profile``);
-    other levels expect a plain Limits object."""
+    """Read a layer file. ``level='platform'`` expects ``PlatformLimits`` (``defaults``/``hard_caps``/``profile``)
+    and gives a ``shared`` layer (one profile for every service); other levels expect a plain Limits object."""
     data = _read_mapping(Path(path))
     if level != "platform":
         return LimitLayer(level=level, values=data, name=name)
@@ -313,6 +452,7 @@ def load_layer(path: str | Path, level: str = "platform", *, name: str | None = 
         hard_caps=data.get("hard_caps") or {},
         name=name or data.get("profile"),
         profile=data.get("profile"),
+        shared=True,
     )
 
 
@@ -360,7 +500,8 @@ class JaneSettings(BaseSettings):
     auth_mode: Literal["none", "api_key", "jwt"] = "none"
     """Reported in ``/v1/info``; enforcement is per service (ADR on authentication, WP-00)."""
     limits_file: Path | None = None
-    """Platform limits file (``PlatformLimits`` shape); env ``<PREFIX>LIMITS__*`` overrides it."""
+    """Platform limits file (``PlatformLimits`` shape, e.g. a whole ``deploy/profiles/<profile>.json``: limits
+    this service does not have are ignored, typos are errors); env ``<PREFIX>LIMITS__*`` overrides it."""
 
     def platform_layers(self, env_prefix: str = "JANE_LIMITS__") -> list[LimitLayer]:
         """Platform layers in order: limits file, then environment overrides."""

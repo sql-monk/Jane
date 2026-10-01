@@ -6,18 +6,28 @@
 
 | Файл | Середовище | Статус |
 |---|---|---|
-| `dev-laptop.json` | ця машина: Windows 11 + Docker Desktop (6 CPU, 16 ГБ у Docker) | кандидат; вимірювання — фаза 2 |
-| `ci.json` | GitHub Actions `ubuntu-latest` (4 vCPU, 16 ГБ), лише testsite і fake LLM | кандидат; вимірювання — фаза 2 |
+| `dev-laptop.json` | ця машина: Windows 11 + Docker Desktop (6 CPU, 16 ГБ у Docker) | кандидат; не виміряно (потрібен вільний Windows-хост) |
+| `ci.json` | GitHub Actions `ubuntu-latest` (4 vCPU, 16 ГБ), лише testsite і fake LLM | виміряно CI run 36908333153: блокерів немає, вердикт `warn` ([звіт](../../docs/delivery/WP-14.md)); повторний прогін — після змін стеку |
 | `single-node.json` | одна Linux VM з Docker Compose, орієнтир 8 vCPU / 32 ГБ | кандидат, **не перевірено на реальному середовищі** |
 | `thresholds.json` | пороги pass/fail harness для `dev-laptop` і `ci` | [опис](../../docs/operations/limits-validation.md) |
-| `compose.stack.yaml`, `stack.py` | ізольований ланцюжок сервісів з профілем | перевірено відтворенням прикладів |
-| `harness/` | `limits_harness.py`, `metrics.py`, `probe_site.py`, пакет `harness.sandbox-probe` | тести без Docker; вимірювань немає |
+| `compose.stack.yaml`, `stack.py` | ізольований ланцюжок сервісів, профіль — `LIMITS_FILE` усіх сервісів | перевірено відтворенням прикладів і стартом сервісів із профілем |
+| `harness/` | `limits_harness.py`, `metrics.py`, `probe_site.py`, пакет `harness.sandbox-probe` | тести без Docker; прогони — CI job `limits` |
 | `check.py` | перевірка форми всіх трьох профілів за контрактом | |
 
-Значення профілів — довідкові приклади WP-00 з однією зміною: у `dev-laptop`
-`sandbox.wall_time_ms` 30 000 → 60 000 і `timeouts.invocation_timeout_ms` 60 000 → 90 000, бо WP-13 на
-Docker Desktop зафіксував 30,7 с старту контейнера пісочниці при 1 с роботи екстрактора (e2e WP-13
-працює з 60 с). Решту чисел підтверджує або змінює фаза 2.
+Значення профілів — довідкові приклади WP-00 з двома змінами:
+
+- у `dev-laptop` `sandbox.wall_time_ms` 30 000 → 60 000 і `timeouts.invocation_timeout_ms` 60 000 → 90 000, бо
+  WP-13 на Docker Desktop зафіксував 30,7 с старту контейнера пісочниці при 1 с роботи екстрактора (e2e WP-13
+  працює з 60 с);
+- у `ci` бюджет LLM `0 USD / run` → `0.01 USD / day`. Нуль асистент читає як «викликів немає»
+  (`spent >= amount` → `budget_exhausted` ще до першого виклику), тож зі змонтованим профілем онбординг не
+  працював би навіть із безкоштовним fake-провайдером. `day`, а не `run`: бюджет `run` шлюз llm пропускає для
+  викликів без `run_id` (асистент його не передає), а `day` діє завжди. 1 цент на добу пропускає fake-модель
+  (ціна 0) і відмовляє платній: резервування одного виклику моделі за 1/5 USD за Mtok — 0,021 USD
+  (вивід — у [звіті WP-14](../../docs/delivery/WP-14.md), фаза 2). `dev-laptop` і `single-node` лишають
+  `5 USD / day`.
+
+Решту чисел підтверджує або змінює вимірювання (`ci` — CI run 36908333153).
 
 ## Команди
 
@@ -43,14 +53,30 @@ uv run --all-packages python deploy/profiles/harness/limits_harness.py run --pro
    й обробника, тож runtime і storage отримують `sandbox`, `timeouts` тощо з профілю в запиті.
 2. **Web Collector і Telegram Collector** приймають увесь профіль як `JANE_*_LIMITS_FILE` (групи, яких не
    моделюють, ігнорують) — це їхні ліміти й для автономних викликів.
-3. **storage, handler-runtime, registry, llm, assistant** зараз **не стартують** з повним профілем як
-   `LIMITS_FILE` (`LimitError: unknown limit(s)`). Для них профіль діє лише через запити оркестратора, а для
-   автономного використання — їхні типові значення з README або окремі змінні `<ПРЕФІКС>_LIMITS__<ГРУПА>__<ПОЛЕ>`.
-   Запит власникам — у [звіті WP-14](../../docs/delivery/WP-14.md).
+3. **storage, handler-runtime, registry, llm, assistant** з WP-01b теж приймають увесь профіль як
+   `JANE_<СЕРВІС>_LIMITS_FILE`: ліміти контракту, які сервіс моделює, беруть значення профілю (`/v1/info` →
+   `limits.profile`, `limits.defaults`), решту ігнорують із рядком журналу старту
+   `platform limits profile applied partially`; опечатка в профілі — `LimitError`, сервіс не стартує. Значення
+   з запитів оркестратора й надалі звужуються стелями (`hard_caps`) профілю.
 
-`compose.stack.yaml` робить саме це: монтує профіль у orchestrator і колектори, генерує виконавців оркестратора
+`compose.stack.yaml` робить саме це: монтує профіль як `LIMITS_FILE` у **всі** сервіси застосунку (orchestrator,
+колектори, storage, handler-runtime, registry, llm, assistant), генерує виконавців оркестратора
 (`.jane/executors-<проєкт>.json`) лише для запущених сервісів і налаштовує registry ↔ runtime ↔ колектори.
 Нові ліміти діють для **нових** запусків. Обмеження сайту, провайдера й `hard_caps` можуть лише звузити профіль.
+
+**Тайм-аут виклику LLM.** llm оголошує `provider.connect_timeout_ms`, `provider.request_timeout_ms` і
+`provider.retries` як контрактні `timeouts.*` / `retries`, тож профіль (тайм-аут запиту 30 с — для
+веб-завантажень) інакше обмежив би кожен виклик моделі 30 с замість типових 120 с сервісу. Стек перекриває лише
+`JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS` значенням `JANE_LLM_PROVIDER_REQUEST_TIMEOUT_MS` (типово
+120 000 — власне типове значення llm). `timeouts.request_timeout_ms` профілів **не** піднято: це послабило б
+веб-завантаження колекторів. Підключення (`provider.connect_timeout_ms` 10 с) і повтори (3 спроби) llm бере з
+профілю. Остаточну семантику `provider.*` вирішує WP-10 (запит у звіті WP-14). Асистент викликає llm синхронно
+з власним `clients.request_timeout_ms` (30 с і в профілі, і типово) — довший виклик моделі він обірве раніше
+(запит до WP-11).
+
+| Змінна стеку | Типово | Що |
+|---|---|---|
+| `JANE_LLM_PROVIDER_REQUEST_TIMEOUT_MS` | `120000` | тайм-аут одного виклику провайдера LLM у стеку профілю |
 
 Профіль `ci` має довідкову частоту 50 запитів/с на хост — лише для локального testsite в ізольованій мережі.
 Для будь-якого реального сайту задайте нижчу межу на рівні джерела; профіль не є дозволом на таку частоту.

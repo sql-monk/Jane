@@ -376,3 +376,9 @@ L1 одиночний збір — 48/1 с. L1, L3–L5, L7–L8 пройшли,
   витрати спроби, одна пісочниця; R-03 — межі backoff 2829…3234 / 5828…6313 мс при 3000/6000; R-08 без xfail).
   Злито в інтеграційну гілку. `published_url()` для Linux перевіряє CI. Запит WP-00/WP-09: трасування item
   (`available_at`, історія claim). Некритичне: R-01 перевіряє лише статус 409, не код.
+- CI [36916718021](https://github.com/sql-monk/Jane/actions/runs/36916718021) на `b51499b`: **12/12 job успішні**;
+  `e2e` — 38 passed (S-M2-04, R-01, R-03 — тепер і на Linux, R-08 ×2). Профіль `ci`: warn лише L6
+  (`runtime max_parallel_invocations = None`, робить WP-14b); L1 jitter цього разу ok. Артефакт —
+  `.jane/limits-ci-36916718021/`.
+- Запущено WP-13: R-07 (`wp/13f-r07-restarts`) і критерій 9 — LLM/storage-пакети з registry та форки типів
+  (`wp/13g-registry-types`).

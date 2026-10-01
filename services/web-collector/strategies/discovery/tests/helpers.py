@@ -23,8 +23,9 @@ WAIT_S = float(os.environ.get("JANE_DISCOVERY_TEST_WAIT_S", "30"))
 # ------------------------------------------------------------------------------------------ test site
 @dataclass
 class Hold:
-    """The first request of ``path`` is answered only after :meth:`release` (later requests at once): a test
-    knows exactly where the collector is when it acts (kills it), instead of polling and racing with it."""
+    """From the first request of ``path`` on, every request to the site waits for :meth:`release` (afterwards
+    requests are answered at once). The collector stands still at a known point while the test acts (kills
+    it), instead of the test polling and racing with it."""
 
     path: str
     arrived: threading.Event = field(default_factory=threading.Event)
@@ -49,8 +50,11 @@ class HoldingSite(Site):
         return hold
 
     def take_hold(self, path: str) -> Hold | None:
-        """The hold of the first request of ``path`` (called by the request handler)."""
+        """The hold a request of ``path`` has to wait for, if any (called by the request handler)."""
         with self.lock:
+            for held in self.holds.values():
+                if held.arrived.is_set() and not held.released.is_set():
+                    return held  # the site stands still: every request waits
             hold = self.holds.get(path)
             if hold is None or hold.arrived.is_set():
                 return None

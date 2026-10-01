@@ -7,6 +7,7 @@ a request until the test releases it (:class:`.helpers.HoldingSite`).
 
 from __future__ import annotations
 
+import os
 import sys
 import threading
 from collections.abc import Iterator
@@ -34,6 +35,14 @@ from .helpers import WAIT_S, HoldingSite
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
 """``services/web-collector/strategies/discovery`` — the package under test."""
+START_S = float(os.environ.get("JANE_DISCOVERY_TEST_START_S", "120"))
+"""How long a collector process may take to answer ``/v1/health`` (``ServiceProcess.start`` waits 30 s, which
+a loaded machine exceeded for the Telegram collector's processes in a full ``just check``)."""
+
+
+class _Process(ServiceProcess):
+    def start(self, timeout: float = START_S) -> None:
+        super().start(timeout)
 
 
 def _recording_handler(site: HoldingSite) -> type[TestSiteHandler]:
@@ -125,7 +134,7 @@ def service_factory(tmp_path: Path) -> Iterator[ServiceFactory]:
             JANE_CONTRACTS_DIR=str(REPO_ROOT / "contracts"),
             **env_overrides,
         )
-        svc = ServiceProcess(port=port, state_dir=state_dir, env=env)
+        svc = _Process(port=port, state_dir=state_dir, env=env)
         started.append(svc)
         return svc
 

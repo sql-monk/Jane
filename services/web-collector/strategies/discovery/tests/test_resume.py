@@ -6,14 +6,14 @@ Killed while the strategies read their navigation documents (``seeds``: sitemaps
 pages) or later, while listing chains are followed from the saved strategy state — in both cases the result is
 exactly the expected union, every URL once, acknowledged materials are not delivered again.
 
-The kill inside ``seeds`` is placed by holding a sitemap request on the test site until the process is dead
-(:class:`.helpers.Hold`), not by polling ``stats.fetched``: the sitemap strategy finishes about 70 ms after its
-third fetch at 15 req/s, so on a loaded machine a poll-then-kill landed after it.
+The kill is placed by holding a request on the test site until the process is dead (:class:`.helpers.Hold`: the
+held request and every later one wait), not by polling ``stats.fetched`` and killing afterwards: the sitemap
+strategy finishes about 70 ms after its third fetch at 15 req/s, so on a loaded machine the "during seeds" kill
+landed after it (and a late "during crawl" kill could hit an API detail or a listing page in flight).
 """
 
 from __future__ import annotations
 
-import time
 from collections import Counter
 from typing import Any
 
@@ -22,7 +22,7 @@ import pytest
 
 from jane_web_collector.testing import ServiceFactory, drain, start, wait_done, web_rules
 
-from .helpers import WAIT_S, HoldingSite, api, archive, categories, sitemap, union
+from .helpers import HoldingSite, api, archive, categories, sitemap, union
 
 SLOW_LIMITS: dict[str, Any] = {
     # slow enough that the kill lands where the test wants it (~60 requests at 15 req/s)
@@ -36,41 +36,31 @@ NAVIGATION_PREFIXES = ("/sitemap", "/api/", "/robots.txt")
 TEMPLATE_MISSES = {"/archive/6", "/archive/7"}  # 404s: a restarted URL template walk checks them again
 SEEDS_HOLD = "/sitemaps/pages.xml"
 """The last child sitemap (4th fetch of seeds()): held until the kill, so the sitemap strategy is unfinished."""
+CRAWL_HOLD = "/product/headphones-pro"
+"""The 15th URL of the crawl (from ``products.xml``, after the 15 seed fetches): seeds() is complete, the crawl
+fetches sitemap products, listing chains have not started (the former kill point ``stats.fetched >= 30``)."""
 
 
-@pytest.mark.parametrize("kill_after", [None, 30], ids=["during-seeds", "during-crawl"])
+@pytest.mark.parametrize("held", [SEEDS_HOLD, CRAWL_HOLD], ids=["during-seeds", "during-crawl"])
 def test_strategies_resume_after_kill(
-    service_factory: ServiceFactory,
-    site: HoldingSite,
-    expected_sets: dict[str, set[str]],
-    kill_after: int | None,
+    service_factory: ServiceFactory, site: HoldingSite, expected_sets: dict[str, set[str]], held: str
 ) -> None:
     rules = web_rules(site, strategies=[sitemap(site), archive(site), api(site), categories(site)])
     body = {"source_kind": "web", "source_id": "resume", "rules": rules, "limits": SLOW_LIMITS}
-    hold = site.hold(SEEDS_HOLD) if kill_after is None else None
+    hold = site.hold(held)
     first = service_factory()
     first.start()
     acked: list[dict[str, Any]] = []
     with httpx.Client(base_url=first.base, timeout=10) as client:
         cid = start(client, body)
-        view: dict[str, Any] = {}
-        if hold is not None:  # seeds() waits for the held sitemap: nothing moves until the kill
-            hold.wait_arrived()
-            view = client.get(f"/v1/collections/{cid}").json()
-        else:
-            deadline = time.monotonic() + WAIT_S
-            while time.monotonic() < deadline:
-                view = client.get(f"/v1/collections/{cid}").json()
-                if view["stats"]["fetched"] >= kill_after:
-                    break
-                time.sleep(0.02)
+        hold.wait_arrived()  # from now on the collector gets no answers: nothing moves until the kill
+        view = client.get(f"/v1/collections/{cid}").json()
         page = client.get(f"/v1/collections/{cid}/materials", params={"limit": 5}).json()
         if page["items"]:  # the consumer took and acknowledged a first page before the crash
             acked = page["items"]
             client.get(f"/v1/collections/{cid}/materials", params={"after": page["next_cursor"], "limit": 1})
     first.kill()
-    if hold is not None:
-        hold.release()  # the handler answers the dead connection; the next request of the path is not held
+    hold.release()  # the handlers answer dead connections; the new process is not held
     assert view["status"] == "running", view
     fetched_before = view["stats"]["fetched"]
 
@@ -95,12 +85,13 @@ def test_strategies_resume_after_kill(
         if n > 1 and not p.startswith(NAVIGATION_PREFIXES) and p not in TEMPLATE_MISSES
     }
     assert len(refetched) <= SLOW_LIMITS["concurrency"]["max_parallel_fetches"], refetched
-    if hold is not None:
+    assert site.requests[held] == 2, dict(site.requests)  # in flight at the kill: requested again
+    if held == SEEDS_HOLD:
         # killed inside seeds() of the sitemap strategy: the new process re-read the sitemaps
         assert fetched_before < SEED_FETCHES, view
         assert site.requests["/sitemap.xml"] == 2
-        assert site.requests[SEEDS_HOLD] == 2, dict(site.requests)
     else:  # killed in the crawl: seeds() was complete and is not repeated, listing chains continued
+        assert fetched_before >= SEED_FETCHES, view
         navigation = [p for p in site.requests if p.startswith(NAVIGATION_PREFIXES) and p != "/robots.txt"]
         assert navigation and all(site.requests[p] == 1 for p in navigation), dict(site.requests)
         assert all(n == 1 for p, n in site.requests.items() if p.startswith("/catalog/")), dict(site.requests)

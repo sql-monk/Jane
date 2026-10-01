@@ -15,14 +15,17 @@ version reached the model.
   to the fork's 1.0.0 keeps answering like 1.0.0, and only the explicit port (fork 1.1.0) brings the template.
 * storage: task stages pin ``jane.storage-files`` / ``jane.storage-postgresql`` 1.0.0 with the registry digests,
   which storage verifies against the package it executes; version 1.0.0 cannot be replaced in the registry; a
-  stage pinned to other content gets ``digest_mismatch`` and writes nothing; the parent's 1.1.0 (RAW as JSON)
-  does not change the pinned task. The fork stays 1.0.0 until the explicit port; storage runs each fork version
-  exactly as given in ``package_archive`` (ADR-0009) and refuses a substituted archive.
+  stage pinned to other content gets ``digest_mismatch`` and writes nothing. The fork stays 1.0.0 until the
+  explicit port; storage runs each fork version exactly as given in ``package_archive`` (ADR-0009) and refuses a
+  substituted archive. (A re-run of the pinned task after the parent's 1.1.0 is kept, but it does not tell
+  versions apart while storage executes only its built-in packages - see the storage xfail.)
 * collector rules: a source pinned to a fork of ``testsite.web-rules`` keeps collecting with the fork's 1.0.0
   rules after the parent excluded ``/pages/*``; a source pinned to the ported fork 1.1.0 applies the exclusion.
 * ``xfail(strict=True)``: a task stage pinned to a storage fork (storage knows only its built-in packages and the
   orchestrator sends no ``package_archive``), and the LLM gateway running a cached other version for a pinned
-  ``package_id@version`` + foreign digest. See "Запити до інших власників" in docs/delivery/WP-13.md.
+  ``package_id@version`` + foreign digest. Each raises :class:`ProductDefect` only on the exact defect condition,
+  so a contract violation, a failed precondition or a setup error is reported as a failure, not as the known
+  defect. See "Запити до інших власників" in docs/delivery/WP-13.md.
 """
 
 from __future__ import annotations
@@ -109,6 +112,13 @@ def scripted_triage(condition: Callable[[dict[str, Any]], bool]) -> dict[str, An
 # The answer to the plain page (versions without the template) and to the page wrapped into template 1.1.
 TRIAGE_V1 = scripted_triage(lambda s: s.get("when_data_contains") == "<h1>Spring meetup</h1>")
 TRIAGE_V11 = scripted_triage(lambda s: "template 1\\.1" in str(s.get("when_data_matches", "")))
+
+
+class ProductDefect(Exception):
+    """The known product defect an ``xfail(strict=True, raises=ProductDefect)`` test reproduces.
+
+    Deliberately not an ``AssertionError``: ``ContractViolation`` of the contract clients and the ``assert``s of
+    the steps are ``AssertionError``s, and they must fail the test instead of passing as the expected defect."""
 
 
 def note(what: str, value: Any = None) -> None:
@@ -351,7 +361,7 @@ def test_llm_package_from_registry_runs_in_tasks_and_its_fork_stays_pinned(
 
 @pytest.mark.xfail(
     strict=True,
-    raises=AssertionError,
+    raises=ProductDefect,
     reason="LLM gateway (WP-10): PackageLoader.load returns a package cached by digest before comparing "
     "package_id/version with the reference, so after version X was loaded once a reference to another "
     "version with X's digest executes X instead of digest_mismatch (cold cache: 422)",
@@ -365,13 +375,8 @@ def test_llm_refuses_a_digest_of_another_version_also_after_caching_it(r9: Regis
         path = next_manifest["entry"]["instructions"]
         next_files[path] = next_files[path] + b"\nKeep the summary under twenty words.\n"
 
-    try:
-        v1_ref = ref_of(publish(registry, own, files))
-        v2_ref = ref_of(
-            publish_version(registry, *new_parent_version(own, files, "1.0.1", "Shorter.", reword))
-        )
-    except AssertionError as exc:  # a precondition, not the defect
-        pytest.fail(f"publication failed: {exc}")
+    v1_ref = ref_of(publish(registry, own, files))
+    v2_ref = ref_of(publish_version(registry, *new_parent_version(own, files, "1.0.1", "Shorter.", reword)))
     foreign = {**v1_ref, "digest": v2_ref["digest"]}
     cold = llm_invoke(llm, foreign, f"c9-llm-cold-{run_id}")
     if cold.status_code != 422 or cold.json().get("code") != "digest_mismatch":
@@ -385,10 +390,9 @@ def test_llm_refuses_a_digest_of_another_version_also_after_caching_it(r9: Regis
         "LLM foreign digest after caching",
         {"requested": foreign, "status": again.status_code, "ran": again.json().get("handler")},
     )
-    assert again.status_code == 422 and again.json()["code"] == "digest_mismatch", (
-        again.status_code,
-        again.json().get("handler"),
-    )
+    if again.status_code == 200 and again.json()["handler"] == v2_ref:
+        raise ProductDefect(f"a reference to 1.0.0 with the 1.0.1 digest executed {again.json()['handler']}")
+    assert again.status_code == 422 and again.json()["code"] == "digest_mismatch", again.text
 
 
 # ---------------------------------------------------------------------------- storage
@@ -486,7 +490,10 @@ def test_storage_stages_pin_registry_digests_and_storage_forks_stay_pinned(
     _, changed_manifest = package_diff(registry, fork_id, "1.0.0", "parent:1.1.0")
     assert changed_manifest["/entry/format/raw"] == "add", changed_manifest
 
-    # 3. The pinned task after the parent's new version: the same package, RAW still stored as HTML.
+    # 3. The pinned task after the parent's new version: the same package, RAW still stored as HTML. This step
+    # does NOT tell versions apart while storage executes only its built-in packages (it never loads 1.1.0 from
+    # the registry - see test_storage_fork_pinned_in_a_task_runs_that_fork); the distinguishing evidence is the
+    # digest_mismatch of step 4 and the package_archive runs of step 5.
     second = run_task(orch, task_id)
     assert run_stage_handler(orch, second["run_id"], "store-raw") == files_ref
     stored = raw_objects(storage, "raw-files", source_id)
@@ -535,29 +542,34 @@ def test_storage_stages_pin_registry_digests_and_storage_forks_stay_pinned(
 
 @pytest.mark.xfail(
     strict=True,
-    raises=AssertionError,
+    raises=ProductDefect,
     reason="storage (WP-07) executes only its built-in jane.storage-* packages or a package_archive, and the "
     "orchestrator (WP-09) sends no package_archive: a task stage pinned to a storage fork from the registry "
     "fails with not_found",
 )
 def test_storage_fork_pinned_in_a_task_runs_that_fork(r9: Registry9, run_id: str) -> None:
     registry, orch, storage = r9["registry"], r9["orchestrator"], r9["storage"]
-    try:
-        fork_ref = ref_of(fork(registry, r9.published[FILES], f"{FILES}-task-{run_id}"))
-        source_id, task_id = new_task(
-            r9,
-            f"storage-fork-{run_id}",
-            ["/product/phone-alpha"],
-            [store_stage("store-raw", fork_ref, "raw-files")],
-        )
-    except AssertionError as exc:  # a precondition, not the defect
-        pytest.fail(f"fork or task creation failed: {exc}")
+    fork_ref = ref_of(fork(registry, r9.published[FILES], f"{FILES}-task-{run_id}"))
+    source_id, task_id = new_task(
+        r9,
+        f"storage-fork-{run_id}",
+        ["/product/phone-alpha"],
+        [store_stage("store-raw", fork_ref, "raw-files")],
+    )
     run = wait_run(orch, start_run(orch, task_id), timeout_s=RUN_TIMEOUT_S)
     (item,) = list_items(orch, run["run_id"], "store-raw")
     note(
         "storage fork pinned in a task",
         {"run": run["status"], "item": item["status"], "error": item.get("error")},
     )
+    error = item.get("error") or {}
+    executor = (error.get("details") or {}).get("executor")
+    if item["status"] == "failed" and (error.get("code"), error.get("status"), executor) == (
+        "not_found",
+        404,
+        "storage",
+    ):
+        raise ProductDefect(f"storage does not know the registry fork: {error.get('detail')}")
     assert item["status"] == "completed", item
     assert run_stage_handler(orch, run["run_id"], "store-raw") == fork_ref
     assert len(raw_objects(storage, "raw-files", source_id)) == 1

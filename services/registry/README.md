@@ -85,7 +85,7 @@ PostgreSQL, публікації одного пакета серіалізую�
 | `REQUIRE_TESTS` | `true` | extractor/llm мають щонайменше один тест `success` і один `empty`/`unrecognized` |
 | `AUTH_MODE` | `none` | `none` (лише локально) або `api_key`; `jwt` у цій версії не реалізовано (сервіс не стартує) |
 | `API_KEYS_FILE` | — | для `api_key`: `[{"name", "sha256": "<hex ключа>", "scopes": [...], "actor": "human"\|"llm"\|"import"}]` (`actor` типово `human`) |
-| `LIMITS_FILE`, `LIMITS__<група>__<поле>` | — | ліміти (файл `PlatformLimits` або змінні) |
+| `LIMITS_FILE`, `LIMITS__<група>__<поле>` | — | ліміти (файл `PlatformLimits`, зокрема цілий профіль `deploy/profiles/<профіль>.json`, або змінні; див. «Ліміти й типові значення») |
 
 Scopes (ADR-0005): `registry:read` — усі GET, зокрема `GET /v1/jobs/{id}`; `registry:write` — створення пакета,
 публікація, PATCH, форк, звіти тестів, upstream-ports, `POST /v1/jobs/{id}/cancel`; `registry:approve` —
@@ -111,7 +111,10 @@ upstream-port записує `provenance.created_by` = `actor` того, хто 
 ## Ліміти й типові значення
 
 Усі — з конфігурації (`JANE_REGISTRY_LIMITS__PACKAGES__MAX_FILES=500` тощо), `/v1/info` показує поля,
-що є в контракті лімітів.
+що є в контракті лімітів. `JANE_REGISTRY_LIMITS_FILE` може бути цілим профілем платформи
+(`deploy/profiles/<профіль>.json`): з нього registry бере `transfer.max_request_body_bytes`,
+`transfer.job_retention_seconds` і `transfer.idempotency_ttl_seconds`, решта лімітів контракту ігнорується й
+перелічується в журналі старту; опечатка чи некоректне значення — помилка старту (див. README jane-kit).
 
 | Параметр | Типово | Що |
 |---|---|---|

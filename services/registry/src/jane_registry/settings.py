@@ -159,5 +159,8 @@ class ServiceLimits(Limits):
 
 
 def resolve_service_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLimits[ServiceLimits]:
-    """Defaults <- platform file (``JANE_REGISTRY_LIMITS_FILE``) <- ``JANE_REGISTRY_LIMITS__*`` <- ``extra``."""
+    """Defaults <- platform file (``JANE_REGISTRY_LIMITS_FILE``) <- ``JANE_REGISTRY_LIMITS__*`` <- ``extra``.
+
+    The platform file may be a whole platform profile (``deploy/profiles/<profile>.json``): contract limits
+    the registry does not have are ignored (``ResolvedLimits.ignored``, start-up log); typos fail."""
     return resolve_limits(ServiceLimits, *settings.platform_layers(f"{ENV_PREFIX}LIMITS__"), *extra)

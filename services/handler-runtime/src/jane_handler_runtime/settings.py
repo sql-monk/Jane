@@ -188,7 +188,10 @@ def request_layer(limits: Mapping[str, Any] | None) -> LimitLayer | None:
 
 def resolve_service_limits(settings: Settings, *extra: LimitLayer | None) -> ResolvedLimits[ServiceLimits]:
     """Defaults <- service default caps <- platform file (``..._LIMITS_FILE``) <- ``JANE_HANDLER_RUNTIME_LIMITS__*``
-    <- ``extra`` (request layer). Values above a hard cap are clamped (``min(request, hard_caps)``)."""
+    <- ``extra`` (request layer). Values above a hard cap are clamped (``min(request, hard_caps)``).
+
+    The platform file may be a whole platform profile (``deploy/profiles/<profile>.json``): contract limits
+    the runtime does not have are ignored (``ResolvedLimits.ignored``, start-up log); typos fail."""
     platform = settings.platform_layers(f"{ENV_PREFIX}LIMITS__")
     layers = [_default_caps_layer(platform), *platform, *(x for x in extra if x is not None)]
     return resolve_limits(ServiceLimits, *layers)

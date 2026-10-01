@@ -160,7 +160,7 @@ just down -v --project jane-wp11
 | `STATE_DSN` | — | PostgreSQL для спільного стану кількох екземплярів (секрет; без нього — пам'ять, один екземпляр) |
 | `STATE_SCHEMA` | `jane_assistant` | схема таблиць стану |
 | `INSTANCE_ID` | `hostname-pid` | власник job і оренд (унікальний для кожного екземпляра) |
-| `LIMITS_FILE` | — | файл `PlatformLimits` (TOML/JSON/YAML) |
+| `LIMITS_FILE` | — | файл `PlatformLimits` (TOML/JSON/YAML), зокрема цілий профіль `deploy/profiles/<профіль>.json`: ліміти контракту, яких асистент не має, ігноруються (перелік — у журналі старту), опечатка чи некоректне значення — помилка старту; `timeouts.connect_timeout_ms` / `request_timeout_ms` і `retries` профілю діють на виклики сусідів (`clients.*`) |
 | `LIMITS__<ГРУПА>__<ПАРАМЕТР>` / `LIMITS__HARD_CAPS__…` | — | перевизначення й жорсткі стелі |
 
 ## Ліміти

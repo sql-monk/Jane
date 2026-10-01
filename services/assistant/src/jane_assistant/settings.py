@@ -215,7 +215,10 @@ class ServiceLimits(Limits):
 
 
 def resolve_service_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLimits[ServiceLimits]:
-    """Defaults <- platform file (``..._LIMITS_FILE``) <- ``JANE_ASSISTANT_LIMITS__*`` <- ``extra``."""
+    """Defaults <- platform file (``..._LIMITS_FILE``) <- ``JANE_ASSISTANT_LIMITS__*`` <- ``extra``.
+
+    The platform file may be a whole platform profile (``deploy/profiles/<profile>.json``): contract limits
+    the assistant does not have are ignored (``ResolvedLimits.ignored``, start-up log); typos fail."""
     return resolve_limits(ServiceLimits, *settings.platform_layers(f"{ENV_PREFIX}LIMITS__"), *extra)
 
 

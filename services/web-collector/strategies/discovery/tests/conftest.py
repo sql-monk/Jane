@@ -1,7 +1,8 @@
 """Fixtures for the WP-03 strategies: the real testsite (WP-01) with a request log and the real collector core
 (WP-02) with this package plugged in exactly as in production (``discovery_path`` / ``DISCOVERY_PATH``).
 
-The testsite is the unmodified ``jane_testsite`` handler; the subclass only records requested paths.
+The testsite is the unmodified ``jane_testsite`` handler; the subclass only records requested paths and can hold
+a request until the test releases it (:class:`.helpers.HoldingSite`).
 """
 
 from __future__ import annotations
@@ -25,21 +26,25 @@ from jane_web_collector.testing import (
     REPO_ROOT,
     ServiceFactory,
     ServiceProcess,
-    Site,
     free_port,
     make_settings,
 )
+
+from .helpers import WAIT_S, HoldingSite
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
 """``services/web-collector/strategies/discovery`` — the package under test."""
 
 
-def _recording_handler(site: Site) -> type[TestSiteHandler]:
+def _recording_handler(site: HoldingSite) -> type[TestSiteHandler]:
     class Recording(TestSiteHandler):  # type: ignore[misc]
         def do_GET(self) -> None:
             with site.lock:
                 site.requests[self.path] += 1
                 site.user_agents.add(self.headers.get("User-Agent", ""))
+            hold = site.take_hold(self.path)
+            if hold is not None:
+                hold.released.wait(WAIT_S)
             super().do_GET()
 
     return Recording
@@ -53,8 +58,8 @@ class _QuietServer(ThreadingHTTPServer):
 
 
 @pytest.fixture
-def site() -> Iterator[Site]:
-    holder = Site(base="")
+def site() -> Iterator[HoldingSite]:
+    holder = HoldingSite(base="")
     server = _QuietServer(("127.0.0.1", 0), _recording_handler(holder))
     server.daemon_threads = True
     holder.base = f"http://127.0.0.1:{server.server_address[1]}"
@@ -63,6 +68,7 @@ def site() -> Iterator[Site]:
     try:
         yield holder
     finally:
+        holder.release_all()
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)

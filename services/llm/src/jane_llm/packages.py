@@ -179,7 +179,13 @@ async def read_content(ref: dict[str, Any], max_bytes: int, timeout_s: float) ->
 
 
 class PackageLoader:
-    """Finds LLM packages: request archive -> local directory -> registry. Caches by digest."""
+    """Finds LLM packages: request archive -> local directory -> registry. Caches by digest.
+
+    The cache only saves fetching and unpacking; a load gives the same answer on a cold and a warm loader. A
+    cached package is reused only for a reference to exactly its ``package_id@version`` (a digest of another
+    package or version goes the cold way and gets its ``digest_mismatch`` / ``not_found``), and a
+    ``package_archive`` of the request is always read and verified.
+    """
 
     def __init__(
         self,
@@ -238,22 +244,34 @@ class PackageLoader:
                 )
             return resp.content
 
+    def _cached(self, digest: str | None, package_id: str, version: str) -> LoadedPackage | None:
+        """The package cached under ``digest`` if it is ``package_id@version`` of the reference, else ``None``."""
+        pkg = self._cache.get(digest) if digest else None
+        if (
+            pkg is None
+            or pkg.manifest.get("package_id") != package_id
+            or pkg.manifest.get("version") != version
+        ):
+            return None
+        return pkg
+
     async def load(self, ref: dict[str, Any], archive_ref: dict[str, Any] | None) -> LoadedPackage:
         package_id, version, wanted = str(ref["package_id"]), str(ref["version"]), ref.get("digest")
-        if wanted and wanted in self._cache:
-            return self._cache[wanted]
         pkg: LoadedPackage | None = None
         if archive_ref is not None:
+            # The request's archive is what runs: read it every time, the cache only skips unpacking it.
             data = await read_content(
                 archive_ref, self.limits.max_package_bytes, self.limits.content_fetch_timeout_ms / 1000
             )
-            pkg = self._from_archive(data)
-        if pkg is None:
-            pkg = self._local(package_id, version)
-        if pkg is None:
-            data_or_none = await self._registry(package_id, version)
-            if data_or_none is not None:
-                pkg = self._from_archive(data_or_none)
+            pkg = self._cached(digest_of(data), package_id, version) or self._from_archive(data)
+        else:
+            pkg = self._cached(wanted, package_id, version)
+            if pkg is None:
+                pkg = self._local(package_id, version)
+            if pkg is None:
+                data_or_none = await self._registry(package_id, version)
+                if data_or_none is not None:
+                    pkg = self._from_archive(data_or_none)
         if pkg is None:
             raise NotFound(f"package {package_id}@{version} not found (archive, local directory, registry)")
         check_llm_manifest(pkg.manifest, ref)

@@ -16,6 +16,16 @@ connections:
     params:
       provider: fake
       responses:
+        # Criterion 9 (test_m2_registry_types.py): version 1.1.0 of e2e.llm-page-triage, published only in the
+        # registry, wraps the page into its input template prompts/input.md. The template's first line reaches
+        # the model only when that version (or a fork that ported it) is executed, so the answer tells which
+        # package version actually ran. Must stay before the plain "Spring meetup" answer below.
+        - when_data_matches: '(?s)Page triage input \(template 1\.1\).*<h1>Spring meetup</h1>'
+          output:
+            page_triages:
+              - page_type: event
+                summary: "Spring meetup announcement, triaged through input template 1.1."
+                suggested_fix: "An event extractor bound to /pages/event-*."
         # S-M2-11: problem result of the extractor (OutOfStock offer) -> valid triage, stored by the task.
         - when_data_contains: "<h1>Phone Gamma</h1>"
           output:

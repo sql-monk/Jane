@@ -1,0 +1,10 @@
+{
+  "entities": [
+    {
+      "entity_type": "page_triage",
+      "fields": {
+        "page_type": "product"
+      }
+    }
+  ]
+}

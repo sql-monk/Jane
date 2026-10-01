@@ -54,8 +54,9 @@ services:
       # S-M2-06 classifies 54 name-only and 16 hinted pages, then S-M2-07 improves a package in one
       # shared module stack. The production default of 60 calls/minute rejects the second onboarding.
       JANE_LLM_LIMITS__LLM__MAX_REQUESTS_PER_MINUTE: ${JANE_E2E_LLM_MAX_REQUESTS_PER_MINUTE:-120}
-      # LLM packages of orchestrated stages (no package_archive) come from the same local archive stand-in.
-      JANE_LLM_REGISTRY_URL: http://package-host:8080
+      # LLM packages of orchestrated stages (no package_archive) come from the same local archive stand-in;
+      # registry acceptance (criterion 9) opts into the real service.
+      JANE_LLM_REGISTRY_URL: ${JANE_E2E_LLM_REGISTRY_URL:-http://package-host:8080}
     volumes:
       - ../tests/e2e/config/llm-seed.yaml:/cfg/llm-seed.yaml:ro
 

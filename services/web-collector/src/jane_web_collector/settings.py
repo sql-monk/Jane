@@ -154,6 +154,8 @@ class Collector(Limits):
     """``/materials?wait_ms=``: how often new materials are looked for while waiting."""
     gc_interval_seconds: int = Field(default=3_600, ge=1)
     """How often expired collections and transit files are cleaned up."""
+    host_state_prune_interval_seconds: int = Field(default=60, ge=1)
+    """How often the shared per-host limiter drops the state of hosts nobody uses any more."""
 
 
 class ServiceLimits(Limits):

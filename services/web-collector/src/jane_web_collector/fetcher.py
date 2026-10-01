@@ -1,14 +1,14 @@
 """HTTP fetching with per-host limits, retries, manual redirects, size limits and conditional requests.
 
 Every hop of a redirect chain goes through ``check_hop`` (scope, exclusions, robots.txt), so a redirect
-cannot lead the crawler out of bounds. All numbers come from :class:`~.settings.ServiceLimits`.
+cannot lead the crawler out of bounds. All numbers come from :class:`~.settings.ServiceLimits`. Per-host
+limits are shared by the whole process (:mod:`.host_limits`); a fetcher uses them through its run's session.
 """
 
 from __future__ import annotations
 
 import asyncio
 import random
-import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -20,9 +20,10 @@ import httpx
 from jane_kit.errors import FieldError, ValidationFailed
 
 from .connections import ConnectionPolicy, header_name_safe, header_value_safe, is_safe_rule_header
+from .host_limits import HostSession
 from .settings import ServiceLimits, Timeouts
 
-__all__ = ["FetchError", "Fetcher", "HostLimiter", "HttpResult", "build_client"]
+__all__ = ["FetchError", "Fetcher", "HttpResult", "build_client"]
 
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
@@ -90,43 +91,6 @@ def build_client(limits: ServiceLimits) -> httpx.AsyncClient:
     return httpx.AsyncClient(timeout=timeout, limits=pool, follow_redirects=False, trust_env=False)
 
 
-class HostLimiter:
-    """Politeness per host: at most ``max_parallel_fetches_per_host`` requests at once and a minimum
-    interval between request starts = max(1/rps, min_delay, robots Crawl-delay)."""
-
-    def __init__(self, limits: ServiceLimits) -> None:
-        self.limits = limits
-        self._sems: dict[str, asyncio.Semaphore] = {}
-        self._next: dict[str, float] = {}
-        self._locks: dict[str, asyncio.Lock] = {}
-
-    def interval(self, crawl_delay: float | None) -> float:
-        rate = self.limits.rate
-        interval = max(1.0 / rate.requests_per_second_per_host, rate.min_delay_ms_per_host / 1000)
-        if rate.respect_crawl_delay and crawl_delay:
-            interval = max(interval, crawl_delay)
-        return interval
-
-    def semaphore(self, host: str) -> asyncio.Semaphore:
-        if host not in self._sems:
-            self._sems[host] = asyncio.Semaphore(self.limits.concurrency.max_parallel_fetches_per_host)
-            self._locks[host] = asyncio.Lock()
-        return self._sems[host]
-
-    async def wait_turn(self, host: str, crawl_delay: float | None) -> None:
-        self.semaphore(host)
-        async with self._locks[host]:
-            now = time.monotonic()
-            start = max(now, self._next.get(host, 0.0))
-            self._next[host] = start + self.interval(crawl_delay)
-        if start > now:
-            await asyncio.sleep(start - now)
-
-    def push_back(self, host: str, seconds: float) -> None:
-        """A source asked to slow down (Retry-After): no request to this host before that."""
-        self._next[host] = max(self._next.get(host, 0.0), time.monotonic() + seconds)
-
-
 HopCheck = Callable[[str], Awaitable[None]]
 DelayFor = Callable[[str], Awaitable[float | None]]
 
@@ -149,7 +113,7 @@ class Fetcher:
         self,
         client: httpx.AsyncClient,
         limits: ServiceLimits,
-        limiter: HostLimiter,
+        limiter: HostSession,
         *,
         user_agent: str,
         headers: Mapping[str, str] | None = None,
@@ -202,24 +166,23 @@ class Fetcher:
             raise FetchError(
                 "rate_limited", f"robots.txt Crawl-delay {delay}s exceeds the configured maximum wait"
             )
-        async with self.limiter.semaphore(host):
-            await self.limiter.wait_turn(host, delay)
-            async with self.client.stream(
-                "GET", url, headers=headers, timeout=self._timeout(timeouts)
-            ) as resp:
-                chunks: list[bytes] = []
-                size = 0
-                truncated = False
-                async for chunk in resp.aiter_bytes():
-                    if size + len(chunk) > max_bytes:
-                        chunks.append(chunk[: max_bytes - size])
-                        size = max_bytes
-                        truncated = True
-                        break
-                    chunks.append(chunk)
-                    size += len(chunk)
-                hdrs = {k.lower(): v for k, v in resp.headers.items()}
-                return resp.status_code, hdrs, b"".join(chunks), truncated
+        async with (
+            self.limiter.slot(host, delay),
+            self.client.stream("GET", url, headers=headers, timeout=self._timeout(timeouts)) as resp,
+        ):
+            chunks: list[bytes] = []
+            size = 0
+            truncated = False
+            async for chunk in resp.aiter_bytes():
+                if size + len(chunk) > max_bytes:
+                    chunks.append(chunk[: max_bytes - size])
+                    size = max_bytes
+                    truncated = True
+                    break
+                chunks.append(chunk)
+                size += len(chunk)
+            hdrs = {k.lower(): v for k, v in resp.headers.items()}
+            return resp.status_code, hdrs, b"".join(chunks), truncated
 
     async def get(
         self,

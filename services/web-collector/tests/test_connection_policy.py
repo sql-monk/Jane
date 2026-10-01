@@ -11,7 +11,8 @@ from fastapi.testclient import TestClient
 from jane_kit.errors import ServiceUnavailable, ValidationFailed
 from jane_web_collector.app import build_app
 from jane_web_collector.connections import ConnectionPolicy, auth_headers
-from jane_web_collector.fetcher import Fetcher, FetchError, HostLimiter
+from jane_web_collector.fetcher import Fetcher, FetchError
+from jane_web_collector.host_limits import HostLimiter
 from jane_web_collector.rules import RulesLoader
 from jane_web_collector.settings import Rate, Retries, ServiceLimits
 from jane_web_collector.testing import Site, make_settings, web_rules
@@ -117,7 +118,7 @@ async def test_secret_never_sent_to_unlisted_origin_or_redirect_target(
         fetcher = Fetcher(
             client,
             limits,
-            HostLimiter(limits),
+            HostLimiter(limits).session(limits),
             user_agent="JaneBot",
             auth_headers={"Authorization": "Bearer safe-token"},
             connection_policy=policy,
@@ -147,7 +148,7 @@ async def test_secret_never_sent_to_unlisted_origin_or_redirect_target(
             Fetcher(
                 client,
                 limits,
-                HostLimiter(limits),
+                HostLimiter(limits).session(limits),
                 user_agent="JaneBot",
                 headers={"X-Client-Key": "top-secret"},
             )
@@ -190,7 +191,7 @@ async def test_transport_error_and_malformed_credential_never_expose_secret(
         fetcher = Fetcher(
             http_client,
             limits,
-            HostLimiter(limits),
+            HostLimiter(limits).session(limits),
             user_agent="JaneBot",
             auth_headers={"Authorization": "Bearer safe-token"},
             connection_policy=policy,

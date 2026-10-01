@@ -19,7 +19,8 @@ from .connections import auth_headers
 from .crawler import CrawlRun, LeaseLost, RunDeps, new_stats
 from .discovery.links import html_meta, is_html, parse_html
 from .discovery.registry import RESERVED_TYPES, Registry
-from .fetcher import Fetcher, FetchError, HostLimiter, build_client
+from .fetcher import Fetcher, FetchError, build_client
+from .host_limits import HostLimiter
 from .materials import Delivery, MaterialTooLarge, TransitStore, build_material, new_observation_id, rfc3339
 from .robots import RobotsCache
 from .rules import ContractSchemas, RulesLoader, validate_rules
@@ -65,6 +66,8 @@ class Engine:
             timeout_s=self.limits.timeouts.request_timeout_ms / 1000,
         )
         self.client = build_client(self.limits)
+        # one per-host schedule for every collection and one-shot fetch of this process (WP-02c)
+        self.host_limiter = HostLimiter(self.limits)
         self.deps = RunDeps(
             state=state,
             registry=registry,
@@ -76,12 +79,12 @@ class Engine:
             heartbeat_seconds=settings.heartbeat_interval_ms / 1000,
             user_agent=settings.user_agent,
             version=__version__,
+            host_limiter=self.host_limiter,
             connection_policy=self.connection_policy,
         )
         self.local: set[str] = set()
         self.shutting_down = False
         self._tasks: list[asyncio.Task[None]] = []
-        self._fetch_limiter = HostLimiter(self.limits)
 
     # ------------------------------------------------------------------ limits
     def resolve(
@@ -165,6 +168,7 @@ class Engine:
             log.info("collections expired", extra={"count": len(expired)})
         if self.transit is not None:
             self.transit.cleanup(self.limits.transfer.transit_ttl_seconds)
+        self.host_limiter.prune()
 
     # ------------------------------------------------------------------ validation
     def _schema_errors(self, component: str, payload: Any) -> None:
@@ -381,9 +385,9 @@ class Engine:
                     errors=[FieldError(pointer="/rules/fetch/connection_id", message="unknown")],
                 )
             creds = auth_headers(found[0], self.connection_policy)
-        base_fetcher = Fetcher(
-            self.client, limits, self._fetch_limiter, user_agent=user_agent, headers=headers
-        )
+        # the request's limits take part in the shared per-host limits until the fetch is over
+        host_session = self.host_limiter.session(limits)
+        base_fetcher = Fetcher(self.client, limits, host_session, user_agent=user_agent, headers=headers)
 
         async def fetch_robots(url: str) -> tuple[int, str] | None:
             try:
@@ -404,15 +408,13 @@ class Engine:
                     f"disallowed by robots.txt for user-agent {token}", code="access_denied_by_policy"
                 )
 
-        await check(canonical)
-
         async def crawl_delay(url: str) -> float | None:
             return None if owner_policy else (await robots.rules_for(url)).crawl_delay
 
         fetcher = Fetcher(
             self.client,
             limits,
-            self._fetch_limiter,
+            host_session,
             user_agent=user_agent,
             headers=headers,
             auth_headers=creds,
@@ -420,6 +422,7 @@ class Engine:
             crawl_delay_for=crawl_delay,
         )
         try:
+            await check(canonical)
             result = await fetcher.get(canonical, check_hop=check)
         except FetchError as exc:
             raise JaneError(
@@ -432,6 +435,8 @@ class Engine:
                 },
                 retry_after_seconds=exc.retry_after_seconds,
             ) from exc
+        finally:
+            host_session.close()
         if result.status >= 400:
             raise JaneError(
                 f"source returned HTTP {result.status}",

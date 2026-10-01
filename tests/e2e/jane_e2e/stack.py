@@ -162,6 +162,8 @@ class E2EStack:
     project: str = field(default_factory=default_project)
     root: Path = ROOT
     timeout_s: int = int(os.environ.get("JANE_E2E_WAIT_TIMEOUT", "900"))
+    # Extra compose files after the e2e overlay - only for the isolated stack of one scenario module.
+    overlays: tuple[Path, ...] = ()
     _env: dict[str, str] = field(default_factory=dict)
     _started: set[str] = field(default_factory=set)
 
@@ -299,18 +301,9 @@ class E2EStack:
     def compose(
         self, *args: str, check: bool = True, text: bool = True, timeout: float | None = None
     ) -> subprocess.CompletedProcess[Any]:
+        files = [arg for path in (INFRA_COMPOSE, E2E_COMPOSE, *self.overlays) for arg in ("-f", str(path))]
         return self._run(
-            [
-                "docker",
-                "compose",
-                "-f",
-                str(INFRA_COMPOSE),
-                "-f",
-                str(E2E_COMPOSE),
-                "-p",
-                self.project,
-                *args,
-            ],
+            ["docker", "compose", *files, "-p", self.project, *args],
             check=check,
             text=text,
             timeout=timeout,

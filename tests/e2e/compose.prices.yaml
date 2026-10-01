@@ -1,0 +1,14 @@
+# S-M2-04 only (tests/e2e/test_m2_prices.py): third compose file of that module's isolated stack.
+#
+#   docker compose -f infra/compose.yaml -f tests/e2e/compose.e2e.yaml -f tests/e2e/compose.prices.yaml -p <unique> ...
+#
+# STAND-IN (Т) for a controllable price change on the test site (requested from WP-01): the testsite image is
+# unchanged; the container runs tests/e2e/jane_e2e/testsite_prices.py, which serves the same jane_testsite
+# pages and adds PUT /_e2e/products/{slug} (price, availability, name of one product in memory).
+# Relative paths resolve against the FIRST compose file (infra/), hence `..`.
+
+services:
+  testsite:
+    command: ["python", "/e2e/testsite_prices.py", "--host", "0.0.0.0", "--port", "8080"]
+    volumes:
+      - ../tests/e2e/jane_e2e/testsite_prices.py:/e2e/testsite_prices.py:ro

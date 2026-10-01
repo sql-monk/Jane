@@ -478,7 +478,11 @@ def test_loader_cache_hit_requires_the_referenced_package_and_version() -> None:
     # d101 gets exactly the cold answer instead of running the cached 1.0.1.
     warm_foreign, warm_other = refused(foreign), refused(other_id)
     assert (type(warm_foreign), type(warm_other)) == cold
-    assert warm_foreign.code == "digest_mismatch" and d100 in str(warm_foreign) and d101 in str(warm_foreign)
+    assert (
+        warm_foreign.error_code == "digest_mismatch"
+        and d100 in str(warm_foreign)
+        and d101 in str(warm_foreign)
+    )
     assert seen[fetched:] == [
         f"/v1/packages/{CACHE_PKG}/versions/1.0.0/archive",
         f"/v1/packages/{CACHE_PKG}-other/versions/1.0.1/archive",
@@ -546,7 +550,8 @@ def test_invocation_refuses_a_foreign_digest_also_after_caching_it(
             "context": {"test_mode": True},
             "delivery": {"delivery_key": key},
         }
-        return client.post("/v1/invocations", json=body, headers={"Idempotency-Key": key})
+        response: httpx.Response = client.post("/v1/invocations", json=body, headers={"Idempotency-Key": key})
+        return response
 
     pinned = {"package_id": CACHE_PKG, "version": "1.0.1", "digest": digest_of(v101)}
     foreign = {**pinned, "version": "1.0.0"}

@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.request
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -484,9 +485,41 @@ class E2EStack:
         self._run(["docker", "network", "disconnect", "-f", self.network, self.container(service, index)])
 
     def reconnect(self, service: str, index: int = 1) -> None:
+        """End of the partition: the replica is reachable again *inside* the stack network.
+
+        The port published to the host is not guaranteed to survive: Docker Engine on Linux re-creates the
+        endpoint, and the host port can change or disappear (connection refused on the old one), while
+        Docker Desktop keeps it. Clients on the host must therefore not reuse a URL resolved before the
+        partition - see :meth:`published_url`."""
         self._run(
             ["docker", "network", "connect", "--alias", service, self.network, self.container(service, index)]
         )
+
+    def published_url(self, service: str, index: int = 1, timeout_s: float = 60.0) -> str:
+        """Base URL of a replica as reachable from the host *now*.
+
+        Re-reads the published port on every probe and waits until ``/v1/health`` answers 200. If the replica
+        stays unreachable from the host (the port binding was lost, e.g. after :meth:`reconnect` on Docker
+        Engine for Linux), it is restarted once - ``docker start`` publishes its ports again - and probed
+        anew. Meant for the end of a scenario (reading effects), not for the middle of a fault."""
+        for attempt in range(2):
+            deadline = time.monotonic() + timeout_s
+            while True:
+                try:
+                    url = self.url(service, index)
+                    with urllib.request.urlopen(f"{url}/v1/health", timeout=5) as r:
+                        if r.status == 200:
+                            return url
+                except (StackError, OSError):
+                    pass  # no published port yet, refused, reset or not healthy (HTTPError is an OSError)
+                if time.monotonic() > deadline:
+                    break
+                time.sleep(1.0)
+            if attempt == 0:
+                print(f"{service}#{index}: not reachable from the host, restarting it", file=sys.stderr)
+                self._run(["docker", "restart", self.container(service, index)], timeout=300)
+                self.wait_healthy(service, index)
+        raise StackError(f"{service}#{index}: not reachable from the host after a restart")
 
     def restart(self, service: str) -> None:
         self.compose(

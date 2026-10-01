@@ -488,7 +488,7 @@ def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_dupl
     ``store-products``. That storage item is then the only unfinished item of the run, so a worker and the
     stage slot are free while it waits: frequent polling of the items API bounds each wait from both sides
     and compares it with the configured backoff. After the partition the run completes, nothing twice."""
-    orch, storage = orchestrated, client("storage")
+    orch = orchestrated
     slow = local_package(stack, SLOW_EXTRACTOR)
     policy = dict(R03_POLICY)
     products = [SLOW_PRODUCT]
@@ -521,6 +521,7 @@ def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_dupl
     wait_for("RAW stored while the extraction runs", raw_stored_extraction_running, timeout_s=300)
 
     polls: list[Poll] = []
+    published_before = stack.url("storage")
     stack.disconnect("storage")
     try:
         # the partition is in place before store-products made its first attempt
@@ -545,6 +546,10 @@ def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_dupl
 
     final = wait_run(orch, run)
     items = handler_items(orch, run)
+    # storage is read from the host only now, through its current published port: after the reconnect
+    # Docker Engine on Linux may publish it on another host port (or lose the binding - then it restarts it)
+    published_after = stack.published_url("storage")
+    storage = client("storage")
     errors = [
         p.item["error"]
         for p in polls
@@ -555,7 +560,7 @@ def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_dupl
     print(
         f"\nR-03: polls={len(polls)} poll latency ms median={latency_ms[len(latency_ms) // 2]:.0f} "
         f"max={latency_ms[-1]:.0f}; worker poll={poll_ms:g} ms; codes={sorted({str(e.get('code')) for e in errors})} "
-        f"run={final['status']}"
+        f"run={final['status']}; storage on the host {published_before} -> {published_after}"
         f"\nR-03: failure details={sorted({str(e.get('detail'))[:120] for e in errors})}"
         "\nR-03: waits (attempt, policy delay ms, lower..upper ms, polls, isolated): "
         f"{[(w.attempt, w.delay_ms, round(w.lower_ms), round(w.upper_ms), w.polls, w.isolated) for w in waits]}"

@@ -46,6 +46,9 @@ services:
       JANE_HANDLER_RUNTIME_SANDBOX_LABELS: '{"io.jane.e2e-project": "${JANE_E2E_PROJECT:-jane-e2e}"}'
       # M1 uses the local package-host; registry acceptance opts into the real service.
       JANE_HANDLER_RUNTIME_REGISTRY_URL: ${JANE_E2E_RUNTIME_REGISTRY_URL:-http://package-host:8080}
+      # When an in-progress delivery key of a killed runtime may be taken over. The default is the service's
+      # own (15 min); R-07 shortens it for its stack so that calls cut by a runtime kill finish in the e2e budget.
+      JANE_HANDLER_RUNTIME_LIMITS__STATE__IN_PROGRESS_LEASE_MS: ${JANE_E2E_RUNTIME_IN_PROGRESS_LEASE_MS:-900000}
 
   llm:
     environment:
@@ -77,6 +80,10 @@ services:
       JANE_ASSISTANT_LIMITS__LLM__MAX_REQUESTS_PER_MINUTE: ${JANE_E2E_LLM_MAX_REQUESTS_PER_MINUTE:-120}
       JANE_ASSISTANT_LIMITS__ONBOARDING__SAMPLE_BATCH_SIZE: "1"
       JANE_ASSISTANT_LIMITS__ONBOARDING__POLL_PAGE_FACTOR: "10"
+      # Job lease and its renewal; the defaults are the service's own (60 s / 15 s). R-07 shortens them for its
+      # stack so that the job of a killed assistant expires within the e2e budget.
+      JANE_ASSISTANT_LIMITS__STATE__JOB_LEASE_MS: ${JANE_E2E_ASSISTANT_JOB_LEASE_MS:-60000}
+      JANE_ASSISTANT_LIMITS__STATE__HEARTBEAT_INTERVAL_MS: ${JANE_E2E_ASSISTANT_HEARTBEAT_MS:-15000}
     volumes:
       - ../tests/e2e/config/assistant-search.json:/cfg/assistant-search.json:ro
 

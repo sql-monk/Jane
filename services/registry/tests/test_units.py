@@ -458,7 +458,7 @@ SCAN_RUNGS = 3
 """Rungs below ``max_scan_bytes_per_file``: 2 MiB / 16**3 = 512 B, so a catastrophic pattern fails within seconds."""
 SCAN_GROWTH_BOUND = float(os.environ.get("JANE_REGISTRY_TEST_SCAN_GROWTH_BOUND", "6"))
 """Allowed CPU time of one scan of the larger input over ``SCAN_GROWTH`` scans of the smaller one (the same number
-of bytes): about 1 for a linear scanner - up to about 3.3 on random bytes, where the larger input passes the
+of bytes): about 1 for a linear scanner - up to about 4 on random bytes, where the larger input passes the
 keyword pre-filter of more detectors - and ``SCAN_GROWTH`` (16) for a quadratic one."""
 MAX_FILE_SCAN_UNITS = float(os.environ.get("JANE_REGISTRY_TEST_MAX_FILE_SCAN_UNITS", "16"))
 """CPU time allowed for one scan of a ``max_scan_bytes_per_file`` file, in units of :func:`_reference_cpu`
@@ -502,7 +502,7 @@ def test_scanner_handles_the_largest_scannable_file_fast(path: str, gen: Any) ->
     """A file of ``max_scan_bytes_per_file`` (2 MiB) of adversarial content is scanned fast, and the scan cost
     grows linearly up to that size (review 2: no ReDoS, no quadratic work).
 
-    No wall-clock seconds (the former bound of 2 s failed at 2.8-7.8 s on a loaded machine): CPU time of the test
+    No wall-clock seconds (the former bound of 2 s failed at 2.8-8.1 s on a loaded machine): CPU time of the test
     thread, compared with CPU time measured next to it.
 
     * growth: sizes go up by ``SCAN_GROWTH`` (512 B ... 2 MiB); on every rung one scan of the larger input may

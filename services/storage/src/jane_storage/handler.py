@@ -1,10 +1,16 @@
 """Storage handler: ``HandlerInvocation`` → ``HandlerResult`` (handler.v1, ``handler_kind: storage``).
 
+The package (:meth:`StorageHandler.resolve_package`) comes from, in this order: ``package_archive`` of the
+request; the built-in catalog (installed adapter distributions; its ``package_id@version`` is authoritative, a
+different ``digest`` is ``digest_mismatch`` without asking the registry); the registry, when configured
+(:mod:`jane_storage.registry_packages`). Not found anywhere → 404; registry unreachable → 502
+``upstream_unavailable`` (retryable).
+
 Two phases:
 
 * :meth:`StorageHandler.prepare` validates the request and raises :class:`jane_kit.errors.JaneError`
-  (HTTP 404/422: unknown package or connection, digest mismatch, invalid params, input kind not
-  accepted by the package) — the call did not happen;
+  (HTTP 404/422/502: unknown package or connection, digest mismatch, invalid params, input kind not
+  accepted by the package, registry unavailable) — the call did not happen;
 * :meth:`StorageHandler.execute` runs it; storage failures are ``status: failed`` results
   (``AdapterError(retryable=True)`` → ``failure.kind = connection_error``), never exceptions.
 
@@ -18,7 +24,7 @@ import json
 import logging
 import secrets
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol
@@ -42,9 +48,15 @@ from .formats import (
 )
 from .keys import canonical_key, entity_delivery_key, key_digest, object_delivery_key
 from .merge import InvalidRecord, validate_record
-from .packages import PackageCatalog, StoragePackage, package_from_archive
+from .packages import (
+    ArchiveLimits,
+    DependencyNotAllowed,
+    PackageCatalog,
+    StoragePackage,
+    package_from_archive,
+)
 
-__all__ = ["AdapterProvider", "Prepared", "StorageHandler", "new_id"]
+__all__ = ["AdapterProvider", "PackageSource", "Prepared", "StorageHandler", "new_id"]
 
 log = logging.getLogger(__name__)
 
@@ -72,6 +84,12 @@ class AdapterProvider(Protocol):
         self, connection_id: str, adapter_kind: str, options: Mapping[str, Any]
     ) -> StorageAdapter:
         """Opened adapter for the connection (raises NotFound / ValidationFailed / AdapterError)."""
+        ...
+
+
+class PackageSource(Protocol):
+    async def get(self, ref: Mapping[str, Any]) -> StoragePackage:
+        """Verified package of ``ref`` (``package_id``, ``version``, digest when given) or a JaneError."""
         ...
 
 
@@ -132,6 +150,9 @@ class StorageHandler:
         retries: RetryPolicy | None = None,
         request_validator: Callable[[dict[str, Any]], list[FieldError]] | None = None,
         clock: Callable[[], datetime] = utcnow,
+        registry: PackageSource | None = None,
+        archive_limits: ArchiveLimits | None = None,
+        installed_adapters: Collection[str] | None = None,
     ) -> None:
         self.catalog = catalog
         self.adapters = adapters
@@ -139,46 +160,80 @@ class StorageHandler:
         self.retries = retries or RetryPolicy()
         self.request_validator = request_validator
         self._clock = clock
+        self.registry = registry
+        """Third package source after ``package_archive`` and the built-in catalog (None: no registry)."""
+        self.archive_limits = archive_limits or ArchiveLimits()
+        self.installed_adapters = None if installed_adapters is None else frozenset(installed_adapters)
+        """Adapters a package from an archive or the registry may name (None: not checked here)."""
 
     # ------------------------------------------------------------------------------ prepare
-    async def _package(self, invocation: Mapping[str, Any]) -> StoragePackage:
-        ref = invocation["handler"]
-        archive_ref = invocation.get("package_archive")
+    async def _archive_package(self, archive_ref: Mapping[str, Any]) -> StoragePackage:
+        try:
+            data = await self.content.read(archive_ref)
+            if len(data) > self.archive_limits.max_archive_bytes:
+                raise ValueError(
+                    f"package archive is {len(data)} bytes, limit "
+                    f"packages.max_archive_bytes={self.archive_limits.max_archive_bytes}"
+                )
+            return package_from_archive(data, self.archive_limits)
+        except DependencyNotAllowed as exc:
+            raise JaneError(
+                f"package_archive: {exc}",
+                code="dependency_not_allowed",
+                errors=[FieldError(pointer="/package_archive", message=str(exc))],
+            ) from exc
+        except (ContentError, ValueError) as exc:
+            raise ValidationFailed(
+                f"package_archive: {exc}",
+                errors=[FieldError(pointer="/package_archive", message=str(exc))],
+            ) from exc
+
+    async def resolve_package(
+        self, ref: Mapping[str, Any], archive_ref: Mapping[str, Any] | None = None
+    ) -> StoragePackage:
+        """The package of ``ref``: ``archive_ref`` (``package_archive``), else built in, else the registry."""
+        builtin = False
         if archive_ref is not None:
-            try:
-                pkg = package_from_archive(await self.content.read(archive_ref))
-            except (ContentError, ValueError) as exc:
-                raise ValidationFailed(
-                    f"package_archive: {exc}",
-                    errors=[FieldError(pointer="/package_archive", message=str(exc))],
-                ) from exc
-            if (pkg.package_id, pkg.version) != (ref["package_id"], ref["version"]):
+            pkg = await self._archive_package(archive_ref)
+            if (pkg.package_id, pkg.version) != (ref.get("package_id"), ref.get("version")):
                 raise ValidationFailed(
                     "package_archive does not contain the requested package version",
                     errors=[
                         FieldError(pointer="/handler", message=f"archive has {pkg.package_id}@{pkg.version}")
                     ],
                 )
+        elif (found := self.catalog.get(str(ref.get("package_id")), str(ref.get("version")))) is not None:
+            pkg, builtin = found, True
+        elif self.registry is not None:
+            pkg = await self.registry.get(ref)
         else:
-            found = self.catalog.get(ref["package_id"], ref["version"])
-            if found is None:
-                raise NotFound(f"{ref['package_id']}@{ref['version']}")
-            pkg = found
+            raise NotFound(f"{ref.get('package_id')}@{ref.get('version')}")
         if ref.get("digest") and ref["digest"] != pkg.digest:
             raise JaneError(
                 f"requested {ref['digest']}, package has {pkg.digest}",
                 code="digest_mismatch",
                 retryable=False,
             )
+        if not builtin and self.installed_adapters is not None and pkg.adapter not in self.installed_adapters:
+            raise ValidationFailed(
+                f"{pkg.package_id}@{pkg.version} needs storage adapter {pkg.adapter!r}, which is not installed",
+                errors=[
+                    FieldError(
+                        pointer="/handler",
+                        message=f"adapter {pkg.adapter!r} not installed ({sorted(self.installed_adapters)})",
+                    )
+                ],
+            )
         return pkg
 
-    async def prepare(self, invocation: dict[str, Any]) -> Prepared:
+    async def prepare(self, invocation: dict[str, Any], *, package: StoragePackage | None = None) -> Prepared:
+        """Validate ``invocation``; ``package`` — already resolved (test runs), else :meth:`resolve_package`."""
         started = self._clock()
         if self.request_validator is not None:
             errors = self.request_validator(invocation)
             if errors:
                 raise ValidationFailed("invalid HandlerInvocation", errors=errors)
-        pkg = await self._package(invocation)
+        pkg = package or await self.resolve_package(invocation["handler"], invocation.get("package_archive"))
         params = dict(invocation.get("params") or {})
         if pkg.params_schema is not None:
             errors = _schema_errors(Draft202012Validator(pkg.params_schema), params, "/params")

@@ -96,6 +96,13 @@ entities = httpx.get(
 `HandlerInvocation.limits` (`retries`, `timeouts.sync_response_max_ms`, `timeouts.request_timeout_ms`) діють у межах
 стель. Типові значення:
 
+Пакет із `handler.package_id` та точної `handler.version` береться з `package_archive` запиту, встановленого
+каталогу адаптерів або, якщо задано `JANE_STORAGE_REGISTRY_URL`, з `registry.v1`. Для іншого дайджесту
+`handler.digest` сервіс повертає `digest_mismatch` до запису даних. Архів має містити пакет типу `storage`
+без залежностей і посилатися на встановлений адаптер. Пакети registry кешуються в пам'яті кожного
+екземпляра; URL і токен задає оператор, а не виклик. Тест пакета (`POST /v1/test-runs`) використовує ті самі
+джерела пакета.
+
 | Параметр | Типово | Призначення |
 |---|---|---|
 | `retries.max_attempts` / `initial_backoff_ms` / `max_backoff_ms` / `backoff_multiplier` / `jitter` | 4 / 200 / 10000 / 2.0 / true | повтори ядра при `CONFLICT` |
@@ -110,10 +117,17 @@ entities = httpx.get(
 | `pages.default_page_size` / `max_page_size` | 50 / 500 | пагінація читального API |
 | `invocations.max_results_in_memory` | 10000 | `GET /v1/invocations/{id}` |
 | `jobs.max_concurrent_jobs` / `max_queued_jobs` / `job_timeout_ms` | 4 / 1000 / 3600000 | виконання викликів |
+| `packages.max_archive_bytes` / `max_unpacked_bytes` / `max_files` | 20971520 / 52428800 / 2000 | межі для архівів у запиті та registry |
+| `packages.cache_max_entries` | 128 | перевірені пакети registry в пам'яті одного екземпляра |
+| `packages.registry_connect_timeout_ms` / `registry_request_timeout_ms` | 5000 / 30000 | встановлення з'єднання / повне завантаження архіву |
 
 Інші налаштування: `JANE_STORAGE_PORT` (8107), `JANE_STORAGE_CONNECTIONS_FILE`, `JANE_STORAGE_TRANSIT_CONNECTION_ID`
 (підключення `s3`/`minio` для читання `s3://`-матеріалів), `JANE_STORAGE_PACKAGE_DIRS`, `JANE_CONTRACTS_DIR`
 (валідація запитів за контрактами), `JANE_STORAGE_LOG_FORMAT`.
+
+`JANE_STORAGE_REGISTRY_URL` (типово порожньо) — HTTP(S) URL власного registry; без нього невідомий
+локально пакет повертає 404. `JANE_STORAGE_REGISTRY_TOKEN` (типово порожньо) — Bearer-токен тільки для
+registry. Сервіс не виконує перенаправлення і не використовує проксі з середовища для цього запиту.
 
 ### Політика секретів і вмісту
 

@@ -412,15 +412,20 @@ def test_r_01_lease_lost_during_active_call_taken_over_with_409_without_spent_at
 
 
 # ---------------------------------------------------------------------------- R-03
+# Delays well above the worker polling interval and the API latency, so that the bounds read by polling stay
+# decisive on a loaded host (3 s, then 6 s; jitter off to compare with exact values).
 R03_POLICY = {
     "max_attempts": 8,
-    "initial_backoff_ms": 2000,
+    "initial_backoff_ms": 3000,
     "backoff_multiplier": 2,
-    "max_backoff_ms": 8000,
+    "max_backoff_ms": 12000,
     "jitter": False,
 }
 R03_HOLD_S = 15.0  # the extraction keeps store-products back until the partition is in place
-R03_POLL_S = 0.1  # frequent polling: the resolution of both bounds of every wait
+R03_POLL_S = 0.1  # target period of the polling: the resolution of both bounds of every wait
+# The orchestrator schedules `available_at = now() + delay` with now() = start of the retry transaction, so the
+# visible `retrying` state may be shorter than the delay by the duration of that transaction.
+R03_COMMIT_TOLERANCE_MS = 250
 
 
 class Poll(NamedTuple):
@@ -534,7 +539,7 @@ def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_dupl
                 break  # two failed attempts and two waits observed
             if time.monotonic() > deadline:
                 raise AssertionError(f"store-products did not reach its third attempt: {run_view(orch, run)}")
-            time.sleep(R03_POLL_S)
+            time.sleep(max(0.0, R03_POLL_S - (received - sent)))
     finally:
         stack.reconnect("storage")
 
@@ -572,7 +577,7 @@ def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_dupl
         # (the queue held no other run, no connection push was pending)
         assert w.isolated, w
         # not claimed before the policy delay had elapsed
-        assert w.upper_ms >= w.delay_ms, w
+        assert w.upper_ms >= w.delay_ms - R03_COMMIT_TOLERANCE_MS, w
         # held back for at least half of the delay although a free worker looked for work every poll_ms
         assert w.lower_ms >= w.delay_ms / 2, w
         # and claimed within the order of the delay - the wait is not explained by something slower

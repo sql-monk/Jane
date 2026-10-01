@@ -55,7 +55,7 @@ Docker-сокет із групою, визначеною автоматично
 | S-M1-04 | Рекурсивний збір зі стороннього застосунку, runtime через CLI | 1, 10 | web-collector, handler-runtime | **пройдено на гілці WP-13** |
 | S-M1-05 | Заміна сховища лише конфігурацією завдання (PostgreSQL ↔ files) | 3 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
 | S-M1-06 | Новий прогін дає нове спостереження й подію історії | 8 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
-| S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | **1 Docker e2e пройшов на гілці WP-13** (у `main` не злито); продовження для LLM, storage і правил (`test_m2_registry_types.py`) — **3 Docker e2e поспіль на гілці `wp/13g-registry-types`** (LLM — З), 2 `xfail(strict)` |
+| S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | 1 Docker e2e пройшов; продовження WP-13g — 3 passed / 2 xfailed (LLM — З). Після WP-10d адресний Docker e2e кешу LLM на WP-13h — 1 passed; відкритий `xfail(strict)` стосується storage-форку в завданні. На фінальній `main` не перевірено |
 | S-M2-02 | Telegram: історія, нові, редагування як ревізії → збереження | 1, 8, 12 | telegram-collector, storage | **1 passed на спільній гілці WP-01a/00a/13** (Telegram — З) |
 | S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | **10 Docker e2e пройшли на `main` `1306ad3`** (`test_m2_discovery.py`; `just e2e`, CI `36694741989`) |
 | S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage, registry; зміна ціни на testsite — e2e-перемикач (Т) | **3 Docker e2e поспіль пройшли на гілці `wp/13e-price-check`** (`test_m2_prices.py`); в інтеграційну гілку й `main` ще не злито |
@@ -187,7 +187,9 @@ orchestrator, storage), замінників немає. Крок 1 викона
 не злитий. Кроки 5–7 (`test_m2_registry_types.py`, **Р**, LLM — **З**) пройшли **3 Docker e2e поспіль на
 гілці `wp/13g-registry-types`**: 3 passed, 2 xfailed (strict) — форк storage в етапі завдання й
 LLM-шлюз, що після кешування виконує іншу версію за чужим дайджестом (звіт WP-13, «Критерій 9: LLM,
-storage і форки типів»). Не перевірено: архіви решти чотирьох storage-пакетів.
+storage і форки типів»). Після WP-10d адресний Docker e2e WP-13h підтвердив
+`422 digest_mismatch` на прогрітому кеші LLM; його `xfail` знято. Відкритим лишається
+форк storage в етапі завдання. Не перевірено: архіви решти чотирьох storage-пакетів.
 
 ### S-M2-02. Telegram
 Клієнт Telegram — **З** (записаний бекенд WP-04). Кроки: історія каналу → нові повідомлення →

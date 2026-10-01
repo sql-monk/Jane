@@ -18,17 +18,29 @@ import httpx
 import psutil  # type: ignore[import-untyped]
 import pytest
 
-from jane_web_collector.testing import FAST_LIMITS, ServiceFactory, Site, drain, start, wait_done, web_rules
+from jane_web_collector.testing import (
+    FAST_LIMITS,
+    ServiceFactory,
+    Site,
+    drain,
+    start,
+    wait_done,
+    wait_timeout_s,
+    web_rules,
+)
 
 SLOW: dict[str, Any] = {
     **FAST_LIMITS,
     "rate": {"requests_per_second_per_host": 10, "min_delay_ms_per_host": 0},
     "concurrency": {"max_parallel_fetches": 2, "max_parallel_fetches_per_host": 2},
 }
+HELD: dict[str, Any] = {**SLOW, "queue": {"max_unacked_materials": 5}}
+"""``SLOW``, and the collection pauses on backpressure after 5 unacknowledged materials: it cannot finish
+before a consumer pulls it, however slowly the test (or a loaded machine) gets to its next step."""
 
 
-def _wait_fetched(api: httpx.Client, cid: str, n: int, timeout: float = 30) -> dict[str, Any]:
-    deadline = time.monotonic() + timeout
+def _wait_fetched(api: httpx.Client, cid: str, n: int) -> dict[str, Any]:
+    deadline = time.monotonic() + wait_timeout_s()
     view: dict[str, Any] = {}
     while time.monotonic() < deadline:
         view = api.get(f"/v1/collections/{cid}").json()
@@ -60,19 +72,24 @@ def test_two_instances_share_state_and_take_over_after_kill(
         httpx.Client(base_url=a.base, timeout=10) as api_a,
         httpx.Client(base_url=b.base, timeout=10) as api_b,
     ):
-        c1 = start(api_a, {"source_kind": "web", "source_id": "s1", "rules": web_rules(site), "limits": SLOW})
-        c2 = start(api_b, {"source_kind": "web", "source_id": "s2", "rules": web_rules(site), "limits": SLOW})
+        # Both collections wait for a consumer (HELD): c2 is still running when it is cancelled and c1 when its
+        # owner is killed. With a plain crawl a slow machine finished them first and the test then checked
+        # neither the cancellation of a running collection nor the takeover.
+        c1 = start(api_a, {"source_kind": "web", "source_id": "s1", "rules": web_rules(site), "limits": HELD})
+        c2 = start(api_b, {"source_kind": "web", "source_id": "s2", "rules": web_rules(site), "limits": HELD})
         _wait_fetched(api_a, c1, 5)
         page = api_b.get(f"/v1/collections/{c1}/materials", params={"limit": 3}).json()  # read via B
         assert page["items"]
         assert api_a.post(f"/v1/jobs/{c2}/cancel", json={"reason": "test"}).status_code == 202  # cancel via A
-        deadline = time.monotonic() + 20
+        deadline = time.monotonic() + wait_timeout_s()
         while api_a.get(f"/v1/collections/{c2}").json()["status"] != "cancelled":
             assert time.monotonic() < deadline, "c2 not cancelled"
             time.sleep(0.1)
+        before_kill = api_b.get(f"/v1/collections/{c1}").json()
+        assert before_kill["status"] == "running" and before_kill["stats"]["frontier_size"] > 0, before_kill
         a.kill()
-        rest = drain(api_b, c1, timeout=90)
-        done = wait_done(api_b, c1, timeout=60)
+        rest = drain(api_b, c1)
+        done = wait_done(api_b, c1)
     assert done["status"] == "succeeded", done
     assert done["stats"]["frontier_size"] == 0
     _assert_exact_once(site, expected_sets["recursive"], page["items"] + rest)

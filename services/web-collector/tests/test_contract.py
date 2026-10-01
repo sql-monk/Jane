@@ -3,16 +3,29 @@
 from __future__ import annotations
 
 import time
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
 from jane_kit.contracts import ContractClient, OpenAPISpec
-from jane_web_collector.testing import FAST_LIMITS, REPO_ROOT, Site, web_rules
+from jane_web_collector.testing import FAST_LIMITS, REPO_ROOT, Site, wait_timeout_s, web_rules
 
 pytestmark = pytest.mark.contract
 
 SPEC = OpenAPISpec.load(REPO_ROOT / "contracts" / "openapi" / "collector.v1.yaml")
+
+
+def _wait_paused(client: TestClient, cid: str) -> dict[str, Any]:
+    """Wait until the collection stands on backpressure (its unacknowledged buffer is full)."""
+    deadline = time.monotonic() + wait_timeout_s()
+    view: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        view = client.get(f"/v1/collections/{cid}").json()
+        if view["paused_by_backpressure"]:
+            return view
+        time.sleep(0.05)
+    raise AssertionError(f"collection {cid} did not pause on backpressure: {view}")
 
 
 def test_every_operation_matches_the_contract(
@@ -45,12 +58,15 @@ def test_every_operation_matches_the_contract(
     SPEC.validate_response("POST", "/v1/rules/validations", raw.status_code, raw.json())
     assert raw.json()["valid"] is False and raw.json()["errors"]
 
-    # collections: 202, replay, 422, 409 (state_key busy), get, materials, errors
+    # collections: 202, replay, 422, 409 (state_key busy), get, materials, errors.
+    # The collection holds at most one unacknowledged material, so it cannot finish before this test
+    # cancels it: the 409 and 202 below are checked on a running collection however slowly the test runs
+    # (a 4 req/s crawl was expected to outlast these steps; under load it finished first: 204, not 409).
     body = {
         "source_kind": "web",
         "source_id": "contract",
         "rules": rules,
-        "limits": {**FAST_LIMITS, "rate": {"requests_per_second_per_host": 4, "min_delay_ms_per_host": 0}},
+        "limits": {**FAST_LIMITS, "queue": {"max_unacked_materials": 1}},
     }
     first = api.post("/v1/collections", json=body, headers={"Idempotency-Key": "c-1"})
     assert first.status_code == 202
@@ -72,7 +88,10 @@ def test_every_operation_matches_the_contract(
     assert tg.status_code == 422
     api.get(f"/v1/collections/{cid}")
     api.get(f"/v1/jobs/{cid}")
+    _wait_paused(client, cid)
     page = api.get(f"/v1/collections/{cid}/materials", params={"limit": 3, "wait_ms": 2000}).json()
+    assert len(page["items"]) == 1 and page["collection_status"] == "running", page
+    # acknowledges the material: the collector may emit one more and stands on backpressure again
     api.get(f"/v1/collections/{cid}/materials", params={"after": page["next_cursor"], "limit": 3})
     api.get(f"/v1/collections/{cid}/errors", params={"limit": 1})
     assert api.get("/v1/collections/job_nope").status_code == 404
@@ -80,9 +99,10 @@ def test_every_operation_matches_the_contract(
     assert api.get("/v1/collections/job_nope/errors").status_code == 404
 
     # state while running -> DELETE conflicts; cancel the job; then state reads and resets
+    assert api.get(f"/v1/collections/{cid}").json()["status"] == "running"
     assert api.delete("/v1/states/contract").status_code == 409
     assert api.post(f"/v1/jobs/{cid}/cancel", json={"reason": "contract test"}).status_code == 202
-    deadline = time.monotonic() + 10
+    deadline = time.monotonic() + wait_timeout_s()
     while api.get(f"/v1/jobs/{cid}").json()["status"] != "cancelled" and time.monotonic() < deadline:
         time.sleep(0.05)
     assert api.get(f"/v1/collections/{cid}").json()["status"] == "cancelled"

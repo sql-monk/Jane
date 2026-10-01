@@ -6,15 +6,19 @@
 from __future__ import annotations
 
 import copy
+import time
 from typing import Any
 
+import httpx
 import pytest
-from assistant_fakes import World
+from assistant_fakes import WAIT_S, World
 from assistant_fakes.runtime import PRODUCT_CODE_V1, PRODUCT_CODE_V2_BREAKING
 from assistant_fakes.site import SITES, material, product
 from fastapi.testclient import TestClient
 
 from jane_assistant.packages import extractor_draft
+from jane_assistant.settings import Settings
+from jane_kit.contracts import ContractClient
 
 PKG = "catalog.product-extractor"
 PROBLEM_URL = "https://shop.example.test/product/c-300"
@@ -353,3 +357,56 @@ def test_invalid_requests(w: World) -> None:
     assert (
         w.client.post("/v1/improvement-runs", json=body, headers={"Idempotency-Key": "b2"}).status_code == 422
     )
+
+
+class _ResetOnce(httpx.AsyncBaseTransport):
+    """A neighbour reached through a pooled keep-alive connection that the neighbour has just closed.
+
+    The first ``method path`` request fails the way httpx reports it, ``httpx.ReadError`` (connection reset),
+    and never reaches the neighbour; later requests pass through. Seen in test_process_e2e under load: uvicorn
+    (every Jane service, ``jane_kit.service.run``) closes a connection idle for 5 s (``timeout_keep_alive``)
+    and the client reuses it at the same moment (``keepalive_expiry`` is 5 s in httpx as well)."""
+
+    def __init__(self, inner: httpx.AsyncBaseTransport, method: str, path: str) -> None:
+        self.inner = inner
+        self.method = method
+        self.path = path
+        self.resets = 0
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        if not self.resets and request.method == self.method and request.url.path == self.path:
+            self.resets += 1
+            raise httpx.ReadError("connection reset by peer", request=request)
+        return await self.inner.handle_async_request(request)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="defect of jane_kit.clients.ServiceClient (WP-01): httpx.ReadError of a reset pooled connection is "
+    "not retried even for GET or a POST with Idempotency-Key; the job fails (docs/delivery/WP-11.md, WP-11d)",
+)
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [("GET", f"/v1/packages/{PKG}"), ("POST", f"/v1/packages/{PKG}/versions")],
+    ids=["get-package", "publish-version"],
+)
+def test_a_reset_pooled_connection_does_not_fail_the_run(w: World, method: str, path: str) -> None:
+    seed(w)
+    reset = _ResetOnce(w.extra["transports"]["registry"], method, path)
+    w.extra["transports"] = {**w.extra["transports"], "registry": reset}
+    with w.instance(Settings(log_format="console", contracts_dir=w.contracts)) as client:
+        api = ContractClient(w.spec, client)
+        r = api.post("/v1/improvement-runs", json=request(), headers={"Idempotency-Key": "imp-reset"})
+        assert r.status_code == 202, r.text
+        deadline = time.monotonic() + WAIT_S
+        while (job := api.get(f"/v1/jobs/{r.json()['job_id']}").json())["status"] not in {
+            "succeeded",
+            "failed",
+            "cancelled",
+        }:
+            assert time.monotonic() < deadline, job
+            time.sleep(0.01)
+    assert reset.resets == 1  # the scenario really went through a reset connection
+    assert job["status"] == "succeeded", job.get("error")
+    assert job["result"]["outcome"] == "new_version" and job["result"]["activated"] is True
+    assert w.registry.versions[PKG]["1.2.1"]["status"] == "approved"

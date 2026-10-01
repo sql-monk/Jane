@@ -2,6 +2,14 @@
 
 Only the standard library, httpx and the service itself: the testsite fixture lives in ``tests/conftest.py``.
 Clients may be ``httpx.Client`` or FastAPI ``TestClient`` (a subclass of it).
+
+How long the helpers wait comes from the environment, so a loaded machine (a full ``just check``, parallel
+agents) can be given more time without touching the tests; a wait is an upper bound, never a pass condition:
+
+* ``JANE_WEB_COLLECTOR_TEST_START_S`` (120): a service process answers ``/v1/health``
+  (:meth:`ServiceProcess.start`);
+* ``JANE_WEB_COLLECTOR_TEST_WAIT_S`` (120): an awaited event happens - a collection finishes, the stream ends,
+  a cancellation takes effect (:func:`wait_done`, :func:`drain`, :func:`wait_timeout_s` in tests).
 """
 
 from __future__ import annotations
@@ -35,9 +43,37 @@ __all__ = [
     "free_port",
     "make_settings",
     "start",
+    "start_timeout_s",
     "wait_done",
+    "wait_timeout_s",
     "web_rules",
 ]
+
+START_TIMEOUT_ENV = "JANE_WEB_COLLECTOR_TEST_START_S"
+WAIT_TIMEOUT_ENV = "JANE_WEB_COLLECTOR_TEST_WAIT_S"
+DEFAULT_START_TIMEOUT_S = 120.0
+DEFAULT_WAIT_TIMEOUT_S = 120.0
+
+
+def _seconds_from_env(name: str, default: float) -> float:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    value = float(raw)
+    if value <= 0:
+        raise ValueError(f"{name} must be a positive number of seconds, got {raw!r}")
+    return value
+
+
+def start_timeout_s() -> float:
+    """How long a service process may take to become healthy (``JANE_WEB_COLLECTOR_TEST_START_S``)."""
+    return _seconds_from_env(START_TIMEOUT_ENV, DEFAULT_START_TIMEOUT_S)
+
+
+def wait_timeout_s() -> float:
+    """Upper bound for an awaited event in a test (``JANE_WEB_COLLECTOR_TEST_WAIT_S``)."""
+    return _seconds_from_env(WAIT_TIMEOUT_ENV, DEFAULT_WAIT_TIMEOUT_S)
+
 
 FAST_LIMITS: dict[str, Any] = {
     "rate": {"requests_per_second_per_host": 500, "min_delay_ms_per_host": 0},
@@ -109,8 +145,8 @@ def start(client: httpx.Client, body: dict[str, Any], key: str | None = None) ->
     return str(r.json()["job_id"])
 
 
-def wait_done(client: httpx.Client, cid: str, timeout: float = 60) -> dict[str, Any]:
-    deadline = time.monotonic() + timeout
+def wait_done(client: httpx.Client, cid: str, timeout: float | None = None) -> dict[str, Any]:
+    deadline = time.monotonic() + (wait_timeout_s() if timeout is None else timeout)
     body: dict[str, Any] = {}
     while time.monotonic() < deadline:
         body = client.get(f"/v1/collections/{cid}").json()
@@ -120,11 +156,13 @@ def wait_done(client: httpx.Client, cid: str, timeout: float = 60) -> dict[str, 
     raise AssertionError(f"collection {cid} did not finish: {body}")
 
 
-def drain(client: httpx.Client, cid: str, *, limit: int = 50, timeout: float = 60) -> list[dict[str, Any]]:
+def drain(
+    client: httpx.Client, cid: str, *, limit: int = 50, timeout: float | None = None
+) -> list[dict[str, Any]]:
     """Pull every material (acknowledging each page with ``after``) until ``end_of_stream``."""
     items: list[dict[str, Any]] = []
     after: str | None = None
-    deadline = time.monotonic() + timeout
+    deadline = time.monotonic() + (wait_timeout_s() if timeout is None else timeout)
     while time.monotonic() < deadline:
         params: dict[str, Any] = {"limit": limit, "wait_ms": 500}
         if after:
@@ -173,7 +211,9 @@ class ServiceProcess:
     def base(self) -> str:
         return f"http://127.0.0.1:{self.port}"
 
-    def start(self, timeout: float = 30) -> None:
+    def start(self, timeout: float | None = None) -> None:
+        """Start the process and wait for ``/v1/health`` (``timeout`` defaults to :func:`start_timeout_s`)."""
+        timeout = start_timeout_s() if timeout is None else timeout
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.log_path = self.state_dir.parent / f"service-{time.time_ns()}.log"
         with self.log_path.open("wb") as log:

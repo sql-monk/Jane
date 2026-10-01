@@ -69,7 +69,7 @@ Docker-сокет із групою, визначеною автоматично
 | S-M2-11 | Ланцюжок з умовами `when` і LLM-етапом | 2 | orchestrator, web-collector, runtime, storage, llm | **пройдено на гілці `wp/13-llm-routing`** (`test_m2_llm_routing.py`; LLM — З, архіви пакетів — `package-host` Т) |
 | R-01 | Kill воркера оркестратора посеред ланцюжка | 8 | orchestrator ×2, виконавці | **3 Docker e2e поспіль пройшли на гілці `wp/13d-reliability`** (у `main` не злито) |
 | R-02 | Kill і рестарт кожного сервісу; повтор після рестарту — дубль | 8 | storage, handler-runtime (далі — усі) | **реалізовано для storage і runtime, проходить** |
-| R-03 | Розрив мережі між оркестратором і виконавцем | 8 | orchestrator, виконавці | **3 Docker e2e поспіль пройшли на гілці `wp/13d-reliability`** (виконавець — storage; у `main` не злито) |
+| R-03 | Розрив мережі між оркестратором і виконавцем | 8 | orchestrator, виконавці | **3 Docker e2e поспіль пройшли на гілці `wp/13d-reliability`** (виконавець — storage; Docker Desktop, Linux CI після виправлення порту ще не перевірено; у `main` не злито) |
 | R-04 | Повторна доставка на кожен виконавець | 8 | усі виконавці | **частково**: Web/Telegram Collector і LLM — 4 Docker e2e на гілці WP-13 (`test_r04_idempotency.py`, у `main` не злито; Telegram і LLM-провайдер — З); storage, runtime — дубль у S-M1-01, R-02, R-06 без перевірки 422 і `Idempotency-Replayed`; повтор під час виконання, після рестарту й на іншому екземплярі колекторів і LLM — ні |
 | R-05 | Запізнілий результат не замінює новішого | 8 | storage, handler-runtime | **реалізовано, проходить** |
 | R-06 | Кілька екземплярів кожного компонента | 8 | усі | **runtime ×2 реалізовано, проходить**; інші — з WP |

@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-__all__ = ["SERVICES", "E2EStack", "ServiceSpec", "StackError"]
+__all__ = ["SANDBOX_PROJECT_LABEL", "SERVICES", "E2EStack", "ServiceSpec", "StackError"]
 
 ROOT = Path(__file__).resolve().parents[3]
 INFRA_COMPOSE = ROOT / "infra" / "compose.yaml"
@@ -51,6 +51,10 @@ CREDENTIAL_KEYS = (
     "JANE_S3_ACCESS_KEY",
     "JANE_S3_SECRET_KEY",
 )
+
+
+# Label of handler-runtime sandboxes started by this stack (JANE_HANDLER_RUNTIME_SANDBOX_LABELS in the overlay).
+SANDBOX_PROJECT_LABEL = "io.jane.e2e-project"
 
 
 class StackError(RuntimeError):
@@ -469,11 +473,15 @@ class E2EStack:
         r = self._run(["docker", "ps", "-q", *filters])
         return str(r.stdout).splitlines()
 
-    def running_label_values(self, labels: Mapping[str, str], key: str) -> list[str]:
+    def running_label_values(
+        self, labels: Mapping[str, str], key: str, *, include_stopped: bool = False
+    ) -> list[str]:
         """Value of label ``key`` of every running container that carries all ``labels`` (for instance the
-        invocation id of each active handler-runtime sandbox). Quiet: scenarios poll it."""
+        invocation id of each active handler-runtime sandbox). ``include_stopped`` adds created and exited
+        containers (sandboxes a killed runtime never removed). Quiet: scenarios poll it."""
         filters = [arg for k, v in labels.items() for arg in ("--filter", f"label={k}={v}")]
-        r = self._run(["docker", "ps", *filters, "--format", f'{{{{.Label "{key}"}}}}'], echo=False)
+        every = ["-a"] if include_stopped else []
+        r = self._run(["docker", "ps", *every, *filters, "--format", f'{{{{.Label "{key}"}}}}'], echo=False)
         return [v.strip() for v in str(r.stdout).splitlines() if v.strip()]
 
     @property
@@ -543,6 +551,14 @@ class E2EStack:
         args = ["down", "--remove-orphans"] + (["-v", "--rmi", "local"] if volumes else [])
         self.compose(*args, timeout=900)
         if volumes:
+            # Sandboxes are created by handler-runtime through the Docker API, not by compose: a runtime that was
+            # killed leaves its sandboxes behind (R-07). They carry the project label of this stack.
+            r = self._run(
+                ["docker", "ps", "-a", "-q", "--filter", f"label={SANDBOX_PROJECT_LABEL}={self.project}"],
+                check=False,
+            )
+            if leftovers := str(r.stdout).split():
+                self._run(["docker", "rm", "-f", "-v", *leftovers], check=False)
             self._run(["docker", "image", "rm", "-f", self.sandbox_image], check=False)
             self.stack_file.unlink(missing_ok=True)
             recordings = self.telegram_recordings_dir.resolve()

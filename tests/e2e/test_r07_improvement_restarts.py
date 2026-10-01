@@ -3,13 +3,14 @@
 
 Each scenario prepares S-M2-07 anew (``jane_e2e.assistant.prepare_improvable``: extractor 1.0.0 in the real
 registry, two bindings, a run that leaves out-of-stock and pre-order cards ``unrecognized``), starts a load run of
-another task (19 product pages, its own copy of the extractor) and then an improvement run. While the candidate
+another task (19 product pages extracted one at a time by the fixture ``e2e.slow-product-extractor`` with a short
+``delay_seconds``, published to the registry under its own id) and then an improvement run. While the candidate
 version 1.1.0 is being tested in the runtime (a sandbox of ``<package>@1.1.0`` runs, the LLM has answered,
 nothing is published yet):
 
 * ``assistant`` - the assistant gets ``docker kill`` (SIGKILL) and ``docker start``;
-* ``runtime`` - handler-runtime gets ``docker kill`` and stays down until the assistant's job has reacted, then
-  ``docker start``.
+* ``runtime`` - handler-runtime gets ``docker kill`` while a call of the load run is also in a sandbox, stays
+  down until the assistant's job has reacted, then ``docker start``.
 
 The interrupted job must end in a state the client can act on, and a repeated improvement run (new
 ``Idempotency-Key``) must finish the cycle: exactly one new version 1.1.0 (digest, parent 1.0.0, made by the
@@ -17,15 +18,17 @@ repeated job), 1.0.0 unchanged, one automatic activation per binding, then a rol
 is checked by execution: runs of the tasks, the ``HandlerResult.handler`` the runtime reports for every call
 and the stored entities. The load run must finish with every effect once.
 
-What the services do with the interrupted job is recorded in ``OBSERVED`` and asserted by the last two
-tests, ``xfail(strict=True)`` while the defects they reproduce are open (docs/delivery/WP-13.md, R-07).
+What the services do with the interrupted jobs and the cut load call is recorded in ``OBSERVED`` and asserted
+by the last three tests, ``xfail(strict=True)`` while the defects they reproduce are open
+(docs/delivery/WP-13.md, R-07).
 
 Real services: assistant, LLM gateway, registry, web-collector, handler-runtime, orchestrator, storage,
 testsite, PostgreSQL, MinIO. Substitutes of EXTERNAL systems (**З**): the LLM provider ``fake`` (scripted
 answers, tests/e2e/config/llm-seed.yaml) and the static web search. Operational observations outside the
 contracts: the JSON access log of handler-runtime (``request`` records, jane-kit) for the ids of the test-run
-jobs the assistant polls, and the Docker labels of runtime sandboxes (``io.jane.package``,
-``io.jane.invocation-id``, ``io.jane.e2e-project``).
+jobs the assistant polls, the start-up line ``configured limits`` (effective limits, ``instance``) of the assistant
+and the runtime, and the Docker labels of runtime sandboxes (``io.jane.package``, ``io.jane.invocation-id``,
+``io.jane.e2e-project``).
 """
 
 from __future__ import annotations
@@ -42,7 +45,7 @@ from typing import Any
 import pytest
 
 from jane_e2e.assistant import (
-    IMPROVABLE,
+    PACKAGES,
     PRODUCT_URLS,
     SUCCESSES,
     Flows,
@@ -75,7 +78,7 @@ from jane_e2e.orchestration import (
     start_run,
     wait_run,
 )
-from jane_e2e.stack import E2EStack
+from jane_e2e.stack import SANDBOX_PROJECT_LABEL, E2EStack
 from jane_e2e.verify import assert_effects_once, entities, site_paths
 
 pytestmark = [pytest.mark.e2e, pytest.mark.milestone("M2")]
@@ -85,7 +88,10 @@ POLL_S = 0.2
 # Settings of this module's stack (tests/e2e/compose.e2e.yaml); defaults chosen for the e2e time budget.
 JOB_LEASE_MS = int(os.environ.get("JANE_E2E_ASSISTANT_JOB_LEASE_MS", "20000"))
 HEARTBEAT_MS = int(os.environ.get("JANE_E2E_ASSISTANT_HEARTBEAT_MS", "2000"))
-IN_PROGRESS_LEASE_MS = int(os.environ.get("JANE_E2E_RUNTIME_IN_PROGRESS_LEASE_MS", "30000"))
+# The runtime's in-progress lease: shorter than the service default (15 min) so that a call cut by the kill can be
+# taken over within the e2e budget, longer than the runtime's downtime so that the retry of that call reaches the
+# runtime while the dead claim still holds the key.
+IN_PROGRESS_LEASE_MS = int(os.environ.get("JANE_E2E_RUNTIME_IN_PROGRESS_LEASE_MS", "120000"))
 STACK_ENV = {
     "JANE_E2E_ASSISTANT_JOB_LEASE_MS": str(JOB_LEASE_MS),
     "JANE_E2E_ASSISTANT_HEARTBEAT_MS": str(HEARTBEAT_MS),
@@ -96,6 +102,9 @@ WAIT_S = float(os.environ.get("JANE_E2E_R07_WAIT_S", "600"))
 
 CANDIDATE = "1.1.0"  # the scripted fix adds fields to the schema: a minor version
 LOAD_PRODUCTS = site_paths("product")
+LOAD_EXTRACTOR = PACKAGES / "e2e.slow-product-extractor"
+# Every load call stays in its sandbox at least this long, so the runtime kill cuts one (params.delay_seconds).
+LOAD_DELAY_S = float(os.environ.get("JANE_E2E_R07_LOAD_DELAY_S", "2"))
 LOAD_LIMITS = {"concurrency": {"max_parallel_stage_items": 1}}  # one call at a time: the load lasts
 # Retries of the load task outlast a runtime restart (attempts are spent while the runtime is down).
 LOAD_RETRIES = {
@@ -109,7 +118,7 @@ LOAD_RETRIES = {
 # JANE_HANDLER_RUNTIME_SANDBOX_LABELS in tests/e2e/compose.e2e.yaml).
 INVOCATION_LABEL = "io.jane.invocation-id"
 PACKAGE_LABEL = "io.jane.package"
-PROJECT_LABEL = "io.jane.e2e-project"
+PROJECT_LABEL = SANDBOX_PROJECT_LABEL
 JOB_PATH = re.compile(r"^/v1/jobs/(?P<job_id>[^/]+)$")
 
 # What the services did with the interrupted jobs; asserted by the xfail tests at the end of the module.
@@ -174,10 +183,16 @@ def version_numbers(registry: JaneClient, package_id: str) -> list[str]:
     return sorted(v["version"] for v in versions(registry, package_id))
 
 
+def sandboxes(stack: E2EStack, package: str, *, include_stopped: bool = False) -> set[str]:
+    """Invocation ids of the runtime sandboxes of ``package`` (``<id>@<version>``) in this stack: running ones,
+    or with ``include_stopped`` also those a killed runtime left behind (it removes every sandbox it finishes)."""
+    labels = {PROJECT_LABEL: stack.project, PACKAGE_LABEL: package}
+    return set(stack.running_label_values(labels, INVOCATION_LABEL, include_stopped=include_stopped))
+
+
 def candidate_sandboxes(stack: E2EStack, package_id: str) -> set[str]:
-    """Invocation ids of the running runtime sandboxes of the candidate ``<package>@1.1.0`` (a test case)."""
-    labels = {PROJECT_LABEL: stack.project, PACKAGE_LABEL: f"{package_id}@{CANDIDATE}"}
-    return set(stack.running_label_values(labels, INVOCATION_LABEL))
+    """Running sandboxes of the candidate ``<package>@1.1.0`` (a test case of the improvement run)."""
+    return sandboxes(stack, f"{package_id}@{CANDIDATE}")
 
 
 def log_records(stack: E2EStack, service: str, msg: str) -> list[dict[str, Any]]:
@@ -238,16 +253,18 @@ class Load:
 
 
 def start_load(flows: Flows, prefix: str) -> Load:
-    """Another source and task with its own copy of the extractor (so that it is not a binding of the improved
-    package): 19 product pages, one stage item at a time, retries that outlast a restart. Returns once the
-    runtime is executing its extraction calls."""
+    """Another source and task with another extractor (not a binding of the improved package): 19 product pages,
+    one stage item at a time, every call at least ``LOAD_DELAY_S`` long, retries that outlast a restart. Returns
+    once the runtime is executing its extraction calls."""
     registry, orch = flows["registry"], flows["orchestrator"]
-    package = ref_of(publish_fixture(registry, IMPROVABLE, f"{prefix}-load.improvable-product-extractor"))
+    package = ref_of(publish_fixture(registry, LOAD_EXTRACTOR, f"{prefix}-load.slow-product-extractor"))
     approve(registry, package, "e2e: load of R-07")
     source_id = task_id = f"{prefix}-load"
     create_source(orch, source_id)
     task = m1_task(task_id, source_id, [TESTSITE + p for p in LOAD_PRODUCTS], package, limits=LOAD_LIMITS)
     task["retries"] = LOAD_RETRIES
+    [extract] = [s for s in task["stages"] if s["stage_id"] == "extract-products"]
+    extract["params"] = {"delay_seconds": LOAD_DELAY_S}
     create_task(orch, task)
     run = start_run(orch, task_id)
 
@@ -259,23 +276,36 @@ def start_load(flows: Flows, prefix: str) -> Load:
     return Load(source_id, task_id, run, package)
 
 
-def finish_load(flows: Flows, load: Load, scenario: str) -> dict[str, Any]:
-    """The load run succeeded; every material stored once and every recognised product stored once."""
+def finish_load(flows: Flows, load: Load, scenario: str, *, may_fail: bool = False) -> dict[str, Any]:
+    """The load run succeeded and every effect happened once: one RAW per material, one entity (with one history
+    event) per product the extractor recognised. With ``may_fail`` extraction items may end ``failed`` (they are
+    returned; R-07/runtime records them for the xfail test below), otherwise every item must be completed."""
     orch, storage = flows["orchestrator"], flows["storage"]
     run = wait_run(orch, load.run, timeout_s=WAIT_S)
     items = list_items(orch, load.run)
     extracted = [i for i in items if i["stage_id"] == "extract-products"]
     # items that needed more than one attempt: "<stage> x<attempts>" -> number of items
     retried = dict(Counter(f"{i['stage_id']} x{i['attempts']}" for i in items if i["attempts"] > 1))
+    failed = [
+        {"stage": i["stage_id"], "attempts": i["attempts"], "error": (i.get("error") or {}).get("code")}
+        for i in items
+        if i["status"] == "failed"
+    ]
     counts = {s["stage_id"]: s.get("counts") for s in run["stages"]}
-    note(scenario, "load run", {"status": run["status"], "stages": counts, "retried items": retried})
+    note(
+        scenario,
+        "load run",
+        {"status": run["status"], "stages": counts, "retried": retried, "failed": failed},
+    )
     assert run["status"] == "succeeded", run
-    assert all(i["status"] == "completed" for i in items), [i for i in items if i["status"] != "completed"]
+    done = {"completed", "failed"} if may_fail else {"completed"}
+    assert all(i["status"] in done for i in items), [i for i in items if i["status"] not in done]
+    assert all(f["stage"] == "extract-products" for f in failed), failed
     assert len(extracted) == len(LOAD_PRODUCTS), extracted
     products = sum(1 for i in extracted if i.get("result_status") == "success")
     assert products > 0, extracted
     assert_effects_once(storage, load.source_id, materials=len(LOAD_PRODUCTS), products=products)
-    return {"retried": retried, "products": products}
+    return {"retried": retried, "failed": failed, "products": products}
 
 
 # ---------------------------------------------------------------------------- the fault window
@@ -414,14 +444,14 @@ def test_r_07_assistant_killed_while_candidate_is_tested_rerun_publishes_exactly
     llm_before = improvement_requests(flows)
 
     first = start_improvement(flows["assistant"], case.request)
-    sandboxes = wait_candidate_under_test(flows, case, first)
+    candidate = wait_candidate_under_test(flows, case, first)
     stack.kill_instance("assistant", 1)
     killed_at = time.monotonic()
     load_at_fault = run_view(flows["orchestrator"], load.run)["status"]
     note(
         scenario,
         "assistant killed",
-        {"job": first, "candidate sandboxes": sorted(sandboxes), "load": load_at_fault},
+        {"job": first, "candidate sandboxes": sorted(candidate), "load": load_at_fault},
     )
     assert load_at_fault == "running"  # the fault happens under load
     assert improvement_requests(flows) == llm_before + 1  # the LLM step of the killed job was done
@@ -466,10 +496,10 @@ def test_r_07_assistant_killed_while_candidate_is_tested_rerun_publishes_exactly
 def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactly_one_version(
     flows: Flows, run_id: str
 ) -> None:
-    """SIGKILL of handler-runtime while it tests the candidate (and executes calls of the load run); it stays
+    """SIGKILL of handler-runtime while it tests the candidate and executes a call of the load run; it stays
     down until the assistant's job has reacted, then starts again. The interrupted job publishes nothing; a
     repeated run publishes exactly one 1.1.0, activation and rollback work by execution, and the load run
-    finishes with every effect once."""
+    finishes with every effect once (an extraction item may end ``failed``: recorded for the xfail test)."""
     scenario = "R-07/runtime"
     stack, registry = flows.stack, flows["registry"]
     case = prepare_improvable(flows, f"e2e-{run_id}", scenario)
@@ -478,26 +508,37 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
     log_offset = len(access_log(stack, "handler-runtime"))
 
     first = start_improvement(flows["assistant"], case.request)
-    sandboxes = wait_candidate_under_test(flows, case, first)
+    candidate = wait_candidate_under_test(flows, case, first)
     runtime = flows["handler-runtime"]
+    load_package = f"{load.package['package_id']}@{load.package['version']}"
 
     def running_test_runs() -> list[str] | None:
-        """Test-run jobs the assistant polls (runtime access log) that the runtime reports as running."""
+        """Test-run jobs the assistant polls (runtime access log) that the runtime reports as running, at a
+        moment when a candidate test case and a call of the load run are both in sandboxes."""
+        job = job_of(flows["assistant"], "assistant", first)
+        assert job["status"] not in TERMINAL_JOB_STATES, job  # the job left the window before the fault
+        if not (candidate_sandboxes(stack, case.package_id) and sandboxes(stack, load_package)):
+            return None
         polled = polled_jobs(stack, "handler-runtime", log_offset)
         return [j for j in polled if job_of(runtime, "handler", j)["status"] == "running"] or None
 
-    test_runs = wait_for("a test-run job of the candidate running in the runtime", running_test_runs)
+    test_runs = wait_for("a candidate test-run and a load call running in the runtime", running_test_runs)
     stack.kill_instance("handler-runtime", 1)
     killed_at = time.monotonic()
     load_at_fault = run_view(flows["orchestrator"], load.run)["status"]
+    # Calls the dead runtime never finished: it removes every sandbox it has read, so the ones still there were
+    # in flight at the kill (operational: Docker labels of the sandboxes).
+    cut_load = sorted(sandboxes(stack, load_package, include_stopped=True))
+    cut_candidate = sorted(sandboxes(stack, f"{case.package_id}@{CANDIDATE}", include_stopped=True))
     note(
         scenario,
         "runtime killed",
         {
             "job": first,
-            "candidate sandboxes": sorted(sandboxes),
+            "candidate sandboxes": sorted(candidate),
             "test-run jobs": test_runs,
             "load": load_at_fault,
+            "sandboxes left by the dead runtime": {"load": cut_load, "candidate": cut_candidate},
         },
     )
     assert load_at_fault == "running"  # the fault happens under load
@@ -527,7 +568,8 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
     new = check_one_new_version(flows, case, second, result, scenario)
     assert improvement_requests(flows) == llm_before + 2  # one LLM answer per job, nothing replayed
     check_activation_and_rollback(flows, case, new, scenario)
-    load_result = finish_load(flows, load, scenario)
+    load_result = finish_load(flows, load, scenario, may_fail=True)
+    OBSERVED["load_after_runtime_restart"] = {"cut calls": cut_load, **load_result}
 
     # the runtime's own record of the test-run jobs the kill interrupted (read again at the end)
     OBSERVED["runtime_test_run_after_restart"] = {
@@ -536,7 +578,7 @@ def test_r_07_runtime_restarted_while_candidate_is_tested_rerun_publishes_exactl
         "seconds_after_restart": round(time.monotonic() - restarted_at, 1),
     }
     note(scenario, "runtime test-run jobs after the restart", OBSERVED["runtime_test_run_after_restart"])
-    note(scenario, "load affected by the restart", load_result["retried"])
+    note(scenario, "load after the restart", OBSERVED["load_after_runtime_restart"])
 
 
 # ---------------------------------------------------------------------------- what happens to the interrupted job
@@ -560,6 +602,30 @@ def test_r_07_job_of_killed_assistant_fails_after_its_lease() -> None:
         pytest.skip("the assistant-kill scenario did not reach the observation")
     assert observed["status"] == "failed", observed
     assert observed["error"] is not None and observed["error"]["code"] == "service_unavailable", observed
+
+
+@pytest.mark.criteria(8)
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "WP-09 (+WP-00): a retry of a delivery carries context.attempt + 1 under the same Idempotency-Key, so the "
+        "runtime that still holds the key of the cut call answers 422 idempotency_key_reused (not retryable) and "
+        "the item fails (docs/delivery/WP-13.md, R-07)"
+    ),
+)
+def test_r_07_load_call_cut_by_a_runtime_kill_completes_after_the_restart() -> None:
+    """Criterion 8: a call cut by the kill of the executor is delivered again with the same ``delivery_key``
+    after the restart and completes (once the dead claim is released, ``state.in_progress_lease_ms``).
+
+    Repro: ``R-07/runtime`` above - SIGKILL of handler-runtime while a sync extraction call of the load run is
+    in its sandbox (``e2e.slow-product-extractor``, ``delay_seconds``), start; the orchestrator retries the item
+    with ``context.attempt`` increased while the key is still claimed."""
+    observed = OBSERVED.get("load_after_runtime_restart")
+    if observed is None:
+        pytest.skip("the runtime-restart scenario did not reach the observation")
+    if not observed["cut calls"]:
+        pytest.skip("no call of the load run was in flight at the kill")
+    assert observed["failed"] == [], observed
 
 
 @pytest.mark.criteria(8)

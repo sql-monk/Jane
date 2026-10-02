@@ -28,6 +28,7 @@ import json
 import os
 import socket
 import tomllib
+import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -489,7 +490,10 @@ class JaneSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="JANE_", extra="ignore", env_nested_delimiter="__")
 
     service_name: str = "jane-service"
-    instance_id: str = f"{socket.gethostname()}-{os.getpid()}"
+    instance_id: str = Field(
+        default_factory=lambda: f"{socket.gethostname()}-{os.getpid()}-{uuid.uuid4().hex}"
+    )
+    """Unique to this process start, including a restart that reuses the container hostname and PID."""
     host: str = "127.0.0.1"
     port: int = 8000
     log_level: str = "INFO"

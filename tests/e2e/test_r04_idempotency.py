@@ -135,7 +135,7 @@ def test_r_04_web_replay_while_collection_is_running(
         view_response = api.get(f"/v1/collections/{collection_id}")
         assert view_response.status_code == 200, view_response.text
         view = view_response.json()
-        if view["status"] == "running" and view["stats"]["fetched"] < len(urls):
+        if view["status"] == "running" and view["stats"]["fetched"] <= 4:
             break
         assert view["status"] not in {"succeeded", "failed", "cancelled"}, view
         assert time.monotonic() < deadline, view
@@ -145,6 +145,9 @@ def test_r_04_web_replay_while_collection_is_running(
     assert replay.status_code == 202, replay.text
     assert replay.headers["Idempotency-Replayed"] == "true"
     assert replay.json() == first.json()
+    during_response = api.get(f"/v1/collections/{collection_id}")
+    assert during_response.status_code == 200, during_response.text
+    assert during_response.json()["status"] == "running", during_response.text
     mismatch = api.post("/v1/collections", json={**body, "mode": "incremental"}, headers=headers)
     assert mismatch.status_code == 422, mismatch.text
     assert mismatch.json()["code"] == "idempotency_key_reused"

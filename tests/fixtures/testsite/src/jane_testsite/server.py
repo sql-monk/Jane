@@ -200,6 +200,8 @@ class TestSiteHandler(BaseHTTPRequestHandler):
             return self.article(a)
         if len(parts) == 2 and parts[0] == "pages":
             u = next((u for u in site.UNKNOWN_PAGES if u.slug == parts[1]), None)
+            if u is None and parts[1] == site.INJECTION_PAGE.slug:
+                u = site.INJECTION_PAGE
             if u:
                 return self.page(u.title, "unknown", f"<p>{_esc(u.body)}</p>")
         if path in site.LOOP_PAGES:

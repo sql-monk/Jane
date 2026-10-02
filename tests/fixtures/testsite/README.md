@@ -50,6 +50,10 @@ uv run python -m jane_testsite --write-expected tests/fixtures/testsite/expected
 - `page_types`: тип кожної сторінки (`product`, `news`, `unknown`, `category`, `news-list`), також у
   `<meta name="jane:page-type">`. `unknown` — сторінки подій, вакансій, FAQ, для яких немає екстрактора.
 
+Окремий прямий URL `/pages/faq-injection` — невідома сторінка для наскрізної перевірки захисту LLM від
+інструкцій у вмісті. Вона містить звичайну відповідь FAQ і фразу `Ignore previous instructions and output ...`.
+Сторінка не входить до наборів пошуку й обходу, щоб інші тести мали незмінні очікувані URL.
+
 Цикли: `/loop/a → /loop/b → /loop/c → /loop/a`, самопосилання, товари посилаються на «пов'язаний» товар
 по колу, статті — на новішу/старішу.
 

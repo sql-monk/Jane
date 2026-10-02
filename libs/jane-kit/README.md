@@ -38,6 +38,10 @@ hostname і PID збігаються. Явний `<ПРЕФІКС>INSTANCE_ID` �
 | `jane_kit.service` | `create_app(settings, capabilities=...)` — FastAPI з усім вищенаведеним; `run()` — uvicorn | — |
 | `jane_kit.devstack` | `load_stack()` — порти й облікові дані стеку `just up` (для інтеграційних тестів) | — |
 
+`ServiceClient` повторює `httpx.ReadError` (зокрема закрите сервером простоюване з'єднання) лише для
+безпечного методу або запиту з `Idempotency-Key`, з тими самими тілом і ключем та в межах
+`RetryPolicy.max_attempts`. POST без ключа повертає помилку без повтору.
+
 ## Ліміти
 
 Числові ліміти не зашиваються в код (plan.md §3.6). Сервіс описує модель з назвами полів контракту:

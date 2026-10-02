@@ -137,7 +137,7 @@ class ServiceClient:
             response: httpx.Response | None = None
             try:
                 response = await self._client.request(method, url, json=json, params=params, headers=hdrs)
-            except (httpx.ConnectError, httpx.ReadTimeout, httpx.RemoteProtocolError):
+            except (httpx.ConnectError, httpx.ReadError, httpx.ReadTimeout, httpx.RemoteProtocolError):
                 if not may_retry or attempt >= attempts:
                     raise
             else:

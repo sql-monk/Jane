@@ -6,9 +6,7 @@ the reproducible examples of WP-14 (``examples/packages``, ``examples/documents`
 registry as canonical archives whose digests must equal ``examples/packages.lock.json``. The documents are
 sent verbatim; only the price check's ``schedule.start_at`` is changed later through ``PUT /v1/tasks``.
 
-STAND-IN (Т): the test site cannot change a price (request to WP-01). The module's own stack runs the
-unchanged ``jane_testsite`` code through ``jane_e2e/testsite_prices.py`` (``compose.prices.yaml``), which adds
-``PUT /_e2e/products/{slug}`` to change the price, availability or name of one product between the runs.
+The testsite's built-in ``PUT /_e2e/products/{slug}`` changes price, availability or name between runs.
 
 Flow (one test, the phases depend on each other):
 
@@ -49,10 +47,8 @@ from jane_testsite import site as testsite_model  # type: ignore[import-untyped]
 
 pytestmark = [pytest.mark.e2e, pytest.mark.milestone("M2"), pytest.mark.criteria(5)]
 
-E2E_DIR = Path(__file__).resolve().parent
 EXAMPLES = ROOT / "examples"
 DOCUMENTS = EXAMPLES / "documents"
-PRICES_OVERLAY = E2E_DIR / "compose.prices.yaml"
 SERVICES = ("testsite", "registry", "handler-runtime", "storage", "web-collector", "orchestrator")
 # Like S-M2-06/07: the runtime, the collector and the orchestrator use the REAL registry.
 REGISTRY_ENV = {
@@ -113,7 +109,7 @@ class Shop:
         return self.clients[service]
 
     def change_site(self, slug: str, changes: Mapping[str, str]) -> dict[str, Any]:
-        """Price switch of the test site stand-in (Т); returns the product as the site now holds it."""
+        """Change the real testsite fixture; return its current product."""
         r = httpx.put(f"{self.stack.url('testsite')}/_e2e/products/{slug}", json=dict(changes), timeout=10)
         assert r.status_code == 200, r.text
         product: dict[str, Any] = r.json()
@@ -127,9 +123,8 @@ class Shop:
 
 @pytest.fixture(scope="module")
 def shop(stack: E2EStack) -> Iterator[Shop]:
-    """An isolated stack: real registry everywhere and the test site with the price switch (``stack`` - the
-    session one - only checks Docker; this module never starts services in it)."""
-    own = E2EStack(project=f"{default_project()}-prices-{uuid.uuid4().hex[:6]}", overlays=(PRICES_OVERLAY,))
+    """An isolated stack with the real registry and testsite (``stack`` only checks Docker)."""
+    own = E2EStack(project=f"{default_project()}-prices-{uuid.uuid4().hex[:6]}")
     own.env().update(REGISTRY_ENV)
     shop = Shop(own)
     try:
@@ -378,7 +373,7 @@ def phase_c_scheduled_price_check(
         page = shop.product_page(slug)
         assert f'"price": "{product["price"]}"' in page, page[:2000]
     assert "<title>Phone Alpha 2027 | Jane Test Shop</title>" in shop.product_page("phone-alpha")
-    note("C site changed through the price switch (stand-in)", SITE_CHANGES)
+    note("C site changed through the testsite fixture", SITE_CHANGES)
 
     catalog_doc, catalog_etag = get_task(orch, CATALOG)
     before = summaries(orch)

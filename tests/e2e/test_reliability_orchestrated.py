@@ -603,6 +603,10 @@ def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_dupl
     assert attempts["store-raw"] == 1 and attempts["extract-products"] == 1, attempts
     assert 3 <= attempts["store-products"] <= policy["max_attempts"], attempts
     assert_effects_once(storage, source_id, materials=len(products), products=len(products))
+    # Docker reconnect may leave an HTTP keep-alive socket in the orchestrator pointing at
+    # the old storage endpoint. Reset that client pool before the next, independent scenario.
+    stack.kill("orchestrator")
+    stack.restart("orchestrator")
 
 
 # ---------------------------------------------------------------------------- R-08
@@ -682,7 +686,8 @@ def test_r_08_bounded_queue_holds_back_collection(
     assert stats["unacked"] == 0, stats
     assert stats["acknowledged"] == len(urls), stats
     completed = handler_items(orch, run)
-    assert completed and all(i["status"] == "completed" for i in completed), completed
+    failures = [(i["stage_id"], i.get("error")) for i in completed if i["status"] != "completed"]
+    assert completed and not failures, failures
     assert_effects_once(storage, source_id, materials=len(urls), products=len(products))
 
 

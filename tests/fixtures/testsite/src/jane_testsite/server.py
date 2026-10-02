@@ -10,6 +10,7 @@ import gzip
 import hashlib
 import html
 import json
+import re
 import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -25,6 +26,7 @@ __all__ = ["TestSiteHandler", "make_server", "serve_in_thread"]
 
 XML = "application/xml; charset=utf-8"
 HTML = "text/html; charset=utf-8"
+CONTROL_PRODUCT = re.compile(r"^/_e2e/products/([a-z0-9-]+)$")
 
 
 def _esc(s: str) -> str:
@@ -122,6 +124,8 @@ class TestSiteHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         url = urlsplit(self.path)
         path, query = url.path, parse_qs(url.query)
+        if match := CONTROL_PRODUCT.fullmatch(path):
+            return self.control_product(match.group(1))
         page_no = self._int(query.get("page", ["1"])[0])
         if path in site.REDIRECTS:
             self.send(301, b"", HTML, {"Location": self.link(site.REDIRECTS[path])})
@@ -149,6 +153,34 @@ class TestSiteHandler(BaseHTTPRequestHandler):
             self._dynamic(path, parts, page_no)
         except LookupError:
             self.not_found()
+
+    def do_PUT(self) -> None:
+        match = CONTROL_PRODUCT.fullmatch(urlsplit(self.path).path)
+        if match is None:
+            return self.send(404, b'{"error":"not a control path"}', "application/json")
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+            changes = json.loads(self.rfile.read(length))
+            if not isinstance(changes, dict):
+                raise ValueError("body must be a JSON object")
+            product = site.change_product(match.group(1), changes)
+        except LookupError:
+            return self.send(404, b'{"error":"unknown product"}', "application/json")
+        except (ValueError, json.JSONDecodeError) as exc:
+            return self.send(422, json.dumps({"error": str(exc)}).encode(), "application/json")
+        self.send(200, self._product_json(product), "application/json")
+
+    @staticmethod
+    def _product_json(product: site.Product) -> bytes:
+        return json.dumps(
+            {key: getattr(product, key) for key in ("slug", "name", "category", "price", "availability")}
+        ).encode()
+
+    def control_product(self, slug: str) -> None:
+        product = site.product_by_slug(slug)
+        if product is None:
+            return self.send(404, b'{"error":"unknown product"}', "application/json")
+        self.send(200, self._product_json(product), "application/json")
 
     @staticmethod
     def _int(v: str) -> int:

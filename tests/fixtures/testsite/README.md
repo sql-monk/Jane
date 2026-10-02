@@ -56,3 +56,11 @@ uv run python -m jane_testsite --write-expected tests/fixtures/testsite/expected
 Дані сторінок: товари містять JSON-LD `Product` з `offers.price`, мікродані й `.price`; статті — `<time>`,
 `article:published_time`/`modified_time`, заголовок `Last-Modified`. Усі сторінки мають `ETag` і відповідають
 `304` на `If-None-Match` (повторне відвідування).
+
+## Керована зміна товару для e2e
+
+`PUT /_e2e/products/{slug}` приймає JSON з одним або кількома полями `price` (рядок на кшталт
+`"279.00"`), `availability` (`InStock`, `OutOfStock`, `PreOrder`) та `name`. `GET` за тим самим шляхом
+повертає поточний товар. Зміна діє в пам'яті одного процесу testsite до його завершення: URL товару не
+змінюється, а HTML, JSON-LD, JSON API та `ETag` відображають нове значення. Службовий шлях не входить
+до посилань, sitemap чи `expected_urls.json` і призначений лише для ізольованого тестового сайту.

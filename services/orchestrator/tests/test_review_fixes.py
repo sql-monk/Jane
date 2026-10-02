@@ -87,6 +87,36 @@ def test_worker_kill_does_not_spend_retry_attempts(
     assert set(neighbours.storage.effects.values()) == {1}
 
 
+def test_retry_with_same_delivery_key_sends_identical_handler_body(
+    make_client: Any, neighbours: Neighbours, db_dsn: str
+) -> None:
+    """A retry must not turn the same Idempotency-Key into a different request (422)."""
+    api = make_client()
+    assert post(api, "/v1/sources", source_doc()).status_code == 201
+    assert (
+        post(api, "/v1/tasks", catalog_task(retries={"max_attempts": 2, "initial_backoff_ms": 5})).status_code
+        == 201
+    )
+    package_id = "shop-example.product-extractor"
+    neighbours.runtime.fail_retryable[package_id] = 1
+    run_id = start(api, "shop-catalog")
+    run = wait_run(api, run_id, 60)
+    assert run["status"] == "succeeded", run
+    calls = [
+        body
+        for method, path, body in neighbours.runtime.requests
+        if method == "POST" and path == "/v1/invocations" and body["handler"]["package_id"] == package_id
+    ]
+    by_key: dict[str, list[dict[str, Any]]] = {}
+    for body in calls:
+        by_key.setdefault(body["delivery"]["delivery_key"], []).append(body)
+    retried = [bodies for bodies in by_key.values() if len(bodies) > 1]
+    assert len(retried) == 1
+    assert retried[0][0] == retried[0][1]
+    assert "attempt" not in retried[0][0]["context"]
+    assert any(i["attempts"] == 2 for i in items_by_stage(db_dsn, run_id)["extract-products"])
+
+
 @pytest.mark.parametrize(
     ("max_wait_ms", "outcome"),
     [(5000, "success"), (300, "retrying")],

@@ -182,7 +182,8 @@ class Engine:
                     "stage_id": item["stage_id"],
                     "source_id": run["source_id"],
                 },
-                "attempt": item["attempts"],
+                # The delivery key is stable across retries, so its request body must be stable too.
+                # HandlerInvocation.context.attempt is optional; item attempts remain in our own state.
                 "test_mode": bool(run["test_mode"]),
             },
             "limits": stage_limits,

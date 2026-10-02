@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import OrderedDict
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from psycopg import sql
@@ -22,8 +22,9 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
+from jane_kit.errors import JaneError
 from jane_kit.idempotency import IdempotencyRecord, IdempotencyStore, InMemoryIdempotencyStore, StoredResponse
-from jane_kit.jobs import InMemoryJobStore, Job, JobStore
+from jane_kit.jobs import TERMINAL_STATUSES, InMemoryJobStore, Job, JobStatus, JobStore
 
 from .settings import ServiceLimits
 
@@ -44,6 +45,7 @@ class ServiceState(Protocol):
     async def open(self) -> None: ...
     async def close(self) -> None: ...
     async def ping(self) -> bool: ...
+    async def heartbeat(self) -> None: ...
 
 
 class InMemoryResultStore:
@@ -78,6 +80,9 @@ class InMemoryState:
     async def ping(self) -> bool:
         return True
 
+    async def heartbeat(self) -> None:
+        return None
+
 
 # ---------------------------------------------------------------------------------------------- PostgreSQL
 
@@ -96,9 +101,13 @@ _DDL = [
     """CREATE TABLE IF NOT EXISTS {schema}.jobs (
         job_id text PRIMARY KEY,
         doc jsonb NOT NULL,
+        owner text,
+        lease_until timestamptz,
         finished_at timestamptz,
         updated_at timestamptz NOT NULL DEFAULT now()
     )""",
+    "ALTER TABLE {schema}.jobs ADD COLUMN IF NOT EXISTS owner text",
+    "ALTER TABLE {schema}.jobs ADD COLUMN IF NOT EXISTS lease_until timestamptz",
     """CREATE TABLE IF NOT EXISTS {schema}.results (
         invocation_id text PRIMARY KEY,
         doc jsonb NOT NULL,
@@ -112,9 +121,10 @@ _DDL = [
 class PostgresState:
     name = "postgresql"
 
-    def __init__(self, dsn: str, schema: str, limits: ServiceLimits) -> None:
+    def __init__(self, dsn: str, schema: str, limits: ServiceLimits, instance_id: str) -> None:
         self.schema = sql.Identifier(schema)
         self.limits = limits
+        self.instance_id = instance_id
         state = limits.state
         self.pool = ConnectionPool(
             dsn,
@@ -151,6 +161,19 @@ class PostgresState:
     async def ping(self) -> bool:
         await asyncio.to_thread(self.run, "SELECT 1")
         return True
+
+    async def heartbeat(self) -> None:
+        await asyncio.to_thread(
+            self.run,
+            "UPDATE {schema}.jobs SET lease_until = clock_timestamp() + make_interval(secs => %s) "
+            "WHERE owner = %s AND finished_at IS NULL AND lease_until > clock_timestamp()",
+            (self.limits.state.job_lease_ms / 1000, self.instance_id),
+        )
+
+    def rowcount(self, text: str, params: tuple[Any, ...]) -> int:
+        with self.pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(self.q(text), params)
+            return int(cur.rowcount)
 
 
 def _epoch(value: datetime | None) -> float:
@@ -223,24 +246,94 @@ class _PgJobs:
         )
         await asyncio.to_thread(
             self.db.run,
-            "INSERT INTO {schema}.jobs (job_id, doc, finished_at) VALUES (%s, %s, %s)",
-            (job.job_id, Jsonb(job.model_dump(mode="json")), job.finished_at),
+            "INSERT INTO {schema}.jobs (job_id, doc, owner, lease_until, finished_at) "
+            "VALUES (%s, %s, %s, clock_timestamp() + make_interval(secs => %s), %s)",
+            (
+                job.job_id,
+                Jsonb(job.model_dump(mode="json")),
+                self.db.instance_id,
+                self.db.limits.state.job_lease_ms / 1000,
+                job.finished_at,
+            ),
         )
 
     async def get(self, job_id: str) -> Job | None:
         rows = await asyncio.to_thread(
-            self.db.run, "SELECT doc FROM {schema}.jobs WHERE job_id = %s", (job_id,), True
+            self.db.run,
+            "SELECT doc, owner, (lease_until IS NULL OR lease_until <= clock_timestamp()) AS expired "
+            "FROM {schema}.jobs WHERE job_id = %s",
+            (job_id,),
+            True,
         )
-        return Job.model_validate(rows[0]["doc"]) if rows else None
+        if not rows:
+            return None
+        job = Job.model_validate(rows[0]["doc"])
+        if job.status in TERMINAL_STATUSES or not rows[0]["expired"]:
+            return job
+        failed = job.model_copy(
+            update={
+                "status": JobStatus.FAILED,
+                "finished_at": datetime.now(UTC),
+                "error": JaneError(
+                    f"instance {rows[0]['owner']} stopped while job was {job.status}",
+                    code="service_unavailable",
+                    retryable=True,
+                ).to_problem(),
+            }
+        )
+        changed = await asyncio.to_thread(
+            self.db.rowcount,
+            "UPDATE {schema}.jobs SET doc = %s, finished_at = %s, updated_at = clock_timestamp() "
+            "WHERE job_id = %s AND finished_at IS NULL "
+            "AND (lease_until IS NULL OR lease_until <= clock_timestamp())",
+            (Jsonb(failed.model_dump(mode="json")), failed.finished_at, job_id),
+        )
+        return failed if changed else await self.get(job_id)
+
+    def _save(self, job: Job) -> None:
+        with self.db.pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                self.db.q(
+                    "SELECT doc, owner, finished_at, lease_until > clock_timestamp() AS live "
+                    "FROM {schema}.jobs WHERE job_id = %s FOR UPDATE"
+                ),
+                (job.job_id,),
+            )
+            row = cur.fetchone()
+            if row is None or row["finished_at"] is not None or not row["live"]:
+                return
+            current = Job.model_validate(row["doc"])
+            if current.status in TERMINAL_STATUSES:
+                return
+            if job.status == JobStatus.CANCELLING:
+                if current.status == JobStatus.CANCELLING:
+                    return
+                saved = current.model_copy(
+                    update={"status": JobStatus.CANCELLING, "cancellation": job.cancellation}
+                )
+            elif row["owner"] != self.db.instance_id:
+                return
+            elif current.status == JobStatus.CANCELLING:
+                if job.status not in TERMINAL_STATUSES:
+                    return
+                # Cancellation committed first: a stale success/failure cannot erase it.
+                saved = current.model_copy(
+                    update={"status": JobStatus.CANCELLED, "finished_at": datetime.now(UTC)}
+                )
+            else:
+                saved = job
+            saved = saved.model_copy(update={"updated_at": datetime.now(UTC)})
+            cur.execute(
+                self.db.q(
+                    "UPDATE {schema}.jobs SET doc = %s, finished_at = %s, updated_at = clock_timestamp() "
+                    "WHERE job_id = %s AND finished_at IS NULL "
+                    "AND lease_until > clock_timestamp()"
+                ),
+                (Jsonb(saved.model_dump(mode="json")), saved.finished_at, saved.job_id),
+            )
 
     async def save(self, job: Job) -> None:
-        job = job.model_copy(update={"updated_at": datetime.now(job.created_at.tzinfo)})
-        await asyncio.to_thread(
-            self.db.run,
-            "INSERT INTO {schema}.jobs (job_id, doc, finished_at) VALUES (%s, %s, %s) ON CONFLICT (job_id) "
-            "DO UPDATE SET doc = EXCLUDED.doc, finished_at = EXCLUDED.finished_at, updated_at = now()",
-            (job.job_id, Jsonb(job.model_dump(mode="json")), job.finished_at),
-        )
+        await asyncio.to_thread(self._save, job)
 
 
 class _PgResults:

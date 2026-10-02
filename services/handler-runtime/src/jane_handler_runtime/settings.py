@@ -114,6 +114,10 @@ class StateLimits(Limits):
     connect_timeout_ms: int = Field(default=10_000, ge=1)
     in_progress_lease_ms: int = Field(default=900_000, ge=1)
     """An in-progress idempotency claim of a crashed instance can be taken over after this."""
+    job_lease_ms: int = Field(default=30_000, ge=1)
+    """A job whose owner stops renewing this lease is marked failed when read."""
+    heartbeat_interval_ms: int = Field(default=5_000, ge=1)
+    """How often this instance renews leases for its unfinished jobs."""
 
 
 class ServiceLimits(Limits):

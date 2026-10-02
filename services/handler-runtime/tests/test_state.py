@@ -7,7 +7,10 @@ The sandbox backend is the real subprocess backend wrapped with a run counter (t
 
 from __future__ import annotations
 
+import asyncio
 import os
+import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -25,8 +28,10 @@ from pydantic import SecretStr
 from jane_handler_runtime.app import build_app
 from jane_handler_runtime.runtime import build_runtime
 from jane_handler_runtime.sandbox import Bundle, SandboxOutcome, SubprocessSandbox
-from jane_handler_runtime.settings import SandboxLimits, Settings
+from jane_handler_runtime.settings import SandboxLimits, ServiceLimits, Settings, StateLimits
+from jane_handler_runtime.state import PostgresState
 from jane_kit.devstack import load_stack
+from jane_kit.jobs import Job, JobCancellation, JobStatus
 
 pytestmark = pytest.mark.integration
 
@@ -165,3 +170,184 @@ def test_cancel_from_another_instance(dsn: tuple[str, str], tmp_path: Path, h: A
         wait_job(b, job_id, {"running"})
         assert b.post(f"/v1/jobs/{job_id}/cancel").status_code == 202
         assert wait_job(a, job_id, {"cancelled", "succeeded", "failed"})["status"] == "cancelled"
+
+
+def test_expired_job_fails_and_old_owner_cannot_overwrite(
+    dsn: tuple[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A killed owner's job becomes terminal; a late write cannot revive it."""
+
+    async def exercise() -> None:
+        a = PostgresState(dsn[0], dsn[1], ServiceLimits(), "dead-owner")
+        b = PostgresState(dsn[0], dsn[1], ServiceLimits(), "new-owner")
+        await a.open()
+        await b.open()
+        try:
+            job = Job(job_id=f"job_{uuid.uuid4().hex}", kind="test_run")
+            await a.jobs.create(job)
+            running = job.model_copy(update={"status": JobStatus.RUNNING})
+            await a.jobs.save(running)
+            await asyncio.to_thread(
+                a.run,
+                "UPDATE {schema}.jobs SET lease_until = clock_timestamp() + interval '1 second' "
+                "WHERE job_id = %s",
+                (job.job_id,),
+            )
+            await a.heartbeat()
+            renewed = await asyncio.to_thread(
+                a.run,
+                "SELECT lease_until > clock_timestamp() + interval '20 seconds' AS ok "
+                "FROM {schema}.jobs WHERE job_id = %s",
+                (job.job_id,),
+                True,
+            )
+            assert renewed[0]["ok"] is True
+            live = await b.jobs.get(job.job_id)
+            assert live is not None and live.status == JobStatus.RUNNING
+            await asyncio.to_thread(
+                a.run,
+                "UPDATE {schema}.jobs SET lease_until = clock_timestamp() - interval '1 second' "
+                "WHERE job_id = %s",
+                (job.job_id,),
+            )
+            failed = await b.jobs.get(job.job_id)
+            assert failed is not None and failed.status == JobStatus.FAILED
+            assert failed.error is not None and failed.error.code == "service_unavailable"
+            assert failed.error.retryable is True
+            await a.jobs.save(running.model_copy(update={"status": JobStatus.SUCCEEDED}))
+            terminal = await b.jobs.get(job.job_id)
+            assert terminal is not None and terminal.status == JobStatus.FAILED
+
+            # Fencing also applies before another instance has observed the expired lease.
+            second = Job(job_id=f"job_{uuid.uuid4().hex}", kind="test_run")
+            await a.jobs.create(second)
+            await asyncio.to_thread(
+                a.run,
+                "UPDATE {schema}.jobs SET lease_until = clock_timestamp() - interval '1 second' "
+                "WHERE job_id = %s",
+                (second.job_id,),
+            )
+            await a.jobs.save(second.model_copy(update={"status": JobStatus.SUCCEEDED}))
+            fenced = await b.jobs.get(second.job_id)
+            assert fenced is not None and fenced.status == JobStatus.FAILED
+
+            # B's cancellation wins over A's success prepared from an older running snapshot.
+            third = Job(job_id=f"job_{uuid.uuid4().hex}", kind="test_run")
+            await a.jobs.create(third)
+            stale_success = third.model_copy(update={"status": JobStatus.SUCCEEDED})
+            await b.jobs.save(
+                third.model_copy(
+                    update={
+                        "status": JobStatus.CANCELLING,
+                        "cancellation": JobCancellation(requested_at=third.created_at),
+                    }
+                )
+            )
+            await a.jobs.save(stale_success)
+            cancelled = await b.jobs.get(third.job_id)
+            assert cancelled is not None and cancelled.status == JobStatus.CANCELLED
+            assert cancelled.cancellation is not None
+
+            # Pause after SELECT FOR UPDATE but before UPDATE: expiry during that gap must fence the write.
+            fourth = Job(job_id=f"job_{uuid.uuid4().hex}", kind="test_run")
+            await a.jobs.create(fourth)
+            await asyncio.to_thread(
+                a.run,
+                "UPDATE {schema}.jobs SET lease_until = clock_timestamp() + interval '1 second' "
+                "WHERE job_id = %s",
+                (fourth.job_id,),
+            )
+            entered = threading.Event()
+            resume = threading.Event()
+            validate = Job.model_validate
+
+            def pause_after_select(cls: type[Job], value: Any) -> Job:
+                entered.set()
+                if not resume.wait(5):
+                    raise AssertionError("save was not resumed")
+                return validate(value)
+
+            with monkeypatch.context() as patch:
+                patch.setattr(Job, "model_validate", classmethod(pause_after_select))
+                saving = asyncio.create_task(
+                    a.jobs.save(fourth.model_copy(update={"status": JobStatus.SUCCEEDED}))
+                )
+                try:
+                    assert await asyncio.to_thread(entered.wait, 5)
+                    await asyncio.sleep(1.2)
+                finally:
+                    resume.set()
+                    await saving
+            expired_during_save = await b.jobs.get(fourth.job_id)
+            assert expired_during_save is not None
+            assert expired_during_save.status == JobStatus.FAILED
+        finally:
+            await b.close()
+            await a.close()
+
+    asyncio.run(exercise())
+
+
+def test_job_of_killed_owner_expires(dsn: tuple[str, str], tmp_path: Path) -> None:
+    """A real killed process leaves a running job that another instance marks failed."""
+    job_file = tmp_path / "killed-job-id"
+    child_code = """
+import asyncio, sys, uuid
+from pathlib import Path
+from jane_handler_runtime.settings import ServiceLimits, StateLimits
+from jane_handler_runtime.state import PostgresState
+from jane_kit.jobs import JobRunner, JobStatus
+
+async def work(ctx):
+    await asyncio.sleep(60)
+    return {}
+
+async def main():
+    limits = ServiceLimits(state=StateLimits(job_lease_ms=800, heartbeat_interval_ms=100))
+    state = PostgresState(sys.argv[1], sys.argv[2], limits, f"killed-{uuid.uuid4().hex}")
+    await state.open()
+    runner = JobRunner(store=state.jobs, limits=limits.jobs)
+    job = await runner.submit("test_run", work)
+    while (await state.jobs.get(job.job_id)).status != JobStatus.RUNNING:
+        await asyncio.sleep(0.01)
+    Path(sys.argv[3]).write_text(job.job_id, encoding="utf-8")
+    while True:
+        await state.heartbeat()
+        await asyncio.sleep(0.1)
+
+asyncio.run(main())
+"""
+    child = subprocess.Popen(
+        [sys.executable, "-c", child_code, dsn[0], dsn[1], str(job_file)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        deadline = time.monotonic() + 15
+        while not job_file.exists() and time.monotonic() < deadline:
+            if child.poll() is not None:
+                raise AssertionError(f"owner exited early: {child.stderr.read() if child.stderr else ''}")
+            time.sleep(0.02)
+        assert job_file.exists(), "owner did not start a running job"
+        job_id = job_file.read_text(encoding="utf-8")
+        child.kill()
+        child.wait(timeout=5)
+
+        async def observe() -> None:
+            limits = ServiceLimits(state=StateLimits(job_lease_ms=800, heartbeat_interval_ms=100))
+            other = PostgresState(dsn[0], dsn[1], limits, "survivor")
+            await other.open()
+            try:
+                await asyncio.sleep(1)
+                job = await other.jobs.get(job_id)
+                assert job is not None and job.status == JobStatus.FAILED
+                assert job.error is not None and job.error.retryable is True
+            finally:
+                await other.close()
+
+        asyncio.run(observe())
+    finally:
+        if child.poll() is None:
+            child.kill()
+            child.wait(timeout=5)

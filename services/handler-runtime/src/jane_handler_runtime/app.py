@@ -84,7 +84,10 @@ def build_state(settings: Settings, runtime: Runtime) -> ServiceState:
     """PostgreSQL state when ``state_dsn`` is set (several instances), else in-memory (one instance)."""
     if settings.state_dsn is not None:
         return PostgresState(
-            settings.state_dsn.get_secret_value(), settings.state_schema, runtime.limits.limits
+            settings.state_dsn.get_secret_value(),
+            settings.state_schema,
+            runtime.limits.limits,
+            settings.instance_id,
         )
     return InMemoryState(runtime.limits.limits)
 
@@ -114,9 +117,21 @@ def build_app(
             },
         )
         await state.open()
+
+        async def heartbeat() -> None:
+            while True:
+                await asyncio.sleep(limits.state.heartbeat_interval_ms / 1000)
+                try:
+                    await state.heartbeat()
+                except Exception:
+                    log.warning("state heartbeat failed", exc_info=True)
+
+        beat = asyncio.create_task(heartbeat(), name="state-heartbeat")
         try:
             yield
         finally:
+            beat.cancel()
+            await asyncio.gather(beat, return_exceptions=True)
             await runner.shutdown()
             await state.close()
             runtime.close()

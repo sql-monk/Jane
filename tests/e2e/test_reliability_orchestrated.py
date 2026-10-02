@@ -300,7 +300,8 @@ def test_r_01_lease_lost_during_active_call_taken_over_with_409_without_spent_at
         # replica 2 stays frozen until the extraction call runs, so replica 1 is the one holding its lease
         stack.pause_instance("orchestrator", 2)
         paused = True
-        run = start_run(replica1, task_id)
+        run_key = f"r06-{run_id}"
+        run = start_run(replica1, task_id, key=run_key)
 
         # 1. replica 1 is inside the extraction call: the sandbox of the slow package runs
         seen: set[str] = set()  # invocation ids of every sandbox of the slow package seen running
@@ -345,6 +346,14 @@ def test_r_01_lease_lost_during_active_call_taken_over_with_409_without_spent_at
         stack.start_instance("orchestrator", 1)
         stack.wait_healthy("orchestrator", 1)
         final = wait_run(replica2, run)
+        replayed = replica2.api("orchestrator").post(
+            f"/v1/tasks/{task_id}/runs",
+            json={"reason": "e2e"},
+            headers={"Idempotency-Key": run_key},
+        )
+        assert replayed.status_code == 202, replayed.text
+        assert replayed.headers["Idempotency-Replayed"] == "true"
+        assert replayed.json()["job_id"] == run
         restarted_view = run_view(client("orchestrator", 1), run)
         items = handler_items(replica2, run)  # replica 2 is removed by the scale-down below
         reclaimed = reclaimed_leases(replica2) - reclaimed_before

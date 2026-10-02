@@ -55,7 +55,7 @@ Docker-сокет із групою, визначеною автоматично
 | S-M1-04 | Рекурсивний збір зі стороннього застосунку, runtime через CLI | 1, 10 | web-collector, handler-runtime | **пройдено на гілці WP-13** |
 | S-M1-05 | Заміна сховища лише конфігурацією завдання (PostgreSQL ↔ files) | 3 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
 | S-M1-06 | Новий прогін дає нове спостереження й подію історії | 8 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
-| S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | 1 Docker e2e пройшов; продовження WP-13g — 3 passed / 2 xfailed (LLM — З). Після WP-10d адресний Docker e2e кешу LLM на WP-13h — 1 passed; відкритий `xfail(strict)` стосується storage-форку в завданні. На фінальній `main` не перевірено |
+| S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | 1 Docker e2e пройшов; продовження WP-13g — 3 passed / 2 xfailed (LLM — З). Після WP-10d кеш LLM — адресний Docker e2e WP-13h 1 passed; після WP-07c storage-форк у завданні з registry — адресний Docker e2e WP-13i 1 passed. Обидва `xfail` знято; повний набір на спільній ревізії й фінальній `main` ще не перевірено |
 | S-M2-02 | Telegram: історія, нові, редагування як ревізії → збереження | 1, 8, 12 | telegram-collector, storage | **1 passed на спільній гілці WP-01a/00a/13** (Telegram — З) |
 | S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | **10 Docker e2e пройшли на `main` `1306ad3`** (`test_m2_discovery.py`; `just e2e`, CI `36694741989`) |
 | S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage, registry; зміна ціни на testsite — e2e-перемикач (Т) | **3 Docker e2e поспіль пройшли на гілці `wp/13e-price-check`** (`test_m2_prices.py`); в інтеграційну гілку й `main` ще не злито |
@@ -164,12 +164,12 @@ LLM, storage та правил перевіряє продовження `tests/
 6. **Storage.** Етапи `jane.storage-files`/`jane.storage-postgresql` фіксують дайджести registry, storage
    звіряє їх зі своїм пакетом (trace). Повторна публікація 1.0.0 — 409 `version_exists`. Етап із
    дайджестом батьківської 1.1.0 (RAW як JSON) для версії 1.0.0 — `digest_mismatch`, запису немає.
-   Зафіксоване завдання після появи 1.1.0 і далі пише `.html`; доки storage у завданні не виконує пакети
-   з registry, цей крок версій не розрізняє (доказ фіксації — `digest_mismatch` і `package_archive`).
+    Зафіксоване завдання після появи 1.1.0 і далі пише `.html`; окремий прогін форку з registry
+    перевіряє виконання саме запитаної версії.
    Форк незмінний до `upstream-ports`;
    версії форку, передані як `package_archive`, пишуть `.html` (1.0.0) і JSON (1.1.0); підмінений архів —
-   `digest_mismatch`. Етап завдання з форком storage — `xfail(strict)`: storage знає лише вбудовані
-   пакети, а оркестратор не передає `package_archive` (`not_found`).
+    `digest_mismatch`. Етап завдання з форком storage після WP-07c завантажує пакет із registry без
+    `package_archive`: item `completed`, run `succeeded`, RAW записано.
 7. **Правила колектора.** Джерело зафіксоване на форку `testsite.web-rules` 1.0.0 і збирає
    `/product/phone-alpha` і `/pages/careers`. Після батьківської 1.1.0 (`exclude: */pages/*`) форк і
    збір не змінюються. Джерело на перенесеному форку 1.1.0 збирає лише товар; кожен матеріал несе
@@ -185,11 +185,12 @@ orchestrator, storage), замінників немає. Крок 1 викона
 `jane.storage-*@1.0.0` без дайджесту й виконуються вбудованими адаптерами. Поточну версію сценарію двічі
 прогнано окремо на гілці WP-13 (звіт WP-13, «Виправлення після рев'ю інтеграції S-M2-01 і R-04»); у `main`
 не злитий. Кроки 5–7 (`test_m2_registry_types.py`, **Р**, LLM — **З**) пройшли **3 Docker e2e поспіль на
-гілці `wp/13g-registry-types`**: 3 passed, 2 xfailed (strict) — форк storage в етапі завдання й
+  гілці `wp/13g-registry-types`**: 3 passed, 2 xfailed (strict) — тоді ще відкриті форк storage в етапі завдання й
 LLM-шлюз, що після кешування виконує іншу версію за чужим дайджестом (звіт WP-13, «Критерій 9: LLM,
 storage і форки типів»). Після WP-10d адресний Docker e2e WP-13h підтвердив
-`422 digest_mismatch` на прогрітому кеші LLM; його `xfail` знято. Відкритим лишається
-форк storage в етапі завдання. Не перевірено: архіви решти чотирьох storage-пакетів.
+  `422 digest_mismatch` на прогрітому кеші LLM; його `xfail` знято. Після WP-07c адресний Docker e2e
+  WP-13i підтвердив виконання storage-форку в завданні з registry (`1 passed`), і цей `xfail` знято.
+  Не перевірено: архіви решти чотирьох storage-пакетів та повний e2e на спільній ревізії.
 
 ### S-M2-02. Telegram
 Клієнт Telegram — **З** (записаний бекенд WP-04). Кроки: історія каналу → нові повідомлення →

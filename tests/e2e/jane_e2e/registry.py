@@ -59,10 +59,11 @@ POSTGRES_DIR = ROOT / "services/storage/adapters/postgres/src/jane_storage_postg
 RULES_DIR = ROOT / "tests/e2e/config/rules/testsite.web-rules/1.0.0"
 
 # The executors of an isolated registry stack take packages from the REAL registry, not from local stand-ins:
-# the runtime fetches archives, the Web Collector reads rules (its local rules directory does not exist), the
-# LLM gateway fetches LLM packages, and the registry checks dependencies against the runtime's profile.
+# the runtime and storage fetch archives, the Web Collector reads rules (its local rules directory does not exist),
+# the LLM gateway fetches LLM packages, and the registry checks dependencies against the runtime's profile.
 REGISTRY_ENV = {
     "JANE_E2E_RUNTIME_REGISTRY_URL": "http://registry:8000",
+    "JANE_E2E_STORAGE_REGISTRY_URL": "http://registry:8000",
     "JANE_E2E_REGISTRY_RUNTIME_PROFILES": '["http://handler-runtime:8000/v1/info"]',
     "JANE_E2E_COLLECTOR_RULES_DIR": "/cfg/registry-only",
     "JANE_E2E_COLLECTOR_REGISTRY_URL": "http://registry:8000",

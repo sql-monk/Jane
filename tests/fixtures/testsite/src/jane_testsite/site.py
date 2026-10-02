@@ -6,7 +6,9 @@ from what is served. Paths are root-relative; absolute URLs are built from the r
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import re
+import threading
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from math import ceil
 from typing import Any
@@ -118,6 +120,35 @@ PRODUCTS: list[Product] = [
         in_api=False,
     ),
 ]
+
+_product_lock = threading.Lock()
+_price_pattern = re.compile(r"\d+\.\d{2}\Z")
+_availability_values = frozenset({"InStock", "OutOfStock", "PreOrder"})
+
+
+def change_product(slug: str, changes: dict[str, Any]) -> Product:
+    """Change a product in this testsite process without changing its URL or other fields."""
+    allowed = {"price", "availability", "name"}
+    if not changes or set(changes) - allowed:
+        raise ValueError("provide price, availability, or name only")
+    if "price" in changes and (
+        not isinstance(changes["price"], str) or not _price_pattern.fullmatch(changes["price"])
+    ):
+        raise ValueError("price must be a string like 279.00")
+    if "availability" in changes and (
+        not isinstance(changes["availability"], str) or changes["availability"] not in _availability_values
+    ):
+        raise ValueError("availability must be InStock, OutOfStock, or PreOrder")
+    if "name" in changes and (not isinstance(changes["name"], str) or not changes["name"].strip()):
+        raise ValueError("name must be a non-empty string")
+    with _product_lock:
+        for index, product in enumerate(PRODUCTS):
+            if product.slug == slug:
+                changed = replace(product, **changes)
+                PRODUCTS[index] = changed
+                return changed
+    raise LookupError(slug)
+
 
 ARTICLES: list[Article] = [
     Article("launch-alpha", "Phone Alpha launched", 1),

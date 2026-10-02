@@ -225,6 +225,39 @@ def test_forwarded_prefix_rewrites_links(base: str) -> None:
     assert status == 200 and b'href="/testsite/catalog/"' in body
 
 
+def test_controlled_price_change_updates_the_same_product_url(base: str) -> None:
+    path = "/product/phone-alpha"
+    control = base + "/_e2e/products/phone-alpha"
+    original = json.loads(fetch(control)[2])
+    before = fetch(base + path)
+
+    def put(changes: dict[str, str]) -> tuple[int, bytes]:
+        request = urllib.request.Request(
+            control,
+            data=json.dumps(changes).encode(),
+            headers={"Content-Type": "application/json"},
+            method="PUT",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=5) as response:
+                return response.status, response.read()
+        except urllib.error.HTTPError as error:
+            return error.code, error.read()
+
+    try:
+        status, changed = put({"price": "279.00", "name": "Phone Alpha 2027"})
+        assert status == 200
+        assert json.loads(changed)["price"] == "279.00"
+        after = fetch(base + path)
+        assert after[0] == 200 and after[1]["ETag"] != before[1]["ETag"]
+        assert b"279.00" in after[2] and b"Phone Alpha 2027" in after[2]
+        assert json.loads(fetch(base + "/api/v1/products/phone-alpha")[2])["price"] == "279.00"
+        assert put({"category": "laptops"})[0] == 422
+        assert json.loads(fetch(control)[2])["category"] == original["category"]
+    finally:
+        assert put({"price": original["price"], "name": original["name"]})[0] == 200
+
+
 def test_expected_json_is_up_to_date() -> None:
     committed = Path(__file__).resolve().parents[1] / "expected_urls.json"
     assert committed.read_text(encoding="utf-8") == expected_json(), (

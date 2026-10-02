@@ -452,3 +452,8 @@ S-M2-04, WP-01b, WP-02c, R-01/R-03/R-08, WP-14b; останній зелений
   падіння `test_lifecycle_over_http` асистента — під час пошуку відтворено справжню `failed` job). Кожен перебазується
   на `fc99478`.
 - CI [36943181809](https://github.com/sql-monk/Jane/actions/runs/36943181809) на `fc99478` — перевірка злиттів паузи.
+- CI 36943181809 на `fc99478` упав на `lint`: `ruff format` у `tests/e2e/test_m2_registry_types.py` (коміт паузи
+  `74711e5`). Координатор відформатував (`f92fb07`, лише форматування). CI
+  [36943443708](https://github.com/sql-monk/Jane/actions/runs/36943443708) на `f92fb07`: **12/12 job успішні**;
+  `e2e` — 42 passed, 1 xfailed (дефект storage-форку WP-07c). Підтверджує злиття паузи (13g, 05b/03a/04a, 10d, 13h)
+  на Linux, зокрема unit без падінь часово-чутливих тестів.

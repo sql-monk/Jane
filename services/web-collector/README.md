@@ -51,6 +51,17 @@ just test web-collector -m contract     # лише контрактні
 сервіс окремим процесом (`python -m jane_web_collector`) і вбивають його жорстко (SIGKILL / TerminateProcess).
 Мок сусіда — лише registry.v1 (`tests/test_rules_sources.py`), відповіді перевіряються за його контрактом.
 
+Скільки тести чекають, задається змінними середовища (`jane_web_collector.testing`; це лише верхня межа
+очікування, не умова проходження — на завантаженій машині її можна збільшити):
+
+| Змінна | Типово | Що обмежує |
+|---|---|---|
+| `JANE_WEB_COLLECTOR_TEST_START_S` | 120 с | старт процесу колектора до `/v1/health` (`ServiceProcess.start`) |
+| `JANE_WEB_COLLECTOR_TEST_WAIT_S` | 120 с | очікувану подію: кінець збору (`wait_done`), кінець потоку (`drain`), скасування, прогрес |
+
+Тести, яким потрібна незавершена колекція (409 на `DELETE /v1/states/…`, скасування, перехоплення після kill),
+утримують її через backpressure (`limits.queue.max_unacked_materials`), а не розраховують на повільний обхід.
+
 ## Конфігурація
 
 Змінні середовища з префіксом `JANE_WEB_COLLECTOR_`:

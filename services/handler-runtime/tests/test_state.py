@@ -172,7 +172,9 @@ def test_cancel_from_another_instance(dsn: tuple[str, str], tmp_path: Path, h: A
         assert wait_job(a, job_id, {"cancelled", "succeeded", "failed"})["status"] == "cancelled"
 
 
-def test_expired_job_fails_and_old_owner_cannot_overwrite(dsn: tuple[str, str]) -> None:
+def test_expired_job_fails_and_old_owner_cannot_overwrite(
+    dsn: tuple[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A killed owner's job becomes terminal; a late write cannot revive it."""
 
     async def exercise() -> None:
@@ -245,6 +247,40 @@ def test_expired_job_fails_and_old_owner_cannot_overwrite(dsn: tuple[str, str]) 
             cancelled = await b.jobs.get(third.job_id)
             assert cancelled is not None and cancelled.status == JobStatus.CANCELLED
             assert cancelled.cancellation is not None
+
+            # Pause after SELECT FOR UPDATE but before UPDATE: expiry during that gap must fence the write.
+            fourth = Job(job_id=f"job_{uuid.uuid4().hex}", kind="test_run")
+            await a.jobs.create(fourth)
+            await asyncio.to_thread(
+                a.run,
+                "UPDATE {schema}.jobs SET lease_until = clock_timestamp() + interval '1 second' "
+                "WHERE job_id = %s",
+                (fourth.job_id,),
+            )
+            entered = threading.Event()
+            resume = threading.Event()
+            validate = Job.model_validate
+
+            def pause_after_select(cls: type[Job], value: Any) -> Job:
+                entered.set()
+                if not resume.wait(5):
+                    raise AssertionError("save was not resumed")
+                return validate(value)
+
+            with monkeypatch.context() as patch:
+                patch.setattr(Job, "model_validate", classmethod(pause_after_select))
+                saving = asyncio.create_task(
+                    a.jobs.save(fourth.model_copy(update={"status": JobStatus.SUCCEEDED}))
+                )
+                try:
+                    assert await asyncio.to_thread(entered.wait, 5)
+                    await asyncio.sleep(1.2)
+                finally:
+                    resume.set()
+                    await saving
+            expired_during_save = await b.jobs.get(fourth.job_id)
+            assert expired_during_save is not None
+            assert expired_during_save.status == JobStatus.FAILED
         finally:
             await b.close()
             await a.close()

@@ -326,7 +326,8 @@ class _PgJobs:
             cur.execute(
                 self.db.q(
                     "UPDATE {schema}.jobs SET doc = %s, finished_at = %s, updated_at = clock_timestamp() "
-                    "WHERE job_id = %s"
+                    "WHERE job_id = %s AND finished_at IS NULL "
+                    "AND lease_until > clock_timestamp()"
                 ),
                 (Jsonb(saved.model_dump(mode="json")), saved.finished_at, saved.job_id),
             )

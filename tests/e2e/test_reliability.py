@@ -48,6 +48,27 @@ def test_r_02_redelivery_after_restart_of_storage_and_runtime(
     )
     assert stored["output"]["writes"][0]["status"] == "written"
 
+    # R-04: a replay on the same live instance reports the original delivery;
+    # changing a stable request field while keeping its key is rejected.
+    for service, body, original in (
+        ("storage", store_body, stored),
+        ("handler-runtime", extract_body, extracted),
+    ):
+        api = client(service).api("handler")
+        headers = {"Idempotency-Key": body["delivery"]["delivery_key"]}
+        replay = api.post("/v1/invocations", json=body, headers=headers)
+        assert replay.status_code == 200, replay.text
+        assert replay.headers["Idempotency-Replayed"] == "true"
+        assert replay.json()["duplicate"] is True
+        if service == "handler-runtime":
+            assert replay.json()["invocation_id"] == original["invocation_id"]
+        else:
+            assert replay.json()["output"]["writes"][0]["status"] == "duplicate"
+
+        mismatch = api.post("/v1/invocations", json={**body, "mode": "async"}, headers=headers)
+        assert mismatch.status_code == 422, mismatch.text
+        assert mismatch.json()["code"] == "idempotency_key_reused"
+
     for service in ("storage", "handler-runtime"):
         stack.kill(service)
         stack.restart(service)

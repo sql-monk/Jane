@@ -98,7 +98,7 @@ def test_retry_with_same_delivery_key_sends_identical_handler_body(
         == 201
     )
     package_id = "shop-example.product-extractor"
-    neighbours.runtime.fail_retryable[package_id] = 1
+    neighbours.runtime.fail_http_retryable[package_id] = 1
     run_id = start(api, "shop-catalog")
     run = wait_run(api, run_id, 60)
     assert run["status"] == "succeeded", run
@@ -114,6 +114,7 @@ def test_retry_with_same_delivery_key_sends_identical_handler_body(
     assert len(retried) == 1
     assert retried[0][0] == retried[0][1]
     assert "attempt" not in retried[0][0]["context"]
+    assert neighbours.runtime.effects[retried[0][0]["delivery"]["delivery_key"]] == 1
     assert any(i["attempts"] == 2 for i in items_by_stage(db_dsn, run_id)["extract-products"])
 
 

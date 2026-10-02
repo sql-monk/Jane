@@ -9,9 +9,9 @@ import pytest
 
 from jane_e2e.clients import JaneClient
 from jane_e2e.materials import fetch_page, standin_web_material
-from jane_e2e.registry import archive, key, package_files, publish_body
+from jane_e2e.registry import FILES_DIR, archive, key, package_files, publish_body
 from jane_e2e.stack import E2EStack
-from jane_e2e.steps import EXTRACTOR_DIR, store
+from jane_e2e.steps import store
 from jane_e2e.verify import objects_by_source
 
 pytestmark = [pytest.mark.e2e, pytest.mark.milestone("M2"), pytest.mark.criteria(8)]
@@ -55,7 +55,7 @@ def test_r_06_registry_replica_reads_published_archive(
     require("registry")
     stack.scale("registry", 2)
     first_client, second_client = client("registry", 1), client("registry", 2)
-    manifest, files = package_files(EXTRACTOR_DIR)
+    manifest, files = package_files(FILES_DIR)
     package_id = manifest["package_id"]
     create_body = {"package_id": package_id, "kind": manifest["kind"], "title": manifest["title"]}
     create_headers = {"Idempotency-Key": key()}

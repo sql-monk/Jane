@@ -378,7 +378,12 @@ def test_window_gap_and_concurrency_metrics() -> None:
     assert m.request_interval({"requests_per_second_per_host": 2, "min_delay_ms_per_host": 700}) == 0.7
 
 
-RATE_TH = {"gap_tolerance_fraction": 0.1, "gap_tolerance_abs_s": 0.02, "min_efficiency": 0.6}
+RATE_TH = {
+    "gap_tolerance_fraction": 0.1,
+    "gap_tolerance_abs_s": 0.02,
+    "max_sub_half_gaps": 1,
+    "min_efficiency": 0.6,
+}
 RATE = {"requests_per_second_per_host": 2, "min_delay_ms_per_host": 0}
 
 
@@ -395,7 +400,58 @@ def test_rate_checks_fail_when_two_collections_double_the_rate() -> None:
     _, checks = m.rate_checks(events, RATE, RATE_TH, expected=20)
     failed = {c["name"] for c in checks if not c["ok"]}
     assert m.verdict(checks) == "fail"
-    assert {"single gap not below half the interval, s", "requests in any 1 s window"} <= failed
+    assert {"short gap compensated by an adjacent gap, s", "requests in any 1 s window"} <= failed
+
+
+def test_rate_checks_warn_when_a_late_arrival_compresses_only_the_next_gap() -> None:
+    """Server-side jitter makes one 2 ms gap after a 38 ms gap; the 50 rps schedule is intact."""
+    rate = {"requests_per_second_per_host": 50, "min_delay_ms_per_host": 0}
+    th = {
+        "gap_tolerance_fraction": 0.1,
+        "gap_tolerance_abs_s": 0.005,
+        "max_sub_half_gaps": 2,
+        "min_efficiency": 0.6,
+    }
+    events = [ev(i * 0.02 + (0.018 if i == 4 else 0)) for i in range(20)]
+    metrics, checks = m.rate_checks(events, rate, th, expected=20)
+    assert metrics["min_gap_s"] == pytest.approx(0.002)
+    assert metrics["min_compensated_gap_s"] == pytest.approx(0.02)
+    assert m.verdict(checks) == "warn", checks
+
+
+def test_rate_checks_fail_on_an_uncompensated_local_burst() -> None:
+    """An extra start after 1 ms fails the short-window check even below the 1 s count limit."""
+    rate = {"requests_per_second_per_host": 50, "min_delay_ms_per_host": 0}
+    th = {
+        "gap_tolerance_fraction": 0.1,
+        "gap_tolerance_abs_s": 0.005,
+        "max_sub_half_gaps": 2,
+        "min_efficiency": 0.6,
+    }
+    events = [ev(i * 0.02) for i in range(20)] + [ev(0.041)]
+    metrics, checks = m.rate_checks(events, rate, th, expected=21)
+    assert metrics["max_in_1s"] < 51
+    assert "short gap compensated by an adjacent gap, s" in {c["name"] for c in checks if not c["ok"]}
+    assert m.verdict(checks) == "fail", checks
+
+
+def test_rate_checks_fail_on_repeated_compensated_close_pairs() -> None:
+    """Frequent 1 ms / 39 ms starts are bursts even though pair means and 1 s counts pass."""
+    rate = {"requests_per_second_per_host": 50, "min_delay_ms_per_host": 0}
+    th = {
+        "gap_tolerance_fraction": 0.2,
+        "gap_tolerance_abs_s": 0.005,
+        "max_sub_half_gaps": 2,
+        "min_efficiency": 0.5,
+    }
+    events = [ev(i * 0.04) for i in range(50)] + [ev(i * 0.04 + 0.001) for i in range(50)]
+    metrics, checks = m.rate_checks(events, rate, th, expected=100)
+    failed = {c["name"] for c in checks if not c["ok"] and c["severity"] == "blocker"}
+    assert metrics["max_in_1s"] <= 51
+    assert metrics["min_compensated_gap_s"] >= 0.015
+    assert metrics["sub_half_gaps"] > th["max_sub_half_gaps"]
+    assert failed == {"gaps below half the interval"}
+    assert m.verdict(checks) == "fail"
 
 
 def test_rate_checks_warn_on_an_over_throttled_collector() -> None:

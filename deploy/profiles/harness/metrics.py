@@ -102,13 +102,27 @@ def mean_gaps(gaps: Sequence[float], span: int = MEAN_GAP_SPAN) -> list[float]:
     return [sum(gaps[i : i + span]) / span for i in range(len(gaps) - span + 1)]
 
 
+def compensated_gaps(gaps: Sequence[float]) -> list[float]:
+    """For each gap, its best neighbouring pair mean; a delayed arrival can compensate on either side."""
+    out = []
+    for i, gap in enumerate(gaps):
+        pairs = []
+        if i:
+            pairs.append((gaps[i - 1] + gap) / 2)
+        if i + 1 < len(gaps):
+            pairs.append((gap + gaps[i + 1]) / 2)
+        out.append(max(pairs) if pairs else gap)
+    return out
+
+
 def rate_checks(
     events: Sequence[Event], rate: Mapping[str, Any], th: Mapping[str, Any], *, expected: int
 ) -> tuple[dict[str, Any], list[Check]]:
     """Politeness per host (server-side request starts).
 
-    Blockers: requests in any 1 s window <= ceil(1 / interval) + 1; mean of every 5 consecutive gaps >=
-    interval - tolerance; no single gap below half the interval. Warnings: a single gap below
+    Blockers: requests in any 1 s window <= ceil(1 / interval) + 1; every gap has an adjacent
+    gap whose pair mean, and every 5-gap mean, are >= interval - tolerance; the number of gaps
+    below half the interval is bounded by the profile. Warnings: a single gap below
     interval - tolerance (jitter), average rate below ``min_efficiency`` of the limit (over-throttling).
     """
     interval = request_interval(rate)
@@ -116,12 +130,15 @@ def rate_checks(
     s = starts(events)
     duration = (s[-1] - s[0]) if len(s) > 1 else 0.0
     means = mean_gaps(gaps)
+    compensated = compensated_gaps(gaps)
     metrics = {
         "requests": len(events),
         "interval_s": interval,
         "min_gap_s": min(gaps) if gaps else None,
+        "sub_half_gaps": sum(gap < interval / 2 for gap in gaps),
         "p50_gap_s": percentile(gaps, 50),
         f"min_mean_of_{MEAN_GAP_SPAN}_gaps_s": min(means) if means else None,
+        "min_compensated_gap_s": min(compensated) if compensated else None,
         "max_in_1s": max_in_window(s, 1.0),
         "avg_rate_rps": (len(s) - 1) / duration if duration > 0 else None,
     }
@@ -137,10 +154,13 @@ def rate_checks(
                 round(interval - tolerance, 4),
             ),
             check(
-                "single gap not below half the interval, s",
-                metrics["min_gap_s"],
+                "short gap compensated by an adjacent gap, s",
+                metrics["min_compensated_gap_s"],
                 ">=",
-                round(interval / 2, 4),
+                round(interval - tolerance, 4),
+            ),
+            check(
+                "gaps below half the interval", metrics["sub_half_gaps"], "<=", int(th["max_sub_half_gaps"])
             ),
             check(
                 "single gap (jitter), s",

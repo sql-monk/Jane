@@ -7,6 +7,7 @@ The sandbox backend is the real subprocess backend wrapped with a run counter (t
 
 from __future__ import annotations
 
+import asyncio
 import os
 import threading
 import time
@@ -25,8 +26,10 @@ from pydantic import SecretStr
 from jane_handler_runtime.app import build_app
 from jane_handler_runtime.runtime import build_runtime
 from jane_handler_runtime.sandbox import Bundle, SandboxOutcome, SubprocessSandbox
-from jane_handler_runtime.settings import SandboxLimits, Settings
+from jane_handler_runtime.settings import SandboxLimits, ServiceLimits, Settings
+from jane_handler_runtime.state import PostgresState
 from jane_kit.devstack import load_stack
+from jane_kit.jobs import Job, JobStatus
 
 pytestmark = pytest.mark.integration
 
@@ -165,3 +168,66 @@ def test_cancel_from_another_instance(dsn: tuple[str, str], tmp_path: Path, h: A
         wait_job(b, job_id, {"running"})
         assert b.post(f"/v1/jobs/{job_id}/cancel").status_code == 202
         assert wait_job(a, job_id, {"cancelled", "succeeded", "failed"})["status"] == "cancelled"
+
+
+def test_expired_job_fails_and_old_owner_cannot_overwrite(dsn: tuple[str, str]) -> None:
+    """A killed owner's job becomes terminal; a late write cannot revive it."""
+
+    async def exercise() -> None:
+        a = PostgresState(dsn[0], dsn[1], ServiceLimits(), "dead-owner")
+        b = PostgresState(dsn[0], dsn[1], ServiceLimits(), "new-owner")
+        await a.open()
+        await b.open()
+        try:
+            job = Job(job_id=f"job_{uuid.uuid4().hex}", kind="test_run")
+            await a.jobs.create(job)
+            running = job.model_copy(update={"status": JobStatus.RUNNING})
+            await a.jobs.save(running)
+            await asyncio.to_thread(
+                a.run,
+                "UPDATE {schema}.jobs SET lease_until = clock_timestamp() + interval '1 second' "
+                "WHERE job_id = %s",
+                (job.job_id,),
+            )
+            await a.heartbeat()
+            renewed = await asyncio.to_thread(
+                a.run,
+                "SELECT lease_until > clock_timestamp() + interval '20 seconds' AS ok "
+                "FROM {schema}.jobs WHERE job_id = %s",
+                (job.job_id,),
+                True,
+            )
+            assert renewed[0]["ok"] is True
+            live = await b.jobs.get(job.job_id)
+            assert live is not None and live.status == JobStatus.RUNNING
+            await asyncio.to_thread(
+                a.run,
+                "UPDATE {schema}.jobs SET lease_until = clock_timestamp() - interval '1 second' "
+                "WHERE job_id = %s",
+                (job.job_id,),
+            )
+            failed = await b.jobs.get(job.job_id)
+            assert failed is not None and failed.status == JobStatus.FAILED
+            assert failed.error is not None and failed.error.code == "service_unavailable"
+            assert failed.error.retryable is True
+            await a.jobs.save(running.model_copy(update={"status": JobStatus.SUCCEEDED}))
+            terminal = await b.jobs.get(job.job_id)
+            assert terminal is not None and terminal.status == JobStatus.FAILED
+
+            # Fencing also applies before another instance has observed the expired lease.
+            second = Job(job_id=f"job_{uuid.uuid4().hex}", kind="test_run")
+            await a.jobs.create(second)
+            await asyncio.to_thread(
+                a.run,
+                "UPDATE {schema}.jobs SET lease_until = clock_timestamp() - interval '1 second' "
+                "WHERE job_id = %s",
+                (second.job_id,),
+            )
+            await a.jobs.save(second.model_copy(update={"status": JobStatus.SUCCEEDED}))
+            fenced = await b.jobs.get(second.job_id)
+            assert fenced is not None and fenced.status == JobStatus.FAILED
+        finally:
+            await b.close()
+            await a.close()
+
+    asyncio.run(exercise())

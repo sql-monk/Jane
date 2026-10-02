@@ -217,6 +217,8 @@ jane-kit) → `JANE_HANDLER_RUNTIME_LIMITS__<ГРУПА>__<ПАРАМЕТР>` �
 | `state.pool_max_size` | 10 | — | з'єднань до PostgreSQL стану на екземпляр |
 | `state.connect_timeout_ms` | 10000 | — | підключення до PostgreSQL стану |
 | `state.in_progress_lease_ms` | 900000 | — | після цього «захоплення» ключа впалим екземпляром можна перехопити |
+| `state.job_lease_ms` | 30000 | — | job убитого екземпляра стає `failed` після спливу lease під час читання |
+| `state.heartbeat_interval_ms` | 5000 | — | як часто екземпляр поновлює lease своїх job |
 | `jobs.*`, `idempotency.*` | як у jane-kit | — | див. `libs/jane-kit/README.md` |
 
 ## Приклад виклику зі стороннього застосунку

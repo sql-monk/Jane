@@ -121,7 +121,8 @@ def rate_checks(
     """Politeness per host (server-side request starts).
 
     Blockers: requests in any 1 s window <= ceil(1 / interval) + 1; every gap has an adjacent
-    gap whose pair mean, and every 5-gap mean, are >= interval - tolerance. Warnings: a single gap below
+    gap whose pair mean, and every 5-gap mean, are >= interval - tolerance; the number of gaps
+    below half the interval is bounded by the profile. Warnings: a single gap below
     interval - tolerance (jitter), average rate below ``min_efficiency`` of the limit (over-throttling).
     """
     interval = request_interval(rate)
@@ -134,6 +135,7 @@ def rate_checks(
         "requests": len(events),
         "interval_s": interval,
         "min_gap_s": min(gaps) if gaps else None,
+        "sub_half_gaps": sum(gap < interval / 2 for gap in gaps),
         "p50_gap_s": percentile(gaps, 50),
         f"min_mean_of_{MEAN_GAP_SPAN}_gaps_s": min(means) if means else None,
         "min_compensated_gap_s": min(compensated) if compensated else None,
@@ -156,6 +158,9 @@ def rate_checks(
                 metrics["min_compensated_gap_s"],
                 ">=",
                 round(interval - tolerance, 4),
+            ),
+            check(
+                "gaps below half the interval", metrics["sub_half_gaps"], "<=", int(th["max_sub_half_gaps"])
             ),
             check(
                 "single gap (jitter), s",

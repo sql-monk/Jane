@@ -101,7 +101,7 @@ def plan(profile_name: str) -> dict[str, Any]:
     timeout_s = d["timeouts"]["request_timeout_ms"] / 1000
     wall_s = d["sandbox"]["wall_time_ms"] / 1000
     steps = {
-        "L1": f"{th['rate']['pages']} pages, each short gap compensated by a neighbour and mean of 5 gaps >= {interval:.3f} s (tolerance), <= {math.ceil(1 / interval) + 1 if interval else '-'} starts in any 1 s",
+        "L1": f"{th['rate']['pages']} pages, each short gap compensated by a neighbour, <= {th['rate']['max_sub_half_gaps']} gaps below half interval, mean of 5 gaps >= {interval:.3f} s (tolerance), <= {math.ceil(1 / interval) + 1 if interval else '-'} starts in any 1 s",
         "L2": f"2 x {th['shared_host']['pages_per_collection']} pages of one host at once, same per-host bounds as L1",
         "L3": f"{th['parallel']['pages']} pages answering after {th['parallel']['slow_ms']} ms, in flight <= {d['concurrency']['max_parallel_fetches_per_host']}",
         "L4": f"{th['retries']['flaky_pages']} pages failing {th['retries']['failures_per_path']}x then 200, 429 Retry-After {th['retries']['retry_after_s']} s, "

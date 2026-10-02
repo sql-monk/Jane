@@ -58,7 +58,7 @@ Docker-сокет із групою, визначеною автоматично
 | S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | 1 Docker e2e пройшов; продовження WP-13g — 3 passed / 2 xfailed (LLM — З). Після WP-10d кеш LLM — адресний Docker e2e WP-13h 1 passed; після WP-07c storage-форк у завданні з registry — адресний Docker e2e WP-13i 1 passed. Обидва `xfail` знято; повний набір на спільній ревізії й фінальній `main` ще не перевірено |
 | S-M2-02 | Telegram: історія, нові, редагування як ревізії → збереження | 1, 8, 12 | telegram-collector, storage | **1 passed на спільній гілці WP-01a/00a/13** (Telegram — З) |
 | S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | **10 Docker e2e пройшли на `main` `1306ad3`** (`test_m2_discovery.py`; `just e2e`, CI `36694741989`) |
-| S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage, registry; зміна ціни на testsite — e2e-перемикач (Т) | **3 Docker e2e поспіль пройшли на гілці `wp/13e-price-check`** (`test_m2_prices.py`); в інтеграційну гілку й `main` ще не злито |
+| S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage, registry, штатний testsite | Після WP-01e сценарій **PASSED** у e2e [CI 36995885370](https://github.com/sql-monk/Jane/actions/runs/36995885370) на `7c34688`; фінальна `main` ще не перевірена |
 | S-M2-05a | Невідома сторінка: асистент викликає LLM лише з прапорцем (без оркестратора) | 11 | testsite, assistant, llm, postgres | **реалізовано, проходить** (LLM — З) |
 | S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, runtime, storage, llm | **пройдено на гілці `wp/13-llm-routing`** (`test_m2_llm_routing.py`; LLM — З, архіви пакетів — `package-host` Т); сторінки з ін'єкцією на testsite немає |
 | S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator | **2 Docker e2e пройшли на інтеграційній гілці** (лише назва та підказки обходу; LLM і пошук — З); повний `just e2e`: 33 passed, у `main` не злито |
@@ -228,10 +228,9 @@ partial`). Після каталогу ціну змінено на testsite (а
 канонічними архівами, дайджести мають збігтися з `examples/packages.lock.json`, версії погоджуються.
 Підключення `raw-files` і `results-pg` беруться з e2e (`tests/e2e/config/storage-connections.json`).
 
-Зміна ціни — **Т**. testsite не вміє змінювати ціну (запит до WP-01), тому контейнер testsite цього стеку
-запускає незмінний код `jane_testsite` через `tests/e2e/jane_e2e/testsite_prices.py` (`compose.prices.yaml`).
-Той додає службовий `PUT /_e2e/products/{slug}`: ціна, наявність або назва одного товару в пам'яті, обхідник
-його не бачить. URL товарів не змінюються, тож обидва завдання пишуть у ті самі сутності.
+Штатний testsite (WP-01e) має службовий `PUT /_e2e/products/{slug}`: ціна, наявність або назва
+одного товару змінюється в пам'яті, обхідник цей шлях не бачить. URL товарів не змінюються, тож
+обидва завдання пишуть у ті самі сутності. Оверлей `compose.prices.yaml` більше не використовується.
 
 1. **Каталог.** Ручний запуск `testsite-catalog`: 23 матеріали, 23 RAW у `raw-files`, 16 повних карток
    (`sku`, `title`, `price`, `availability`, `category`, `url` — значення з моделі testsite), `version = 1`,

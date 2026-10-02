@@ -60,7 +60,7 @@ Docker-сокет із групою, визначеною автоматично
 | S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | **10 Docker e2e пройшли на `main` `1306ad3`** (`test_m2_discovery.py`; `just e2e`, CI `36694741989`) |
 | S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage, registry, штатний testsite | Після WP-01e сценарій **PASSED** у e2e [CI 36995885370](https://github.com/sql-monk/Jane/actions/runs/36995885370) на `7c34688`; фінальна `main` ще не перевірена |
 | S-M2-05a | Невідома сторінка: асистент викликає LLM лише з прапорцем (без оркестратора) | 11 | testsite, assistant, llm, postgres | **реалізовано, проходить** (LLM — З) |
-| S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, runtime, storage, llm | **пройдено на гілці `wp/13-llm-routing`** (`test_m2_llm_routing.py`; LLM — З, архіви пакетів — `package-host` Т); сторінки з ін'єкцією на testsite немає |
+| S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, runtime, storage, llm | Маршрут прапорця пройдено; WP-13n додав FAQ із ін'єкцією, він і звичайний FAQ дали ту саму відповідь LLM у [CI 37002784428](https://github.com/sql-monk/Jane/actions/runs/37002784428). Зовнішня LLM — З (`fake`), архіви — `package-host` Т. |
 | S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator | **2 Docker e2e пройшли на інтеграційній гілці** (лише назва та підказки обходу; LLM і пошук — З); повний `just e2e`: 33 passed, у `main` не злито |
 | S-M2-07 | Проблемні приклади → нова версія → тести → активація → відкат | 6 | orchestrator, assistant, llm, registry, runtime | **1 Docker e2e пройшов на інтеграційній гілці** (LLM — З); повний `just e2e`: 33 passed, у `main` не злито |
 | S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, усі сховища | **1 Docker e2e пройшов на `main` `1306ad3`** (`just e2e`, CI `36694741989`); S3 — З |
@@ -70,7 +70,7 @@ Docker-сокет із групою, визначеною автоматично
 | R-01 | Kill воркера оркестратора посеред ланцюжка | 8 | orchestrator ×2, виконавці | **Пройшов** у [CI 36999629588](https://github.com/sql-monk/Jane/actions/runs/36999629588) на WP-13m: після перехоплення lease друга репліка повторила старт того самого run і повернула ту саму job; ефекти лишилися одиничними. Фінальна `main` ще не перевірена. |
 | R-02 | Kill і рестарт кожного сервісу; повтор після рестарту — дубль | 8 | storage, handler-runtime (далі — усі) | **реалізовано для storage і runtime, проходить** |
 | R-03 | Розрив мережі між оркестратором і виконавцем | 8 | orchestrator, виконавці | **3 Docker e2e поспіль пройшли на гілці `wp/13d-reliability`** (виконавець — storage; Docker Desktop, Linux CI після виправлення порту ще не перевірено; у `main` не злито) |
-| R-04 | Повторна доставка на кожен виконавець | 8 | усі виконавці | **частково**: Web/Telegram Collector і LLM — 8 Docker e2e на гілці WP-13 (`test_r04_idempotency.py`, у `main` не злито; Telegram і LLM-провайдер — З), з них 4 — повтор на іншому екземплярі; storage, runtime — дубль у S-M1-01, R-02, R-06 без перевірки 422 і `Idempotency-Replayed`; повтор під час виконання й після рестарту колекторів і LLM — ні |
+| R-04 | Повторна доставка на кожен виконавець | 8 | усі виконавці | **частково**: Web/Telegram Collector і LLM — 8 Docker e2e, з них 4 на іншому екземплярі; storage/runtime — дубль, `Idempotency-Replayed` і 422 для іншого тіла пройшли у [CI 37002784428](https://github.com/sql-monk/Jane/actions/runs/37002784428). Повтор під час виконання й після рестарту колекторів та LLM лишається відкритим. |
 | R-05 | Запізнілий результат не замінює новішого | 8 | storage, handler-runtime | **реалізовано, проходить** |
 | R-06 | Кілька екземплярів кожного компонента | 8 | усі | **runtime, Web/Telegram Collector, LLM, storage, registry, assistant та orchestrator ×2 проходять** (CI 36988073141, 36994135652 і [36999629588](https://github.com/sql-monk/Jane/actions/runs/36999629588)); фінальна `main` ще не перевірена |
 | R-07 | Повний цикл LLM → тести → активація → відкат під навантаженням і з рестартами | 6, 8 | orchestrator, assistant, llm, registry, runtime, storage | Після виправлень WP-11e/06a/09c усі сценарії `test_r07_improvement_restarts.py` **PASSED** у [CI 36994135652](https://github.com/sql-monk/Jane/actions/runs/36994135652), e2e `54 passed, 0 xfailed` на `e8927bd`; LLM — З, фінальна `main` ще не перевірена |
@@ -305,8 +305,10 @@ LLM — **З**: вбудований детермінований провайд
 LLM — **З** (провайдер `fake` з ненульовими цінами, скрипти — `tests/e2e/config/llm-seed.yaml`). Архів
 LLM-пакета — через `package-host` (**Т**). Асистент у цьому маршруті не бере участі: оркестратор
 передає невідомі матеріали етапу `unmatched_materials`; шлях через асистента — S-M2-05a.
-**Сторінки з ін'єкцією testsite не має** (див. `tests/fixtures/testsite/README.md`), тож цю частину
-e2e не перевіряє; доказ поки що — `services/llm/tests/test_injection.py` (WP-10), запит — у звіті WP-13.
+WP-01f додав пряму `/pages/faq-injection`. WP-13n провів її і звичайний FAQ через цей маршрут:
+обидві класифіковані як `faq`, інструкція з HTML не змінила відповідь, e2e **PASSED** у
+[CI 37002784428](https://github.com/sql-monk/Jane/actions/runs/37002784428). Контроль ін'єкції
+в довіреному каналі лишається в `services/llm/tests/test_injection.py` (WP-10).
 
 ### S-M2-06. Нове джерело через асистента
 `POST /v1/onboarding-sessions` (лише назва testsite; пошуковий провайдер — **З**, LLM — **З** WP-10) →

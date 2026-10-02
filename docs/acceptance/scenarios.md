@@ -70,9 +70,9 @@ Docker-сокет із групою, визначеною автоматично
 | R-01 | Kill воркера оркестратора посеред ланцюжка | 8 | orchestrator ×2, виконавці | **3 Docker e2e поспіль пройшли на гілці `wp/13d-reliability`** (у `main` не злито) |
 | R-02 | Kill і рестарт кожного сервісу; повтор після рестарту — дубль | 8 | storage, handler-runtime (далі — усі) | **реалізовано для storage і runtime, проходить** |
 | R-03 | Розрив мережі між оркестратором і виконавцем | 8 | orchestrator, виконавці | **3 Docker e2e поспіль пройшли на гілці `wp/13d-reliability`** (виконавець — storage; Docker Desktop, Linux CI після виправлення порту ще не перевірено; у `main` не злито) |
-| R-04 | Повторна доставка на кожен виконавець | 8 | усі виконавці | **частково**: Web/Telegram Collector і LLM — 4 Docker e2e на гілці WP-13 (`test_r04_idempotency.py`, у `main` не злито; Telegram і LLM-провайдер — З); storage, runtime — дубль у S-M1-01, R-02, R-06 без перевірки 422 і `Idempotency-Replayed`; повтор під час виконання, після рестарту й на іншому екземплярі колекторів і LLM — ні |
+| R-04 | Повторна доставка на кожен виконавець | 8 | усі виконавці | **частково**: Web/Telegram Collector і LLM — 8 Docker e2e на гілці WP-13 (`test_r04_idempotency.py`, у `main` не злито; Telegram і LLM-провайдер — З), з них 4 — повтор на іншому екземплярі; storage, runtime — дубль у S-M1-01, R-02, R-06 без перевірки 422 і `Idempotency-Replayed`; повтор під час виконання й після рестарту колекторів і LLM — ні |
 | R-05 | Запізнілий результат не замінює новішого | 8 | storage, handler-runtime | **реалізовано, проходить** |
-| R-06 | Кілька екземплярів кожного компонента | 8 | усі | **runtime ×2 реалізовано, проходить**; інші — з WP |
+| R-06 | Кілька екземплярів кожного компонента | 8 | усі | **runtime, Web/Telegram Collector і LLM ×2 проходять** (CI 36988073141 для останніх трьох); registry, assistant, orchestrator і storage лишаються відкритими |
 | R-07 | Повний цикл LLM → тести → активація → відкат під навантаженням і з рестартами | 6, 8 | orchestrator, assistant, llm, registry, runtime, storage | **3 Docker e2e поспіль пройшли на гілці `wp/13f-r07-restarts`** (`test_r07_improvement_restarts.py`; LLM — З; у `main` не злито): повтор після рестарту дає рівно одну нову версію, активація й відкат працюють; стан перерваних job і повтор обірваного виклику — 3 `xfail` (дефекти WP-11, WP-06, WP-09). Після прогонів перевірки `xfail` звужено до точних відомих станів; Docker повторно не запускався |
 | R-08 | Обмежена черга стримує збір (backpressure) | 8, 13 | orchestrator, web-collector | **3 Docker e2e поспіль пройшли на гілці `wp/13d-reliability`**, без `xfail` (у `main` не злито) |
 
@@ -404,14 +404,15 @@ LLM — **З**, архіви пакетів-фікстур — `package-host` (*
 | R-03 | `docker network disconnect` виконавця на час прогону, потім `connect` | оркестратор повторює з backoff (ізольована повторна спроба чекає в межах політики), після відновлення прогін завершується без дублів |
 | R-04 | Той самий `delivery_key` на кожен виконавець (storage, runtime, llm, колектори — `Idempotency-Key`) | дубль без побічного ефекту, `Idempotency-Replayed: true`; інше тіло дає 422 `idempotency_key_reused` |
 | R-05 | Новіше спостереження (ціна 199), потім старіше (ціна 249) того самого товару | стан лишається 199; старіше отримує `stale`, `price` у `stale_fields`, подія є в історії |
-| R-06 | `--scale <сервіс>=2` (зараз — handler-runtime); запит на екземпляр 1, повтор на екземпляр 2 | повтор — дубль із тим самим `invocation_id`; результат читається з іншого екземпляра; далі так само для колекторів (спільний стан), registry, llm (спільний бюджет), assistant, orchestrator (воркери не дублюють) |
+| R-06 | `--scale <сервіс>=2`; запит на екземпляр 1, повтор на екземпляр 2 | runtime — дубль із тим самим `invocation_id`; Web/Telegram Collector — той самий job і матеріали; LLM — той самий completion/job і бюджет; інші сервіси ще потрібно перевірити |
 | R-07 | S-M2-07 з `docker kill` + `start` асистента (окремо — runtime), поки кандидат тестується в runtime, паралельно з прогоном навантаження | цикл завершується або відновлюється без втрати й дублювання версій; відкат працює |
 | R-08 | Малий `limits.queue.max_unacked_materials`, повільний споживач | колектор призупиняється, пам'ять не росте, після споживання продовжує |
 
 Реалізовані зараз: `tests/e2e/test_reliability.py` — `test_r_02_…`, `test_r_05_…`, `test_r_06_…`;
-`tests/e2e/test_r04_idempotency.py` — частина R-04 (лише гілка WP-13):
+`tests/e2e/test_r04_idempotency.py` — частина R-04/R-06 (лише гілка WP-13):
 `test_r_04_collectors_replay_one_job_without_new_materials[web-collector|telegram-collector]` і
-`test_r_04_llm_replay_does_not_spend_usage_twice[sync|async]`. Вони надсилають `POST /v1/collections`
+`test_r_04_llm_replay_does_not_spend_usage_twice[sync|async]`, кожен на тому самому та іншому
+екземплярі (усі 8 пройшли в CI 36988073141). Вони надсилають `POST /v1/collections`
 і `POST /v1/completions` повторно з тим самим `Idempotency-Key` після завершення першого виклику,
 а потім той самий ключ з іншим тілом. Telegram-мережа — записаний backend (**З**), LLM-провайдер —
 `fake` (**З**), HTTP-сервіси реальні.

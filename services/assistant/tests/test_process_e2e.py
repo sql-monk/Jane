@@ -3,6 +3,10 @@ neighbours are contract-bound fakes served by uvicorn on free ports, search is t
 
 new source (by name) -> proposals -> accept + activate (source and task created) -> problem samples
 -> new version (manual approval) -> admin approves and activates -> admin rolls back.
+
+Waits are upper bounds from the environment (a loaded machine needs more, the assertions stay the same):
+``JANE_ASSISTANT_TEST_START_S`` (120) for the assistant process and the fakes to start,
+``JANE_ASSISTANT_TEST_WAIT_S`` (120) for a job to finish (``assistant_fakes.START_S`` / ``WAIT_S``).
 """
 
 from __future__ import annotations
@@ -21,6 +25,7 @@ from typing import Any
 import httpx
 import pytest
 import uvicorn
+from assistant_fakes import START_S, WAIT_S
 from assistant_fakes.llm import FakeLlm
 from assistant_fakes.registry import FakeRegistry
 from assistant_fakes.services import FakeCollector, FakeHandler, FakeOrchestrator, FakeStorage
@@ -35,11 +40,13 @@ def _free_port() -> int:
 
 class _Server:
     def __init__(self, app: Any) -> None:
-        self.port = _free_port()
-        self.server = uvicorn.Server(
-            uvicorn.Config(app, host="127.0.0.1", port=self.port, log_level="warning", lifespan="off")
-        )
-        self.thread = threading.Thread(target=self.server.run, daemon=True)
+        # the socket is bound here and handed to uvicorn: no other process can take the port in between
+        # (a free port picked and released first was taken by a parallel test run: WinError 10048)
+        self.sock = socket.socket()
+        self.sock.bind(("127.0.0.1", 0))
+        self.port = int(self.sock.getsockname()[1])
+        self.server = uvicorn.Server(uvicorn.Config(app, log_level="warning", lifespan="off"))
+        self.thread = threading.Thread(target=self.server.run, kwargs={"sockets": [self.sock]}, daemon=True)
 
     @property
     def url(self) -> str:
@@ -47,7 +54,7 @@ class _Server:
 
     def __enter__(self) -> _Server:
         self.thread.start()
-        deadline = time.monotonic() + 10
+        deadline = time.monotonic() + START_S
         while not self.server.started:
             if time.monotonic() > deadline:
                 raise RuntimeError("fake server did not start")
@@ -57,6 +64,7 @@ class _Server:
     def __exit__(self, *exc: object) -> None:
         self.server.should_exit = True
         self.thread.join(timeout=5)
+        self.sock.close()
 
 
 @pytest.fixture
@@ -98,7 +106,7 @@ def stack(contracts: Path, tmp_path: Path) -> Iterator[dict[str, Any]]:
     )
     base = f"http://127.0.0.1:{port}"
     try:
-        deadline = time.monotonic() + 30
+        deadline = time.monotonic() + START_S
         while True:
             try:
                 if httpx.get(f"{base}/v1/health", timeout=1).status_code == 200:
@@ -125,7 +133,7 @@ def stack(contracts: Path, tmp_path: Path) -> Iterator[dict[str, Any]]:
 
 
 def _wait(client: httpx.Client, job_id: str) -> dict[str, Any]:
-    deadline = time.monotonic() + 30
+    deadline = time.monotonic() + WAIT_S
     while True:
         job: dict[str, Any] = client.get(f"/v1/jobs/{job_id}").json()
         if job["status"] in {"succeeded", "failed", "cancelled"}:
@@ -137,7 +145,8 @@ def _wait(client: httpx.Client, job_id: str) -> dict[str, Any]:
 
 def test_lifecycle_over_http(stack: dict[str, Any]) -> None:
     fakes = stack["fakes"]
-    with httpx.Client(base_url=stack["base"], timeout=10) as c:
+    # one request may wait as long as a job: under load the assistant answered a poll after more than 10 s
+    with httpx.Client(base_url=stack["base"], timeout=WAIT_S) as c:
         info = c.get("/v1/info").json()
         assert info["capabilities"]["search_provider"] == "static"
         job = c.post(
@@ -194,8 +203,8 @@ def test_lifecycle_over_http(stack: dict[str, Any]) -> None:
 
     registry: FakeRegistry = fakes["registry"]
     with (
-        httpx.Client(base_url=stack["servers"]["registry"].url) as reg,
-        httpx.Client(base_url=stack["servers"]["orchestrator"].url) as admin,
+        httpx.Client(base_url=stack["servers"]["registry"].url, timeout=WAIT_S) as reg,
+        httpx.Client(base_url=stack["servers"]["orchestrator"].url, timeout=WAIT_S) as admin,
     ):
         assert (
             reg.post(

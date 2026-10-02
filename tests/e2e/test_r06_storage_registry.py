@@ -57,18 +57,35 @@ def test_r_06_registry_replica_reads_published_archive(
     first_client, second_client = client("registry", 1), client("registry", 2)
     manifest, files = package_files(EXTRACTOR_DIR)
     package_id = manifest["package_id"]
+    create_body = {"package_id": package_id, "kind": manifest["kind"], "title": manifest["title"]}
+    create_headers = {"Idempotency-Key": key()}
     created = first_client.api("registry").post(
         "/v1/packages",
-        json={"package_id": package_id, "kind": manifest["kind"], "title": manifest["title"]},
-        headers={"Idempotency-Key": key()},
+        json=create_body,
+        headers=create_headers,
     )
     assert created.status_code == 201, created.text
+    replay_created = second_client.api("registry").post(
+        "/v1/packages", json=create_body, headers=create_headers
+    )
+    assert replay_created.status_code == 201, replay_created.text
+    assert replay_created.headers["Idempotency-Replayed"] == "true"
+    assert replay_created.json() == created.json()
+
+    version_body = publish_body(manifest, files)
+    version_headers = {"Idempotency-Key": key()}
     published = first_client.api("registry").post(
         f"/v1/packages/{package_id}/versions",
-        json=publish_body(manifest, files),
-        headers={"Idempotency-Key": key()},
+        json=version_body,
+        headers=version_headers,
     )
     assert published.status_code == 201, published.text
+    replay_published = second_client.api("registry").post(
+        f"/v1/packages/{package_id}/versions", json=version_body, headers=version_headers
+    )
+    assert replay_published.status_code == 201, replay_published.text
+    assert replay_published.headers["Idempotency-Replayed"] == "true"
+    assert replay_published.json() == published.json()
     version: dict[str, Any] = published.json()
 
     read = second_client.api("registry").get(f"/v1/packages/{package_id}/versions/{manifest['version']}")

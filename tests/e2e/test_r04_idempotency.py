@@ -12,6 +12,7 @@ import pytest
 from jane_e2e.clients import JaneClient
 from jane_e2e.orchestration import TESTSITE
 from jane_e2e.stack import E2EStack
+from jane_e2e.verify import site_paths
 from jane_telegram_collector.recorded import Recording  # type: ignore[import-untyped]
 
 pytestmark = [pytest.mark.e2e, pytest.mark.milestone("M2"), pytest.mark.criteria(8)]
@@ -108,6 +109,50 @@ def test_r_04_collectors_replay_one_job_without_new_materials(
     view_after, materials_after = _collection_result(replay_collector, collection_id)
     assert view_after == view_before
     assert materials_after == materials_before
+
+
+def test_r_04_web_replay_while_collection_is_running(
+    require: Callable[..., None], client: Callable[..., JaneClient], run_id: str
+) -> None:
+    require("testsite", "web-collector")
+    collector = client("web-collector")
+    api = collector.api("collector")
+    urls = [TESTSITE + path for path in site_paths("product")[:8]]
+    body = {
+        "source_kind": "web",
+        "source_id": f"r04-active-{run_id}",
+        "rules_ref": {"package_id": "testsite.web-rules", "version": "1.0.0"},
+        "urls": urls,
+        "limits": {"rate": {"requests_per_second_per_host": 1, "min_delay_ms_per_host": 1000}},
+    }
+    headers = {"Idempotency-Key": f"r04-active-{run_id}"}
+    first = api.post("/v1/collections", json=body, headers=headers)
+    assert first.status_code == 202, first.text
+    collection_id = first.json()["job_id"]
+
+    deadline = time.monotonic() + 30
+    while True:
+        view_response = api.get(f"/v1/collections/{collection_id}")
+        assert view_response.status_code == 200, view_response.text
+        view = view_response.json()
+        if view["status"] == "running" and view["stats"]["fetched"] < len(urls):
+            break
+        assert view["status"] not in {"succeeded", "failed", "cancelled"}, view
+        assert time.monotonic() < deadline, view
+        time.sleep(0.1)
+
+    replay = api.post("/v1/collections", json=body, headers=headers)
+    assert replay.status_code == 202, replay.text
+    assert replay.headers["Idempotency-Replayed"] == "true"
+    assert replay.json() == first.json()
+    mismatch = api.post("/v1/collections", json={**body, "mode": "incremental"}, headers=headers)
+    assert mismatch.status_code == 422, mismatch.text
+    assert mismatch.json()["code"] == "idempotency_key_reused"
+
+    final, materials = _collection_result(collector, collection_id)
+    assert final["stats"]["fetched"] == len(urls), final
+    assert len(materials) == len(urls), materials
+    assert final["stats"]["duplicates"] == 0, final
 
 
 @pytest.mark.parametrize("mode", ["sync", "async"])

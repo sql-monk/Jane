@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
 
 from jane_kit.clients import RetryPolicy
@@ -13,7 +13,8 @@ from jane_kit.idempotency import IdempotencyLimits
 from jane_kit.jobs import JobLimits
 from jane_kit.pagination import PageLimits
 
-from .policy import ConnectionPolicy
+from .packages import ArchiveLimits
+from .policy import AddressError, ConnectionPolicy, service_url
 
 ENV_PREFIX = "JANE_STORAGE_"
 
@@ -42,11 +43,29 @@ class Settings(JaneSettings):
     """Only ``file:///`` ContentRef blobs below this directory may be read; None disables local blobs."""
     download_host_allowlist: list[str] = Field(default_factory=list)
     """``hostname`` or ``hostname:port`` allowed for ContentRef download_url; empty disables downloads."""
+    registry_url: str | None = None
+    """Base URL of the handler registry (``registry.v1``, e.g. ``http://registry:8000``): a storage package that is
+    neither built in nor given as ``package_archive`` is downloaded from it (ADR-0009 §4). Operator configuration
+    only (never taken from a request); empty: no registry, such a package is ``404 not_found``."""
+    registry_token: SecretStr | None = None
+    """Bearer token for the registry (environment only; never logged, sent only to ``registry_url``). Not an
+    ``env:JANE_SECRET_*`` variable, so a connection's ``secret_refs`` cannot reference it."""
 
     @field_validator("secret_files_dir", "content_files_dir", mode="before")
     @classmethod
     def _empty_files_dir_disables(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("registry_url", mode="before")
+    @classmethod
+    def _registry_url(cls, value: object) -> object:
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        try:
+            service_url(value, "registry_url")
+        except AddressError as exc:
+            raise ValueError(f"registry_url {exc}") from None
+        return str(value).rstrip("/")
 
     @field_validator("connection_host_allowlist", "download_host_allowlist")
     @classmethod
@@ -100,6 +119,26 @@ class Invocations(Limits):
     """How many recent HandlerResults ``GET /v1/invocations/{id}`` keeps (per instance)."""
 
 
+class PackageLimits(Limits):
+    """Storage packages that are not built in: ``package_archive`` and registry downloads (untrusted archives).
+
+    The size defaults equal the registry's own ``packages`` limits, so every version it accepts can be loaded."""
+
+    max_archive_bytes: int = Field(default=20 * 1024 * 1024, ge=1)
+    """Largest package archive; a registry download stops as soon as it is passed."""
+    max_unpacked_bytes: int = Field(default=50 * 1024 * 1024, ge=1)
+    """Total size of the files of one package."""
+    max_files: int = Field(default=2_000, ge=1)
+    cache_max_entries: int = Field(default=128, ge=1)
+    """Registry packages kept in memory per instance (LRU by digest)."""
+    registry_connect_timeout_ms: int = Field(default=5_000, ge=1)
+    registry_request_timeout_ms: int = Field(default=30_000, ge=1)
+    """Whole archive download from the registry (connect + response + body)."""
+
+    def archive_limits(self) -> ArchiveLimits:
+        return ArchiveLimits(self.max_archive_bytes, self.max_unpacked_bytes, self.max_files)
+
+
 class ServiceLimits(Limits):
     """Limits of this service. Contract names (``limits.schema.json``) where the limit exists there."""
 
@@ -113,6 +152,7 @@ class ServiceLimits(Limits):
     adapters: Adapters = Adapters()
     pages: PageLimits = PageLimits()
     invocations: Invocations = Invocations()
+    packages: PackageLimits = PackageLimits()
 
 
 def resolve_service_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLimits[ServiceLimits]:

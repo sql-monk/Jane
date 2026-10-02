@@ -45,6 +45,7 @@ __all__ = [
     "network_addresses",
     "parse_host_port",
     "redact",
+    "service_url",
 ]
 
 SECRET_REF_NOT_ALLOWED = "secret_ref_not_allowed"  # noqa: S105 - an error code, not a secret
@@ -128,6 +129,17 @@ def _url(
         raise AddressError(pointer, "must name a single host")
     port = _DEFAULT_PORTS.get(scheme) if default_port is None else default_port
     return [_host(h, pointer, port) for h in hosts]
+
+
+def service_url(value: object, pointer: str) -> Address:
+    """Address of a Jane service URL configured by the operator (``JANE_STORAGE_REGISTRY_URL``):
+    ``http(s)://host[:port][/path]`` with the same strict parsing as connection addresses, one host, no userinfo,
+    query or fragment."""
+    (address,) = _url(value, pointer, schemes=frozenset({"http", "https"}))
+    m = _URL.fullmatch(str(value))
+    if m is not None and m.group("rest") and ("?" in m.group("rest") or "#" in m.group("rest")):
+        raise AddressError(pointer, "must not have a query or a fragment")
+    return address
 
 
 def _port(params: Mapping[str, Any], default: int) -> int:

@@ -110,10 +110,40 @@ entities = httpx.get(
 | `pages.default_page_size` / `max_page_size` | 50 / 500 | пагінація читального API |
 | `invocations.max_results_in_memory` | 10000 | `GET /v1/invocations/{id}` |
 | `jobs.max_concurrent_jobs` / `max_queued_jobs` / `job_timeout_ms` | 4 / 1000 / 3600000 | виконання викликів |
+| `packages.max_archive_bytes` / `max_unpacked_bytes` / `max_files` | 20971520 / 52428800 / 2000 | межі для архівів у запиті та registry |
+| `packages.cache_max_entries` | 128 | перевірені пакети registry в пам'яті одного екземпляра |
+| `packages.registry_connect_timeout_ms` / `registry_request_timeout_ms` | 5000 / 30000 | встановлення з'єднання / повне завантаження архіву |
 
 Інші налаштування: `JANE_STORAGE_PORT` (8107), `JANE_STORAGE_CONNECTIONS_FILE`, `JANE_STORAGE_TRANSIT_CONNECTION_ID`
 (підключення `s3`/`minio` для читання `s3://`-матеріалів), `JANE_STORAGE_PACKAGE_DIRS`, `JANE_CONTRACTS_DIR`
 (валідація запитів за контрактами), `JANE_STORAGE_LOG_FORMAT`.
+
+### Пакети з registry (ADR-0009 §4)
+
+Пакет `handler` (`package_id`, точна `version`, необов'язковий `digest`) береться в такому порядку:
+
+1. `package_archive` запиту;
+2. вбудований каталог (пакети встановлених адаптерів і `JANE_STORAGE_PACKAGE_DIRS`) — він авторитетний для
+   свого `package_id@version`: інший `digest` → `422 digest_mismatch` без звернення до registry;
+3. registry (`GET /v1/packages/{id}/versions/{v}/archive`, `registry.v1`), якщо задано
+   `JANE_STORAGE_REGISTRY_URL`.
+
+| Змінна | Типово | Дія |
+|---|---|---|
+| `JANE_STORAGE_REGISTRY_URL` | порожньо | `http(s)://host[:port][/шлях]` registry; без userinfo, query, fragment (помилка старту). Порожньо — registry немає, невідомий пакет → `404 not_found` |
+| `JANE_STORAGE_REGISTRY_TOKEN` | порожньо | Bearer-токен лише для цієї адреси; не журналюється; не має префікса `JANE_SECRET_`, тож `secret_refs` підключень на нього не посилаються |
+
+Перевірки архіву з registry (і `package_archive`): `ETag` = `sha256:` байтів; канонічний дайджест (той самий
+алгоритм, що в registry) = `handler.digest`, якщо задано; маніфест — саме `package_id@version` запиту,
+`kind: storage`, `entry.executor: storage`, без `dependencies`, адаптер встановлено; zip без небезпечних шляхів,
+дублікатів і symlink, у межах `packages.*`. Адреса й токен — конфігурація оператора, не запиту; перенаправлення
+не виконуються, проксі із середовища не використовується (тому allowlist хостів не потрібен).
+Перевірені пакети кешуються за дайджестом у пам'яті екземпляра (`packages.cache_max_entries`); влучання в кеш
+перевіряється на `package_id@version` так само, як завантаження: дайджест іншої версії → `digest_mismatch`
+і з холодним, і з теплим кешем. Одночасні виклики однієї версії ділять одне завантаження. Помилки:
+`404 not_found` (немає у registry), `502 upstream_unavailable` (немає відповіді, тайм-аут, 5xx/429 —
+`retryable: true`; 401/403, перенаправлення — `retryable: false`), `422` (`digest_mismatch`,
+`validation_failed`, `dependency_not_allowed`, `limit_exceeded`). `POST /v1/test-runs` бере пакет так само.
 
 ### Політика секретів і вмісту
 

@@ -27,6 +27,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi import FastAPI, Query, Request, Response
 from fastapi.responses import JSONResponse
 from jsonschema import Draft202012Validator
@@ -54,6 +55,7 @@ from .connections import AdapterPool, ConnectionRegistry
 from .content import ContentReader
 from .handler import StorageHandler
 from .packages import PackageCatalog, StoragePackage
+from .registry_packages import RegistryPackages
 from .settings import ServiceLimits, Settings, resolve_service_limits
 
 log = logging.getLogger(__name__)
@@ -158,7 +160,10 @@ def _connection_validator(root: Path | None) -> Any:
     return Draft202012Validator(schema)
 
 
-def build_app(settings: Settings | None = None) -> FastAPI:
+def build_app(
+    settings: Settings | None = None, *, registry_transport: httpx.AsyncBaseTransport | None = None
+) -> FastAPI:
+    """The storage service. ``registry_transport`` — HTTP transport to the registry (tests)."""
     settings = settings or Settings()
     resolved = resolve_service_limits(settings)
     limits: ServiceLimits = resolved.limits
@@ -170,6 +175,17 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         registry.load_file(settings.connections_file)
     pool = AdapterPool(registry, limits.adapters.model_dump())
     catalog = PackageCatalog.discover(settings.package_dirs)
+    installed = frozenset(available_adapters())
+    remote = (
+        RegistryPackages(
+            settings.registry_url,
+            limits.packages,
+            token=settings.registry_token.get_secret_value() if settings.registry_token else None,
+            transport=registry_transport,
+        )
+        if settings.registry_url
+        else None
+    )
 
     async def transit() -> Any:
         if settings.transit_connection_id is None:
@@ -185,7 +201,14 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             download_host_allowlist=settings.download_host_allowlist,
         )
         return StorageHandler(
-            catalog, pool, reader, retries=lim.retries, request_validator=_request_validator(root)
+            catalog,
+            pool,
+            reader,
+            retries=lim.retries,
+            request_validator=_request_validator(root),
+            registry=remote,
+            archive_limits=lim.packages.archive_limits(),
+            installed_adapters=installed,
         )
 
     default_handler = handler_for(limits)
@@ -197,8 +220,9 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         log.info(
             "storage ready",
             extra={
-                "adapters": sorted(available_adapters()),
+                "adapters": sorted(installed),
                 "packages": [f"{p.package_id}@{p.version}" for p in catalog.all()],
+                "registry": settings.registry_url,
                 "connections": [c.connection_id for c in registry.list()],
             },
         )
@@ -209,7 +233,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     def capabilities() -> dict[str, Any]:
         return {
             "handler_kinds": ["storage"],
-            "adapters": sorted(available_adapters()),
+            "adapters": sorted(installed),
             "packages": [p.ref for p in catalog.all()],
             "connections": True,
             "test_mode": True,
@@ -343,10 +367,13 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                 f"{IDEMPOTENCY_HEADER} header is required",
                 errors=[FieldError(parameter=IDEMPOTENCY_HEADER, message="required")],
             )
-        ref = body.get("handler") or {}
-        pkg = catalog.get(str(ref.get("package_id")), str(ref.get("version")))
-        if pkg is None:
-            raise NotFound(f"{ref.get('package_id')}@{ref.get('version')}")
+        ref = body.get("handler") if isinstance(body, dict) else None
+        if not isinstance(ref, dict) or not {"package_id", "version"} <= set(ref):
+            raise ValidationFailed(
+                "TestRunRequest.handler with package_id and version is required",
+                errors=[FieldError(pointer="/handler", message="required")],
+            )
+        pkg = await default_handler.resolve_package(ref, body.get("package_archive"))
         cases = manifest_test_cases(pkg, body)
 
         async def work(ctx: JobContext) -> dict[str, Any]:
@@ -355,7 +382,9 @@ def build_app(settings: Settings | None = None) -> FastAPI:
             for i, (name, invocation, expected) in enumerate(cases):
                 await ctx.check_cancelled()
                 try:
-                    result = await default_handler.invoke(invocation)
+                    result = await default_handler.execute(
+                        await default_handler.prepare(invocation, package=pkg)
+                    )
                 except JaneError as exc:
                     report.append(
                         {

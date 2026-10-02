@@ -7,6 +7,11 @@ and tests. Every adapter distribution ships its package and registers it in the 
 of all installed adapters without the registry (ADR-0009: standard ``jane.storage-*`` packages are
 built into the service).
 
+Other storage packages (forks, new versions) come as ``HandlerInvocation.package_archive`` or from the registry
+(:mod:`jane_storage.registry_packages`); both are untrusted archives read by :func:`package_from_archive` within
+:class:`ArchiveLimits`. A storage package has no code, so - like the built-in ones - it declares no dependencies
+(runtime profile, Python requirements, other packages).
+
 Publication to the registry (``registry.v1``: ``POST /v1/packages`` + ``POST
 /v1/packages/{id}/versions``) is done by ``jane-storage-packages publish --registry <url>``.
 """
@@ -19,6 +24,7 @@ import hashlib
 import io
 import json
 import os
+import stat
 import sys
 import zipfile
 from collections.abc import Mapping, Sequence
@@ -31,12 +37,15 @@ import httpx
 from .adapters import package_dirs
 
 __all__ = [
+    "ArchiveLimits",
+    "DependencyNotAllowed",
     "PackageCatalog",
     "PublishOutcome",
     "StoragePackage",
     "canonical_archive",
     "load_package",
     "main",
+    "package_from_archive",
     "publish",
 ]
 
@@ -115,20 +124,93 @@ class StoragePackage:
         raise KeyError(path)
 
 
+class DependencyNotAllowed(ValueError):
+    """The manifest declares dependencies the storage executor cannot provide (``dependency_not_allowed``)."""
+
+
+@dataclass(frozen=True)
+class ArchiveLimits:
+    """Bounds for reading an untrusted package archive (``limits.packages`` of the service)."""
+
+    max_archive_bytes: int = 20 * 1024 * 1024
+    max_unpacked_bytes: int = 50 * 1024 * 1024
+    max_files: int = 2_000
+
+
+_DEPENDENCY_KEYS = ("runtime_profile", "python", "packages")
+
+
 def _from_files(files: Sequence[tuple[str, bytes]]) -> StoragePackage:
     table = dict(files)
     if MANIFEST not in table:
         raise ValueError(f"package archive has no {MANIFEST}")
-    manifest = json.loads(table[MANIFEST])
-    if manifest.get("kind") != "storage" or (manifest.get("entry") or {}).get("executor") != "storage":
-        raise ValueError(f"{manifest.get('package_id')}: not a storage package")
-    if manifest["entry"].get("history", True) is not True:
+    try:
+        manifest = json.loads(table[MANIFEST])
+    except (ValueError, UnicodeError) as exc:
+        raise ValueError(f"{MANIFEST} is not valid JSON: {exc}") from exc
+    if not isinstance(manifest, dict):
+        raise ValueError(f"{MANIFEST} must be a JSON object")
+    entry = manifest.get("entry")
+    if manifest.get("kind") != "storage" or not isinstance(entry, dict) or entry.get("executor") != "storage":
+        raise ValueError(
+            f"{manifest.get('package_id')}: kind={manifest.get('kind')!r} is not a storage package "
+            "(this executor runs kind=storage, entry.executor=storage only)"
+        )
+    for key in ("package_id", "version"):
+        if not isinstance(manifest.get(key), str):
+            raise ValueError(f"{MANIFEST}: {key} must be a string")
+    if not isinstance(entry.get("adapter"), str) or not entry["adapter"] or not isinstance(entry.get("writes"), str):
+        raise ValueError(f"{manifest['package_id']}: entry.adapter and entry.writes are required")
+    if entry["writes"] not in {"raw", "entities", "raw_and_entities", "data"}:
+        raise ValueError(f"{manifest['package_id']}: unsupported entry.writes {entry['writes']!r}")
+    fmt = entry.get("format") or {}
+    if not isinstance(fmt, dict):
+        raise ValueError(f"{manifest['package_id']}: invalid entry.format")
+    raw_format, entities_format = fmt.get("raw", "original"), fmt.get("entities", "json")
+    if (
+        not isinstance(raw_format, str)
+        or raw_format not in {"original", "html", "json"}
+        or not isinstance(entities_format, str)
+        or entities_format not in {"json", "jsonl"}
+    ):
+        raise ValueError(f"{manifest['package_id']}: invalid entry.format")
+    if entry.get("history", True) is not True:
         # History is part of the delivery-completeness check of every adapter; it cannot be switched off.
         raise ValueError(
             f"{manifest.get('package_id')}: entry.history=false is not supported by this executor"
         )
+    deps = manifest.get("dependencies") or {}
+    if not isinstance(deps, dict) or any(deps.values()):
+        declared = [k for k in _DEPENDENCY_KEYS if isinstance(deps, dict) and deps.get(k)]
+        raise DependencyNotAllowed(
+            f"{manifest['package_id']}: a storage package has no code and declares no dependencies "
+            f"({', '.join(f'dependencies.{k}' for k in declared) or 'dependencies'})"
+        )
+    input_contract = manifest.get("input") or {}
+    if not isinstance(input_contract, dict):
+        raise ValueError(f"{manifest['package_id']}: invalid input.accepts")
+    accepts = input_contract.get("accepts", [])
+    if not isinstance(accepts, list) or any(
+        not isinstance(kind, str) or kind not in {"material", "entities", "data"} for kind in accepts
+    ):
+        raise ValueError(f"{manifest['package_id']}: invalid input.accepts")
     params_path = manifest.get("params_schema")
-    params_schema = json.loads(table[params_path]) if params_path else None
+    if params_path is not None and not isinstance(params_path, str):
+        raise ValueError(f"{manifest['package_id']}: params_schema must be a path")
+    if params_path is not None and params_path not in table:
+        raise ValueError(f"{manifest['package_id']}: params_schema {params_path!r} is not in the package")
+    try:
+        params_schema = json.loads(table[params_path]) if params_path else None
+    except (ValueError, UnicodeError) as exc:
+        raise ValueError(f"{manifest['package_id']}: params_schema is not valid JSON: {exc}") from exc
+    if params_schema is not None:
+        from jsonschema import Draft202012Validator
+        from jsonschema.exceptions import SchemaError
+
+        try:
+            Draft202012Validator.check_schema(params_schema)
+        except SchemaError as exc:
+            raise ValueError(f"{manifest['package_id']}: invalid params_schema: {exc.message}") from exc
     ordered = tuple(sorted(files))
     return StoragePackage(
         manifest=manifest, files=ordered, params_schema=params_schema, archive=canonical_archive(ordered)
@@ -139,18 +221,54 @@ def load_package(root: Path) -> StoragePackage:
     return _from_files(_package_files(root))
 
 
-def package_from_archive(archive: bytes) -> StoragePackage:
-    """Package given in ``HandlerInvocation.package_archive`` (zip with ``jane-package.json``)."""
-    with zipfile.ZipFile(io.BytesIO(archive)) as zf:
-        files = []
-        for info in zf.infolist():
-            name = info.filename
-            if info.is_dir():
-                continue
-            if name.startswith("/") or ".." in name.split("/"):
-                raise ValueError(f"unsafe path in package archive: {name!r}")
-            files.append((name, zf.read(info)))
-    return _from_files(files)
+def _archive_path(name: str) -> str:
+    if not name or name.startswith("/") or "\\" in name or {"", ".", ".."} & set(name.split("/")):
+        raise ValueError(f"unsafe path in package archive: {name!r}")
+    return name
+
+
+def package_from_archive(archive: bytes, limits: ArchiveLimits | None = None) -> StoragePackage:
+    """Package from an untrusted zip with ``jane-package.json`` (``package_archive`` or a registry download).
+
+    Raises ``ValueError`` (:class:`DependencyNotAllowed` for declared dependencies) when the archive is not a
+    readable zip, exceeds ``limits``, has unsafe, duplicate or symlink entries, or is not a storage package.
+    The package's digest is that of the canonical archive of its files (the registry's algorithm).
+    """
+    lim = limits or ArchiveLimits()
+    if len(archive) > lim.max_archive_bytes:
+        raise ValueError(
+            f"package archive is {len(archive)} bytes, limit max_archive_bytes={lim.max_archive_bytes}"
+        )
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(archive))
+    except (zipfile.BadZipFile, OSError) as exc:
+        raise ValueError(f"package archive is not a zip file: {exc}") from exc
+    files: dict[str, bytes] = {}
+    with zf:
+        infos = [i for i in zf.infolist() if not i.is_dir()]
+        if len(infos) > lim.max_files:
+            raise ValueError(f"package archive has {len(infos)} files, limit max_files={lim.max_files}")
+        total = 0
+        for info in infos:
+            name = _archive_path(info.filename)
+            if stat.S_ISLNK(info.external_attr >> 16):
+                raise ValueError(f"symlinks are not allowed in a package: {name!r}")
+            if name in files:
+                raise ValueError(f"duplicate entry in package archive: {name!r}")
+            total += info.file_size
+            if total > lim.max_unpacked_bytes:
+                raise ValueError(
+                    f"package archive unpacks beyond max_unpacked_bytes={lim.max_unpacked_bytes}"
+                )
+            try:
+                with zf.open(info) as src:
+                    data = src.read(info.file_size + 1)
+            except (zipfile.BadZipFile, NotImplementedError, RuntimeError, OSError) as exc:
+                raise ValueError(f"cannot read {name!r} from the package archive: {exc}") from exc
+            if len(data) != info.file_size:
+                raise ValueError(f"size mismatch of {name!r} in the package archive")
+            files[name] = data
+    return _from_files(list(files.items()))
 
 
 class PackageCatalog:

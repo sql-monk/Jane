@@ -543,6 +543,8 @@ class FakeHandler(ContractFake):
         self.hung = threading.Event()
         self.fail_retryable: Counter[str] = Counter()
         """package_id → how many more calls should fail with a retryable failure."""
+        self.fail_http_retryable: Counter[str] = Counter()
+        """package_id → reject this many calls with retryable 503 before any effect."""
         self.concurrent = 0
         self.max_concurrent = 0
         self.async_jobs = False
@@ -567,6 +569,10 @@ class FakeHandler(ContractFake):
                 if self.in_progress_retryable_after_409 and self.in_progress_rejections[key] > 1:
                     return problem(503, "service_unavailable", retryable=True)
                 return problem(409, "idempotency_in_progress", retryable=True)
+            pkg = body["handler"]["package_id"]
+            if self.fail_http_retryable[pkg] > 0:
+                self.fail_http_retryable[pkg] -= 1
+                return problem(503, "service_unavailable", retryable=True)
             self.in_flight.add(key)
             self.concurrent += 1
             self.max_concurrent = max(self.max_concurrent, self.concurrent)

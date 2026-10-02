@@ -145,7 +145,8 @@ def _wait(client: httpx.Client, job_id: str) -> dict[str, Any]:
 
 def test_lifecycle_over_http(stack: dict[str, Any]) -> None:
     fakes = stack["fakes"]
-    with httpx.Client(base_url=stack["base"], timeout=10) as c:
+    # one request may wait as long as a job: under load the assistant answered a poll after more than 10 s
+    with httpx.Client(base_url=stack["base"], timeout=WAIT_S) as c:
         info = c.get("/v1/info").json()
         assert info["capabilities"]["search_provider"] == "static"
         job = c.post(
@@ -202,8 +203,8 @@ def test_lifecycle_over_http(stack: dict[str, Any]) -> None:
 
     registry: FakeRegistry = fakes["registry"]
     with (
-        httpx.Client(base_url=stack["servers"]["registry"].url) as reg,
-        httpx.Client(base_url=stack["servers"]["orchestrator"].url) as admin,
+        httpx.Client(base_url=stack["servers"]["registry"].url, timeout=WAIT_S) as reg,
+        httpx.Client(base_url=stack["servers"]["orchestrator"].url, timeout=WAIT_S) as admin,
     ):
         assert (
             reg.post(

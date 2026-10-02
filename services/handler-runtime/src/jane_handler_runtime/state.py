@@ -290,22 +290,49 @@ class _PgJobs:
         )
         return failed if changed else await self.get(job_id)
 
+    def _save(self, job: Job) -> None:
+        with self.db.pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                self.db.q(
+                    "SELECT doc, owner, finished_at, lease_until > clock_timestamp() AS live "
+                    "FROM {schema}.jobs WHERE job_id = %s FOR UPDATE"
+                ),
+                (job.job_id,),
+            )
+            row = cur.fetchone()
+            if row is None or row["finished_at"] is not None or not row["live"]:
+                return
+            current = Job.model_validate(row["doc"])
+            if current.status in TERMINAL_STATUSES:
+                return
+            if job.status == JobStatus.CANCELLING:
+                if current.status == JobStatus.CANCELLING:
+                    return
+                saved = current.model_copy(
+                    update={"status": JobStatus.CANCELLING, "cancellation": job.cancellation}
+                )
+            elif row["owner"] != self.db.instance_id:
+                return
+            elif current.status == JobStatus.CANCELLING:
+                if job.status not in TERMINAL_STATUSES:
+                    return
+                # Cancellation committed first: a stale success/failure cannot erase it.
+                saved = current.model_copy(
+                    update={"status": JobStatus.CANCELLED, "finished_at": datetime.now(UTC)}
+                )
+            else:
+                saved = job
+            saved = saved.model_copy(update={"updated_at": datetime.now(UTC)})
+            cur.execute(
+                self.db.q(
+                    "UPDATE {schema}.jobs SET doc = %s, finished_at = %s, updated_at = clock_timestamp() "
+                    "WHERE job_id = %s"
+                ),
+                (Jsonb(saved.model_dump(mode="json")), saved.finished_at, saved.job_id),
+            )
+
     async def save(self, job: Job) -> None:
-        job = job.model_copy(update={"updated_at": datetime.now(UTC)})
-        # Only the live owner may finish/progress a job. Another instance may request cancellation.
-        await asyncio.to_thread(
-            self.db.run,
-            "UPDATE {schema}.jobs SET doc = %s, finished_at = %s, updated_at = clock_timestamp() "
-            "WHERE job_id = %s AND (owner = %s OR %s) "
-            "AND finished_at IS NULL AND lease_until > clock_timestamp()",
-            (
-                Jsonb(job.model_dump(mode="json")),
-                job.finished_at,
-                job.job_id,
-                self.db.instance_id,
-                job.status == JobStatus.CANCELLING,
-            ),
-        )
+        await asyncio.to_thread(self._save, job)
 
 
 class _PgResults:

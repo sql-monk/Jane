@@ -272,7 +272,11 @@ def test_etag_that_does_not_match_the_bytes_is_refused(
         ({"entry": {**files_package().entry, "history": False}}, "validation_failed", "history"),
         ({"entry": {**files_package().entry, "writes": "everything"}}, "validation_failed", "entry.writes"),
         ({"entry": {**files_package().entry, "format": {"raw": []}}}, "validation_failed", "entry.format"),
-        ({"entry": {**files_package().entry, "format": {"entities": {}}}}, "validation_failed", "entry.format"),
+        (
+            {"entry": {**files_package().entry, "format": {"entities": {}}}},
+            "validation_failed",
+            "entry.format",
+        ),
         ({"input": {"accepts": "material"}}, "validation_failed", "input.accepts"),
         ({"input": {"accepts": [{}]}}, "validation_failed", "input.accepts"),
         ({"dependencies": {"unknown": "unexpected"}}, "dependency_not_allowed", "dependencies"),

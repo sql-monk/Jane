@@ -159,7 +159,11 @@ def _from_files(files: Sequence[tuple[str, bytes]]) -> StoragePackage:
     for key in ("package_id", "version"):
         if not isinstance(manifest.get(key), str):
             raise ValueError(f"{MANIFEST}: {key} must be a string")
-    if not isinstance(entry.get("adapter"), str) or not entry["adapter"] or not isinstance(entry.get("writes"), str):
+    if (
+        not isinstance(entry.get("adapter"), str)
+        or not entry["adapter"]
+        or not isinstance(entry.get("writes"), str)
+    ):
         raise ValueError(f"{manifest['package_id']}: entry.adapter and entry.writes are required")
     if entry["writes"] not in {"raw", "entities", "raw_and_entities", "data"}:
         raise ValueError(f"{manifest['package_id']}: unsupported entry.writes {entry['writes']!r}")

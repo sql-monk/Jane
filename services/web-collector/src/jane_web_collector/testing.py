@@ -244,7 +244,8 @@ class ServiceProcess:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if self.proc.poll() is not None:
-                raise AssertionError(f"service exited: {self.log_path.read_text(errors='replace')}")
+                log_text = self.log_path.read_text(errors="replace")
+                raise AssertionError(f"service exited with code {self.proc.returncode}: {log_text}")
             try:
                 if httpx.get(self.base + "/v1/health", timeout=1).status_code == 200:
                     return

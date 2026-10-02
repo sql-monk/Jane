@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import socket
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,20 @@ from jane_kit.config import (
     resolve_limits,
 )
 from jane_kit.jobs import JobLimits
+
+
+def test_default_instance_id_changes_between_starts_and_explicit_id_wins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("JANE_INSTANCE_ID", raising=False)
+    first = JaneSettings().instance_id
+    second = JaneSettings().instance_id
+    assert first != second
+    assert first.startswith(f"{socket.gethostname()}-{os.getpid()}-")
+    assert second.startswith(f"{socket.gethostname()}-{os.getpid()}-")
+
+    monkeypatch.setenv("JANE_INSTANCE_ID", "configured-owner")
+    assert JaneSettings().instance_id == "configured-owner"
 
 
 class SvcLimits(Limits):

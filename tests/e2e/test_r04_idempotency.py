@@ -38,12 +38,14 @@ def _collection_result(
 
 
 @pytest.mark.parametrize("service", ["web-collector", "telegram-collector"])
+@pytest.mark.parametrize("replay_replica", [1, 2], ids=["same-instance", "other-instance"])
 def test_r_04_collectors_replay_one_job_without_new_materials(
     stack: E2EStack,
     require: Callable[..., None],
     client: Callable[..., JaneClient],
     run_id: str,
     service: str,
+    replay_replica: int,
 ) -> None:
     if service == "web-collector":
         require("testsite", service)
@@ -72,8 +74,12 @@ def test_r_04_collectors_replay_one_job_without_new_materials(
             "limits": {"rate": {"min_delay_ms_per_host": 0}},
         }
 
-    collector = client(service)
+    if replay_replica == 2:
+        stack.scale(service, 2)
+    collector = client(service, 1)
+    replay_collector = client(service, replay_replica)
     api = collector.api("collector")
+    replay_api = replay_collector.api("collector")
     headers = {"Idempotency-Key": f"r04-{service}-{run_id}"}
     first = api.post("/v1/collections", json=body, headers=headers)
     assert first.status_code == 202, first.text
@@ -81,29 +87,39 @@ def test_r_04_collectors_replay_one_job_without_new_materials(
     view_before, materials_before = _collection_result(collector, collection_id)
     assert len(materials_before) == 1, materials_before
 
-    replay = api.post("/v1/collections", json=body, headers=headers)
+    replay = replay_api.post("/v1/collections", json=body, headers=headers)
     assert replay.status_code == 202, replay.text
     assert replay.headers["Idempotency-Replayed"] == "true"
     assert replay.json() == first.json()
     assert replay.json()["job_id"] == collection_id
 
     changed = {**body, "mode": "incremental"}
-    mismatch = api.post("/v1/collections", json=changed, headers=headers)
+    mismatch = replay_api.post("/v1/collections", json=changed, headers=headers)
     assert mismatch.status_code == 422, mismatch.text
     assert mismatch.json()["code"] == "idempotency_key_reused"
 
-    view_after, materials_after = _collection_result(collector, collection_id)
+    view_after, materials_after = _collection_result(replay_collector, collection_id)
     assert view_after == view_before
     assert materials_after == materials_before
 
 
 @pytest.mark.parametrize("mode", ["sync", "async"])
+@pytest.mark.parametrize("replay_replica", [1, 2], ids=["same-instance", "other-instance"])
 def test_r_04_llm_replay_does_not_spend_usage_twice(
-    require: Callable[..., None], client: Callable[..., JaneClient], run_id: str, mode: str
+    stack: E2EStack,
+    require: Callable[..., None],
+    client: Callable[..., JaneClient],
+    run_id: str,
+    mode: str,
+    replay_replica: int,
 ) -> None:
     require("llm")
-    llm = client("llm")
+    if replay_replica == 2:
+        stack.scale("llm", 2)
+    llm = client("llm", 1)
+    replay_llm = client("llm", replay_replica)
     api = llm.api("llm")
+    replay_api = replay_llm.api("llm")
     task_id = f"r04-{mode}-{run_id}"
     body = {
         "model": "default",
@@ -137,17 +153,20 @@ def test_r_04_llm_replay_does_not_spend_usage_twice(
 
     before = usage()
     assert before["totals"]["requests"] == 1, before
-    replay = api.post("/v1/completions", json=body, headers=headers)
+    replay = replay_api.post("/v1/completions", json=body, headers=headers)
     assert replay.status_code == first.status_code, replay.text
     assert replay.headers["Idempotency-Replayed"] == "true"
     assert replay.json() == first.json()
     if mode == "async":
         assert replay.json()["job_id"] == job_id
-        assert llm.wait_job("llm", job_id)["result"]["completion_id"] == completion_id
+        assert replay_llm.wait_job("llm", job_id)["result"]["completion_id"] == completion_id
     else:
         assert replay.json()["completion_id"] == completion_id
 
-    mismatch = api.post("/v1/completions", json={**body, "instructions": "Summarize."}, headers=headers)
+    mismatch = replay_api.post(
+        "/v1/completions", json={**body, "instructions": "Summarize."}, headers=headers
+    )
     assert mismatch.status_code == 422, mismatch.text
     assert mismatch.json()["code"] == "idempotency_key_reused"
     assert usage() == before
+    assert replay_api.get("/v1/usage", params={"scope_type": "task", "scope_id": task_id}).json() == before

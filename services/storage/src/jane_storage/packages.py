@@ -164,9 +164,15 @@ def _from_files(files: Sequence[tuple[str, bytes]]) -> StoragePackage:
     if entry["writes"] not in {"raw", "entities", "raw_and_entities", "data"}:
         raise ValueError(f"{manifest['package_id']}: unsupported entry.writes {entry['writes']!r}")
     fmt = entry.get("format") or {}
-    if not isinstance(fmt, dict) or fmt.get("raw", "original") not in {"original", "html", "json"} or fmt.get(
-        "entities", "json"
-    ) not in {"json", "jsonl"}:
+    if not isinstance(fmt, dict):
+        raise ValueError(f"{manifest['package_id']}: invalid entry.format")
+    raw_format, entities_format = fmt.get("raw", "original"), fmt.get("entities", "json")
+    if (
+        not isinstance(raw_format, str)
+        or raw_format not in {"original", "html", "json"}
+        or not isinstance(entities_format, str)
+        or entities_format not in {"json", "jsonl"}
+    ):
         raise ValueError(f"{manifest['package_id']}: invalid entry.format")
     if entry.get("history", True) is not True:
         # History is part of the delivery-completeness check of every adapter; it cannot be switched off.
@@ -181,8 +187,11 @@ def _from_files(files: Sequence[tuple[str, bytes]]) -> StoragePackage:
             f"({', '.join(f'dependencies.{k}' for k in declared) or 'dependencies'})"
         )
     input_contract = manifest.get("input") or {}
-    if not isinstance(input_contract, dict) or not isinstance(input_contract.get("accepts", []), list) or any(
-        kind not in {"material", "entities", "data"} for kind in input_contract.get("accepts", [])
+    if not isinstance(input_contract, dict):
+        raise ValueError(f"{manifest['package_id']}: invalid input.accepts")
+    accepts = input_contract.get("accepts", [])
+    if not isinstance(accepts, list) or any(
+        not isinstance(kind, str) or kind not in {"material", "entities", "data"} for kind in accepts
     ):
         raise ValueError(f"{manifest['package_id']}: invalid input.accepts")
     params_path = manifest.get("params_schema")

@@ -60,6 +60,36 @@ async def test_post_with_idempotency_key_is_retried_and_context_propagated() -> 
     assert seen[0].headers["X-Request-ID"] == "req-7"
 
 
+@pytest.mark.parametrize(
+    ("method", "idempotency_key", "should_retry"),
+    [("GET", None, True), ("POST", "delivery-1", True), ("POST", None, False)],
+)
+async def test_read_error_retries_only_safe_or_idempotent_requests(
+    method: str, idempotency_key: str | None, should_retry: bool
+) -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if len(seen) == 1:
+            raise httpx.ReadError("server closed an idle pooled connection", request=request)
+        return httpx.Response(200, json={"ok": True})
+
+    async with ServiceClient("http://svc", FAST, transport=httpx.MockTransport(handler)) as client:
+        if should_retry:
+            response = await client.request(
+                method, "/v1/x", json={"a": 1} if method == "POST" else None, idempotency_key=idempotency_key
+            )
+            assert response.json() == {"ok": True}
+        else:
+            with pytest.raises(httpx.ReadError):
+                await client.request(method, "/v1/x", json={"a": 1})
+    assert len(seen) == (2 if should_retry else 1)
+    if idempotency_key:
+        assert all(request.headers["Idempotency-Key"] == idempotency_key for request in seen)
+        assert seen[0].content == seen[1].content
+
+
 async def test_non_retryable_problem_is_not_retried_even_with_key() -> None:
     seen: list[httpx.Request] = []
     body = {

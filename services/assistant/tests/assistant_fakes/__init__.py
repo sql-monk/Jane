@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -22,7 +23,20 @@ from .llm import FakeLlm
 from .registry import FakeRegistry
 from .services import FakeCollector, FakeHandler, FakeOrchestrator, FakeStorage
 
-__all__ = ["FakeSearch", "World", "world"]
+__all__ = ["START_S", "WAIT_S", "FakeSearch", "World", "world"]
+
+
+def _seconds(name: str, default: float) -> float:
+    value = float(os.environ.get(name, "").strip() or default)
+    if value <= 0:
+        raise ValueError(f"{name} must be a positive number of seconds")
+    return value
+
+
+START_S = _seconds("JANE_ASSISTANT_TEST_START_S", 120)
+"""Upper bound for a process or server of a test to start (a loaded machine needs more than a few seconds)."""
+WAIT_S = _seconds("JANE_ASSISTANT_TEST_WAIT_S", 120)
+"""Upper bound for an awaited job to finish. Only how long a test waits, never a pass condition."""
 
 
 class FakeSearch:
@@ -81,8 +95,8 @@ class World:
     def violations(self) -> list[str]:
         return [v for f in self.fakes() for v in f.app.violations]
 
-    def wait(self, job_id: str, timeout_s: float = 20.0) -> dict[str, Any]:
-        deadline = time.monotonic() + timeout_s
+    def wait(self, job_id: str, timeout_s: float | None = None) -> dict[str, Any]:
+        deadline = time.monotonic() + (WAIT_S if timeout_s is None else timeout_s)
         while True:
             job: dict[str, Any] = self.api.get(f"/v1/jobs/{job_id}").json()
             if job["status"] in {"succeeded", "failed", "cancelled"}:

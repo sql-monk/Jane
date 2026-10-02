@@ -94,3 +94,47 @@ def test_r_06_registry_replica_reads_published_archive(
     assert archive(second_client, package_id, manifest["version"], version["digest"]) == archive(
         first_client, package_id, manifest["version"], version["digest"]
     )
+
+
+def test_r_02_registry_restart_replays_package_and_version(
+    stack: E2EStack, require: Callable[..., None], client: Callable[..., JaneClient], run_id: str
+) -> None:
+    require("registry")
+    registry = client("registry")
+    manifest, files = package_files(FILES_DIR)
+    package_id = f"e2e.registry-restart-{run_id}"
+    manifest = {**manifest, "package_id": package_id}
+    create_body = {"package_id": package_id, "kind": manifest["kind"], "title": manifest["title"]}
+    create_headers = {"Idempotency-Key": key()}
+    created = registry.api("registry").post("/v1/packages", json=create_body, headers=create_headers)
+    assert created.status_code == 201, created.text
+
+    version_body = publish_body(manifest, files)
+    version_headers = {"Idempotency-Key": key()}
+    version_path = f"/v1/packages/{package_id}/versions"
+    published = registry.api("registry").post(version_path, json=version_body, headers=version_headers)
+    assert published.status_code == 201, published.text
+    before = archive(registry, package_id, manifest["version"], published.json()["digest"])
+
+    stack.kill("registry")
+    stack.restart("registry")
+    restarted = client("registry")
+    replay_created = restarted.api("registry").post("/v1/packages", json=create_body, headers=create_headers)
+    assert replay_created.status_code == 201, replay_created.text
+    assert replay_created.headers["Idempotency-Replayed"] == "true"
+    assert replay_created.json() == created.json()
+    replay_published = restarted.api("registry").post(
+        version_path, json=version_body, headers=version_headers
+    )
+    assert replay_published.status_code == 201, replay_published.text
+    assert replay_published.headers["Idempotency-Replayed"] == "true"
+    assert replay_published.json() == published.json()
+    mismatch = restarted.api("registry").post(
+        version_path, json={**version_body, "files": {}}, headers=version_headers
+    )
+    assert mismatch.status_code == 422, mismatch.text
+    assert mismatch.json()["code"] == "idempotency_key_reused"
+    read = restarted.api("registry").get(f"{version_path}/{manifest['version']}")
+    assert read.status_code == 200, read.text
+    assert read.json() == published.json()
+    assert archive(restarted, package_id, manifest["version"], published.json()["digest"]) == before

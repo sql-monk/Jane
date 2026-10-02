@@ -354,7 +354,16 @@ def test_r_01_lease_lost_during_active_call_taken_over_with_409_without_spent_at
         assert replayed.status_code == 202, replayed.text
         assert replayed.headers["Idempotency-Replayed"] == "true"
         assert replayed.json()["job_id"] == run
-        restarted_view = run_view(client("orchestrator", 1), run)
+        restarted_orchestrator = client("orchestrator", 1)
+        replayed_after_restart = restarted_orchestrator.api("orchestrator").post(
+            f"/v1/tasks/{task_id}/runs",
+            json={"reason": "e2e"},
+            headers={"Idempotency-Key": run_key},
+        )
+        assert replayed_after_restart.status_code == 202, replayed_after_restart.text
+        assert replayed_after_restart.headers["Idempotency-Replayed"] == "true"
+        assert replayed_after_restart.json() == replayed.json()
+        restarted_view = run_view(restarted_orchestrator, run)
         items = handler_items(replica2, run)  # replica 2 is removed by the scale-down below
         reclaimed = reclaimed_leases(replica2) - reclaimed_before
         reclaim_log = {

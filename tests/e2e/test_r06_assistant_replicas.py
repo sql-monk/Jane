@@ -42,6 +42,23 @@ def test_r_06_assistant_replay_and_session_are_shared_by_replicas() -> None:
             assert on_first.status_code == on_second.status_code == 200
             assert on_first.json() == on_second.json()
             assert on_second.json()["status"] == "needs_disambiguation"
+
+            flows.stack.kill("assistant")
+            flows.stack.restart("assistant")
+            restarted = JaneClient(flows.stack.url("assistant", 1))
+            try:
+                after_restart = restarted.api("assistant").post(
+                    "/v1/onboarding-sessions", json=body, headers=headers
+                )
+                assert after_restart.status_code == 202, after_restart.text
+                assert after_restart.headers["Idempotency-Replayed"] == "true"
+                assert after_restart.json() == started.json()
+                assert restarted.wait_job("assistant", job_id, timeout_s=600) == job
+                session = restarted.api("assistant").get(f"/v1/onboarding-sessions/{session_id}")
+                assert session.status_code == 200, session.text
+                assert session.json() == on_second.json()
+            finally:
+                restarted.close()
         finally:
             first.close()
             second.close()

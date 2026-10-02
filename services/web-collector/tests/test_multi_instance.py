@@ -69,8 +69,8 @@ def test_two_instances_share_state_and_take_over_after_kill(
     b = service_factory(state_dir=a.state_dir)
     b.start()
     with (
-        httpx.Client(base_url=a.base, timeout=10) as api_a,
-        httpx.Client(base_url=b.base, timeout=10) as api_b,
+        a.client() as api_a,
+        b.client() as api_b,
     ):
         # Both collections wait for a consumer (HELD): c2 is still running when it is cancelled and c1 when its
         # owner is killed. With a plain crawl a slow machine finished them first and the test then checked
@@ -111,8 +111,8 @@ def test_stalled_owner_is_fenced_out(
     # the venv's python.exe on Windows is a launcher with the interpreter as a child: freeze the whole tree
     parent = psutil.Process(a.proc.pid)
     frozen = [parent, *parent.children(recursive=True)]
-    with httpx.Client(base_url=b.base, timeout=10) as api_b:
-        with httpx.Client(base_url=a.base, timeout=10) as api_a:
+    with b.client() as api_b:
+        with a.client() as api_a:
             c1 = start(
                 api_a, {"source_kind": "web", "source_id": "s1", "rules": web_rules(site), "limits": SLOW}
             )

@@ -54,6 +54,8 @@ START_TIMEOUT_ENV = "JANE_WEB_COLLECTOR_TEST_START_S"
 WAIT_TIMEOUT_ENV = "JANE_WEB_COLLECTOR_TEST_WAIT_S"
 DEFAULT_START_TIMEOUT_S = 120.0
 DEFAULT_WAIT_TIMEOUT_S = 120.0
+CLIENT_KEEPALIVE_EXPIRY_S = 1.0
+"""Idle keep-alive of :meth:`ServiceProcess.client`; the service's uvicorn keeps an idle connection for 5 s."""
 
 
 def _seconds_from_env(name: str, default: float) -> float:
@@ -216,6 +218,17 @@ class ServiceProcess:
     @property
     def base(self) -> str:
         return f"http://127.0.0.1:{self.port}"
+
+    def client(self) -> httpx.Client:
+        """A client of this process for a test: request timeout :func:`wait_timeout_s`, and an idle pooled
+        connection is dropped after ``CLIENT_KEEPALIVE_EXPIRY_S``, long before the service closes it. A client that
+        keeps idle connections as long as the server (5 s in both httpx and uvicorn) may send a request on a
+        connection the server is closing at that moment and get ``httpx.ReadError`` (WinError 10054 under load)."""
+        return httpx.Client(
+            base_url=self.base,
+            timeout=wait_timeout_s(),
+            limits=httpx.Limits(keepalive_expiry=CLIENT_KEEPALIVE_EXPIRY_S),
+        )
 
     def start(self, timeout: float = START_TIMEOUT_S) -> None:
         """Start the process and wait for ``/v1/health`` (``timeout`` defaults to ``START_TIMEOUT_S``)."""

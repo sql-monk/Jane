@@ -38,14 +38,14 @@ def _collection_result(
 
 
 @pytest.mark.parametrize("service", ["web-collector", "telegram-collector"])
-@pytest.mark.parametrize("replay_replica", [1, 2], ids=["same-instance", "other-instance"])
+@pytest.mark.parametrize("replay_location", ["same-instance", "other-instance", "after-restart"])
 def test_r_04_collectors_replay_one_job_without_new_materials(
     stack: E2EStack,
     require: Callable[..., None],
     client: Callable[..., JaneClient],
     run_id: str,
     service: str,
-    replay_replica: int,
+    replay_location: str,
 ) -> None:
     if service == "web-collector":
         require("testsite", service)
@@ -74,8 +74,9 @@ def test_r_04_collectors_replay_one_job_without_new_materials(
             "limits": {"rate": {"min_delay_ms_per_host": 0}},
         }
 
-    if replay_replica == 2:
+    if replay_location == "other-instance":
         stack.scale(service, 2)
+    replay_replica = 2 if replay_location == "other-instance" else 1
     collector = client(service, 1)
     replay_collector = client(service, replay_replica)
     api = collector.api("collector")
@@ -86,6 +87,12 @@ def test_r_04_collectors_replay_one_job_without_new_materials(
     collection_id = first.json()["job_id"]
     view_before, materials_before = _collection_result(collector, collection_id)
     assert len(materials_before) == 1, materials_before
+
+    if replay_location == "after-restart":
+        stack.kill(service)
+        stack.restart(service)
+        replay_collector = client(service, 1)
+        replay_api = replay_collector.api("collector")
 
     replay = replay_api.post("/v1/collections", json=body, headers=headers)
     assert replay.status_code == 202, replay.text
@@ -104,18 +111,19 @@ def test_r_04_collectors_replay_one_job_without_new_materials(
 
 
 @pytest.mark.parametrize("mode", ["sync", "async"])
-@pytest.mark.parametrize("replay_replica", [1, 2], ids=["same-instance", "other-instance"])
+@pytest.mark.parametrize("replay_location", ["same-instance", "other-instance", "after-restart"])
 def test_r_04_llm_replay_does_not_spend_usage_twice(
     stack: E2EStack,
     require: Callable[..., None],
     client: Callable[..., JaneClient],
     run_id: str,
     mode: str,
-    replay_replica: int,
+    replay_location: str,
 ) -> None:
     require("llm")
-    if replay_replica == 2:
+    if replay_location == "other-instance":
         stack.scale("llm", 2)
+    replay_replica = 2 if replay_location == "other-instance" else 1
     llm = client("llm", 1)
     replay_llm = client("llm", replay_replica)
     api = llm.api("llm")
@@ -153,6 +161,13 @@ def test_r_04_llm_replay_does_not_spend_usage_twice(
 
     before = usage()
     assert before["totals"]["requests"] == 1, before
+    if replay_location == "after-restart":
+        stack.kill("llm")
+        stack.restart("llm")
+        llm = client("llm", 1)
+        api = llm.api("llm")
+        replay_llm = client("llm", 1)
+        replay_api = replay_llm.api("llm")
     replay = replay_api.post("/v1/completions", json=body, headers=headers)
     assert replay.status_code == first.status_code, replay.text
     assert replay.headers["Idempotency-Replayed"] == "true"

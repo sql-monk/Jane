@@ -578,7 +578,15 @@ SELF_TEST_PROFILE: dict[str, Any] = {
     "hard_caps": {},
 }
 SELF_TEST_THRESHOLDS: dict[str, Any] = {
-    "rate": {"pages": 12, "gap_tolerance_fraction": 0.2, "gap_tolerance_abs_s": 0.01, "min_efficiency": 0.3},
+    # max_sub_half_gaps (blocker since WP-14c): the stricter of thresholds.json (dev-laptop: 1, ci: 2), the
+    # self-test being a short local run like dev-laptop.
+    "rate": {
+        "pages": 12,
+        "gap_tolerance_fraction": 0.2,
+        "gap_tolerance_abs_s": 0.01,
+        "max_sub_half_gaps": 1,
+        "min_efficiency": 0.3,
+    },
     "shared_host": {"pages_per_collection": 6},
     "parallel": {"pages": 6, "slow_ms": 400},
     "retries": {"flaky_pages": 2, "failures_per_path": 2, "retry_after_s": 1, "timeout_extra_ms": 500},
@@ -633,6 +641,7 @@ def test_harness_collector_scenarios_run_against_a_local_collector(probe: str, t
     assert {c["name"] for c in results["L1"]["checks"]} >= {
         "requests in any 1 s window",
         "all pages requested",
+        "gaps below half the interval",
     }
     assert results["L3"]["metrics"]["max_in_flight"] <= 2
     assert (tmp_path / "out" / "raw" / "r1-L1-probe.jsonl").is_file()

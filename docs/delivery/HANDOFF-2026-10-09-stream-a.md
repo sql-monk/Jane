@@ -70,8 +70,8 @@ git, на origin і в цьому документі. Звітам агенті�
   orchestrator/registry. Рішення координатора: реалізувати й `api_key`, і `jwt` (ADR прийнятий).
 - Гілка на origin: **`wp/01g2-service-auth`** (локально в worktree `.claude/worktrees/wp01g` вона називається
   `wp/01g-service-auth` — після rebase її запушено під новим ім'ям, бо force push заборонено; стара
-  `origin/wp/01g-service-auth` `0a5b56b` — до rebase, **не використовувати**). HEAD на момент запису `7b41bf4`
-  (база — інтеграційна ревізія з B1/WP-13s/WP-14d/should-fix/WP-12d; без WP-06c). Звіт: `docs/delivery/M3/01g-auth.md`.
+  `origin/wp/01g-service-auth` `0a5b56b` — до rebase, **не використовувати**). HEAD `5c36792`, код —
+  `7b41bf4` (база `3ec9358` з B1/WP-13s/WP-14d/should-fix/WP-12d; без WP-06c). Звіт: `docs/delivery/M3/01g-auth.md`.
 - Зроблено: модуль `auth.py`/`auth_scopes.py` у jane-kit (режими `none`/`api_key`/`jwt`; ключі — хеш або `secret_ref`;
   JWT лише RS*/PS*/ES* за JWKS; 401 `unauthenticated`/403 problem+json; fail-closed; `none` лише на loopback; таблиці
   scopes = операції OpenAPI, тест звіряє множини); підключення в **усіх 8 сервісах**; власні сервісні токени
@@ -90,15 +90,33 @@ git, на origin і в цьому документі. Звітам агенті�
   4. `ExecutorConfig.token` → `SecretStr` (`services/orchestrator/.../settings.py`);
   5. README registry: відсутній `actor` у JWT/ключі → `human`.
   `/metrics` відкритий за замовчуванням — задокументоване рішення (йде в ADR через B-8).
-- Автор вніс виправлення (коміти `fe977e4` «bound JWKS fetches by the cooldown, also when the IdP fails», `7b41bf4`
-  звіт). Повний CI на `7b41bf4`: **[37857870977](https://github.com/sql-monk/Jane/actions/runs/37857870977)** (на момент
-  запису — у процесі). Автора попросили зупинитися в безпечній точці й дописати «Передачу» в `01g-auth.md`.
+- Автор вніс виправлення і **зупинився** (на вимогу людини), усе закомічено й запушено:
+  - `origin/wp/01g2-service-auth` HEAD **`5c36792`** (лише документація, `[skip ci]`); останній кодовий коміт —
+    **`7b41bf4`**; виправлення рев'ю — `fe977e4`. База — `codex/jane-integration` `3ec9358` (без WP-06c `041e20d` і
+    без пізніших документальних комітів — злиття їх підтягне). Docker-проєктів автора не лишилось.
+  - Звіт `docs/delivery/M3/01g-auth.md`: розділи «Rebase на інтеграційну ревізію і L6», «Виправлення після рев'ю 1»,
+    «Передача». Конфлікти rebase були в `services/llm/src/jane_llm/settings.py` (імпорти) і
+    `services/handler-runtime/README.md` — збережено обидві сторони. Нові шляхи B1/WP-13s до сервісів Jane — з
+    токенами; `ContentReader` і R-04-«шлюзи» ходять лише до `package-host` (токен не потрібен).
+  - За автором: п. 1 — до IdP не частіше одного запиту за cooldown з будь-якої причини, зокрема після невдачі;
+    паралельні запити не завантажують JWKS вдруге; без ключів — одразу 503 з `Retry-After` без нового запиту й без
+    повторного warning; відомий `kid` працює з кешу під час і після невдалого оновлення; тест «IdP 503, 20 запитів → 1
+    завантаження», на старому коді обидва нові тести падають. П. 2–5 зроблено (`authenticate()` перенесено в
+    тестовий `orch_support.py`). Локально: ruff/mypy чисті; auth-тести jane-kit і сервісів +
+    `test_logic`/`test_executors` orchestrator — `98 passed, 1 skipped` (postgres-параметр llm).
+  - Повний CI на `7b41bf4`: **[37857870977](https://github.com/sql-monk/Jane/actions/runs/37857870977)** — на момент
+    зупинки success: lint, unit, contract, web, web-mock-e2e, isolation, adapters ×4; **ще виконувались `e2e`,
+    `stack`, `limits`**. L6 у `limits` ще може впасти через OOM-класифікацію, бо гілка не містить WP-06c — це не
+    дефект B2 (виправлено в `041e20d`, перевіриться у фінальному CI).
+  - Запити автора до інших власників: WP-00/ADR (`/v1/info`, `/metrics`, scopes) → B-8; WP-12 ключ real-e2e зі
+    стек-файлу і WP-01 scopes у `templates/service` → B-7; WP-06 OOM → уже закрито `041e20d`.
 
 **Що зробити з B2:**
-1. `git fetch origin`; переконайся, що `origin/wp/01g2-service-auth` — фінальний HEAD автора; прочитай «Передачу» в
-   `01g-auth.md`; перевір, що в worktree `wp01g` немає незакомічених змін, які варто зберегти.
-2. Перевір CI 37857870977 (або новіший на HEAD гілки): 12/12, рядок e2e без skip (`JANE_E2E_REQUIRED=1`), `limits`.
-   Якщо червоний — з'ясуй причину; виправлення роби в новій гілці від HEAD B2 (агентом або сам), один CI.
+1. `git fetch origin`; переконайся, що `origin/wp/01g2-service-auth` = `5c36792` (або новіше, якщо хтось продовжив);
+   прочитай «Передачу» в `01g-auth.md`; worktree `wp01g` має бути чистим.
+2. Перевір CI 37857870977: усі job success, рядок e2e без skip (`JANE_E2E_REQUIRED=1`), `stack`. Падіння лише L6
+   у `limits` з симптомом OOM (`execution_error`, exit 137) — відоме й закрите WP-06c, B2 не блокує. Інше червоне —
+   з'ясуй причину; виправлення в новій гілці від `5c36792` (агентом або сам), один CI.
 3. **Сам перевір виправлення рев'ю** (без раунду 2): прочитай `git diff 0a5b56b..origin/wp/01g2-service-auth --
    libs/jane-kit/src/jane_kit/auth.py libs/jane-kit/tests/test_auth.py services/orchestrator`; запусти
    `uv run --all-packages python -m pytest libs/jane-kit/tests/test_auth.py -q`; **мутант**: прибери в `auth.py`

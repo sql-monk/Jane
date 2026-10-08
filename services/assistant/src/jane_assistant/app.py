@@ -18,6 +18,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from jane_kit.auth_scopes import ASSISTANT
 from jane_kit.config import LimitError
 from jane_kit.errors import ValidationFailed
 from jane_kit.idempotency import IDEMPOTENCY_HEADER, StoredResponse, idempotent
@@ -232,6 +233,7 @@ def build_app(settings: Settings | None = None, deps: Dependencies | None = None
         lifespan=lifespan,
         capabilities=capabilities,
         limits=resolved,
+        auth_scopes=ASSISTANT,  # ADR-0005 scopes per operation
     )
     app.state.limits = resolved
     app.state.runner = runner

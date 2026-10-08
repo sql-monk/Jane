@@ -20,6 +20,7 @@ from fastapi import Body, FastAPI, Header, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
+from jane_kit.auth_scopes import HANDLER, LLM, merge
 from jane_kit.errors import (
     Conflict,
     FieldError,
@@ -192,6 +193,7 @@ def build_app(
         lifespan=lifespan,
         capabilities=capabilities,
         limits=resolved,
+        auth_scopes=merge(HANDLER, LLM),  # ADR-0005 scopes per operation
     )
     metrics: dict[str, Any] = {}
     if settings.metrics_enabled:

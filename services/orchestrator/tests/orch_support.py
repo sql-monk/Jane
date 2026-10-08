@@ -1057,3 +1057,23 @@ def items_by_stage(db_dsn: str, run_id: str) -> dict[str, list[dict[str, Any]]]:
 
 def iter_lines(path: Path) -> Iterator[str]:
     yield from path.read_text(encoding="utf-8").splitlines()
+
+
+# --------------------------------------------------------------------------- auth (test helper)
+def authenticate(request: Any, mode: str, keys: list[dict[str, Any]]) -> Any:
+    """One request against ``none`` / ``api_key`` without the service middleware: the orchestrator's
+    :class:`~jane_orchestrator.auth.Principal` from jane-kit's key verifier (the service itself authenticates
+    through ``jane_kit.auth`` in ``create_app``)."""
+    from jane_kit.auth import ApiKeyConfig, ApiKeyVerifier
+    from jane_kit.errors import Unauthenticated
+    from jane_orchestrator.auth import ALL_SCOPES, Principal
+
+    if mode == "none":
+        return Principal("anonymous", ALL_SCOPES)
+    scheme, _, token = request.headers.get("authorization", "").partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        raise Unauthenticated("bearer token required")
+    found = ApiKeyVerifier([ApiKeyConfig.model_validate(k) for k in keys]).verify(token.strip())
+    if found is None:
+        raise Unauthenticated("invalid API key")
+    return Principal(found.name, frozenset(found.scopes))

@@ -18,7 +18,7 @@ import logging
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from jane_kit.auth import resolve_secret_ref
@@ -49,9 +49,9 @@ class ExecutorConfig(BaseModel):
     token_ref: str | None = None
     """Secret reference (``env:VAR`` / ``file:/path``, ADR-0006) of the bearer token for this executor;
     without it the orchestrator's own ``service_token_ref`` is used (ADR-0005 §5)."""
-    token: str | None = None
+    token: SecretStr | None = None
     """Bearer token in plain text - deprecated (logged as a warning at start), use ``token_ref``. After
-    :meth:`Settings.all_executors` it holds the resolved token; never logged or returned by the API."""
+    :meth:`Settings.all_executors` it holds the resolved token (``SecretStr``: never in reprs, logs or the API)."""
 
     @model_validator(mode="after")
     def _one_token(self) -> ExecutorConfig:
@@ -189,11 +189,11 @@ class Settings(JaneSettings):
     def all_executors(self) -> list[ExecutorConfig]:
         """Executors with ``token`` = the bearer token to send: ``token_ref``, else the deprecated plain
         ``token``, else ``service_token_ref``. An unresolvable reference raises (the service must not start)."""
-        default = resolve_secret_ref(self.service_token_ref) if self.service_token_ref else None
+        default = SecretStr(resolve_secret_ref(self.service_token_ref)) if self.service_token_ref else None
         out = []
         for cfg in self.executor_configs():
             if cfg.token_ref:
-                token: str | None = resolve_secret_ref(cfg.token_ref)
+                token: SecretStr | None = SecretStr(resolve_secret_ref(cfg.token_ref))
             elif cfg.token:
                 log.warning(
                     "executor token given in plain text; use token_ref (env:/file:)",

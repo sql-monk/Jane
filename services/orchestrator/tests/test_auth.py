@@ -32,7 +32,9 @@ def test_executor_tokens_come_from_secret_refs(
         ],
     )
     with caplog.at_level(logging.WARNING):
-        tokens = {e.executor: e.token for e in settings.all_executors()}
+        resolved = settings.all_executors()
+        tokens = {e.executor: e.token.get_secret_value() for e in resolved if e.token}
+        assert all("own-token" not in repr(e) for e in resolved)  # SecretStr: never in reprs or logs
     assert tokens == {"runtime": "own-token", "storage": "file-token", "legacy": "plain-token"}
     assert any("plain text" in r.getMessage() for r in caplog.records)
     assert all(e.token is None for e in settings.executor_configs() if e.executor != "legacy")

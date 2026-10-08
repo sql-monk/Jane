@@ -249,6 +249,7 @@ class Idp:
         self.ec = ec.generate_private_key(ec.SECP256R1())
         self.published = {"rsa-1": self._jwk(self.rsa, "rsa-1"), "ec-1": self._jwk(self.ec, "ec-1")}
         self.requests = 0
+        self.down = False
 
     @staticmethod
     def _jwk(key: Any, kid: str) -> dict[str, Any]:
@@ -263,6 +264,8 @@ class Idp:
         def handler(request: httpx.Request) -> httpx.Response:
             assert str(request.url) == JWKS_URL
             self.requests += 1
+            if self.down:
+                return httpx.Response(503)
             return httpx.Response(200, json=self.jwks())
 
         return httpx.MockTransport(handler)
@@ -399,6 +402,80 @@ def test_jwks_unavailable_is_503_not_401(idp: Idp) -> None:
     with TestClient(build(s, authenticator=Authenticator.from_settings(s, transport=down))) as c:
         r = c.get("/v1/things", headers=bearer(idp.token()))
         assert r.status_code == 503 and r.json()["code"] == "service_unavailable"
+
+
+def test_jwks_outage_asks_the_idp_once_per_cooldown(idp: Idp, caplog: pytest.LogCaptureFixture) -> None:
+    """Review 1: without keys, a failing IdP is asked once per cooldown, every other request is 503 at once."""
+    now = [1000.0]
+    idp.down = True
+    s = jwt_settings(jwt_jwks_refresh_cooldown_seconds=10)
+    auth = Authenticator.from_settings(s, transport=idp.transport(), clock=lambda: now[0])
+    anonymous = f"{_b64({'alg': 'RS256', 'kid': 'zzz'})}.{_b64({'sub': 'x'})}.c2ln"
+    with caplog.at_level(logging.WARNING, logger="jane.auth"), TestClient(build(s, authenticator=auth)) as c:
+        for _ in range(20):
+            r = c.get("/v1/things", headers=bearer(anonymous))
+            assert r.status_code == 503 and r.json()["code"] == "service_unavailable"
+            assert r.headers["retry-after"] == "10"
+        assert idp.requests == 1
+        assert sum("JWKS fetch failed" in rec.getMessage() for rec in caplog.records) == 1
+        now[0] += 9
+        assert c.get("/v1/things", headers=bearer(idp.token())).status_code == 503
+        assert idp.requests == 1  # still within the cooldown
+        now[0] += 2
+        idp.down = False
+        assert c.get("/v1/things", headers=bearer(idp.token())).status_code == 200
+        assert idp.requests == 2
+
+
+def test_cached_keys_outlive_a_failed_refresh(idp: Idp) -> None:
+    """An expired cache with a failing IdP: known keys keep working, one attempt per cooldown, unknown kid 401."""
+    now = [1000.0]
+    s = jwt_settings(jwt_jwks_cache_ttl_seconds=300, jwt_jwks_refresh_cooldown_seconds=10)
+    auth = Authenticator.from_settings(s, transport=idp.transport(), clock=lambda: now[0])
+    with TestClient(build(s, authenticator=auth)) as c:
+        assert c.get("/v1/things", headers=bearer(idp.token())).status_code == 200
+        idp.down = True
+        now[0] += 301  # cache expired
+        for _ in range(5):
+            assert c.get("/v1/things", headers=bearer(idp.token())).status_code == 200
+        assert idp.requests == 2  # one failed refresh, the stale keys stay in use
+        other = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        unknown = c.get("/v1/things", headers=bearer(idp.token(kid="rsa-9", key=other)))
+        assert unknown.status_code == 401 and idp.requests == 2
+        now[0] += 10
+        assert c.get("/v1/things", headers=bearer(idp.token())).status_code == 200
+        assert idp.requests == 3
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["//v1/things", "/V1/things", "/v1/%74hings", "/v1/health/../things", "/v1/health/", "/v1/health%2f"],
+)
+def test_only_the_exact_health_path_is_open(api_client: TestClient, path: str) -> None:
+    """Review 1: path variants never reach an operation (or a 404) without a token."""
+    response = api_client.get(httpx.URL(f"http://testserver{path}"))
+    assert response.status_code == 401, (path, response.status_code)
+
+
+def test_head_takes_the_get_scope_and_other_methods_need_a_row() -> None:
+    table = {**SCOPES, "GET /v1/heads": "storage:read"}
+    app = build(settings(auth_mode="api_key", api_keys=keys_doc()), scopes=table)
+
+    @app.api_route("/v1/heads", methods=["GET", "HEAD"])
+    async def heads() -> dict[str, str]:
+        return {"ok": "heads"}
+
+    @app.options("/v1/things")
+    async def things_options() -> dict[str, str]:
+        return {"ok": "options"}
+
+    with TestClient(app) as c:
+        assert c.head("/v1/heads").status_code == 401
+        assert c.head("/v1/heads", headers=bearer("key-bare")).status_code == 403
+        assert c.head("/v1/heads", headers=bearer("key-reader")).status_code == 200
+        assert c.options("/v1/things").status_code == 401
+        denied = c.options("/v1/things", headers=bearer("key-writer"))
+        assert denied.status_code == 403 and denied.json()["detail"] == "operation is not mapped to a scope"
 
 
 def test_jwt_with_jwks_served_over_local_http(idp: Idp) -> None:

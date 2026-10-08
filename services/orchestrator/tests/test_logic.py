@@ -339,10 +339,10 @@ def test_ids_etags_time_keys() -> None:
 def test_api_key_auth_and_scopes() -> None:
     import hashlib
 
+    from orch_support import authenticate
     from starlette.requests import Request
 
     from jane_kit.errors import Forbidden, Unauthenticated
-    from jane_orchestrator.auth import authenticate
 
     def req(token: str | None) -> Request:
         headers = [(b"authorization", f"Bearer {token}".encode())] if token else []

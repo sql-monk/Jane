@@ -104,7 +104,12 @@ upstream-port записує `provenance.created_by` = `actor` того, хто 
 
 Scopes операцій (таблиця `REGISTRY` з `jane_kit.auth_scopes`, по суті та сама, що в абзаці «Scopes» вище):
 
-- невідомий `actor` у ключі — сервіс не стартує, у JWT — 403; `GET /v1/jobs/{id}` — `registry:read`, `POST /v1/jobs/{id}/cancel` — `registry:write`.
+- невідомий `actor` у ключі — сервіс не стартує, у JWT — 403;
+- **увага, `jwt`:** `actor` береться з claim `actor` токена, а якщо claim немає — клієнт вважається `human`, як і
+  ключ без поля `actor`. Сервісний JWT асистента без claim `actor: llm` **обходить** обмеження для `llm` (може
+  публікувати версії з `provenance.created_by: human` і не підпадає під заборону автозмін через походження). У
+  режимі `jwt` налаштуйте в IdP для клієнта асистента claim `actor` зі значенням `llm` (mapper/optional claim) або
+  видайте асистенту ключ `api_key` з `"actor": "llm"`; код registry цього не перевіряє; `GET /v1/jobs/{id}` — `registry:read`, `POST /v1/jobs/{id}/cancel` — `registry:write`.
 
 Приклад для `api_key` (зберігається лише хеш ключа):
 

@@ -116,7 +116,7 @@ class Executors:
             client = self._clients.get(name)
             if client is None:
                 cfg = self.configs[name]
-                headers = {"Authorization": f"Bearer {cfg.token}"} if cfg.token else {}
+                headers = {"Authorization": f"Bearer {cfg.token.get_secret_value()}"} if cfg.token else {}
                 client = httpx.Client(
                     base_url=cfg.base_url.rstrip("/"),
                     headers=headers,

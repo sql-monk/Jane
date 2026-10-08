@@ -62,7 +62,7 @@ hostname і PID збігаються. Явний `<ПРЕФІКС>INSTANCE_ID` �
 | `JWT_SCOPE_CLAIM` | `scope` | рядок через пробіл або список рядків |
 | `JWT_LEEWAY_SECONDS` | 30 | допуск годинника для `exp`/`nbf`/`iat` |
 | `JWT_JWKS_CACHE_TTL_SECONDS` / `JWT_JWKS_TIMEOUT_MS` | 300 / 5000 | кеш JWKS і тайм-аут одного запиту до IdP |
-| `JWT_JWKS_REFRESH_COOLDOWN_SECONDS` / `JWT_JWKS_MAX_BYTES` | 10 / 1048576 | невідомий `kid` оновлює JWKS один раз, не частіше; найбільший JWKS |
+| `JWT_JWKS_REFRESH_COOLDOWN_SECONDS` / `JWT_JWKS_MAX_BYTES` | 10 / 1048576 | до IdP — не частіше одного запиту за cooldown (застарілий кеш, невідомий `kid`, повтор після невдачі; паралельні запити чекають одне завантаження); між спробами відомі ключі працюють, невідомий `kid` — 401, без жодного ключа — одразу 503; `0` вимикає захист. Найбільший JWKS |
 | `AUTH_MAX_TOKEN_BYTES` | 16384 | довший токен — 401 без розбору |
 | `METRICS_PUBLIC` | `true` | `/metrics` без токена (скрейпер Prometheus у внутрішній мережі); `false` — будь-який дійсний токен |
 
@@ -72,7 +72,7 @@ hostname і PID збігаються. Явний `<ПРЕФІКС>INSTANCE_ID` �
 `application/problem+json`. Операція без рядка в таблиці — 403 і помилка в журналі, а на старті — відмова
 стартувати. JWT: `iss`/`aud`/`exp` обов'язкові, `nbf` перевіряється, ключ за `kid` (без `kid` — лише якщо в JWKS
 один ключ), алгоритм заголовка має збігатися з ключем; недоступний IdP без ключів у кеші — 503
-`service_unavailable`, а не 401. Неповна конфігурація (`api_key` без ключів, `jwt` без URL/issuer/audience,
+`service_unavailable` з `Retry-After` = cooldown, а не 401 (і без нового запиту до IdP до кінця cooldown). Неповна конфігурація (`api_key` без ключів, `jwt` без URL/issuer/audience,
 нерозв'язне `secret_ref`) — `AuthConfigError` під час `create_app`, сервіс не стартує. Значення ключів не
 потрапляють у журнали й повідомлення про помилки; на старті журналюються лише режим та імена ключів.
 

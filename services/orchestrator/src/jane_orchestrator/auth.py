@@ -11,16 +11,14 @@ name (audit, ``requested_by``). Scopes: ``orchestrator:read`` (GET), ``orchestra
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from fastapi import Request
 
-from jane_kit.auth import ApiKeyConfig, ApiKeyVerifier, principal_of
-from jane_kit.errors import Forbidden, Unauthenticated
+from jane_kit.auth import principal_of
+from jane_kit.errors import Forbidden
 
-__all__ = ["ADMIN", "ALL_SCOPES", "Principal", "authenticate", "caller"]
+__all__ = ["ADMIN", "ALL_SCOPES", "Principal", "caller"]
 
-ANONYMOUS = "anonymous"
 ADMIN = "orchestrator:admin"
 ALL_SCOPES = frozenset({"orchestrator:read", "orchestrator:write", ADMIN})
 
@@ -41,19 +39,3 @@ def caller(request: Request, scope: str) -> Principal:
     principal = Principal(p.name, ALL_SCOPES if p.method == "none" else frozenset(p.scopes))
     principal.require(scope)
     return principal
-
-
-def authenticate(request: Request, mode: str, keys: list[dict[str, Any]]) -> Principal:
-    """Standalone check of one request against ``none`` / ``api_key`` (no middleware), kept for tools and tests."""
-    if mode == "none":
-        return Principal(ANONYMOUS, ALL_SCOPES)
-    if mode != "api_key":
-        raise Unauthenticated(f"auth mode {mode} needs the service middleware (jane_kit.auth)")
-    header = request.headers.get("authorization", "")
-    scheme, _, token = header.partition(" ")
-    if scheme.lower() != "bearer" or not token.strip():
-        raise Unauthenticated("bearer token required", headers={"WWW-Authenticate": "Bearer"})
-    found = ApiKeyVerifier([ApiKeyConfig.model_validate(k) for k in keys]).verify(token.strip())
-    if found is None:
-        raise Unauthenticated("invalid API key", headers={"WWW-Authenticate": "Bearer"})
-    return Principal(found.name, frozenset(found.scopes))

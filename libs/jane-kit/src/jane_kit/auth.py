@@ -9,9 +9,10 @@ Modes (``auth_mode``, env ``<PREFIX>AUTH_MODE``):
   "env:VAR" | "file:/run/secrets/x"`` (ADR-0006) which is resolved once at start and kept only as its hash.
   Further fields of an entry (e.g. ``actor`` of the registry) become :attr:`Principal.attributes`;
 * ``jwt`` - RS*/PS*/ES* tokens verified with the keys published at ``jwt_jwks_url`` (cached for
-  ``jwt_jwks_cache_ttl_seconds``, fetched within ``jwt_jwks_timeout_ms``; a token with an unknown ``kid``
-  refreshes the set once, at most every ``jwt_jwks_refresh_cooldown_seconds``), with ``iss``/``aud``/``exp``
-  required and ``nbf`` checked. Scopes come from the ``scope`` claim (space separated or a list).
+  ``jwt_jwks_cache_ttl_seconds``, fetched within ``jwt_jwks_timeout_ms``). The IdP is asked at most once per
+  ``jwt_jwks_refresh_cooldown_seconds`` - for an expired cache, an unknown ``kid`` and after a failed fetch
+  alike; meanwhile known keys keep working and, without any keys, requests get 503 at once. ``iss``/``aud``/
+  ``exp`` are required and ``nbf`` checked. Scopes come from the ``scope`` claim (space separated or a list).
   ``alg=none`` and HMAC algorithms are never accepted (a public key must not become an HMAC secret).
 
 Incomplete configuration is an error at start (fail closed): ``api_key`` without keys, ``jwt`` without
@@ -32,6 +33,7 @@ import hmac
 import ipaddress
 import json
 import logging
+import math
 import os
 import re
 import time
@@ -331,10 +333,18 @@ class _Clock(Protocol):
 
 
 class JwksCache:
-    """Signing keys of the identity provider: fetched on demand, cached ``ttl_s``; an unknown ``kid``
-    triggers one more fetch unless the last one is younger than ``cooldown_s``. On a failed fetch the
-    previous keys stay in use; without any keys the request fails with 503 (the IdP is unavailable,
-    the token is not necessarily wrong)."""
+    """Signing keys of the identity provider, fetched on demand and cached for ``ttl_s``.
+
+    The IdP gets at most one request per ``cooldown_s``, whatever triggers it (empty or expired cache, a token
+    with an unknown ``kid``) and whether the previous attempt succeeded or failed; concurrent requests wait for
+    the one fetch in progress instead of starting their own. Between attempts:
+
+    * a token whose ``kid`` is in the cache is checked with that key, also while the cache is being refreshed
+      or after a failed refresh (stale keys stay in use);
+    * an unknown ``kid`` is answered from the cache (-> 401) without contacting the IdP;
+    * without any keys every request fails at once with 503 ``service_unavailable`` (the IdP is unavailable,
+      the token is not necessarily wrong) - one warning per failed attempt, not per request.
+    """
 
     def __init__(
         self,
@@ -356,6 +366,10 @@ class JwksCache:
         self._clock = clock
         self._keys: list[dict[str, Any]] = []
         self._fetched_at: float | None = None
+        """Time of the last successful fetch (age of the cached keys)."""
+        self._attempted_at: float | None = None
+        """Time of the last fetch attempt, successful or not (the cooldown counts from it)."""
+        self._attempts = 0
         self._lock = asyncio.Lock()
         self.fetches = 0
         """Number of JWKS requests made (diagnostics and tests)."""
@@ -388,25 +402,40 @@ class JwksCache:
             raise ValueError("JWKS has no RSA/EC signing keys")
         return usable
 
-    async def _refresh(self, *, unknown_kid: bool) -> None:
+    def _may_attempt(self, now: float) -> bool:
+        return self._attempted_at is None or now - self._attempted_at >= self.cooldown_s
+
+    def _expired(self, now: float) -> bool:
+        return self._fetched_at is None or now - self._fetched_at >= self.ttl_s
+
+    def _unavailable(self) -> ServiceUnavailable:
+        return ServiceUnavailable(
+            "signing keys of the identity provider are unavailable",
+            retry_after_seconds=max(1, math.ceil(self.cooldown_s)),
+        )
+
+    async def _refresh(self) -> None:
+        """One fetch for all waiting requests: a request that waited while another one fetched does not fetch
+        again, and nobody fetches before the cooldown since the last attempt has passed."""
+        seen = self._attempts
         async with self._lock:
             now = self._clock()
-            if self._fetched_at is not None:
-                age = now - self._fetched_at
-                if (unknown_kid and age < self.cooldown_s) or (not unknown_kid and age < self.ttl_s):
-                    return  # another request refreshed meanwhile, or the cooldown holds
+            if self._attempts != seen or not self._may_attempt(now):
+                return
+            self._attempts += 1
+            self._attempted_at = now
             try:
                 keys = await self._download()
-            except (httpx.HTTPError, ValueError) as exc:
+            except (httpx.HTTPError, httpx.InvalidURL, ValueError, TypeError) as exc:
                 log.warning(
-                    "JWKS fetch failed",
-                    extra={"jwks_url": self.url, "error": f"{type(exc).__name__}: {exc}"[:500]},
+                    "JWKS fetch failed; cached keys stay in use, next attempt after the cooldown",
+                    extra={
+                        "jwks_url": self.url,
+                        "cooldown_s": self.cooldown_s,
+                        "cached_keys": len(self._keys),
+                        "error": f"{type(exc).__name__}: {exc}"[:500],
+                    },
                 )
-                if not self._keys:
-                    raise ServiceUnavailable(
-                        "signing keys of the identity provider are unavailable", retry_after_seconds=5
-                    ) from None
-                self._fetched_at = now  # keep the stale keys; retry after the TTL / cooldown
                 return
             self._keys = keys
             self._fetched_at = now
@@ -417,13 +446,21 @@ class JwksCache:
         return next((k for k in self._keys if k.get("kid") == kid), None)
 
     async def key(self, kid: str | None) -> dict[str, Any] | None:
-        if self._fetched_at is None or self._clock() - self._fetched_at >= self.ttl_s:
-            await self._refresh(unknown_kid=False)
+        """The JWK for ``kid`` (``None`` - unknown key, 401); raises 503 when no keys are available."""
+        now = self._clock()
         found = self._find(kid)
-        if found is None:
-            await self._refresh(unknown_kid=True)
-            found = self._find(kid)
-        return found
+        if found is not None and (
+            not self._expired(now) or self._lock.locked() or not self._may_attempt(now)
+        ):
+            return found  # fresh; or a refresh is running / was just tried - the cached key stays valid
+        if not self._may_attempt(now):
+            if not self._keys:
+                raise self._unavailable()
+            return None  # unknown kid within the cooldown: no request to the IdP
+        await self._refresh()
+        if not self._keys:
+            raise self._unavailable()
+        return self._find(kid)
 
 
 class JwtVerifier:

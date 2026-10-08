@@ -65,7 +65,7 @@ services:
       # LLM packages of orchestrated stages (no package_archive) come from the real registry (WP-05).
       JANE_LLM_REGISTRY_URL: ${JANE_E2E_LLM_REGISTRY_URL:-http://registry:8000}
       # ContentRef policy (WP-01h): download_url only to these hosts (R-04 reads material content through a gate of
-      # the package-host stand-in); file:// stays disabled - the llm container has no shared blob volume.
+      # the package-host stand-in); file:// only below the stored RAW volume (JANE_LLM_BLOB_ROOTS, infra/compose.yaml).
       JANE_LLM_DOWNLOAD_HOST_ALLOWLIST: '["package-host:8080"]'
     volumes:
       - ../tests/e2e/config/llm-seed.yaml:/cfg/llm-seed.yaml:ro

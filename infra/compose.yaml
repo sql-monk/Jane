@@ -162,8 +162,12 @@ services:
     environment:
       JANE_HANDLER_RUNTIME_STATE_DSN: postgresql://jane_handler_runtime:${JANE_PG_HANDLER_RUNTIME_PASSWORD:?run `just up`}@postgres:5432/jane_handler_runtime
       JANE_HANDLER_RUNTIME_LOG_FORMAT: json
+      # Reprocessing of stored RAW: the files adapter of storage references it as file:///var/lib/jane/storage/...
+      # (ADR-0004: file:// only on one node with a shared volume); only that root may be read (WP-01h policy).
+      JANE_HANDLER_RUNTIME_BLOB_ROOTS: '["/var/lib/jane/storage"]'
     volumes:
       - ${JANE_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+      - storage-data:/var/lib/jane/storage:ro
     group_add: ["${JANE_DOCKER_GID:-0}"]
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_HANDLER_RUNTIME:-}:8000"]
     depends_on:
@@ -215,6 +219,10 @@ services:
       JANE_LLM_DATABASE_URL: postgresql://jane_llm:${JANE_PG_LLM_PASSWORD:?run `just up`}@postgres:5432/jane_llm
       JANE_LLM_FAKE_PROVIDER_ENABLED: "true"
       JANE_LLM_LOG_FORMAT: json
+      # Reprocessing from an LLM stage gets stored RAW as file:///var/lib/jane/storage/... (as handler-runtime).
+      JANE_LLM_BLOB_ROOTS: '["/var/lib/jane/storage"]'
+    volumes:
+      - storage-data:/var/lib/jane/storage:ro
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_LLM:-}:8110"]
     depends_on:
       pg-provision: { condition: service_completed_successfully }

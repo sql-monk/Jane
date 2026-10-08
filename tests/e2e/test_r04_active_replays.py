@@ -113,6 +113,13 @@ def job_status(service: JaneClient, api: str, job_id: str) -> str:
     return str(r.json()["status"])
 
 
+def running(service: JaneClient, api: str, job_id: str) -> bool | None:
+    """True once the job is ``running``; fails if it ended before the replays."""
+    status = job_status(service, api, job_id)
+    assert status not in TERMINAL_JOB_STATES, f"job {job_id} already {status}"
+    return True if status == "running" else None
+
+
 def llm_usage(llm: JaneClient, task_id: str) -> dict[str, Any]:
     r = llm.api("llm").get("/v1/usage", params={"scope_type": "task", "scope_id": task_id})
     assert r.status_code == 200, r.text
@@ -481,13 +488,13 @@ def test_r_04_registry_replay_while_port_job_and_publication_are_running(
         first = api.post(port_path, json=port_body, headers=port_headers)
         assert first.status_code == 202, first.text
         job_id = first.json()["job_id"]
-        assert job_status(registry, "registry", job_id) not in TERMINAL_JOB_STATES
+        wait_for("port job running", lambda: running(registry, "registry", job_id), WAIT_S)
         assert_replayed(api.post(port_path, json=port_body, headers=port_headers), first)
         assert_key_reused(
             api.post(port_path, json={**port_body, "new_version": "1.2.0"}, headers=port_headers)
         )
         port_during = job_status(registry, "registry", job_id)
-        assert port_during not in TERMINAL_JOB_STATES, port_during
+        assert port_during == "running", port_during
 
         # 2. synchronous: two identical publications race for the key; one holds it, the other gets 409
         with ThreadPoolExecutor(2) as pool:

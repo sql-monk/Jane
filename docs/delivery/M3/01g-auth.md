@@ -1,8 +1,8 @@
 # WP-01g. Автентифікація й scopes у всіх сервісах (B2, фінальне рев'ю M3)
 
-**Гілка:** `wp/01g-service-auth` · **База:** `origin/codex/jane-integration` `f1c78e9` (перебазовано двічі:
-`3c98542` → `03a31fa` → `f1c78e9`) · **Доручення:** наскрізне, координатор за фінальним рев'ю M3 (без `.jane-wp`)
-· **Ревізія коду в CI:** `5f77bdf` · **Стан:** review
+**Гілка:** `wp/01g2-service-auth` (перебазована; попередня `wp/01g-service-auth` на `0a5b56b` лишилась без змін, без
+force push) · **База:** `origin/codex/jane-integration` `3ec9358` (послідовно `3c98542` → `03a31fa` → `f1c78e9` →
+`3ec9358`) · **Доручення:** наскрізне, координатор за фінальним рев'ю M3 (без `.jane-wp`) · **Стан:** review
 
 ## Результат
 
@@ -206,6 +206,66 @@ CI на `5f77bdf` (код; наступні коміти — лише докум
   (cold start p95 4.19 с при межі 15 с, `timeout` і `resource_exceeded` як треба, паралельних пісочниць 2 ≤ 2).
   Причину першого `fail` не встановлено; L6 кличе runtime тим самим ключем, що й L8, який пройшов.
 
+## Rebase на інтеграційну ревізію і L6
+
+**Rebase.** `git rebase origin/codex/jane-integration` (на час rebase — `bf69429`, далі лише документація до `3ec9358`;
+у базі вже злито WP-14d, WP-13s, B1 `wp/01h-content-ref-policy`, M3 should-fix `69ab303`, WP-12d `bf69429`). Конфлікти
+два, обидві сторони збережено:
+
+- `services/llm/src/jane_llm/settings.py` — імпорти: `from pydantic import Field, SecretStr, field_validator`
+  (`field_validator` — B1/should-fix для `api_base`, `SecretStr` — мій токен registry);
+- `services/handler-runtime/README.md` — абзац B1 «Політика ContentRef (WP-01h)» і мій розділ «Автентифікація».
+
+`infra/compose.yaml`, `tests/e2e/compose.e2e.yaml`, settings orchestrator/web-collector/telegram, `ci.yml`
+злилися без конфліктів (мої рядки автентифікації поруч із монтуванням `storage-data:ro`, `BLOB_ROOTS` і allowlist B1).
+Перевірив нові шляхи на токени: `ContentReader` B1 ходить лише до blob/`download_url` (`package-host`, не сервіси Jane),
+«шлюзи» R-04 WP-13s (`jane_e2e/active.py`) — теж до `package-host`; виклик LLM у R-04 (`llm.http.post("/v1/completions")`)
+іде через `JaneClient` і отримує ключ стеку; `configure-real-stack.mjs` WP-12d вмикає `REGISTRY_URL`/`ORCHESTRATOR_URL`/
+`COLLECTOR_WEB_URL` асистента — асистент іде туди власним токеном із базового compose (`SERVICE_TOKEN_REF`), а
+`llm`-виконавець оркестратора — токеном оркестратора (`handler:invoke` у llm є). `executors.py` після should-fix
+(`keepalive_expiry`) і далі ставить `Authorization` у клієнта виконавця.
+
+```text
+$ uv run --all-packages ruff check . ; ruff format --check .
+444 files already formatted
+$ uv run --all-packages mypy <пакет>/src <пакет>/tests
+mypy libs/jane-kit: Success: no issues found in 30 source files
+mypy services/storage: Success: no issues found in 29 source files
+mypy services/handler-runtime: Success: no issues found in 25 source files
+mypy services/llm: Success: no issues found in 30 source files
+mypy services/web-collector: Success: no issues found in 39 source files
+mypy services/telegram-collector: Success: no issues found in 23 source files
+mypy services/assistant: Success: no issues found in 36 source files
+mypy services/orchestrator: Success: no issues found in 31 source files
+mypy services/registry: Success: no issues found in 28 source files
+mypy scripts infra/tests: Success: no issues found in 6 source files
+$ uv run --all-packages pytest libs/jane-kit infra/tests scripts/tests services/llm services/handler-runtime     services/assistant services/registry services/orchestrator services/storage     services/web-collector/tests/test_auth.py services/telegram-collector/tests/test_auth.py     -m "not integration and not isolation" -q
+788 passed, 259 deselected, 32 warnings in 488.98s (0:08:08)
+```
+
+**Причина L6 у першій спробі `limits` CI 37850701212** (`gh run download 37850701212 -n limits-ci-37850701212-1`,
+`results.json` і `raw/r1-L6-runtime.jsonl`): з автентифікацією **не пов'язана**. Усі виклики runtime пройшли
+(холодні старти, тайм-аут, паралельні пісочниці, `/v1/info` — 200); впала одна блокувальна перевірка:
+
+```text
+FAIL blocker memory exceeded -> failure.kind execution_error == resource_exceeded
+{"case": "memory", "elapsed_s": 0.33183123099999534, "status": "failed", "failure": {"kind": "execution_error",
+ "details": {"error": "Expecting value: line 1 column 1 (char 0)", "exit_code": 137, "max_processes": 16},
+ "message": "sandbox runner produced no valid result (exit code 137)", "retryable": false}}
+OK   blocker cold start p95, s 0.2589876870000012 <= 15.0
+OK   blocker wall time exceeded -> failure.kind timeout == timeout
+OK   blocker parallel sandboxes 2 <= 2
+OK   blocker parallel invocations finished 4 == 4
+```
+
+Пісочницю вбив OOM (код 137 = SIGKILL через 0.33 с після старту, під час виділення `memory_mb` + 256 МБ), але Docker
+повернув `State.OOMKilled = false`, тож `executor.py` (класифікує `resource_exceeded` лише за
+`outcome.oom_killed`, який `docker_sandbox.py` бере з `inspect_container().State.OOMKilled`) віднесла відмову до
+`execution_error`. На cgroup v2 (ubuntu-24.04) прапорець OOMKilled виставляється за подією OOM від containerd і може
+не встигнути до `wait`/`inspect` або не стосуватися PID 1, якщо OOM-killer вибрав дочірній процес; у другій спробі й
+локально (`--only L6`) та сама перевірка — `resource_exceeded`. Це нестабільна класифікація OOM у handler-runtime
+(WP-06), не дефект автентифікації; код пісочниці поза моїм дорученням, тож не правив — запит нижче.
+
 ## Конфігурація й ліміти
 
 | Параметр (env `<PREFIX>…`) | Типове значення | Де задається |
@@ -249,4 +309,5 @@ CI на `5f77bdf` (код; наступні коміти — лише докум
 | WP-00 / координатор (ADR-0005) | Записати в ADR рішення, які він лишав відкритими: `/v1/info` — будь-який дійсний токен; `/metrics` — типово відкритий; scopes читання підключень, `/v1/jobs`, перевірки правил і скидання стану колектора, читання llm; `none` лише на loopback | Щоб наступні сервіси не вирішували це заново; зараз джерело правди — `jane_kit/auth_scopes.py` |
 | WP-00 (contracts) | Розглянути `security: [{bearerAuth: [<scope>]}]` на операціях OpenAPI (або `x-jane-scope`) | Тоді `test_table_equals_contract` звірятиме й самі scopes, не лише перелік операцій |
 | WP-12 (admin) | `scripts/e2e.mjs --real` — брати ключ із `.jane/stack-<project>.json` (`env.JANE_API_KEY_ADMIN`), якщо `JANE_ADMIN_E2E_API_KEY` не задано; у README «Режими e2e» — звідки ключ (`just env` → `JANE_STACK_AUTH_ADMIN_API_KEY`) | Real-e2e у стеку `api_key` без ручного копіювання ключа; без ключа адмінка отримає 401 |
+| WP-06 (handler-runtime) | Класифікувати OOM надійно: після `wait` за коду 137 без тайм-ауту перечитати `State.OOMKilled` (коротко, з тайм-аутом з конфігурації) і/або читати лічильник `oom_kill` з `memory.events` cgroup v2 контейнера; лише якщо OOM не підтверджено — `execution_error` | L6 `limits` CI 37850701212 спроба 1: `exit_code 137`, `OOMKilled=false` → `execution_error` замість `resource_exceeded` (нестабільний блокер профілю `ci`) |
 | WP-01 (templates/service) | `create_app(..., auth_scopes=...)` у шаблоні з таблицею для прикладних маршрутів і рядок у README про автентифікацію | Нові сервіси одразу з таблицею scopes (зараз — лише автентифікація) |

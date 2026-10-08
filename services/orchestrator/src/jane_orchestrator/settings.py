@@ -107,6 +107,14 @@ class EngineLimits(Limits):
     """Delay before retrying a failed connection sync."""
     sync_max_attempts: int = Field(default=5, ge=1)
     executor_health_timeout_ms: int = Field(default=2_000, ge=1)
+    executor_keepalive_expiry_ms: int = Field(default=4_000, ge=0)
+    """Idle time after which a pooled connection to an executor is dropped. Keep it below the executors'
+    server keep-alive (uvicorn ``timeout_keep_alive``, 5 s for every Jane service): with equal values a
+    request sent at the moment the server closes the idle connection fails with ``RemoteProtocolError``."""
+    executor_stale_connection_retries: int = Field(default=1, ge=0)
+    """Immediate re-sends, on a new connection, of a request that is safe to repeat (GET/HEAD/OPTIONS/PUT/
+    DELETE or with ``Idempotency-Key``) after the executor dropped the connection without a response. They do
+    not spend ``retries.max_attempts`` of an item; 0 hands such an error to the item retry policy."""
     job_poll_interval_ms: int = Field(default=500, ge=10)
     """Polling interval for an executor's 202 job (async handler invocation)."""
     idempotency_in_progress_poll_ms: int = Field(default=500, ge=10)

@@ -1,7 +1,12 @@
 """Calls to the services the orchestrator combines (collector.v1, handler.v1, storage.v1, registry.v1).
 
 Only their versioned APIs are used — never their databases (ТЗ §4). Retries are decided by the caller
-(item-level retry policy with the same ``Idempotency-Key``), so this client does not retry by itself.
+(item-level retry policy with the same ``Idempotency-Key``). The only re-send done here is for a pooled
+keep-alive connection that the executor closed under the request: the request is repeated on a fresh
+connection (``engine.executor_stale_connection_retries``) when it is safe to repeat - an idempotent method
+or an ``Idempotency-Key`` - so such a race does not spend an item attempt. Pooled connections are dropped
+after ``engine.executor_keepalive_expiry_ms`` of idleness, below the executors' server keep-alive (uvicorn
+``timeout_keep_alive``, 5 s), which avoids most of these races in the first place.
 """
 
 from __future__ import annotations
@@ -23,6 +28,14 @@ __all__ = ["ExecutorError", "Executors"]
 log = logging.getLogger(__name__)
 
 RETRYABLE_STATUSES = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
+REPEATABLE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "PUT", "DELETE"})
+STALE_CONNECTION_ERRORS: tuple[type[httpx.TransportError], ...] = (
+    httpx.RemoteProtocolError,  # "Server disconnected without sending a response"
+    httpx.ReadError,  # connection reset while waiting for the response
+    httpx.WriteError,  # connection closed while sending the request
+)
+"""Transport errors of a connection the executor closed under the request (keep-alive race). Timeouts are
+not here: a slow executor is a real failure for the item retry policy."""
 
 
 @dataclass
@@ -75,7 +88,13 @@ class ExecutorError(Exception):
 
 class Executors:
     def __init__(
-        self, configs: list[ExecutorConfig], *, connect_timeout_ms: int, request_timeout_ms: int
+        self,
+        configs: list[ExecutorConfig],
+        *,
+        connect_timeout_ms: int,
+        request_timeout_ms: int,
+        keepalive_expiry_ms: int = 4_000,
+        stale_connection_retries: int = 1,
     ) -> None:
         self.configs = {c.executor: c for c in configs}
         self._clients: dict[str, httpx.Client] = {}
@@ -83,6 +102,8 @@ class Executors:
         self._kind_cache: dict[str, str] = {}
         self.connect_timeout_ms = connect_timeout_ms
         self.request_timeout_ms = request_timeout_ms
+        self.keepalive_expiry_ms = keepalive_expiry_ms
+        self.stale_connection_retries = stale_connection_retries
 
     def close(self) -> None:
         with self._lock:
@@ -96,7 +117,11 @@ class Executors:
             if client is None:
                 cfg = self.configs[name]
                 headers = {"Authorization": f"Bearer {cfg.token}"} if cfg.token else {}
-                client = httpx.Client(base_url=cfg.base_url.rstrip("/"), headers=headers)
+                client = httpx.Client(
+                    base_url=cfg.base_url.rstrip("/"),
+                    headers=headers,
+                    limits=httpx.Limits(keepalive_expiry=self.keepalive_expiry_ms / 1000),
+                )
                 self._clients[name] = client
             return client
 
@@ -169,14 +194,28 @@ class Executors:
         timeout = httpx.Timeout(
             (timeout_ms or self.request_timeout_ms) / 1000, connect=self.connect_timeout_ms / 1000
         )
-        try:
-            response = self._client(executor.executor).request(
-                method, path, json=json, params=params, headers=headers, timeout=timeout
-            )
-        except httpx.HTTPError as exc:
-            raise ExecutorError(
-                executor.executor, None, None, f"{method} {path}: {type(exc).__name__}: {exc}"
-            ) from exc
+        repeatable = method.upper() in REPEATABLE_METHODS or bool(idempotency_key)
+        stale_retries = self.stale_connection_retries if repeatable else 0
+        while True:
+            try:
+                response = self._client(executor.executor).request(
+                    method, path, json=json, params=params, headers=headers, timeout=timeout
+                )
+                break
+            except STALE_CONNECTION_ERRORS as exc:
+                if stale_retries <= 0:
+                    raise ExecutorError(
+                        executor.executor, None, None, f"{method} {path}: {type(exc).__name__}: {exc}"
+                    ) from exc
+                stale_retries -= 1
+                log.info(
+                    "executor connection dropped, re-sending on a new connection",
+                    extra={"executor": executor.executor, "method": method, "error": type(exc).__name__},
+                )
+            except httpx.HTTPError as exc:
+                raise ExecutorError(
+                    executor.executor, None, None, f"{method} {path}: {type(exc).__name__}: {exc}"
+                ) from exc
         if response.status_code < 400 or response.status_code in ok:
             return response
         problem = None

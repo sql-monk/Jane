@@ -103,6 +103,8 @@ platform → source → task → stage → request (`RunRequest.limits`), `hard_
 | `sync_retry_ms` / `sync_max_attempts` | 5000 / 5 | синхронізація підключень |
 | `idempotency_in_progress_poll_ms` / `idempotency_in_progress_max_wait_ms` / `idempotency_in_progress_retry_ms` | 500 / 120000 / 5000 | повтор з тим самим `delivery_key` після 409 `idempotency_in_progress` під чинним lease; після межі елемент відкладається на `retry_ms` і перевіряється з тим самим ключем та номером спроби |
 | `executor_health_timeout_ms` | 2000 | `/v1/executors` → статус |
+| `executor_keepalive_expiry_ms` | 4000 | простій, після якого з'єднання з виконавцем прибирається з пулу; **має бути меншим** за keep-alive сервера виконавця (uvicorn `timeout_keep_alive`, 5 с у кожному сервісі Jane), інакше запит у мить закриття з'єднання сервером падає з `RemoteProtocolError: Server disconnected` |
+| `executor_stale_connection_retries` | 1 | негайних повторів на новому з'єднанні, якщо виконавець закрив з'єднання без відповіді (`RemoteProtocolError`, `ReadError`, `WriteError`; тайм-аути — ні). Лише для запитів, які безпечно повторити: `GET/HEAD/OPTIONS/PUT/DELETE` або з `Idempotency-Key` (зокрема `POST /v1/invocations` із `delivery_key`). Такий повтор **не** витрачає `retries.max_attempts` елемента; `0` — віддати помилку звичайній політиці повторів |
 | `job_poll_interval_ms` | 500 | опитування 202-job виконавця |
 | `problem_samples` / `trace_outputs_max` | 10 / 100 | зразки в групі проблем / посилання виходів на елемент |
 | `db_pool_max` | 10 | з'єднань із БД на процес |

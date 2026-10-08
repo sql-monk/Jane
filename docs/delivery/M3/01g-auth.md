@@ -306,7 +306,18 @@ test_only_the_exact_health_path_is_open[/v1/health%2f] PASSED
 test_head_takes_the_get_scope_and_other_methods_need_a_row PASSED
 ```
 
-FINAL_CI_PLACEHOLDER
+### Передача (зупинка на вимогу людини, 2026-10-09)
+
+- **Зроблено після рев'ю 1:** усі 5 зауважень (таблиця вище), коміт `fe977e4`; звіт — `7b41bf4`. Гілка
+  `wp/01g2-service-auth` перебазована на `origin/codex/jane-integration` `3ec9358` і запушена без force; стара
+  `wp/01g-service-auth` на віддаленому репозиторії лишилась на `0a5b56b`.
+- **CI:** один повний прогін на фінальному коді — [37857870977](https://github.com/sql-monk/Jane/actions/runs/37857870977)
+  (workflow_dispatch, SHA `7b41bf4`). На момент зупинки lint, unit, contract, web, web-mock-e2e, isolation і
+  adapters ×4 — ✓; e2e, limits, stack — ще виконувалися; результат не дочікував (вказівка координатора).
+  Push-прогін 37857863534 скасовано concurrency-групою (той самий ref), проміжний 37856354197 скасовано мною.
+- **Лишилось:** дочекатися 37857870977 (рядок e2e і вердикт limits; нестабільний L6 OOM — окреме виправлення
+  handler-runtime), перевірка виправлень координатором, запити до WP-00/WP-06/WP-12/WP-01 (нижче).
+- Docker-проєктів цього доручення не лишилось (`jane-01g`, `jane-01g-limits` прибрано).
 
 ## Конфігурація й ліміти
 

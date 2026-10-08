@@ -28,7 +28,7 @@ from typing import Any
 
 import pytest
 
-from jane_e2e.clients import CONTRACTS, JaneClient, spec
+from jane_e2e.clients import CONTRACTS, JaneClient, spec, token_for
 from jane_e2e.orchestration import list_items
 from jane_e2e.stack import ROOT, E2EStack, default_project
 from jane_registry.archive import canonical_archive, digest_of, files_from_dir
@@ -155,8 +155,11 @@ def publish_storage_packages(registry_url: str) -> str:
     """``jane-storage-packages publish`` (WP-07 CLI): every built-in ``jane.storage-*`` package -> registry.
 
     Time limit of the CLI call: ``JANE_E2E_CLI_TIMEOUT_S`` (default 120 s)."""
+    token = token_for(registry_url)
+    cli = [sys.executable, "-m", "jane_storage.packages", "publish", "--registry", registry_url]
     done = subprocess.run(
-        [sys.executable, "-m", "jane_storage.packages", "publish", "--registry", registry_url],
+        [*cli, "--token-env", "JANE_E2E_REGISTRY_TOKEN"] if token else cli,
+        env={**os.environ, "JANE_E2E_REGISTRY_TOKEN": token or ""},
         capture_output=True,
         text=True,
         timeout=float(os.environ.get("JANE_E2E_CLI_TIMEOUT_S", "120")),

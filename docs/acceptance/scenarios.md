@@ -79,7 +79,7 @@ Docker-сокет із групою, визначеною автоматично
 | R-01 | Kill воркера оркестратора посеред ланцюжка | 8 | orchestrator ×2, виконавці | **Пройшов** у [CI 36999629588](https://github.com/sql-monk/Jane/actions/runs/36999629588) на WP-13m: після перехоплення lease друга репліка повторила старт того самого run і повернула ту саму job; ефекти лишилися одиничними. Фінальна `main` ще не перевірена. |
 | R-02 | Kill і рестарт кожного сервісу; повтор після рестарту — дубль | 8 | усі сервіси | **Усі вісім сервісів пройшли на одному SHA `cb4895d`**: storage, handler-runtime, Web/Telegram Collector, LLM (sync/async), registry, assistant, orchestrator. [CI 37017296604](https://github.com/sql-monk/Jane/actions/runs/37017296604): 12/12 job, e2e 62 passed. Фінальна `main` не перевірена. |
 | R-03 | Розрив мережі між оркестратором і виконавцем | 8 | orchestrator, виконавці | Storage partition і retry **PASSED** у Linux [CI 37002784428](https://github.com/sql-monk/Jane/actions/runs/37002784428); локальні 3 Docker e2e теж пройшли. Фінальна `main` ще не перевірена. |
-| R-04 | Повторна доставка на кожен виконавець | 8 | усі виконавці | **Частково**: Web/Telegram Collector і LLM — replay на тому самому, іншому й після рестарту; storage/runtime — дубль, `Idempotency-Replayed` і 422 для іншого тіла. WP-13q додав Web Collector під час активного збору (**PASSED** у [CI 37017296604](https://github.com/sql-monk/Jane/actions/runs/37017296604)). WP-13r (гілка `wp/13r-r04-active-replays`, `test_r04_active_replays.py`) додав повтор **під час** роботи: Telegram Collector, handler-runtime (sync/async), storage, LLM `/v1/invocations` (sync/async), registry (job перенесення змін і публікація), assistant (`/v1/unknown-materials`), orchestrator (старт run і повторна обробка) — адресно 2 × 9 passed локально, CI — у координатора. Не покрито: `/v1/completions` LLM і onboarding/improvement асистента (фейковий провайдер без затримки). Фінальна `main` відкрита. |
+| R-04 | Повторна доставка на кожен виконавець | 8 | усі виконавці | **Частково**: Web/Telegram Collector і LLM — replay на тому самому, іншому й після рестарту; storage/runtime — дубль, `Idempotency-Replayed` і 422 для іншого тіла. WP-13q додав Web Collector під час активного збору (**PASSED** у [CI 37017296604](https://github.com/sql-monk/Jane/actions/runs/37017296604)). WP-13r (гілка `wp/13r-r04-active-replays`, `test_r04_active_replays.py`) додав повтор **під час** роботи: Telegram Collector, handler-runtime (sync/async), storage, LLM `/v1/invocations` (sync/async), registry (job перенесення змін і публікація), assistant (`/v1/unknown-materials`), orchestrator (старт run і повторна обробка) — адресно 2 × 9 passed локально, CI — у координатора. WP-13s (гілка `wp/13s-r04-completions`) додав LLM `/v1/completions` (sync/async) і job onboarding/improvement асистента під час роботи: фейковий провайдер тримає відповідь `params.delay_ms` (WP-10), повтор — коли шлюз зажурналював утримання виклику (результати прогонів — звіт WP-13, «WP-13s»). Фінальна `main` відкрита. |
 | R-05 | Запізнілий результат не замінює новішого | 8 | storage, handler-runtime | **реалізовано, проходить** |
 | R-06 | Кілька екземплярів кожного компонента | 8 | усі | **runtime, Web/Telegram Collector, LLM, storage, registry, assistant та orchestrator ×2 проходять** (CI 36988073141, 36994135652 і [36999629588](https://github.com/sql-monk/Jane/actions/runs/36999629588)); фінальна `main` ще не перевірена |
 | R-07 | Повний цикл LLM → тести → активація → відкат під навантаженням і з рестартами | 6, 8 | orchestrator, assistant, llm, registry, runtime, storage | Після виправлень WP-11e/06a/09c усі сценарії `test_r07_improvement_restarts.py` **PASSED** у [CI 36994135652](https://github.com/sql-monk/Jane/actions/runs/36994135652), e2e `54 passed, 0 xfailed` на `e8927bd`; LLM — З, фінальна `main` ще не перевірена |
@@ -453,8 +453,20 @@ registry (WP-13t: опубліковано й погоджено, етапи з�
 `idempotency_in_progress` (`retryable: true`), після завершення — збережений результат (`duplicate: true`);
 інше тіло з тим самим ключем — 422 `idempotency_key_reused` і під час роботи. Ефекти перевірено один раз:
 матеріали колекції, RAW-об'єкт, пісочниці runtime, `/v1/usage` LLM, версії registry, запуски завдання.
-`/v1/completions` LLM та onboarding/improvement асистента так не утримати без зміни фейкового провайдера
-(запит до WP-10 у звіті WP-13, розділ «WP-13r»).
+
+WP-13s (гілка `wp/13s-r04-completions`) додав у той самий модуль LLM `/v1/completions` і job асистента:
+
+- LLM `POST /v1/completions` sync і async: власні підключення й провайдер `fake` прогону з `params.delay_ms`
+  (затримка фейкового провайдера, WP-10; межа — `fake.max_delay_ms`); повтор надсилається, коли шлюз
+  зажурналював `fake provider holds its answer` з `connection_id` прогону. Sync — 409
+  `idempotency_in_progress` (`retryable`), 422 для іншого тіла, потім збережений результат; async — той самий
+  `202` + `job_id`, `Idempotency-Replayed`, job `running`; `/v1/usage` завдання — 0 під час утримання, 1 після й
+  без змін після повтору; утримано рівно один виклик провайдера;
+- assistant: job onboarding (точне посилання на тестовий сайт → вибірка) і improvement (S-M2-07) на власному
+  стеку з реальним registry; на час повторів псевдоніми `cheap`/`strong` указують на копію провайдера
+  `e2e-assistant` з тими самими скриптами й `delay_ms`. Повтор — той самий `202` + job (і session), 422 для
+  іншого тіла, job `running`, облік LLM без змін; потім job `succeeded` (`proposals_ready` / `new_version`
+  1.1.0), витрата LLM дорівнює власному обліку job (`costs`), версія опублікована один раз.
 
 `tests/e2e/test_reliability_orchestrated.py` — R-01, R-03, R-08 на завданнях оркестратора (реальні
 orchestrator, web-collector, handler-runtime, storage, registry; архіви пакетів — з реального registry

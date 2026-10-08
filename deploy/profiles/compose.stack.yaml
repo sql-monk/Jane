@@ -99,6 +99,9 @@ services:
       JANE_ORCHESTRATOR_LOG_FORMAT: json
       # Executors of the services started with this stack (written by stack.py for each `up`).
       JANE_ORCHESTRATOR_EXECUTORS_FILE: /cfg/executors.json
+      # false in the environment of `stack.py up` = API without schedules / run workers (backup, restore).
+      JANE_ORCHESTRATOR_SCHEDULER_ENABLED: ${JANE_ORCHESTRATOR_SCHEDULER_ENABLED:-true}
+      JANE_ORCHESTRATOR_RUN_WORKERS: ${JANE_ORCHESTRATOR_RUN_WORKERS:-true}
     volumes:
       - *limits
       - type: bind

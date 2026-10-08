@@ -1,13 +1,14 @@
 # Профілі лімітів WP-14
 
 Документи `PlatformLimits` (`contracts/schemas/common/limits.schema.json#/$defs/PlatformLimits`) для
-підтримуваних середовищ, стек, що застосовує профіль, і harness вимірювання. Рішення людини (2026-09-30):
-перевіряються `dev-laptop` і `ci`; `single-node` — кандидат.
+підтримуваних середовищ, стек, що застосовує профіль, і harness вимірювання. [Рішення людини 2026-10-08](../../docs/delivery/WP-14.md#рішення-людини-2026-10-08-і-стан-критерію-13):
+наживо прийнято лише `ci`; вимірювання `dev-laptop` ×3 виключено з обсягу, тож `dev-laptop` і `single-node` —
+кандидати, **не перевірено на реальному середовищі**.
 
 | Файл | Середовище | Статус |
 |---|---|---|
-| `dev-laptop.json` | ця машина: Windows 11 + Docker Desktop (6 CPU, 16 ГБ у Docker) | кандидат; не виміряно (потрібен вільний Windows-хост) |
-| `ci.json` | GitHub Actions `ubuntu-latest` (4 vCPU, 16 ГБ), лише testsite і fake LLM | виміряно CI run 36908333153: блокерів немає, вердикт `warn` ([звіт](../../docs/delivery/WP-14.md)); повторний прогін — після змін стеку |
+| `dev-laptop.json` | ця машина: Windows 11 + Docker Desktop (6 CPU, 16 ГБ у Docker) | кандидат, **не перевірено на реальному середовищі** (вимірювання виключено рішенням людини 2026-10-08) |
+| `ci.json` | GitHub Actions `ubuntu-latest` (4 vCPU, 16 ГБ), лише testsite і fake LLM | **прийнято наживо**, job `limits`: CI [36921026070](https://github.com/sql-monk/Jane/actions/runs/36921026070) `pass`, [36952287098](https://github.com/sql-monk/Jane/actions/runs/36952287098) `warn` без блокерів, останній на `main` — [37811082079](https://github.com/sql-monk/Jane/actions/runs/37811082079) `pass` ([звіт](../../docs/delivery/WP-14.md)) |
 | `single-node.json` | одна Linux VM з Docker Compose, орієнтир 8 vCPU / 32 ГБ | кандидат, **не перевірено на реальному середовищі** |
 | `thresholds.json` | пороги pass/fail harness для `dev-laptop` і `ci` | [опис](../../docs/operations/limits-validation.md) |
 | `compose.stack.yaml`, `stack.py` | ізольований ланцюжок сервісів, профіль — `LIMITS_FILE` усіх сервісів | перевірено відтворенням прикладів і стартом сервісів із профілем |
@@ -27,7 +28,8 @@
   (вивід — у [звіті WP-14](../../docs/delivery/WP-14.md), фаза 2). `dev-laptop` і `single-node` лишають
   `5 USD / day`.
 
-Решту чисел підтверджує або змінює вимірювання (`ci` — CI run 36908333153).
+Числа `ci` підтвердили живі прогони job `limits` (таблиця вище); числа `dev-laptop` і `single-node` — довідкові,
+не виміряні.
 
 ## Команди
 
@@ -41,8 +43,8 @@ uv run --all-packages python deploy/profiles/harness/limits_harness.py plan --pr
 uv run --all-packages python deploy/profiles/harness/limits_harness.py run --profile dev-laptop   # вільна машина!
 ```
 
-`just check` цей каталог не тестує (`testpaths` кореневого `pyproject.toml` належить WP-01); тести запускаються
-окремою командою вище, типи — `uv run --all-packages mypy deploy/profiles`.
+Тести без Docker входять у `just unit` / `just check` (і CI job `unit`) окремою сесією pytest разом з `examples/`
+(`EXTRA_UNIT_PATHS` у `scripts/dev.py`); окремо — командою вище. Типи — `uv run --all-packages mypy deploy/profiles`.
 
 ## Як профіль доходить до сервісів
 
@@ -77,6 +79,7 @@ uv run --all-packages python deploy/profiles/harness/limits_harness.py run --pro
 | Змінна стеку | Типово | Що |
 |---|---|---|
 | `JANE_LLM_PROVIDER_REQUEST_TIMEOUT_MS` | `120000` | тайм-аут одного виклику провайдера LLM у стеку профілю |
+| `JANE_ORCHESTRATOR_SCHEDULER_ENABLED` / `JANE_ORCHESTRATOR_RUN_WORKERS` | `true` / `true` | `false` у середовищі `stack.py up` — оркестратор без розкладів / воркерів ([резервування й відновлення](../../docs/operations/backup-restore.md)) |
 
 Профіль `ci` має довідкову частоту 50 запитів/с на хост — лише для локального testsite в ізольованій мережі.
 Для будь-якого реального сайту задайте нижчу межу на рівні джерела; профіль не є дозволом на таку частоту.

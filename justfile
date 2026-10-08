@@ -32,7 +32,7 @@ fmt:
 types:
     @types
 
-# Unit tests (everything except contract/integration/isolation markers); extra args go to pytest
+# Unit tests (no contract/integration/isolation marker) + offline examples/, deploy/profiles/; extra args go to pytest
 unit *args:
     @unit
 

@@ -1,11 +1,14 @@
 # Експлуатація Jane v1
 
-Інструкції описують фактичний стан `main` після WP-01a: усі сервіси мають образи й профілі в
-`infra/compose.yaml`, Caddy віддає їх за `/api/<сервіс>/*`, `just e2e` проганяє приймальні сценарії.
-Перевірені середовища — `dev-laptop` (Windows 11 + Docker Desktop, ця машина) і `ci`
-(GitHub Actions `ubuntu-latest`) — див. [рішення людини](../delivery/WP-14.md). `single-node` — кандидат,
-**не перевірено на реальному середовищі**. Числа профілів ще не виміряні (фаза 2,
-[протокол](limits-validation.md)).
+Інструкції описують `main`: усі сервіси мають образи й профілі в `infra/compose.yaml`, Caddy віддає їх за
+`/api/<сервіс>/*`, `just e2e` проганяє приймальні сценарії. Профілі лімітів
+([`deploy/profiles/`](../../deploy/profiles/README.md)): `ci` (GitHub Actions `ubuntu-latest`) прийнято за живими
+вимірюваннями job `limits` — CI [36921026070](https://github.com/sql-monk/Jane/actions/runs/36921026070) `pass`,
+[36952287098](https://github.com/sql-monk/Jane/actions/runs/36952287098) `warn` без блокерів, останній на `main` —
+[37811082079](https://github.com/sql-monk/Jane/actions/runs/37811082079) `pass`. `dev-laptop` і `single-node` —
+кандидати, **не перевірено на реальному середовищі**: вимірювання `dev-laptop` виключено з обсягу
+[рішенням людини 2026-10-08](../delivery/WP-14.md#рішення-людини-2026-10-08-і-стан-критерію-13)
+([протокол](limits-validation.md)).
 
 ## Три способи запуску
 
@@ -86,15 +89,22 @@ reverse proxy (Caddy з `/api/<сервіс>/*` і CSP — `infra/proxy/Caddyfil
 ## Оновлення, міграції та відкат
 
 1. Зафіксуйте ревізії коду, образів, контрактів, пакетів і дайджестів активних етапів, `ETag` платформних
-   лімітів. Вимкніть розклади (`schedule.enabled: false` через `PUT /v1/tasks/{id}` або
-   `JANE_ORCHESTRATOR_SCHEDULER_ENABLED=false`) і дочекайтеся завершення або скасуйте активні запуски
-   (`POST /v1/runs/{id}/cancel`).
+   лімітів. Вимкніть розклади (`schedule.enabled: false` через `PUT /v1/tasks/{id}` або для всього
+   оркестратора `JANE_ORCHESTRATOR_SCHEDULER_ENABLED=false`, разом із воркерами —
+   `JANE_ORCHESTRATOR_RUN_WORKERS=false`; обидві змінні задаються в середовищі `just up` / `stack.py up`,
+   типово `true`, команди — у [резервуванні](backup-restore.md#копіювання)) і дочекайтеся завершення або
+   скасуйте активні запуски (`POST /v1/runs/{id}/cancel`).
 2. Зробіть узгоджену копію за [резервуванням і відновленням](backup-restore.md) і перевірте її відновлення
    в ізольованому проєкті.
 3. Міграції: orchestrator (`Database.migrate()`), registry (таблиці під advisory lock), handler-runtime,
    llm і assistant створюють/оновлюють **свої** схеми під час старту; колектори — власні SQLite-файли стану.
    Автоматичної сумісності довільного відкату це не гарантує.
-4. Оновлюйте по одному сервісу (`docker compose ... up -d --build <сервіс>`), перевіряючи health, журнали
+4. Оновлюйте по одному сервісу: `just up --project <P> <сервіс>` (dev-стек; перебудовує образ і перестворює
+   лише змінений контейнер) або та сама команда `stack.py up --project <P> --profile <профіль> [--telegram]`, що
+   піднімала стек (коротший `--services` перезапише файл виконавців оркестратора). Без обгорток —
+   `docker compose -f infra/compose.yaml -p <P> up -d --build --wait <сервіс>` зі змінними `env` з
+   `.jane/stack-<P>.json`; накладку профілю — лише через `stack.py` (він задає ще `JANE_PROFILE_FILE`,
+   `JANE_EXECUTORS_FILE` тощо). Перевіряйте health, журнали
    міграції, контрактні smoke-запити й `GET /v1/executors`. При помилці зупиніть нові записи; відкат коду
    після зміни схеми — лише за документованої сумісності, інакше разом із відновленням копії даних.
 5. Пакети обробників незмінні: оновлення — нова версія в registry, активація через

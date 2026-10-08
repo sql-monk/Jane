@@ -42,7 +42,7 @@
 ```text
 uv sync --all-packages
 uv run --all-packages python examples/jane_examples.py check
-uv run --all-packages pytest examples -q
+uv run --all-packages pytest examples -q          # входить і в just unit / just check
 ```
 
 `check` звіряє маніфести й правила зі схемами контрактів, проганяє тести пакетів у процесі, перераховує
@@ -93,6 +93,21 @@ uv run --all-packages python deploy/profiles/stack.py down --project jane-exampl
 
 Підсумок кожного кроку — `.jane/examples-<проєкт>.json` (без секретів). Очікуваний вивід `verify`:
 `"ok": true`, `"raw_objects": 23`, `"entities": 16`, `"platform_profile": "dev-laptop"`.
+
+Що у виводі очікувано і не є помилкою:
+
+- Час у рядках журналу скрипта (`[12:34:56Z] …`) — UTC, як і мітки часу API.
+- `telegram` спершу повторює `publish` і `apply` (вони ідемпотентні). Після `demo` registry відповідає 409 на вже
+  створені пакети й версії (у підсумку `"package": "existed"`, `"version_publish": 409`), а оркестратор —
+  `orchestrator: source testsite-shop -> 409` і `task testsite-catalog -> 409` (при повторному `telegram` на тому
+  самому стеку — також для джерела й завдання `telegram-events`).
+- Лічильники запуску каталогу (`catalog.counters` у підсумку, `GET /v1/runs/{id}`): `materials: 23`,
+  `unknown_materials: 7`. Ці 7 — сторінки категорій із пагінацією (`/catalog/<категорія>/`, `?page=2`, `?page=3`):
+  їх збережено як RAW, але екстрактор прив'язано лише до `*/product/*`, а передача невідомих сторінок у LLM вимкнена
+  (`forward_unknown_to_llm: false`). 23 = 16 карток + 7 категорій.
+- `stack.py down` файл підсумку **не видаляє** (`leftovers` його не рахує): `.jane/examples-<проєкт>.json`
+  лишається для звіту. Окремий `verify` бере з нього запуски `catalog` і `price-check`, тож перед новим стеком
+  з тим самим ім'ям проєкту видаліть файл або запускайте `demo` повністю.
 
 Кроки можна запускати окремо (`publish`, `apply`, `catalog`, `price-check`, `verify`) і на стеку, піднятому
 інакше, якщо він має той самий ланцюжок і файл `.jane/stack-<проєкт>.json` з адресами

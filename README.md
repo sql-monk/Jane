@@ -10,8 +10,22 @@ Jane — платформа, яка збирає матеріали із сай�
 
 Проєкт названо на честь докторки Джейн Гудолл — на знак поваги до її внеску в спостереження, дослідження та розуміння живого світу. Jane є незалежним проєктом і не має офіційного зв’язку з Jane Goodall Institute; назва не означає його підтримки або схвалення.
 
+## Швидкий старт
+
+Потрібні `uv`, `just` і Docker (Compose v2); Windows і Linux однаково.
+
+1. [DEVELOPMENT.md](DEVELOPMENT.md) — встановлення інструментів, `uv sync --all-packages`, dev-стек
+   `just up` / `just env` / `just down -v`, перевірки `just check`.
+2. [examples/README.md](examples/README.md) — відтворювані приклади: каталог товарів, окрема перевірка цін і
+   події з Telegram через публічні API сервісів (один скрипт від чистого checkout до перевірки результатів).
+3. [docs/operations/README.md](docs/operations/README.md) — незалежний запуск кожного компонента, спільний
+   запуск ланцюжка, зміна лімітів, оновлення й міграції, [резервування й відновлення](docs/operations/backup-restore.md).
+4. [deploy/profiles/README.md](deploy/profiles/README.md) — профілі лімітів середовищ і стек, що їх застосовує.
+5. [web/admin/README.md](web/admin/README.md) — адміністративний інтерфейс (запуск на моках і на реальному стеку).
+6. [docs/acceptance/matrix.md](docs/acceptance/matrix.md) — критерії приймання ТЗ §12 і сценарії, що їх перевіряють.
+
 ## Документація
 
 - [Технічне завдання](TECHNICAL_SPECIFICATION.md) — погоджена основа архітектури, сценарії, вимоги та критерії приймання.
-
-Поточний етап — проєктування. Реалізацію не розпочато.
+- [Контракти](contracts/README.md) — OpenAPI і JSON Schema сервісів; кожен сервіс описує незалежний запуск у
+  власному README (`services/<сервіс>/README.md`).

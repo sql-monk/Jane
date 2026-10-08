@@ -189,6 +189,10 @@ services:
     build: { context: .., dockerfile: services/orchestrator/Dockerfile }
     environment:
       JANE_ORCHESTRATOR_DATABASE_URL: postgresql://jane_orchestrator:${JANE_PG_ORCHESTRATOR_PASSWORD:?run `just up`}@postgres:5432/jane_orchestrator
+      # Set to false in the caller's environment to start the API without schedules / run workers
+      # (backup, restore, upgrades - docs/operations/README.md).
+      JANE_ORCHESTRATOR_SCHEDULER_ENABLED: ${JANE_ORCHESTRATOR_SCHEDULER_ENABLED:-true}
+      JANE_ORCHESTRATOR_RUN_WORKERS: ${JANE_ORCHESTRATOR_RUN_WORKERS:-true}
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_ORCHESTRATOR:-}:8000"]
     depends_on:
       pg-provision: { condition: service_completed_successfully }

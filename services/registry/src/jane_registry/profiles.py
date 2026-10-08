@@ -103,10 +103,13 @@ class ProfileSource:
         sources: Sequence[str],
         limits: ProfileLimits,
         transport: httpx.AsyncBaseTransport | None = None,
+        token: str | None = None,
     ) -> None:
         self.sources = list(sources)
         self.limits = limits
         self.transport = transport
+        self._token = token
+        """Bearer token of the registry for http(s) sources (``GET <runtime>/v1/info`` needs one, ADR-0005)."""
         self._profiles: dict[str, RuntimeProfile] = {}
         self._loaded_at: float | None = None
         self._lock = asyncio.Lock()
@@ -121,7 +124,8 @@ class ProfileSource:
             async with httpx.AsyncClient(
                 timeout=self.limits.fetch_timeout_ms / 1000, transport=self.transport
             ) as client:
-                response = await client.get(source)
+                headers = {"Authorization": f"Bearer {self._token}"} if self._token else None
+                response = await client.get(source, headers=headers)
                 response.raise_for_status()
                 return response.json()
         return json.loads(await asyncio.to_thread(Path(source).read_text, encoding="utf-8"))

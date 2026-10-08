@@ -19,13 +19,14 @@ from fastapi import FastAPI, Query, Request, Response
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from jane_kit.auth_scopes import ORCHESTRATOR
 from jane_kit.errors import BadRequest, NotFound
 from jane_kit.idempotency import IDEMPOTENCY_HEADER, StoredResponse, idempotent
 from jane_kit.pagination import clamp_limit
 from jane_kit.service import create_app
 
 from . import __version__
-from .auth import Principal, authenticate
+from .auth import Principal, caller
 from .common import etag
 from .core import Core
 from .engine import Engine, Worker
@@ -43,6 +44,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     resolved = resolve_service_limits(settings)
     limits = resolved.limits
+    settings.all_executors()  # fail closed now on an unresolvable executor token reference
     holder: dict[str, Any] = {}
 
     @asynccontextmanager
@@ -73,10 +75,11 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         version=__version__,
         lifespan=lifespan,
         capabilities=lambda: {
-            "executors": [e.executor for e in settings.all_executors()],
+            "executors": [e.executor for e in settings.executor_configs()],
             "queue": "postgresql-skip-locked",
         },
         limits=resolved,
+        auth_scopes=ORCHESTRATOR,  # ADR-0005; handlers also check through principal()
     )
     app.state.limits = resolved
 
@@ -93,9 +96,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         return a
 
     def principal(request: Request, scope: str) -> Principal:
-        p = authenticate(request, settings.auth_mode, settings.api_keys)
-        p.require(scope)
-        return p
+        return caller(request, scope)
 
     async def body_json(request: Request) -> Any:
         raw = await request.body()

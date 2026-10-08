@@ -53,9 +53,20 @@ class Settings(JaneSettings):
     handler_runtime_url: str | None = None
     orchestrator_url: str | None = None
     storage_url: str | None = None
+    # The assistant's own bearer tokens for its neighbours (ADR-0005 §5): secret references ``env:VAR`` or
+    # ``file:/path`` (ADR-0006), resolved once at start - an unresolvable one stops the start.
+    service_token_ref: str | None = None
+    """Token for every neighbour that has no reference of its own below."""
+    llm_token_ref: str | None = None
+    registry_token_ref: str | None = None
+    collector_web_token_ref: str | None = None
+    collector_telegram_token_ref: str | None = None
+    handler_runtime_token_ref: str | None = None
+    orchestrator_token_ref: str | None = None
+    storage_token_ref: str | None = None
     service_token_env: str | None = None
-    """Name of the environment variable that holds the bearer token for neighbour services
-    (a secret reference, never the value itself; ADR-0005/0006)."""
+    """Deprecated: name of an environment variable with the token for all neighbours; use
+    ``service_token_ref=env:<name>``."""
 
     # Source search provider (plan.md WP-11: "налаштований пошуковий провайдер").
     search_provider: Literal["none", "static", "http_json"] = "none"

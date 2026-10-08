@@ -442,7 +442,11 @@ def test_routes_of_included_routers_are_checked_too() -> None:
     assert unmapped_routes(partial, SCOPES) == ["GET /v1/jobs/{job_id}", "POST /v1/jobs/{job_id}/cancel"]
     with pytest.raises(AuthConfigError, match="/v1/jobs"), TestClient(partial):
         pass
-    table = {**SCOPES, "GET /v1/jobs/{job_id}": "storage:read", "POST /v1/jobs/{job_id}/cancel": "storage:write"}
+    table = {
+        **SCOPES,
+        "GET /v1/jobs/{job_id}": "storage:read",
+        "POST /v1/jobs/{job_id}/cancel": "storage:write",
+    }
     with TestClient(make(table)) as c:
         assert c.get("/v1/jobs/job_x", headers=bearer("key-bare")).status_code == 403
         assert c.get("/v1/jobs/job_x", headers=bearer("key-reader")).status_code == 404  # authorized, no job

@@ -164,7 +164,7 @@ def build_app(
         packages_dir,
         settings.registry_url,
         limits.registry.client_limits(),
-        settings.registry_token,
+        settings.registry_token.get_secret_value() if settings.registry_token else None,
         limits=limits.gateway,
     )
 

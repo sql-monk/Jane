@@ -13,7 +13,7 @@
 | 1 | WP-06: `libs/extractor-sdk/src/jane_extractor_sdk/package.py`, `tests/test_sdk.py`, `README.md` | `build_archive` будує канонічний ZIP_STORED: порядок ASCII-шляхів, час 1980-01-01, права 0644, Unix, без extra/comment. Golden digest registry `sha256:e80692e640c2cb1a1976caaad1ba67460a0af0926012748f85748d15c6a404a0` збігається; перевірено розпакування й CLI прикладу. Коміт `4db7c27`. |
 | 2 | WP-09: `services/orchestrator/src/jane_orchestrator/{core,executors,settings}.py`, `tests/test_executors.py`, `README.md` | Keep-alive з конфігурації: `executor_keepalive_expiry_ms=4000`, менше server keep-alive 5 с; `executor_stale_connection_retries=1`. Справжній HTTP-сервер перевіряє нове TCP-з'єднання після простою, повтор ідемпотентного/keyed запиту, відсутність повтору POST без ключа й вимкнення повторів. Коміт `236321c`. |
 | 3 | WP-02: `services/web-collector/src/jane_web_collector/{egress,engine,fetcher,settings}.py`, `tests/test_egress_policy.py`, `README.md` | Заборонено link-local/metadata за замовчуванням (`egress_deny_link_local=true`), приватні/loopback адреси — за конфігурацією (`egress_deny_private=false` у dev). Кожне фактичне з'єднання після DNS та кожний redirect перевіряються; TCP йде на перевірений IP. Тести класифікують IPv4/IPv6, DNS, metadata, redirect для fetch/collection, приватні адреси. Коміт `6b67f1a`. |
-| 4 | WP-10/WP-04: `services/{llm,telegram-collector}/src/*/connections.py`, відповідні `tests/test_secret_files.py` | `file:` повторно перевіряється й читається за розв'язаним дозволеним шляхом. Тести міняють symlink після перевірки/resolve, перевіряють дозволений symlink, NUL/бінарний файл/каталог. Коміт `e0cc576`. |
+| 4 | WP-10/WP-04: `services/{llm,telegram-collector}/src/*/{connections,secret_files}.py`, відповідні `tests/test_secret_files.py` | `file:` читається через перевірені дескриптори відкритих об'єктів і всіх компонентів resolved шляху. Тести міняють symlink/reference, resolved target/parent до відкриття та target/parent після відкриття; дозволений safe symlink, NUL/бінарний файл/каталог також перевірені. Початковий коміт `e0cc576`; race у самому resolved target/parent виправлено після рев'ю 1 нижче. |
 | 5 | WP-10: `services/llm/src/jane_llm/connections.py`, `tests/test_api_base.py` | Невалідний порт `:99999`/`:abc`, зламаний IPv6 URL → 422 з `/params/api_base`, без збереження підключення. Старі невалідні дані не отримують секретів і не викликають провайдер. Коміт `2f77ae6`. |
 | 6 | WP-09: `services/orchestrator/src/jane_orchestrator/engine.py`, `tests/orch_support.py`, `tests/test_stored_raw.py`, `README.md` | Reprocessing запитує storage `GET /v1/objects` із `source_id` завдання; явно чуже джерело у summary/detail додатково відкидається. Два джерела мають однакові URL/material_id, але один material_id дає лише власне observation; повний запит дає 6 власних RAW, а не 12. |
 | 7 | WP-09: `services/orchestrator/src/jane_orchestrator/{engine,db,service,stored_raw}.py`, `tests/test_stored_raw.py`, `README.md` | Відомий RAW id з фактичного storage write записується в item цього запису; id зі storage-read — у collect item reprocessing. Власна міграція 4 додає nullable `items.stored_object_id` та індекс. API збагачує наявні `ProblemGroup.samples[].stored_object_id` і `UnknownMaterial.stored_object_id` за source/observation/run (для sample — через invocation). Немає залежності від пам'яті процесу чи таблиць storage; RAW, що завершився після екстрактора, стає доступним при наступному читанні. Simulated/missing/неоднозначний id не вигадується. |
@@ -146,3 +146,101 @@ no leaks found
    «reprocessing one stored material takes only RAW of the task's source», запустити цей real-тест.
    Ці файли належать іншому виконавцю й тут не редагувались.
 3. **Потік A:** final M3 CI/матриця/real admin gate й остаточний merge до main лишаються вашим дорученням.
+
+## Виправлення після рев'ю 1 — TOCTOU `file:` (пункт 4)
+
+Рев'юер відтворив 4 витоки: після `secret_file()` resolved target або його батьківський каталог
+замінюється symlink; `Path.read_text()` відкриває вже зовнішній файл. Попередня перевірка resolved pathname
+була недостатньою. Repro автора зі сценарію рев'юера: `.jane/review-m3-toctou-repro.py`.
+Справжній вихід до виправлення у `.jane/m3fix-review1-before.txt`:
+
+```text
+llm resolved-target-swap: outside-secret
+llm resolved-parent-swap: outside-secret
+telegram resolved-target-swap: outside-secret
+telegram resolved-parent-swap: outside-secret
+```
+
+Нові pytest-регресії до виправлення:
+
+```text
+uv run --all-packages --locked pytest services/llm/tests/test_secret_files.py services/telegram-collector/tests/test_secret_files.py -v -k resolved_target_or_parent
+FAILED services/llm/tests/test_secret_files.py::test_resolved_target_or_parent_swapped_before_open_is_not_read[target]
+FAILED services/llm/tests/test_secret_files.py::test_resolved_target_or_parent_swapped_before_open_is_not_read[parent]
+FAILED services/telegram-collector/tests/test_secret_files.py::test_resolved_target_or_parent_swapped_before_open_is_not_read[target]
+FAILED services/telegram-collector/tests/test_secret_files.py::test_resolved_target_or_parent_swapped_before_open_is_not_read[parent]
+======================= 4 failed, 8 deselected in 0.31s =======================
+```
+
+Повний log: `.jane/m3fix-review1-pytest-before.txt`.
+
+Виправлення не перечитує pathname після перевірки: два service-owned `secret_files.py` читають
+саме відкритий і перевірений файловий об'єкт. POSIX відкриває компоненти absolute resolved шляху
+від filesystem root через `dir_fd`, `O_DIRECTORY` і `O_NOFOLLOW`; leaf — також `O_NOFOLLOW`,
+`fstat` має підтвердити regular file до читання байтів. Відкриті directory/file descriptors утримуються
+до завершення читання, тому підміна pathname після open не перенаправляє fd.
+Можливості `dir_fd` та потрібні flags перевіряються; непідтримана платформа відмовляє у читанні.
+Використані API задокументовані в [Python os](https://docs.python.org/3/library/os.html#os.open).
+
+Windows відкриває кожен компонент із `FILE_FLAG_OPEN_REPARSE_POINT` і перевіряє атрибути
+відкритого handle, відкидаючи reparse points і неправильний тип. Усі directory handles утримуються
+без `FILE_SHARE_DELETE`, який потрібний також для rename; фактичний final handle path має збігтися
+з перевіреним resolved path. CRT fd отримує той самий handle, `fstat` підтверджує regular file,
+байти читаються лише після перевірок. Семантика: [CreateFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew),
+[GetFinalPathNameByHandleW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlew).
+Safe symlink підтриманий: його дозволений target розв'язується перед цим проходом.
+`libs/jane-kit/**`, потік A, контракти та інші пункти M3 не змінювались.
+
+Адресні тести на Windows після виправлення (`.jane/m3fix-review1-secret-after.txt`):
+
+```text
+uv run --all-packages --locked pytest services/llm/tests/test_secret_files.py services/telegram-collector/tests/test_secret_files.py -v
+============================= 16 passed in 0.33s ==============================
+```
+
+Додані також 4 сценарії target/parent swap **після open, до першого байта**: POSIX читає старий
+перевірений fd; Windows забороняє delete/rename, поки handles утримуються. У тесті підмінено лише
+OS stream wrapper на межі читання, самі компоненти й файлові операції справжні.
+
+Додаткова Linux-перевірка обох читачів на справжній POSIX FS у власному контейнері
+`jane-m3fix-review1-posix`, readonly mount цього checkout; контейнер автоматично видаляється:
+
+```text
+docker run --rm --name jane-m3fix-review1-posix --mount type=bind,source=C:/repos/Jane/.claude/worktrees/wpm3fix,target=/repo,readonly python:3.12-slim python /repo/.jane/review1_posix.py
+llm POSIX resolved-none: PASS
+llm POSIX resolved-target: PASS
+llm POSIX resolved-parent: PASS
+llm POSIX resolved-opened-target: PASS
+llm POSIX resolved-opened-parent: PASS
+telegram-collector POSIX resolved-none: PASS
+telegram-collector POSIX resolved-target: PASS
+telegram-collector POSIX resolved-parent: PASS
+telegram-collector POSIX resolved-opened-target: PASS
+telegram-collector POSIX resolved-opened-parent: PASS
+10 passed; real POSIX filesystem, no skipped
+```
+
+Log: `.jane/m3fix-review1-posix.txt`. Це адресні filesystem-сценарії, не повний local e2e.
+
+Контрактна регресія на реальних apps (`.jane/m3fix-review1-contract.txt`):
+
+```text
+uv run --all-packages --locked pytest services/llm/tests/test_contract.py services/telegram-collector/tests/test_contract.py -v -m "contract and not integration"
+======================= 3 passed, 2 deselected in 1.27s =======================
+```
+
+Два deselected — PostgreSQL-варіанти LLM; їх виконає full CI stack.
+Ruff / format і strict mypy обох сервісів, додатково читачі з `--platform linux`:
+
+```text
+All checks passed!
+35 files already formatted
+Success: no issues found in 17 source files
+Success: no issues found in 16 source files
+Success: no issues found in 2 source files
+```
+
+Logs: `.jane/m3fix-review1-lint.txt`, `.jane/m3fix-review1-lint-types.txt`.
+Новий commit після цього виправлення залишено локальним до повного висновку рев'ю 1;
+push і full workflow dispatch виконує автор лише після вказівки координатора.
+CI `37850604947` на старому `3b45a7b` не є фінальним доказом для виправленого інкременту.

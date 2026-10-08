@@ -25,6 +25,7 @@ from urllib.parse import urlsplit
 
 from jane_kit.errors import FieldError
 from jane_llm.providers.base import ResolvedConnection
+from jane_llm.secret_files import read_secret_file
 
 _SECRET_KEY_RE = re.compile(r"(?i)(pass(word|wd)?|secret|token|api[_-]?key|credential|private[_-]?key|auth)")
 _SECRET_VALUE_RES = [
@@ -78,8 +79,8 @@ class ConnectionPolicy:
     def secret_file(self, ref: str) -> Path | None:
         """Resolved path (``..`` and symlinks resolved) of an allowed ``file:`` reference, else ``None``.
 
-        The secret is read from this path, never from the raw reference: a symlink swapped after the check
-        cannot redirect the read outside ``files_dir`` (the same rule as storage and web-collector).
+        The reader must still pin and check every filesystem component before reading this path;
+        resolving a pathname alone does not prevent a later target or parent replacement.
         """
         if self.files_dir is None or not ref.startswith("file:") or not ref[5:]:
             return None
@@ -125,10 +126,7 @@ def resolve_ref(ref: str, policy: ConnectionPolicy) -> str | None:
         path = policy.secret_file(ref)  # re-resolved now; the raw reference is never opened
         if path is None:
             return None
-        try:
-            return path.read_text(encoding="utf-8").strip() or None
-        except (OSError, UnicodeDecodeError):
-            return None
+        return read_secret_file(path)
     return None
 
 

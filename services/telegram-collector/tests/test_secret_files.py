@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -59,6 +61,31 @@ def test_read_uses_the_resolved_path(layout: tuple[Path, Path, Path]) -> None:
     assert SwapAfterResolve(files_dir=secrets_dir).resolve(f"file:{link}") == "inside-secret"
 
 
+@pytest.mark.parametrize("swap", ["target", "parent"])
+def test_resolved_target_or_parent_swapped_before_open_is_not_read(tmp_path: Path, swap: str) -> None:
+    secrets_dir = tmp_path / "secrets"
+    parent = secrets_dir / "sub"
+    parent.mkdir(parents=True)
+    target = parent / "secret"
+    target.write_text("inside-secret", encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret").write_text("outside-secret", encoding="utf-8")
+
+    class SwapAfterResolvedTarget(ConnectionPolicy):
+        def secret_file(self, ref: str) -> Path | None:
+            path = super().secret_file(ref)
+            if swap == "target":
+                target.unlink()
+                target.symlink_to(outside / "secret")
+            else:
+                parent.rename(secrets_dir / "original-sub")
+                parent.symlink_to(outside, target_is_directory=True)
+            return path
+
+    assert SwapAfterResolvedTarget(files_dir=secrets_dir).resolve(f"file:{target}") is None
+
+
 def test_malformed_file_references_do_not_raise(tmp_path: Path) -> None:
     secrets_dir = tmp_path / "secrets"
     secrets_dir.mkdir()
@@ -68,3 +95,39 @@ def test_malformed_file_references_do_not_raise(tmp_path: Path) -> None:
     assert policy.ref_error(nul) is not None and policy.resolve(nul) is None
     assert policy.resolve(f"file:{secrets_dir / 'binary'}") is None
     assert policy.resolve(f"file:{secrets_dir}") is None  # the directory itself is not a secret
+
+
+@pytest.mark.parametrize("swap", ["target", "parent"])
+def test_swap_after_open_cannot_redirect_the_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, swap: str
+) -> None:
+    secrets_dir = tmp_path / "secrets"
+    parent = secrets_dir / "sub"
+    parent.mkdir(parents=True)
+    target = parent / "secret"
+    target.write_text("inside-secret", encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret").write_text("outside-secret", encoding="utf-8")
+    real_fdopen = os.fdopen
+    attempted = False
+
+    def before_bytes(fd: int, *args: Any, **kwargs: Any) -> Any:
+        nonlocal attempted
+        attempted = True
+        try:
+            if swap == "target":
+                target.unlink()
+                target.symlink_to(outside / "secret")
+            else:
+                parent.rename(secrets_dir / "original-sub")
+                parent.symlink_to(outside, target_is_directory=True)
+        except PermissionError:
+            # Windows handles prohibit deletion/rename; POSIX reads the already pinned descriptors.
+            assert os.name == "nt"
+        return real_fdopen(fd, *args, **kwargs)
+
+    # Replace the OS stream wrapper at the boundary, after verification and before the first byte.
+    monkeypatch.setattr(os, "fdopen", before_bytes)
+    assert ConnectionPolicy(files_dir=secrets_dir).resolve(f"file:{target}") == "inside-secret"
+    assert attempted

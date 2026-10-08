@@ -30,6 +30,7 @@ from typing import Any
 from jane_kit.errors import FieldError, JaneError, ValidationFailed
 
 from .client import ResolvedAccount
+from .secret_files import read_secret_file
 
 __all__ = [
     "HOST_PARAMS",
@@ -110,8 +111,8 @@ class ConnectionPolicy:
     def secret_file(self, ref: str) -> Path | None:
         """Resolved path (``..`` and symlinks resolved) of an allowed ``file:`` reference, else ``None``.
 
-        The secret is read from this path, never from the raw reference: a symlink swapped after the check
-        cannot redirect the read outside ``files_dir`` (the same rule as storage and web-collector).
+        The reader must still pin and check every filesystem component before reading this path;
+        resolving a pathname alone does not prevent a later target or parent replacement.
         """
         if self.files_dir is None or not ref.startswith("file:") or not ref[5:]:
             return None
@@ -155,10 +156,7 @@ class ConnectionPolicy:
         path = self.secret_file(ref)  # re-resolved now; the raw reference is never opened
         if path is None:
             return None
-        try:
-            return path.read_text(encoding="utf-8").strip() or None
-        except (OSError, UnicodeDecodeError):
-            return None
+        return read_secret_file(path)
 
 
 def connection_etag(body: Mapping[str, Any]) -> str:

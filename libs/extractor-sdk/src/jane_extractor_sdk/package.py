@@ -39,6 +39,8 @@ MANIFEST_NAME = "jane-package.json"
 PACKAGE_PATH_RE = re.compile(r"^(?!/)(?!.*(^|/)\.\.(/|$))[A-Za-z0-9._/-]{1,300}$")
 SKIP_PARTS = frozenset({"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".git", ".venv"})
 ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
+FILE_ATTR = (stat.S_IFREG | 0o644) << 16
+UNIX = 3
 TEXT_MEDIA_PREFIXES = ("text/",)
 TEXT_MEDIA_TYPES = frozenset(
     {
@@ -89,19 +91,24 @@ def iter_package_files(package_dir: Path) -> Iterator[tuple[str, Path]]:
 
 
 def build_archive(package_dir: Path) -> bytes:
-    """Canonical zip of a package directory: files sorted by path, fixed timestamps and permissions, deflate.
+    """Canonical zip of a package directory - the same bytes, and so the same digest, as the registry.
 
-    The same directory always gives the same bytes (and digest) on Windows and Linux.
+    The algorithm is the one of the registry (``services/registry/README.md``, "Канонічний архів і дайджест"):
+    one entry per regular file (no directory entries, no symlinks), names sorted in ascending byte order,
+    compression method 0 (**stored**: the bytes do not depend on a zlib build), timestamp
+    1980-01-01 00:00:00, ``external_attr = 0o100644 << 16``, ``create_system = 3`` (Unix), no extra fields,
+    no comments. The same directory always gives the same bytes on Windows and Linux.
     """
     if not (package_dir / MANIFEST_NAME).is_file():
         raise PackageError(f"{package_dir}: no {MANIFEST_NAME}")
     buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_STORED) as zf:
+        # iter_package_files sorts by package path; paths are ASCII, so str order = byte order.
         for name, path in iter_package_files(package_dir):
             info = zipfile.ZipInfo(name, date_time=ZIP_EPOCH)
-            info.external_attr = (stat.S_IFREG | 0o644) << 16
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.create_system = 3  # unix, independent of the building OS
+            info.compress_type = zipfile.ZIP_STORED
+            info.external_attr = FILE_ATTR
+            info.create_system = UNIX  # independent of the building OS
             zf.writestr(info, path.read_bytes())
     return buf.getvalue()
 

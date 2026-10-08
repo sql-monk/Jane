@@ -131,6 +131,32 @@ def test_canonical_archive_is_deterministic_and_unpacks(tmp_path: Path) -> None:
     assert load_manifest(tmp_path / "out")["package_id"] == "testsite.product-extractor"
 
 
+def test_canonical_archive_matches_registry_golden_digest(tmp_path: Path) -> None:
+    """``build_archive`` must give the registry's canonical bytes (services/registry/README.md: stored,
+    sorted by bytes, 1980-01-01, 0o100644, Unix, no extra/comment), so ``handler.digest`` computed locally
+    equals the registry digest. The vector and its digest are the registry golden ones; do not update the
+    value casually - it changes every digest of every package."""
+    files = {"jane-package.json": b'{"a": 1}\n', "src/m.py": b"print('x')\n", "B.txt": b"upper"}
+    for name, data in files.items():
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_bytes(data)
+    (tmp_path / "src" / "__pycache__").mkdir()
+    (tmp_path / "src" / "__pycache__" / "m.cpython-312.pyc").write_bytes(b"cache")  # never packed
+    archive = build_archive(tmp_path)
+    assert digest_of(archive) == "sha256:e80692e640c2cb1a1976caaad1ba67460a0af0926012748f85748d15c6a404a0"
+    with zipfile.ZipFile(io.BytesIO(archive)) as zf:
+        infos = zf.infolist()
+        assert [i.filename for i in infos] == ["B.txt", "jane-package.json", "src/m.py"]  # byte order
+        for info in infos:
+            assert info.compress_type == zipfile.ZIP_STORED
+            assert info.compress_size == info.file_size
+            assert info.date_time == (1980, 1, 1, 0, 0, 0)
+            assert info.external_attr >> 16 == 0o100644
+            assert info.create_system == 3
+            assert info.extra == b"" and info.comment == b""
+            assert zf.read(info) == files[info.filename]
+
+
 def _zip(entries: dict[str, bytes], symlink: str | None = None) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:

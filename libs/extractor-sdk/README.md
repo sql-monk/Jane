@@ -53,10 +53,29 @@ def extract(material: Material, params: dict, ctx: Context) -> ExtractResult:
 | `jane_extractor_sdk` | `success`, `empty`, `unrecognized`, `entity`, `Context`, типи `Material`, `ExtractResult`, `EntityOut`, `Diagnostic` |
 | `jane_extractor_sdk.context` | `Context` (`bytes()`, `text()`, `charset()`, `log`, `params`, `test_mode`) |
 | `jane_extractor_sdk.runner` | раннер у пісочниці: `python -I -m jane_extractor_sdk.runner <workdir>`, протокол v1 (опис — docstring модуля), аудит-хук спроб мережі/процесів |
-| `jane_extractor_sdk.package` | `build_archive` (канонічний zip: сортування, фіксовані час і права), `digest_of`, `safe_unpack` (шляхи, симлінки, ліміти), `load_manifest`, `material_from_file/bytes`, `case_input` (вхід тесту маніфесту) |
+| `jane_extractor_sdk.package` | `build_archive` (канонічний zip registry — див. нижче), `digest_of`, `safe_unpack` (шляхи, симлінки, ліміти), `load_manifest`, `material_from_file/bytes`, `case_input` (вхід тесту маніфесту) |
 | `jane_extractor_sdk.entities` | `to_entity_record`, `build_key`, `observation_of` — спільні з runtime |
 | `jane_extractor_sdk.compare` | `compare_output(expected, actual, "exact" | "subset")` → `differences` з JSON Pointer; ігнорує `observation`, `provenance`, `schema` |
 | `jane_extractor_sdk.testing` | `run_local`, `run_package_tests`, `assert_package_tests_pass`, `apply_param_defaults` |
+
+## Канонічний архів і дайджест
+
+`build_archive(<тека пакета>)` збирає **той самий** канонічний zip, що й registry
+([алгоритм](../../services/registry/README.md#канонічний-архів-і-дайджест)), тож `digest_of(build_archive(тека))`
+збігається з `digest` версії в registry і з `handler.digest`, який рахує handler-runtime для локального пакета:
+
+1. один запис на звичайний файл, без записів тек і симлінків (симлінк → `PackageError`); кеші (`__pycache__`,
+   `.pyc`/`.pyo`, `.git`, `.venv`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`) не пакуються;
+2. імена — шляхи пакета, відсортовані за зростанням байтів;
+3. метод **0 (stored, без стиснення)** — байти не залежать від збірки zlib;
+4. час `1980-01-01 00:00:00`, `external_attr = 0o100644 << 16`, `create_system = 3` (Unix), без extra-полів і
+   коментарів;
+5. `digest = "sha256:" + sha256(байти архіву)`.
+
+Незмінність закріплює тест `test_canonical_archive_matches_registry_golden_digest` на тому самому векторі, що
+й `test_canonical_archive_golden_digest` registry. До M3 SDK пакував `deflate`, тому локальні дайджести старих
+збірок не збігалися з registry; для пакетів, опублікованих у registry, нічого не змінюється (registry завжди
+перепаковує канонічно).
 
 ## Тестові утиліти
 

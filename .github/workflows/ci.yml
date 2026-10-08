@@ -71,7 +71,7 @@ jobs:
       - run: uv sync --all-packages --locked
       - run: just contract
 
-  # Admin UI (WP-12). No-op until web/* contains a package.json.
+  # Admin UI (web/admin): pnpm install --frozen-lockfile, lint, typecheck, test, build (scripts/dev.py web).
   web:
     needs: lint
     runs-on: ubuntu-24.04
@@ -86,8 +86,8 @@ jobs:
           version: ${{ env.UV_VERSION }}
       - run: uv run --no-project python scripts/dev.py web
 
-  # Sandbox isolation tests of the handler runtime must run on Linux (plan.md §9).
-  # Placeholder for WP-06: `just isolation` runs tests marked `isolation`; none exist yet.
+  # Sandbox isolation tests of the handler runtime must run on Linux (plan.md §9):
+  # `just isolation` runs the tests marked `isolation` (services/handler-runtime/tests/test_isolation.py).
   isolation:
     needs: unit
     runs-on: ubuntu-24.04

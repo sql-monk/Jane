@@ -1,6 +1,8 @@
 # Розробка Jane
 
 Короткий довідник для людей і агентів. Правила роботи — [CLAUDE.md](CLAUDE.md) і [plan.md](plan.md).
+Відтворювані приклади (каталог, перевірка цін, Telegram) — [examples/README.md](examples/README.md);
+експлуатація (незалежний і спільний запуск, ліміти, оновлення, резервування) — [docs/operations/](docs/operations/README.md).
 
 ## Встановлення
 
@@ -10,7 +12,7 @@
 | just | ≥ 1.40 | `uv tool install rust-just` (або без встановлення: `uvx --from rust-just just <рецепт>`) |
 | Docker | Compose v2 | Docker Desktop (Windows) або Docker Engine (Linux) |
 | gitleaks | ≥ 8.19 | https://github.com/gitleaks/gitleaks — для pre-commit і хука Claude Code |
-| Node.js | 24 (`.node-version`) | лише для `web/*` (WP-12); pnpm — через `corepack enable` |
+| Node.js | 24 (`.node-version`) | лише для адмінки `web/admin`; pnpm — через `corepack enable` |
 
 Далі: `uv sync --all-packages` і `just hooks` (git pre-commit із gitleaks).
 
@@ -51,8 +53,10 @@
 ## CI
 
 `.github/workflows/ci.yml`, Linux runner: `lint` (ruff, mypy, gitleaks) → `unit` → `contract`; паралельно
-`web` (no-op до WP-12) та `isolation` (місце для тестів ізоляції WP-06, plan.md §9); `stack` — повний стек і
-інтеграційні тести (на `main`, PR і вручну).
+`web` (адмінка: install, lint, typecheck, test, build) та `isolation` (тести ізоляції пісочниці, plan.md §9);
+`stack` — повний стек і інтеграційні тести, `adapters` — адаптери storage на SQL Server, MongoDB, MinIO, S3
+(на `main`, PR і вручну); `e2e` — приймальні сценарії (на `main` і вручну); `limits` — вимірювання профілю `ci`
+(лише вручну, `gh workflow run ci --ref <гілка>`).
 
 ## Хуки Claude Code
 
@@ -63,11 +67,11 @@ prettier для `web/**`, м'яко), нагадування про звіт. Д
 
 ## Вебзастосунки (`web/*`)
 
-Базова конфігурація для WP-12; сам застосунок створює WP-12.
+Адмінка — [`web/admin`](web/admin/README.md) (запуск на моках і на реальному стеку, команди, e2e). Спільна конфігурація:
 
 - Кожен `web/<app>` — окремий pnpm-проєкт зі своїм `pnpm-lock.yaml` (корінь не є pnpm-workspace, тож WP-12
   не змінює кореневих файлів). pnpm фіксується полем `"packageManager": "pnpm@11.27.1"` у `package.json`.
 - TypeScript: `"extends": "../../tsconfig.base.json"` ([tsconfig.base.json](tsconfig.base.json)).
 - Prettier: конфігурація [`.prettierrc.json`](.prettierrc.json) у корені; prettier — devDependency застосунку.
-- `just web` і CI запускають `pnpm install --frozen-lockfile` і скрипти `lint`, `typecheck`, `test` (якщо є).
+- `just web` і CI запускають `pnpm install --frozen-lockfile` і скрипти `lint`, `typecheck`, `test`, `build` (якщо є).
 - API-клієнти генеруються з `contracts/` у `src/api/generated/` (виключено з prettier).

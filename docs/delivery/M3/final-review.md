@@ -73,6 +73,7 @@ B1, B2; решта (пакет уточнень контрактів через 
 | M3 should-fix | `wp/m3-should-fix` | SDK-архів, keep-alive, політика адрес Web Collector, TOCTOU, порт llm; source_id/stored_object_id повторної обробки | Прийнято, злито `69ab303`; C-1 підтвердив |
 | WP-12d | `wp/12d2-real-reprocessing` | S-M2-10: адмінка на реальному API | Прийнято, злито `bf69429`; C-1 підтвердив із неблокувальним C-W2 |
 | WP-06c | `wp/06c-oom-classification` | OOM: SIGKILL за memory limit без OOMKilled | Прийнято, злито `041e20d`; C-1 підтвердив розрізнення evidence sigkill/oom_killed |
+| WP-06d | `wp/06d-async-network-test` | Windows network sandbox test очікує кінцеву job після дозволеного 202 | Прийнято, злито `3e13f68`; незалежне рев'ю r1 accepted, два адресні прогони по 2 passed, assertions збережено; [звіт](../WP-06.md#wp-06d--network-violation-тест-із-дозволеним-202-2026-10-09) |
 
 [Фінальне рев'ю дельти C-1](final-review-delta.md) опубліковано `22ce98e`: нових блокерів M3 немає.
 Після B2 залишаються B-7/B-8 (один real-прогін адмінки на зведеній ревізії), відтворення C-2,

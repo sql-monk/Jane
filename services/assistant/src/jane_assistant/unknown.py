@@ -7,7 +7,10 @@ again and refuses (403 ``access_denied_by_policy``) *before* any LLM call when i
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+
+import httpx
 
 from jane_kit.errors import JaneError
 
@@ -20,6 +23,8 @@ from .settings import ServiceLimits, Settings
 __all__ = ["FlagOff", "run_unknown"]
 
 NAVIGATION_TYPES = {"category", "listing", "news_list", "sitemap", "feed", "index", "search"}
+
+log = logging.getLogger(__name__)
 
 
 class FlagOff(JaneError):
@@ -58,12 +63,19 @@ async def run_unknown(
         }
     mtype, conf = str(out["material_type"]), float(out["confidence"])
     entity_types = sorted({str(t) for t in out.get("entity_types") or []})
+    # The source's expected entity types only refine the suggestion (the assistant works without the
+    # orchestrator): an error answer or an orchestrator still unreachable after the client's retries
+    # (transport errors) leaves them unknown instead of failing the analysis the LLM was already paid for.
     expected: set[str] | None = None
     if nb.orchestrator.configured:
         try:
             source = await nb.orchestrator.get_source(req["source_id"])
             expected = set(source.get("expected_entity_types") or [])
-        except (RemoteError, JaneError):
+        except (RemoteError, JaneError, httpx.HTTPError) as exc:
+            log.warning(
+                "expected entity types not read from the orchestrator",
+                extra={"source_id": req["source_id"], "error": f"{type(exc).__name__}: {exc}"},
+            )
             expected = None
     if conf < limits.unknown.min_confidence or not (out.get("relevant") or out.get("navigation")):
         action, details = "none", f"{mtype} (confidence {conf:.2f}) is not worth a handler"

@@ -115,9 +115,18 @@ class RegistryLimits(Limits):
         )
 
 
+class FakeProviderLimits(Limits):
+    """The deterministic test provider ``fake`` (internal, not in ``limits.schema.json``)."""
+
+    max_delay_ms: int = Field(default=30_000, ge=0)
+    """Upper bound of the delay a ``fake`` connection asks for (``params.delay_ms``,
+    ``params.responses[].delay_ms``); a longer delay is shortened to it, ``0`` turns delays off."""
+
+
 class ServiceLimits(Limits):
     llm: LlmLimits = LlmLimits()
     gateway: GatewayLimits = GatewayLimits()
+    fake: FakeProviderLimits = FakeProviderLimits()
     provider: ClientLimits = ClientLimits(
         request_timeout_ms=120_000, retries=RetryPolicy(max_attempts=2, initial_backoff_ms=500)
     )

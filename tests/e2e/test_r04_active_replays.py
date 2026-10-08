@@ -24,23 +24,31 @@ The window of "work still running" is made deterministic, never guessed with sle
   a blob whose ``download_url`` is a *gate* of the ``package-host`` stand-in (``jane_e2e.active.Gate``): the
   service is inside its work while the gate holds its download, and the gate counts downloads;
 * registry - ``docker pause`` of MinIO, where the registry stores archives: a port job and a publication cannot
-  finish until it is unpaused.
+  finish until it is unpaused;
+* LLM gateway (``/v1/completions``) and assistant (onboarding and improvement jobs, WP-13s) - the provider
+  ``fake`` holds its answer for ``params.delay_ms`` of its connection (WP-10): a connection and provider of this
+  run (for the assistant: its model aliases ``cheap``/``strong`` point at them while the replays are sent). The
+  provider call is observed to have started by the gateway's log record ``fake provider holds its answer`` with
+  the connection id of the run; the replays are sent only then.
 
 Substitutes (**З**): the recorded Telegram backend, the LLM provider ``fake``, the gate standing in for the blob
-store behind ``download_url``. Not covered here (no mechanism holds the work without changing other components,
-see docs/delivery/WP-13.md, "WP-13r"): ``/v1/completions`` of the LLM gateway and the onboarding/improvement jobs
-of the assistant - the fake provider answers at once.
+store behind ``download_url``, the static web search of the assistant. The onboarding and improvement scenarios run
+on their own stack with the real registry everywhere (``jane_e2e.assistant.assistant_flows``), as S-M2-06/07.
 
 Operational observations outside the contracts: Docker labels of runtime sandboxes (``io.jane.invocation-id``,
-``io.jane.package``, ``io.jane.e2e-project``) and the gate counters of the stand-in.
+``io.jane.package``, ``io.jane.e2e-project``), the gate counters of the stand-in and the hold records of the fake
+LLM provider in the gateway's JSON log.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import os
-from collections.abc import Callable
+import time
+from collections.abc import Callable, Iterator
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -49,7 +57,8 @@ import httpx
 import pytest
 
 from jane_e2e.active import gate, package_ref, wait_for
-from jane_e2e.clients import TERMINAL_JOB_STATES, JaneClient
+from jane_e2e.assistant import Flows, assistant_flows, note, prepare_improvable
+from jane_e2e.clients import CONTRACTS, TERMINAL_JOB_STATES, JaneClient, spec
 from jane_e2e.materials import delivery_key, fetch_page, standin_web_material
 from jane_e2e.orchestration import TESTSITE, create_source, create_task, list_items, m1_task, wait_run
 from jane_e2e.registry import (
@@ -66,6 +75,7 @@ from jane_e2e.stack import SANDBOX_PROJECT_LABEL, E2EStack
 from jane_e2e.steps import sandbox_limits
 from jane_e2e.verify import assert_effects_once, entities, objects_by_source
 from jane_extractor_sdk.package import build_archive
+from jane_llm.providers.fake import HOLD_LOG_MESSAGE  # type: ignore[import-untyped]
 from jane_telegram_collector.recorded import Recording  # type: ignore[import-untyped]
 
 pytestmark = [pytest.mark.e2e, pytest.mark.milestone("M2"), pytest.mark.criteria(8)]
@@ -84,6 +94,14 @@ TELEGRAM_PACING_MS = 1000
 INVOCATION_LABEL = "io.jane.invocation-id"
 PACKAGE_LABEL = "io.jane.package"
 REPLAYED = "Idempotency-Replayed"
+# How long the fake LLM provider holds one answer (``params.delay_ms`` of the run's connection): the replays are sent
+# while it holds (window, not a timing). Within the gateway's ``fake.max_delay_ms`` (30 s by default) and below the
+# assistant's request timeout to the gateway (30 s by default).
+LLM_DELAY_MS = int(os.environ.get("JANE_E2E_R04_LLM_DELAY_MS", "10000"))
+# Upper bound of the onboarding and improvement jobs (sampling, generation, tests in the runtime, publication).
+ASSISTANT_WAIT_S = float(os.environ.get("JANE_E2E_R04_ASSISTANT_WAIT_S", "900"))
+ASSISTANT_ALIASES = ("cheap", "strong")  # the assistant's models (tests/e2e/config/llm-seed.yaml)
+ONBOARDING_RUNNING = frozenset({"resolving", "sampling", "analyzing", "applying"})
 
 
 # ---------------------------------------------------------------------------- assertions
@@ -168,6 +186,98 @@ class Sandboxes:
             return sorted(new)[0] if new else None
 
         return wait_for("slow extraction running in a sandbox", fresh, WAIT_S, poll_s=0.2)
+
+
+class HeldCalls:
+    """Calls of the fake LLM provider through one connection of this run that started holding their answer
+    (``params.delay_ms``), as the gateway logs them: JSON record ``HOLD_LOG_MESSAGE`` with ``connection_id``."""
+
+    def __init__(self, stack: E2EStack, connection_id: str) -> None:
+        self.stack = stack
+        self.connection_id = connection_id
+        self.started = time.monotonic()
+
+    def count(self) -> int:
+        # The connection id is unique to this run, so a generous log window cannot pick up foreign records.
+        window = f"{int(time.monotonic() - self.started) + 120}s"
+        held = 0
+        for line in self.stack.logs("llm", echo=False, since=window).splitlines():
+            if self.connection_id not in line or HOLD_LOG_MESSAGE not in line:
+                continue
+            try:
+                record = json.loads(line[line.index("{") :])
+            except ValueError:
+                continue
+            if record.get("msg") == HOLD_LOG_MESSAGE and record.get("connection_id") == self.connection_id:
+                held += 1
+        return held
+
+    def wait(self, count: int = 1) -> int:
+        """Wait until ``count`` provider calls hold their answer (the caller's work is inside the LLM call)."""
+
+        def started() -> int | None:
+            held = self.count()
+            return held if held >= count else None
+
+        return wait_for(
+            f"{count} held call(s) of fake connection {self.connection_id}", started, WAIT_S, 0.25
+        )
+
+
+def stored(response: httpx.Response) -> dict[str, Any]:
+    assert response.status_code in {200, 201}, response.text
+    return dict(response.json())
+
+
+def slow_fake(llm: JaneClient, name: str, *, like: str | None = None) -> str:
+    """Connection and provider ``name`` (kind ``fake``) whose every answer is held ``LLM_DELAY_MS``; ``like`` copies
+    the models, prices and scripted answers of that provider. Returns the provider id. Connections are the shared
+    ``handler.v1`` path items of the gateway, providers ``llm.v1``."""
+    api, connections = llm.api("llm"), llm.api("handler")
+    params: dict[str, Any] = {"provider": "fake"}
+    provider: dict[str, Any] = {
+        "kind": "fake",
+        "enabled": True,
+        "models": [
+            {
+                "model_id": "fake-deterministic-1",
+                "max_context_tokens": 128000,
+                "supports_structured_output": True,
+                "pricing": {"input_per_mtok": 1, "output_per_mtok": 4, "currency": "USD"},
+            }
+        ],
+    }
+    if like is not None:
+        provider = stored(api.get(f"/v1/providers/{like}"))
+        params = dict(stored(connections.get(f"/v1/connections/{provider['connection_id']}"))["params"])
+    connection = {
+        "connection_id": name,
+        "kind": "llm_provider",
+        "title": f"e2e R-04: fake answers held {LLM_DELAY_MS} ms",
+        "params": {**params, "delay_ms": LLM_DELAY_MS},
+    }
+    stored(connections.put(f"/v1/connections/{name}", json=connection))
+    stored(api.put(f"/v1/providers/{name}", json={**provider, "provider_id": name, "connection_id": name}))
+    return name
+
+
+@contextmanager
+def assistant_models_held(stack: E2EStack, llm: JaneClient, name: str) -> Iterator[HeldCalls]:
+    """Inside: the assistant's model aliases point at ``slow_fake(name, like=<their provider>)`` - the same scripted
+    answers, held. On exit the aliases point back, so the rest of the job runs at the usual pace."""
+    api = llm.api("llm")
+    listed = stored(api.get("/v1/model-aliases"))["items"]
+    aliases = {a["alias"]: dict(a) for a in listed if a["alias"] in ASSISTANT_ALIASES}
+    assert set(aliases) == set(ASSISTANT_ALIASES), listed
+    (provider_id,) = {a["provider_id"] for a in aliases.values()}
+    slow_fake(llm, name, like=provider_id)
+    try:
+        for alias, doc in aliases.items():
+            stored(api.put(f"/v1/model-aliases/{alias}", json={**doc, "provider_id": name}))
+        yield HeldCalls(stack, name)
+    finally:
+        for alias, doc in aliases.items():
+            stored(api.put(f"/v1/model-aliases/{alias}", json=doc))
 
 
 # ---------------------------------------------------------------------------- Telegram Collector
@@ -446,6 +556,84 @@ def test_r_04_llm_replay_while_invocation_is_running(
     assert held.status()["requests"] == 1, held.status()
 
 
+PROBLEM_SCHEMA = (CONTRACTS.parent / "schemas" / "common" / "problem.schema.json").as_uri() + "#"
+PAGE_TYPE_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["page_type"],
+    "properties": {"page_type": {"type": "string", "enum": ["product", "category", "article", "other"]}},
+}
+
+
+@pytest.mark.parametrize("mode", ["sync", "async"])
+def test_r_04_llm_completion_replay_while_provider_call_is_running(
+    stack: E2EStack, require: Callable[..., None], client: Callable[..., JaneClient], run_id: str, mode: str
+) -> None:
+    require("llm")
+    llm = client("llm")
+    api = llm.api("llm")
+    name = task_id = f"r04-completion-{mode}-{run_id}"
+    held = HeldCalls(stack, slow_fake(llm, name))
+    body: dict[str, Any] = {
+        "model": f"{name}/fake-deterministic-1",
+        "instructions": "Classify the page type.",
+        "data": [{"name": "page", "media_type": "text/plain", "text": "Phone Alpha, 299.00 UAH, in stock"}],
+        "output_schema": PAGE_TYPE_SCHEMA,
+        "max_output_tokens": 64,
+        "scope": {"purpose": "other", "task_id": task_id},
+        "mode": mode,
+    }
+    headers = {"Idempotency-Key": f"r04-completion-{mode}-{run_id}"}
+    other = {**body, "instructions": "Classify the page type of another page."}
+    if mode == "sync":
+        with ThreadPoolExecutor(1) as pool:
+            first_api = client("llm").api("llm")
+            pending = pool.submit(first_api.post, "/v1/completions", json=body, headers=headers)
+            held.wait()  # the provider holds the answer of the first call: its key is in progress
+            # llm.v1 lists no 409 for POST /v1/completions, although the IdempotencyKey convention (common.yaml)
+            # and contracts/docs/errors.md define it (contract gap, docs/delivery/WP-13.md "WP-13s"): the replay
+            # goes past the contract client and its body is checked against the Problem schema.
+            busy = llm.http.post("/v1/completions", json=body, headers=headers)
+            spec("llm").validate_at(PROBLEM_SCHEMA, busy.json(), "409 of POST /v1/completions")
+            assert_in_progress(busy)
+            assert_key_reused(api.post("/v1/completions", json=other, headers=headers))
+            assert not pending.done(), "the completion ended before the replays"
+            assert llm_usage(llm, task_id)["totals"]["requests"] == 0
+            first = pending.result(timeout=WAIT_S)
+        assert first.status_code == 200, first.text
+        result = first.json()
+    else:
+        first = api.post("/v1/completions", json=body, headers=headers)
+        assert first.status_code == 202, first.text
+        job_id = first.json()["job_id"]
+        held.wait()
+        assert_replayed(api.post("/v1/completions", json=body, headers=headers), first)
+        assert_key_reused(api.post("/v1/completions", json=other, headers=headers))
+        assert job_status(llm, "llm", job_id) == "running"
+        assert llm_usage(llm, task_id)["totals"]["requests"] == 0
+        job = llm.wait_job("llm", job_id, timeout_s=WAIT_S)
+        assert job["status"] == "succeeded", job
+        result = job["result"]
+
+    assert result["valid"] is True, result
+    usage = llm_usage(llm, task_id)
+    assert usage["totals"]["requests"] == 1, usage
+    after = api.post("/v1/completions", json=body, headers=headers)
+    if mode == "sync":
+        assert after.status_code == 200, after.text
+        assert after.headers.get(REPLAYED) == "true"
+        assert after.json() == result
+    else:
+        assert_replayed(after, first)
+        assert llm.wait_job("llm", job_id)["result"]["completion_id"] == result["completion_id"]
+    assert llm_usage(llm, task_id) == usage
+    calls = held.count()
+    print(
+        f"\nR-04 LLM completion {mode}: {result['completion_id']}, held calls {calls}, usage {usage['totals']}"
+    )
+    assert calls == 1, "a replay reached the provider"
+
+
 # ---------------------------------------------------------------------------- registry
 def test_r_04_registry_replay_while_port_job_and_publication_are_running(
     stack: E2EStack, require: Callable[..., None], client: Callable[..., JaneClient], run_id: str
@@ -537,8 +725,9 @@ def test_r_04_registry_replay_while_port_job_and_publication_are_running(
 def test_r_04_assistant_replay_while_unknown_material_job_is_running(
     stack: E2EStack, require: Callable[..., None], client: Callable[..., JaneClient], run_id: str
 ) -> None:
-    # The orchestrator runs because the assistant is configured with it: unreachable, it fails the job after the
-    # LLM call (httpx.ConnectError escapes run_unknown) - a defect outside R-04, docs/delivery/WP-13.md "WP-13r".
+    # The orchestrator runs because the assistant is configured with it (it reads the source's expected entity
+    # types). Unreachable, it once failed the job after the paid LLM call - fixed in WP-13s (unit test
+    # services/assistant/tests/test_unknown.py), docs/delivery/WP-13.md "WP-13r", "WP-13s".
     require("testsite", "llm", "assistant", "package-host", "orchestrator")
     assistant, llm = client("assistant"), client("llm")
     api = assistant.api("assistant")
@@ -656,3 +845,137 @@ def test_r_04_orchestrator_replay_while_run_and_reprocessing_are_active(
     # one history event from the run and one from the single reprocessing run; the RAW is stored once
     assert product["version"] == 2, product
     assert len(objects_by_source(storage, "raw-files", source_id)) == 1
+
+
+# ---------------------------------------------------------------------------- assistant: onboarding, improvement
+@pytest.fixture(scope="module")
+def assistant_stack(stack: E2EStack) -> Iterator[Flows]:
+    """The S-M2-06/07 stack (assistant, LLM, registry, Web Collector, runtime, orchestrator, storage; the real
+    registry everywhere) under its own compose project, removed at the end of the module. ``stack`` (session) only
+    checks Docker here."""
+    with assistant_flows("r04", label="R-04") as own:
+        yield own
+
+
+def onboarding_session(assistant: JaneClient, session_id: str) -> dict[str, Any]:
+    r = assistant.api("assistant").get(f"/v1/onboarding-sessions/{session_id}")
+    assert r.status_code == 200, r.text
+    return dict(r.json())
+
+
+def purpose_usage(llm: JaneClient, purpose: str) -> tuple[int, float]:
+    """``(requests, cost)`` of the whole platform for one ``scope.purpose``."""
+    r = llm.api("llm").get("/v1/usage", params={"group_by": "purpose"})
+    assert r.status_code == 200, r.text
+    rows = [row for row in r.json()["items"] if row.get("purpose") == purpose]
+    return sum(int(row["requests"]) for row in rows), sum(float(row["cost"]["amount"]) for row in rows)
+
+
+def source_usage(llm: JaneClient, source_id: str) -> tuple[int, float]:
+    r = llm.api("llm").get("/v1/usage", params={"scope_type": "source", "scope_id": source_id})
+    assert r.status_code == 200, r.text
+    totals = r.json()["totals"]
+    return int(totals["requests"]), float(totals["cost"]["amount"])
+
+
+def registry_versions(registry: JaneClient, package_id: str) -> list[str]:
+    r = registry.api("registry").get(f"/v1/packages/{package_id}/versions", params={"limit": 100})
+    assert r.status_code == 200, r.text
+    assert r.json()["next_cursor"] is None, r.json()
+    return sorted(v["version"] for v in r.json()["items"])
+
+
+def test_r_04_assistant_replay_while_onboarding_job_is_running(assistant_stack: Flows, run_id: str) -> None:
+    flows = assistant_stack
+    assistant, llm = flows["assistant"], flows["llm"]
+    api = assistant.api("assistant")
+    body: dict[str, Any] = {
+        "query": f"{TESTSITE}/"
+    }  # an exact link: one certain candidate, straight to sampling
+    headers = {"Idempotency-Key": f"r04-onboarding-{run_id}"}
+    before = purpose_usage(llm, "onboarding")
+    with assistant_models_held(flows.stack, llm, f"r04-onboarding-{run_id}") as held:
+        first = api.post("/v1/onboarding-sessions", json=body, headers=headers)
+        assert first.status_code == 202, first.text
+        job_id, session_id = first.json()["job_id"], first.json()["labels"]["session_id"]
+        held.wait()  # an LLM call of the job (sampling) holds its answer
+        assert_replayed(api.post("/v1/onboarding-sessions", json=body, headers=headers), first)
+        assert_key_reused(
+            api.post("/v1/onboarding-sessions", json={**body, "auto_activation": True}, headers=headers)
+        )
+        assert job_status(assistant, "assistant", job_id) == "running"
+        during = onboarding_session(assistant, session_id)
+        assert during["status"] in ONBOARDING_RUNNING and during["job_id"] == job_id, during
+        assert purpose_usage(llm, "onboarding") == before  # the held call has not been paid for yet
+
+    job = assistant.wait_job("assistant", job_id, timeout_s=ASSISTANT_WAIT_S)
+    assert job["status"] == "succeeded", job
+    session = onboarding_session(assistant, session_id)
+    assert session["status"] == "proposals_ready", session
+    assert session["job_id"] == job_id
+    assert_replayed(api.post("/v1/onboarding-sessions", json=body, headers=headers), first)
+    requests, cost = purpose_usage(llm, "onboarding")
+    note(
+        "R-04",
+        "onboarding replayed during sampling",
+        {
+            "status": during["status"],
+            "held_calls": held.count(),
+            "llm_requests": requests - before[0],
+            "llm_cost": round(cost - before[1], 6),
+            "session_costs": session["costs"],
+        },
+    )
+    # The LLM work of exactly one onboarding was paid for: what the session itself accounts for.
+    assert requests > before[0]
+    assert cost - before[1] == pytest.approx(session["costs"]["amount"], abs=1e-5)
+    assert purpose_usage(llm, "onboarding") == (requests, cost)
+    assert held.count() >= 1
+
+
+def test_r_04_assistant_replay_while_improvement_job_is_running(assistant_stack: Flows, run_id: str) -> None:
+    flows = assistant_stack
+    assistant, llm, registry = flows["assistant"], flows["llm"], flows["registry"]
+    api = assistant.api("assistant")
+    case = prepare_improvable(flows, f"e2e-r04-{run_id}", "R-04")
+    body = case.request
+    headers = {"Idempotency-Key": f"r04-improvement-{run_id}"}
+    other = {**body, "policy": {**body["policy"], "approval": "manual"}}
+    before = source_usage(llm, case.source_id)
+    with assistant_models_held(flows.stack, llm, f"r04-improvement-{run_id}") as held:
+        first = api.post("/v1/improvement-runs", json=body, headers=headers)
+        assert first.status_code == 202, first.text
+        job_id = first.json()["job_id"]
+        held.wait()  # the "improve" call of the job holds its answer
+        assert_replayed(api.post("/v1/improvement-runs", json=body, headers=headers), first)
+        assert_key_reused(api.post("/v1/improvement-runs", json=other, headers=headers))
+        assert job_status(assistant, "assistant", job_id) == "running"
+        assert source_usage(llm, case.source_id) == before  # the held call has not been paid for yet
+        assert registry_versions(registry, case.package_id) == ["1.0.0"]
+
+    job = assistant.wait_job("assistant", job_id, timeout_s=ASSISTANT_WAIT_S)
+    assert job["status"] == "succeeded", job
+    result = job["result"]
+    assert result["outcome"] == "new_version" and result["activated"] is True, result
+    assert result["attempts"] == 1, result
+    assert (result["version"]["package_id"], result["version"]["version"]) == (case.package_id, "1.1.0"), (
+        result
+    )
+    assert_replayed(api.post("/v1/improvement-runs", json=body, headers=headers), first)
+    requests, cost = source_usage(llm, case.source_id)
+    note(
+        "R-04",
+        "improvement replayed during the improve call",
+        {
+            "held_calls": held.count(),
+            "llm_requests": requests - before[0],
+            "llm_cost": round(cost - before[1], 6),
+            "result_costs": result["costs"],
+            "version": result["version"]["version"],
+        },
+    )
+    assert requests - before[0] == 1  # one improve call: neither replay started another one
+    assert cost - before[1] == pytest.approx(result["costs"]["amount"], abs=1e-5)
+    assert source_usage(llm, case.source_id) == (requests, cost)
+    assert registry_versions(registry, case.package_id) == ["1.0.0", "1.1.0"]  # published once
+    assert held.count() == 1

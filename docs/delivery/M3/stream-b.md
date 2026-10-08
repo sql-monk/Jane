@@ -10,10 +10,19 @@
 |---|---|---|---|
 | WP-13s | `wp/13s-r04-completions`, `892a2e1` | **accepted, злито `86cdece`** | незалежне review 1 accepted; [CI 37847417132](https://github.com/sql-monk/Jane/actions/runs/37847417132) на `fcf798c`: 12/12 success, e2e 75 passed, 4 нові PASSED, 0 skipped/xfail/failed; `892a2e1` лише доповнює звіт |
 | WP-14d | `wp/14d-docs-entrypoints`, `467bf84` | **accepted, злито `0507ef9`** | незалежне review 1 accepted; повний [CI 37819395884](https://github.com/sql-monk/Jane/actions/runs/37819395884) на `f21947f`: 12/12, e2e 62 passed; push [CI 37848025370](https://github.com/sql-monk/Jane/actions/runs/37848025370) на `359eb0d`: success, нові offline-тести 83 passed; `467bf84` лише доповнює звіт |
-| M3 should-fix | `wp/m3-should-fix` | active, виправлення review 1 | review на `3b45a7b`: changes requested — TOCTOU resolved target/parent і неоднозначний RAW id; TOCTOU виправлено локально `c07d91a`, другий пункт у роботі; потрібні новий full CI і review 2 |
+| M3 should-fix | `wp/m3-should-fix`, код `aa2b974`, звіт `8718dd2` | **accepted, злито `69ab303`** | незалежне review 2 accepted; [CI 37853233033](https://github.com/sql-monk/Jane/actions/runs/37853233033): lint/types, unit, contract, web, isolation success; розширену частину зупинено за уточненим дорученням користувача; фінальний повний gate — A |
 | WP-12d | `wp/12d2-real-reprocessing`, `d5d8efc` | виправлення review 1 готові; очікує should-fix | [CI 37850908072](https://github.com/sql-monk/Jane/actions/runs/37850908072) success, включно з новим `web-mock-e2e`; mock 29 passed/14 skipped; 9 real completed (8 успішних + очікуваний WP-09 failure); остаточне review 2 після зняття `test.fail` і real-перевірки WP-09 |
 
-Прийнято й опубліковано 2 із 4 інкрементів потоку B. Фінальний gate M3 ще не виконаний.
+Прийнято й опубліковано 3 із 4 інкрементів потоку B. Фінальний gate M3 ще не виконаний.
+
+## Уточнення користувача щодо мінімальних gates
+
+2026-10-09 користувач прямо доручив скоротити рев'ю й тести до необхідного мінімуму та завершити головне.
+Після незалежного підтвердження двох виправлень should-fix і success необхідних CI job не очікуємо
+branch full e2e/stack/adapters/limits. Запуск 37853233033 зупинено; його загальний статус `cancelled`, а не
+`success`. Повний gate зведеної ревізії залишається потоку A. Для фінальної дельти WP-12d (зняття одного
+`test.fail` без зміни assert + звіт) достатньо одного real-сценарію на прийнятому backend і перевірки логу/дельти
+рецензентом; повторні mock/real suites та новий повний CI цієї дельти не потрібні.
 
 ## Журнал
 
@@ -39,6 +48,14 @@
   для LLM/Telegram) і довільний останній RAW id за двох копій одного observation. Автор виправляє обидва;
   CI 37850604947 на `3b45a7b` не є фінальним доказом після цих виправлень. Решта адресних перевірок
   рецензента: 67 passed/4 deselected та 3 integration passed/0 skipped; власність 26/0.
+- **Should-fix review 2 — accepted, код `aa2b974`; злиття `69ab303` опубліковано в origin.** Обидва findings
+  закриті: власні 4 TOCTOU підміни рецензента повертають `None`; Windows 19 passed/2 deselected;
+  Linux 10 filesystem-перевірок/0 skipped. RAW-репро: collect/sample id `None`, ambiguity `True`, порушення
+  storage-контракту `[]`; PostgreSQL-набір 10 passed/0 skipped (72.97 с), міграції 3/4 → 5. CI на точному
+  `aa2b974`: lint/types/secret scan, unit, contract, web, isolation success; unit `857 passed, 5 skipped,
+  326 deselected in 268.62s`. Загальний CI скасовано після цих gates за уточненням користувача.
+  Документальний підсумок `8718dd2` коду не змінює. Злиття поверх прийнятого B1 потоку A — без конфліктів;
+  зміни потоку A збережені. Власність дельти B: 28 файлів, 0 поза делегованими областями.
 
 ## Межі й відкриті запити
 

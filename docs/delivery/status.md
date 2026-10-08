@@ -720,3 +720,13 @@ R-04/R-06, S-M2-10, WP-14 `dev-laptop` ×3 на вільному хості та
   в таблиці тестів `services/llm/README.md` з WP-13s; llm+assistant+jane-kit content 166 passed після злиття).
   Повний CI на зведеній інтеграційній ревізії (13r, 13t, 14d, 13s, B1): 37853683903.
 
+## Три потоки (2026-10-09)
+
+Рішення людини: додано третього координатора. **Потік B** (Codex) завершив першу чергу (4/4, [M3/stream-b.md](M3/stream-b.md))
+і веде другу — [HANDOFF-2026-10-09-stream-b-2.md](HANDOFF-2026-10-09-stream-b-2.md). **Потік C** —
+[HANDOFF-2026-10-09-stream-c.md](HANDOFF-2026-10-09-stream-c.md): фінальне рев'ю дельти злитих змін (крім B2) і
+повторне відтворення з чистого клону після B2; журнал `M3/stream-c.md`, злиття з worktree `.claude/worktrees/integ-c`.
+**Потік A**: B2, фінальний CI, «Фінальна ревізія» в матриці, цей файл. Checkout потоку A перенесено в
+`.claude/worktrees/integ-a` (попередній `C:\Users\aleks\.codex\worktrees\fix-agent-hooks-ci\Jane` прибрано Codex;
+усі коміти були запушені, втрат немає).
+

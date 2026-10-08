@@ -93,9 +93,14 @@ class ConnectionPolicy:
     def api_base_error(self, api_base: Any) -> str | None:
         if api_base is None:
             return None
-        if not isinstance(api_base, str) or origin(api_base) not in self._origins:
-            return f"api_base must be one of the allowed origins {sorted(self._origins)}"
-        return None
+        allowed = f"api_base must be one of the allowed origins {sorted(self._origins)}"
+        if not isinstance(api_base, str):
+            return allowed
+        try:
+            parsed = origin(api_base)
+        except ValueError:  # bad port ("…:99999", "…:abc") or bracket: a validation error, not a 500
+            return f"api_base is not a valid URL; {allowed}"
+        return None if parsed in self._origins else allowed
 
     def violations(self, doc: dict[str, Any]) -> list[FieldError]:
         errors = []

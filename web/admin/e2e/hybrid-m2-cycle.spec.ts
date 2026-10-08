@@ -1,12 +1,17 @@
-import { readFileSync } from "node:fs";
 import path from "node:path";
 import { captureRequest, expect, realServiceUrl, test } from "./fixtures";
 import {
   TESTSITE_URL as site,
   jsonRequest,
   publishExtractorPackage,
+  approvePackage,
+  htmlMaterial,
   publishTestsiteRules,
+  runItems,
+  storageInvoke,
+  syncStorageConnections,
   uniqueId,
+  waitRun,
 } from "./seed";
 
 const repo = path.resolve(import.meta.dirname, "..", "..", "..");
@@ -81,17 +86,7 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
   expect(createdSource.body["collector_rules"]).toEqual({ package_id: rulesId, version: "1.0.0" });
   await expect(admin).toHaveURL(new RegExp(`/sources/${sourceId}$`));
 
-  const connections = JSON.parse(
-    readFileSync(path.join(repo, "infra", "config", "storage-connections.json"), "utf8"),
-  ) as { connections: Array<Record<string, unknown> & { connection_id: string }> };
-  for (const connection of connections.connections)
-    await jsonRequest(
-      request,
-      "put",
-      `${orchestratorUrl}/v1/connections/${connection.connection_id}`,
-      connection,
-      [200, 201],
-    );
+  await syncStorageConnections(request, orchestratorUrl);
 
   const task = {
     task_id: taskId,
@@ -143,28 +138,129 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
   expect(started.request.headers()["idempotency-key"]).toBeTruthy();
   await expect(admin).toHaveURL(/\/runs\/run_/);
   const runId = admin.url().split("/").at(-1) as string;
-  await expect
-    .poll(
-      async () => {
-        const run = await jsonRequest(request, "get", `${orchestratorUrl}/v1/runs/${runId}`);
-        return run["status"];
-      },
-      { timeout: 180_000 },
-    )
-    .toBe("succeeded");
+  const run = await waitRun(request, orchestratorUrl, runId);
+  expect(run["status"], JSON.stringify(run)).toBe("succeeded");
+  const extracted = (await runItems(request, orchestratorUrl, runId)).filter(
+    (i) => i.stage_id === "extract-products",
+  );
+  expect(extracted.map((i) => i.result_status)).toEqual(["success"]);
+  const materialId = extracted[0]?.material_id as string;
+  const observationId = extracted[0]?.observation_id as string;
   await admin.reload();
   await expect(admin.getByRole("table", { name: "Прогрес етапів" })).toContainText("store-raw");
   await admin.getByRole("tab", { name: "Елементи й помилки" }).click();
   await admin.getByLabel("Стан елемента").selectOption("");
-  await expect(admin.getByRole("table", { name: "Елементи запуску" })).toContainText("extract-products");
+  const runItemsTable = admin.getByRole("table", { name: "Елементи запуску" });
+  await expect(runItemsTable).toContainText("extract-products");
+  // trace link of a run item -> every stage of the material in this run, with package versions and outputs
+  await runItemsTable
+    .getByRole("row", { name: /extract-products/ })
+    .getByRole("link", { name: materialId })
+    .click();
+  await expect(admin.getByRole("heading", { name: `Простежуваність ${materialId}` })).toBeVisible();
+  const traced = admin.getByRole("table", { name: `Етапи ${observationId} (${runId})` });
+  await expect(traced.getByRole("row", { name: /store-raw/ })).toContainText("jane.storage-files@1.0.0");
+  await expect(traced.getByRole("row", { name: /store-raw/ })).toContainText("stored_object");
+  await expect(traced.getByRole("row", { name: /extract-products/ })).toContainText(
+    `${extractor.package_id}@${extractor.version}`,
+  );
+  await expect(traced.getByRole("row", { name: /store-products/ })).toContainText("results-pg");
+  await admin.goto(`/runs/${runId}`);
   await admin.getByRole("tab", { name: "Помилки колектора" }).click();
   await expect(admin.getByRole("table", { name: "Помилки колектора" })).toContainText("404");
 
+  // reprocessing of the stored RAW from a stage (run page): RAW stored since this run, from extract-products on
+  await admin.getByRole("tab", { name: "Повторна обробка" }).click();
+  const reprocessForm = admin.getByRole("form", { name: "Повторна обробка" });
+  await expect(reprocessForm.getByLabel("Завдання")).toHaveValue(taskId);
+  await reprocessForm.getByLabel("Сховище RAW (connection_id)").fill("raw-files");
+  await reprocessForm.getByLabel("Почати з етапу").fill("extract-products");
+  await reprocessForm.getByLabel("Збережені з (RFC 3339)").fill(run["created_at"] as string);
+  await reprocessForm.getByLabel("Причина").fill("M2 reprocess stored RAW of the run");
+  const [stageReprocess, stageAccepted] = await Promise.all([
+    captureRequest(admin, "POST", "/api/orchestrator/v1/reprocessing", () =>
+      reprocessForm.getByRole("button", { name: "Обробити повторно" }).click(),
+    ),
+    admin.waitForResponse(
+      (r) => r.request().method() === "POST" && r.url().endsWith("/api/orchestrator/v1/reprocessing"),
+    ),
+  ]);
+  expect(stageReprocess.request.headers()["idempotency-key"]).toBeTruthy();
+  expect(stageReprocess.body).toEqual({
+    task_id: taskId,
+    stored_materials: { storage_connection_id: "raw-files", since: run["created_at"] },
+    from_stage: "extract-products",
+    reason: "M2 reprocess stored RAW of the run",
+  });
+  expect(stageAccepted.status()).toBe(202);
+  const stageJob = (await stageAccepted.json()) as { job_id: string };
+  await expect(admin).toHaveURL(new RegExp(`/runs/${stageJob.job_id}$`));
+  const stageRun = await waitRun(request, orchestratorUrl, stageJob.job_id);
+  expect(stageRun["status"], JSON.stringify(stageRun)).toBe("succeeded");
+  expect(stageRun["trigger"]).toBe("reprocess");
+  const stageRunItems = await runItems(request, orchestratorUrl, stageJob.job_id);
+  expect(stageRunItems.filter((i) => i.stage_id === "store-raw")).toEqual([]); // starts at extract-products
+  expect(
+    stageRunItems
+      .filter((i) => i.stage_id !== "collect")
+      .map((i) => [i.stage_id, i.material_id, i.observation_id, i.result_status]),
+  ).toEqual([
+    ["extract-products", materialId, observationId, "success"],
+    ["store-products", materialId, observationId, "success"],
+  ]);
+  await admin.reload();
+  await expect(admin.getByText("reprocess", { exact: true })).toBeVisible();
+  await expect(
+    admin.getByRole("table", { name: "Прогрес етапів" }).getByRole("row", { name: /extract-products/ }),
+  ).toContainText(`${extractor.package_id}@${extractor.version}`);
+
+  // materials: the stored RAW as text, its trace (original run and the reprocessing), reprocessing of it alone
   await admin.goto(`/materials?connection_id=raw-files&source_id=${sourceId}`);
   const materials = admin.getByRole("table", { name: "Збережені матеріали" });
-  await expect(materials).toContainText("testsite:8080");
-  await materials.getByRole("button", { name: "Переглянути" }).first().click();
+  await expect(materials).toContainText(`${site}/product/phone-alpha`);
+  await expect(materials.getByRole("row")).toHaveCount(2);
+  await materials.getByRole("button", { name: "Переглянути" }).click();
   await expect(admin.getByTestId("content-preview")).toContainText("<html");
+  await materials.getByRole("link", { name: "Простежити" }).click();
+  await expect(admin.getByRole("heading", { name: `Простежуваність ${materialId}` })).toBeVisible();
+  await expect(admin.getByRole("table", { name: `Етапи ${observationId} (${runId})` })).toContainText(
+    "store-raw",
+  );
+  await expect(
+    admin.getByRole("table", { name: `Етапи ${observationId} (${stageJob.job_id})` }),
+  ).toContainText("extract-products");
+  await admin.goBack();
+
+  await materials.getByRole("button", { name: "Повторно обробити" }).click();
+  const oneForm = admin.getByRole("form", { name: "Повторна обробка" });
+  await expect(oneForm).toContainText(materialId);
+  await oneForm.getByLabel("Завдання").fill(taskId);
+  await oneForm.getByLabel("Почати з етапу").fill("extract-products");
+  await oneForm.getByLabel("Причина").fill("M2 reprocess one stored material from admin");
+  const reprocessing = await captureRequest(admin, "POST", "/api/orchestrator/v1/reprocessing", () =>
+    oneForm.getByRole("button", { name: "Обробити повторно" }).click(),
+  );
+  expect(reprocessing.request.headers()["idempotency-key"]).toBeTruthy();
+  expect(reprocessing.body).toEqual({
+    task_id: taskId,
+    stored_materials: { storage_connection_id: "raw-files", material_ids: [materialId] },
+    from_stage: "extract-products",
+    reason: "M2 reprocess one stored material from admin",
+  });
+  await expect(admin).toHaveURL(/\/runs\/run_/);
+  const reprocessRunId = admin.url().split("/").at(-1) as string;
+  const oneRun = await waitRun(request, orchestratorUrl, reprocessRunId);
+  expect(oneRun["status"], JSON.stringify(oneRun)).toBe("succeeded");
+  // The selected material only, with its RAW of this source among the fed objects. The orchestrator does not
+  // filter by the task's source, so RAW of the same URL stored by OTHER sources is fed too (WP-09 test below).
+  const oneItems = (await runItems(request, orchestratorUrl, reprocessRunId)).filter(
+    (i) => i.stage_id === "extract-products",
+  );
+  expect(oneItems.map((i) => i.observation_id)).toContain(observationId);
+  for (const item of oneItems)
+    expect([item.material_id, item.result_status]).toEqual([materialId, "success"]);
+  await admin.reload();
+  await expect(admin.getByRole("table", { name: "Прогрес етапів" })).toContainText("extract-products");
 
   await admin.goto(`/results?connection_id=results-pg&entity_type=product&scope=${sourceId}`);
   const products = admin.getByRole("table", { name: "Сутності" });
@@ -197,4 +293,101 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
   await expect(stage.getByRole("table", { name: "Історія активацій extract-products" })).toContainText(
     forkId,
   );
+
+  // both are in the audit log of the stage (who, what, which package)
+  await admin.goto("/audit");
+  await admin.getByLabel("Тип об'єкта").selectOption("stage");
+  await admin.getByLabel("Об'єкт", { exact: true }).fill(`${taskId}/extract-products`);
+  const audit = admin.getByRole("table", { name: "Події аудиту" });
+  const activated = audit.getByRole("row", { name: /stage\.activate/ });
+  await expect(activated).toContainText("M2 switch to approved independent fork");
+  await expect(activated).toContainText(forkId);
+  const rolledBack = audit.getByRole("row", { name: /stage\.rollback/ });
+  await expect(rolledBack).toContainText("M2 restore original package");
+  await expect(rolledBack).toContainText(extractor.package_id);
+  await expect(audit.getByRole("row")).toHaveCount(3);
+});
+
+// «Повторно обробити» on ONE stored object must reprocess the RAW of the task's source only. The orchestrator
+// filters the stored objects of the connection by `material_ids` alone (WP-09 `_feed_stored`; reported by WP-13 in
+// docs/delivery/WP-13.md, «Запити до інших власників»), so RAW of the same URL stored by another source is fed
+// into this task as well. Expected to fail until WP-09 filters by the task's source (storage.v1 listObjects
+// accepts `source_id`); then this test reports an unexpected pass and `test.fail` must go.
+test("reprocessing one stored material takes only RAW of the task's source (WP-09 defect) @hybrid", async ({
+  admin,
+  request,
+}) => {
+  test.fail(true, "WP-09: /v1/reprocessing feeds RAW of other sources with the same material_id");
+  test.setTimeout(180_000);
+  const registry = realServiceUrl("registry");
+  const orchestrator = realServiceUrl("orchestrator");
+  const storage = realServiceUrl("storage");
+  test.skip(!registry || !orchestrator || !storage, "Full real API stack is required");
+  const [registryUrl, orchestratorUrl, storageUrl] = [registry, orchestrator, storage] as [
+    string,
+    string,
+    string,
+  ];
+  await syncStorageConnections(request, orchestratorUrl);
+  const extractor = await publishExtractorPackage(
+    request,
+    registryUrl,
+    path.join(repo, "libs", "extractor-sdk", "examples", "testsite-product-extractor"),
+  );
+  await approvePackage(request, registryUrl, extractor, "WP-09 reprocessing filter fixture");
+  // The same page (one material_id) stored as RAW by two sources.
+  const ownSource = uniqueId("e2e-wp09-own");
+  const otherSource = uniqueId("e2e-wp09-other");
+  const url = `${site}/product/phone-alpha?wp09=${ownSource}`;
+  const html = "<html><body><h1>Phone Alpha</h1></body></html>";
+  for (const sourceId of [ownSource, otherSource])
+    await storageInvoke(request, storageUrl, "raw-files", `${sourceId}-raw`, {
+      kind: "material",
+      material: htmlMaterial(sourceId, url, html, `obs_${sourceId}`, new Date().toISOString()),
+    });
+  await jsonRequest(
+    request,
+    "post",
+    `${orchestratorUrl}/v1/sources`,
+    { source_id: ownSource, kind: "web", title: `WP-09 ${ownSource}`, locator: { url: `${site}/` } },
+    [200, 201],
+  );
+  const taskId = uniqueId("e2e-wp09-task");
+  await jsonRequest(
+    request,
+    "post",
+    `${orchestratorUrl}/v1/tasks`,
+    {
+      task_id: taskId,
+      title: `WP-09 ${taskId}`,
+      input: { source_id: ownSource, urls: [url] },
+      stages: [
+        { stage_id: "collect", kind: "collect", collector: { collector: "web", mode: "full" } },
+        {
+          stage_id: "extract-products",
+          kind: "handler",
+          handler: { package_id: extractor.package_id, version: extractor.version, digest: extractor.digest },
+          inputs: [{ from: "collect" }],
+        },
+      ],
+    },
+    201,
+  );
+
+  await admin.goto(`/materials?connection_id=raw-files&source_id=${ownSource}`);
+  const materials = admin.getByRole("table", { name: "Збережені матеріали" });
+  await expect(materials.getByRole("row")).toHaveCount(2);
+  await materials.getByRole("button", { name: "Повторно обробити" }).click();
+  const form = admin.getByRole("form", { name: "Повторна обробка" });
+  await form.getByLabel("Завдання").fill(taskId);
+  await form.getByLabel("Почати з етапу").fill("extract-products");
+  await form.getByRole("button", { name: "Обробити повторно" }).click();
+  await expect(admin).toHaveURL(/\/runs\/run_/);
+  const runId = admin.url().split("/").at(-1) as string;
+  const run = await waitRun(request, orchestratorUrl, runId);
+  expect(run["status"], JSON.stringify(run)).toBe("succeeded");
+  const fed = (await runItems(request, orchestratorUrl, runId)).filter(
+    (i) => i.stage_id === "extract-products",
+  );
+  expect(fed.map((i) => i.observation_id)).toEqual([`obs_${ownSource}`]);
 });

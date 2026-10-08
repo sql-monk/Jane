@@ -922,7 +922,7 @@ class Engine:
         end: bool,
         feed_error: dict[str, Any] | None,
         from_stage: str | None = None,
-        stored_objects: Mapping[str, str] | None = None,
+        stored_objects: Mapping[str, str | None] | None = None,
     ) -> int:
         """Record materials as collect items + route them, then advance the cursor — one transaction."""
         config = run["config"]
@@ -938,12 +938,17 @@ class Engine:
             accept = owner["status"] == "running"
             for m in materials if accept else []:
                 loc = m.get("locator") or {}
+                observation_id = m["observation_id"]
+                stored_id = (stored_objects or {}).get(observation_id)
+                ambiguous = (
+                    stored_objects is not None and observation_id in stored_objects and stored_id is None
+                )
                 cur = conn.execute(
                     """
                     INSERT INTO items (item_id, run_id, task_id, stage_id, item_key, status, material_id,
                                        observation_id, source_id, url, fetched_at, content_sha256, attempts,
-                                       finished_at, stored_object_id)
-                    VALUES (%s, %s, %s, %s, %s, 'completed', %s, %s, %s, %s, %s, %s, 0, now(), %s)
+                                       finished_at, stored_object_id, stored_object_ambiguous)
+                    VALUES (%s, %s, %s, %s, %s, 'completed', %s, %s, %s, %s, %s, %s, 0, now(), %s, %s)
                     ON CONFLICT (run_id, stage_id, item_key) DO NOTHING
                     """,
                     (
@@ -958,10 +963,34 @@ class Engine:
                         loc.get("canonical_url") or loc.get("url"),
                         m.get("fetched_at"),
                         (m.get("revision") or {}).get("content_sha256"),
-                        (stored_objects or {}).get(m["observation_id"]),
+                        stored_id,
+                        ambiguous,
                     ),
                 )
                 if not cur.rowcount:
+                    if stored_objects is not None and observation_id in stored_objects:
+                        previous = conn.execute(
+                            "SELECT item_id, stored_object_id, stored_object_ambiguous FROM items"
+                            " WHERE run_id = %s AND stage_id = %s AND item_key = %s FOR UPDATE",
+                            (run["run_id"], collect_id, str(observation_id)),
+                        ).fetchone()
+                        assert previous is not None
+                        ambiguous = (
+                            ambiguous
+                            or previous["stored_object_ambiguous"]
+                            or (
+                                previous["stored_object_id"] is not None
+                                and previous["stored_object_id"] != stored_id
+                            )
+                        )
+                        conn.execute(
+                            "UPDATE items SET stored_object_id = %s, stored_object_ambiguous = %s WHERE item_id = %s",
+                            (
+                                None if ambiguous else previous["stored_object_id"] or stored_id,
+                                ambiguous,
+                                previous["item_id"],
+                            ),
+                        )
                     continue  # re-delivered observation: already routed
                 if (m.get("source") or {}).get("source_id") is None:
                     m = {**m, "source": {**(m.get("source") or {}), "source_id": run["source_id"]}}
@@ -1029,7 +1058,7 @@ class Engine:
             executor, "GET", "/v1/objects", params=params, trace_id=run["trace_id"]
         ).json()
         materials = []
-        stored_objects: dict[str, str] = {}
+        stored_objects: dict[str, str | None] = {}
         for obj in page.get("items") or []:
             mat_meta = obj.get("material") or {}
             if wanted and mat_meta.get("material_id") not in wanted:
@@ -1050,7 +1079,11 @@ class Engine:
             if source_id and (material.get("source") or {}).get("source_id") not in (None, source_id):
                 continue
             materials.append(material)
-            stored_objects[material["observation_id"]] = object_id
+            observation_id = material["observation_id"]
+            if observation_id not in stored_objects:
+                stored_objects[observation_id] = object_id
+            elif stored_objects[observation_id] != object_id:
+                stored_objects[observation_id] = None  # distinct copies: never choose the last object
         nxt = page.get("next_cursor")
         created = self._accept_materials(
             run, worker, materials, nxt, nxt is None, None, run["input"].get("from_stage"), stored_objects

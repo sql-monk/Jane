@@ -254,6 +254,12 @@ MIGRATIONS: list[str] = [
     CREATE INDEX items_stored_raw ON items (source_id, observation_id)
         WHERE stored_object_id IS NOT NULL;
     """,
+    # 5 — remember conflicting storage-read copies across pages and process restarts
+    """
+    ALTER TABLE items ADD COLUMN stored_object_ambiguous boolean NOT NULL DEFAULT false;
+    CREATE INDEX items_stored_raw_ambiguous ON items (source_id, observation_id)
+        WHERE stored_object_ambiguous;
+    """,
 ]
 
 

@@ -16,7 +16,7 @@
 | 4 | WP-10/WP-04: `services/{llm,telegram-collector}/src/*/{connections,secret_files}.py`, відповідні `tests/test_secret_files.py` | `file:` читається через перевірені дескриптори відкритих об'єктів і всіх компонентів resolved шляху. Тести міняють symlink/reference, resolved target/parent до відкриття та target/parent після відкриття; дозволений safe symlink, NUL/бінарний файл/каталог також перевірені. Початковий коміт `e0cc576`; race у самому resolved target/parent виправлено після рев'ю 1 нижче. |
 | 5 | WP-10: `services/llm/src/jane_llm/connections.py`, `tests/test_api_base.py` | Невалідний порт `:99999`/`:abc`, зламаний IPv6 URL → 422 з `/params/api_base`, без збереження підключення. Старі невалідні дані не отримують секретів і не викликають провайдер. Коміт `2f77ae6`. |
 | 6 | WP-09: `services/orchestrator/src/jane_orchestrator/engine.py`, `tests/orch_support.py`, `tests/test_stored_raw.py`, `README.md` | Reprocessing запитує storage `GET /v1/objects` із `source_id` завдання; явно чуже джерело у summary/detail додатково відкидається. Два джерела мають однакові URL/material_id, але один material_id дає лише власне observation; повний запит дає 6 власних RAW, а не 12. |
-| 7 | WP-09: `services/orchestrator/src/jane_orchestrator/{engine,db,service,stored_raw}.py`, `tests/test_stored_raw.py`, `README.md` | Відомий RAW id з фактичного storage write записується в item цього запису; id зі storage-read — у collect item reprocessing. Власна міграція 4 додає nullable `items.stored_object_id` та індекс. API збагачує наявні `ProblemGroup.samples[].stored_object_id` і `UnknownMaterial.stored_object_id` за source/observation/run (для sample — через invocation). Немає залежності від пам'яті процесу чи таблиць storage; RAW, що завершився після екстрактора, стає доступним при наступному читанні. Simulated/missing/неоднозначний id не вигадується. |
+| 7 | WP-09: `services/orchestrator/src/jane_orchestrator/{engine,db,service,stored_raw}.py`, `tests/test_stored_raw.py`, `README.md` | Відомий RAW id з фактичного storage write записується в item цього запису; id зі storage-read — у collect item reprocessing. Міграція 4 додає nullable `items.stored_object_id`, міграція 5 — durable ознаку неоднозначності; див. виправлення review 1 нижче. API збагачує наявні `ProblemGroup.samples[].stored_object_id` і `UnknownMaterial.stored_object_id` за source/observation/run (для sample — через invocation). Немає залежності від пам'яті процесу чи таблиць storage; RAW, що завершився після екстрактора, стає доступним при наступному читанні. Simulated/missing/неоднозначний id не вигадується. |
 
 Прочитано `CLAUDE.md`, ТЗ §4–§5/§9/§10/§12, plan §3–§5, `DEVELOPMENT.md`, скіли
 `jane-wp`, `jane-contracts`, `jane-handler-package`. Нових API/полів контрактів немає.
@@ -241,6 +241,77 @@ Success: no issues found in 2 source files
 ```
 
 Logs: `.jane/m3fix-review1-lint.txt`, `.jane/m3fix-review1-lint-types.txt`.
-Новий commit після цього виправлення залишено локальним до повного висновку рев'ю 1;
-push і full workflow dispatch виконує автор лише після вказівки координатора.
+Коміт цього виправлення `c07d91a` спочатку залишався локальним до повного висновку рев'ю 1.
+Повний review 1 отримано: два findings (TOCTOU і неоднозначний RAW). Координатор доручив після
+адресного виправлення обох запушити гілку й запустити новий full workflow dispatch на фінальному SHA.
 CI `37850604947` на старому `3b45a7b` не є фінальним доказом для виправленого інкременту.
+
+## Виправлення після рев'ю 1 — finding 2: неоднозначні RAW (пункт 7)
+
+Repro рев'юера `.jane/review-m3-ambiguous-raw-repro.py` повертає два валідні RAW object_id для одного
+source/observation. Page map перезаписував id останньою копією, а collect item маршрутизував лише
+перше спостереження. Вихід автора до виправлення (`.jane/m3fix-review1-ambiguity-before.txt`):
+
+```text
+storage valid RAW ids for same source/observation: ['obj_79886e6c09d14e92ad63', 'obj_review_duplicate']
+reprocessing collect stored id: obj_review_duplicate
+reprocessing problem sample stored id: obj_review_duplicate
+storage contract violations: []
+```
+
+Координатор обрав omission для неоднозначної копії, без нового контракту. Міграція 5 додає
+внутрішній `items.stored_object_ambiguous` з default false та частковий індекс. У межах однієї сторінки
+storage різні id для того самого observation дають підтверджену неоднозначність; між сторінками
+collect metadata об'єднується з уже записаними id/ознакою в тій самій feed-транзакції. Ознака не
+скидається наступним повтором id, DAG для вже прийнятого observation удруге не запускається.
+`stored_raw_id` враховує durable ознаку відповідного source/observation/run, тому collect, sample
+і unknown material не вибирають довільну копію. Повтор того самого `object_id` залишається known.
+README уточнено; `ReprocessRequest` і `contracts/**` не змінювались.
+
+Нові регресії до виправлення (`.jane/m3fix-review1-ambiguity-pytest-before.txt`):
+
+```text
+uv run --all-packages --locked pytest services/orchestrator/tests/test_stored_raw.py -v -k ambiguous_raw
+E           AssertionError: assert 'obj_ambiguous_0' == None
+FAILED services/orchestrator/tests/test_stored_raw.py::test_reprocessing_omits_ambiguous_raw_references[distinct-objects-1]
+FAILED services/orchestrator/tests/test_stored_raw.py::test_reprocessing_omits_ambiguous_raw_references[distinct-objects-100]
+================= 2 failed, 2 passed, 3 deselected in 30.55s ==================
+```
+
+Два passed — повторення того самого id, два failed — різні id на сторінці або між сторінками.
+Виправлений набір запускається двічі на одному власному PostgreSQL-контейнері:
+
+```text
+uv run --all-packages --locked pytest services/orchestrator/tests/test_stored_raw.py services/orchestrator/tests/test_contract.py -v
+```
+
+Повні логи: `.jane/m3fix-review1-ambiguity-after-1.txt`, `.jane/m3fix-review1-ambiguity-after-2.txt`.
+Набір містить 4 storage-read випадки (same/distinct id × page size 1/100), попередні RAW/source/race
+регресії, міграцію з наявних schema 3 і 4, обидва контрактні сценарії оркестратора. Компонент справжній;
+PostgreSQL справжній; storage/runtime — контрактні сусіди; API-відповіді з omission валідовано за OpenAPI.
+Новий API instance читає ту саму ознаку з БД. Обидва прогони завершились на одному власному PostgreSQL:
+
+```text
+======================= 10 passed in 101.30s (0:01:41) ========================
+======================== 10 passed in 73.91s (0:01:13) ========================
+```
+
+0 skipped, 0 deselected. Після другого прогону контейнер видалено runner-ом у `finally`.
+
+Адресні Ruff / strict mypy (`.jane/m3fix-review1-ambiguity-lint.txt`, `.jane/m3fix-review1-ambiguity-types.txt`):
+
+```text
+All checks passed!
+21 files already formatted
+Success: no issues found in 21 source files
+```
+
+Task-scoped ownership після обох виправлень (`.jane/m3fix-review1-final-ownership.txt`):
+
+```text
+Base 3c98542: 28 files; 0 outside the explicit cross-owner assignment
+```
+
+Друга finding змінює лише `services/orchestrator/**` та цей звіт (6 файлів від `c07d91a`).
+До accepted залишаються review 2 лише виправлень та full CI на остаточному code SHA; ідентифікатор
+CI передається координатору в журнал потоку B після push/dispatch. Старий `37850604947` не фінальний.

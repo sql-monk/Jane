@@ -22,12 +22,15 @@ def stored_raw_id(
         return None
     rows = conn.execute(
         """
-        SELECT DISTINCT raw.stored_object_id FROM items raw
-        WHERE raw.source_id = %s AND raw.observation_id = %s AND raw.stored_object_id IS NOT NULL
+        SELECT DISTINCT raw.stored_object_id, raw.stored_object_ambiguous FROM items raw
+        WHERE raw.source_id = %s AND raw.observation_id = %s
+          AND (raw.stored_object_id IS NOT NULL OR raw.stored_object_ambiguous)
           AND (%s::text IS NULL OR raw.run_id = %s)
           AND (%s::text IS NULL OR EXISTS (
               SELECT 1 FROM items problem WHERE problem.run_id = raw.run_id AND problem.invocation_id = %s))
         """,
         (source_id, observation_id, run_id, run_id, invocation_id, invocation_id),
     ).fetchall()
+    if any(row["stored_object_ambiguous"] for row in rows):
+        return None
     return str(rows[0]["stored_object_id"]) if len(rows) == 1 else None

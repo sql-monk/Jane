@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from threading import Event
 from typing import Any
 
@@ -205,11 +206,12 @@ def test_problem_samples_and_unknown_materials_name_the_stored_raw(
     assert neighbours.storage.violations == [] and neighbours.runtime.violations == []
 
 
-def test_stored_raw_migration_upgrades_an_existing_database(db_dsn: str) -> None:
+@pytest.mark.parametrize("previous_version", [3, 4])
+def test_stored_raw_migration_upgrades_an_existing_database(db_dsn: str, previous_version: int) -> None:
     # Existing schema, including a real user record, rather than a fresh app creating all migrations.
     with psycopg.connect(db_dsn) as conn:
         conn.execute("CREATE TABLE schema_migrations (version integer PRIMARY KEY)")
-        for version, sql in enumerate(MIGRATIONS[:-1], start=1):
+        for version, sql in enumerate(MIGRATIONS[:previous_version], start=1):
             conn.execute(sql)
             conn.execute("INSERT INTO schema_migrations VALUES (%s)", (version,))
         conn.execute(
@@ -225,6 +227,96 @@ def test_stored_raw_migration_upgrades_an_existing_database(db_dsn: str) -> None
             assert conn.execute("SELECT material_id FROM unknown_materials").fetchone() == {
                 "material_id": "old-material"
             }
-            assert conn.execute("SELECT stored_object_id FROM items").fetchall() == []
+            assert (
+                conn.execute("SELECT stored_object_id, stored_object_ambiguous FROM items").fetchall() == []
+            )
     finally:
         db.close()
+
+
+@pytest.mark.parametrize("page_size", [1, 100])
+@pytest.mark.parametrize("distinct_objects", [False, True], ids=["same-object", "distinct-objects"])
+def test_reprocessing_omits_ambiguous_raw_references(
+    make_client: Any,
+    neighbours: Neighbours,
+    db_dsn: str,
+    monkeypatch: pytest.MonkeyPatch,
+    page_size: int,
+    distinct_objects: bool,
+) -> None:
+    monkeypatch.setenv("JANE_ORCHESTRATOR_LIMITS__ENGINE__FEED_PAGE_SIZE", str(page_size))
+    unrecognized_first_product(neighbours)
+    client = make_client()
+    assert post(client, "/v1/sources", source_doc()).status_code == 201
+    assert post(client, "/v1/tasks", catalog_task()).status_code == 201
+    live = run_to_end(client, post(client, "/v1/tasks/shop-catalog/runs", {}))
+    assert live["status"] == "succeeded", live
+    originals = {
+        oid: obj
+        for oid, obj in neighbours.storage.stored_objects.items()
+        if obj["material"]["locator"]["url"].endswith(("/product/a-0", "/gift-cards/0"))
+    }
+    assert len(originals) == 2, [o["material"]["locator"] for o in neighbours.storage.stored_objects.values()]
+    for index, (object_id, obj) in enumerate(originals.items()):
+        duplicate_id = f"obj_ambiguous_{index}" if distinct_objects else object_id
+        duplicate = deepcopy(obj)
+        duplicate["object"]["object_id"] = duplicate_id
+        neighbours.storage.stored_objects[duplicate_id] = duplicate
+        neighbours.storage.object_order.append(duplicate_id)
+
+    # Collect-style reprocessing registers the gift card as unknown and a-0 as a problem. Skip RAW
+    # writes in this task so no new stored copy hides the storage-read reference under investigation.
+    task = catalog_task(task_id="replay-without-raw")
+    task["stages"] = [s for s in task["stages"] if s["stage_id"] != "store-raw"]
+    assert post(client, "/v1/tasks", task).status_code == 201
+    replay = run_to_end(
+        client,
+        post(
+            client,
+            "/v1/reprocessing",
+            {
+                "task_id": task["task_id"],
+                "stored_materials": {
+                    "storage_connection_id": "raw-files",
+                    "material_ids": [o["material"]["material_id"] for o in originals.values()],
+                },
+            },
+        ),
+    )
+    assert replay["status"] == "succeeded", replay
+    items = items_by_stage(db_dsn, replay["run_id"])
+    assert len(items["collect"]) == 2 and len(items["extract-products"]) == 1
+    expected = {o["material"]["observation_id"]: oid for oid, o in originals.items()}
+    for collected in items["collect"]:
+        assert collected["stored_object_id"] == (
+            None if distinct_objects else expected[collected["observation_id"]]
+        )
+        assert collected["stored_object_ambiguous"] is distinct_objects
+
+    groups_response = client.get("/v1/problem-groups")
+    samples = [s for g in groups_response.json()["items"] for s in g["samples"]]
+    sample = next(s for s in samples if s["invocation_id"] == items["extract-products"][0]["invocation_id"])
+    unknown_response = client.get("/v1/unknown-materials")
+    (unknown,) = [u for u in unknown_response.json()["items"] if u["run_id"] == replay["run_id"]]
+    for reference in (sample, unknown):
+        if distinct_objects:
+            assert "stored_object_id" not in reference, reference
+        else:
+            assert reference["stored_object_id"] == expected[reference["observation_id"]]
+    for path, response in (
+        ("/v1/problem-groups", groups_response),
+        ("/v1/unknown-materials", unknown_response),
+    ):
+        SPECS["orchestrator"].validate_response(
+            "GET", path, response.status_code, response.json(), "application/json"
+        )
+    fresh = make_client(run_workers=False)
+    refreshed_groups = fresh.get("/v1/problem-groups").json()["items"]
+    refreshed_sample = next(
+        s
+        for group in refreshed_groups
+        for s in group["samples"]
+        if s["invocation_id"] == sample["invocation_id"]
+    )
+    assert refreshed_sample == sample  # a new API instance keeps the ambiguity, not a transient page map
+    assert neighbours.storage.violations == [] and neighbours.runtime.violations == []

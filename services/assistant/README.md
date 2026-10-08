@@ -145,6 +145,19 @@ just down -v --project jane-wp11
 
 ## Конфігурація
 
+**Політика вмісту матеріалів (ContentRef, WP-01h).** Матеріал приходить у запиті (`/v1/unknown-materials`,
+`problem_samples`/`successful_examples` вдосконалення) або від колектора (вибірка онбордингу), тож його вміст
+читається спільним `jane_kit.content.ContentReader`: `inline` (utf-8/base64); `download_url` — лише `http(s)` на хост
+із `JANE_ASSISTANT_DOWNLOAD_HOST_ALLOWLIST`, без редиректів, без проксі й `.netrc` із середовища, лише незакодоване
+тіло, обрізання на `content.max_material_bytes`, усе завантаження — у межах `content.fetch_timeout_ms`; `file://` —
+лише строго всередині `JANE_ASSISTANT_BLOB_ROOTS` (шлях спершу розв'язується з `..` і symlink, читається саме
+розв'язаний звичайний файл); `s3://` без `download_url` — 422. Перевіряються `size_bytes` blob і `sha256`. Відмова
+завершує job помилкою (`validation_failed` / `limit_exceeded` — 422, `not_found` — 404, `upstream_unavailable` — 502)
+без шляхів і вмісту в `detail`, до LLM нічого не йде. Застосунок ставить свій читач для кожного запиту
+(`content.MaterialContentScope`), тож його успадковують і job, які запит запускає; поза застосунком
+`material_bytes` читає лише inline. Збережений RAW зі storage асистент і так отримує inline (`/v1/objects/{id}/content`).
+Тести: `tests/test_content_policy.py`, `test_improvement.py::test_problem_sample_content_follows_the_content_policy`.
+
 Змінні середовища з префіксом `JANE_ASSISTANT_`:
 
 | Змінна | Типово | Опис |
@@ -158,7 +171,9 @@ just down -v --project jane-wp11
 | `SERVICE_TOKEN_ENV` | — | **ім'я** змінної з bearer-токеном для сусідів (значення в конфігурації немає) |
 | `SEARCH_PROVIDER` | `none` | `none`, `static`, `http_json` |
 | `SEARCH_STATIC_FILE` | — | JSON `[{"title","url"?,"telegram_username"?,"description"?,"aliases"?}]` |
-| `SEARCH_URL_TEMPLATE`, `SEARCH_ITEMS_PATH`, `SEARCH_TITLE_FIELD`, `SEARCH_URL_FIELD`, `SEARCH_DESCRIPTION_FIELD` | —, `results`, `title`, `url`, `description` | HTTP-пошук з JSON-відповіддю |
+| `SEARCH_URL_TEMPLATE`, `SEARCH_ITEMS_PATH`, `SEARCH_TITLE_FIELD`, `SEARCH_URL_FIELD`, `SEARCH_DESCRIPTION_FIELD` | —, `results`, `title`, `url`, `description` | HTTP-пошук з JSON-відповіддю (тайм-аути — `limits.search`) |
+| `BLOB_ROOTS` | `[]` (вимкнено) | каталоги, з яких можна читати `file://` вміст матеріалів (JSON-список); порожньо — `file://` відхиляється (422) |
+| `DOWNLOAD_HOST_ALLOWLIST` | `[]` (вимкнено) | `hostname` (будь-який порт) або `hostname:port`, куди може вести `download_url` вмісту матеріалу (JSON-список); порожньо — завантаження відхиляються (422) |
 | `LLM_MODEL_CHEAP` / `LLM_MODEL_STRONG` | `cheap` / `strong` | псевдоніми моделей шлюзу |
 | `CONTRACTS_DIR` | пошук угору / `/app/contracts` | де `contracts/schemas` для локальної валідації |
 | `GENERATED_CODE_ALLOWED_MODULES` | `re, html, json, math, datetime, decimal, string, unicodedata, itertools, functools, collections, typing, dataclasses` | політика імпортів згенерованого коду (JSON-список) |
@@ -204,6 +219,9 @@ just down -v --project jane-wp11
 | `improvement.max_problem_samples`, `max_successful_examples`, `max_sample_chars`, `max_file_chars` | 10, 5, 6000, 20000 | обсяг даних для моделі |
 | `unknown.min_confidence`, `max_sample_chars` | 0.6, 6000 | нижче — пропозиція `none` |
 | `transfer.inline_max_bytes` | 262144 | чернетка пакета до runtime inline; більша — `payload_too_large` |
+| `content.max_material_bytes` | 16777216 | найбільший вміст одного матеріалу (inline, `file://`, `download_url`); більший — `limit_exceeded` |
+| `content.fetch_timeout_ms` / `connect_timeout_ms` | 30000 / 5000 | усе завантаження за `download_url` / встановлення з'єднання |
+| `search.request_timeout_ms` / `connect_timeout_ms` | 10000 / 5000 | виклики пошукового провайдера `http_json` |
 | `clients.*` (тайм-аути, повтори, опитування job) | див. jane-kit | виклики сусідів |
 | `jobs.*`, `idempotency.*` | див. jane-kit | job і ключі ідемпотентності |
 

@@ -26,6 +26,7 @@ from jane_kit.service import create_app
 
 from . import __version__
 from .clients import Neighbours
+from .content import MaterialContent, MaterialContentScope
 from .guards import SchemaValidator
 from .improvement import run_improvement
 from .onboarding import OnboardingService
@@ -133,7 +134,7 @@ def build_state(settings: Settings, limits: ServiceLimits) -> ServiceState:
     return InMemoryState(limits)
 
 
-def build_search(settings: Settings) -> SearchProvider:
+def build_search(settings: Settings, limits: ServiceLimits) -> SearchProvider:
     if settings.search_provider == "static":
         if settings.search_static_file is None:
             raise ValueError("search_provider=static needs JANE_ASSISTANT_SEARCH_STATIC_FILE")
@@ -147,6 +148,7 @@ def build_search(settings: Settings) -> SearchProvider:
             title_field=settings.search_title_field,
             url_field=settings.search_url_field,
             description_field=settings.search_description_field,
+            limits=limits.search,
         )
     return NoSearchProvider()
 
@@ -172,7 +174,7 @@ def build_app(settings: Settings | None = None, deps: Dependencies | None = None
     idem_store = state.idempotency
     neighbours = Neighbours.from_settings(settings, limits.clients, deps.transports)
     validator = SchemaValidator.locate(settings.contracts_dir)
-    search = deps.search or build_search(settings)
+    search = deps.search or build_search(settings, limits)
     onboarding = OnboardingService(
         settings=settings,
         neighbours=neighbours,
@@ -239,6 +241,8 @@ def build_app(settings: Settings | None = None, deps: Dependencies | None = None
     app.state.health.add("state", state.ping)
     app.state.onboarding = onboarding
     app.state.neighbours = neighbours
+    # Material content of requests and of the jobs they start: JANE_ASSISTANT_BLOB_ROOTS / _DOWNLOAD_HOST_ALLOWLIST.
+    app.add_middleware(MaterialContentScope, content=MaterialContent.from_settings(settings, limits))
     app.include_router(jobs_router(runner))
 
     def accepted(job: dict[str, Any], extra: dict[str, str] | None = None) -> StoredResponse:

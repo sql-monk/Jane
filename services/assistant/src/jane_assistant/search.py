@@ -25,6 +25,8 @@ import httpx
 
 from jane_kit.errors import JaneError
 
+from .settings import SearchLimits
+
 __all__ = [
     "Candidate",
     "HttpJsonSearchProvider",
@@ -143,6 +145,7 @@ class HttpJsonSearchProvider:
         url_field: str = "url",
         description_field: str = "description",
         http: httpx.AsyncClient | None = None,
+        limits: SearchLimits | None = None,
     ) -> None:
         if "{query}" not in url_template:
             raise ValueError("search_url_template must contain {query}")
@@ -150,9 +153,14 @@ class HttpJsonSearchProvider:
         self.items_path = items_path
         self.fields = (title_field, url_field, description_field)
         self.http = http
+        limits = limits or SearchLimits()
+        self.timeout = httpx.Timeout(
+            limits.request_timeout_ms / 1000, connect=limits.connect_timeout_ms / 1000
+        )
+        """``limits.search`` (``JANE_ASSISTANT_LIMITS__SEARCH__*``) instead of the httpx default of 5 s."""
 
     async def search(self, query: str, source_kind: str | None, limit: int) -> list[Candidate]:
-        client = self.http or httpx.AsyncClient()
+        client = self.http or httpx.AsyncClient(timeout=self.timeout)
         try:
             r = await client.get(self.url_template.replace("{query}", quote(query)))
             r.raise_for_status()

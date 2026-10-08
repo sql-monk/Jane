@@ -713,4 +713,10 @@ R-04/R-06, S-M2-10, WP-14 `dev-laptop` ×3 на вільному хості та
   [HANDOFF-2026-10-09-stream-b.md](HANDOFF-2026-10-09-stream-b.md); журнал потоку — `docs/delivery/M3/stream-b.md`.
   Злиття потоку B — з worktree `.claude/worktrees/integ-b` (`push origin HEAD:codex/jane-integration`), потік A перед
   кожним своїм злиттям робить `git pull --ff-only`.
+- Потік A: B1 / WP-01h (спільний `ContentReader` у jane-kit для llm, assistant, handler-runtime; доступ runtime/llm до
+  RAW storage лише для читання) — незалежне рев'ю безпеки, раунд 1: changes requested (ліміт розміру в потоці без
+  `Content-Length` не покритий тестом, IDN); виправлення перевірив координатор: тести політики 35 passed, мутант
+  рецензента 6 failed. CI 37846393926 (12/12, e2e 71 passed), 37852086269 (success). Злито `cdf261a` (конфлікт лише
+  в таблиці тестів `services/llm/README.md` з WP-13s; llm+assistant+jane-kit content 166 passed після злиття).
+  Повний CI на зведеній інтеграційній ревізії (13r, 13t, 14d, 13s, B1): 37853683903.
 

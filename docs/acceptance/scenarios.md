@@ -11,14 +11,22 @@
 2. **Замінники зовнішніх систем позначаються явно:** фейковий провайдер LLM (WP-10), записаний або фейковий
    клієнт Telegram (WP-04), статичний пошуковий провайдер (WP-11), SeaweedFS замість AWS S3 (WP-01).
    У матриці вони мають позначку **З**.
-3. **Тимчасові замінники компонентів** мають позначку **Т**. У M1 використано лише `package-host`:
-   він віддає архів локального пакета runtime через HTTP у сценаріях з оркестратором. Це перевірка
-   виконання локального пакета, а не перевірка реального registry; для M2 потрібен окремий сценарій із registry.
+3. **Тимчасові замінники компонентів** мають позначку **Т**. Після WP-13t їх у сценаріях немає. Раніше
+   `package-host` віддавав runtime і LLM-шлюзу архіви локальних пакетів замість registry; тепер
+   оркестровані сценарії публікують пакети-фікстури й приклад екстрактора SDK у реальний registry
+   (погодження, `package_id@version`, дайджест registry, перевірка завантаженого архіву), а `package-host`
+   лишився тільки «шлюзом» `download_url` для R-04 (**З** blob-сховища) і архівів не віддає.
+   Material, який тест як сторонній застосунок сам формує з відповіді testsite для прямого виклику
+   виконавця (S-M2-05a, R-04 під час роботи), позначено «вхід прямого виклику»: він не заміщує ланку
+   ланцюжка Jane, і висновків про Web Collector із таких сценаріїв не роблять.
 4. **Незалежність від стану.** Кожен прогін має свій `run_id`, від якого залежать `source_id` (а отже
    `key.scope` сутностей), `observation_id` і `delivery_key`. Тому сценарії можна повторювати на тому самому
    стеку. Сховище перевіряється через `storage.v1`: список об'єктів, метадані й вміст. У S-M1-01
    RAW-файл додатково читається прямо з тому; таблиці PostgreSQL ці сценарії прямо не читають.
 5. **Сервіс, якого немає в `main`**, дає `skip` з причиною («WP-NN ще не злито в main»), а не падіння.
+   Обов'язковий режим `JANE_E2E_REQUIRED=1` (job e2e у CI) робить помилкою і відсутність Docker, і кожен
+   `skip` сценарію, а `just e2e` — ще й нуль зібраних сценаріїв (exit 5). Тож зелений обов'язковий прогін
+   означає, що виконано кожен зібраний сценарій. Без змінної (локально) поведінка попередня.
 
 ## Запуск
 
@@ -39,7 +47,8 @@ uv run --all-packages pytest tests/e2e -v -k s_m1_01         # один сцен
 збирає образ пісочниці `python-extractor@1` (`jane-handler-runtime build-image`) і передає сервісу
 Docker-сокет із групою, визначеною автоматично (`JANE_DOCKER_GID`).
 
-Змінні: `JANE_E2E_PROJECT`, `JANE_E2E_KEEP`, `JANE_E2E_WAIT_TIMEOUT` (типово 900 с),
+Змінні: `JANE_E2E_PROJECT`, `JANE_E2E_KEEP`, `JANE_E2E_REQUIRED` (`1` — обов'язковий e2e, див. принцип 5),
+`JANE_E2E_WAIT_TIMEOUT` (типово 900 с),
 `JANE_E2E_SANDBOX_WALL_TIME_MS` (типово 60000; ліміт запиту до пісочниці), `JANE_E2E_DOCKER_SOCKET`,
 `JANE_E2E_DOCKER_GID`, `JANE_E2E_SANDBOX_IMAGE`, `JANE_E2E_HTTP_KEEPALIVE_S` (типово 2 с; час простою,
 після якого тестовий клієнт не використовує з'єднання повторно; має бути меншим за keep-alive сервісів —
@@ -51,22 +60,22 @@ Docker-сокет із групою, визначеною автоматично
 |---|---|---|---|---|
 | S-M1-01 | Web Collector → RAW у files ‖ екстракція локальним пакетом → PostgreSQL | 1, 2, 8, 12 | testsite, web-collector, storage, handler-runtime, postgres | **пройдено на гілці WP-13** |
 | S-M1-02 | Колекція з курсорним підтвердженням і повторною доставкою → RAW та екстракція | 1, 2, 12 | web-collector, storage, handler-runtime | **пройдено на гілці WP-13** |
-| S-M1-03 | M1-завдання через оркестратор: RAW, екстракція, trace, unknown | 2, 8, 11, 12 | + orchestrator, локальний `package-host` (Т) | **пройдено на гілці WP-13** |
+| S-M1-03 | M1-завдання через оркестратор: RAW, екстракція, trace, unknown | 2, 8, 11, 12 | + orchestrator, registry (архів екстрактора — з реального registry, WP-13t) | **пройдено на гілці WP-13** |
 | S-M1-04 | Рекурсивний збір зі стороннього застосунку, runtime через CLI | 1, 10 | web-collector, handler-runtime | **пройдено на гілці WP-13** |
-| S-M1-05 | Заміна сховища лише конфігурацією завдання (PostgreSQL ↔ files) | 3 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
-| S-M1-06 | Новий прогін дає нове спостереження й подію історії | 8 | orchestrator, storage, handler-runtime | **пройдено на гілці WP-13** |
+| S-M1-05 | Заміна сховища лише конфігурацією завдання (PostgreSQL ↔ files) | 3 | orchestrator, storage, handler-runtime, registry | **пройдено на гілці WP-13** |
+| S-M1-06 | Новий прогін дає нове спостереження й подію історії | 8 | orchestrator, storage, handler-runtime, registry | **пройдено на гілці WP-13** |
 | S-M2-01 | Репозиторій: пакети всіх типів, версії, форк, оновлення батька | 7, 9 | registry, runtime, storage, llm, orchestrator | Після WP-10d/07c повний набір `test_m2_registry.py` і `test_m2_registry_types.py` **PASSED** у [CI 36994135652](https://github.com/sql-monk/Jane/actions/runs/36994135652) на `e8927bd`; LLM — З, фінальна `main` ще не перевірена |
 | S-M2-02 | Telegram: історія, нові, редагування як ревізії → збереження | 1, 8, 12 | telegram-collector, storage | **1 passed на спільній гілці WP-01a/00a/13** (Telegram — З) |
 | S-M2-03 | Стратегії пошуку окремо й у комбінаціях проти `expected_urls.json` | 10 | web-collector (+WP-03), testsite | **10 Docker e2e пройшли на `main` `1306ad3`** (`test_m2_discovery.py`; `just e2e`, CI `36694741989`) |
 | S-M2-04 | Каталог і перевірка цін — окремі завдання | 5 | orchestrator, web-collector, runtime, storage, registry, штатний testsite | Після WP-01e сценарій **PASSED** у e2e [CI 36995885370](https://github.com/sql-monk/Jane/actions/runs/36995885370) на `7c34688`; фінальна `main` ще не перевірена |
-| S-M2-05a | Невідома сторінка: асистент викликає LLM лише з прапорцем (без оркестратора) | 11 | testsite, assistant, llm, postgres | **реалізовано, проходить** (LLM — З) |
-| S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, runtime, storage, llm | Маршрут прапорця пройдено; WP-13n додав FAQ із ін'єкцією, він і звичайний FAQ дали ту саму відповідь LLM у [CI 37002784428](https://github.com/sql-monk/Jane/actions/runs/37002784428). Зовнішня LLM — З (`fake`), архіви — `package-host` Т. |
+| S-M2-05a | Невідома сторінка: асистент викликає LLM лише з прапорцем (без оркестратора) | 11 | testsite, assistant, llm, postgres | **реалізовано, проходить** (LLM — З; матеріал — вхід прямого виклику асистента) |
+| S-M2-05 | Невідомі сторінки в завданні: LLM лише з прапорцем | 11 | orchestrator, web-collector, runtime, storage, llm | Маршрут прапорця пройдено; сторінка з ін'єкцією (WP-13n) проходить як дані, класифікація `faq` у [CI 37002784428](https://github.com/sql-monk/Jane/actions/runs/37002784428) (**З**); стійкість до ін'єкції — unit WP-10, на реальній LLM не перевірено. Зовнішня LLM — З (`fake`); архіви — тоді `package-host` (Т), після WP-13t — реальний registry. |
 | S-M2-06 | Нове джерело через асистента → варіанти → пакет → тести → активація | 4 | assistant, llm, registry, web-collector, runtime, orchestrator | **2 Docker e2e пройшли на інтеграційній гілці** (лише назва та підказки обходу; LLM і пошук — З); повний `just e2e`: 33 passed, у `main` не злито |
 | S-M2-07 | Проблемні приклади → нова версія → тести → активація → відкат | 6 | orchestrator, assistant, llm, registry, runtime | **1 Docker e2e пройшов на інтеграційній гілці** (LLM — З); повний `just e2e`: 33 passed, у `main` не злито |
-| S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, усі сховища | **1 Docker e2e пройшов на `main` `1306ad3`** (`just e2e`, CI `36694741989`); S3 — З |
-| S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці | **1 Docker e2e пройшов на `main` `1306ad3`** (кількість сторінок; `just e2e`, CI `36694741989`); темп ще не виміряно |
+| S-M2-08 | Усі 6 адаптерів: RAW + сутності; заміна в конфігурації завдання | 3, 12 | storage (+WP-08), orchestrator, registry, усі сховища | **1 Docker e2e пройшов на `main` `1306ad3`** (`just e2e`, CI `36694741989`); S3 — З |
+| S-M2-09 | Зміна лімітів без зміни коду | 13 | orchestrator, виконавці, registry | **1 Docker e2e пройшов на `main` `1306ad3`** (кількість сторінок; `just e2e`, CI `36694741989`); темп ще не виміряно |
 | S-M2-10 | Адмінка на реальному API (Playwright) | 6, 7 (UI) | admin, усі API | WP-12c виконав повний наявний real-набір через Caddy: **14/14 passed** ([звіт WP-12](../delivery/WP-12.md), розділ «WP-12c — завершення»). Основні дії S-M2-10 охоплено; 5 із 26 mock-сценаріїв не мають real-аналога, 12 — лише частково. Фінальна спільна ревізія `main` не перевірена. |
-| S-M2-11 | Ланцюжок з умовами `when` і LLM-етапом | 2 | orchestrator, web-collector, runtime, storage, llm | **пройдено на гілці `wp/13-llm-routing`** (`test_m2_llm_routing.py`; LLM — З, архіви пакетів — `package-host` Т) |
+| S-M2-11 | Ланцюжок з умовами `when` і LLM-етапом | 2 | orchestrator, web-collector, runtime, storage, llm | **пройдено на гілці `wp/13-llm-routing`** (`test_m2_llm_routing.py`; LLM — З; архіви пакетів — тоді `package-host` Т, після WP-13t — реальний registry) |
 | R-01 | Kill воркера оркестратора посеред ланцюжка | 8 | orchestrator ×2, виконавці | **Пройшов** у [CI 36999629588](https://github.com/sql-monk/Jane/actions/runs/36999629588) на WP-13m: після перехоплення lease друга репліка повторила старт того самого run і повернула ту саму job; ефекти лишилися одиничними. Фінальна `main` ще не перевірена. |
 | R-02 | Kill і рестарт кожного сервісу; повтор після рестарту — дубль | 8 | усі сервіси | **Усі вісім сервісів пройшли на одному SHA `cb4895d`**: storage, handler-runtime, Web/Telegram Collector, LLM (sync/async), registry, assistant, orchestrator. [CI 37017296604](https://github.com/sql-monk/Jane/actions/runs/37017296604): 12/12 job, e2e 62 passed. Фінальна `main` не перевірена. |
 | R-03 | Розрив мережі між оркестратором і виконавцем | 8 | orchestrator, виконавці | Storage partition і retry **PASSED** у Linux [CI 37002784428](https://github.com/sql-monk/Jane/actions/runs/37002784428); локальні 3 Docker e2e теж пройшли. Фінальна `main` ще не перевірена. |
@@ -106,8 +115,9 @@ Docker-сокет із групою, визначеною автоматично
    (`handler`), storage (`handler` для `jane.storage-*` і `storage_read`). Підключення `raw-files` і `results-pg`
    задаються через `PUT /v1/connections/{id}` оркестратора і синхронізуються у storage.
 2. `POST /v1/sources` (testsite), `POST /v1/tasks` з DAG `collect` → `store-raw` ‖ `extract-products`
-   (прив'язка `url_patterns: /product/*`) → `store-products`. Версію й дайджест локального екстрактора
-   зафіксовано; його архів runtime отримує з тестового `package-host` (**Т**).
+   (прив'язка `url_patterns: /product/*`) → `store-products`. Приклад екстрактора SDK опубліковано й
+   погоджено в реальному registry; етап посилається на `package_id@version` з дайджестом registry, тож
+   runtime завантажує архів із registry й перевіряє дайджест (`package_sources` runtime: `registry`).
 3. `POST /v1/tasks/{id}/runs`, далі очікування завершення прогону (`GET /v1/runs/{id}`).
 4. Перевірки: `GET /v1/runs/{id}/items` — кожен матеріал пройшов потрібні етапи. `GET /v1/materials/{id}/trace`
    дає ланцюжок матеріал → етап → результат → версія пакета. RAW лежить у files (як у S-M1-01),
@@ -136,9 +146,9 @@ PostgreSQL (`jane.storage-postgresql` / `results-pg`) і files (`jane.storage-fi
 ### S-M2-01. Єдиний репозиторій: типи, версії, форки
 `tests/e2e/test_m2_registry.py` піднімає реальний registry і перевіряє публікацію пакетів,
 архіви та SHA-256, правила Web Collector із registry, виконання екстрактора runtime через
-архів registry і завдання оркестратора на незмінній версії форку. Локальний `package-host`
-лишається типовим для старих M1-тестів; registry-сценарій вибирає реальний URL через тестову
-конфігурацію. LLM-пакет тут лише публікується. Виконання LLM-пакета, дайджести storage-етапів і форки
+архів registry і завдання оркестратора на незмінній версії форку. Після WP-13t реальний registry
+типовий для всіх оркестрованих сценаріїв спільного стеку; цей сценарій має власний стек, бо бере з
+registry ще й правила колектора та storage-пакети. LLM-пакет тут лише публікується. Виконання LLM-пакета, дайджести storage-етапів і форки
 LLM, storage та правил перевіряє продовження `tests/e2e/test_m2_registry_types.py` (кроки 5–7).
 
 1. Публікація в registry (`POST /v1/packages`, `…/versions`): екстрактор testsite, `jane.storage-files`,
@@ -266,7 +276,10 @@ succeeded. Перевірка цін: `schedule` succeeded, `manual` succeeded. 
 
 ### S-M2-05a. Невідома сторінка: асистент і LLM-шлюз напряму
 `tests/e2e/test_m2.py::test_s_m2_05a_unknown_page_goes_to_llm_only_with_flag`. Сторінка
-`/pages/event-spring-meetup` testsite має тип `unknown`, матеріал формує замінник колектора (**Т**). Кроки:
+`/pages/event-spring-meetup` testsite має тип `unknown`. Матеріал — **вхід прямого виклику**: тест як
+сторонній застосунок формує його з відповіді testsite (`jane_e2e.materials`). Перевіряється політика
+прапорця асистента й виклики LLM, а не Web Collector. Матеріал Web Collector тут не взято, бо його URL
+`http://testsite:8080/…` збігся б зі скриптом класифікації асистента в `llm-seed.yaml` (S-M2-06). Кроки:
 
 1. `POST /v1/unknown-materials` асистента з `forward_unknown_to_llm: false` дає 403 `access_denied_by_policy`.
    `GET /v1/usage` LLM-шлюзу (`totals.requests`) до й після виклику однаковий.
@@ -281,7 +294,7 @@ LLM — **З**: вбудований детермінований провайд
 Джерело з `forward_unknown_to_llm: false`, завдання з прив'язками екстракторів, прогін на testsite
 (сторінки `unknown`). `GET /v1/usage` шлюзу LLM не показує викликів, `GET /v1/unknown-materials` —
 показує матеріали. Після ввімкнення прапорця й повторного прогону виклики є, вони прив'язані до цих
-матеріалів, облік витрат ведеться. Вміст сторінки з ін'єкцією не змінює поведінки.
+матеріалів, облік витрат ведеться. Сторінка з ін'єкцією обробляється як дані.
 
 `tests/e2e/test_m2_llm_routing.py::test_s_m2_05_unknown_pages_reach_llm_only_after_the_flag_is_enabled`.
 Реальні orchestrator, web-collector, handler-runtime, storage, llm (шлюз і LLM-обробник), testsite.
@@ -302,13 +315,15 @@ LLM — **З**: вбудований детермінований провайд
 4. Облік: `GET /v1/usage?scope_type=source` — рівно 3 запити, токени й вартість > 0, `purpose: handler`;
    `Run.costs.llm` > 0.
 
-LLM — **З** (провайдер `fake` з ненульовими цінами, скрипти — `tests/e2e/config/llm-seed.yaml`). Архів
-LLM-пакета — через `package-host` (**Т**). Асистент у цьому маршруті не бере участі: оркестратор
-передає невідомі матеріали етапу `unmatched_materials`; шлях через асистента — S-M2-05a.
-WP-01f додав пряму `/pages/faq-injection`. WP-13n провів її і звичайний FAQ через цей маршрут:
-обидві класифіковані як `faq`, інструкція з HTML не змінила відповідь, e2e **PASSED** у
-[CI 37002784428](https://github.com/sql-monk/Jane/actions/runs/37002784428). Контроль ін'єкції
-в довіреному каналі лишається в `services/llm/tests/test_injection.py` (WP-10).
+LLM — **З** (провайдер `fake` з ненульовими цінами, скрипти — `tests/e2e/config/llm-seed.yaml`). Архіви
+екстрактора й LLM-пакета — з реального registry (WP-13t; раніше `package-host`, **Т**). Асистент у цьому
+маршруті не бере участі: оркестратор передає невідомі матеріали етапу `unmatched_materials`; шлях через
+асистента — S-M2-05a. WP-01f додав пряму `/pages/faq-injection`. WP-13n провів її і звичайний FAQ через
+цей маршрут ([CI 37002784428](https://github.com/sql-monk/Jane/actions/runs/37002784428)): сторінка з
+ін'єкцією проходить як дані (**З**), обидві класифіковані як `faq`, `hijacked` у виході немає. Вплив
+ін'єкції цей сценарій виявити не може: сід фейкового провайдера відповідає `faq` на будь-які дані з
+`<h1>FAQ</h1>`. Стійкість до ін'єкції — unit WP-10 (`services/llm/tests/test_injection.py`); на реальній
+LLM не перевірено.
 
 ### S-M2-06. Нове джерело через асистента
 `POST /v1/onboarding-sessions` (лише назва testsite; пошуковий провайдер — **З**, LLM — **З** WP-10) →
@@ -394,7 +409,8 @@ JSON прив'язано до екстрактора, але `when` за media t
 JSON — лише `store-raw-json`. Група проблем екстрактора `unknown-availability` має `count: 2`; облік
 LLM у scope джерела й `Run.costs.llm` > 0.
 
-LLM — **З**, архіви пакетів-фікстур — `package-host` (**Т**; реальний registry тут не перевіряється).
+LLM — **З**. Архіви пакетів-фікстур `e2e.instock-product-extractor` і `e2e.llm-page-triage` — з реального
+registry (WP-13t: опубліковано й погоджено, етапи зафіксовано дайджестами registry; раніше `package-host`, **Т**).
 
 ## Надійність
 
@@ -409,7 +425,8 @@ LLM — **З**, архіви пакетів-фікстур — `package-host` (*
 | R-07 | S-M2-07 з `docker kill` + `start` асистента (окремо — runtime), поки кандидат тестується в runtime, паралельно з прогоном навантаження | цикл завершується або відновлюється без втрати й дублювання версій; відкат працює |
 | R-08 | Малий `limits.queue.max_unacked_materials`, повільний споживач | колектор призупиняється, пам'ять не росте, після споживання продовжує |
 
-Реалізовані зараз: `tests/e2e/test_reliability.py` — `test_r_02_…`, `test_r_05_…`, `test_r_06_…`;
+Реалізовані зараз: `tests/e2e/test_reliability.py` — `test_r_02_…`, `test_r_05_…`, `test_r_06_…` (матеріал
+дає реальний Web Collector, `POST /v1/fetches`; так само R-06 storage у `test_r06_storage_registry.py`);
 `tests/e2e/test_r04_idempotency.py` — частина R-04/R-06 (лише гілка WP-13):
 `test_r_04_collectors_replay_one_job_without_new_materials[web-collector|telegram-collector]` і
 `test_r_04_llm_replay_does_not_spend_usage_twice[sync|async]`, кожен на тому самому та іншому
@@ -439,9 +456,9 @@ LLM — **З**, архіви пакетів-фікстур — `package-host` (*
 `/v1/completions` LLM та onboarding/improvement асистента так не утримати без зміни фейкового провайдера
 (запит до WP-10 у звіті WP-13, розділ «WP-13r»).
 
-`tests/e2e/test_reliability_orchestrated.py` — R-01, R-03, R-08 на завданнях оркестратора (лише
-гілка `wp/13d-reliability`; реальні orchestrator, web-collector, handler-runtime, storage; архіви
-пакетів — `package-host`, **Т**). R-01: дві репліки на одній БД; репліка 1 тримає lease виклику
+`tests/e2e/test_reliability_orchestrated.py` — R-01, R-03, R-08 на завданнях оркестратора (реальні
+orchestrator, web-collector, handler-runtime, storage, registry; архіви пакетів — з реального registry
+після WP-13t, раніше `package-host`, **Т**). R-01: дві репліки на одній БД; репліка 1 тримає lease виклику
 повільного екстрактора-фікстури `e2e.slow-product-extractor` (виклик довший за lease), отримує
 `docker kill`, далі `docker start`. Репліка 2 перехоплює прострочений lease, поки осиротілий виклик
 ще виконується; повтор із тим самим `delivery_key` отримує від runtime 409 `idempotency_in_progress`

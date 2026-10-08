@@ -359,6 +359,25 @@ def test_invalid_requests(w: World) -> None:
     )
 
 
+def test_problem_sample_content_follows_the_content_policy(w: World) -> None:
+    """A sample material in the request cannot make the assistant read a file of its container (WP-01h)."""
+    seed(w)
+    body = request()
+    body["problem_samples"][1]["material"]["content"] = {
+        "kind": "blob",
+        "uri": "file:///proc/self/environ",
+        "media_type": "text/html",
+        "size_bytes": 100,
+        "sha256": "0" * 64,
+    }
+    r = w.api.post("/v1/improvement-runs", json=body, headers={"Idempotency-Key": "policy"})
+    assert r.status_code == 202, r.text
+    job = w.wait(r.json()["job_id"])
+    assert job["status"] == "failed" and job["error"]["code"] == "validation_failed", job
+    assert "JANE_ASSISTANT_BLOB_ROOTS" in job["error"]["detail"]
+    assert "improve_extractor" not in w.llm.steps()
+
+
 class _ResetOnce(httpx.AsyncBaseTransport):
     """A neighbour reached through a pooled keep-alive connection that the neighbour has just closed.
 

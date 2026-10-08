@@ -46,7 +46,7 @@ services:
       # (reprocessing of stored RAW, S-M2-07).
       - storage-data:/var/lib/jane/storage:ro
     environment:
-      JANE_HANDLER_RUNTIME_BLOB_ROOTS: '["/var/lib/jane/storage"]'
+      JANE_HANDLER_RUNTIME_BLOB_ROOTS: '["/var/lib/jane/storage/objects"]'  # RAW objects only (WP-01h)
       JANE_HANDLER_RUNTIME_PROFILE_IMAGES: '{"python-extractor@1": "${JANE_E2E_SANDBOX_IMAGE:?set by tests/e2e}"}'
       JANE_HANDLER_RUNTIME_SANDBOX_LABELS: '{"io.jane.e2e-project": "${JANE_E2E_PROJECT:-jane-e2e}"}'
       # Archives of orchestrated stages (no package_archive) come from the real registry (WP-05).
@@ -64,6 +64,9 @@ services:
       JANE_LLM_LIMITS__LLM__MAX_REQUESTS_PER_MINUTE: ${JANE_E2E_LLM_MAX_REQUESTS_PER_MINUTE:-120}
       # LLM packages of orchestrated stages (no package_archive) come from the real registry (WP-05).
       JANE_LLM_REGISTRY_URL: ${JANE_E2E_LLM_REGISTRY_URL:-http://registry:8000}
+      # ContentRef policy (WP-01h): download_url only to these hosts (R-04 reads material content through a gate of
+      # the package-host stand-in); file:// only below the stored RAW volume (JANE_LLM_BLOB_ROOTS, infra/compose.yaml).
+      JANE_LLM_DOWNLOAD_HOST_ALLOWLIST: '["package-host:8080"]'
     volumes:
       - ../tests/e2e/config/llm-seed.yaml:/cfg/llm-seed.yaml:ro
 
@@ -78,6 +81,9 @@ services:
       JANE_ASSISTANT_ORCHESTRATOR_URL: http://orchestrator:8000
       JANE_ASSISTANT_DEFAULT_STORAGE_PACKAGE: jane.storage-postgresql@1.0.0
       JANE_ASSISTANT_DEFAULT_STORAGE_CONNECTION: results-pg
+      # ContentRef policy (WP-01h): material download_url only to the package-host stand-in (R-04 gates); file://
+      # stays disabled - stored RAW reaches the assistant inline through storage /v1/objects/{id}/content.
+      JANE_ASSISTANT_DOWNLOAD_HOST_ALLOWLIST: '["package-host:8080"]'
       # One material per classification request: the fake LLM answers by the content of the request, so a
       # scripted answer can classify exactly that material (tests/e2e/config/llm-seed.yaml). The pool the
       # diversity selection picks from stays ~10 materials (batch x poll_page_factor).

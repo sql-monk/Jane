@@ -15,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
 
 from jane_kit.clients import ClientLimits
@@ -27,6 +27,7 @@ from jane_kit.config import (
     contract_field,
     resolve_limits,
 )
+from jane_kit.content import parse_host_allowlist
 from jane_kit.idempotency import IdempotencyLimits
 from jane_kit.jobs import JobLimits
 
@@ -68,6 +69,15 @@ class Settings(JaneSettings):
     search_url_field: str = "url"
     search_description_field: str = "description"
 
+    # ContentRef policy (WP-01h): material content arrives in requests (unknown materials, improvement samples)
+    # and from collectors, so neither file:// nor download_url may reach arbitrary files or hosts.
+    blob_roots: list[Path] = Field(default_factory=list)
+    """Directories from which ``file://`` material content may be read (JSON list). Empty (default): ``file://``
+    content is refused - a request must not read arbitrary files of this container."""
+    download_host_allowlist: list[str] = Field(default_factory=list)
+    """``hostname`` (any port) or ``hostname:port`` a material ``download_url`` may point to (JSON list).
+    Empty (default): downloads are refused. Redirects are never followed."""
+
     contracts_dir: Path | None = None
     """Where ``contracts/schemas`` live (local validation of generated rules and manifests).
     Empty -> found upwards from the package (dev checkout) or ``/app/contracts`` (Docker)."""
@@ -102,6 +112,12 @@ class Settings(JaneSettings):
     onboarding_allow_activation: bool = True
     """Allow ``acceptProposal`` with ``activate: true`` to create the source and task in the
     orchestrator (only when every extractor passed its tests)."""
+
+    @field_validator("download_host_allowlist")
+    @classmethod
+    def _valid_download_hosts(cls, value: list[str]) -> list[str]:
+        parse_host_allowlist(value)  # a typo stops the service at start
+        return value
 
 
 class Budget(Limits):
@@ -187,6 +203,24 @@ class TransferLimits(Limits):
     """Package archives up to this size are sent to the runtime inline (base64)."""
 
 
+class ContentLimits(Limits):
+    """Reading material content (``ContentRef``) under ``blob_roots`` / ``download_host_allowlist``."""
+
+    max_material_bytes: int = Field(default=16_777_216, ge=1)
+    """Largest material content read (inline, file or download); larger is ``limit_exceeded``."""
+    fetch_timeout_ms: int = Field(default=30_000, ge=1)
+    """The whole ``download_url`` download, connection included."""
+    connect_timeout_ms: int = Field(default=5_000, ge=1)
+    """Establishing the connection of a ``download_url`` download."""
+
+
+class SearchLimits(Limits):
+    """Calls of the ``http_json`` search provider."""
+
+    request_timeout_ms: int = Field(default=10_000, ge=1)
+    connect_timeout_ms: int = Field(default=5_000, ge=1)
+
+
 class StateLimits(Limits):
     """Shared PostgreSQL state (``state_dsn``)."""
 
@@ -209,6 +243,8 @@ class ServiceLimits(Limits):
     onboarding: OnboardingLimits = OnboardingLimits()
     improvement: ImprovementLimits = ImprovementLimits()
     unknown: UnknownLimits = UnknownLimits()
+    content: ContentLimits = ContentLimits()
+    search: SearchLimits = SearchLimits()
     clients: ClientLimits = ClientLimits()
     jobs: JobLimits = JobLimits()
     idempotency: IdempotencyLimits = IdempotencyLimits()

@@ -5,11 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import SettingsConfigDict
 
 from jane_kit.clients import ClientLimits, RetryPolicy
 from jane_kit.config import JaneSettings, LimitLayer, Limits, ResolvedLimits, contract_field, resolve_limits
+from jane_kit.content import ContentReader, parse_host_allowlist
 from jane_kit.idempotency import IdempotencyLimits
 from jane_kit.jobs import JobLimits
 from jane_llm.connections import ConnectionPolicy
@@ -54,12 +55,34 @@ class Settings(JaneSettings):
     """``file:`` secret references may only point inside this directory (unset: ``file:`` disabled)."""
     provider_api_base_allowlist: list[str] = Field(default_factory=lambda: ["https://api.anthropic.com"])
     """Origins a connection's ``params.api_base`` may point to (JSON list in the environment)."""
+    blob_roots: list[Path] = Field(default_factory=list)
+    """Directories from which ``file://`` content (materials, entities/data refs, package archives) may be read
+    (JSON list). Empty (default): ``file://`` content is refused - a request must not read arbitrary files."""
+    download_host_allowlist: list[str] = Field(default_factory=list)
+    """``hostname`` (any port) or ``hostname:port`` a ContentRef ``download_url`` may point to (JSON list).
+    Empty (default): downloads are refused. Redirects are never followed."""
+
+    @field_validator("download_host_allowlist")
+    @classmethod
+    def _valid_download_hosts(cls, value: list[str]) -> list[str]:
+        parse_host_allowlist(value)  # a typo stops the service at start
+        return value
 
     def connection_policy(self) -> ConnectionPolicy:
         return ConnectionPolicy(
             env_prefix=self.secret_env_prefix,
             files_dir=self.secret_files_dir,
             api_base_allowlist=tuple(self.provider_api_base_allowlist),
+        )
+
+    def content_reader(self, limits: GatewayLimits) -> ContentReader:
+        """Reader of request ContentRefs under ``blob_roots`` / ``download_host_allowlist`` and the gateway
+        limits (``content_fetch_timeout_ms``; sizes are given per read)."""
+        return ContentReader(
+            timeout_ms=limits.content_fetch_timeout_ms,
+            blob_roots=self.blob_roots,
+            download_host_allowlist=self.download_host_allowlist,
+            settings_prefix=ENV_PREFIX,
         )
 
 
@@ -93,7 +116,8 @@ class GatewayLimits(Limits):
     max_data_part_bytes: int = Field(default=2_000_000, ge=1)
     """Largest single data part (material content) accepted from inline or blob content."""
     content_fetch_timeout_ms: int = Field(default=30_000, ge=1)
-    """Timeout of downloading blob content (``download_url``) of materials and package archives."""
+    """Timeout of downloading blob content (``download_url``) of materials and package archives (the whole
+    download, connection included)."""
     max_package_bytes: int = Field(default=20_000_000, ge=1)
     """Largest package archive (compressed, and total uncompressed size) from a request or the registry."""
     max_package_files: int = Field(default=1_000, ge=1)

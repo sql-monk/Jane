@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
 
 from jane_kit.config import (
@@ -17,6 +17,7 @@ from jane_kit.config import (
     contract_field,
     resolve_limits,
 )
+from jane_kit.content import parse_host_allowlist
 from jane_kit.idempotency import IdempotencyLimits
 from jane_kit.jobs import JobLimits
 
@@ -55,6 +56,9 @@ class Settings(JaneSettings):
     blob_roots: list[Path] = Field(default_factory=list)
     """Directories from which ``file://`` blobs (package archives, material content) may be read.
     Empty = ``file://`` blobs are refused (the service must not read arbitrary host files)."""
+    download_host_allowlist: list[str] = Field(default_factory=list)
+    """``hostname`` (any port) or ``hostname:port`` a ContentRef ``download_url`` may point to (JSON list).
+    Empty (default): downloads are refused. Redirects are never followed."""
     state_dsn: SecretStr | None = None
     """PostgreSQL DSN of the service's own state (idempotency keys, jobs, results) shared by instances.
     Unset: in-memory state - only for a single standalone instance and the CLI (lost on restart)."""
@@ -62,6 +66,12 @@ class Settings(JaneSettings):
     """Schema of the state tables (created if missing)."""
     contracts_dir: Path | None = None
     """``contracts/`` with the JSON Schemas; default: found upwards from the package (repo checkout)."""
+
+    @field_validator("download_host_allowlist")
+    @classmethod
+    def _valid_download_hosts(cls, value: list[str]) -> list[str]:
+        parse_host_allowlist(value)  # a typo stops the service at start
+        return value
 
 
 class SandboxLimits(Limits):
@@ -79,7 +89,7 @@ class TimeoutLimits(Limits):
     invocation_timeout_ms: int = contract_field("timeouts.invocation_timeout_ms", 60_000, ge=1)
     sync_response_max_ms: int = contract_field("timeouts.sync_response_max_ms", 25_000, ge=1)
     request_timeout_ms: int = contract_field("timeouts.request_timeout_ms", 30_000, ge=1)
-    """Registry and blob downloads."""
+    """Registry calls and blob downloads (a whole ``download_url`` download, connection included)."""
 
 
 class ConcurrencyLimits(Limits):

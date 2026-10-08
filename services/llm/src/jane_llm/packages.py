@@ -1,4 +1,4 @@
-"""LLM packages (``kind: llm``): loading from an archive, the registry or a local directory; content refs.
+"""LLM packages (``kind: llm``): loading from an archive, the registry or a local directory.
 
 A package is a manifest (``jane-package.json``) plus prompts and schemas; no code. The executor verifies
 ``handler.digest`` when given (``sha256:`` of the archive bytes; for a local directory — of the canonical
@@ -16,12 +16,11 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
-from urllib.parse import unquote, urlparse
-from urllib.request import url2pathname
 
 import httpx
 
 from jane_kit.clients import ClientLimits, RemoteError, ServiceClient
+from jane_kit.content import ContentReader
 from jane_kit.errors import JaneError, NotFound, UpstreamUnavailable, ValidationFailed
 from jane_llm.settings import GatewayLimits
 
@@ -132,52 +131,6 @@ def check_llm_manifest(manifest: dict[str, Any], ref: dict[str, Any] | None = No
         )
 
 
-async def read_content(ref: dict[str, Any], max_bytes: int, timeout_s: float) -> bytes:
-    """Bytes of a ``ContentRef``: inline (utf-8/base64) or blob (``file://`` or ``download_url``).
-
-    ``max_bytes`` and ``timeout_s`` come from ``limits.gateway`` (``max_data_part_bytes`` /
-    ``max_package_bytes``, ``content_fetch_timeout_ms``); downloads stop as soon as ``max_bytes`` is passed.
-    """
-    if ref.get("kind") == "inline":
-        data = ref.get("data", "")
-        raw = base64.b64decode(data) if ref.get("encoding") == "base64" else str(data).encode("utf-8")
-    elif ref.get("kind") == "blob":
-        uri = str(ref.get("uri", ""))
-        if ref.get("download_url"):
-            async with (
-                httpx.AsyncClient(timeout=timeout_s) as client,
-                client.stream("GET", str(ref["download_url"])) as resp,
-            ):
-                if resp.status_code >= 400:
-                    raise UpstreamUnavailable(
-                        f"blob download failed: HTTP {resp.status_code}", retryable=True
-                    )
-                buf = bytearray()
-                async for chunk in resp.aiter_bytes():
-                    buf.extend(chunk)
-                    if len(buf) > max_bytes:
-                        raise ValidationFailed(f"blob content exceeds {max_bytes} bytes")
-                raw = bytes(buf)
-        elif uri.startswith("file://"):
-            parsed = urlparse(uri)
-            path = Path(url2pathname(unquote(parsed.path)))
-            try:
-                if (await asyncio.to_thread(path.stat)).st_size > max_bytes:
-                    raise ValidationFailed(f"blob {uri} exceeds {max_bytes} bytes")
-                raw = await asyncio.to_thread(path.read_bytes)
-            except OSError as exc:
-                raise NotFound(f"blob {uri} is not readable") from exc
-        else:
-            raise ValidationFailed(f"blob {uri} has no download_url; this service reads file:// blobs only")
-    else:
-        raise ValidationFailed(f"unknown content kind {ref.get('kind')!r}")
-    if len(raw) > max_bytes:
-        raise ValidationFailed(f"content of {len(raw)} bytes exceeds the limit of {max_bytes} bytes")
-    if (sha := ref.get("sha256")) and hashlib.sha256(raw).hexdigest() != sha:
-        raise ValidationFailed("content sha256 does not match the content reference")
-    return raw
-
-
 class PackageLoader:
     """Finds LLM packages: request archive -> local directory -> registry. Caches by digest.
 
@@ -189,6 +142,9 @@ class PackageLoader:
       only for exactly its ``package_id@version`` and digest. A digest of another package or version, or a
       package seen only in some request's archive, goes the cold way and gets its ``digest_mismatch`` /
       ``not_found``.
+
+    ``package_archive`` is read by ``content`` (``jane_kit.content.ContentReader`` under ``JANE_LLM_BLOB_ROOTS`` /
+    ``JANE_LLM_DOWNLOAD_HOST_ALLOWLIST``); without it only inline archives can be read.
     """
 
     def __init__(
@@ -200,9 +156,11 @@ class PackageLoader:
         *,
         limits: GatewayLimits,
         transport: httpx.AsyncBaseTransport | None = None,
+        content: ContentReader | None = None,
     ) -> None:
         self.transport = transport
         self.limits = limits
+        self.content = content or ContentReader(timeout_ms=limits.content_fetch_timeout_ms)
         self.packages_dir = packages_dir
         self.registry_url = registry_url
         self.registry_limits = registry_limits
@@ -265,8 +223,8 @@ class PackageLoader:
         pkg: LoadedPackage | None = None
         if archive_ref is not None:
             # The request's archive is what runs: read it every time, the cache only skips unpacking it.
-            data = await read_content(
-                archive_ref, self.limits.max_package_bytes, self.limits.content_fetch_timeout_ms / 1000
+            data = await self.content.read(
+                archive_ref, max_bytes=self.limits.max_package_bytes, limit="gateway.max_package_bytes"
             )
             pkg = self._archives.get(digest_of(data)) or self._from_archive(data)
             cache = self._archives

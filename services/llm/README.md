@@ -64,6 +64,7 @@ just down -v --project jane-wp10
 | `tests/test_contract.py` | усі операції `llm.v1` і `handler.v1` через `ContractClient` (запити й відповіді за схемами) |
 | `tests/test_service.py` | повтори за схемою, 502 з вивільненням резерву, ліміти частоти й токенів, тести пакета через `/v1/test-runs`, простежуваність результату, seed-файл, публікація в registry (мок з контракту), завантаження пакета з registry з перевіркою дайджесту, адаптер Anthropic проти локального замінника API |
 | `tests/test_units.py` | промпт і розмежувачі, фейкова модель, вікна бюджетів, розв'язання секретів, семантика резервувань |
+| `tests/test_fake_provider.py` | затримка провайдера `fake`: `params.delay_ms`, `responses[].delay_ms` (зокрема скрипт лише із затримкою), межа `fake.max_delay_ms` з конфігурації, некоректні значення; синхронний `/v1/completions`, утримуваний затримкою, — 409 `idempotency_in_progress` на повтор, 422 на інше тіло, потім збережений результат і один виклик провайдера |
 
 Фікстура `store_kind` проганяє кожен сценарій на `memory` і (з маркером `integration`) на PostgreSQL.
 
@@ -150,6 +151,14 @@ just down -v --project jane-wp10
   вище) → перший збіг зі скриптів підключення (`params.responses: [{when_data_contains | when_data_matches,
   output | output_text | error: unavailable|rejected}]`) → мінімальне значення, що відповідає схемі →
   `fake:<sha256>`. Токени — `ceil(символи / 4)`. Ціни задаються в моделі провайдера (типово 0).
+  **Затримка відповіді** (детерміноване вікно «виклик ще в польоті» для тестів, напр. R-04): `delay_ms`
+  першого скрипту, що збігся й має `delay_ms` (скрипт лише з `delay_ms`, без відповіді, тільки задає затримку —
+  відповідь шукається далі), інакше `params.delay_ms` підключення; ціле число мс ≥ 0, інше значення — помилка
+  виклику (не `retryable`). Затримка обмежується `fake.max_delay_ms` (див. «Ліміти»), відбувається перед
+  відповіддю (і перед скриптованою помилкою) і журналюється рядком `fake provider holds its answer` з
+  `connection_id`, `delay_ms`. Приклад: `params: {provider: fake, delay_ms: 10000}` — кожен виклик через це
+  підключення відповідає через 10 с; `responses: [{when_data_contains: "slow-marker", delay_ms: 10000}, …]` —
+  лише запити з цим текстом у даних.
 
 ## Ліміти
 
@@ -170,6 +179,7 @@ just down -v --project jane-wp10
 | `gateway.content_fetch_timeout_ms` | 30000 | тайм-аут завантаження blob за `download_url` (матеріали, архіви) |
 | `gateway.max_package_bytes` | 20000000 | архів пакета: стиснений розмір, відповідь registry і сума розпакованих файлів |
 | `gateway.max_package_files` | 1000 | файлів в архіві пакета |
+| `fake.max_delay_ms` | 30000 | верхня межа затримки провайдера `fake` (`params.delay_ms`, `responses[].delay_ms`); довша скорочується до неї, `0` вимикає затримки (`JANE_LLM_LIMITS__FAKE__MAX_DELAY_MS`) |
 | пул PostgreSQL (`JANE_LLM_DB_POOL_MIN_SIZE` / `JANE_LLM_DB_POOL_MAX_SIZE`) | 1 / 10 | з'єднань на екземпляр (налаштування процесу, не `limits`) |
 | `provider.connect_timeout_ms` / `provider.request_timeout_ms` | 5000 / 120000 | тайм-аути викликів провайдера (контракт `timeouts.*`) |
 | `provider.retries.max_attempts` | 2 | спроби виклику провайдера (контракт `retries`) |

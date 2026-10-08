@@ -16,12 +16,20 @@ It deliberately behaves like a **gullible, obedient model**, so that injection t
 So an injection placed inside data is harmless **only if** the gateway really keeps data inside
 unforgeable delimiters; the same text in the instruction channel, or any delimiter forgery that
 works, changes the answer. Token counts are ``ceil(chars / 4)``.
+
+4. It can hold its answer, so that tests get a deterministic "call still in flight" window (R-04): the
+   ``delay_ms`` of the first matching script that has one (a script with ``delay_ms`` and no answer only sets
+   the delay; matching goes on to the next scripts for the answer), else the connection's ``params.delay_ms``.
+   The delay is bounded by ``limits.fake.max_delay_ms`` (``0`` turns delays off) and logged
+   (:data:`HOLD_LOG_MESSAGE` with ``connection_id`` and ``delay_ms``) before it starts.
 """
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import logging
 import math
 import re
 from typing import TYPE_CHECKING, Any
@@ -33,6 +41,11 @@ if TYPE_CHECKING:
 
 FAKE_PROVIDER_ID = "fake"
 FAKE_MODEL_ID = "fake-deterministic-1"
+HOLD_LOG_MESSAGE = "fake provider holds its answer"
+"""Log message emitted (INFO, with ``connection_id`` and ``delay_ms``) when a call starts its delay."""
+_ANSWER_KEYS = ("output_text", "output")
+
+log = logging.getLogger(__name__)
 
 _NONCE_RE = re.compile(r"<<<JANE-DATA ([0-9a-f]{32})")
 _DIRECTIVE_RE = re.compile(
@@ -113,9 +126,24 @@ class FakeProvider:
     ) -> ProviderResponse:
         instruction_text, data = split_channels(request.system, request.user)
         data_text = "\n".join(data) if data else request.user
+        script, delay_ms = self._match(data_text, connection)
+        if delay_ms is None:
+            params = connection.params if connection else {}
+            delay_ms = _delay_ms(params.get("delay_ms", 0), "params.delay_ms")
+        held = min(delay_ms, limits.fake.max_delay_ms)
+        if held > 0:
+            log.info(
+                HOLD_LOG_MESSAGE,
+                extra={
+                    "connection_id": connection.connection_id if connection else None,
+                    "delay_ms": held,
+                    "requested_delay_ms": delay_ms,
+                },
+            )
+            await self._hold(held / 1000)
         text = find_directive(instruction_text)
-        if text is None:
-            text = self._scripted(data_text, connection)
+        if text is None and script is not None:
+            text = self._answer(script)
         if text is None:
             if request.output_schema is not None:
                 text = json.dumps(minimal_instance(request.output_schema), ensure_ascii=False)
@@ -132,10 +160,19 @@ class FakeProvider:
             finish_reason=finish,
         )
 
+    async def _hold(self, seconds: float) -> None:
+        """Wait before answering (the delay of a script or connection)."""
+        await asyncio.sleep(seconds)
+
     @staticmethod
-    def _scripted(data_text: str, connection: ResolvedConnection | None) -> str | None:
+    def _match(
+        data_text: str, connection: ResolvedConnection | None
+    ) -> tuple[dict[str, Any] | None, int | None]:
+        """The first matching script with an answer, and the ``delay_ms`` of the first matching script that
+        has one up to it (``None``: no script sets a delay)."""
         scripts = (connection.params.get("responses") if connection else None) or []
-        for script in scripts:
+        delay_ms: int | None = None
+        for i, script in enumerate(scripts):
             if not isinstance(script, dict):
                 continue
             contains = script.get("when_data_contains")
@@ -144,10 +181,25 @@ class FakeProvider:
                 continue
             if pattern is not None and not re.search(str(pattern), data_text):
                 continue
-            if err := script.get("error"):
-                raise ProviderError(f"scripted fake error: {err}", retryable=err == "unavailable")
-            if "output_text" in script:
-                return str(script["output_text"])
-            if "output" in script:
-                return json.dumps(script["output"], ensure_ascii=False)
-        return None
+            if delay_ms is None and "delay_ms" in script:
+                delay_ms = _delay_ms(script["delay_ms"], f"params.responses[{i}].delay_ms")
+            if script.get("error") or any(k in script for k in _ANSWER_KEYS):
+                return script, delay_ms
+        return None, delay_ms
+
+    @staticmethod
+    def _answer(script: dict[str, Any]) -> str:
+        if err := script.get("error"):
+            raise ProviderError(f"scripted fake error: {err}", retryable=err == "unavailable")
+        if "output_text" in script:
+            return str(script["output_text"])
+        return json.dumps(script["output"], ensure_ascii=False)
+
+
+def _delay_ms(value: Any, where: str) -> int:
+    """A delay from the connection params: a non-negative integer of milliseconds, else the call fails."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ProviderError(
+            f"fake provider: {where} must be a non-negative integer (ms), got {value!r}", retryable=False
+        )
+    return value

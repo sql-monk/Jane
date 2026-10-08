@@ -126,11 +126,20 @@ def test_schema_mismatch_is_failed(client: TestClient, h: Any) -> None:
     SCHEMAS.check("handler-result.schema.json", result)
 
 
-def test_network_attempt_is_a_sandbox_violation(client: TestClient, h: Any) -> None:
+@pytest.mark.parametrize("mode", ["sync", "async"])
+def test_network_attempt_is_a_sandbox_violation(client: TestClient, h: Any, mode: str) -> None:
     body = h.invocation(
-        h.probe, h.product_material(), key="n", params={"mode": "network", "host": "127.0.0.1", "port": 9}
+        h.probe,
+        h.product_material(),
+        key="n",
+        mode=mode,
+        params={"mode": "network", "host": "127.0.0.1", "port": 9},
     )
-    result = post(client, body).json()
+    response = post(client, body)
+    assert response.status_code in {200, 202}
+    result = response.json()
+    if response.status_code == 202:
+        result = wait_job(client, result["job_id"])["result"]
     assert result["status"] == "failed"
     assert result["failure"]["kind"] == "sandbox_violation"
     events = {v["event"] for v in result["failure"]["details"]["violations"]}

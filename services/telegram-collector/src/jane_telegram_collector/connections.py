@@ -98,7 +98,7 @@ class ConnectionPolicy:
             try:
                 path = Path(ref[5:]).resolve()
                 base = self.files_dir.resolve()
-            except (OSError, RuntimeError):
+            except (OSError, RuntimeError, ValueError):
                 return "file: reference is not a valid path"
             if not path.is_relative_to(base):
                 return f"file: references must point inside {self.files_dir}"
@@ -106,6 +106,21 @@ class ConnectionPolicy:
         if ref.startswith("vault:"):
             return "vault: references are not configured in this service"
         return "unknown secret reference scheme"
+
+    def secret_file(self, ref: str) -> Path | None:
+        """Resolved path (``..`` and symlinks resolved) of an allowed ``file:`` reference, else ``None``.
+
+        The secret is read from this path, never from the raw reference: a symlink swapped after the check
+        cannot redirect the read outside ``files_dir`` (the same rule as storage and web-collector).
+        """
+        if self.files_dir is None or not ref.startswith("file:") or not ref[5:]:
+            return None
+        try:
+            path = Path(ref[5:]).resolve()
+            base = self.files_dir.resolve()
+        except (OSError, RuntimeError, ValueError):
+            return None
+        return path if path != base and path.is_relative_to(base) else None
 
     def host_error(self, value: Any) -> str | None:
         parsed = parse_host(value)
@@ -137,9 +152,12 @@ class ConnectionPolicy:
             return None
         if ref.startswith("env:"):
             return os.environ.get(ref[4:]) or None
+        path = self.secret_file(ref)  # re-resolved now; the raw reference is never opened
+        if path is None:
+            return None
         try:
-            return Path(ref[5:]).read_text(encoding="utf-8").strip() or None
-        except OSError:
+            return path.read_text(encoding="utf-8").strip() or None
+        except (OSError, UnicodeDecodeError):
             return None
 
 

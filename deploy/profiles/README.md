@@ -64,6 +64,9 @@ uv run --all-packages python deploy/profiles/harness/limits_harness.py run --pro
 `compose.stack.yaml` робить саме це: монтує профіль як `LIMITS_FILE` у **всі** сервіси застосунку (orchestrator,
 колектори, storage, handler-runtime, registry, llm, assistant), генерує виконавців оркестратора
 (`.jane/executors-<проєкт>.json`) лише для запущених сервісів і налаштовує registry ↔ runtime ↔ колектори.
+Автентифікацію (`api_key`, ключ на кожну ідентичність, оркестратор кличе виконавців власним ключем) задає
+базовий `infra/compose.yaml`; `stack.py` генерує ключі у `.jane/stack-<проєкт>.json`, а харнес ходить до сервісів
+з ключем оператора `JANE_API_KEY_ADMIN`.
 Нові ліміти діють для **нових** запусків. Обмеження сайту, провайдера й `hard_caps` можуть лише звузити профіль.
 
 **Тайм-аут виклику LLM.** llm оголошує `provider.connect_timeout_ms`, `provider.request_timeout_ms` і

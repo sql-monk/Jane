@@ -118,9 +118,9 @@ just down -v --project jane-wp10
 | `JANE_LLM_SECRET_FILES_DIR` | `/run/secrets` | `file:`-посилання — лише на файли в цьому каталозі |
 | `JANE_LLM_PROVIDER_API_BASE_ALLOWLIST` | `["https://api.anthropic.com"]` | дозволені origin для `params.api_base` підключень (JSON-список) |
 | `JANE_LLM_PACKAGES_DIR` | вбудований `services/llm/packages` | локальні LLM-пакети (`<dir>/**/jane-package.json`) |
-| `JANE_LLM_REGISTRY_URL` / `JANE_LLM_REGISTRY_TOKEN` | — | репозиторій обробників для пакетів за `handler` (архів `…/archive`) |
+| `JANE_LLM_REGISTRY_URL` / `JANE_LLM_REGISTRY_TOKEN` | — | репозиторій обробників для пакетів за `handler` (архів `…/archive`); токен — власний ключ шлюзу (`registry:read`), лише з середовища, не журналюється |
 | `JANE_LLM_LOG_LEVEL` / `JANE_LLM_LOG_FORMAT` | `INFO` / `json` | журнали |
-| `JANE_LLM_AUTH_MODE` | `none` | значення для `/v1/info` (перевірка токенів у цьому WP не реалізована, див. звіт) |
+| `JANE_LLM_AUTH_MODE` | `none` | `none` / `api_key` / `jwt` — див. «Автентифікація (ADR-0005)» |
 | `JANE_LLM_LIMITS_FILE` | — | файл `PlatformLimits` (`defaults`, `hard_caps`), зокрема цілий профіль `deploy/profiles/<профіль>.json`: ліміти контракту, яких сервіс не має, ігноруються (перелік — у журналі старту), опечатка чи некоректне значення — помилка старту. Увага: `timeouts.connect_timeout_ms`, `timeouts.request_timeout_ms` і `retries` профілю діють і на виклики провайдерів (`provider.*` оголошені як ці поля контракту), тобто замінюють типові 120 с тайм-ауту запиту |
 | `JANE_LLM_LIMITS__<ГРУПА>__<ПАРАМЕТР>` | — | перевизначення, напр. `JANE_LLM_LIMITS__LLM__BUDGET__AMOUNT=5` |
 | `JANE_LLM_LIMITS__HARD_CAPS__…` | — | жорсткі стелі платформи |
@@ -150,6 +150,23 @@ just down -v --project jane-wp10
   вище) → перший збіг зі скриптів підключення (`params.responses: [{when_data_contains | when_data_matches,
   output | output_text | error: unavailable|rejected}]`) → мінімальне значення, що відповідає схемі →
   `fake:<sha256>`. Токени — `ceil(символи / 4)`. Ціни задаються в моделі провайдера (типово 0).
+
+## Автентифікація (ADR-0005)
+
+Режими й усі змінні (`AUTH_MODE`, `API_KEYS`, `API_KEYS_FILE`, `JWT_*`, `METRICS_PUBLIC`) спільні для всіх сервісів: [jane-kit, «Автентифікація»](../../libs/jane-kit/README.md#автентифікація-adr-0005) і [docs/operations](../../docs/operations/README.md#автентифікація-adr-0005). `/v1/health` (і `/metrics`, доки `METRICS_PUBLIC=true`) працюють без токена; `/v1/info` приймає будь-який дійсний токен; решта потребує токена (401 `unauthenticated`) і scope операції (403 `forbidden`). `AUTH_MODE=none` — лише для локальних тестів на loopback; за неповної конфігурації `api_key`/`jwt` сервіс не стартує. JWT з реальним IdP **не перевірено на реальному сервісі** (лише локальний JWKS у тестах jane-kit).
+
+Scopes операцій (таблиця `merge(HANDLER, LLM)` з `jane_kit.auth_scopes`):
+
+- llm.v1: `llm:invoke` — `POST /v1/completions`; `GET /v1/providers…` і `GET /v1/model-aliases` — `llm:invoke` або `llm:admin`; зміни провайдерів, псевдонімів і бюджетів, `GET /v1/budgets`, `GET /v1/usage` — `llm:admin` (оркестратор синхронізує бюджети з `llm:admin`); `/v1/jobs/*` — `llm:invoke`, `llm:admin`, `handler:invoke` або `handler:test`;
+- handler.v1: `handler:invoke` — `POST /v1/invocations`, `GET /v1/invocations/{id}`; `handler:test` — `POST /v1/test-runs`; `/v1/jobs/*` — `handler:invoke` або `handler:test`; `GET /v1/connections…` — `connections:write` або `handler:invoke`; `PUT`/`DELETE /v1/connections/{id}` і `POST …/test` — `connections:write`.
+
+Приклад для `api_key` (зберігається лише хеш ключа):
+
+```text
+JANE_LLM_AUTH_MODE=api_key
+JANE_LLM_API_KEYS=[{"name": "assistant", "sha256": "<sha256 hex ключа>", "scopes": ["llm:invoke"]},
+  {"name": "ops", "secret_ref": "file:/run/secrets/jane-ops-key", "scopes": ["llm:invoke"]}]
+```
 
 ## Ліміти
 

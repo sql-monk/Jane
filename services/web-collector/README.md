@@ -85,9 +85,27 @@ just test web-collector -m contract     # лише контрактні
 | `STATE_BUSY_TIMEOUT_MS` | `10000` | скільки запис чекає на блокування SQLite іншим процесом |
 | `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | журнали |
 | `METRICS_ENABLED` | `true` | `/metrics` |
-| `AUTH_MODE` | `none` | значення для `/v1/info` |
+| `AUTH_MODE` | `none` | `none` / `api_key` / `jwt` — див. «Автентифікація (ADR-0005)» |
 | `LIMITS_FILE` | — | `PlatformLimits` (`profile`, `defaults`, `hard_caps`; TOML/JSON/YAML); групи, яких колектор не використовує (`sandbox`, `llm`, `telegram`…), ігноруються |
 | `LIMITS__<ГРУПА>__<ПАРАМЕТР>` / `LIMITS__HARD_CAPS__…` | — | перевизначення, напр. `JANE_WEB_COLLECTOR_LIMITS__CRAWL__MAX_DEPTH=3` |
+
+## Автентифікація (ADR-0005)
+
+Режими й усі змінні (`AUTH_MODE`, `API_KEYS`, `API_KEYS_FILE`, `JWT_*`, `METRICS_PUBLIC`) спільні для всіх сервісів: [jane-kit, «Автентифікація»](../../libs/jane-kit/README.md#автентифікація-adr-0005) і [docs/operations](../../docs/operations/README.md#автентифікація-adr-0005). `/v1/health` (і `/metrics`, доки `METRICS_PUBLIC=true`) працюють без токена; `/v1/info` приймає будь-який дійсний токен; решта потребує токена (401 `unauthenticated`) і scope операції (403 `forbidden`). `AUTH_MODE=none` — лише для локальних тестів на loopback; за неповної конфігурації `api_key`/`jwt` сервіс не стартує. JWT з реальним IdP **не перевірено на реальному сервісі** (лише локальний JWKS у тестах jane-kit).
+
+Scopes операцій (таблиця `COLLECTOR` з `jane_kit.auth_scopes`):
+
+- `collector:run` — `POST /v1/fetches`, `POST /v1/collections`, `DELETE /v1/states/{key}`, `POST /v1/jobs/{id}/cancel`; `collector:read` — `GET /v1/collections/{id}`, `…/materials`, `…/errors`, `GET /v1/states/{key}`, `GET /v1/jobs/{id}`; `POST /v1/rules/validations` — `collector:read` або `collector:run`; `GET /v1/connections…` — `connections:write` або `collector:read`; зміна й перевірка підключень — `connections:write`.
+
+Власний токен колектора до registry — у змінній, яку називає `REGISTRY_TOKEN_ENV`; у dev-стеку `JANE_SECRET_WEB_COLLECTOR_TOKEN` (ключ ідентичності `web-collector`).
+
+Приклад для `api_key` (зберігається лише хеш ключа):
+
+```text
+JANE_WEB_COLLECTOR_AUTH_MODE=api_key
+JANE_WEB_COLLECTOR_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 hex ключа>", "scopes": ["collector:read", "collector:run", "connections:write"]},
+  {"name": "ops", "secret_ref": "file:/run/secrets/jane-ops-key", "scopes": ["collector:read", "collector:run", "connections:write"]}]
+```
 
 ## Ліміти
 

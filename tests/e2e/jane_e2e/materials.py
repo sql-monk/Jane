@@ -1,10 +1,13 @@
-"""Explicitly labelled stand-ins for components that are not merged into main yet.
+"""A ``Material`` that the test, acting as a third-party application, builds itself (criterion 1: executors are
+called directly with the caller's own data).
 
-:func:`standin_web_material` replaces the Web Collector (WP-02) in M1 scenarios until it is merged: the page is
-fetched from the real test site over HTTP and wrapped into a ``Material`` (contracts/schemas/material.schema.json)
-with ``collector.name = STANDIN_COLLECTOR``, so every stored object shows it did not come from the collector.
-Scenarios that use it are marked "замінник колектора" in docs/acceptance and never count as proof of the
-collector's own behaviour.
+:func:`standin_web_material` fetches a page of the real test site over HTTP and wraps it into a ``Material``
+(contracts/schemas/material.schema.json) with ``collector.name = STANDIN_COLLECTOR``, so every stored object shows
+it did not come from the Web Collector. It is only the INPUT of a direct call of the executor under test
+(S-M2-05a: assistant ``/v1/unknown-materials``; R-04 during work: the content becomes a gated blob). It replaces no
+link of a Jane chain and is never evidence of the Web Collector's behaviour; docs/acceptance/matrix.md marks these
+scenarios as "вхід прямого виклику". Scenarios about chains or redelivery take the material from the real Web
+Collector (``jane_e2e.steps.collector_fetch``).
 """
 
 from __future__ import annotations
@@ -31,7 +34,7 @@ def fetch_page(url: str, timeout_s: float = 30.0) -> httpx.Response:
 def standin_web_material(
     response: httpx.Response, *, source_id: str, observation_id: str, section: str | None = None
 ) -> dict[str, Any]:
-    """``Material`` built from a real HTTP response of the test site (stand-in for the Web Collector)."""
+    """``Material`` built by the test from a real HTTP response of the test site (input of a direct call)."""
     media_type = response.headers.get("content-type", "text/html").split(";", 1)[0].strip()
     material = material_from_bytes(
         response.content,

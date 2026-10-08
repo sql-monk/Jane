@@ -8,25 +8,24 @@ from typing import Any
 import pytest
 
 from jane_e2e.clients import JaneClient
-from jane_e2e.materials import fetch_page, standin_web_material
+from jane_e2e.orchestration import TESTSITE
 from jane_e2e.registry import FILES_DIR, archive, key, package_files, publish_body
 from jane_e2e.stack import E2EStack
-from jane_e2e.steps import store
+from jane_e2e.steps import collector_fetch, store
 from jane_e2e.verify import objects_by_source
 
 pytestmark = [pytest.mark.e2e, pytest.mark.milestone("M2"), pytest.mark.criteria(8)]
 
 
 def test_r_06_storage_replica_deduplicates_delivery(
-    stack: E2EStack, require: Callable[..., None], client: Callable[..., JaneClient], run_id: str
+    require: Callable[..., None],
+    scale: Callable[[str, int], None],
+    client: Callable[..., JaneClient],
+    run_id: str,
 ) -> None:
-    require("testsite", "storage")
-    stack.scale("storage", 2)
-    material = standin_web_material(
-        fetch_page(f"{stack.url('testsite')}/product/phone-alpha"),
-        source_id=f"r06-{run_id}",
-        observation_id=f"obs_r06_{run_id}",
-    )
+    require("testsite", "web-collector", "storage")
+    scale("storage", 2)
+    material = collector_fetch(client("web-collector"), f"{TESTSITE}/product/phone-alpha", f"r06-{run_id}")
     first_client, second_client = client("storage", 1), client("storage", 2)
     body, first = store(
         first_client,
@@ -50,10 +49,10 @@ def test_r_06_storage_replica_deduplicates_delivery(
 
 
 def test_r_06_registry_replica_reads_published_archive(
-    stack: E2EStack, require: Callable[..., None], client: Callable[..., JaneClient]
+    require: Callable[..., None], scale: Callable[[str, int], None], client: Callable[..., JaneClient]
 ) -> None:
     require("registry")
-    stack.scale("registry", 2)
+    scale("registry", 2)
     first_client, second_client = client("registry", 1), client("registry", 2)
     manifest, files = package_files(FILES_DIR)
     package_id = manifest["package_id"]

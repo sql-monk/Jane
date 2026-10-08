@@ -16,7 +16,6 @@ __all__ = [
     "EXTRACTOR_DIR",
     "collector_fetch",
     "extract",
-    "extractor_archive",
     "extractor_ref",
     "sandbox_limits",
     "store",
@@ -37,17 +36,6 @@ def sandbox_limits() -> dict[str, Any]:
     return {"sandbox": {"wall_time_ms": wall}, "timeouts": {"invocation_timeout_ms": wall + 30000}}
 
 
-def extractor_archive(package_dir: Path = EXTRACTOR_DIR) -> tuple[dict[str, Any], bytes]:
-    """Local package: handler ref (id, version, digest of the canonical SDK archive) and the archive bytes."""
-    archive = build_archive(package_dir)
-    handler = {
-        "package_id": "testsite.product-extractor",
-        "version": "1.0.0",
-        "digest": "sha256:" + hashlib.sha256(archive).hexdigest(),
-    }
-    return handler, archive
-
-
 def collector_fetch(collector: JaneClient, url: str, source_id: str) -> dict[str, Any]:
     """One page through the real Web Collector (collector.v1 fetchMaterial) - a new observation each call."""
     body = {
@@ -64,7 +52,8 @@ def collector_fetch(collector: JaneClient, url: str, source_id: str) -> dict[str
 
 
 def extractor_ref(package_dir: Path = EXTRACTOR_DIR) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Local package (not from the registry): handler ref + inline ContentRef of its archive."""
+    """Local package of a third-party application (not from the registry, criterion 1): handler ref + inline
+    ContentRef of its SDK archive. Orchestrated scenarios use the registry instead (``conftest.extractor``)."""
     archive = build_archive(package_dir)
     sha = hashlib.sha256(archive).hexdigest()
     manifest_id = {"package_id": "testsite.product-extractor", "version": "1.0.0"}

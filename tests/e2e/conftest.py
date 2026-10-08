@@ -9,6 +9,10 @@ Environment:
     JANE_E2E_KEEP=1        keep the stack after the session (default: ``down -v`` - containers, volumes, images)
     JANE_E2E_WAIT_TIMEOUT  seconds to wait for health-checks (default 900)
     JANE_E2E_DOCKER_SOCKET / JANE_E2E_DOCKER_GID   docker API for handler-runtime sandboxes (auto-detected)
+    JANE_E2E_REQUIRED=1    mandatory e2e (the CI job ``e2e``): no Docker is an error, and every skipped scenario
+                           is reported as failed - a green run means every collected scenario was executed.
+                           ``scripts/dev.py e2e`` also fails when no scenario was collected (pytest exit 5).
+                           Default (unset): without Docker the scenarios are skipped, as before.
 """
 
 from __future__ import annotations
@@ -18,7 +22,7 @@ import shutil
 import subprocess
 import sys
 import uuid
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -29,10 +33,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from jane_e2e.clients import JaneClient
 from jane_e2e.orchestration import put_connections
+from jane_e2e.registry import publish_fixture_package
 from jane_e2e.stack import SERVICES, E2EStack
-from jane_e2e.steps import extractor_archive
+from jane_e2e.steps import EXTRACTOR_DIR
 
 E2E_DIR = Path(__file__).resolve().parent
+REQUIRED = os.environ.get("JANE_E2E_REQUIRED") == "1"
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -43,11 +49,29 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "milestone(name): M1 / M2 / M3 (plan.md §6)")
 
 
+def _is_e2e(item: pytest.Item) -> bool:
+    return Path(str(item.path)).resolve().is_relative_to(E2E_DIR)
+
+
 @pytest.hookimpl(tryfirst=True)
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     for item in items:
-        if Path(str(item.path)).resolve().is_relative_to(E2E_DIR):
+        if _is_e2e(item):
             item.add_marker(pytest.mark.e2e)
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(
+    item: pytest.Item, call: pytest.CallInfo[None]
+) -> Generator[None, pytest.TestReport, pytest.TestReport]:
+    """``JANE_E2E_REQUIRED=1``: a skipped e2e scenario (no Docker, a missing service, a precondition not reached)
+    is a failure, so a green mandatory run cannot hide scenarios that did not run. ``xfail`` is not a skip."""
+    report: pytest.TestReport = yield
+    if REQUIRED and report.skipped and not hasattr(report, "wasxfail") and _is_e2e(item):
+        reason = report.longrepr[2] if isinstance(report.longrepr, tuple) else str(report.longrepr)
+        report.outcome = "failed"
+        report.longrepr = f"JANE_E2E_REQUIRED=1: the scenario was skipped, which is an error here: {reason}"
+    return report
 
 
 def _docker_ok() -> str | None:
@@ -60,6 +84,8 @@ def _docker_ok() -> str | None:
 @pytest.fixture(scope="session")
 def stack() -> Iterator[E2EStack]:
     if reason := _docker_ok():
+        if REQUIRED:
+            pytest.fail(f"JANE_E2E_REQUIRED=1, but {reason}", pytrace=False)
         pytest.skip(reason)
     s = E2EStack()
     try:
@@ -84,6 +110,22 @@ def require(stack: E2EStack) -> Callable[..., None]:
 
 
 @pytest.fixture
+def scale(stack: E2EStack) -> Iterator[Callable[[str, int], None]]:
+    """``scale("storage", 2)`` - several replicas of a service for one scenario of the shared stack; the finalizer
+    returns every scaled service to one replica, so later scenarios see the usual topology."""
+    scaled: list[str] = []
+
+    def _scale(service: str, replicas: int) -> None:
+        if service not in scaled:
+            scaled.append(service)
+        stack.scale(service, replicas)
+
+    yield _scale
+    for service in scaled:
+        stack.scale(service, 1)
+
+
+@pytest.fixture
 def client(stack: E2EStack) -> Iterator[Callable[..., JaneClient]]:
     """``client("storage")`` - contract-validating client of a running service (instance ``index``)."""
     opened: list[JaneClient] = []
@@ -105,19 +147,21 @@ def run_id() -> str:
 
 
 @pytest.fixture
-def extractor(stack: E2EStack) -> dict[str, Any]:
-    """Handler ref of the LOCAL example extractor; its archive is served by the ``package-host`` stand-in
-    (the orchestrator sends no ``package_archive``; the runtime then asks its registry URL)."""
-    handler, archive = extractor_archive()
-    stack.publish_local_package(handler["package_id"], handler["version"], archive)
-    return handler
+def extractor(require: Callable[..., None], client: Callable[..., JaneClient]) -> dict[str, Any]:
+    """Pinned ref (``package_id@version`` + digest) of the example extractor of the SDK, published to the REAL
+    registry of the stack and approved. Orchestrated stages send no ``package_archive``: handler-runtime
+    downloads this archive from the registry and checks the digest. The registry checks the package's
+    dependencies against the runtime's published profile, so both run first."""
+    require("registry", "handler-runtime")
+    return publish_fixture_package(client("registry"), EXTRACTOR_DIR)
 
 
 @pytest.fixture
 def orchestrated(require: Callable[..., None], client: Callable[..., JaneClient]) -> JaneClient:
-    """Full M1 set (testsite, web-collector, orchestrator, storage, handler-runtime, package-host) with the
-    storage connections registered in the orchestrator; returns the orchestrator client."""
-    require("testsite", "web-collector", "storage", "handler-runtime", "package-host", "orchestrator")
+    """Full M1 set (testsite, web-collector, orchestrator, storage, handler-runtime, registry) with the storage
+    connections registered in the orchestrator; returns the orchestrator client. Package archives of the
+    stages come from the real registry (see :func:`extractor`)."""
+    require("testsite", "web-collector", "storage", "handler-runtime", "registry", "orchestrator")
     orch = client("orchestrator")
     put_connections(orch)
     return orch

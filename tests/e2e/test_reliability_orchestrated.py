@@ -1,11 +1,11 @@
 """Reliability scenarios R-01, R-03 and R-08 on orchestrated chains (docs/acceptance/scenarios.md; criterion 8,
 partly 13).
 
-Real services: orchestrator (WP-09), web-collector (WP-02), handler-runtime (WP-06), storage (WP-07), testsite
-and PostgreSQL (WP-01). The only stand-in is ``package-host`` (Т): orchestrated stages send no
-``package_archive``, so it serves the archives of LOCAL packages - the example extractor and the fixture
-``tests/e2e/packages/e2e.slow-product-extractor``, whose ``params.delay_seconds`` keeps one extraction call in
-flight for a given time.
+Real services: orchestrator (WP-09), web-collector (WP-02), handler-runtime (WP-06), storage (WP-07), registry
+(WP-05), testsite and PostgreSQL (WP-01); no stand-ins. Orchestrated stages send no ``package_archive``: the
+example extractor of the SDK and the fixture ``tests/e2e/packages/e2e.slow-product-extractor`` (whose
+``params.delay_seconds`` keeps one extraction call in flight for a given time) are published to the real
+registry, and handler-runtime downloads them from it and checks the pinned digest.
 
 Faults are injected with Docker only: ``docker pause``/``unpause`` and ``docker kill``/``start`` of orchestrator
 replicas (R-01), ``docker network disconnect``/``connect`` of storage (R-03).
@@ -21,7 +21,6 @@ counter ``jane_http_requests_total`` of handler-runtime (``/metrics``); JSON log
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 import time
@@ -32,7 +31,7 @@ from typing import Any, NamedTuple
 
 import pytest
 
-from jane_e2e.clients import CONTRACTS, JaneClient, spec
+from jane_e2e.clients import JaneClient
 from jane_e2e.orchestration import (
     CONNECTIONS,
     RULES_REF,
@@ -47,7 +46,7 @@ from jane_e2e.orchestration import (
 from jane_e2e.stack import E2EStack, StackError
 from jane_e2e.steps import sandbox_limits
 from jane_e2e.verify import assert_effects_once, site_paths
-from jane_extractor_sdk.package import build_archive
+from jane_registry.archive import canonical_archive, files_from_dir
 
 pytestmark = [pytest.mark.e2e, pytest.mark.milestone("M2")]
 
@@ -60,7 +59,6 @@ LEASES_RECLAIMED = "jane_orchestrator_leases_reclaimed_total"
 HTTP_REQUESTS = "jane_http_requests_total"  # jane-kit metrics of every service
 
 PACKAGES = Path(__file__).resolve().parent / "packages"
-MANIFEST_SCHEMA = (CONTRACTS.parent / "schemas" / "package-manifest.schema.json").as_uri() + "#"
 SLOW_EXTRACTOR = "e2e.slow-product-extractor"
 SLOW_PRODUCT = "/product/phone-alpha"
 # Labels of handler-runtime sandboxes (docker_sandbox.py, sandbox.py; the project label comes from
@@ -204,19 +202,13 @@ def task_with(
     return m1_task(task_id, source_id, urls, extractor, limits=limits)
 
 
-def local_package(stack: E2EStack, name: str) -> dict[str, Any]:
-    """Fixture package of ``tests/e2e/packages``: manifest checked against the contract, canonical archive
-    published to the ``package-host`` stand-in (Т); returns the pinned ``PackageRef`` with its digest."""
-    package_dir = PACKAGES / name
-    manifest = json.loads((package_dir / "jane-package.json").read_text(encoding="utf-8"))
-    spec("registry").validate_at(MANIFEST_SCHEMA, manifest, f"{name}/jane-package.json")
-    archive = build_archive(package_dir)
-    stack.publish_local_package(manifest["package_id"], manifest["version"], archive)
-    return {
-        "package_id": manifest["package_id"],
-        "version": manifest["version"],
-        "digest": "sha256:" + hashlib.sha256(archive).hexdigest(),
-    }
+def registry_package(stack: E2EStack, name: str) -> dict[str, Any]:
+    """Fixture package of ``tests/e2e/packages`` published to the REAL registry of the stack and approved (its
+    manifest is checked against the contract first); returns the pinned ``PackageRef`` with the registry digest.
+    Orchestrated stages send no ``package_archive``, so the executor downloads this archive and checks it."""
+    archive = canonical_archive(files_from_dir(PACKAGES / name))
+    manifest = json.loads((PACKAGES / name / "jane-package.json").read_text(encoding="utf-8"))
+    return stack.publish_local_package(manifest["package_id"], manifest["version"], archive)
 
 
 def slow_extraction(task: dict[str, Any], delay_s: float) -> None:
@@ -257,7 +249,7 @@ def test_r_01_lease_lost_during_active_call_taken_over_with_409_without_spent_at
     ``idempotency_in_progress`` until the orphaned call ends and then replays its result. The take-over
     spends no retry attempt, the handler runs once and every effect happens once."""
     storage, runtime = client("storage"), client("handler-runtime")
-    slow = local_package(stack, SLOW_EXTRACTOR)
+    slow = registry_package(stack, SLOW_EXTRACTOR)
     products = [SLOW_PRODUCT]
     urls = [TESTSITE + p for p in products + OTHERS]
     task = task_with(run_id, "r01", slow, urls, {})
@@ -507,7 +499,7 @@ def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_dupl
     stage slot are free while it waits: frequent polling of the items API bounds each wait from both sides
     and compares it with the configured backoff. After the partition the run completes, nothing twice."""
     orch = orchestrated
-    slow = local_package(stack, SLOW_EXTRACTOR)
+    slow = registry_package(stack, SLOW_EXTRACTOR)
     policy = dict(R03_POLICY)
     products = [SLOW_PRODUCT]
     task = task_with(run_id, "r03", slow, [TESTSITE + p for p in products], {})

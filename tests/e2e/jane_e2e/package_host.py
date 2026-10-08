@@ -1,17 +1,13 @@
-"""STAND-IN (Т) for the handler registry (WP-05) until it is merged: serves archives of LOCAL packages.
+"""SUBSTITUTE (З) of a blob store's ``download_url`` (ContentRef ``kind: blob``, ADR-0004) for R-04 "replay while
+the work is still running" (``tests/e2e/test_r04_active_replays.py``).
 
-Only one operation of registry.v1 is implemented - ``GET /v1/packages/{id}/versions/{v}/archive``
-(``application/zip``, ``ETag: "sha256:…"``) - because the orchestrator does not send ``package_archive`` and
-handler-runtime otherwise takes the package from the registry (``JANE_HANDLER_RUNTIME_REGISTRY_URL``).
-Plan.md §6 defines M1 with extraction by a *local* package, so this host is how the local archive reaches
-the runtime in orchestrated scenarios. It is NOT evidence for criteria 7/9 (registry); those wait for WP-05.
+It replaces no component of Jane: package archives of every e2e scenario come from the real registry (WP-05,
+``E2EStack.publish_local_package`` / ``jane_e2e.registry.publish_archive``). The earlier role of this host - a
+temporary stand-in (Т) of the registry serving archives of local packages - is gone, so no scenario can take
+an archive from here.
 
-Layout: ``<root>/<package_id>/<version>.zip`` (written by the e2e harness).
-
-Second role, SUBSTITUTE (З) of a blob store's ``download_url`` (ContentRef ``kind: blob``, ADR-0004) for R-04
-"replay while the work is still running" (``tests/e2e/test_r04_active_replays.py``). A *gate* holds a
-download open until the test releases it, so a service that reads material content is provably inside its
-work while the test replays the request - no timing guesses:
+A *gate* holds a download open until the test releases it, so a service that reads material content is provably
+inside its work while the test replays the request - no timing guesses:
 
 * ``PUT  /e2e/gates/{gate}``          body = content (``Content-Type`` kept); creates or resets the gate;
 * ``GET  /e2e/gates/{gate}/content``  the download: waits until the gate is released, then serves the content
@@ -20,26 +16,21 @@ work while the test replays the request - no timing guesses:
 * ``GET  /e2e/gates/{gate}``          JSON ``{"requests", "waiting", "served", "released"}`` - how many downloads
   started, are held now and were served (a second execution of the same work would download again).
 
-Standard library only:
+Standard library only (the service name ``package-host`` is kept for the compose overlay):
 
-    python package_host.py <root> [port]
+    python package_host.py [port]
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 import sys
 import threading
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-ARCHIVE = re.compile(
-    r"^/v1/packages/(?P<pid>[a-z0-9][a-z0-9._-]*)/versions/(?P<ver>[A-Za-z0-9.+_-]+)/archive$"
-)
 GATE = re.compile(r"^/e2e/gates/(?P<gate>[A-Za-z0-9._-]{1,128})(?P<action>/content|/release)?$")
 MAX_WAIT_S = 300.0  # upper bound of one held download; a scenario releases its gate long before
 NOT_FOUND = b'{"type":"urn:jane:problem:not_found","title":"Not found","status":404,"code":"not_found"}'
@@ -63,7 +54,7 @@ class Gate:
         }
 
 
-def make_handler(root: Path) -> type[BaseHTTPRequestHandler]:
+def make_handler() -> type[BaseHTTPRequestHandler]:
     gates: dict[str, Gate] = {}
     lock = threading.Lock()
 
@@ -76,14 +67,7 @@ def make_handler(root: Path) -> type[BaseHTTPRequestHandler]:
             if g := GATE.match(url.path):
                 self._gate_get(g["gate"], g["action"], parse_qs(url.query))
                 return
-            m = ARCHIVE.match(url.path)
-            file = root / m["pid"] / f"{m['ver']}.zip" if m else None
-            if file is None or not file.is_file():
-                self._send(404, NOT_FOUND, "application/problem+json")
-                return
-            data = file.read_bytes()
-            etag = '"sha256:' + hashlib.sha256(data).hexdigest() + '"'
-            self._send(200, data, "application/zip", {"ETag": etag})
+            self._send(404, NOT_FOUND, "application/problem+json")
 
         def do_PUT(self) -> None:
             g = GATE.match(urlsplit(self.path).path)
@@ -153,9 +137,8 @@ def make_handler(root: Path) -> type[BaseHTTPRequestHandler]:
 
 
 def main() -> None:
-    root = Path(sys.argv[1])
-    port = int(sys.argv[2]) if len(sys.argv) > 2 else 8080
-    ThreadingHTTPServer(("0.0.0.0", port), make_handler(root)).serve_forever()
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+    ThreadingHTTPServer(("0.0.0.0", port), make_handler()).serve_forever()
 
 
 if __name__ == "__main__":

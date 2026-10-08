@@ -120,7 +120,8 @@ SERVICES: dict[str, ServiceSpec] = {
         ServiceSpec(
             "orchestrator", "WP-09", 8000, "app", ("services/orchestrator/Dockerfile",), depends=("postgres",)
         ),
-        # STAND-IN for the registry (WP-05) serving LOCAL package archives - see jane_e2e/package_host.py.
+        # SUBSTITUTE (З) of a blob store's download_url: gated downloads of R-04 - see jane_e2e/package_host.py.
+        # Package archives come from the real registry (``publish_local_package``), never from this host.
         ServiceSpec("package-host", "WP-13", 8080, "app", ("tests/e2e/jane_e2e/package_host.py",)),
         ServiceSpec("llm", "WP-10", 8110, "app", ("services/llm/Dockerfile",), depends=("postgres",)),
         ServiceSpec(
@@ -244,16 +245,8 @@ class E2EStack:
             .resolve()
             .as_posix(),
             "COMPOSE_PROFILES": ",".join(self.available_apps()),
-            "JANE_E2E_PACKAGES_DIR": self.packages_dir.as_posix(),
             "JANE_E2E_TELEGRAM_RECORDINGS_DIR": self.telegram_recordings_dir.as_posix(),
         }
-
-    @property
-    def packages_dir(self) -> Path:
-        """Archives of local packages served by the ``package-host`` stand-in (``<id>/<version>.zip``)."""
-        path = STACK_DIR / f"e2e-packages-{self.project}"
-        path.mkdir(parents=True, exist_ok=True)
-        return path
 
     @property
     def telegram_recordings_dir(self) -> Path:
@@ -262,10 +255,22 @@ class E2EStack:
         path.mkdir(parents=True, exist_ok=True)
         return path
 
-    def publish_local_package(self, package_id: str, version: str, archive: bytes) -> None:
-        target = self.packages_dir / package_id / f"{version}.zip"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(archive)
+    def publish_local_package(self, package_id: str, version: str, archive: bytes) -> dict[str, str]:
+        """Publish ``archive`` of a package of this checkout to the REAL registry of this stack (it must run),
+        approved; returns the pinned ref (``package_id``, ``version``, registry digest). Orchestrated stages send
+        no ``package_archive``: handler-runtime and the LLM gateway download it from the registry and check the
+        digest (``jane_e2e.registry.publish_archive``)."""
+        # Imported here: jane_e2e.registry imports this module.
+        from jane_e2e.clients import JaneClient
+        from jane_e2e.registry import publish_archive
+
+        registry = JaneClient(self.url("registry"))
+        try:
+            ref = publish_archive(registry, archive)
+        finally:
+            registry.close()
+        assert (ref["package_id"], ref["version"]) == (package_id, version), ref
+        return ref
 
     def _write_stack_file(self, creds: Mapping[str, str], services: Mapping[str, Any]) -> None:
         STACK_DIR.mkdir(exist_ok=True)

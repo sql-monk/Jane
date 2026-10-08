@@ -9,13 +9,13 @@
 Real services: orchestrator (WP-09), web-collector (WP-02), handler-runtime (WP-06), storage (WP-07),
 llm gateway and LLM handler (WP-10), testsite and PostgreSQL (WP-01).
 Substitutes: the external LLM is the deterministic provider ``fake`` of WP-10 (**З**), its answers are
-scripted in ``tests/e2e/config/llm-seed.yaml``; ``package-host`` (**Т**) serves the archives of the LOCAL
-fixture packages ``tests/e2e/packages/*`` because orchestrated stages send no ``package_archive``.
+scripted in ``tests/e2e/config/llm-seed.yaml``. The fixture packages ``tests/e2e/packages/*`` and the example
+extractor are published to the REAL registry (WP-05): orchestrated stages send no ``package_archive``, so
+handler-runtime and the LLM gateway download the archives from it and check the pinned digests.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import urllib.request
 from collections import defaultdict
@@ -25,16 +25,15 @@ from typing import Any
 
 import pytest
 
-from jane_e2e.clients import CONTRACTS, JaneClient, spec
+from jane_e2e.clients import JaneClient
 from jane_e2e.orchestration import TESTSITE, create_source, create_task, list_items, start_run, wait_run
 from jane_e2e.stack import E2EStack
 from jane_e2e.verify import entities, objects_by_source, site_paths
-from jane_extractor_sdk.package import build_archive
+from jane_registry.archive import canonical_archive, files_from_dir
 
 pytestmark = [pytest.mark.e2e, pytest.mark.milestone("M2")]
 
 PACKAGES = Path(__file__).resolve().parent / "packages"
-MANIFEST_SCHEMA = (CONTRACTS.parent / "schemas" / "package-manifest.schema.json").as_uri() + "#"
 HTML = {"field": "material.format.media_type", "op": "eq", "value": "text/html"}
 JSON = {"field": "material.format.media_type", "op": "eq", "value": "application/json"}
 SUCCESS = {"field": "result.status", "op": "eq", "value": "success"}
@@ -42,19 +41,13 @@ UNRECOGNIZED = {"field": "result.status", "op": "eq", "value": "unrecognized"}
 
 
 # ---------------------------------------------------------------------------- helpers
-def local_package(stack: E2EStack, name: str) -> dict[str, Any]:
-    """Fixture package of ``tests/e2e/packages``: manifest checked against the contract, canonical archive
-    published to the ``package-host`` stand-in (Т); returns the pinned ``PackageRef`` with its digest."""
-    package_dir = PACKAGES / name
-    manifest = json.loads((package_dir / "jane-package.json").read_text(encoding="utf-8"))
-    spec("registry").validate_at(MANIFEST_SCHEMA, manifest, f"{name}/jane-package.json")
-    archive = build_archive(package_dir)
-    stack.publish_local_package(manifest["package_id"], manifest["version"], archive)
-    return {
-        "package_id": manifest["package_id"],
-        "version": manifest["version"],
-        "digest": "sha256:" + hashlib.sha256(archive).hexdigest(),
-    }
+def registry_package(stack: E2EStack, name: str) -> dict[str, Any]:
+    """Fixture package of ``tests/e2e/packages`` published to the REAL registry of the stack and approved (its
+    manifest is checked against the contract first); returns the pinned ``PackageRef`` with the registry digest.
+    Orchestrated stages send no ``package_archive``, so the executor downloads this archive and checks it."""
+    archive = canonical_archive(files_from_dir(PACKAGES / name))
+    manifest = json.loads((PACKAGES / name / "jane-package.json").read_text(encoding="utf-8"))
+    return stack.publish_local_package(manifest["package_id"], manifest["version"], archive)
 
 
 def llm_usage(llm: JaneClient, **params: str) -> dict[str, Any]:
@@ -178,8 +171,8 @@ def test_s_m2_11_conditional_branches_and_llm_on_problem_results(
     extractor; a schema-valid LLM output is stored, a schema-violating one is rejected and not stored;
     the trace shows every step of the material."""
     orch, storage, llm = orchestrated_llm, client("storage"), client("llm")
-    extractor = local_package(stack, "e2e.instock-product-extractor")
-    triage = local_package(stack, "e2e.llm-page-triage")
+    extractor = registry_package(stack, "e2e.instock-product-extractor")
+    triage = registry_package(stack, "e2e.llm-page-triage")
     source_id, task_id = f"e2e-{run_id}", f"e2e-{run_id}-branches"
     create_source(orch, source_id)
     task = branching_task(task_id, source_id, extractor, triage)
@@ -348,7 +341,7 @@ def test_s_m2_05_unknown_pages_reach_llm_only_after_the_flag_is_enabled(
     run forwards exactly those pages to the LLM stage; calls, results and costs point to them."""
     orch, llm = orchestrated_llm, client("llm")
     api = orch.api("orchestrator")
-    triage = local_package(stack, "e2e.llm-page-triage")
+    triage = registry_package(stack, "e2e.llm-page-triage")
     source_id, task_id = f"e2e-{run_id}", f"e2e-{run_id}-unknown"
     products = site_paths("product")[:2]
     assert sorted(UNKNOWN_TYPES) == site_paths("unknown")  # testsite page_types: unknown
@@ -440,7 +433,7 @@ def test_s_m2_05_prompt_injection_in_unknown_page_does_not_change_llm_triage(
     assert "&quot;hijacked&quot;: true" in html
 
     orch, llm = orchestrated_llm, client("llm")
-    triage = local_package(stack, "e2e.llm-page-triage")
+    triage = registry_package(stack, "e2e.llm-page-triage")
     source_id, task_id = f"e2e-{run_id}", f"e2e-{run_id}-injection"
     urls = [TESTSITE + path for path in (safe_path, attack_path)]
     create_source(orch, source_id, forward_unknown_to_llm=True)

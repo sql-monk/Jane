@@ -37,6 +37,9 @@
    (профіль compose = ім'я сервісу, залежності стартують автоматично).
 3. Перевірте `GET /v1/health`, `GET /v1/info` (можливості, ліміти й стелі), `GET /metrics`. Через Caddy ті самі
    шляхи доступні як `http://<proxy>/api/<сервіс>/v1/...` (незапущений сервіс → 502, невідомий → 404).
+   Процес без налаштувань працює в `AUTH_MODE=none` (лише `127.0.0.1`); контейнер `just up` — в `api_key`:
+   `GET /v1/info` і решта API потребують `Authorization: Bearer <ключ>` (адміністратора — з `just env`,
+   `JANE_STACK_AUTH_ADMIN_API_KEY`), без токена відповідає лише `/v1/health` (і `/metrics`).
 4. Ліміти сервісу — типові значення з README сервісу, `<ПРЕФІКС>_LIMITS__<ГРУПА>__<ПОЛЕ>` або
    `<ПРЕФІКС>_LIMITS_FILE`. Увесь профіль `deploy/profiles/<profile>.json` як `LIMITS_FILE` приймає **кожен**
    сервіс (storage, handler-runtime, registry, llm, assistant — з WP-01b): ліміти, яких сервіс не має,

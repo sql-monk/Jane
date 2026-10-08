@@ -7,6 +7,7 @@ stack is ``examples/jane_examples.py demo`` (see examples/README.md).
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -193,3 +194,10 @@ def test_real_telegram_path_uses_only_secret_refs() -> None:
         "env:JANE_SECRET_TG_SESSION",
     }
     assert ex.validate("common/connection.schema.json", account) == []
+
+
+def test_progress_log_time_names_its_zone(capsys: pytest.CaptureFixture[str]) -> None:
+    """The driver logs UTC; without a zone mark the time read as local and looked hours off on UTC+3."""
+    ex.log("probe")
+    line = capsys.readouterr().out.strip()
+    assert re.fullmatch(r"\[\d{2}:\d{2}:\d{2}Z\] probe", line), line

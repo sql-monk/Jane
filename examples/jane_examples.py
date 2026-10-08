@@ -353,7 +353,8 @@ class Services:
 
 
 def log(message: str) -> None:
-    print(f"[{datetime.now(UTC).strftime('%H:%M:%S')}] {message}", flush=True)
+    """Progress line; the time is UTC and says so (``Z``), like the API timestamps it sits next to."""
+    print(f"[{datetime.now(UTC).strftime('%H:%M:%SZ')}] {message}", flush=True)
 
 
 def publish(svc: Services) -> dict[str, Any]:

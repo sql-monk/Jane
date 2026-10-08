@@ -36,7 +36,9 @@ corepack pnpm dev            # http://127.0.0.1:4600, Vite проксіює /api
 | `pnpm e2e -- --grep @hybrid`  | сценарії проти окремих реальних сервісів (потрібні `JANE_ADMIN_TARGET_*`)          |
 | `pnpm build` / `pnpm preview` | production-збірка в `dist/` і її перегляд з тим самим проксі                       |
 
-`just web` і CI job `web` запускають `install --frozen-lockfile`, `lint`, `typecheck`, `test`.
+`just web` і CI job `web` запускають `install --frozen-lockfile`, `lint`, `typecheck`, `test`, `build`.
+Окремий CI job `web-mock-e2e` встановлює Chromium і виконує повний `pnpm e2e` на контрактних моках без Docker;
+pnpm store, Chromium і uv кешуються, HTML-звіт та артефакти помилок зберігаються в Actions.
 
 ## Режими e2e
 
@@ -67,6 +69,9 @@ web-collector) і його псевдоніми моделей `e2e-admin-cheap`
 `jane.storage-postgresql`; нестандартні підключення/пакети задають
 `JANE_ADMIN_E2E_STORAGE_CONNECTION`, `JANE_ADMIN_E2E_STORAGE_PACKAGE`,
 `JANE_ADMIN_E2E_RESULTS_CONNECTION`, `JANE_ADMIN_E2E_RESULTS_PACKAGE`.
+`JANE_ADMIN_E2E_SCHEMA_RETRIES` (типово `1`) задає `gateway.max_schema_retries` LLM у тестовому override;
+задавайте однакове значення під час `e2e:real:prepare` і `e2e:real`. Сценарій невдалого LLM-елемента перевіряє
+точну кількість викликів (успішна сторінка + невдала сторінка та її schema retries) і показане UI число запитів.
 
 Гібридні сценарії для orchestrator і registry засівають унікальні джерела, завдання й пакети через реальні API.
 Registry (WP-05) є в `main`: для справжнього прогону тестів пакета запустіть handler-runtime з

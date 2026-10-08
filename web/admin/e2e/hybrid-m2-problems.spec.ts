@@ -341,6 +341,7 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
             kind: "handler",
             handler: { package_id: triage.package_id, version: triage.version, digest: triage.digest },
             inputs: [{ from: "collect", select: "unmatched_materials" }],
+            on_failure: "continue", // the scripted answer for /pages/careers violates the output schema
           },
         ],
       },
@@ -402,6 +403,7 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
 
     // ---- the user switches «Передавати в LLM невідомі сторінки» on and starts run 2 from the task page
     await admin.goto(`/sources/${sourceId}`);
+    await expect(admin.getByRole("heading", { name: `Джерело ${sourceId}` })).toBeVisible();
     // the strategies of the source's real rules package (seed list + recursive crawl)
     const strategies = admin.getByRole("table", { name: "Стратегії обходу" });
     await expect(strategies.getByRole("row").filter({ hasText: "home" })).toContainText("Явний перелік URL");
@@ -424,7 +426,12 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
     const triaged = (await runItems(request, orchestrator, runId)).filter(
       (i) => i.stage_id === "unknown-pages",
     );
-    expect(triaged.map((i) => i.result_status)).toEqual(["success", "success"]);
+    // faq: a valid triage; careers: the scripted answer violates the package output schema -> a failed item
+    expect(triaged.map((i) => `${i.status}/${i.result_status}`).sort()).toEqual([
+      "completed/success",
+      "failed/failed",
+    ]);
+    const failedItem = triaged.find((i) => i.status === "failed") as (typeof triaged)[number];
     expect(
       (await runItems(request, orchestrator, runId)).filter((i) => i.stage_id === "analyze-problems"),
     ).toEqual([]);
@@ -443,6 +450,22 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
     await expect(progress.getByRole("row", { name: /unknown-pages/ })).toContainText(
       `${triage.package_id}@1.0.0`,
     );
+
+    // run page: the failed item (default filter «failed») with its trace link -> the failed LLM stage
+    await admin.getByRole("tab", { name: "Елементи й помилки" }).click();
+    const failedRows = admin
+      .getByRole("table", { name: "Елементи запуску" })
+      .getByRole("row")
+      .filter({ hasText: "unknown-pages" });
+    await expect(failedRows).toHaveCount(1);
+    await expect(failedRows).toContainText("Помилка елемента");
+    await failedRows.getByRole("link", { name: failedItem.material_id as string }).click();
+    await expect(
+      admin.getByRole("heading", { name: `Простежуваність ${failedItem.material_id}` }),
+    ).toBeVisible();
+    await expect(admin.getByText(`${site}/pages/careers`, { exact: true })).toBeVisible();
+    const failedTrace = admin.getByRole("table", { name: `Етапи ${failedItem.observation_id} (${runId})` });
+    await expect(failedTrace.getByRole("row").filter({ hasText: "unknown-pages" })).toContainText("failed");
 
     // unknown materials: now forwarded; the trace leads to the LLM stage of run 2
     await admin.goto("/problems?tab=unknown");
@@ -469,7 +492,12 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
       `${llm}/v1/usage?group_by=purpose&scope_type=source&scope_id=${sourceId}`,
     );
     const totals = usage["totals"] as { requests: number; cost: { amount: number; currency: string } };
-    expect(totals.requests).toBe(unknownPaths.length);
+    // FAQ is valid on its first call; Careers returns the same invalid enum on EVERY attempt, so all
+    // configured schema retries are consumed. The prepared stack explicitly sets that limit (default 1).
+    const schemaRetries = Number(process.env["JANE_ADMIN_E2E_SCHEMA_RETRIES"] ?? "1");
+    expect(totals.requests).toBe(unknownPaths.length + schemaRetries);
+    expect(totals.cost.currency).toBe(cost.currency);
+    expect(totals.cost.amount).toBeCloseTo(cost.amount, 6);
     await admin.goto("/llm");
     await admin.getByRole("tab", { name: "Витрати" }).click();
     await admin.getByLabel("Групувати за").selectOption("purpose");
@@ -479,8 +507,12 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
       money(totals.cost.amount, totals.cost.currency),
     );
     await expect(
-      admin.getByRole("table", { name: "Витрати LLM" }).getByRole("row", { name: /handler/ }),
-    ).toContainText(String(unknownPaths.length));
+      admin
+        .getByRole("table", { name: "Витрати LLM" })
+        .getByRole("row", { name: /handler/ })
+        .getByRole("cell")
+        .nth(1),
+    ).toHaveText(String(totals.requests));
 
     // dashboard: the run among the latest runs, the platform LLM total
     const platform = await jsonRequest(request, "get", `${llm}/v1/usage?group_by=day`);

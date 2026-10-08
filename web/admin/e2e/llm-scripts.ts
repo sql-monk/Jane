@@ -102,7 +102,11 @@ export const IMPROVE_IMPROVABLE_EXTRACTOR = {
   },
 };
 
-/** Page triage (tests/e2e/packages/e2e.llm-page-triage) of the unknown test-site pages /pages/faq, /pages/careers. */
+/**
+ * Page triage (tests/e2e/packages/e2e.llm-page-triage) of the unknown test-site pages: a valid answer for /pages/faq;
+ * for /pages/careers an answer that violates the package output schema (`page_type` is not in its enum), so the
+ * gateway rejects it and the run has a failed item (as Phone Zeta in S-M2-11).
+ */
 export const TRIAGE_UNKNOWN_PAGES = [
   {
     when_data_contains: "<h1>FAQ</h1>",
@@ -112,6 +116,6 @@ export const TRIAGE_UNKNOWN_PAGES = [
   },
   {
     when_data_contains: "<h1>Careers</h1>",
-    output: { page_triages: [{ page_type: "job", summary: "Job posting for a warehouse operator." }] },
+    output: { page_triages: [{ page_type: "vacancy", summary: "Job posting for a warehouse operator." }] },
   },
 ];

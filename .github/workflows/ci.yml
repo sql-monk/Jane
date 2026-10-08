@@ -86,6 +86,49 @@ jobs:
           version: ${{ env.UV_VERSION }}
       - run: uv run --no-project python scripts/dev.py web
 
+  # Contract-backed admin Playwright regression; no Docker or real services.
+  web-mock-e2e:
+    needs: lint
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web/admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: corepack enable
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --locked
+        working-directory: .
+      - name: Locate pnpm store
+        id: pnpm-store
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-admin-pnpm-${{ hashFiles('web/admin/pnpm-lock.yaml') }}
+      - run: corepack pnpm install --frozen-lockfile
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-admin-chromium-${{ hashFiles('web/admin/pnpm-lock.yaml') }}
+      - run: corepack pnpm exec playwright install --with-deps chromium
+      - name: Run mock Playwright suite
+        run: corepack pnpm e2e
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-mock-playwright-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            web/admin/playwright-report/
+            web/admin/test-results/
+
   # Sandbox isolation tests of the handler runtime must run on Linux (plan.md §9).
   # Placeholder for WP-06: `just isolation` runs tests marked `isolation`; none exist yet.
   isolation:

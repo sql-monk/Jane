@@ -300,10 +300,14 @@ class Harness:
         self.out = out
         self.repetition = repetition
         self.urls = dict(urls) if urls is not None else jane_stack.service_urls(project)
+        # ADR-0005: the stack's operator key (auth_mode=api_key); none for the self-test's local services
+        token = None if urls is not None else jane_stack.admin_token(project)
         self.probe_host = probe_host
-        self.collector = api(self.urls["web-collector"], "collector")
+        self.collector = api(self.urls["web-collector"], "collector", token=token)
         self.runtime: Any = (
-            api(self.urls["handler-runtime"], "handler") if "handler-runtime" in self.urls else None
+            api(self.urls["handler-runtime"], "handler", token=token)
+            if "handler-runtime" in self.urls
+            else None
         )
         self.probe_url = self.urls["probe-site"]
 

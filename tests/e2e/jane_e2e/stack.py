@@ -27,6 +27,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from jane_e2e.clients import register_token
+from jane_kit.devstack import api_key_var, new_api_keys
+
 __all__ = ["SANDBOX_PROJECT_LABEL", "SERVICES", "E2EStack", "ServiceSpec", "StackError"]
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -207,11 +210,21 @@ class E2EStack:
             self._env = {**self._credentials(), **self._runtime_env()}
         return self._env
 
+    @property
+    def admin_token(self) -> str:
+        """The operator's API key of this stack (all scopes of every service, ADR-0005)."""
+        return self.env()[api_key_var("admin")]
+
     def _credentials(self) -> dict[str, str]:
         if self.stack_file.is_file():
             data = json.loads(self.stack_file.read_text(encoding="utf-8"))
-            if all(k in data.get("env", {}) for k in CREDENTIAL_KEYS):
-                return {k: str(data["env"][k]) for k in CREDENTIAL_KEYS}
+            env = {k: str(v) for k, v in data.get("env", {}).items()}
+            if all(k in env for k in CREDENTIAL_KEYS):
+                creds = {k: env[k] for k in CREDENTIAL_KEYS}
+                keys = new_api_keys(env)  # API keys of the stack; added to an older stack file
+                if any(env.get(k) != v for k, v in keys.items()):
+                    self._write_stack_file({**creds, **keys}, data.get("services", {}))
+                return {**creds, **keys}
         creds = {
             "JANE_PG_USER": "jane",
             "JANE_PG_DB": "jane",
@@ -230,6 +243,7 @@ class E2EStack:
             "JANE_S3_ACCESS_KEY": "jane-" + secrets.token_hex(4),
             "JANE_S3_SECRET_KEY": secrets.token_urlsafe(24),
         }
+        creds.update(new_api_keys())  # ADR-0005: one key per caller, the services verify the hashes
         self._write_stack_file(creds, {})
         return creds
 
@@ -392,7 +406,9 @@ class E2EStack:
         return int(lines[0].rsplit(":", 1)[1])
 
     def url(self, service: str, index: int = 1) -> str:
-        return f"http://127.0.0.1:{self.host_port(service, index)}"
+        url = f"http://127.0.0.1:{self.host_port(service, index)}"
+        register_token(url, self.admin_token)  # JaneClient(url) authenticates as this stack's operator
+        return url
 
     def describe(self) -> dict[str, dict[str, Any]]:
         """Stack-file ``services`` section (same keys as `just up` for infra services)."""

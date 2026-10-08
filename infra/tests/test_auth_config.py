@@ -34,8 +34,8 @@ TABLES = {
 VAR = re.compile(r"\$\{(?P<name>[A-Z0-9_]+)(?::?[-?][^}]*)?\}")
 
 
-def load_dev() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("jane_scripts_dev_auth", ROOT / "scripts" / "dev.py")
+def load_dev(path: Path = ROOT / "scripts" / "dev.py") -> ModuleType:
+    spec = importlib.util.spec_from_file_location(f"jane_auth_copy_{path.parent.name}", path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -53,12 +53,14 @@ def service_env(name: str) -> dict[str, Any]:
     return env
 
 
-def test_generators_agree() -> None:
-    dev = load_dev()
-    assert dev.STACK_IDENTITIES == STACK_IDENTITIES
-    generated = dev.new_api_keys()
+@pytest.mark.parametrize("copy", ["scripts/dev.py", "deploy/profiles/stack.py"])
+def test_generators_agree(copy: str) -> None:
+    """The stdlib copies (``just up``, ``deploy/profiles/stack.py``) generate the same variables as jane-kit."""
+    module = load_dev(ROOT / copy)
+    assert module.STACK_IDENTITIES == STACK_IDENTITIES
+    generated = module.new_api_keys()
     assert set(generated) == set(new_api_keys())
-    assert dev.new_api_keys(generated) == new_api_keys(generated)  # same hashes, existing keys are kept
+    assert module.new_api_keys(generated) == new_api_keys(generated)  # same hashes, existing keys are kept
 
 
 @pytest.mark.parametrize("service", sorted(TABLES))

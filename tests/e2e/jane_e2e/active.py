@@ -5,7 +5,8 @@
   service that reads it is provably inside its work until the test releases the gate. SUBSTITUTE (З) of the
   blob store behind ``download_url`` (ADR-0004); the services read it through their real code path.
 * :func:`package_ref` - pinned ref and inline archive of a local fixture package (``tests/e2e/packages``), for
-  direct ``handler.v1`` calls that carry ``package_archive``.
+  direct ``handler.v1`` calls that carry ``package_archive``; the archive is the registry's canonical one, so
+  the same ref also pins the version published to the real registry (``E2EStack.publish_local_package``).
 * :func:`wait_for` - poll a condition instead of sleeping.
 """
 
@@ -23,7 +24,7 @@ from typing import Any
 import httpx
 
 from jane_e2e.stack import E2EStack
-from jane_extractor_sdk.package import build_archive
+from jane_registry.archive import canonical_archive, files_from_dir
 
 __all__ = ["PACKAGE_HOST", "Gate", "gate", "package_ref", "wait_for"]
 
@@ -111,10 +112,11 @@ def gate(stack: E2EStack, name: str, content: bytes, media_type: str) -> Iterato
 
 
 def package_ref(package_dir: Path) -> tuple[dict[str, str], dict[str, Any]]:
-    """Pinned ``PackageRef`` (id, version, digest of the canonical archive) and the archive as inline
-    ``ContentRef`` (``package_archive`` of a direct call)."""
+    """Pinned ``PackageRef`` (id, version, digest of the registry's canonical archive) and the archive as inline
+    ``ContentRef`` (``package_archive`` of a direct call). The registry stores this canonical form of the same
+    files, so the digest also matches the version published there."""
     manifest = json.loads((package_dir / "jane-package.json").read_text(encoding="utf-8"))
-    archive = build_archive(package_dir)
+    archive = canonical_archive(files_from_dir(package_dir))
     sha = hashlib.sha256(archive).hexdigest()
     ref = {
         "package_id": str(manifest["package_id"]),

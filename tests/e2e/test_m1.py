@@ -1,9 +1,10 @@
 """M1 - first end-to-end slice (plan.md §6): Web -> RAW in files and, in parallel, extraction by a local
 package -> results in PostgreSQL. Scenarios S-M1-* of docs/acceptance/scenarios.md.
 
-All services are real (web-collector WP-02, handler-runtime WP-06, storage WP-07, orchestrator WP-09, testsite
-WP-01). The only stand-in is ``package-host`` (Т): it serves the archive of the LOCAL extractor package to the
-runtime in orchestrated scenarios until the registry (WP-05) is merged.
+All services are real (web-collector WP-02, handler-runtime WP-06, storage WP-07, orchestrator WP-09, registry
+WP-05, testsite WP-01); no stand-ins. Without the orchestrator (S-M1-01/02/04) the extractor is a LOCAL package
+of a third-party application (inline archive, runtime CLI); orchestrated scenarios (S-M1-03/05/06) take it from
+the real registry by ``package_id@version`` with its digest (``conftest.extractor``).
 """
 
 from __future__ import annotations
@@ -290,7 +291,12 @@ def test_s_m1_03_orchestrated_task_web_to_files_and_postgres(
     text = json.dumps(trace)
     for stage in ("store-raw", "extract-products", "store-products"):
         assert stage in text, (stage, trace)
-    assert extractor["digest"] in text
+    assert extractor["digest"] in text  # the digest the real registry gave the published version
+
+    # stages carry no package_archive, so the runtime loaded the extractor from the registry of the stack
+    info = client("handler-runtime").api("handler").get("/v1/info")
+    assert info.status_code == 200, info.text
+    assert info.json()["capabilities"]["package_sources"] == ["package_archive", "registry"], info.json()
 
     # pages that match no binding are registered as unknown and NOT forwarded to an LLM (flag off by default)
     unknown = (

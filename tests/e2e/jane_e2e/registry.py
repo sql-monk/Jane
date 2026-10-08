@@ -1,8 +1,13 @@
-"""Registry-side steps (registry.v1) of the criterion-9 scenarios: publication, archives, forks, upstream ports.
+"""Registry-side steps (registry.v1): publication, archives, forks, upstream ports.
 
 Shared by S-M2-01 (``test_m2_registry.py``) and its continuation for the other package kinds
 (``test_m2_registry_types.py``). Every call goes through the contract-validating client; the helpers assert
 the documented status codes, so a scenario reads as the sequence of registry operations it performs.
+
+:func:`publish_fixture_package` / :func:`publish_archive` put the packages of this checkout (the SDK example
+extractor, the fixtures of ``tests/e2e/packages``) into the REAL registry of a stack for the orchestrated
+scenarios: their stages send no ``package_archive``, so handler-runtime and the LLM gateway download the
+archive from the registry by ``package_id@version`` and check the pinned digest.
 """
 
 from __future__ import annotations
@@ -23,12 +28,14 @@ from typing import Any
 
 import pytest
 
-from jane_e2e.clients import JaneClient
+from jane_e2e.clients import CONTRACTS, JaneClient, spec
 from jane_e2e.orchestration import list_items
 from jane_e2e.stack import ROOT, E2EStack, default_project
+from jane_registry.archive import canonical_archive, digest_of, files_from_dir
 
 __all__ = [
     "FILES_DIR",
+    "FIXTURE_APPROVAL",
     "LLM_DIR",
     "POSTGRES_DIR",
     "REGISTRY_ENV",
@@ -43,7 +50,9 @@ __all__ = [
     "package_files",
     "port_upstream",
     "publish",
+    "publish_archive",
     "publish_body",
+    "publish_fixture_package",
     "publish_storage_packages",
     "publish_version",
     "ref_of",
@@ -57,6 +66,8 @@ LLM_DIR = ROOT / "services/llm/packages/jane.llm-event-extractor"
 FILES_DIR = ROOT / "services/storage/adapters/files/src/jane_storage_files/package"
 POSTGRES_DIR = ROOT / "services/storage/adapters/postgres/src/jane_storage_postgres/package"
 RULES_DIR = ROOT / "tests/e2e/config/rules/testsite.web-rules/1.0.0"
+MANIFEST_SCHEMA = (CONTRACTS.parent / "schemas" / "package-manifest.schema.json").as_uri() + "#"
+FIXTURE_APPROVAL = "e2e: package of the checkout (tests/e2e/packages, SDK example), tests run by its owner WP"
 
 # The executors of an isolated registry stack take packages from the REAL registry, not from local stand-ins:
 # the runtime and storage fetch archives, the Web Collector reads rules (its local rules directory does not exist),
@@ -153,6 +164,60 @@ def publish_storage_packages(registry_url: str) -> str:
     )
     assert done.returncode == 0, (done.stdout, done.stderr)
     return done.stdout
+
+
+def publish_archive(registry: JaneClient, data: bytes, *, reason: str = FIXTURE_APPROVAL) -> dict[str, str]:
+    """Publish a package archive of this checkout to the REAL registry, approve it, return the pinned ref.
+
+    The registry keeps its canonical archive of the files (``jane_registry.archive.canonical_archive``), so the
+    pinned digest is computed here from the same files and must equal the registry's answer and the downloaded
+    archive (``ETag`` and SHA-256). Idempotent on a shared stack: an existing package is reused and an existing
+    version must have exactly this digest (versions are immutable; other content fails the scenario)."""
+    with zipfile.ZipFile(io.BytesIO(data)) as zipped:
+        files = {i.filename: zipped.read(i) for i in zipped.infolist() if not i.is_dir()}
+    canonical = canonical_archive(files)
+    expected = digest_of(canonical)
+    manifest = json.loads(files["jane-package.json"])
+    package_id, version_ = str(manifest["package_id"]), str(manifest["version"])
+    spec("registry").validate_at(MANIFEST_SCHEMA, manifest, f"{package_id}/jane-package.json")
+    api = registry.api("registry")
+    body = {"package_id": package_id, "kind": manifest["kind"], "title": manifest["title"]}
+    created = api.post("/v1/packages", json=body, headers={"Idempotency-Key": key()})
+    if created.status_code == 409:  # published by an earlier scenario of this stack
+        existing = api.get(f"/v1/packages/{package_id}")
+        assert existing.status_code == 200, existing.text
+        assert existing.json()["kind"] == manifest["kind"], existing.json()
+    else:
+        assert created.status_code == 201, created.text
+    published = api.post(
+        f"/v1/packages/{package_id}/versions",
+        content=canonical,
+        headers={"Content-Type": "application/zip", "Idempotency-Key": key()},
+    )
+    if published.status_code == 409:
+        assert published.json()["code"] == "version_exists", published.text
+        doc = version(registry, package_id, version_)
+    else:
+        assert published.status_code == 201, published.text
+        doc = dict(published.json())
+    assert doc["digest"] == expected, (package_id, version_, doc["digest"], expected)
+    if doc["status"] == "draft":
+        approved = api.post(
+            f"/v1/packages/{package_id}/versions/{version_}/status",
+            json={"status": "approved", "reason": reason},
+            headers={"Idempotency-Key": key()},
+        )
+        assert approved.status_code == 200, approved.text
+        assert approved.json()["status"] == "approved", approved.json()
+    archive(registry, package_id, version_, expected)
+    return {"package_id": package_id, "version": version_, "digest": expected}
+
+
+def publish_fixture_package(
+    registry: JaneClient, package_dir: Path, *, reason: str = FIXTURE_APPROVAL
+) -> dict[str, str]:
+    """:func:`publish_archive` of a package directory of this checkout; returns ``package_id@version`` + digest."""
+    return publish_archive(registry, canonical_archive(files_from_dir(package_dir)), reason=reason)
 
 
 def new_parent_version(

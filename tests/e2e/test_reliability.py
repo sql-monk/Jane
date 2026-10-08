@@ -1,8 +1,7 @@
-"""Reliability scenarios R-* (docs/acceptance/scenarios.md) on the services already merged into main.
-
-R-02/R-04 (restart + redelivery), R-05 (late results) and R-06 (several instances) run now for storage and
-handler-runtime; the orchestrator-driven variants (kill of a worker mid-chain, network partitions between
-orchestrator and executors) are added when WP-09 is merged.
+"""Reliability scenarios R-02/R-04 (restart + redelivery), R-05 (late results) and R-06 (several instances) for
+storage and handler-runtime (docs/acceptance/scenarios.md). The material comes from the real Web Collector
+(``collector.v1`` ``POST /v1/fetches``); the orchestrator-driven variants are in
+``test_reliability_orchestrated.py``.
 """
 
 from __future__ import annotations
@@ -15,16 +14,18 @@ from typing import Any
 import pytest
 
 from jane_e2e.clients import JaneClient
-from jane_e2e.materials import fetch_page, standin_web_material
+from jane_e2e.orchestration import TESTSITE
 from jane_e2e.stack import E2EStack
-from jane_e2e.steps import extract, store
+from jane_e2e.steps import collector_fetch, extract, store
 
 pytestmark = [pytest.mark.e2e, pytest.mark.milestone("M1")]
 
 
-def _material(stack: E2EStack, run_id: str, path: str = "/product/phone-alpha") -> dict[str, Any]:
-    page = fetch_page(stack.url("testsite") + path)
-    return standin_web_material(page, source_id=f"e2e-{run_id}", observation_id=f"obs_e2e_{run_id}")
+def _material(
+    client: Callable[..., JaneClient], run_id: str, path: str = "/product/phone-alpha"
+) -> dict[str, Any]:
+    """One page through the real Web Collector (a new observation of source ``e2e-<run_id>``)."""
+    return collector_fetch(client("web-collector"), TESTSITE + path, f"e2e-{run_id}")
 
 
 @pytest.mark.criteria(8)
@@ -32,8 +33,8 @@ def test_r_02_redelivery_after_restart_of_storage_and_runtime(
     stack: E2EStack, require: Callable[..., None], client: Callable[..., JaneClient], run_id: str
 ) -> None:
     """R-02/R-04: a result delivered before a crash (docker kill) is a duplicate after the restart."""
-    require("testsite", "storage", "handler-runtime")
-    material = _material(stack, run_id)
+    require("testsite", "web-collector", "storage", "handler-runtime")
+    material = _material(client, run_id)
     extract_body, extracted = extract(client("handler-runtime"), material, run_id)
     assert extracted["status"] == "success", extracted
     inputs = [{"kind": "entities", "entities": extracted["output"]["entities"]}]
@@ -86,9 +87,9 @@ def test_r_05_late_result_does_not_replace_newer_one(
     stack: E2EStack, require: Callable[..., None], client: Callable[..., JaneClient], run_id: str
 ) -> None:
     """R-05 (TZ §11): an older observation delivered after a newer one lands in history, not in the state."""
-    require("testsite", "storage", "handler-runtime")
+    require("testsite", "web-collector", "storage", "handler-runtime")
     storage = client("storage")
-    material = _material(stack, run_id)
+    material = _material(client, run_id)
     _, extracted = extract(client("handler-runtime"), material, run_id)
     (base,) = extracted["output"]["entities"]
     t0 = datetime.now(UTC).replace(microsecond=0)
@@ -136,10 +137,10 @@ def test_r_06_two_runtime_instances_share_idempotency(
     stack: E2EStack, require: Callable[..., None], client: Callable[..., JaneClient], run_id: str
 ) -> None:
     """R-06: with two handler-runtime instances a redelivery to the other instance is a duplicate."""
-    require("testsite", "handler-runtime")
+    require("testsite", "web-collector", "handler-runtime")
     stack.scale("handler-runtime", 2)
     try:
-        material = _material(stack, run_id)
+        material = _material(client, run_id)
         body, first = extract(client("handler-runtime", 1), material, run_id)
         assert first["status"] == "success"
         _, second = client("handler-runtime", 2).invoke(body)

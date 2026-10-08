@@ -155,6 +155,12 @@ def cmd_isolation(ns: argparse.Namespace) -> int:
 
 def cmd_e2e(ns: argparse.Namespace) -> int:
     code = run(uv_run("pytest", "tests/e2e", "-m", "e2e", *ns.pytest_args)).returncode
+    if os.environ.get("JANE_E2E_REQUIRED") == "1":
+        # Mandatory e2e (CI job e2e): no collected scenario (exit 5) is an error, not a green run;
+        # tests/e2e/conftest.py also turns every skipped scenario into a failure.
+        if code == 5:
+            print("JANE_E2E_REQUIRED=1: no e2e scenario was collected", file=sys.stderr, flush=True)
+        return code
     return 0 if pytest_ok(code) else code
 
 

@@ -158,6 +158,8 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       JANE_E2E_PROJECT: jane-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+      # Mandatory e2e: a skipped scenario or no collected scenario fails the job (tests/e2e/conftest.py).
+      JANE_E2E_REQUIRED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

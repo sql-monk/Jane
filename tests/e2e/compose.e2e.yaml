@@ -49,8 +49,8 @@ services:
       JANE_HANDLER_RUNTIME_BLOB_ROOTS: '["/var/lib/jane/storage"]'
       JANE_HANDLER_RUNTIME_PROFILE_IMAGES: '{"python-extractor@1": "${JANE_E2E_SANDBOX_IMAGE:?set by tests/e2e}"}'
       JANE_HANDLER_RUNTIME_SANDBOX_LABELS: '{"io.jane.e2e-project": "${JANE_E2E_PROJECT:-jane-e2e}"}'
-      # M1 uses the local package-host; registry acceptance opts into the real service.
-      JANE_HANDLER_RUNTIME_REGISTRY_URL: ${JANE_E2E_RUNTIME_REGISTRY_URL:-http://package-host:8080}
+      # Archives of orchestrated stages (no package_archive) come from the real registry (WP-05).
+      JANE_HANDLER_RUNTIME_REGISTRY_URL: ${JANE_E2E_RUNTIME_REGISTRY_URL:-http://registry:8000}
       # When an in-progress delivery key of a killed runtime may be taken over. The default is the service's
       # own (15 min); R-07 shortens it for its stack so that calls cut by a runtime kill finish in the e2e budget.
       JANE_HANDLER_RUNTIME_LIMITS__STATE__IN_PROGRESS_LEASE_MS: ${JANE_E2E_RUNTIME_IN_PROGRESS_LEASE_MS:-900000}
@@ -62,9 +62,8 @@ services:
       # S-M2-06 classifies 54 name-only and 16 hinted pages, then S-M2-07 improves a package in one
       # shared module stack. The production default of 60 calls/minute rejects the second onboarding.
       JANE_LLM_LIMITS__LLM__MAX_REQUESTS_PER_MINUTE: ${JANE_E2E_LLM_MAX_REQUESTS_PER_MINUTE:-120}
-      # LLM packages of orchestrated stages (no package_archive) come from the same local archive stand-in;
-      # registry acceptance (criterion 9) opts into the real service.
-      JANE_LLM_REGISTRY_URL: ${JANE_E2E_LLM_REGISTRY_URL:-http://package-host:8080}
+      # LLM packages of orchestrated stages (no package_archive) come from the real registry (WP-05).
+      JANE_LLM_REGISTRY_URL: ${JANE_E2E_LLM_REGISTRY_URL:-http://registry:8000}
     volumes:
       - ../tests/e2e/config/llm-seed.yaml:/cfg/llm-seed.yaml:ro
 
@@ -139,8 +138,8 @@ services:
 
   registry:
     environment:
-      # Registry acceptance opts into the runtime's published profile.
-      JANE_REGISTRY_RUNTIME_PROFILES: ${JANE_E2E_REGISTRY_RUNTIME_PROFILES:-[]}
+      # Dependencies of extractor packages are checked against the runtime's published profile.
+      JANE_REGISTRY_RUNTIME_PROFILES: '${JANE_E2E_REGISTRY_RUNTIME_PROFILES:-["http://handler-runtime:8000/v1/info"]}'
     healthcheck:
       <<: *e2e-health
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]
@@ -155,14 +154,13 @@ services:
       <<: *e2e-health
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8102/v1/health', timeout=2)"]
 
-  # Local package archive stand-in for reproducible WP-13 fixture packages.
+  # SUBSTITUTE (З) of a blob store's download_url for R-04 (gated downloads); it serves no package archives.
   package-host:
     profiles: ["package-host"]
     image: ${JANE_IMAGE_PYTHON:-python:3.12-slim}
-    command: ["python", "/app/package_host.py", "/packages", "8080"]
+    command: ["python", "/app/package_host.py", "8080"]
     volumes:
       - ../tests/e2e/jane_e2e/package_host.py:/app/package_host.py:ro
-      - ${JANE_E2E_PACKAGES_DIR:?set by tests/e2e}:/packages:ro
     ports: ["${JANE_BIND:-127.0.0.1}::8080"]
     healthcheck:
       <<: *e2e-health

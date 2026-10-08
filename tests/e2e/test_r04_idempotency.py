@@ -43,6 +43,7 @@ def _collection_result(
 def test_r_04_collectors_replay_one_job_without_new_materials(
     stack: E2EStack,
     require: Callable[..., None],
+    scale: Callable[[str, int], None],
     client: Callable[..., JaneClient],
     run_id: str,
     service: str,
@@ -76,7 +77,7 @@ def test_r_04_collectors_replay_one_job_without_new_materials(
         }
 
     if replay_location == "other-instance":
-        stack.scale(service, 2)
+        scale(service, 2)
     replay_replica = 2 if replay_location == "other-instance" else 1
     collector = client(service, 1)
     replay_collector = client(service, replay_replica)
@@ -163,6 +164,7 @@ def test_r_04_web_replay_while_collection_is_running(
 def test_r_04_llm_replay_does_not_spend_usage_twice(
     stack: E2EStack,
     require: Callable[..., None],
+    scale: Callable[[str, int], None],
     client: Callable[..., JaneClient],
     run_id: str,
     mode: str,
@@ -170,7 +172,7 @@ def test_r_04_llm_replay_does_not_spend_usage_twice(
 ) -> None:
     require("llm")
     if replay_location == "other-instance":
-        stack.scale("llm", 2)
+        scale("llm", 2)
     replay_replica = 2 if replay_location == "other-instance" else 1
     llm = client("llm", 1)
     replay_llm = client("llm", replay_replica)

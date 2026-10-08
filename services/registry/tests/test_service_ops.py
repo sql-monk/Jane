@@ -46,7 +46,9 @@ def test_api_keys_and_scopes(tmp_path: Path, profile_file: Path) -> None:
 
     with TestClient(build_app(settings)) as c:
         assert c.get("/v1/health").status_code == 200  # no auth for health
-        assert c.get("/v1/info").json()["auth_mode"] == "api_key"
+        # common.yaml Info has bearerAuth and 401: any valid key reads it (ADR-0005, M3 auth)
+        assert c.get("/v1/info").status_code == 401
+        assert c.get("/v1/info", headers=auth("reader")).json()["auth_mode"] == "api_key"
         assert c.get("/v1/packages").status_code == 401
         assert c.get("/v1/packages", headers={"Authorization": "Bearer wrong"}).status_code == 401
         assert c.get("/v1/packages", headers=auth("reader")).status_code == 200

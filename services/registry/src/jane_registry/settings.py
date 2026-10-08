@@ -60,9 +60,10 @@ class Settings(JaneSettings):
     (contracts/docs/handler-packages.md)."""
 
     # ---------------------------------------------------------------- auth (ADR-0005)
-    api_keys_file: Path | None = None
-    """``auth_mode=api_key``: JSON file ``[{"name": "...", "sha256": "<hex of the key>", "scopes": [...]}]``.
-    Only hashes are stored; the keys themselves live with the clients."""
+    # auth_mode, api_keys, api_keys_file, jwt_* come from jane_kit.auth.AuthSettings (JaneSettings).
+    runtime_profiles_token_ref: str | None = None
+    """Secret reference (``env:VAR`` / ``file:/path``, ADR-0006) of the registry's own token for http(s)
+    ``runtime_profiles`` sources: ``GET <runtime>/v1/info`` needs a valid token of the runtime."""
 
 
 class PackageLimits(Limits):

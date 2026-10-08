@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
 
 from jane_kit.clients import ClientLimits, RetryPolicy
@@ -43,8 +43,9 @@ class Settings(JaneSettings):
     registry. The built-in ``services/llm/packages`` is used when unset and present."""
     registry_url: str | None = None
     """Base URL of the handler registry (``registry.v1``) for packages referenced by ``handler``."""
-    registry_token: str | None = None
-    """Bearer token for the registry (give it through the environment)."""
+    registry_token: SecretStr | None = None
+    """The gateway's own bearer token for the registry (ADR-0005 §5; give it through the environment,
+    never logged)."""
     db_pool_min_size: int = Field(default=1, ge=0)
     """Minimum PostgreSQL connections per instance."""
     db_pool_max_size: int = Field(default=10, ge=1)

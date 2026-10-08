@@ -119,3 +119,41 @@ WP-13s. Матриця й сценарії оновлені цим найсві�
 Злиття зроблено в detached `integ-b` поверх нового origin `76a03f7`; два нові коміти потоку A збережено,
 конфліктів немає. Власна дельта — лише matrix/scenarios/open-requests і цей журнал. `main`, worktree/гілки
 потоку A, jane-kit і status потік B не змінював. Подальші B-7/B-8 — після `merge: accept B2`.
+
+## Третя черга
+
+Доручення: [HANDOFF-2026-10-09-stream-b-3.md](../HANDOFF-2026-10-09-stream-b-3.md).
+Підготовка виконана у трьох окремих worktree від `origin/wp/01g2-service-auth` `7b41bf4`.
+Усі три результати закомічено й опубліковано у власні гілки; **до інтеграційної гілки B-7/B-8/B-9 не злито**.
+
+| Завдання | Підготовлена гілка / SHA | Результат і перевірка |
+|---|---|---|
+| B-7, адмінка | `wp/12e-admin-auth-key`, `58c5eec`, checkout `wp12e` | Real-wrapper читає `env.JANE_API_KEY_ADMIN` зі stack-файлу `just up`; `--project` / `JANE_STACK_FILE` / єдиний matching proxy URL. Незалежний env key не підміняє стековий; ключ і JSON не друкуються, неоднозначність/відсутність key зупиняють запуск. README оновлено; real-prepare не розширює B1 root за межі `storage/objects`. Web lint/typecheck exit 0. [Звіт WP-12e](https://github.com/sql-monk/Jane/blob/58c5eec/docs/delivery/WP-12.md) |
+| B-7, шаблон | `wp/01i-template-scopes`, `9fa705f`, checkout `wp01i` | `create_app(auth_scopes=AUTH_SCOPES)` для прикладу й job read/cancel. Ruff check/format, mypy (6 файлів) exit 0; **один** pytest: `10 passed, 1 skipped in 14.59s`. Skip — наявний placeholder контракту; common і новий 401/403/allowed scope тест PASSED. [Звіт WP-01i](https://github.com/sql-monk/Jane/blob/9fa705f/docs/delivery/WP-01.md) |
+| B-8 / B-9, документи | `wp/00d-auth-decisions`, `c301bbe`, checkout `wp00d` | ADR: info/metrics/none/401, scopes, делегування токенів і межа live IdP. Беклог B-6 доповнено умовним «закрито після злиття B2» для auth/JWT/scopes/RAW boundary/neighbor tokens/stack identities; scopes в OpenAPI — відкритий запит. Тестів і guardian — 0; OpenAPI не змінено. [Звіт WP-00d](https://github.com/sql-monk/Jane/blob/c301bbe/docs/delivery/WP-00.md) |
+
+Після завершення підготовки виконано `git fetch origin`: origin інтеграції `d99e7a9`,
+`git log origin/codex/jane-integration --grep="^merge: accept B2"` — **маркер відсутній**.
+За третім handoff роботу зупинено. **Повний real-набір адмінки на зведеній auth-ревізії не запускався**;
+`N passed` для фінального real gate поки не заявляється. До B2 додаткових перевірок не потрібно.
+
+Мінімум дотримано: один прогін шаблону, web lint/typecheck, 0 CI dispatch, 0 окремих reviewers
+(`web/admin/src` не змінено; шаблон — scaffold). 156 локальних посилань у змінених README/ADR/беклозі —
+0 відсутніх файлів. Gitleaks commit hooks трьох гілок — `no leaks found`.
+Corepack запустив pnpm 12.8.1 із попередженням про налаштовану 11.27.1; lockfile не змінено.
+Вивід перевірок: `wp12e/.jane/b7-web-checks.txt`, `wp01i/.jane/b7-template-checks.txt`.
+
+Власна дельта проти `7b41bf4`: WP-12 — 4/0, WP-01 — 4/0; WP-00 — 3 файли, один OUTSIDE
+(`docs/delivery/M3/open-requests.md`) прямо делеговано B-9. Виняток записано у звіт; власність/хуки не змінено.
+`main`, `wp01g`, `wp01h`, їхні гілки, jane-kit та status потік B не редагував.
+
+### Продовження після прийняття B2
+
+1. Перевірити маркер `merge: accept B2`, взяти актуальний origin інтеграції. Від підготовлених SHA створити
+   нові локальні гілки для rebase; опубліковані підготовлені гілки зберегти, force push не потрібний.
+2. Rebase на `origin/codex/jane-integration`, зберігаючи додаткові зміни B2/A/C. Для B-9 можливий add/add:
+   залишити чинний інтеграційний `open-requests.md` і накласти лише умовні закриття B-9 та R32.
+3. На зведеній ревізії виконати **один повний** real-набір через Caddy з ключем того самого stack-файлу;
+   записати `N passed` і SHA в цей журнал. До цього не приймати B-7 як виконаний фінальний real gate.
+4. Злити B-7/B-8/B-9 через detached `integ-b`; push лише інтеграції або нових гілок, без force push і без main.
+   Повний CI M3, фінальна ревізія матриці й статус — потік A; merge main — людина.

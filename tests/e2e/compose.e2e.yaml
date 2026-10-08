@@ -22,6 +22,9 @@ services:
   storage:
     environment:
       JANE_STORAGE_CONNECTION_HOST_ALLOWLIST: '["postgres:5432", "sqlserver:1433", "mongodb:27017", "minio:9000", "s3:8333"]'
+      # R-04 while a write is running: material content is a blob whose download_url is a gate of the
+      # package-host stand-in (tests/e2e/jane_e2e/active.py); downloads stay disabled for every other host.
+      JANE_STORAGE_DOWNLOAD_HOST_ALLOWLIST: '["package-host:8080"]'
       # Criterion 9 opts into the real registry for a task pinned to a storage fork.
       JANE_STORAGE_REGISTRY_URL: ${JANE_E2E_STORAGE_REGISTRY_URL:-}
       # Secret values only through secret_refs (ADR-0006); names use the JANE_SECRET_ prefix.

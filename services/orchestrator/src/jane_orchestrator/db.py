@@ -248,6 +248,12 @@ MIGRATIONS: list[str] = [
     """
     ALTER TABLE runs ADD COLUMN collection_restarts integer NOT NULL DEFAULT 0;
     """,
+    # 4 — durable RAW reference for problem samples, including storage-fed reprocessing
+    """
+    ALTER TABLE items ADD COLUMN stored_object_id text;
+    CREATE INDEX items_stored_raw ON items (source_id, observation_id)
+        WHERE stored_object_id IS NOT NULL;
+    """,
 ]
 
 

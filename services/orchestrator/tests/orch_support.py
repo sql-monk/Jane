@@ -690,29 +690,33 @@ class FakeStorage(FakeHandler):
         return JSONResponse(body, status_code=status)
 
     async def list_objects(self, request: Request) -> Response:
+        """storage.v1 ``GET /v1/objects`` with its ``source_id`` and ``material_id`` filters."""
         q = request.query_params
         if "connection_id" not in q:
             self.violations.append("storage GET /v1/objects without connection_id")
         start = int(q.get("cursor", "0"))
         limit = int(q.get("limit", "50"))
+
+        def wanted(material: dict[str, Any]) -> bool:
+            source_ok = q.get("source_id") in (None, material["source"].get("source_id"))
+            return source_ok and q.get("material_id") in (None, material["material_id"])
+
         with self.lock:
-            ids = self.object_order[start : start + limit]
-            more = start + limit < len(self.object_order)
+            matching = [oid for oid in self.object_order if wanted(self.stored_objects[oid]["material"])]
+            ids = matching[start : start + limit]
+            more = start + limit < len(matching)
         items = []
         for oid in ids:
             o = self.stored_objects[oid]
             m = o["material"]
-            items.append(
-                {
-                    "object": o["object"],
-                    "stored_at": o["stored_at"],
-                    "material": {
-                        "material_id": m["material_id"],
-                        "observation_id": m["observation_id"],
-                        "url": m["locator"]["url"],
-                    },
-                }
-            )
+            summary = {
+                "material_id": m["material_id"],
+                "observation_id": m["observation_id"],
+                "url": m["locator"]["url"],
+            }
+            if m["source"].get("source_id"):
+                summary["source_id"] = m["source"]["source_id"]
+            items.append({"object": o["object"], "stored_at": o["stored_at"], "material": summary})
         return self.respond_read(
             request, 200, {"items": items, "next_cursor": str(start + limit) if more else None}
         )

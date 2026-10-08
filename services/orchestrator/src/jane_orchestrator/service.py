@@ -25,6 +25,7 @@ from jane_orchestrator.db import Jsonb
 from jane_orchestrator.executors import ExecutorError
 from jane_orchestrator.runs import Runs
 from jane_orchestrator.schedule import CronError, next_fire
+from jane_orchestrator.stored_raw import stored_raw_id
 
 __all__ = ["Admin", "PreconditionFailed"]
 
@@ -610,8 +611,20 @@ class Admin:
         return self._activation_view(act)
 
     # ================================================================== problems & unknown
-    @staticmethod
-    def _group_view(r: Mapping[str, Any]) -> dict[str, Any]:
+    def _group_view(self, r: Mapping[str, Any]) -> dict[str, Any]:
+        samples = [dict(s) for s in r["samples"]]
+        # RAW storage and extraction run in parallel. Enrich at read time so a RAW write completed
+        # after the problem was registered is visible, also after a new API process starts.
+        with self.core.db.conn() as conn:
+            for sample in samples:
+                object_id = stored_raw_id(
+                    conn,
+                    r["source_id"],
+                    sample.get("observation_id"),
+                    invocation_id=sample.get("invocation_id"),
+                )
+                if object_id:
+                    sample["stored_object_id"] = object_id
         out: dict[str, Any] = {
             "group_id": r["group_id"],
             "source_id": r["source_id"],
@@ -622,7 +635,7 @@ class Admin:
             "first_seen_at": rfc3339(r["first_seen_at"]),
             "last_seen_at": rfc3339(r["last_seen_at"]),
             "status": r["status"],
-            "samples": r["samples"],
+            "samples": samples,
         }
         if r["failure_kind"]:
             out["failure_kind"] = r["failure_kind"]
@@ -686,6 +699,10 @@ class Admin:
                 f"SELECT * FROM unknown_materials WHERE {' AND '.join(where)} ORDER BY id LIMIT %s",  # noqa: S608
                 (*params, limit + 1),
             ).fetchall()
+            for row in rows:
+                row["stored_object_id"] = stored_raw_id(
+                    conn, row["source_id"], row["observation_id"], run_id=row["run_id"]
+                )
         page, nxt = _page(rows, limit, "id")
         out = []
         for r in page:
@@ -701,6 +718,8 @@ class Admin:
                 item["url"] = r["url"]
             if r["reason"]:
                 item["reason"] = r["reason"]
+            if r["stored_object_id"]:
+                item["stored_object_id"] = r["stored_object_id"]
             out.append(item)
         return out, nxt
 

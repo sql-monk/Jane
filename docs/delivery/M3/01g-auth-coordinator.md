@@ -53,11 +53,35 @@ $ uv run --all-packages python -m pytest services/orchestrator/tests/test_logic.
 ## CI і рішення
 
 [CI 37857870977](https://github.com/sql-monk/Jane/actions/runs/37857870977) на коді `7b41bf4`:
-12/13 job success, e2e ще виконується на момент запису. `stack` і `limits` success.
+**13/13 job success**, включно зі stack/e2e/limits/web-mock-e2e. Рядок e2e:
+`75 passed in 1403.48s (0:23:23)`, без skip/xfail, `JANE_E2E_REQUIRED=1`.
 Артефакт `limits-ci-37857870977-1`, `ci-20261008T231735Z/summary.md`: **verdict warn** —
 L2 single gap 0.0082674 s < 0.015 s; решта перевірок, включно з memory L6, успішні.
 Це branch evidence, фінальний CI M3 після B-7/B-8/C-2 ще потрібний.
 
-Виправлення п'яти зауважень r1 підтверджені. Приймання і злиття B2 чекають завершення e2e.
-Код не змінено, конфліктів у попередньому `git merge-tree --write-tree HEAD origin/wp/01g2-service-auth` немає.
+Виправлення п'яти зауважень r1 підтверджені. **B2 прийнято й злито `5fd7acd48972b9521e906721e8510d684b65bcd4`**
+з маркером `merge: accept B2`; push в інтеграцію виконано. Обидва README/backup auto-merge без конфліктів.
+Код результату тотожний кандидату, на якому виконано адресні перевірки:
+
+```text
+$ git diff --exit-code 5b622e46dd46829790ebf938ce8ce32aa7bf41ae HEAD -- libs services infra tests scripts deploy examples templates uv.lock pyproject.toml justfile
+exit 0; без виводу
+
+$ uv run --all-packages ruff check libs/jane-kit services/orchestrator services/handler-runtime
+All checks passed!
+$ uv run --all-packages python -m pytest libs/jane-kit/tests/test_auth.py libs/jane-kit/tests/test_auth_scopes.py libs/jane-kit/tests/test_content.py -q
+65 passed, 1 warning in 5.78s
+$ uvx --from rust-just just test orchestrator -q
+32 passed, 48 deselected in 102.75s (0:01:42)
+$ uvx --from rust-just just test handler-runtime -q
+1 failed, 62 passed, 13 deselected, 32 warnings in 852.90s (0:14:12)
+# test_network_attempt_is_a_sandbox_violation: HTTP 202/job.running замість очікуваного sync результату;
+# у teardown той самий invocation завершився failed/sandbox_violation, duration_ms=24750.
+$ uv run --all-packages python -m pytest services/handler-runtime/tests/test_classification.py services/handler-runtime/tests/test_auth.py -q
+15 passed, 1 warning in 1.43s
+```
+
+Повний локальний runtime-набір **не зелений**: тест має припущення про завершення в sync budget.
+Автоматичний перехід у 202 відповідає контракту; async job підтвердила правильну sandbox_violation.
+Окремий інкремент WP-06 має дочекатися job у цьому тесті й зберегти всі assertions. Це не зміна B2.
 JWT з реальним IdP — **не перевірено на реальному сервісі**.

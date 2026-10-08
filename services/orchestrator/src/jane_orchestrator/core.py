@@ -64,6 +64,8 @@ class Core:
             settings.all_executors(),
             connect_timeout_ms=c.timeouts.connect_timeout_ms,
             request_timeout_ms=c.timeouts.request_timeout_ms,
+            keepalive_expiry_ms=limits.engine.executor_keepalive_expiry_ms,
+            stale_connection_retries=limits.engine.executor_stale_connection_retries,
         )
         self.metrics = EngineMetrics(metrics)
         self.fallback: dict[str, Any] = c.model_dump(mode="json")

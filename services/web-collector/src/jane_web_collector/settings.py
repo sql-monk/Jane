@@ -30,6 +30,7 @@ from jane_kit.jobs import JobLimits
 from jane_kit.pagination import PageLimits
 
 from .connections import ConnectionPolicy
+from .egress import EgressPolicy
 
 ENV_PREFIX = "JANE_WEB_COLLECTOR_"
 LIMITS_ENV_PREFIX = f"{ENV_PREFIX}LIMITS__"
@@ -59,6 +60,12 @@ class Settings(JaneSettings):
     """Only file: references inside this directory may be resolved; empty disables file: references."""
     connection_origin_allowlist: list[str] = Field(default_factory=list)
     """Exact HTTP(S) origins allowed to receive resolved connection credentials; empty denies all."""
+    egress_deny_link_local: bool = True
+    """Outbound policy: never connect to link-local addresses (169.254.0.0/16 with the cloud metadata service,
+    fe80::/10, fd00:ec2::254). Checked after DNS resolution for every connection, including redirect hops."""
+    egress_deny_private: bool = False
+    """Outbound policy: also never connect to loopback, private and other non-public addresses. Off by default:
+    the dev/e2e test site is in a private Docker network; turn it on where sources are public sites only."""
     contracts_dir: Path | None = None
     """``contracts/`` with the JSON Schemas; default: ``JANE_CONTRACTS_DIR`` or the checkout's contracts."""
     discovery_path: Path | None = None
@@ -84,6 +91,11 @@ class Settings(JaneSettings):
             )
         self.connection_policy()
         return self
+
+    def egress_policy(self) -> EgressPolicy:
+        return EgressPolicy(
+            deny_link_local=self.egress_deny_link_local, deny_private=self.egress_deny_private
+        )
 
     def connection_policy(self) -> ConnectionPolicy:
         return ConnectionPolicy(

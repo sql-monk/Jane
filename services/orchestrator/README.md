@@ -12,6 +12,17 @@ PostgreSQL (`SELECT … FOR UPDATE SKIP LOCKED`) з воркерами на leas
 (`jane_orchestrator`) і не зберігає вмісту матеріалів — лише ідентифікатори й посилання; транзитний вхід
 елемента черги (Material з `ContentRef`, сутності) очищається, щойно елемент завершено.
 
+Повторна обробка `stored_materials` обмежена `source_id` завдання: однаковий `material_id` у сховищі
+іншого джерела не потрапляє до запуску. `material_ids` обирає матеріали, а не одне конкретне спостереження.
+Відомий `stored_object_id` RAW зберігається у власному `items` після справжнього запису або читання RAW
+зі storage API; міграція застосовується під час запуску. Групи проблем і невідомі матеріали повертають
+це необов'язкове поле за `observation_id` та запуском, зокрема коли RAW завершився після екстрактора
+чи API запущено повторно. Для симульованого запису, невідомого id або неоднозначних копій поле відсутнє.
+При reprocessing різні storage `object_id` для того самого source/observation позначаються у власній
+БД як неоднозначні; collect item, problem sample й unknown material не повертають id такої копії.
+Ця ознака зберігається між сторінками storage та перезапусками API. Повторення того самого `object_id`
+не є неоднозначністю і не запускає DAG удруге. Точний вибір копії потребує окремого рішення контракту.
+
 ## Незалежний запуск
 
 Потрібна PostgreSQL (наприклад, dev-стек: `just up postgres`, адреса — `just env`).
@@ -103,6 +114,8 @@ platform → source → task → stage → request (`RunRequest.limits`), `hard_
 | `sync_retry_ms` / `sync_max_attempts` | 5000 / 5 | синхронізація підключень |
 | `idempotency_in_progress_poll_ms` / `idempotency_in_progress_max_wait_ms` / `idempotency_in_progress_retry_ms` | 500 / 120000 / 5000 | повтор з тим самим `delivery_key` після 409 `idempotency_in_progress` під чинним lease; після межі елемент відкладається на `retry_ms` і перевіряється з тим самим ключем та номером спроби |
 | `executor_health_timeout_ms` | 2000 | `/v1/executors` → статус |
+| `executor_keepalive_expiry_ms` | 4000 | простій, після якого з'єднання з виконавцем прибирається з пулу; **має бути меншим** за keep-alive сервера виконавця (uvicorn `timeout_keep_alive`, 5 с у кожному сервісі Jane), інакше запит у мить закриття з'єднання сервером падає з `RemoteProtocolError: Server disconnected` |
+| `executor_stale_connection_retries` | 1 | негайних повторів на новому з'єднанні, якщо виконавець закрив з'єднання без відповіді (`RemoteProtocolError`, `ReadError`, `WriteError`; тайм-аути — ні). Лише для запитів, які безпечно повторити: `GET/HEAD/OPTIONS/PUT/DELETE` або з `Idempotency-Key` (зокрема `POST /v1/invocations` із `delivery_key`). Такий повтор **не** витрачає `retries.max_attempts` елемента; `0` — віддати помилку звичайній політиці повторів |
 | `job_poll_interval_ms` | 500 | опитування 202-job виконавця |
 | `problem_samples` / `trace_outputs_max` | 10 / 100 | зразки в групі проблем / посилання виходів на елемент |
 | `db_pool_max` | 10 | з'єднань із БД на процес |

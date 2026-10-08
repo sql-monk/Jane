@@ -25,6 +25,7 @@ from urllib.parse import urlsplit
 
 from jane_kit.errors import FieldError
 from jane_llm.providers.base import ResolvedConnection
+from jane_llm.secret_files import read_secret_file
 
 _SECRET_KEY_RE = re.compile(r"(?i)(pass(word|wd)?|secret|token|api[_-]?key|credential|private[_-]?key|auth)")
 _SECRET_VALUE_RES = [
@@ -66,7 +67,7 @@ class ConnectionPolicy:
             try:
                 path = Path(ref[5:]).resolve()
                 base = self.files_dir.resolve()
-            except (OSError, RuntimeError):
+            except (OSError, RuntimeError, ValueError):
                 return "file: reference is not a valid path"
             if not path.is_relative_to(base):
                 return f"file: references must point inside {self.files_dir}"
@@ -75,12 +76,32 @@ class ConnectionPolicy:
             return "vault: references are not configured in this service"
         return "unknown secret reference scheme"
 
+    def secret_file(self, ref: str) -> Path | None:
+        """Resolved path (``..`` and symlinks resolved) of an allowed ``file:`` reference, else ``None``.
+
+        The reader must still pin and check every filesystem component before reading this path;
+        resolving a pathname alone does not prevent a later target or parent replacement.
+        """
+        if self.files_dir is None or not ref.startswith("file:") or not ref[5:]:
+            return None
+        try:
+            path = Path(ref[5:]).resolve()
+            base = self.files_dir.resolve()
+        except (OSError, RuntimeError, ValueError):
+            return None
+        return path if path != base and path.is_relative_to(base) else None
+
     def api_base_error(self, api_base: Any) -> str | None:
         if api_base is None:
             return None
-        if not isinstance(api_base, str) or origin(api_base) not in self._origins:
-            return f"api_base must be one of the allowed origins {sorted(self._origins)}"
-        return None
+        allowed = f"api_base must be one of the allowed origins {sorted(self._origins)}"
+        if not isinstance(api_base, str):
+            return allowed
+        try:
+            parsed = origin(api_base)
+        except ValueError:  # bad port ("…:99999", "…:abc") or bracket: a validation error, not a 500
+            return f"api_base is not a valid URL; {allowed}"
+        return None if parsed in self._origins else allowed
 
     def violations(self, doc: dict[str, Any]) -> list[FieldError]:
         errors = []
@@ -102,10 +123,10 @@ def resolve_ref(ref: str, policy: ConnectionPolicy) -> str | None:
     if ref.startswith("env:"):
         return os.environ.get(ref[4:]) or None
     if ref.startswith("file:"):
-        try:
-            return Path(ref[5:]).read_text(encoding="utf-8").strip() or None
-        except OSError:
+        path = policy.secret_file(ref)  # re-resolved now; the raw reference is never opened
+        if path is None:
             return None
+        return read_secret_file(path)
     return None
 
 

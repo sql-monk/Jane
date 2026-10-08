@@ -248,6 +248,18 @@ MIGRATIONS: list[str] = [
     """
     ALTER TABLE runs ADD COLUMN collection_restarts integer NOT NULL DEFAULT 0;
     """,
+    # 4 — durable RAW reference for problem samples, including storage-fed reprocessing
+    """
+    ALTER TABLE items ADD COLUMN stored_object_id text;
+    CREATE INDEX items_stored_raw ON items (source_id, observation_id)
+        WHERE stored_object_id IS NOT NULL;
+    """,
+    # 5 — remember conflicting storage-read copies across pages and process restarts
+    """
+    ALTER TABLE items ADD COLUMN stored_object_ambiguous boolean NOT NULL DEFAULT false;
+    CREATE INDEX items_stored_raw_ambiguous ON items (source_id, observation_id)
+        WHERE stored_object_ambiguous;
+    """,
 ]
 
 

@@ -208,8 +208,12 @@ export function MaterialTracePage() {
               ["URL", trace.data.url ?? "—"],
             ]}
           />
+          {/* Reprocessing of stored RAW runs the same observation again: one entry per (observation, run). */}
           {trace.data.observations.map((obs) => (
-            <Section key={obs.observation_id} title={`Спостереження ${obs.observation_id}`}>
+            <Section
+              key={`${obs.observation_id}/${obs.run_id ?? ""}`}
+              title={`Спостереження ${obs.observation_id}${obs.run_id ? `, запуск ${obs.run_id}` : ""}`}
+            >
               <p className="muted">
                 Запуск{" "}
                 {obs.run_id ? <Link to={`/runs/${encodeURIComponent(obs.run_id)}`}>{obs.run_id}</Link> : "—"},
@@ -217,7 +221,7 @@ export function MaterialTracePage() {
                 <code>{obs.content_sha256 ?? "—"}</code>
               </p>
               <Table
-                label={`Етапи ${obs.observation_id}`}
+                label={`Етапи ${obs.observation_id}${obs.run_id ? ` (${obs.run_id})` : ""}`}
                 rows={obs.stages}
                 rowKey={(s) => s.stage_id}
                 columns={[

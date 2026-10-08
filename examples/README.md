@@ -42,7 +42,7 @@
 ```text
 uv sync --all-packages
 uv run --all-packages python examples/jane_examples.py check
-uv run --all-packages pytest examples -q
+uv run --all-packages pytest examples -q          # входить і в just unit / just check
 ```
 
 `check` звіряє маніфести й правила зі схемами контрактів, проганяє тести пакетів у процесі, перераховує

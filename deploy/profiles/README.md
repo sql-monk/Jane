@@ -43,8 +43,8 @@ uv run --all-packages python deploy/profiles/harness/limits_harness.py plan --pr
 uv run --all-packages python deploy/profiles/harness/limits_harness.py run --profile dev-laptop   # вільна машина!
 ```
 
-`just check` цей каталог не тестує (`testpaths` кореневого `pyproject.toml` належить WP-01); тести запускаються
-окремою командою вище, типи — `uv run --all-packages mypy deploy/profiles`.
+Тести без Docker входять у `just unit` / `just check` (і CI job `unit`) окремою сесією pytest разом з `examples/`
+(`EXTRA_UNIT_PATHS` у `scripts/dev.py`); окремо — командою вище. Типи — `uv run --all-packages mypy deploy/profiles`.
 
 ## Як профіль доходить до сервісів
 

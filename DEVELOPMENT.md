@@ -27,7 +27,7 @@
 | `just check` | lint + types + unit + contract (+ web, якщо є `web/*`) — те саме, що CI |
 | `just lint` / `just fmt` | ruff check + ruff format --check + лінтер контрактів / автовиправлення |
 | `just types` | mypy (strict) для кожного члена workspace, `scripts/`, `infra/tests/` |
-| `just unit` / `just contract` | тести без маркерів / `@pytest.mark.contract` + лінтер `contracts/` |
+| `just unit` / `just contract` | тести без маркерів (+ офлайнові тести `examples/` і `deploy/profiles/` окремою сесією) / `@pytest.mark.contract` + лінтер `contracts/` |
 | `just test <сервіс> [аргументи pytest]` | тести одного сервісу чи бібліотеки (`web-collector`, `jane-kit`, `testsite`) без `integration` |
 | `just integration [--project <ім'я>]` | тести `@pytest.mark.integration` проти стеку цього checkout (або названого проєкту; потрібен `just up`) |
 | `just isolation` | тести `@pytest.mark.isolation` (лише Linux; WP-06) |

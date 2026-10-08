@@ -26,6 +26,10 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_FILE = ROOT / "infra" / "compose.yaml"
 STACK_DIR = ROOT / ".jane"
 UNIT_MARKERS = "not contract and not integration and not isolation"
+# Offline tests outside the workspace members and the root `testpaths`: examples (WP-14) and the limits
+# profiles with their harness. They need no Docker. A separate pytest session, because their conftest files
+# put generic module names (stack, check, metrics, jane_examples) on sys.path.
+EXTRA_UNIT_PATHS = ("examples", "deploy/profiles")
 
 for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
@@ -124,9 +128,19 @@ def cmd_types(_: argparse.Namespace) -> int:
     return code
 
 
+def names_test_paths(pytest_args: Sequence[str]) -> bool:
+    """True when the caller selected tests by path (`just unit services/x/tests`): pytest then ignores
+    `testpaths`, and the extra sessions are not added either."""
+    return any(not a.startswith("-") and (ROOT / a.split("::", 1)[0]).exists() for a in pytest_args)
+
+
 def cmd_unit(ns: argparse.Namespace) -> int:
     code = run(uv_run("pytest", "-m", UNIT_MARKERS, *ns.pytest_args)).returncode
-    return 0 if pytest_ok(code) else code
+    result = 0 if pytest_ok(code) else code
+    if not names_test_paths(ns.pytest_args):
+        extra = run(uv_run("pytest", *EXTRA_UNIT_PATHS, "-m", UNIT_MARKERS, *ns.pytest_args)).returncode
+        result = result or (0 if pytest_ok(extra) else extra)
+    return result
 
 
 def cmd_contract(ns: argparse.Namespace) -> int:

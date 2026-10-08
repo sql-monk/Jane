@@ -70,7 +70,7 @@ Docker-сокет із групою, визначеною автоматично
 | R-01 | Kill воркера оркестратора посеред ланцюжка | 8 | orchestrator ×2, виконавці | **Пройшов** у [CI 36999629588](https://github.com/sql-monk/Jane/actions/runs/36999629588) на WP-13m: після перехоплення lease друга репліка повторила старт того самого run і повернула ту саму job; ефекти лишилися одиничними. Фінальна `main` ще не перевірена. |
 | R-02 | Kill і рестарт кожного сервісу; повтор після рестарту — дубль | 8 | усі сервіси | **Усі вісім сервісів пройшли на одному SHA `cb4895d`**: storage, handler-runtime, Web/Telegram Collector, LLM (sync/async), registry, assistant, orchestrator. [CI 37017296604](https://github.com/sql-monk/Jane/actions/runs/37017296604): 12/12 job, e2e 62 passed. Фінальна `main` не перевірена. |
 | R-03 | Розрив мережі між оркестратором і виконавцем | 8 | orchestrator, виконавці | Storage partition і retry **PASSED** у Linux [CI 37002784428](https://github.com/sql-monk/Jane/actions/runs/37002784428); локальні 3 Docker e2e теж пройшли. Фінальна `main` ще не перевірена. |
-| R-04 | Повторна доставка на кожен виконавець | 8 | усі виконавці | **Частково**: Web/Telegram Collector і LLM — replay на тому самому, іншому й після рестарту; storage/runtime — дубль, `Idempotency-Replayed` і 422 для іншого тіла. WP-13q додав Web Collector під час активного збору (**PASSED** у [CI 37017296604](https://github.com/sql-monk/Jane/actions/runs/37017296604)). Повтор під час незавершеної роботи решти виконавців і фінальна `main` відкриті. |
+| R-04 | Повторна доставка на кожен виконавець | 8 | усі виконавці | **Частково**: Web/Telegram Collector і LLM — replay на тому самому, іншому й після рестарту; storage/runtime — дубль, `Idempotency-Replayed` і 422 для іншого тіла. WP-13q додав Web Collector під час активного збору (**PASSED** у [CI 37017296604](https://github.com/sql-monk/Jane/actions/runs/37017296604)). WP-13r (гілка `wp/13r-r04-active-replays`, `test_r04_active_replays.py`) додав повтор **під час** роботи: Telegram Collector, handler-runtime (sync/async), storage, LLM `/v1/invocations` (sync/async), registry (job перенесення змін і публікація), assistant (`/v1/unknown-materials`), orchestrator (старт run і повторна обробка) — адресно 2 × 9 passed локально, CI — у координатора. Не покрито: `/v1/completions` LLM і onboarding/improvement асистента (фейковий провайдер без затримки). Фінальна `main` відкрита. |
 | R-05 | Запізнілий результат не замінює новішого | 8 | storage, handler-runtime | **реалізовано, проходить** |
 | R-06 | Кілька екземплярів кожного компонента | 8 | усі | **runtime, Web/Telegram Collector, LLM, storage, registry, assistant та orchestrator ×2 проходять** (CI 36988073141, 36994135652 і [36999629588](https://github.com/sql-monk/Jane/actions/runs/36999629588)); фінальна `main` ще не перевірена |
 | R-07 | Повний цикл LLM → тести → активація → відкат під навантаженням і з рестартами | 6, 8 | orchestrator, assistant, llm, registry, runtime, storage | Після виправлень WP-11e/06a/09c усі сценарії `test_r07_improvement_restarts.py` **PASSED** у [CI 36994135652](https://github.com/sql-monk/Jane/actions/runs/36994135652), e2e `54 passed, 0 xfailed` на `e8927bd`; LLM — З, фінальна `main` ще не перевірена |
@@ -403,7 +403,7 @@ LLM — **З**, архіви пакетів-фікстур — `package-host` (*
 | R-01 | Два воркери оркестратора. Посеред прогону один отримує `docker kill` під час ще активного виклику виконавця, потім рестарт | прогін завершено; кожен ефект один раз (кількість записів у storage = кількості матеріалів); lease перехоплено; повтор виклику отримує 409 `idempotency_in_progress`, обробник виконано один раз; retries не витрачено на kill |
 | R-02 | `docker kill` + `up` кожного сервісу між доставкою й повтором (зараз — storage і handler-runtime) | повтор з тим самим `delivery_key` дає `duplicate: true`; runtime повертає той самий `invocation_id` (стан у PostgreSQL) |
 | R-03 | `docker network disconnect` виконавця на час прогону, потім `connect` | оркестратор повторює з backoff (ізольована повторна спроба чекає в межах політики), після відновлення прогін завершується без дублів |
-| R-04 | Той самий `delivery_key` на кожен виконавець (storage, runtime, llm, колектори — `Idempotency-Key`) | дубль без побічного ефекту, `Idempotency-Replayed: true`; інше тіло дає 422 `idempotency_key_reused` |
+| R-04 | Той самий `delivery_key` на кожен виконавець (storage, runtime, llm, колектори — `Idempotency-Key`), також поки перший запит ще виконується | дубль без побічного ефекту, `Idempotency-Replayed: true`; інше тіло дає 422 `idempotency_key_reused`; під час роботи: асинхронна операція повертає той самий `202` + `job_id` з `Idempotency-Replayed: true`, синхронний виклик — 409 `idempotency_in_progress` (`retryable`), а після завершення — збережений результат; перша робота завершується, ефект один |
 | R-05 | Новіше спостереження (ціна 199), потім старіше (ціна 249) того самого товару | стан лишається 199; старіше отримує `stale`, `price` у `stale_fields`, подія є в історії |
 | R-06 | `--scale <сервіс>=2`; запит на екземпляр 1, повтор на екземпляр 2 | runtime — дубль із тим самим `invocation_id`; Web/Telegram Collector — той самий job і матеріали; LLM — той самий completion/job і бюджет; storage — один об'єкт; registry — ті самі пакет, версія й архів; assistant — та сама job/session; orchestrator — та сама job запуску run після takeover (WP-13m, CI 36999629588) |
 | R-07 | S-M2-07 з `docker kill` + `start` асистента (окремо — runtime), поки кандидат тестується в runtime, паралельно з прогоном навантаження | цикл завершується або відновлюється без втрати й дублювання версій; відкат працює |
@@ -417,6 +417,27 @@ LLM — **З**, архіви пакетів-фікстур — `package-host` (*
 і `POST /v1/completions` повторно з тим самим `Idempotency-Key` після завершення першого виклику,
 а потім той самий ключ з іншим тілом. Telegram-мережа — записаний backend (**З**), LLM-провайдер —
 `fake` (**З**), HTTP-сервіси реальні.
+
+`tests/e2e/test_r04_active_replays.py` — R-04 **під час** незавершеної роботи (WP-13r, гілка
+`wp/13r-r04-active-replays`). Вікно «робота ще йде» детерміноване, без `sleep`-гонок:
+
+- Telegram Collector: темп `limits.rate.min_delay_ms_per_host = 1000` на 6 записаних каналах; повтор, коли
+  колекція `running` і `1 ≤ fetched < 6`;
+- handler-runtime (sync/async) і orchestrator (старт run, `/v1/reprocessing`): фікстура
+  `e2e.slow-product-extractor` (`delay_seconds = 12`), активна пісочниця видна за Docker-мітками;
+- storage, LLM `/v1/invocations` (sync/async), assistant `/v1/unknown-materials`: вміст матеріалу — blob, чий
+  `download_url` веде на «шлюз» стенду `package-host` (**З** blob-сховища): сервіс у роботі, поки шлюз тримає
+  завантаження, а лічильник шлюзу показує, скільки разів вміст читали;
+- registry: `docker pause` MinIO, де registry зберігає архіви: job `upstream-ports` і публікація версії не
+  можуть завершитися до `unpause`.
+
+Очікування за контрактом: асинхронна операція вже відповіла, тож повтор отримує той самий `202` + `job_id`
+з `Idempotency-Replayed: true`, поки job `running`; синхронний виклик у польоті — 409
+`idempotency_in_progress` (`retryable: true`), після завершення — збережений результат (`duplicate: true`);
+інше тіло з тим самим ключем — 422 `idempotency_key_reused` і під час роботи. Ефекти перевірено один раз:
+матеріали колекції, RAW-об'єкт, пісочниці runtime, `/v1/usage` LLM, версії registry, запуски завдання.
+`/v1/completions` LLM та onboarding/improvement асистента так не утримати без зміни фейкового провайдера
+(запит до WP-10 у звіті WP-13, розділ «WP-13r»).
 
 `tests/e2e/test_reliability_orchestrated.py` — R-01, R-03, R-08 на завданнях оркестратора (лише
 гілка `wp/13d-reliability`; реальні orchestrator, web-collector, handler-runtime, storage; архіви

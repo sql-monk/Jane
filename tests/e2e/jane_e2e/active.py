@@ -22,7 +22,6 @@ from typing import Any
 
 import httpx
 
-from jane_e2e.clients import keepalive_expiry_s
 from jane_e2e.stack import E2EStack
 from jane_extractor_sdk.package import build_archive
 
@@ -53,13 +52,13 @@ class Gate:
         self.name = name
         self.content = content
         self.media_type = media_type
-        self.admin = httpx.Client(
-            base_url=stack.url("package-host"),
-            timeout=30.0,
-            limits=httpx.Limits(keepalive_expiry=keepalive_expiry_s()),
-        )
-        r = self.admin.put(f"/e2e/gates/{name}", content=content, headers={"Content-Type": media_type})
+        self.base_url = stack.url("package-host")
+        r = self._call("PUT", "", content=content, headers={"Content-Type": media_type})
         assert r.status_code == 201, r.text
+
+    def _call(self, method: str, suffix: str, **kwargs: Any) -> httpx.Response:
+        """One request on its own connection: the gate stays usable after the scenario released it."""
+        return httpx.request(method, f"{self.base_url}/e2e/gates/{self.name}{suffix}", timeout=30.0, **kwargs)
 
     @property
     def download_url(self) -> str:
@@ -82,7 +81,7 @@ class Gate:
         return ref
 
     def status(self) -> dict[str, Any]:
-        r = self.admin.get(f"/e2e/gates/{self.name}")
+        r = self._call("GET", "")
         assert r.status_code == 200, r.text
         return dict(r.json())
 
@@ -96,12 +95,9 @@ class Gate:
         return wait_for(f"{count} download(s) held by gate {self.name}", held, timeout_s)
 
     def release(self) -> dict[str, Any]:
-        r = self.admin.post(f"/e2e/gates/{self.name}/release")
+        r = self._call("POST", "/release")
         assert r.status_code == 200, r.text
         return dict(r.json())
-
-    def close(self) -> None:
-        self.admin.close()
 
 
 @contextmanager
@@ -111,10 +107,7 @@ def gate(stack: E2EStack, name: str, content: bytes, media_type: str) -> Iterato
     try:
         yield g
     finally:
-        try:
-            g.release()
-        finally:
-            g.close()
+        g.release()
 
 
 def package_ref(package_dir: Path) -> tuple[dict[str, str], dict[str, Any]]:

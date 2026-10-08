@@ -38,6 +38,8 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from jane_kit.auth import AuthSettings
+
 __all__ = [
     "CONTRACT_LIMIT_PATHS",
     "LEVELS",
@@ -481,10 +483,12 @@ def layer_from_env(
     return LimitLayer(level=level, values=_unflatten(values), hard_caps=_unflatten(caps), name="env")
 
 
-class JaneSettings(BaseSettings):
+class JaneSettings(BaseSettings, AuthSettings):
     """Common process settings. A service subclasses it and sets its own ``env_prefix``.
 
     Only process-level knobs live here; operational limits belong in a :class:`Limits` model.
+    Authentication fields (``auth_mode``, ``api_keys``, ``jwt_*``...) come from
+    :class:`jane_kit.auth.AuthSettings` (ADR-0005); ``create_app`` enforces them.
     """
 
     model_config = SettingsConfigDict(env_prefix="JANE_", extra="ignore", env_nested_delimiter="__")
@@ -501,8 +505,6 @@ class JaneSettings(BaseSettings):
     metrics_enabled: bool = True
     health_check_timeout_ms: int = Field(default=2_000, ge=1)
     """Time box of every ``/v1/health`` check (env ``<PREFIX>HEALTH_CHECK_TIMEOUT_MS``)."""
-    auth_mode: Literal["none", "api_key", "jwt"] = "none"
-    """Reported in ``/v1/info``; enforcement is per service (ADR on authentication, WP-00)."""
     limits_file: Path | None = None
     """Platform limits file (``PlatformLimits`` shape, e.g. a whole ``deploy/profiles/<profile>.json``: limits
     this service does not have are ignored, typos are errors); env ``<PREFIX>LIMITS__*`` overrides it."""

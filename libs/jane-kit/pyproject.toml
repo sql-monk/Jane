@@ -14,6 +14,7 @@ dependencies = [
     "referencing>=0.35",
     "PyYAML>=6.0",
     "uvicorn>=0.32",
+    "pyjwt[crypto]>=2.10",
 ]
 
 [project.scripts]

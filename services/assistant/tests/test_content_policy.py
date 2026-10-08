@@ -29,6 +29,7 @@ from starlette.routing import Route
 
 from jane_assistant.app import build_search
 from jane_assistant.content import material_bytes
+from jane_assistant.search import HttpJsonSearchProvider
 from jane_assistant.settings import Settings, resolve_service_limits
 from jane_kit.errors import JaneError
 
@@ -104,7 +105,7 @@ def servers() -> Iterator[tuple[str, str, list[str]]]:
         return RedirectResponse(f"{urls[1]}/page", status_code=302)
 
     async def slow(request: Request) -> Response:
-        await asyncio.sleep(3)
+        await asyncio.sleep(10)
         return Response(b'{"results": []}', media_type="application/json")
 
     routes = [Route("/page", page), Route("/big", big), Route("/redirect", redirect), Route("/slow", slow)]
@@ -204,8 +205,11 @@ async def test_search_provider_timeout_comes_from_limits(
     monkeypatch.setenv("JANE_ASSISTANT_LIMITS__SEARCH__REQUEST_TIMEOUT_MS", "300")
     s = settings(contracts, search_provider="http_json", search_url_template=f"{first}/slow?q={{query}}")
     provider = build_search(s, resolve_service_limits(s).limits)
+    assert isinstance(provider, HttpJsonSearchProvider)
+    assert (provider.timeout.read, provider.timeout.connect) == (0.3, 5.0)
     started = time.monotonic()
     with pytest.raises(JaneError) as exc:
         await provider.search("meetup", None, 5)
     assert exc.value.error_code == "upstream_unavailable"
-    assert time.monotonic() - started < 2.5  # the server answers after 3 s; httpx alone would wait 5 s
+    # The server answers after 10 s; the httpx default (5 s) would fail later than this margin even on a busy host.
+    assert time.monotonic() - started < 4.5

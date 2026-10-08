@@ -7,7 +7,9 @@
 just up                     # увесь стек, чекає health-checks
 just up postgres minio      # лише потрібні сервіси
 just up storage registry     # профілі застосунків; їхні залежності стартують автоматично
-just web && just up proxy    # зібрати адмінку та віддавати dist через Caddy
+corepack pnpm --dir web/admin install --frozen-lockfile    # зібрати адмінку (web/admin/README.md)
+corepack pnpm --dir web/admin build
+just up proxy               # віддавати зібраний web/admin/dist через Caddy
 just env                    # адреси й облікові дані (dotenv); just env --format json
 just integration            # інтеграційні тести, зокрема infra/tests (smoke усього стеку)
 just down -v                # зупинити й видалити томи, зібрані образи (<проєкт>-testsite) і файл стеку
@@ -34,7 +36,9 @@ just down -v                # зупинити й видалити томи, з�
   тож кожен worktree має власне ім'я. Контейнери, мережа й **томи** отримують цей префікс — `down -v` одного
   агента не зачіпає інших. Інше ім'я: `just up --project jane-wp07-pg`.
 - **Порти.** Типово Docker сам обирає вільний порт хоста (`127.0.0.1::5432`), тож паралельні стеки не конфліктують.
-  Фактичні порти записуються у `.jane/stack-<проєкт>.json` і виводяться `just up` / `just env`. Фіксований порт:
+  Фактичні порти записуються у `.jane/stack-<проєкт>.json` і виводяться `just up` / `just env`. Коли контейнер
+  перестворюється (зміна конфігурації чи образу, повторний `just up` після `down`), Docker обирає новий порт —
+  зокрема для `proxy`; `just up` друкує нові адреси. Фіксований порт:
   `JANE_PORT_POSTGRES=15432 just up` (також `JANE_PORT_SQLSERVER`, `_MONGODB`, `_MINIO`, `_MINIO_CONSOLE`,
   `_S3`, `_TESTSITE`, `_PROXY`).
 - **Адреса.** `JANE_BIND` (типово `127.0.0.1`) — назовні хоста стек не відкривається.
@@ -65,8 +69,13 @@ just down -v                # зупинити й видалити томи, з�
   Його host-файл можна підмінити через `JANE_STORAGE_CONNECTIONS_FILE_HOST` (абсолютний шлях). Додаткові URL
   сусідів для assistant задавайте лише коли відповідні сервіси запущені. Для handler-runtime потрібен
   налаштований образ пісочниці (`JANE_HANDLER_RUNTIME_PROFILE_IMAGES`), якщо запускати екстрактори.
+  Оркестратор бере `JANE_ORCHESTRATOR_SCHEDULER_ENABLED` і `JANE_ORCHESTRATOR_RUN_WORKERS` (типово `true`) із
+  середовища `just up`: `false` — API без розкладів і воркерів на час резервування, відновлення чи оновлення
+  ([backup-restore.md](../docs/operations/backup-restore.md)).
 - **Статика адмінки.** `just up` підмонтовує `web/admin/dist`, якщо тека вже існує; інакше Caddy показує
-  службову сторінку з `infra/proxy/empty`. Прямий `docker compose` приймає `JANE_ADMIN_DIST_PATH`.
+  службову сторінку з `infra/proxy/empty`. Зібрати `dist` — `corepack pnpm --dir web/admin build` (вище);
+  `just web` — повна перевірка адмінки (install, lint, typecheck, test, build), як job `web` у CI. Прямий
+  `docker compose` приймає `JANE_ADMIN_DIST_PATH`.
   `/config.json` береться з `infra/proxy/admin-config.json`; для іншого середовища задайте
   `JANE_ADMIN_CONFIG_PATH` до власного JSON-файлу. Після зміни файлу образ адмінки перебудовувати не треба.
 - **Тести.** `jane_kit.devstack.load_stack()` повертає адреси й облікові дані (або `None`, якщо стек не

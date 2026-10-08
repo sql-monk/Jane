@@ -49,7 +49,7 @@ C-1 прийнято до відома: [final-review-delta.md](M3/final-review-
    тимчасову гілку `wp/m3c-b2-merge-check` і `gh workflow run ci --ref wp/m3c-b2-merge-check` (один прогін).
 4. Запиши в `M3/stream-c.md`: вердикт перевірки виправлень (з виводом мутанта), SHA злиття, CI.
 
-## C-2. Відтворення з чистого клону (після C-3)
+## C-2. Відтворення з чистого клону (після злиття B2 потоком A)
 
 Без змін — як у [HANDOFF-2026-10-09-stream-c.md](HANDOFF-2026-10-09-stream-c.md) §3, C-2.
 

@@ -309,11 +309,9 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
 });
 
 // «Повторно обробити» on ONE stored object must reprocess the RAW of the task's source only. The orchestrator
-// filters the stored objects of the connection by `material_ids` alone (WP-09 `_feed_stored`; reported by WP-13 in
-// docs/delivery/WP-13.md, «Запити до інших власників»), so RAW of the same URL stored by another source is fed
-// into this task as well. Only the final assertion is expected to fail (`test.fail` is declared right before it,
-// so a broken set-up still fails the test) until WP-09 filters by the task's source (storage.v1 listObjects
-// accepts `source_id`); then this test reports an unexpected pass and `test.fail` must go.
+// used to filter the connection by `material_ids` alone (WP-09 `_feed_stored`, reported by WP-13 in
+// docs/delivery/WP-13.md), feeding RAW of the same URL from another source into this task as well.
+// The accepted WP-09 fix also filters by the task's source (storage.v1 listObjects accepts `source_id`).
 test("reprocessing one stored material takes only RAW of the task's source (WP-09 defect) @hybrid", async ({
   admin,
   request,
@@ -391,6 +389,5 @@ test("reprocessing one stored material takes only RAW of the task's source (WP-0
   );
   // the set-up worked: the RAW of the task's own source was fed
   expect(fed.map((i) => i.observation_id)).toContain(`obs_${ownSource}`);
-  test.fail(true, "WP-09: /v1/reprocessing feeds RAW of other sources with the same material_id");
   expect(fed.map((i) => i.observation_id)).toEqual([`obs_${ownSource}`]);
 });

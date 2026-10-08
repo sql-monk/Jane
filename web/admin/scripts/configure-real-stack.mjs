@@ -65,7 +65,7 @@ const override = {
         JANE_HANDLER_RUNTIME_REGISTRY_URL: "http://registry:8000",
         // Stored RAW of the files adapter is a file:// ContentRef (ADR-0004: one node, shared volume);
         // reprocessing of stored RAW reads it read-only.
-        JANE_HANDLER_RUNTIME_BLOB_ROOTS: JSON.stringify(["/var/lib/jane/storage"]),
+        JANE_HANDLER_RUNTIME_BLOB_ROOTS: JSON.stringify(["/var/lib/jane/storage/objects"]),
       },
       volumes: ["storage-data:/var/lib/jane/storage:ro"],
     },

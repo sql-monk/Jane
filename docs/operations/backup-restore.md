@@ -29,6 +29,19 @@ RAW, результати зберігання, пакети, курсори к�
 
 ## Копіювання
 
+Команди `docker exec` / `docker cp` нижче виконуються з кореня checkout і не потребують compose-файлу чи
+повторного передавання його секретних змінних. Знайдіть ID контейнерів **саме свого** проєкту:
+
+```text
+docker ps -q --filter label=com.docker.compose.project=<P> --filter label=com.docker.compose.service=postgres
+docker ps -q --filter label=com.docker.compose.project=<P> --filter label=com.docker.compose.service=orchestrator
+```
+
+Перший ID підставляйте замість `<POSTGRES_CONTAINER>`, другий — `<ORCHESTRATOR_CONTAINER>`.
+Якщо результат порожній або містить кілька ID, спершу уточніть стан потрібного проєкту (`just ps --project <P>`).
+Саме `docker compose -p <P>` з кореня не працює: конфігурація лежить у `infra/compose.yaml`, а її змінні
+збережено у файлі стеку, не в середовищі батьківського термінала.
+
 1. Забороніть нові запуски, зупиніть планувальник і воркери, дочекайтеся завершення активних
    записів. Під час тестової репетиції можна зупинити всі застосунки після фіксації їхнього
    стану. Не використовуйте `just down -v`: цей варіант видаляє томи.
@@ -45,7 +58,7 @@ RAW, результати зберігання, пакети, курсори к�
    # bash
    JANE_ORCHESTRATOR_SCHEDULER_ENABLED=false JANE_ORCHESTRATOR_RUN_WORKERS=false just up --project <P> orchestrator
 
-   docker compose -p <P> exec -T orchestrator printenv JANE_ORCHESTRATOR_SCHEDULER_ENABLED   # false
+   docker exec <ORCHESTRATOR_CONTAINER> printenv JANE_ORCHESTRATOR_SCHEDULER_ENABLED   # false
    just logs --project <P> orchestrator      # рядок "orchestrator started" закінчується "workers": 0}
    ```
 
@@ -60,10 +73,10 @@ RAW, результати зберігання, пакети, курсори к�
    стане шляхом Windows.
 
    ```text
-   docker compose -p <P> exec -T postgres pg_dump -U jane_orchestrator -d jane_orchestrator --format=custom --file=/tmp/jane_orchestrator.dump
-   docker compose -p <P> exec -T postgres pg_restore --list /tmp/jane_orchestrator.dump
-   docker compose -p <P> cp postgres:/tmp/jane_orchestrator.dump backup/jane_orchestrator.dump
-   docker compose -p <P> exec -T postgres rm /tmp/jane_orchestrator.dump
+   docker exec <POSTGRES_CONTAINER> pg_dump -U jane_orchestrator -d jane_orchestrator --format=custom --file=/tmp/jane_orchestrator.dump
+   docker exec <POSTGRES_CONTAINER> pg_restore --list /tmp/jane_orchestrator.dump
+   docker cp <POSTGRES_CONTAINER>:/tmp/jane_orchestrator.dump backup/jane_orchestrator.dump
+   docker exec <POSTGRES_CONTAINER> rm /tmp/jane_orchestrator.dump
    ```
 
    Те саме для `jane_registry`, `jane_handler_runtime`, `jane_llm`, `jane_assistant`, `jane_storage_results`.
@@ -73,7 +86,7 @@ RAW, результати зберігання, пакети, курсори к�
      `db-handler-runtime`, `db-llm`, `db-assistant`, `db-storage-results`): `endpoint` (без пароля),
      `db_user`, `db_password`; `db_dsn` містить пароль;
    - `stack.py`: файл `.jane/stack-<P>.json` записів `db-*` не має — пароль ролі в
-     `env.JANE_PG_<СЕРВІС>_PASSWORD`, порт — `docker compose -p <P> port postgres 5432`, адреса —
+     `env.JANE_PG_<СЕРВІС>_PASSWORD`, порт — `docker port <POSTGRES_CONTAINER> 5432/tcp`, адреса —
      `postgresql://127.0.0.1:<порт>/jane_<сервіс>`.
 
    Не вставляйте пароль у командний рядок, що журналюється: використайте `.pgpass` або змінну процесу
@@ -92,12 +105,19 @@ RAW, результати зберігання, пакети, курсори к�
    сервісів із новими паролями). Застосунки ще не запускайте: під час старту кожен створює свою схему, і
    `pg_restore` у непорожню БД дасть конфлікти. Переконайтеся, що ім'я compose-проєкту та шляхи томів не
    належать чинному стеку.
-2. Відновіть кожну БД її роллю (`--no-owner`: об'єкти належатимуть ролі, якою відновлюєте):
+2. Знайдіть PostgreSQL нового проєкту:
 
    ```text
-   docker compose -p <NEW> cp backup/jane_orchestrator.dump postgres:/tmp/jane_orchestrator.dump
-   docker compose -p <NEW> exec -T postgres pg_restore -U jane_orchestrator -d jane_orchestrator --no-owner --exit-on-error /tmp/jane_orchestrator.dump
-   docker compose -p <NEW> exec -T postgres rm /tmp/jane_orchestrator.dump
+   docker ps -q --filter label=com.docker.compose.project=<NEW> --filter label=com.docker.compose.service=postgres
+   ```
+
+   Підставляйте цей єдиний ID замість `<NEW_POSTGRES_CONTAINER>`; контейнер чинного проєкту тут не використовуйте.
+   Відновіть кожну БД її роллю (`--no-owner`: об'єкти належатимуть ролі, якою відновлюєте):
+
+   ```text
+   docker cp backup/jane_orchestrator.dump <NEW_POSTGRES_CONTAINER>:/tmp/jane_orchestrator.dump
+   docker exec <NEW_POSTGRES_CONTAINER> pg_restore -U jane_orchestrator -d jane_orchestrator --no-owner --exit-on-error /tmp/jane_orchestrator.dump
+   docker exec <NEW_POSTGRES_CONTAINER> rm /tmp/jane_orchestrator.dump
    ```
 
    З хоста — `pg_restore --dbname=<адреса нового проєкту> --username=<роль> --no-owner --exit-on-error

@@ -75,12 +75,31 @@ docker run --rm -p 8109:8000 -e JANE_ORCHESTRATOR_DATABASE_URL=postgresql://… 
 | Параметр | Типово | Опис |
 |---|---|---|
 | `DATABASE_URL` | `postgresql://jane@127.0.0.1:5432/jane_orchestrator` | власна БД |
-| `EXECUTORS` / `EXECUTORS_FILE` | `[]` | виконавці (JSON: `executor`, `role` = collector/handler/storage_read/registry/llm, `base_url`, `capabilities`, `sync_connections`, `token`). Маршрутизація пакета: `capabilities.packages` (glob id пакета) → тип пакета з registry ↔ `handler_kinds` → `default: true` |
+| `EXECUTORS` / `EXECUTORS_FILE` | `[]` | виконавці (JSON: `executor`, `role` = collector/handler/storage_read/registry/llm, `base_url`, `capabilities`, `sync_connections`, `token_ref` — `env:VAR`/`file:/path` токена саме для цього виконавця; застарілий `token` відкритим текстом ще приймається з попередженням у журналі). Маршрутизація пакета: `capabilities.packages` (glob id пакета) → тип пакета з registry ↔ `handler_kinds` → `default: true` |
 | `CONTRACTS_DIR` | `JANE_CONTRACTS_DIR` або `contracts/` checkout | схеми для валідації запитів |
 | `LIMITS_FILE` | — | `PlatformLimits` (TOML/JSON/YAML, напр. профіль WP-14) для **першого** заповнення лімітів платформи в БД; далі — `PUT /v1/limits/platform` |
-| `AUTH_MODE` | `none` | `none` \| `api_key` (`API_KEYS=[{"name","sha256","scopes"}]`, scopes `orchestrator:read/write/admin`) |
+| `AUTH_MODE` | `none` | `none` / `api_key` / `jwt` — див. «Автентифікація (ADR-0005)» |
+| `SERVICE_TOKEN_REF` | — | `env:VAR` / `file:/path` власного токена оркестратора для виконавців без `token_ref` (ADR-0005 §5); нерозв'язне посилання — сервіс не стартує |
 | `RUN_WORKERS` / `SCHEDULER_ENABLED` | `true` / `true` | воркери в процесі API; планувальник |
 | `PORT`, `HOST`, `LOG_LEVEL`, `LOG_FORMAT` | `8109`, `127.0.0.1`, `INFO`, `json` | процес |
+
+## Автентифікація (ADR-0005)
+
+Режими й усі змінні (`AUTH_MODE`, `API_KEYS`, `API_KEYS_FILE`, `JWT_*`, `METRICS_PUBLIC`) спільні для всіх сервісів: [jane-kit, «Автентифікація»](../../libs/jane-kit/README.md#автентифікація-adr-0005) і [docs/operations](../../docs/operations/README.md#автентифікація-adr-0005). `/v1/health` (і `/metrics`, доки `METRICS_PUBLIC=true`) працюють без токена; `/v1/info` приймає будь-який дійсний токен; решта потребує токена (401 `unauthenticated`) і scope операції (403 `forbidden`). `AUTH_MODE=none` — лише для локальних тестів на loopback; за неповної конфігурації `api_key`/`jwt` сервіс не стартує. JWT з реальним IdP **не перевірено на реальному сервісі** (лише локальний JWKS у тестах jane-kit).
+
+Scopes операцій (таблиця `ORCHESTRATOR` з `jane_kit.auth_scopes`; `orchestrator:admin` дає також читання й запис):
+
+- `orchestrator:read` — усі GET і `POST /v1/task-validations`; `orchestrator:write` — зміни джерел і завдань, запуски, скасування, активації, повторна обробка, `PATCH /v1/problem-groups/{id}`, `POST /v1/jobs/{id}/cancel`; `orchestrator:admin` — `PUT /v1/limits/platform`, `PUT`/`DELETE /v1/connections/{id}`.
+
+Виконавців оркестратор викликає власним токеном: `token_ref` виконавця або `SERVICE_TOKEN_REF`. Потрібні scopes ключа оркестратора: колектори — `collector:read`, `collector:run`, `connections:write`; handler-runtime і storage — `handler:invoke`, `connections:write` (+ `storage:read` для `storage_read`); llm — `handler:invoke`, `connections:write`, `llm:admin` (бюджети); registry — `registry:read`. Ім'я ключа (або `sub` JWT) записується в аудит.
+
+Приклад для `api_key` (зберігається лише хеш ключа):
+
+```text
+JANE_ORCHESTRATOR_AUTH_MODE=api_key
+JANE_ORCHESTRATOR_API_KEYS=[{"name": "admin", "sha256": "<sha256 hex ключа>", "scopes": ["orchestrator:read", "orchestrator:write", "orchestrator:admin"]},
+  {"name": "ops", "secret_ref": "file:/run/secrets/jane-ops-key", "scopes": ["orchestrator:read", "orchestrator:write", "orchestrator:admin"]}]
+```
 
 ## Ліміти
 
@@ -182,7 +201,6 @@ print(api.get(f"/v1/runs/{job['job_id']}").json()["status"])
 - `concurrency.max_parallel_stage_items` — м'яке обмеження (кілька воркерів можуть на мить перевищити його).
 - Не застосовуються: `timeouts.stage_timeout_ms`, `timeouts.sync_response_max_ms`, `transfer.job_retention_seconds` (старі запуски не прибираються); ці ліміти лише передаються виконавцям.
 - Активація/відкат — лише для `handler`-етапів (не для версій правил колектора).
-- `auth_mode=jwt` не реалізовано (`none` — лише локально, `api_key` — працює).
 
 ## Журнали й метрики
 

@@ -68,9 +68,52 @@
    `profile`), один малий контрольований запуск. Робочий приклад усього цього —
    [`examples/`](../../examples/README.md) (`jane_examples.py demo`).
 
-У робочому середовищі додатково: автентифікація (`AUTH_MODE=api_key`, окремі ключі й scopes), TLS і
-reverse proxy (Caddy з `/api/<сервіс>/*` і CSP — `infra/proxy/Caddyfile`), секрети лише через
-`secret_refs` з дозволеним префіксом, окремі облікові записи БД (як `pg-provision`), закріплені образи.
+У робочому середовищі додатково: автентифікація (`AUTH_MODE=jwt` з IdP або `api_key` з окремими ключами й
+scopes на кожного клієнта — див. «Автентифікація (ADR-0005)» нижче), TLS і reverse proxy (Caddy з
+`/api/<сервіс>/*` і CSP — `infra/proxy/Caddyfile`), секрети лише через `secret_refs` з дозволеним префіксом,
+окремі облікові записи БД (як `pg-provision`), закріплені образи.
+
+## Автентифікація (ADR-0005)
+
+**Що змінилося в M3.** До M3 перевірку токена мали лише orchestrator і registry (режим `api_key`); у
+storage, handler-runtime, llm, web-collector, telegram-collector і assistant `AUTH_MODE=api_key` лише
+показувався в `/v1/info` і **нічого не захищав**. Тепер усі 8 сервісів перевіряють токен і scope кожної
+операції однаковим модулем `jane_kit.auth`, а dev-стек, e2e-стеки й стек профілів працюють у `api_key`.
+
+Режими (`<PREFIX>AUTH_MODE` кожного сервісу; повний перелік змінних — [jane-kit](../../libs/jane-kit/README.md#автентифікація-adr-0005)):
+
+- `none` — лише локальні тести: сервіс приймає всіх, пише попередження й відмовляється стартувати з `HOST`, що
+  не є loopback (виняток — явне `AUTH_NONE_ALLOW_REMOTE=true` для ізольованої тестової мережі);
+- `api_key` — ключі в конфігурації лише хешем (`API_KEYS` / `API_KEYS_FILE`: `sha256` або `secret_ref`
+  `env:`/`file:`), scopes на кожен ключ; типовий режим dev-стеку;
+- `jwt` — RS256/ES256 за JWKS IdP (`JWT_JWKS_URL`, `JWT_ISSUER`, `JWT_AUDIENCE`), scopes у claim `scope`;
+  рекомендований для прод. Перевірено лише з локальним JWKS у тестах; з реальним IdP (Keycloak, Entra ID)
+  — **не перевірено на реальному сервісі**.
+
+Без токена працюють лише `/v1/health` і (типово) `/metrics`; `/v1/info` приймає будь-який дійсний токен.
+Неповна конфігурація (`api_key` без ключів, `jwt` без JWKS/issuer/audience, нерозв'язне `secret_ref`) —
+сервіс не стартує. Scopes операцій — `jane_kit.auth_scopes` (тест звіряє їх із контрактами) і README сервісів.
+
+**Dev-стек.** `just up` генерує в ігнорований `.jane/stack-<project>.json` по ключу на кожну ідентичність
+(`admin`, `orchestrator`, `assistant`, `handler-runtime`, `storage`, `llm`, `web-collector`,
+`telegram-collector`, `registry`): `JANE_API_KEY_<ID>` — ключ, `JANE_API_KEY_<ID>_SHA256` — хеш, який
+перевіряють сервіси (`infra/compose.yaml`; у git немає ні ключів, ні хешів). Ключ адміністратора показує
+`just env` (`JANE_STACK_AUTH_ADMIN_API_KEY`); його вводять на сторінці входу адмінки, а для реального
+e2e адмінки передають як `JANE_ADMIN_E2E_API_KEY`. Хто кого викликає власним ключем:
+
+| Ідентичність | Приймають (scopes) |
+|---|---|
+| `admin` | усі сервіси, усі scopes своїх API |
+| `orchestrator` | колектори (`collector:read`, `collector:run`, `connections:write`), handler-runtime і storage (`handler:invoke`, `connections:write`, storage ще `storage:read`), llm (`handler:invoke`, `connections:write`, `llm:admin`), registry (`registry:read`) |
+| `assistant` | llm (`llm:invoke`), registry (`registry:read`, `registry:write`, `registry:approve`, `actor: llm`), колектори (`collector:read`, `collector:run`), handler-runtime (`handler:invoke`, `handler:test`), storage (`storage:read`), orchestrator (`orchestrator:read`, `orchestrator:write`) |
+| `handler-runtime`, `storage`, `llm`, `web-collector`, `telegram-collector` | registry (`registry:read`) |
+| `registry` | handler-runtime (без scopes: лише `GET /v1/info` для профілів runtime) |
+
+Свій токен кожен сервіс бере із середовища: orchestrator — `SERVICE_TOKEN_REF` (або `token_ref` виконавця;
+відкритий `token` у `EXECUTORS_FILE` застарів), assistant — `SERVICE_TOKEN_REF` чи окремий `*_TOKEN_REF`
+для кожного сусіда, registry — `RUNTIME_PROFILES_TOKEN_REF`, handler-runtime/storage/llm — `REGISTRY_TOKEN`,
+колектори — `REGISTRY_TOKEN_ENV`. Ключ іншого розгортання додають так само: згенерувати випадкове значення,
+віддати його клієнту через секрет середовища, а в `API_KEYS` сервісу записати лише `sha256` і scopes.
 
 ## Зміна лімітів без зміни коду
 

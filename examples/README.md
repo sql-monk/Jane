@@ -56,6 +56,8 @@ uv run --all-packages pytest examples -q          # входить і в just un
 
 Потрібні Docker (Compose v2) і `uv`; Windows і Linux однаково. Стек ізольований: власна назва
 compose-проєкту, порти обирає Docker (лише `127.0.0.1`), паролі генеруються у `.jane/stack-<проєкт>.json`.
+Сервіси працюють у `AUTH_MODE=api_key` (ADR-0005): там же генеруються ключі API, і драйвер звертається до
+registry, orchestrator і storage з ключем оператора `JANE_API_KEY_ADMIN` цього стеку.
 
 ```text
 uv sync --all-packages

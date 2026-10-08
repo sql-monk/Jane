@@ -214,10 +214,10 @@ FAILED deploy/profiles/tests/test_profiles_harness.py::test_harness_collector_sc
 1 failed, 56 deselected in 9.58s
 ```
 
-Останній збій — **не від цих змін** і поза дозволеними шляхами: `SELF_TEST_THRESHOLDS["rate"]` у
+На момент першого прогону останній збій був **не від цих змін** і поза початковим дорученням: `SELF_TEST_THRESHOLDS["rate"]` у
 `deploy/profiles/tests/test_profiles_harness.py` не має ключа `max_sub_half_gaps`, який WP-14c (`300fdba`) зробив
 обов'язковим у `metrics.rate_checks`. `just check` і CI каталог `deploy/profiles` не запускають, тому збій не
-помічено. Запит нижче.
+помічено. Координатор розширив доручення; виправлення і новий gate описано нижче.
 
 ## CI
 
@@ -239,6 +239,38 @@ stack:  232 passed, 889 deselected in 214.18s (0:03:34)
 `limits` і `e2e` піднімали стек профілю й e2e-стек уже зі зміненими compose-файлами — змінні оркестратора з
 типовим `true` поведінки не змінили. Останній коміт (лише цей розділ звіту) запушено з `[skip ci]`.
 
+## Доповнення після першого CI (2026-10-09)
+
+- `cc74ccd`: самоперевірка harness тепер задає `rate.max_sub_half_gaps = 1` (найсуворіше значення
+  наявних профілів) і перевіряє, що L1 оцінює цей показник. Це закриває знайдений `KeyError` після WP-14c.
+- `359eb0d`: `scripts/dev.py` додає окрему pytest-сесію для `examples/` і `deploy/profiles/` у `just unit`,
+  а отже й `just check` та CI. Сесія використовує той самий фільтр маркерів, обходиться без Docker і не
+  додається, коли користувач вибрав тести шляхом. Окрема сесія не змішує їхні generic-модулі з workspace.
+  Оновлено довідники `DEVELOPMENT.md`, `justfile`, README прикладів і профілів.
+
+Фактичний локальний вивід із `.jane/wp14d-pytest-profiles-examples.txt`:
+
+```text
+$ uv run --all-packages pytest deploy/profiles examples -q
+83 passed in 280.33s (0:04:40)
+```
+
+[CI 37848025370](https://github.com/sql-monk/Jane/actions/runs/37848025370) на `359eb0d`: `completed success`;
+lint/types/secret scan, unit, web, contract, isolation успішні. Важкі job (`stack`, `adapters`, `e2e`, `limits`)
+не запускаються на push `wp/**` за умовою workflow; повний доказ compose — попередній dispatch 37819395884.
+
+```text
+$ gh run view 37848025370 --log --job 113553987439
+========== 802 passed, 5 skipped, 314 deselected in 259.01s (0:04:19) ==========
+$ uv run --all-packages pytest examples deploy/profiles -m not contract and not integration and not isolation
+============================= 83 passed in 16.19s ==============================
+```
+
+Нова сесія додала близько 17 с до unit job. Весь unit job: 4 хв 50 с проти 4 хв 12 с у
+37819395884 (різні runner, це орієнтир, а не контрольований benchmark). Повний `just check` локально повторно
+не запускали за handoff; новий offline gate підтверджено CI. П'ять пропусків workspace unit — наявні перевірки,
+що вимагають стек; нові 83 offline-тести пройшли без пропусків.
+
 ## Відомі обмеження
 
 - Репетиція — лише PostgreSQL оркестратора на малому стеку; решта сховищ не репетирувалась (див. вище).
@@ -250,4 +282,4 @@ stack:  232 passed, 889 deselected in 214.18s (0:03:34)
 | Кому | Що потрібно | Навіщо |
 |---|---|---|
 | Координатор / WP-13 | узгодити рядок 13 [матриці](../../acceptance/matrix.md) з розділом [«Рішення людини 2026-10-08 і стан критерію 13»](../WP-14.md#рішення-людини-2026-10-08-і-стан-критерію-13) | матриця суперечить рішенню й документації профілів |
-| Власник WP-14 (`deploy/profiles/tests`) | додати `"max_sub_half_gaps"` у `SELF_TEST_THRESHOLDS["rate"]` (`test_profiles_harness.py:581`); розглянути запуск `pytest deploy/profiles` у CI | самотест harness падає з `KeyError` від `300fdba` |
+| Власник WP-14 (`deploy/profiles/tests`) | **закрито** комітами `cc74ccd`, `359eb0d`: `max_sub_half_gaps` у самотесті й offline-тести у CI | 83 passed у CI 37848025370 |

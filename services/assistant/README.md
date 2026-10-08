@@ -166,9 +166,11 @@ just down -v --project jane-wp11
 | `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | журнали (JSON у stdout) |
 | `METRICS_ENABLED` | `true` | `/metrics` (Prometheus) |
 | `HEALTH_CHECK_TIMEOUT_MS` | `2000` | тайм-аут перевірок `/v1/health` |
-| `AUTH_MODE` | `none` | значення для `/v1/info` |
+| `AUTH_MODE` | `none` | `none` / `api_key` / `jwt` — див. «Автентифікація (ADR-0005)» |
 | `LLM_URL`, `REGISTRY_URL`, `COLLECTOR_WEB_URL`, `COLLECTOR_TELEGRAM_URL`, `HANDLER_RUNTIME_URL`, `ORCHESTRATOR_URL`, `STORAGE_URL` | — | адреси сусідів |
-| `SERVICE_TOKEN_ENV` | — | **ім'я** змінної з bearer-токеном для сусідів (значення в конфігурації немає) |
+| `SERVICE_TOKEN_REF` | — | `env:VAR` / `file:/path` власного токена асистента для всіх сусідів (ADR-0005 §5) |
+| `LLM_TOKEN_REF`, `REGISTRY_TOKEN_REF`, `COLLECTOR_WEB_TOKEN_REF`, `COLLECTOR_TELEGRAM_TOKEN_REF`, `HANDLER_RUNTIME_TOKEN_REF`, `ORCHESTRATOR_TOKEN_REF`, `STORAGE_TOKEN_REF` | — | окремий токен конкретного сусіда (перекриває `SERVICE_TOKEN_REF`); нерозв'язне посилання — сервіс не стартує |
+| `SERVICE_TOKEN_ENV` | — | застаріле: **ім'я** змінної з токеном для всіх сусідів; замість нього `SERVICE_TOKEN_REF=env:<ім'я>` |
 | `SEARCH_PROVIDER` | `none` | `none`, `static`, `http_json` |
 | `SEARCH_STATIC_FILE` | — | JSON `[{"title","url"?,"telegram_username"?,"description"?,"aliases"?}]` |
 | `SEARCH_URL_TEMPLATE`, `SEARCH_ITEMS_PATH`, `SEARCH_TITLE_FIELD`, `SEARCH_URL_FIELD`, `SEARCH_DESCRIPTION_FIELD` | —, `results`, `title`, `url`, `description` | HTTP-пошук з JSON-відповіддю (тайм-аути — `limits.search`) |
@@ -184,6 +186,24 @@ just down -v --project jane-wp11
 | `INSTANCE_ID` | `hostname-pid` | власник job і оренд (унікальний для кожного екземпляра) |
 | `LIMITS_FILE` | — | файл `PlatformLimits` (TOML/JSON/YAML), зокрема цілий профіль `deploy/profiles/<профіль>.json`: ліміти контракту, яких асистент не має, ігноруються (перелік — у журналі старту), опечатка чи некоректне значення — помилка старту; `timeouts.connect_timeout_ms` / `request_timeout_ms` і `retries` профілю діють на виклики сусідів (`clients.*`) |
 | `LIMITS__<ГРУПА>__<ПАРАМЕТР>` / `LIMITS__HARD_CAPS__…` | — | перевизначення й жорсткі стелі |
+
+## Автентифікація (ADR-0005)
+
+Режими й усі змінні (`AUTH_MODE`, `API_KEYS`, `API_KEYS_FILE`, `JWT_*`, `METRICS_PUBLIC`) спільні для всіх сервісів: [jane-kit, «Автентифікація»](../../libs/jane-kit/README.md#автентифікація-adr-0005) і [docs/operations](../../docs/operations/README.md#автентифікація-adr-0005). `/v1/health` (і `/metrics`, доки `METRICS_PUBLIC=true`) працюють без токена; `/v1/info` приймає будь-який дійсний токен; решта потребує токена (401 `unauthenticated`) і scope операції (403 `forbidden`). `AUTH_MODE=none` — лише для локальних тестів на loopback; за неповної конфігурації `api_key`/`jwt` сервіс не стартує. JWT з реальним IdP **не перевірено на реальному сервісі** (лише локальний JWKS у тестах jane-kit).
+
+Scopes операцій (таблиця `ASSISTANT` з `jane_kit.auth_scopes`):
+
+- `assistant:use` — усі операції (`/v1/onboarding-sessions…`, `/v1/improvement-runs`, `/v1/unknown-materials`, `/v1/jobs/*`).
+
+Сусідів асистент викликає власним токеном (`SERVICE_TOKEN_REF` або окремі `*_TOKEN_REF`), а не токеном користувача. Потрібні scopes ключа асистента: llm — `llm:invoke`; registry — `registry:read`, `registry:write`, `registry:approve` і `actor: llm`; колектори — `collector:read`, `collector:run`; handler-runtime — `handler:test`; storage — `storage:read`; orchestrator — `orchestrator:read`, `orchestrator:write`.
+
+Приклад для `api_key` (зберігається лише хеш ключа):
+
+```text
+JANE_ASSISTANT_AUTH_MODE=api_key
+JANE_ASSISTANT_API_KEYS=[{"name": "admin", "sha256": "<sha256 hex ключа>", "scopes": ["assistant:use"]},
+  {"name": "ops", "secret_ref": "file:/run/secrets/jane-ops-key", "scopes": ["assistant:use"]}]
+```
 
 ## Ліміти
 

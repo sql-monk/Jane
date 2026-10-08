@@ -170,6 +170,25 @@ HTTP-перенаправлення не виконуються. Змінні HT
 `s3.us-east-1.amazonaws.com:443` не дозволяє жоден із цих host. Перевірка формує запит без мережевого
 виклику та враховує також AWS endpoint, заданий через середовище процесу.
 
+## Автентифікація (ADR-0005)
+
+Режими й усі змінні (`AUTH_MODE`, `API_KEYS`, `API_KEYS_FILE`, `JWT_*`, `METRICS_PUBLIC`) спільні для всіх сервісів: [jane-kit, «Автентифікація»](../../libs/jane-kit/README.md#автентифікація-adr-0005) і [docs/operations](../../docs/operations/README.md#автентифікація-adr-0005). `/v1/health` (і `/metrics`, доки `METRICS_PUBLIC=true`) працюють без токена; `/v1/info` приймає будь-який дійсний токен; решта потребує токена (401 `unauthenticated`) і scope операції (403 `forbidden`). `AUTH_MODE=none` — лише для локальних тестів на loopback; за неповної конфігурації `api_key`/`jwt` сервіс не стартує. JWT з реальним IdP **не перевірено на реальному сервісі** (лише локальний JWKS у тестах jane-kit).
+
+Scopes операцій (таблиця `merge(HANDLER, STORAGE)` з `jane_kit.auth_scopes`):
+
+- handler.v1: `handler:invoke` — `POST /v1/invocations`, `GET /v1/invocations/{id}`; `handler:test` — `POST /v1/test-runs`; `/v1/jobs/*` — `handler:invoke` або `handler:test`; `GET /v1/connections…` — `connections:write` або `handler:invoke`; `PUT`/`DELETE /v1/connections/{id}` і `POST …/test` — `connections:write`;
+- storage.v1: `storage:read` — `GET /v1/entities`, `/v1/entity-history`, `/v1/objects`, `/v1/objects/{id}`, `/v1/objects/{id}/content`.
+
+Власний токен storage до registry (ADR-0005 §5) — `JANE_STORAGE_REGISTRY_TOKEN` (вище); у dev-стеку це ключ ідентичності `storage` з `registry:read`.
+
+Приклад для `api_key` (зберігається лише хеш ключа):
+
+```text
+JANE_STORAGE_AUTH_MODE=api_key
+JANE_STORAGE_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 hex ключа>", "scopes": ["handler:invoke", "connections:write", "storage:read"]},
+  {"name": "ops", "secret_ref": "file:/run/secrets/jane-ops-key", "scopes": ["handler:invoke", "connections:write", "storage:read"]}]
+```
+
 ## Адаптери
 
 Кожен адаптер — окремий uv-пакет `services/storage/adapters/<name>/` з дистрибутивом `jane-storage-<name>`

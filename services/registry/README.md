@@ -83,8 +83,9 @@ PostgreSQL, публікації одного пакета серіалізую�
 | `RUNTIME_PROFILES` | `[]` | JSON-список файлів або URL з описом профілів runtime (див. нижче) |
 | `CONTRACTS_DIR` | `contracts/` checkout або `/app/contracts` | де лежать контрактні схеми |
 | `REQUIRE_TESTS` | `true` | extractor/llm мають щонайменше один тест `success` і один `empty`/`unrecognized` |
-| `AUTH_MODE` | `none` | `none` (лише локально) або `api_key`; `jwt` у цій версії не реалізовано (сервіс не стартує) |
-| `API_KEYS_FILE` | — | для `api_key`: `[{"name", "sha256": "<hex ключа>", "scopes": [...], "actor": "human"\|"llm"\|"import"}]` (`actor` типово `human`) |
+| `AUTH_MODE` | `none` | `none` / `api_key` / `jwt` — див. «Автентифікація (ADR-0005)» |
+| `API_KEYS` / `API_KEYS_FILE` | — | для `api_key`: `[{"name", "sha256": "<hex ключа>" або "secret_ref": "env:…"\|"file:…", "scopes": [...], "actor": "human"\|"llm"\|"import"}]` (`actor` типово `human`; у `jwt` — claim `actor`) |
+| `RUNTIME_PROFILES_TOKEN_REF` | — | `env:VAR` / `file:/path` власного токена registry для http(s)-джерел `RUNTIME_PROFILES` (`GET <runtime>/v1/info` потребує токена) |
 | `LIMITS_FILE`, `LIMITS__<група>__<поле>` | — | ліміти (файл `PlatformLimits`, зокрема цілий профіль `deploy/profiles/<профіль>.json`, або змінні; див. «Ліміти й типові значення») |
 
 Scopes (ADR-0005): `registry:read` — усі GET, зокрема `GET /v1/jobs/{id}`; `registry:write` — створення пакета,
@@ -96,6 +97,27 @@ Scopes (ADR-0005): `registry:read` — усі GET, зокрема `GET /v1/jobs/
 версії з `provenance.created_by: llm` (інакше `403`), тож заборона автозмін не обходиться підміною походження;
 upstream-port записує `provenance.created_by` = `actor` того, хто його запустив (`requested_by` = ім'я ключа).
 У `auth_mode=none` усі клієнти — `human`.
+
+### Автентифікація (ADR-0005)
+
+Режими й усі змінні (`AUTH_MODE`, `API_KEYS`, `API_KEYS_FILE`, `JWT_*`, `METRICS_PUBLIC`) спільні для всіх сервісів: [jane-kit, «Автентифікація»](../../libs/jane-kit/README.md#автентифікація-adr-0005) і [docs/operations](../../docs/operations/README.md#автентифікація-adr-0005). `/v1/health` (і `/metrics`, доки `METRICS_PUBLIC=true`) працюють без токена; `/v1/info` приймає будь-який дійсний токен; решта потребує токена (401 `unauthenticated`) і scope операції (403 `forbidden`). `AUTH_MODE=none` — лише для локальних тестів на loopback; за неповної конфігурації `api_key`/`jwt` сервіс не стартує. JWT з реальним IdP **не перевірено на реальному сервісі** (лише локальний JWKS у тестах jane-kit).
+
+Scopes операцій (таблиця `REGISTRY` з `jane_kit.auth_scopes`, по суті та сама, що в абзаці «Scopes» вище):
+
+- невідомий `actor` у ключі — сервіс не стартує, у JWT — 403;
+- **увага, `jwt`:** `actor` береться з claim `actor` токена, а якщо claim немає — клієнт вважається `human`, як і
+  ключ без поля `actor`. Сервісний JWT асистента без claim `actor: llm` **обходить** обмеження для `llm` (може
+  публікувати версії з `provenance.created_by: human` і не підпадає під заборону автозмін через походження). У
+  режимі `jwt` налаштуйте в IdP для клієнта асистента claim `actor` зі значенням `llm` (mapper/optional claim) або
+  видайте асистенту ключ `api_key` з `"actor": "llm"`; код registry цього не перевіряє; `GET /v1/jobs/{id}` — `registry:read`, `POST /v1/jobs/{id}/cancel` — `registry:write`.
+
+Приклад для `api_key` (зберігається лише хеш ключа):
+
+```text
+JANE_REGISTRY_AUTH_MODE=api_key
+JANE_REGISTRY_API_KEYS=[{"name": "assistant", "sha256": "<sha256 hex ключа>", "scopes": ["registry:read", "registry:write", "registry:approve"], "actor": "llm"},
+  {"name": "ops", "secret_ref": "file:/run/secrets/jane-ops-key", "scopes": ["registry:read", "registry:write", "registry:approve"]}]
+```
 
 ### Профілі runtime
 
@@ -276,7 +298,6 @@ API-тести параметризовано бекендом (`memory` / `real
 
 ## Відомі обмеження
 
-- `auth_mode=jwt` не реалізовано (сервіс відмовляється стартувати в цьому режимі).
 - Прогін тестів пакета при публікації через handler-runtime не робиться: звіти приходять через
   `POST …/test-results` (ADR-0002 §8 — опційно).
 - Архіви без посилань (після невдалої вставки версії) лишаються в blob-сховищі; вони content-addressed і

@@ -18,6 +18,7 @@ from typing import Any
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
+from jane_kit.auth_scopes import HANDLER
 from jane_kit.contracts import ContractViolation, OpenAPISpec
 from jane_kit.errors import (
     BadRequest,
@@ -157,6 +158,7 @@ def build_app(
         lifespan=lifespan,
         capabilities=capabilities,
         limits=resolved,
+        auth_scopes=HANDLER,  # ADR-0005 scopes per operation
     )
     app.state.limits = resolved
     app.state.runtime = runtime

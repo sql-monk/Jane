@@ -19,6 +19,7 @@ from typing import Any
 
 import httpx
 
+from jane_kit.auth import bearer_header, resolve_secret_ref
 from jane_kit.clients import ClientLimits, RemoteError, ServiceClient
 from jane_kit.errors import JaneError, UpstreamUnavailable
 
@@ -292,15 +293,28 @@ class Neighbours:
         """Clients for configured URLs. ``transports`` (tests) maps a neighbour name to an ASGI
         transport; the URL then only provides the base."""
         transports = transports or {}
-        headers: dict[str, str] = {}
-        if settings.service_token_env and (token := os.environ.get(settings.service_token_env)):
-            headers["Authorization"] = f"Bearer {token}"
+        default = resolve_secret_ref(settings.service_token_ref) if settings.service_token_ref else None
+        if default is None and settings.service_token_env:
+            default = os.environ.get(settings.service_token_env) or None
+        refs = {
+            "llm": settings.llm_token_ref,
+            "registry": settings.registry_token_ref,
+            "collector_web": settings.collector_web_token_ref,
+            "collector_telegram": settings.collector_telegram_token_ref,
+            "handler": settings.handler_runtime_token_ref,
+            "orchestrator": settings.orchestrator_token_ref,
+            "storage": settings.storage_token_ref,
+        }
+        tokens = {name: resolve_secret_ref(ref) if ref else default for name, ref in refs.items()}
 
         def make(name: str, url: str | None) -> ServiceClient | None:
             if url is None and name not in transports:
                 return None
             return ServiceClient(
-                url or f"http://{name}.test", limits, headers=headers, transport=transports.get(name)
+                url or f"http://{name}.test",
+                limits,
+                headers=bearer_header(tokens[name]),
+                transport=transports.get(name),
             )
 
         return cls(

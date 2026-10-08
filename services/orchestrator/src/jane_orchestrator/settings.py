@@ -14,18 +14,21 @@ Two kinds of limits:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic_settings import SettingsConfigDict
 
+from jane_kit.auth import resolve_secret_ref
 from jane_kit.clients import RetryPolicy
 from jane_kit.config import JaneSettings, LimitLayer, Limits, ResolvedLimits, contract_field, resolve_limits
 from jane_kit.idempotency import IdempotencyLimits
 from jane_kit.pagination import PageLimits
 
 ENV_PREFIX = "JANE_ORCHESTRATOR_"
+log = logging.getLogger(__name__)
 
 
 class ExecutorConfig(BaseModel):
@@ -43,8 +46,18 @@ class ExecutorConfig(BaseModel):
     sync_connections: bool | None = None
     """Push the connections registry to this executor (``PUT /v1/connections/{id}``). Default: true for
     collectors, handlers and llm."""
-    token: str | None = None
-    """Bearer token for this executor (service account); never logged or returned by the API."""
+    token_ref: str | None = None
+    """Secret reference (``env:VAR`` / ``file:/path``, ADR-0006) of the bearer token for this executor;
+    without it the orchestrator's own ``service_token_ref`` is used (ADR-0005 §5)."""
+    token: SecretStr | None = None
+    """Bearer token in plain text - deprecated (logged as a warning at start), use ``token_ref``. After
+    :meth:`Settings.all_executors` it holds the resolved token (``SecretStr``: never in reprs, logs or the API)."""
+
+    @model_validator(mode="after")
+    def _one_token(self) -> ExecutorConfig:
+        if self.token and self.token_ref:
+            raise ValueError(f"executor {self.executor}: give token_ref or token, not both")
+        return self
 
     @property
     def syncs_connections(self) -> bool:
@@ -156,18 +169,43 @@ class Settings(JaneSettings):
     """JSON file with a list of executors (alternative to ``JANE_ORCHESTRATOR_EXECUTORS``)."""
     contracts_dir: Path | None = None
     """``contracts/`` for request validation (default: env ``JANE_CONTRACTS_DIR`` or the checkout)."""
-    api_keys: list[dict[str, Any]] = Field(default_factory=list)
-    """``auth_mode=api_key``: ``[{"name": "admin", "sha256": "<hex of key>", "scopes": [...]}]``."""
+    # auth_mode, api_keys (``[{"name", "sha256" | "secret_ref", "scopes"}]``), api_keys_file and jwt_* come
+    # from jane_kit.auth.AuthSettings (JaneSettings), ADR-0005.
+    service_token_ref: str | None = None
+    """Secret reference (``env:VAR`` / ``file:/path``) of the orchestrator's own service token: the bearer
+    token for every executor without its own ``token_ref`` (ADR-0005 §5)."""
     scheduler_enabled: bool = True
     run_workers: bool = True
     """Start worker threads inside the API process (``python -m jane_orchestrator worker`` runs them alone)."""
 
-    def all_executors(self) -> list[ExecutorConfig]:
+    def executor_configs(self) -> list[ExecutorConfig]:
+        """Executors as configured (tokens not resolved)."""
         items = list(self.executors)
         if self.executors_file is not None:
             data = json.loads(self.executors_file.read_text(encoding="utf-8"))
             items += [ExecutorConfig.model_validate(x) for x in data]
         return items
+
+    def all_executors(self) -> list[ExecutorConfig]:
+        """Executors with ``token`` = the bearer token to send: ``token_ref``, else the deprecated plain
+        ``token``, else ``service_token_ref``. An unresolvable reference raises (the service must not start)."""
+        default = SecretStr(resolve_secret_ref(self.service_token_ref)) if self.service_token_ref else None
+        out = []
+        for cfg in self.executor_configs():
+            if cfg.token_ref:
+                token: SecretStr | None = SecretStr(resolve_secret_ref(cfg.token_ref))
+            elif cfg.token:
+                log.warning(
+                    "executor token given in plain text; use token_ref (env:/file:)",
+                    extra={"executor": cfg.executor},
+                )
+                token = cfg.token
+            else:
+                token = default
+            if token is None:
+                log.warning("executor has no bearer token", extra={"executor": cfg.executor})
+            out.append(cfg.model_copy(update={"token": token}))
+        return out
 
 
 def resolve_service_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLimits[ServiceLimits]:

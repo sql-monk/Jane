@@ -1,24 +1,26 @@
-"""Bearer authentication (ADR-0005): ``none`` (local tests) or ``api_key`` with scopes.
+"""Bearer authentication (ADR-0005) of the orchestrator, implemented by ``jane_kit.auth``.
 
-``api_key``: keys are configured as SHA-256 hashes (``JANE_ORCHESTRATOR_API_KEYS``); the key value is never
-stored. Scopes: ``orchestrator:read`` (GET), ``orchestrator:write`` (changes, runs),
-``orchestrator:admin`` (platform limits, connections). ``jwt`` is reported but not enforced here yet.
+Modes ``none`` (local tests on loopback), ``api_key`` (``JANE_ORCHESTRATOR_API_KEYS`` /
+``JANE_ORCHESTRATOR_API_KEYS_FILE``: ``[{"name", "sha256" | "secret_ref", "scopes"}]``, only hashes kept) and
+``jwt`` (``JANE_ORCHESTRATOR_JWT_*``). jane-kit's middleware authenticates every request (401) and checks the
+scope table ``jane_kit.auth_scopes.ORCHESTRATOR`` (403); the handlers call :func:`caller` for the principal's
+name (audit, ``requested_by``). Scopes: ``orchestrator:read`` (GET), ``orchestrator:write`` (changes, runs),
+``orchestrator:admin`` (platform limits, connections; also grants read and write).
 """
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 from dataclasses import dataclass
-from typing import Any
 
 from fastapi import Request
 
-from jane_kit.errors import Forbidden, Unauthenticated
+from jane_kit.auth import principal_of
+from jane_kit.errors import Forbidden
 
-__all__ = ["Principal", "authenticate"]
+__all__ = ["ADMIN", "ALL_SCOPES", "Principal", "caller"]
 
-ANONYMOUS = "anonymous"
+ADMIN = "orchestrator:admin"
+ALL_SCOPES = frozenset({"orchestrator:read", "orchestrator:write", ADMIN})
 
 
 @dataclass(frozen=True)
@@ -27,24 +29,13 @@ class Principal:
     scopes: frozenset[str]
 
     def require(self, scope: str) -> None:
-        if scope not in self.scopes and "orchestrator:admin" not in self.scopes:
+        if scope not in self.scopes and ADMIN not in self.scopes:
             raise Forbidden(f"scope {scope} required")
 
 
-ALL_SCOPES = frozenset({"orchestrator:read", "orchestrator:write", "orchestrator:admin"})
-
-
-def authenticate(request: Request, mode: str, keys: list[dict[str, Any]]) -> Principal:
-    if mode == "none":
-        return Principal(ANONYMOUS, ALL_SCOPES)
-    header = request.headers.get("authorization", "")
-    scheme, _, token = header.partition(" ")
-    if scheme.lower() != "bearer" or not token:
-        raise Unauthenticated("bearer token required", headers={"WWW-Authenticate": "Bearer"})
-    if mode == "api_key":
-        digest = hashlib.sha256(token.strip().encode()).hexdigest()
-        for key in keys:
-            if hmac.compare_digest(str(key.get("sha256", "")).lower(), digest):
-                return Principal(str(key.get("name", "api-key")), frozenset(key.get("scopes") or []))
-        raise Unauthenticated("invalid API key", headers={"WWW-Authenticate": "Bearer"})
-    raise Unauthenticated(f"auth mode {mode} is not supported by this build")
+def caller(request: Request, scope: str) -> Principal:
+    """The authenticated caller of this request with ``scope`` (or ``orchestrator:admin``)."""
+    p = principal_of(request)
+    principal = Principal(p.name, ALL_SCOPES if p.method == "none" else frozenset(p.scopes))
+    principal.require(scope)
+    return principal

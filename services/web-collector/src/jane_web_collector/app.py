@@ -20,6 +20,7 @@ from typing import Any
 from fastapi import FastAPI, Header, Query, Request, Response
 from fastapi.responses import JSONResponse
 
+from jane_kit.auth_scopes import COLLECTOR
 from jane_kit.errors import FieldError, JaneError, NotFound, ValidationFailed
 from jane_kit.idempotency import StoredResponse, idempotent
 from jane_kit.jobs import JobRunner, jobs_router
@@ -92,6 +93,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
         capabilities=engine.capabilities,
         limits=resolved,
+        auth_scopes=COLLECTOR,  # ADR-0005 scopes per operation
     )
     app.state.limits = resolved
     app.state.engine = engine

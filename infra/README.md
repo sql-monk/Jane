@@ -72,6 +72,12 @@ just down -v                # зупинити й видалити томи, з�
   Оркестратор бере `JANE_ORCHESTRATOR_SCHEDULER_ENABLED` і `JANE_ORCHESTRATOR_RUN_WORKERS` (типово `true`) із
   середовища `just up`: `false` — API без розкладів і воркерів на час резервування, відновлення чи оновлення
   ([backup-restore.md](../docs/operations/backup-restore.md)).
+- **Автентифікація (ADR-0005).** Застосунки стартують у `AUTH_MODE=api_key`. `just up` генерує ключ для кожної
+  ідентичності (`JANE_API_KEY_<ID>`, зокрема `ADMIN`) і його SHA-256 (`JANE_API_KEY_<ID>_SHA256`) у
+  `.jane/stack-<проєкт>.json`; сервіси отримують лише хеші з scopes кожного клієнта, а власний ключ для викликів
+  сусідів — із середовища. Ключ адміністратора для адмінки: `just env` → `JANE_STACK_AUTH_ADMIN_API_KEY`.
+  Матриця «хто кого викликає» — [docs/operations](../docs/operations/README.md#автентифікація-adr-0005);
+  `infra/tests/test_auth_config.py` перевіряє її без стеку.
 - **Статика адмінки.** `just up` підмонтовує `web/admin/dist`, якщо тека вже існує; інакше Caddy показує
   службову сторінку з `infra/proxy/empty`. Зібрати `dist` — `corepack pnpm --dir web/admin build` (вище);
   `just web` — повна перевірка адмінки (install, lint, typecheck, test, build), як job `web` у CI. Прямий
@@ -83,8 +89,9 @@ just down -v                # зупинити й видалити томи, з�
   `just integration --project <ім'я>` задає інший (через `JANE_STACK_FILE`).
 
 Прямий запуск без just: задати змінні `JANE_PG_PASSWORD`, `JANE_MSSQL_SA_PASSWORD`,
-`JANE_MONGO_PASSWORD`, `JANE_MINIO_SECRET_KEY`, `JANE_S3_SECRET_KEY` і всі шість
-`JANE_PG_*_PASSWORD` із таблиці вище. Спершу `docker compose -f infra/compose.yaml -p <унікальне-ім'я>
+`JANE_MONGO_PASSWORD`, `JANE_MINIO_SECRET_KEY`, `JANE_S3_SECRET_KEY`, усі шість
+`JANE_PG_*_PASSWORD` із таблиці вище і для застосунків — `JANE_API_KEY_<ID>` та `JANE_API_KEY_<ID>_SHA256`
+(генерує `jane_kit.devstack.new_api_keys()`). Спершу `docker compose -f infra/compose.yaml -p <унікальне-ім'я>
 up -d --wait postgres`, потім `docker compose -f infra/compose.yaml -p <те саме ім'я> run --rm
 --no-deps pg-provision`, далі `up -d --wait <сервіс>`. Для звичайної роботи `just up` робить це сам.
 

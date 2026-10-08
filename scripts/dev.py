@@ -277,6 +277,36 @@ PG_SERVICE_DATABASES = {
     "storage-results": ("jane_storage_results", "JANE_PG_STORAGE_RESULTS_PASSWORD"),
 }
 DEFAULT_STACK_SERVICES = ("postgres", "sqlserver", "mongodb", "minio", "s3", "testsite", "proxy")
+# ADR-0005: the stack runs in auth_mode=api_key. One key per caller identity; the services verify only the hashes
+# (infra/compose.yaml). Copy of jane_kit.devstack.STACK_IDENTITIES/new_api_keys (this script is stdlib only);
+# infra/tests/test_auth_config.py keeps them equal.
+STACK_IDENTITIES = (
+    "admin",
+    "orchestrator",
+    "assistant",
+    "handler-runtime",
+    "storage",
+    "llm",
+    "web-collector",
+    "telegram-collector",
+    "registry",
+)
+
+
+def api_key_var(identity: str) -> str:
+    return "JANE_API_KEY_" + identity.upper().replace("-", "_")
+
+
+def new_api_keys(existing: dict[str, str] | None = None) -> dict[str, str]:
+    """Keys and their SHA-256 for every identity; keys already in ``existing`` are kept."""
+    out: dict[str, str] = {}
+    have = existing or {}
+    for identity in STACK_IDENTITIES:
+        var = api_key_var(identity)
+        key = have.get(var) or "jk_" + secrets.token_urlsafe(32)
+        out[var] = key
+        out[f"{var}_SHA256"] = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    return out
 
 
 def load_or_create_credentials(project: str) -> dict[str, str]:
@@ -285,8 +315,11 @@ def load_or_create_credentials(project: str) -> dict[str, str]:
         data = json.loads(path.read_text(encoding="utf-8"))
         if "env" in data:
             creds = dict(data["env"])
-            if missing := [key for _, key in PG_SERVICE_DATABASES.values() if key not in creds]:
+            keys = new_api_keys(creds)
+            missing = [key for _, key in PG_SERVICE_DATABASES.values() if key not in creds]
+            if missing or any(creds.get(k) != v for k, v in keys.items()):
                 creds.update({key: secrets.token_urlsafe(24) for key in missing})
+                creds.update(keys)
                 data["env"] = creds
                 path.write_text(json.dumps(data, indent=2), encoding="utf-8")
             return creds
@@ -303,6 +336,7 @@ def load_or_create_credentials(project: str) -> dict[str, str]:
         "JANE_S3_SECRET_KEY": secrets.token_urlsafe(24),
     }
     creds.update({key: secrets.token_urlsafe(24) for _, key in PG_SERVICE_DATABASES.values()})
+    creds.update(new_api_keys())
     STACK_DIR.mkdir(exist_ok=True)
     path.write_text(
         json.dumps({"project": project, "env": creds, "services": {}}, indent=2), encoding="utf-8"
@@ -400,6 +434,9 @@ def describe(project: str, env: dict[str, str]) -> dict[str, dict[str, object]]:
     ):
         if port := ports[name]:
             services[name] = {"host": host, "port": port, "url": f"http://{host}:{port}"}
+    if admin_key := env.get(api_key_var("admin")):
+        # ADR-0005: the operator's key for the admin UI (login page) and API calls through the proxy.
+        services["auth"] = {"mode": "api_key", "admin_api_key": admin_key}
     if pg_port := ports["postgres"]:
         for name, (database, password_key) in PG_SERVICE_DATABASES.items():
             services[f"db-{name}"] = {
@@ -444,6 +481,9 @@ def cmd_up(ns: argparse.Namespace) -> int:
     )
     print(f"\nproject: {project}   (stack file: {stack_file(project).relative_to(ROOT).as_posix()})")
     for name, info in services.items():
+        if name == "auth":  # never print the key itself here; `just env` shows it on request
+            print(f"  {name:<10} api_key (admin key: `just env` -> JANE_STACK_AUTH_ADMIN_API_KEY)")
+            continue
         print(f"  {name:<10} {info.get('url') or info.get('endpoint') or f'{info["host"]}:{info["port"]}'}")
     if code:
         print(
@@ -463,6 +503,7 @@ def cmd_down(ns: argparse.Namespace) -> int:
         "JANE_MINIO_SECRET_KEY",
         "JANE_S3_SECRET_KEY",
         *(key for _, key in PG_SERVICE_DATABASES.values()),
+        *(f"{api_key_var(i)}{suffix}" for i in STACK_IDENTITIES for suffix in ("", "_SHA256")),
     ):
         env.setdefault(var, "unused")
     # -v also removes locally built images (<project>-testsite) so they do not pile up.

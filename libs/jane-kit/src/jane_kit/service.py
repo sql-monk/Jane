@@ -2,7 +2,8 @@
 
 ``create_app`` gives every service the same behaviour: JSON logs with ``trace_id``/``request_id``,
 W3C ``traceparent`` continuation, access log, Problem-details errors, Prometheus ``/metrics``,
-``/v1/health`` and ``/v1/info`` (WP-00 ``common.yaml``).
+``/v1/health`` and ``/v1/info`` (WP-00 ``common.yaml``) and bearer authentication with scopes
+(ADR-0005, :mod:`jane_kit.auth`).
 """
 
 from __future__ import annotations
@@ -15,8 +16,9 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 
+from jane_kit.auth import Authenticator, ScopeTable, authorize, check_scopes, install_auth
 from jane_kit.config import JaneSettings, ResolvedLimits
 from jane_kit.errors import install_error_handlers
 from jane_kit.health import HealthRegistry, ServiceInfo, install_health
@@ -43,6 +45,8 @@ def create_app(
     lifespan: Lifespan | None = None,
     limits: ResolvedLimits[Any] | None = None,
     configure_logs: bool = True,
+    auth_scopes: ScopeTable | None = None,
+    authenticator: Authenticator | None = None,
     **fastapi_kwargs: Any,
 ) -> FastAPI:
     """Build a FastAPI app. ``app.state.health`` and ``app.state.metrics`` are ready to extend.
@@ -50,6 +54,11 @@ def create_app(
     ``limits`` (the service's resolved platform limits) is published in ``/v1/info`` as ``limits``
     (``PlatformLimits``: contract-mapped defaults and hard caps, WP-00 ``ServiceInfo``); limits of a shared
     platform profile that the service does not have (``ResolvedLimits.ignored``) are logged at start.
+
+    Authentication follows ``settings.auth_mode`` (:func:`jane_kit.auth.install_auth`; an incomplete
+    configuration raises :class:`~jane_kit.auth.AuthConfigError` here). ``auth_scopes`` maps every route
+    ``"METHOD /path"`` to its scope (checked at start); without it handlers check scopes themselves
+    (:func:`jane_kit.auth.require`). ``authenticator`` replaces the one built from settings (tests).
     """
     if configure_logs:
         configure_logging(
@@ -70,6 +79,7 @@ def create_app(
                     "ignored_hard_caps": sorted(limits.ignored_hard_caps),
                 },
             )
+        check_scopes(app)
         if lifespan is None:
             yield
         else:
@@ -88,11 +98,19 @@ def create_app(
             limits=limits.platform_limits() if limits is not None else None,
         )
 
-    app = FastAPI(title=title or settings.service_name, version=version, lifespan=_lifespan, **fastapi_kwargs)
+    dependencies = [Depends(authorize), *(fastapi_kwargs.pop("dependencies", None) or [])]
+    app = FastAPI(
+        title=title or settings.service_name,
+        version=version,
+        lifespan=_lifespan,
+        dependencies=dependencies,
+        **fastapi_kwargs,
+    )
     app.state.settings = settings
     app.state.health = HealthRegistry(check_timeout_s=settings.health_check_timeout_ms / 1000)
     install_error_handlers(app)
     install_health(app, app.state.health, info)
+    install_auth(app, settings, scopes=auth_scopes, authenticator=authenticator)  # innermost middleware
     if settings.metrics_enabled:
         app.state.metrics = Metrics(settings.service_name)
         install_metrics(app, app.state.metrics)

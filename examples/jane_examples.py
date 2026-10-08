@@ -297,8 +297,12 @@ def spec(api: str) -> OpenAPISpec:
 class Api:
     """One service; every request body and response is validated against its contract."""
 
-    def __init__(self, base_url: str, api: str, timeout_s: float = 120.0) -> None:
-        self.http = httpx.Client(base_url=base_url, timeout=timeout_s)
+    def __init__(
+        self, base_url: str, api: str, timeout_s: float = 120.0, *, token: str | None = None
+    ) -> None:
+        # ADR-0005: the stack runs in auth_mode=api_key; the driver calls as the stack's operator (admin key).
+        headers = {"Authorization": f"Bearer {token}"} if token else None
+        self.http = httpx.Client(base_url=base_url, timeout=timeout_s, headers=headers)
         self.client = ContractClient(spec(api), self.http)
 
     def close(self) -> None:
@@ -337,14 +341,16 @@ class Services:
         path = STACK_DIR / f"stack-{project}.json"
         if not path.is_file():
             raise SystemExit(f"no stack file {path}: start the stack with deploy/profiles/stack.py up")
-        urls = {name: info["url"] for name, info in read_json(path)["services"].items() if "url" in info}
+        stack = read_json(path)
+        urls = {name: info["url"] for name, info in stack["services"].items() if "url" in info}
         missing = [s for s in ("registry", "orchestrator", "storage") if s not in urls]
         if missing:
             raise SystemExit(f"stack {project} has no {', '.join(missing)}")
+        token = (stack.get("env") or {}).get("JANE_API_KEY_ADMIN")  # generated with the stack, never in git
         return cls(
-            Api(urls["registry"], "registry"),
-            Api(urls["orchestrator"], "orchestrator"),
-            Api(urls["storage"], "storage"),
+            Api(urls["registry"], "registry", token=token),
+            Api(urls["orchestrator"], "orchestrator", token=token),
+            Api(urls["storage"], "storage", token=token),
         )
 
     def close(self) -> None:

@@ -206,6 +206,24 @@ FS лише для читання, користувач 65534, відсутні�
 тайм-аут, 5xx — 502 `upstream_unavailable` (повторюваний), редирект чи інший 4xx — 502 неповторюваний. `detail` без
 шляхів і вмісту. Тести: `tests/test_content_policy.py`.
 
+## Автентифікація (ADR-0005)
+
+Режими й усі змінні (`AUTH_MODE`, `API_KEYS`, `API_KEYS_FILE`, `JWT_*`, `METRICS_PUBLIC`) спільні для всіх сервісів: [jane-kit, «Автентифікація»](../../libs/jane-kit/README.md#автентифікація-adr-0005) і [docs/operations](../../docs/operations/README.md#автентифікація-adr-0005). `/v1/health` (і `/metrics`, доки `METRICS_PUBLIC=true`) працюють без токена; `/v1/info` приймає будь-який дійсний токен; решта потребує токена (401 `unauthenticated`) і scope операції (403 `forbidden`). `AUTH_MODE=none` — лише для локальних тестів на loopback; за неповної конфігурації `api_key`/`jwt` сервіс не стартує. JWT з реальним IdP **не перевірено на реальному сервісі** (лише локальний JWKS у тестах jane-kit).
+
+Scopes операцій (таблиця `HANDLER` з `jane_kit.auth_scopes`):
+
+- `handler:invoke` — `POST /v1/invocations`, `GET /v1/invocations/{id}`; `handler:test` — `POST /v1/test-runs`; `/v1/jobs/*` — `handler:invoke` або `handler:test`; `GET /v1/connections…` — `connections:write` або `handler:invoke`; `PUT`/`DELETE /v1/connections/{id}` і `POST …/test` — `connections:write`.
+
+Registry читає профілі runtime з `GET /v1/info` власним ключем (scopes runtime йому не потрібні). Власний токен runtime до registry — `REGISTRY_TOKEN`; у dev-стеку це ключ ідентичності `handler-runtime`.
+
+Приклад для `api_key` (зберігається лише хеш ключа):
+
+```text
+JANE_HANDLER_RUNTIME_AUTH_MODE=api_key
+JANE_HANDLER_RUNTIME_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 hex ключа>", "scopes": ["handler:invoke", "connections:write"]},
+  {"name": "ops", "secret_ref": "file:/run/secrets/jane-ops-key", "scopes": ["handler:invoke", "connections:write"]}]
+```
+
 ## Ліміти
 
 Рівні: типові значення → стелі сервісу (`DEFAULT_HARD_CAPS`) → файл платформи (`LIMITS_FILE`, форма

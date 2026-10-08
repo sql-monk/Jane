@@ -161,6 +161,45 @@ def recordings_dir(project: str) -> Path:
     return STACK_DIR / f"telegram-recordings-{project}"
 
 
+# ADR-0005: the services run in auth_mode=api_key (infra/compose.yaml). One key per caller identity, the services
+# verify only the hashes; copy of jane_kit.devstack (this module is stdlib only), kept equal by
+# infra/tests/test_auth_config.py.
+STACK_IDENTITIES = (
+    "admin",
+    "orchestrator",
+    "assistant",
+    "handler-runtime",
+    "storage",
+    "llm",
+    "web-collector",
+    "telegram-collector",
+    "registry",
+)
+
+
+def api_key_var(identity: str) -> str:
+    return "JANE_API_KEY_" + identity.upper().replace("-", "_")
+
+
+def new_api_keys(existing: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Keys and their SHA-256 for every identity; keys already in ``existing`` are kept."""
+    out: dict[str, str] = {}
+    have = existing or {}
+    for identity in STACK_IDENTITIES:
+        var = api_key_var(identity)
+        key = have.get(var) or "jk_" + secrets.token_urlsafe(32)
+        out[var] = key
+        out[f"{var}_SHA256"] = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    return out
+
+
+def admin_token(project: str) -> str | None:
+    """The operator's API key of a running stack (all scopes; for the harness and the examples)."""
+    data = read_stack(project) or {}
+    token = (data.get("env") or {}).get(api_key_var("admin"))
+    return str(token) if token else None
+
+
 def new_credentials() -> dict[str, str]:
     """Random credentials of one stack (the same keys as `just up`); stored only in the ignored stack file."""
     creds = {
@@ -176,6 +215,7 @@ def new_credentials() -> dict[str, str]:
         "JANE_S3_SECRET_KEY": secrets.token_urlsafe(24),
     }
     creds.update({key: secrets.token_urlsafe(24) for key in PG_PASSWORD_KEYS})
+    creds.update(new_api_keys())
     return creds
 
 
@@ -209,6 +249,7 @@ class Stack:
         env = dict(data.get("env") or {})
         if not all(k in env for k in ("JANE_PG_PASSWORD", *PG_PASSWORD_KEYS)):
             env = new_credentials()
+        env.update(new_api_keys(env))  # a stack file of an older checkout has no API keys yet
         self.creds = env
 
     # ------------------------------------------------------------------ environment

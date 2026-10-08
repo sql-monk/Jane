@@ -17,7 +17,7 @@ import httpx
 
 from jane_kit.contracts import ContractClient, OpenAPISpec
 
-__all__ = ["API_OF_SERVICE", "JaneClient", "spec"]
+__all__ = ["API_OF_SERVICE", "JaneClient", "register_token", "spec", "token_for"]
 
 CONTRACTS = Path(__file__).resolve().parents[3] / "contracts" / "openapi"
 
@@ -34,6 +34,18 @@ API_OF_SERVICE = {
 }
 
 TERMINAL_JOB_STATES = frozenset({"succeeded", "failed", "cancelled"})
+
+# ADR-0005: the stacks run in auth_mode=api_key. Every base URL a stack hands out (E2EStack.url) is registered
+# with that stack's operator key, so a client of any stack of the session sends the right bearer token.
+_TOKENS: dict[str, str] = {}
+
+
+def register_token(base_url: str, token: str) -> None:
+    _TOKENS[base_url.rstrip("/")] = token
+
+
+def token_for(base_url: str) -> str | None:
+    return _TOKENS.get(base_url.rstrip("/"))
 
 
 @cache
@@ -55,12 +67,14 @@ def keepalive_expiry_s() -> float:
 class JaneClient:
     """HTTP client of one service instance; ``api(name)`` validates against that contract."""
 
-    def __init__(self, base_url: str, timeout_s: float = 120.0) -> None:
+    def __init__(self, base_url: str, timeout_s: float = 120.0, *, token: str | None = None) -> None:
         self.base_url = base_url
+        token = token or token_for(base_url)
         self.http = httpx.Client(
             base_url=base_url,
             timeout=timeout_s,
             limits=httpx.Limits(keepalive_expiry=keepalive_expiry_s()),
+            headers={"Authorization": f"Bearer {token}"} if token else None,
         )
         self._clients: dict[str, ContractClient] = {}
 

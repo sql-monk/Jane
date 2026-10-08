@@ -17,6 +17,8 @@ from fastapi import Depends, FastAPI, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from jane_kit.auth import resolve_secret_ref
+from jane_kit.auth_scopes import REGISTRY
 from jane_kit.errors import FieldError, Forbidden, JaneError, ValidationFailed
 from jane_kit.idempotency import IdempotencyStore, InMemoryIdempotencyStore, StoredResponse, idempotent
 from jane_kit.jobs import (
@@ -32,7 +34,7 @@ from jane_kit.pagination import clamp_limit, decode_cursor, encode_cursor
 from jane_kit.service import create_app
 
 from . import __version__
-from .auth import Authenticator, Principal, load_api_keys
+from .auth import Authenticator, Principal
 from .blobs import BlobStore, FileBlobStore, S3BlobStore
 from .profiles import ProfileSource
 from .service import RegistryService, package_etag, package_wire, version_wire
@@ -191,11 +193,15 @@ def build_app(settings: Settings | None = None, components: Components | None = 
     resolved = resolve_service_limits(settings)
     limits = resolved.limits
     comp = components or build_components(settings, limits)
-    auth = Authenticator(
-        settings.auth_mode, load_api_keys(settings.api_keys_file) if settings.api_keys_file else None
-    )
+    auth = Authenticator(settings)
     schemas = ContractSchemas(find_contracts_dir(settings.contracts_dir))
-    profiles = ProfileSource(settings.runtime_profiles, limits.profiles)
+    profiles = ProfileSource(
+        settings.runtime_profiles,
+        limits.profiles,
+        token=resolve_secret_ref(settings.runtime_profiles_token_ref)
+        if settings.runtime_profiles_token_ref
+        else None,
+    )
     service = RegistryService(
         comp.store,
         comp.blobs,
@@ -210,8 +216,6 @@ def build_app(settings: Settings | None = None, components: Components | None = 
         await comp.store.open()
         if isinstance(comp.blobs, S3BlobStore) and settings.s3_create_bucket:
             await asyncio.to_thread(comp.blobs.ensure_bucket)
-        if settings.auth_mode == "none":
-            log.warning("auth_mode=none: every caller has every scope (local use only)")
         heartbeat: asyncio.Task[None] | None = None
         sweep = getattr(comp.jobs, "sweep", None)
         if sweep is not None:
@@ -255,6 +259,7 @@ def build_app(settings: Settings | None = None, components: Components | None = 
             "upstream_ports": True,
         },
         limits=resolved,
+        auth_scopes=REGISTRY,  # ADR-0005; the route dependencies below also give the caller's actor
     )
     app.state.limits = resolved
     app.state.service = service

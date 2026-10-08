@@ -36,12 +36,48 @@ hostname і PID збігаються. Явний `<ПРЕФІКС>INSTANCE_ID` �
 | `jane_kit.clients` | `ServiceClient` (httpx): `timeouts.*_ms` і `RetryPolicy` з конфігурації, повтор лише для безпечних методів або з `Idempotency-Key` і лише retryable-помилок, `Retry-After`, `traceparent`, `wait_for_job` | `RetryPolicy` у limits |
 | `jane_kit.contracts` | `OpenAPISpec` (OpenAPI 3.1, `$ref` між файлами, `$ref` на path items), `ContractClient` — перевіряє кожну відповідь справжнього сервісу, `build_mock_app` — мок сусіда з прикладів контракту, `contracts_dir()`, `find_specs()` | `contracts/openapi/*.v1.yaml` |
 | `jane_kit.codegen` | `uv run jane-codegen client <spec> --out <pkg>/_generated/<svc>` — моделі Pydantic (datamodel-code-generator) + асинхронний клієнт на `ServiceClient` | — |
-| `jane_kit.service` | `create_app(settings, capabilities=...)` — FastAPI з усім вищенаведеним; `run()` — uvicorn | — |
-| `jane_kit.devstack` | `load_stack()` — порти й облікові дані стеку `just up` (для інтеграційних тестів) | — |
+| `jane_kit.auth` | автентифікація й scopes за ADR-0005: `none` / `api_key` / `jwt`, middleware (401) і залежність авторизації маршруту (403), `resolve_secret_ref` (`env:`/`file:`), `bearer_header` — див. «Автентифікація» | `common.yaml` `bearerAuth`, `Unauthenticated`, `Forbidden` |
+| `jane_kit.auth_scopes` | scope кожної операції кожного контракту (`COLLECTOR`, `HANDLER`, `STORAGE`, `LLM`, `ASSISTANT`, `REGISTRY`, `ORCHESTRATOR`), `merge()` для сервісу з кількома API | `contracts/openapi/*.v1.yaml` |
+| `jane_kit.service` | `create_app(settings, capabilities=..., auth_scopes=...)` — FastAPI з усім вищенаведеним; `run()` — uvicorn | — |
+| `jane_kit.devstack` | `load_stack()` — порти й облікові дані стеку `just up` (для інтеграційних тестів); `new_api_keys()` — ключі API стеків | — |
 
 `ServiceClient` повторює `httpx.ReadError` (зокрема закрите сервером простоюване з'єднання) лише для
 безпечного методу або запиту з `Idempotency-Key`, з тими самими тілом і ключем та в межах
 `RetryPolicy.max_attempts`. POST без ключа повертає помилку без повтору.
+
+## Автентифікація (ADR-0005)
+
+Один модуль для всіх сервісів: `create_app` вмикає перевірку сам, сервіс лише передає таблицю scopes своїх
+операцій (`auth_scopes=merge(HANDLER, STORAGE)` тощо з `jane_kit.auth_scopes`; таблиці дорівнюють контрактам —
+`tests/test_auth_scopes.py`). Без таблиці (`auth_scopes=None`) лишається лише автентифікація, а scopes
+перевіряють обробники (`Depends(require("x:y"))`, `principal_of(request)`).
+
+| Налаштування (env `<PREFIX><НАЗВА>`) | Типово | Значення |
+|---|---|---|
+| `AUTH_MODE` | `none` | `none` — лише локальні тести: усі мають усі scopes, попередження в журналі, `HOST` не loopback → сервіс не стартує (крім `AUTH_NONE_ALLOW_REMOTE=true`); `api_key` — типовий для dev-стеку; `jwt` — для прод |
+| `API_KEYS` | `[]` | JSON `[{"name", "scopes": [...], "sha256": "<hex ключа>"}]` або замість `sha256` — `"secret_ref": "env:VAR"` / `"file:/run/secrets/x"` (розв'язується один раз на старті, зберігається лише хеш); інші поля (напр. `actor` у registry) — атрибути принципала |
+| `API_KEYS_FILE` | — | JSON/YAML із тим самим списком (додається до `API_KEYS`) |
+| `JWT_JWKS_URL` / `JWT_ISSUER` / `JWT_AUDIENCE` | — | обов'язкові для `jwt`; JWKS лише `https://` (http — тільки loopback) |
+| `JWT_ALGORITHMS` | `["RS256","ES256"]` | підмножина RS*/PS*/ES*; `none` і `HS*` заборонені конфігурацією |
+| `JWT_SCOPE_CLAIM` | `scope` | рядок через пробіл або список рядків |
+| `JWT_LEEWAY_SECONDS` | 30 | допуск годинника для `exp`/`nbf`/`iat` |
+| `JWT_JWKS_CACHE_TTL_SECONDS` / `JWT_JWKS_TIMEOUT_MS` | 300 / 5000 | кеш JWKS і тайм-аут одного запиту до IdP |
+| `JWT_JWKS_REFRESH_COOLDOWN_SECONDS` / `JWT_JWKS_MAX_BYTES` | 10 / 1048576 | до IdP — не частіше одного запиту за cooldown (застарілий кеш, невідомий `kid`, повтор після невдачі; паралельні запити чекають одне завантаження); між спробами відомі ключі працюють, невідомий `kid` — 401, без жодного ключа — одразу 503; `0` вимикає захист. Найбільший JWKS |
+| `AUTH_MAX_TOKEN_BYTES` | 16384 | довший токен — 401 без розбору |
+| `METRICS_PUBLIC` | `true` | `/metrics` без токена (скрейпер Prometheus у внутрішній мережі); `false` — будь-який дійсний токен |
+
+Поведінка: `/v1/health` — завжди без токена; `/v1/info` (контракт `common.yaml` Info: `bearerAuth`, 401),
+`/openapi.json`, `/docs` — будь-який дійсний токен без scope; решта — токен (401 `unauthenticated`,
+`WWW-Authenticate: Bearer`) і scope операції (403 `forbidden`, `detail: scope x:y required`), обидва у форматі
+`application/problem+json`. Операція без рядка в таблиці — 403 і помилка в журналі, а на старті — відмова
+стартувати. JWT: `iss`/`aud`/`exp` обов'язкові, `nbf` перевіряється, ключ за `kid` (без `kid` — лише якщо в JWKS
+один ключ), алгоритм заголовка має збігатися з ключем; недоступний IdP без ключів у кеші — 503
+`service_unavailable` з `Retry-After` = cooldown, а не 401 (і без нового запиту до IdP до кінця cooldown). Неповна конфігурація (`api_key` без ключів, `jwt` без URL/issuer/audience,
+нерозв'язне `secret_ref`) — `AuthConfigError` під час `create_app`, сервіс не стартує. Значення ключів не
+потрапляють у журнали й повідомлення про помилки; на старті журналюються лише режим та імена ключів.
+
+Вихідні виклики: сервіс викликає сусідів **власним** токеном (ADR-0005 §5); `resolve_secret_ref` і
+`bearer_header` — спільні помічники (налаштування — у README кожного сервісу).
 
 ## Ліміти
 

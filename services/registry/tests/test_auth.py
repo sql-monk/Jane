@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -15,7 +16,7 @@ from jane_registry.settings import ProfileLimits, Settings
 from jane_registry.testing import TEST_PROFILE
 
 
-def settings(tmp_path: Path, profile_file: Path, keys: list[dict[str, object]], **kw: object) -> Settings:
+def settings(tmp_path: Path, profile_file: Path, keys: list[dict[str, Any]], **kw: Any) -> Settings:
     return Settings(
         log_format="console",
         db="memory",

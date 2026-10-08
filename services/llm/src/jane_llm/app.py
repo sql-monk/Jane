@@ -159,12 +159,14 @@ def build_app(
     runner = JobRunner(store=StoreJobs(store), limits=limits.jobs)
     adapters = adapters or ADAPTERS
     packages_dir = settings.packages_dir or (BUILTIN_PACKAGES if BUILTIN_PACKAGES.is_dir() else None)
+    content = settings.content_reader(limits.gateway)
     loader = PackageLoader(
         packages_dir,
         settings.registry_url,
         limits.registry.client_limits(),
         settings.registry_token,
         limits=limits.gateway,
+        content=content,
     )
 
     @asynccontextmanager
@@ -213,7 +215,7 @@ def build_app(
         metrics=metrics,
         **({"clock": clock} if clock else {}),
     )
-    handler = LlmHandler(gateway, loader)
+    handler = LlmHandler(gateway, loader, content)
     app.state.limits = resolved
     app.state.store = store
     app.state.gateway = gateway

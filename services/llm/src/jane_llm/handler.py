@@ -24,10 +24,11 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from jane_kit.content import ContentReader
 from jane_kit.errors import JaneError, ValidationFailed
 from jane_llm.gateway import BudgetExhausted, Gateway
 from jane_llm.models import CompletionRequest, CompletionScope, LlmLimitsIn
-from jane_llm.packages import LoadedPackage, PackageLoader, read_content
+from jane_llm.packages import LoadedPackage, PackageLoader
 from jane_llm.prompt import DataBlock
 
 _KEY_FROM_MATERIAL = {"message", "material", "material_id"}
@@ -70,21 +71,25 @@ class HandlerFailure(Exception):
 
 
 class LlmHandler:
-    def __init__(self, gateway: Gateway, loader: PackageLoader) -> None:
+    def __init__(self, gateway: Gateway, loader: PackageLoader, content: ContentReader | None = None) -> None:
         self.gateway = gateway
         self.loader = loader
+        self.content = content or loader.content
+        """Reads input ContentRefs (``JANE_LLM_BLOB_ROOTS`` / ``JANE_LLM_DOWNLOAD_HOST_ALLOWLIST``)."""
+
+    async def _read(self, ref: dict[str, Any]) -> bytes:
+        max_bytes = self.gateway.limits.gateway.max_data_part_bytes
+        return await self.content.read(ref, max_bytes=max_bytes, limit="gateway.max_data_part_bytes")
 
     async def _input_blocks(
         self, inp: dict[str, Any], index: int, pkg: LoadedPackage
     ) -> tuple[list[DataBlock], dict[str, Any]]:
         """Data blocks for one input and the template context (``content`` = decoded text)."""
-        max_bytes = self.gateway.limits.gateway.max_data_part_bytes
-        timeout_s = self.gateway.limits.gateway.content_fetch_timeout_ms / 1000
         kind = inp.get("kind")
         ctx: dict[str, Any] = {"input": inp, "index": index}
         if kind == "material":
             material = inp["material"]
-            raw = await read_content(material["content"], max_bytes, timeout_s)
+            raw = await self._read(material["content"])
             charset = material["content"].get("charset") or "utf-8"
             text = raw.decode(charset if charset.lower() != "binary" else "utf-8", errors="replace")
             ctx.update(material=material, content=text)
@@ -111,13 +116,13 @@ class LlmHandler:
         elif kind == "entities":
             entities = inp.get("entities")
             if entities is None and inp.get("entities_ref"):
-                entities = json.loads(await read_content(inp["entities_ref"], max_bytes, timeout_s))
+                entities = json.loads(await self._read(inp["entities_ref"]))
             ctx.update(entities=entities, content=json.dumps(entities, ensure_ascii=False))
             blocks = [DataBlock(f"entities[{index}]", "application/json", ctx["content"])]
         elif kind == "data":
             data = inp.get("data")
             if data is None and inp.get("data_ref"):
-                data = json.loads(await read_content(inp["data_ref"], max_bytes, timeout_s))
+                data = json.loads(await self._read(inp["data_ref"]))
             ctx.update(
                 data=data, content=data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)
             )

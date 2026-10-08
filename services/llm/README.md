@@ -64,6 +64,7 @@ just down -v --project jane-wp10
 | `tests/test_contract.py` | усі операції `llm.v1` і `handler.v1` через `ContractClient` (запити й відповіді за схемами) |
 | `tests/test_service.py` | повтори за схемою, 502 з вивільненням резерву, ліміти частоти й токенів, тести пакета через `/v1/test-runs`, простежуваність результату, seed-файл, публікація в registry (мок з контракту), завантаження пакета з registry з перевіркою дайджесту, адаптер Anthropic проти локального замінника API |
 | `tests/test_units.py` | промпт і розмежувачі, фейкова модель, вікна бюджетів, розв'язання секретів, семантика резервувань |
+| `tests/test_content_policy.py` | політика ContentRef входів: `file:///proc/self/environ`, шлях поза `JANE_LLM_BLOB_ROOTS`, `..`, symlink назовні, хост поза `JANE_LLM_DOWNLOAD_HOST_ALLOWLIST`, редирект на інший хост, перевищення `gateway.max_data_part_bytes` — відмова без виклику провайдера; дозволені `file://` і `download_url` — успіх |
 
 Фікстура `store_kind` проганяє кожен сценарій на `memory` і (з маркером `integration`) на PostgreSQL.
 
@@ -117,6 +118,8 @@ just down -v --project jane-wp10
 | `JANE_LLM_SECRET_ENV_PREFIX` | `JANE_SECRET_` | `env:`-посилання підключень — лише на змінні з цим префіксом |
 | `JANE_LLM_SECRET_FILES_DIR` | `/run/secrets` | `file:`-посилання — лише на файли в цьому каталозі |
 | `JANE_LLM_PROVIDER_API_BASE_ALLOWLIST` | `["https://api.anthropic.com"]` | дозволені origin для `params.api_base` підключень (JSON-список) |
+| `JANE_LLM_BLOB_ROOTS` | `[]` (вимкнено) | каталоги, з яких можна читати `file://` ContentRef (вміст матеріалу, `entities_ref`, `data_ref`, `package_archive`), JSON-список; порожньо — `file://` відхиляється (422) |
+| `JANE_LLM_DOWNLOAD_HOST_ALLOWLIST` | `[]` (вимкнено) | `hostname` (будь-який порт) або `hostname:port`, куди може вести `download_url` ContentRef, JSON-список; порожньо — завантаження відхиляються (422) |
 | `JANE_LLM_PACKAGES_DIR` | вбудований `services/llm/packages` | локальні LLM-пакети (`<dir>/**/jane-package.json`) |
 | `JANE_LLM_REGISTRY_URL` / `JANE_LLM_REGISTRY_TOKEN` | — | репозиторій обробників для пакетів за `handler` (архів `…/archive`) |
 | `JANE_LLM_LOG_LEVEL` / `JANE_LLM_LOG_FORMAT` | `INFO` / `json` | журнали |
@@ -139,6 +142,19 @@ just down -v --project jane-wp10
 `params.api_base` — лише origin з `JANE_LLM_PROVIDER_API_BASE_ALLOWLIST` (типово офіційний хост Anthropic).
 Порушення — 422 при `PUT /v1/connections` і в seed-файлі; підключення, збережене в обхід API, під час виклику
 не отримує секретів і відхиляється (422). Тести: `test_connection_policy_rejects_exfiltration`.
+
+**Політика ContentRef (WP-01h).** Вміст входів `POST /v1/invocations` і `package_archive` приходить у запиті, тож
+сервіс читає його спільним `jane_kit.content.ContentReader`: `inline` (utf-8/base64); `blob` з `download_url` —
+лише `http(s)` на хост із `JANE_LLM_DOWNLOAD_HOST_ALLOWLIST`, без редиректів, без проксі й `.netrc` із середовища,
+лише незакодоване тіло, обрізання на `gateway.max_data_part_bytes` / `gateway.max_package_bytes` під час
+завантаження, усе завантаження — у межах `gateway.content_fetch_timeout_ms`; `file://` — лише строго всередині
+`JANE_LLM_BLOB_ROOTS` (шлях спершу розв'язується з `..` і symlink, читається саме розв'язаний файл, лише звичайний
+файл); `s3://` без `download_url` — 422 (облікових даних сховища сервіс не має). Після читання перевіряються
+`size_bytes` blob і `sha256`. Відмови: політика, невалідне посилання чи невідповідність `sha256` — 422
+`validation_failed`; понад ліміт — 422 `limit_exceeded` (`details.path`); файла немає або `download_url` дав 404 —
+404 `not_found`; мережа, тайм-аут, 5xx — 502 `upstream_unavailable` (повторюваний), редирект чи інший 4xx — 502
+неповторюваний. `detail` не містить шляхів і вмісту; відхилений вміст до провайдера не потрапляє. Тести:
+`tests/test_content_policy.py` (і `libs/jane-kit/tests/test_content.py`).
 
 - **`anthropic`** — Anthropic Messages API (`POST {api_base}/v1/messages` через httpx; офіційний SDK 1.x тягне `httpx2`, що в спільному uv workspace перемикає `TestClient` усіх сервісів — тому не використано): `params.api_base` (необов'язково),
   `secret_refs.api_key`; структурований вихід — `output_config.format` (JSON Schema) для моделей з
@@ -167,7 +183,7 @@ just down -v --project jane-wp10
 | `gateway.chars_per_token_estimate` | 2.0 | оцінка вхідних токенів (символи / значення) для резерву бюджету |
 | `gateway.reservation_ttl_seconds` | 900 | резерв старший за це (екземпляр упав під час виклику) списується за оцінкою |
 | `gateway.max_data_part_bytes` | 2000000 | найбільша частина даних (вміст матеріалу, `entities_ref`, `data_ref`) |
-| `gateway.content_fetch_timeout_ms` | 30000 | тайм-аут завантаження blob за `download_url` (матеріали, архіви) |
+| `gateway.content_fetch_timeout_ms` | 30000 | тайм-аут усього завантаження blob за `download_url` (матеріали, архіви), включно з з'єднанням |
 | `gateway.max_package_bytes` | 20000000 | архів пакета: стиснений розмір, відповідь registry і сума розпакованих файлів |
 | `gateway.max_package_files` | 1000 | файлів в архіві пакета |
 | пул PostgreSQL (`JANE_LLM_DB_POOL_MIN_SIZE` / `JANE_LLM_DB_POOL_MAX_SIZE`) | 1 / 10 | з'єднань на екземпляр (налаштування процесу, не `limits`) |

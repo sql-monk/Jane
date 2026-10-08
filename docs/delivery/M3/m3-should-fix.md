@@ -1,7 +1,7 @@
 # M3 should-fix — наскрізний інкремент потоку B
 
 Дата: 2026-10-09. Гілка: `wp/m3-should-fix`. База: `3c98542`.
-Статус: **review**, до незалежного вердикту та повного CI не прийнято.
+Статус: **accepted**, незалежне review 2 на кодовому `aa2b974` за уточненими мінімальними gates користувача.
 Доручення: `docs/delivery/HANDOFF-2026-10-09-stream-b.md`, §3.4 з `origin/codex/jane-integration`.
 `main`, checkout інтеграції потоку A, `wp01g`, `wp01h`, `libs/jane-kit/**`, `contracts/**`
 та `docs/delivery/status.md` не змінювались цим інкрементом.
@@ -245,6 +245,32 @@ Logs: `.jane/m3fix-review1-lint.txt`, `.jane/m3fix-review1-lint-types.txt`.
 Повний review 1 отримано: два findings (TOCTOU і неоднозначний RAW). Координатор доручив після
 адресного виправлення обох запушити гілку й запустити новий full workflow dispatch на фінальному SHA.
 CI `37850604947` на старому `3b45a7b` не є фінальним доказом для виправленого інкременту.
+
+## Приймання за уточненим дорученням користувача
+
+Користувач 2026-10-09 прямо скоротив рев'ю й тести до необхідного мінімуму. Для потоку B залишено
+незалежне підтвердження обох виправлень та lint/types/unit/contract; фінальний повний gate зведеної ревізії —
+відповідальність потоку A. Розширену частину branch CI зупинено після завершення необхідних job.
+
+[CI 37853233033](https://github.com/sql-monk/Jane/actions/runs/37853233033), точний кодовий SHA
+`aa2b97433076c5118f0dd8ae632003dd8799a639`, фактичний вивід метаданих перед зупинкою:
+
+```text
+lint (types + secret scan): completed success
+unit:                       completed success
+contract:                   completed success
+web:                        completed success
+isolation:                  completed success
+```
+
+Це результат необхідних job; **повний запуск не оголошується успішним**. Stack/adapters/e2e/limits на цьому
+SHA не є завершеним приймальним доказом потоку B. Root надіслав `gh run cancel 37853233033` за рішенням користувача.
+
+Незалежне review 2 — **accepted**. Рецензент сам отримав: TOCTOU target/parent для обох сервісів — 4 підміни
+повертають `None`; Windows `19 passed, 2 deselected`; Linux — 10 filesystem-перевірок, без skip, включно з
+підмінами після open. RAW-репро: collect/sample id `None`, ambiguity `True`, порушення storage-контракту `[]`.
+PostgreSQL-набір — `10 passed in 72.97s`, без skip (same/distinct id, сторінки, новий API instance, upgrade 3/4 → 5).
+Його власні контейнери прибрані. Цей підсумок додається лише комітом документації після перевіреного коду.
 
 ## Виправлення після рев'ю 1 — finding 2: неоднозначні RAW (пункт 7)
 

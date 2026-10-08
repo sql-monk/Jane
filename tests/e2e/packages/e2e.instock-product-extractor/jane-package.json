@@ -33,6 +33,30 @@
   "access": {
     "network": "none"
   },
+  "tests": [
+    {
+      "name": "in-stock-card",
+      "input": {
+        "file": "tests/in-stock-card/page.html",
+        "media_type": "text/html",
+        "url": "http://testsite:8080/product/phone-alpha"
+      },
+      "expected_status": "success",
+      "expected": "tests/in-stock-card/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "category-page-empty",
+      "input": {
+        "file": "tests/category-page/page.html",
+        "media_type": "text/html",
+        "url": "http://testsite:8080/catalog/phones/"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
   "provenance": {
     "created_by": "human",
     "authors": ["WP-13"],

@@ -1,7 +1,8 @@
 """HTTP fetching with per-host limits, retries, manual redirects, size limits and conditional requests.
 
 Every hop of a redirect chain goes through ``check_hop`` (scope, exclusions, robots.txt), so a redirect
-cannot lead the crawler out of bounds. All numbers come from :class:`~.settings.ServiceLimits`. Per-host
+cannot lead the crawler out of bounds; every connection (first request and each hop) is checked by the
+outbound address policy after DNS resolution (:mod:`.egress`). All numbers come from :class:`~.settings.ServiceLimits`. Per-host
 limits are shared by the whole process (:mod:`.host_limits`); a fetcher uses them through its run's session.
 """
 
@@ -20,6 +21,7 @@ import httpx
 from jane_kit.errors import FieldError, ValidationFailed
 
 from .connections import ConnectionPolicy, header_name_safe, header_value_safe, is_safe_rule_header
+from .egress import EgressDenied, EgressPolicy, GuardedBackend, GuardedTransport, Resolver, system_resolve
 from .host_limits import HostSession
 from .settings import ServiceLimits, Timeouts
 
@@ -83,12 +85,16 @@ class HttpResult:
         return None
 
 
-def build_client(limits: ServiceLimits) -> httpx.AsyncClient:
+def build_client(
+    limits: ServiceLimits, egress: EgressPolicy | None = None, *, resolver: Resolver = system_resolve
+) -> httpx.AsyncClient:
+    """The fetch client; every connection is checked by ``egress`` (default: link-local denied)."""
     timeout = httpx.Timeout(
         limits.timeouts.request_timeout_ms / 1000, connect=limits.timeouts.connect_timeout_ms / 1000
     )
     pool = httpx.Limits(max_connections=limits.concurrency.max_parallel_fetches * 2)
-    return httpx.AsyncClient(timeout=timeout, limits=pool, follow_redirects=False, trust_env=False)
+    transport = GuardedTransport(pool, GuardedBackend(egress or EgressPolicy(), resolver=resolver))
+    return httpx.AsyncClient(timeout=timeout, transport=transport, follow_redirects=False, trust_env=False)
 
 
 HopCheck = Callable[[str], Awaitable[None]]
@@ -257,6 +263,8 @@ class Fetcher:
         for attempt in range(1, max_attempts + 1):
             try:
                 status, hdrs, body, truncated = await self._one_request(url, headers, max_bytes, timeouts)
+            except EgressDenied as exc:  # a policy decision: never retried
+                raise FetchError("access_denied_by_policy", str(exc), attempts=attempt) from None
             except httpx.TimeoutException:
                 last_error = "HTTP Timeout"
                 last_status = None

@@ -65,7 +65,12 @@ class Engine:
             registry_token_env=settings.registry_token_env,
             timeout_s=self.limits.timeouts.request_timeout_ms / 1000,
         )
-        self.client = build_client(self.limits)
+        egress = settings.egress_policy()
+        log.info(
+            "outbound address policy",
+            extra={"deny_link_local": egress.deny_link_local, "deny_private": egress.deny_private},
+        )
+        self.client = build_client(self.limits, egress)
         # one per-host schedule for every collection and one-shot fetch of this process (WP-02c)
         self.host_limiter = HostLimiter(self.limits)
         self.deps = RunDeps(

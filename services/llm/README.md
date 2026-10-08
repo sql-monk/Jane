@@ -119,7 +119,7 @@ just down -v --project jane-wp10
 | `JANE_LLM_SECRET_FILES_DIR` | `/run/secrets` | `file:`-посилання — лише на файли в цьому каталозі |
 | `JANE_LLM_PROVIDER_API_BASE_ALLOWLIST` | `["https://api.anthropic.com"]` | дозволені origin для `params.api_base` підключень (JSON-список) |
 | `JANE_LLM_BLOB_ROOTS` | `[]` (вимкнено) | каталоги, з яких можна читати `file://` ContentRef (вміст матеріалу, `entities_ref`, `data_ref`, `package_archive`), JSON-список; порожньо — `file://` відхиляється (422) |
-| `JANE_LLM_DOWNLOAD_HOST_ALLOWLIST` | `[]` (вимкнено) | `hostname` (будь-який порт) або `hostname:port`, куди може вести `download_url` ContentRef, JSON-список; порожньо — завантаження відхиляються (422) |
+| `JANE_LLM_DOWNLOAD_HOST_ALLOWLIST` | `[]` (вимкнено) | `hostname` (будь-який порт) або `hostname:port`, куди може вести `download_url` ContentRef, JSON-список (IDN — у punycode `xn--…`); порожньо — завантаження відхиляються (422) |
 | `JANE_LLM_PACKAGES_DIR` | вбудований `services/llm/packages` | локальні LLM-пакети (`<dir>/**/jane-package.json`) |
 | `JANE_LLM_REGISTRY_URL` / `JANE_LLM_REGISTRY_TOKEN` | — | репозиторій обробників для пакетів за `handler` (архів `…/archive`) |
 | `JANE_LLM_LOG_LEVEL` / `JANE_LLM_LOG_FORMAT` | `INFO` / `json` | журнали |

@@ -4,7 +4,9 @@ A ``ContentRef`` arrives in a request, so every reference is untrusted input. :c
 
 * ``inline`` - ``data`` as ``utf-8`` text (default) or strict ``base64`` (RFC 4648);
 * ``blob`` with ``download_url`` - only ``http``/``https`` to a host on the allowlist (``hostname`` = any port,
-  ``hostname:port`` = that port; empty by default, so downloads are disabled). Redirects are not followed, proxies
+  ``hostname:port`` = that port; empty by default, so downloads are disabled). Hosts are compared in their ASCII
+  (wire) form - an internationalized name is allowed by its punycode ``xn--...`` entry, the host actually
+  connected to; a URL with non-ASCII characters is refused. Redirects are not followed, proxies
   and ``.netrc`` of the environment are ignored (``trust_env=False``), only an unencoded body is accepted
   (``Accept-Encoding: identity``), the size limit is enforced while streaming and the whole download is bounded by
   the timeout;
@@ -216,7 +218,8 @@ class ContentReader:
             raise bad from None
         if target.scheme not in _DEFAULT_PORTS or not target.host or target.userinfo or target.fragment:
             raise bad
-        host = _host_port(target.host)
+        # raw_host is the ASCII (punycode) host httpx connects to; ``host`` would be the decoded IDN form.
+        host = _host_port(target.raw_host.decode("ascii", errors="replace"))
         if host is None or host[1] is not None:
             raise ValidationFailed("download_url host must be a plain hostname")
         port = target.port or _DEFAULT_PORTS[target.scheme]

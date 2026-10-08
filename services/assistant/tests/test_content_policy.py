@@ -14,7 +14,7 @@ import json
 import os
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +24,7 @@ from assistant_fakes import World, world
 from assistant_fakes.site import material
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import RedirectResponse, Response
+from starlette.responses import RedirectResponse, Response, StreamingResponse
 from starlette.routing import Route
 
 from jane_assistant.app import build_search
@@ -98,7 +98,13 @@ def servers() -> Iterator[tuple[str, str, list[str]]]:
 
     async def big(request: Request) -> Response:
         hits.append(f"{request.url.port}{request.url.path}")
-        return Response(b"x" * 100_000, media_type="text/html")
+
+        async def body() -> AsyncIterator[bytes]:
+            # 100 000 bytes, chunked transfer encoding: no Content-Length to refuse early
+            for _ in range(100):
+                yield b"x" * 1_000
+
+        return StreamingResponse(body(), media_type="text/html")
 
     async def redirect(request: Request) -> Response:
         hits.append(f"{request.url.port}{request.url.path}")
@@ -183,7 +189,8 @@ def test_download_size_comes_from_content_limits(
     monkeypatch.setenv("JANE_ASSISTANT_LIMITS__CONTENT__MAX_MATERIAL_BYTES", "50000")
     allow = settings(contracts, download_host_allowlist=[first.removeprefix("http://")])
     with world(contracts, allow) as w:
-        # size_bytes under the limit (wrong on purpose): the stream itself is cut at the limit.
+        # Chunked body without Content-Length, size_bytes under the limit (wrong on purpose): only the
+        # count while streaming can refuse it.
         understated = blob("s3://t/k", download_url=f"{first}/big", size_bytes=40_000)
         error = refused(w, understated, "big", "limit_exceeded")
         assert error["details"] == {"path": "content.max_material_bytes", "limit": 50000}

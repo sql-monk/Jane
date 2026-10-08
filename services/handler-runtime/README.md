@@ -180,7 +180,7 @@ FS лише для читання, користувач 65534, відсутні�
 | `REGISTRY_URL` / `REGISTRY_TOKEN` | — | репозиторій пакетів і bearer-токен (лише з середовища) |
 | `PACKAGE_CACHE_DIR` | тимчасова тека | кеш перевірених пакетів за дайджестом |
 | `BLOB_ROOTS` | `[]` | теки, з яких дозволено читати `file://` (JSON-масив); порожньо — `file://` заборонено |
-| `DOWNLOAD_HOST_ALLOWLIST` | `[]` | `hostname` (будь-який порт) або `hostname:port`, куди може вести `download_url` (JSON-масив); порожньо — завантаження заборонено |
+| `DOWNLOAD_HOST_ALLOWLIST` | `[]` | `hostname` (будь-який порт) або `hostname:port`, куди може вести `download_url` (JSON-масив; IDN — у punycode `xn--…`); порожньо — завантаження заборонено |
 | `STATE_DSN` | — (стан у пам'яті) | PostgreSQL для спільного стану кількох екземплярів (секрет — лише з середовища) |
 | `STATE_SCHEMA` | `jane_handler_runtime` | схема таблиць стану |
 | `CONTRACTS_DIR` | пошук угору від пакета (`JANE_CONTRACTS_DIR`) | `contracts/` зі схемами; в образі — `/app/contracts` |

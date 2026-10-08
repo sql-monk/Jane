@@ -9,7 +9,7 @@ import hashlib
 import os
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +19,7 @@ import uvicorn
 from fastapi.testclient import TestClient
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import RedirectResponse, Response
+from starlette.responses import RedirectResponse, Response, StreamingResponse
 from starlette.routing import Route
 
 from jane_handler_runtime.app import build_app
@@ -96,7 +96,13 @@ def servers(h: Any) -> Iterator[tuple[str, str, list[str]]]:
 
     async def big(request: Request) -> Response:
         hits.append(f"{request.url.port}{request.url.path}")
-        return Response(b"x" * 200_000, media_type="text/html")
+
+        async def body() -> AsyncIterator[bytes]:
+            # 200 000 bytes, chunked transfer encoding: no Content-Length to refuse early
+            for _ in range(200):
+                yield b"x" * 1_000
+
+        return StreamingResponse(body(), media_type="text/html")
 
     async def redirect(request: Request) -> Response:
         hits.append(f"{request.url.port}{request.url.path}")
@@ -196,7 +202,8 @@ def test_download_size_comes_from_package_limits(
     first, _, _ = servers
     monkeypatch.setenv("JANE_HANDLER_RUNTIME_LIMITS__PACKAGES__MAX_INPUT_BYTES", "100000")
     with app(subprocess_settings, download_host_allowlist=[first.removeprefix("http://")]) as c:
-        # size_bytes under the limit (wrong on purpose): the stream itself is cut at the limit.
+        # Chunked body without Content-Length, size_bytes under the limit (wrong on purpose): only the
+        # count while streaming can refuse it.
         understated = blob("s3://t/k", b"x" * 50_000, download_url=f"{first}/big")
         problem = refused(c, h, understated, "big", 422, "limit_exceeded")
         assert problem["details"] == {"path": "packages.max_input_bytes", "limit": 100000}

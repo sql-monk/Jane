@@ -173,7 +173,7 @@ just down -v --project jane-wp11
 | `SEARCH_STATIC_FILE` | — | JSON `[{"title","url"?,"telegram_username"?,"description"?,"aliases"?}]` |
 | `SEARCH_URL_TEMPLATE`, `SEARCH_ITEMS_PATH`, `SEARCH_TITLE_FIELD`, `SEARCH_URL_FIELD`, `SEARCH_DESCRIPTION_FIELD` | —, `results`, `title`, `url`, `description` | HTTP-пошук з JSON-відповіддю (тайм-аути — `limits.search`) |
 | `BLOB_ROOTS` | `[]` (вимкнено) | каталоги, з яких можна читати `file://` вміст матеріалів (JSON-список); порожньо — `file://` відхиляється (422) |
-| `DOWNLOAD_HOST_ALLOWLIST` | `[]` (вимкнено) | `hostname` (будь-який порт) або `hostname:port`, куди може вести `download_url` вмісту матеріалу (JSON-список); порожньо — завантаження відхиляються (422) |
+| `DOWNLOAD_HOST_ALLOWLIST` | `[]` (вимкнено) | `hostname` (будь-який порт) або `hostname:port`, куди може вести `download_url` вмісту матеріалу (JSON-список; IDN — у punycode `xn--…`); порожньо — завантаження відхиляються (422) |
 | `LLM_MODEL_CHEAP` / `LLM_MODEL_STRONG` | `cheap` / `strong` | псевдоніми моделей шлюзу |
 | `CONTRACTS_DIR` | пошук угору / `/app/contracts` | де `contracts/schemas` для локальної валідації |
 | `GENERATED_CODE_ALLOWED_MODULES` | `re, html, json, math, datetime, decimal, string, unicodedata, itertools, functools, collections, typing, dataclasses` | політика імпортів згенерованого коду (JSON-список) |

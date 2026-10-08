@@ -17,7 +17,7 @@ import pytest
 import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import RedirectResponse, Response
+from starlette.responses import RedirectResponse, Response, StreamingResponse
 from starlette.routing import Route
 
 from jane_kit.content import ContentReader, parse_host_allowlist
@@ -178,6 +178,19 @@ async def test_file_missing_size_and_digest(tree: dict[str, Path]) -> None:
 
 
 # ------------------------------------------------------------------------------------------------ download_url
+class Chunks(httpx.AsyncByteStream):
+    """A response body streamed in chunks: no ``Content-Length`` unless the test sets one."""
+
+    def __init__(self, chunks: int, size: int = 1_000) -> None:
+        self.chunks, self.size = chunks, size
+        self.sent = 0
+
+    async def __aiter__(self) -> Any:
+        for _ in range(self.chunks):
+            self.sent += self.size
+            yield b"x" * self.size
+
+
 def mock(seen: list[httpx.Request], respond: Any) -> httpx.MockTransport:
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
@@ -262,6 +275,39 @@ async def test_download_size_limit_and_statuses() -> None:
     assert code(client) == (502, "upstream_unavailable") and client.retryable is False
 
 
+@pytest.mark.parametrize(
+    "content_length", [None, "10"], ids=["no-content-length", "understated-content-length"]
+)
+async def test_streamed_body_is_cut_at_the_limit(content_length: str | None) -> None:
+    """Without (or with a false) ``Content-Length`` only the count while streaming stops the download."""
+    body = Chunks(chunks=100)  # 100 000 bytes, far above the limit
+    headers = {"Content-Length": content_length} if content_length else {}
+    t = mock([], lambda _: httpx.Response(200, headers=headers, stream=body))
+    r = reader(download_host_allowlist=["gate"], transport=t)
+    # size_bytes understated on purpose, so neither the reference nor a header refuses it before the stream.
+    err = await refused(r, remote("http://gate/stream", b"x" * 10), max_bytes=5_000)
+    assert code(err) == (422, "limit_exceeded")
+    assert err.details == {"path": "test.max_bytes", "limit": 5_000}
+    assert body.sent <= 6_000  # stopped right after the limit, not after reading the whole body
+
+
+async def test_internationalized_hosts_are_compared_in_punycode() -> None:
+    seen: list[httpx.Request] = []
+    t = mock(seen, lambda _: httpx.Response(200, content=PAYLOAD))
+    r = reader(download_host_allowlist=["xn--bcher-kva.example"], transport=t)
+    assert await r.read(remote("http://xn--bcher-kva.example/k"), max_bytes=1_000) == PAYLOAD
+    assert seen[0].url.raw_host == b"xn--bcher-kva.example"
+    for url in (
+        "http://bücher.example/k",
+        "http://xn--bcher-kva.example.evil/k",
+        "http://bcher-kva.example/k",
+    ):
+        assert code(await refused(r, remote(url))) == (422, "validation_failed"), url
+    other = reader(download_host_allowlist=["bücher.example".encode("idna").decode()], transport=t)
+    assert other.download_hosts == {("xn--bcher-kva.example", None)}
+    assert len(seen) == 1
+
+
 async def test_download_timeout_is_bounded() -> None:
     async def slow(request: httpx.Request) -> httpx.Response:
         await asyncio.sleep(5)
@@ -287,7 +333,16 @@ def servers() -> Iterator[tuple[int, int, list[str]]]:
         hits.append(f"{request.url.port}{request.url.path}")
         return RedirectResponse(f"http://localhost:{ports[1]}/page", status_code=302)
 
-    routes = [Route("/page", page), Route("/redirect", redirect)]
+    async def stream(request: Request) -> Response:
+        hits.append(f"{request.url.port}{request.url.path}")
+
+        async def body() -> Any:
+            for _ in range(200):  # 200 000 bytes, chunked transfer encoding: no Content-Length
+                yield b"x" * 1_000
+
+        return StreamingResponse(body(), media_type="text/html")
+
+    routes = [Route("/page", page), Route("/redirect", redirect), Route("/stream", stream)]
     started: list[uvicorn.Server] = []
     ports: list[int] = []
     for _ in range(2):
@@ -316,6 +371,9 @@ async def test_real_http_ignores_proxy_env_and_redirects(
     assert code(err) == (502, "upstream_unavailable")
     assert hits == [f"{first}/page", f"{first}/redirect"]  # the other host was never contacted
     assert second != first
+    # A chunked body without Content-Length is cut while streaming (size_bytes understated on purpose).
+    big = await refused(r, remote(f"http://127.0.0.1:{first}/stream", b"x" * 10), max_bytes=50_000)
+    assert code(big) == (422, "limit_exceeded") and big.details == {"path": "test.max_bytes", "limit": 50_000}
 
 
 def test_allowlist_entries_are_validated() -> None:

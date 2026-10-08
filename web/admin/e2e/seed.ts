@@ -93,12 +93,30 @@ export async function publishExtractorPackage(
   registryUrl: string,
   packageDir: string,
 ): Promise<{ package_id: string; version: string; digest: string; manifest: Record<string, unknown> }> {
+  return publishPackage(request, registryUrl, packageDir, "e2e-extractor");
+}
+
+/** Fixture packages of WP-13 (tests/e2e/packages), read only. */
+export const E2E_PACKAGES_DIR = path.join(REPO_ROOT, "tests", "e2e", "packages");
+
+/**
+ * Publish a package directory (manifest + files) into the real registry under a unique `<prefix>-…` id;
+ * `adjust` may change the manifest copy (e.g. the model alias of an LLM package). The kind comes from the manifest.
+ */
+export async function publishPackage(
+  request: APIRequestContext,
+  registryUrl: string,
+  packageDir: string,
+  prefix: string,
+  adjust: (manifest: Record<string, unknown>) => void = () => {},
+): Promise<{ package_id: string; version: string; digest: string; manifest: Record<string, unknown> }> {
   const manifest = JSON.parse(readFileSync(path.join(packageDir, "jane-package.json"), "utf8")) as Record<
     string,
     unknown
   >;
-  const packageId = uniqueId("e2e-extractor");
+  const packageId = uniqueId(prefix);
   manifest["package_id"] = packageId;
+  adjust(manifest);
   const files: Record<string, { encoding: "base64"; data: string }> = {};
   function collect(dir: string) {
     for (const name of readdirSync(dir).sort()) {
@@ -116,7 +134,7 @@ export async function publishExtractorPackage(
   const headers = { Authorization: `Bearer ${API_KEY}`, "Idempotency-Key": uniqueId("registry") };
   const created = await request.post(`${registryUrl}/v1/packages`, {
     headers,
-    data: { package_id: packageId, kind: "extractor", title: manifest["title"] },
+    data: { package_id: packageId, kind: manifest["kind"], title: manifest["title"] },
   });
   if (created.status() !== 201)
     throw new Error(`registry create: HTTP ${created.status()} ${await created.text()}`);
@@ -206,4 +224,155 @@ export async function storageInvoke(
     );
   }
   return body;
+}
+
+/** Approve a published version in the real registry (status change with a reason). */
+export async function approvePackage(
+  request: APIRequestContext,
+  registryUrl: string,
+  ref: { package_id: string; version: string },
+  reason: string,
+): Promise<void> {
+  await jsonRequest(
+    request,
+    "post",
+    `${registryUrl}/v1/packages/${ref.package_id}/versions/${ref.version}/status`,
+    {
+      status: "approved",
+      reason,
+    },
+  );
+}
+
+/**
+ * Register the dev storage connections (infra/config/storage-connections.json: `raw-files`, `results-pg`) in the
+ * real orchestrator, so that tasks may use them. The file is only read; PUT is idempotent.
+ */
+export async function syncStorageConnections(
+  request: APIRequestContext,
+  orchestratorUrl: string,
+): Promise<void> {
+  const file = path.join(REPO_ROOT, "infra", "config", "storage-connections.json");
+  const { connections } = JSON.parse(readFileSync(file, "utf8")) as {
+    connections: Array<Record<string, unknown> & { connection_id: string }>;
+  };
+  for (const connection of connections)
+    await jsonRequest(
+      request,
+      "put",
+      `${orchestratorUrl}/v1/connections/${connection.connection_id}`,
+      connection,
+      [200, 201],
+    );
+}
+
+/** Polls a run of the real orchestrator until it is terminal and returns it. */
+export async function waitRun(
+  request: APIRequestContext,
+  orchestratorUrl: string,
+  runId: string,
+  timeout = 180_000,
+): Promise<Record<string, unknown>> {
+  let run: Record<string, unknown> = {};
+  await expect
+    .poll(
+      async () => {
+        run = await jsonRequest(request, "get", `${orchestratorUrl}/v1/runs/${runId}`);
+        return run["status"];
+      },
+      { timeout, message: `run ${runId} did not finish` },
+    )
+    .toMatch(/^(succeeded|failed|cancelled)$/);
+  return run;
+}
+
+export interface RunItem {
+  stage_id: string;
+  status: string;
+  material_id?: string;
+  observation_id?: string;
+  result_status?: string;
+  invocation_id?: string;
+}
+
+/** All items of a run (orchestrator listRunItems, following the cursor). */
+export async function runItems(
+  request: APIRequestContext,
+  orchestratorUrl: string,
+  runId: string,
+): Promise<RunItem[]> {
+  const items: RunItem[] = [];
+  let cursor: string | null = null;
+  do {
+    const query: string = cursor ? `?limit=200&cursor=${encodeURIComponent(cursor)}` : "?limit=200";
+    const page = await jsonRequest(request, "get", `${orchestratorUrl}/v1/runs/${runId}/items${query}`);
+    items.push(...(page["items"] as RunItem[]));
+    cursor = (page["next_cursor"] as string | null) ?? null;
+  } while (cursor);
+  return items;
+}
+
+/**
+ * Model aliases of the source assistant on the prepared test stack (scripts/configure-real-stack.mjs sets
+ * JANE_ASSISTANT_LLM_MODEL_CHEAP/STRONG to them); the specs bind them to a fake provider.
+ */
+export const ASSISTANT_MODEL_ALIASES = ["e2e-admin-cheap", "e2e-admin-strong"] as const;
+
+/**
+ * A deterministic LLM in the real gateway through its public API (WP-10 provider `fake`, a substitute of the
+ * external model): an `llm_provider` connection with scripted `responses` (first match by the data channel; no
+ * match -> the minimal value valid for the output schema), a provider with non-zero prices (so that costs are
+ * visible) and model aliases pointing at it. Every call is an idempotent PUT.
+ */
+export async function seedFakeLlm(
+  request: APIRequestContext,
+  llmUrl: string,
+  id: string,
+  responses: unknown[],
+  aliases: readonly string[],
+): Promise<void> {
+  await jsonRequest(
+    request,
+    "put",
+    `${llmUrl}/v1/connections/${id}`,
+    {
+      connection_id: id,
+      kind: "llm_provider",
+      title: `e2e admin: scripted fake LLM ${id}`,
+      params: { provider: "fake", responses },
+    },
+    [200, 201],
+  );
+  await jsonRequest(
+    request,
+    "put",
+    `${llmUrl}/v1/providers/${id}`,
+    {
+      provider_id: id,
+      kind: "fake",
+      connection_id: id,
+      enabled: true,
+      models: [
+        {
+          model_id: "fake-deterministic-1",
+          max_context_tokens: 128000,
+          supports_structured_output: true,
+          pricing: { input_per_mtok: 50, output_per_mtok: 200, currency: "USD" },
+        },
+      ],
+    },
+    [200, 201],
+  );
+  for (const alias of aliases)
+    await jsonRequest(
+      request,
+      "put",
+      `${llmUrl}/v1/model-aliases/${alias}`,
+      {
+        alias,
+        provider_id: id,
+        model_id: "fake-deterministic-1",
+      },
+      [200, 201],
+    );
 }

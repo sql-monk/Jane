@@ -47,8 +47,8 @@ test.describe("problem groups, improvement, unknown materials, assistant session
       policy: { approval: "manual", allow_fork: true },
     });
     expect(patch.headers()["content-type"]).toContain("application/merge-patch+json");
+    // The admin only links the job; the assistant itself moves the group to in_progress and to its final state.
     expect(JSON.parse(patch.postData() ?? "{}")).toEqual({
-      status: "in_progress",
       assistant_job_id: "job_01J9ZQ3F8W2N4K7T5B6C1D0E9F",
     });
     await expect(admin.getByLabel("Вдосконалення")).toBeVisible();

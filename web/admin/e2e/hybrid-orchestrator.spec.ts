@@ -263,14 +263,52 @@ test.describe("real orchestrator: sources, tasks, schedules, limits, connections
     await admin.getByLabel("Тип").last().fill("filesystem");
     await admin.getByRole("button", { name: "Додати посилання" }).click();
     await admin.getByLabel("Ім'я секрету 1").fill("token");
+    // an open value instead of a reference is refused before anything is sent
+    await admin.getByLabel("Посилання на секрет 1").fill("plain-token-value");
+    await expect(admin.getByLabel("Помилки підключення")).toContainText(
+      "очікується посилання env:, file: або vault:",
+    );
+    await expect(admin.getByRole("button", { name: "Зберегти й синхронізувати" })).toBeDisabled();
     await admin.getByLabel("Посилання на секрет 1").fill("env:JANE_SECRET_E2E_TOKEN");
-    await admin.getByRole("button", { name: "Зберегти й синхронізувати" }).click();
+    const savedConnection = await captureRequest(
+      admin,
+      "PUT",
+      `/api/orchestrator/v1/connections/${connectionId}`,
+      () => admin.getByRole("button", { name: "Зберегти й синхронізувати" }).click(),
+    );
+    expect(savedConnection.body["secret_refs"]).toEqual({ token: "env:JANE_SECRET_E2E_TOKEN" });
     await expect(admin.getByText("синхронізація з виконавцями — асинхронна")).toBeVisible();
     await admin.getByRole("button", { name: "Закрити" }).click();
     await admin.reload();
     const table = admin.getByRole("table", { name: "Підключення" });
     await expect(table).toContainText(connectionId);
     await expect(table).toContainText("env:JANE_SECRET_E2E_TOKEN");
+    // the asynchronous sync reaches the storage executor (the list is polled by reloading)
+    const connectionRow = table.getByRole("row", { name: new RegExp(connectionId) });
+    await expect(async () => {
+      await admin.reload();
+      await expect(connectionRow).toContainText(/storage:\s*synced/, { timeout: 1_000 });
+    }).toPass({ timeout: 30_000 });
+    // the executor resolves the reference in ITS environment: not set there -> unresolved; no value is shown
+    await connectionRow.getByRole("button", { name: connectionId }).click();
+    const connectionExecutors = admin.getByRole("table", { name: "Виконавці підключення" });
+    const storageExecutor = connectionExecutors.getByRole("row", { name: /^storage\b/ });
+    await expect(storageExecutor).toContainText("synced");
+    const [tested] = await Promise.all([
+      admin.waitForResponse(
+        (r) =>
+          r.request().method() === "POST" &&
+          r.url().endsWith(`/api/storage/v1/connections/${connectionId}/test`),
+      ),
+      storageExecutor.getByRole("button", { name: "Перевірити" }).click(),
+    ]);
+    expect(tested.status()).toBe(200);
+    const testResult = admin.getByLabel("Результат перевірки підключення");
+    await expect(testResult).toContainText("Перевірка підключення не вдалася");
+    await expect(
+      testResult.getByRole("table", { name: "Розв'язання секретів" }).getByRole("row", { name: /token/ }),
+    ).toContainText("failed");
+    await admin.getByRole("button", { name: "Закрити" }).click();
 
     await admin.goto("/audit");
     await expect(admin.getByRole("table", { name: "Події аудиту" })).toContainText(connectionId);

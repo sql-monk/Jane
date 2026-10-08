@@ -36,7 +36,9 @@ corepack pnpm dev            # http://127.0.0.1:4600, Vite проксіює /api
 | `pnpm e2e -- --grep @hybrid`  | сценарії проти окремих реальних сервісів (потрібні `JANE_ADMIN_TARGET_*`)          |
 | `pnpm build` / `pnpm preview` | production-збірка в `dist/` і її перегляд з тим самим проксі                       |
 
-`just web` і CI job `web` запускають `install --frozen-lockfile`, `lint`, `typecheck`, `test`.
+`just web` і CI job `web` запускають `install --frozen-lockfile`, `lint`, `typecheck`, `test`, `build`.
+Окремий CI job `web-mock-e2e` встановлює Chromium і виконує повний `pnpm e2e` на контрактних моках без Docker;
+pnpm store, Chromium і uv кешуються, HTML-звіт та артефакти помилок зберігаються в Actions.
 
 ## Режими e2e
 
@@ -56,12 +58,20 @@ corepack pnpm --dir web/admin e2e:real http://127.0.0.1:<порт proxy з just 
 ```
 
 `e2e:real:prepare` читає створений `just up` файл `.jane/stack-<id>.json` і тимчасовим Compose
-override задає адреси реальних виконавців для orchestrator, адресу registry для handler-runtime та
-джерело runtime-профілю для registry. Файли `infra/` і секрети стеку він не змінює та не друкує.
+override (лише для цього тестового проєкту, як `tests/e2e/compose.e2e.yaml`) задає: адреси реальних
+виконавців orchestrator (виконавець `llm` — для пакетів `kind: llm`), адресу registry для handler-runtime,
+web-collector і LLM-шлюзу, джерело runtime-профілю для registry, сусідів асистента (registry, orchestrator,
+web-collector) і його псевдоніми моделей `e2e-admin-cheap` / `e2e-admin-strong`, а також том `storage-data`
+у handler-runtime лише для читання з `JANE_HANDLER_RUNTIME_BLOB_ROOTS` — без нього повторна обробка RAW
+адаптера files падає з `validation_failed` (ADR-0004: `file://` лише на одному вузлі зі спільним томом).
+Файли `infra/` і секрети стеку він не змінює та не друкує.
 Для Storage типовий dev-стек використовує `raw-files` + `jane.storage-files` і `results-pg` +
 `jane.storage-postgresql`; нестандартні підключення/пакети задають
 `JANE_ADMIN_E2E_STORAGE_CONNECTION`, `JANE_ADMIN_E2E_STORAGE_PACKAGE`,
 `JANE_ADMIN_E2E_RESULTS_CONNECTION`, `JANE_ADMIN_E2E_RESULTS_PACKAGE`.
+`JANE_ADMIN_E2E_SCHEMA_RETRIES` (типово `1`) задає `gateway.max_schema_retries` LLM у тестовому override;
+задавайте однакове значення під час `e2e:real:prepare` і `e2e:real`. Сценарій невдалого LLM-елемента перевіряє
+точну кількість викликів (успішна сторінка + невдала сторінка та її schema retries) і показане UI число запитів.
 
 Гібридні сценарії для orchestrator і registry засівають унікальні джерела, завдання й пакети через реальні API.
 Registry (WP-05) є в `main`: для справжнього прогону тестів пакета запустіть handler-runtime з
@@ -71,12 +81,16 @@ Registry (WP-05) є в `main`: для справжнього прогону те
 його вмикає `JANE_ADMIN_E2E_REGISTRY_STANDIN_PORT`.
 
 Режим реального стеку пропускає 26 сценаріїв `@mock`, прив'язаних до статичних прикладів контрактів.
-Замість частини з них `@hybrid` перевіряє реальний orchestrator (джерела, завдання, розклад, запуск у тестовому
-режимі та скасування, ліміти, підключення, аудит), registry (публікація, погодження, форк, правила, diff),
-handler-runtime із реальним registry (тести пакета), storage (RAW і результати), LLM та assistant.
+Замість більшості з них `@hybrid` перевіряє реальний orchestrator (джерела, завдання, розклад, запуск у тестовому
+режимі та скасування, ліміти, підключення й їх синхронізація, аудит), registry (публікація, погодження, форк,
+правила, diff), handler-runtime із реальним registry (тести пакета), storage (RAW і результати), LLM та assistant;
+`hybrid-m2-cycle` — збір testsite, trace, повторну обробку збереженого RAW з етапу й одного матеріалу, активацію
+й відкат з аудитом; `hybrid-m2-problems` — групу проблем реального запуску, вдосконалення через асистента
+(`unresolved`, нова версія, пропозиція типів даних), невідомі матеріали зі станом передачі в LLM і витрати LLM.
+Зовнішню LLM замінює детермінований провайдер `fake` (WP-10): специфікації налаштовують його через API LLM
+(підключення зі скриптованими `responses`, провайдер, псевдоніми; `e2e/llm-scripts.ts`).
 Сценарій `problem-redaction.spec.ts` запускається в обох режимах і перевіряє помилку `problem+json` із секретом.
-Повне покриття запусків із реальним колектором, груп проблем, редактора коду й перенесення змін форку
-залишається інтеграційним прийманням WP-13.
+Що з `@mock` лишається лише на моках і чому — таблиця в `docs/delivery/WP-12.md` (розділ WP-12d).
 
 ## Конфігурація (`public/config.json`, замінюється при розгортанні без перезбірки)
 

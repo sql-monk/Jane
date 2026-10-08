@@ -43,9 +43,16 @@ const executors = [
     sync_connections: false,
   },
   { executor: "registry", role: "registry", base_url: "http://registry:8000" },
-  { executor: "llm", role: "llm", base_url: "http://llm:8110" },
+  // LLM stages (packages of kind `llm`, e.g. page triage of unknown materials) run in the LLM gateway.
+  { executor: "llm", role: "llm", base_url: "http://llm:8110", capabilities: { handler_kinds: ["llm"] } },
   { executor: "assistant", role: "assistant", base_url: "http://assistant:8000" },
 ];
+// Model aliases of the source assistant on the TEST stack only. The real-mode specs point them at a
+// deterministic fake provider through the LLM API (e2e/seed.ts), so aliases of a shared stack stay untouched.
+const ASSISTANT_ALIASES = { cheap: "e2e-admin-cheap", strong: "e2e-admin-strong" };
+const schemaRetries = Number(process.env.JANE_ADMIN_E2E_SCHEMA_RETRIES ?? "1");
+if (!Number.isInteger(schemaRetries) || schemaRetries < 0)
+  throw new Error("JANE_ADMIN_E2E_SCHEMA_RETRIES must be a non-negative integer");
 const override = {
   services: {
     registry: {
@@ -54,13 +61,35 @@ const override = {
       },
     },
     "handler-runtime": {
-      environment: { JANE_HANDLER_RUNTIME_REGISTRY_URL: "http://registry:8000" },
+      environment: {
+        JANE_HANDLER_RUNTIME_REGISTRY_URL: "http://registry:8000",
+        // Stored RAW of the files adapter is a file:// ContentRef (ADR-0004: one node, shared volume);
+        // reprocessing of stored RAW reads it read-only.
+        JANE_HANDLER_RUNTIME_BLOB_ROOTS: JSON.stringify(["/var/lib/jane/storage"]),
+      },
+      volumes: ["storage-data:/var/lib/jane/storage:ro"],
     },
     "web-collector": {
       environment: { JANE_WEB_COLLECTOR_REGISTRY_URL: "http://registry:8000" },
     },
     orchestrator: {
       environment: { JANE_ORCHESTRATOR_EXECUTORS: JSON.stringify(executors) },
+    },
+    llm: {
+      // LLM packages of orchestrated stages come from the real registry (no package_archive in invocations).
+      environment: {
+        JANE_LLM_REGISTRY_URL: "http://registry:8000",
+        JANE_LLM_LIMITS__GATEWAY__MAX_SCHEMA_RETRIES: String(schemaRetries),
+      },
+    },
+    assistant: {
+      environment: {
+        JANE_ASSISTANT_REGISTRY_URL: "http://registry:8000",
+        JANE_ASSISTANT_ORCHESTRATOR_URL: "http://orchestrator:8000",
+        JANE_ASSISTANT_COLLECTOR_WEB_URL: "http://web-collector:8101",
+        JANE_ASSISTANT_LLM_MODEL_CHEAP: ASSISTANT_ALIASES.cheap,
+        JANE_ASSISTANT_LLM_MODEL_STRONG: ASSISTANT_ALIASES.strong,
+      },
     },
   },
 };
@@ -89,6 +118,8 @@ try {
       "handler-runtime",
       "orchestrator",
       "web-collector",
+      "llm",
+      "assistant",
     ],
     { env: { ...process.env, ...stack.env }, stdio: "inherit" },
   );

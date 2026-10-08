@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { useApi } from "../app/context";
-import { newIdempotencyKey, unwrap } from "../api/client";
+import { newIdempotencyKey, unwrap, type ApiClients } from "../api/client";
 import { useCursorList } from "../api/hooks";
 import type { ImprovementRequest, Job, ProblemGroup, ProblemGroupStatus } from "../api/types";
 import { ConnectionPicker } from "../components/ConnectionPicker";
@@ -154,7 +154,9 @@ function ProblemGroupDetail({
     },
   });
 
-  const samples = (group.samples ?? []).filter((s) => s.stored_object_id);
+  // A sample is usable when its stored RAW is known (stored_object_id) or can be found in the chosen storage
+  // by material_id + observation_id (the orchestrator records only the material ids of a problem result).
+  const samples = (group.samples ?? []).filter((s) => s.stored_object_id || s.material_id);
   const bindingList = (bindings.data?.items ?? []).flatMap((t) =>
     (t.package_stages ?? []).map((s) => ({ task_id: t.task_id, stage_id: s.stage_id })),
   );
@@ -162,12 +164,14 @@ function ProblemGroupDetail({
   const improve = useMutation({
     mutationFn: async () => {
       if (!group.package) throw new Error("group has no package");
+      const objectIds = await storedSampleObjects(api, storage, group.source_id, samples);
+      if (objectIds.length === 0) throw new NoStoredSamples(storage);
       const body: ImprovementRequest = {
         package: group.package,
         source_id: group.source_id,
         problem_group_id: group.group_id,
-        problem_samples: samples.map((s) => ({
-          material_ref: { storage_connection_id: storage, object_id: s.stored_object_id as string },
+        problem_samples: objectIds.map((objectId) => ({
+          material_ref: { storage_connection_id: storage, object_id: objectId },
         })),
         ...(bindingList.length ? { bindings: bindingList } : {}),
         policy: { approval, allow_fork: allowFork },
@@ -179,7 +183,9 @@ function ProblemGroupDetail({
           body,
         }),
       )) as Job;
-      await patch.mutateAsync({ status: "in_progress", assistant_job_id: job.job_id });
+      // Only link the job: the assistant moves the group itself (in_progress at the start, then unresolved /
+      // resolved / in_progress at the end). A status here could overwrite its final status when the job is fast.
+      await patch.mutateAsync({ assistant_job_id: job.job_id });
       return job;
     },
     onSuccess: (job) => setJobId(job.job_id),
@@ -283,9 +289,21 @@ function ProblemGroupDetail({
         Запустити вдосконалення
       </button>
       {samples.length === 0 ? (
-        <p className="muted">У групи немає збережених прикладів (stored_object_id).</p>
-      ) : null}
-      <ErrorBox error={improve.error} title="Не вдалося запустити вдосконалення" />
+        <p className="muted">У групи немає прикладів (material_id або stored_object_id).</p>
+      ) : (
+        <p className="muted">
+          Збережений RAW прикладу береться з обраного сховища: за stored_object_id або за material_id і
+          observation_id прикладу.
+        </p>
+      )}
+      {improve.error instanceof NoStoredSamples ? (
+        <Notice tone="warn">
+          У сховищі <code>{improve.error.connection}</code> немає збереженого RAW жодного прикладу групи —
+          оберіть сховище, куди завдання записувало RAW.
+        </Notice>
+      ) : (
+        <ErrorBox error={improve.error} title="Не вдалося запустити вдосконалення" />
+      )}
       {jobId ? (
         <JobPanel
           service="assistant"
@@ -296,6 +314,76 @@ function ProblemGroupDetail({
         />
       ) : null}
     </Section>
+  );
+}
+
+type ProblemSample = NonNullable<ProblemGroup["samples"]>[number];
+
+/** None of the problem samples has stored RAW in the chosen storage connection. */
+class NoStoredSamples extends Error {
+  constructor(readonly connection: string) {
+    super(`no stored RAW of the problem samples in ${connection}`);
+  }
+}
+
+/**
+ * Object ids of the stored RAW of problem samples, in sample order. `stored_object_id` is used as is;
+ * otherwise the RAW of the sample's observation is looked up in the storage connection by `material_id`
+ * (storage.v1 listObjects). Samples without stored RAW there are skipped.
+ */
+async function storedSampleObjects(
+  api: ApiClients,
+  connectionId: string,
+  sourceId: string,
+  samples: ProblemSample[],
+): Promise<string[]> {
+  const ids: string[] = [];
+  for (const sample of samples) {
+    if (sample.stored_object_id) {
+      ids.push(sample.stored_object_id);
+      continue;
+    }
+    if (!sample.material_id) continue;
+    let cursor: string | null = null;
+    do {
+      const page: Awaited<ReturnType<typeof listStored>> = await listStored(
+        api,
+        connectionId,
+        sourceId,
+        sample.material_id,
+        cursor,
+      );
+      const hit = page.items.find(
+        (o) => !sample.observation_id || o.material?.observation_id === sample.observation_id,
+      );
+      if (hit) {
+        ids.push(hit.object.object_id);
+        break;
+      }
+      cursor = page.next_cursor ?? null;
+    } while (cursor);
+  }
+  return [...new Set(ids)];
+}
+
+function listStored(
+  api: ApiClients,
+  connectionId: string,
+  sourceId: string,
+  materialId: string,
+  cursor: string | null,
+) {
+  return unwrap(
+    api.storage.GET("/v1/objects", {
+      params: {
+        query: {
+          connection_id: connectionId,
+          source_id: sourceId,
+          material_id: materialId,
+          ...(cursor ? { cursor } : {}),
+        },
+      },
+    }),
   );
 }
 

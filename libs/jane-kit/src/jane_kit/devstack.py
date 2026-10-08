@@ -2,6 +2,11 @@
 
 ``just up`` writes ``.jane/stack-<project>.json`` with host ports and generated credentials.
 Tests call :func:`load_stack` and skip when the stack is not running.
+
+API keys of the stacks (ADR-0005, ``auth_mode=api_key``): one key per identity of
+:data:`STACK_IDENTITIES` in ``JANE_API_KEY_<IDENTITY>`` (the caller's own token) and its SHA-256 in
+``JANE_API_KEY_<IDENTITY>_SHA256`` (what the services verify, ``infra/compose.yaml``). ``scripts/dev.py``
+(stdlib only) keeps a copy of :func:`new_api_keys`; ``infra/tests/test_auth_config.py`` keeps them equal.
 """
 
 from __future__ import annotations
@@ -10,11 +15,51 @@ import hashlib
 import json
 import os
 import re
+import secrets
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-__all__ = ["StackInfo", "default_project", "find_repo_root", "load_stack"]
+__all__ = [
+    "STACK_IDENTITIES",
+    "StackInfo",
+    "api_key_var",
+    "default_project",
+    "find_repo_root",
+    "load_stack",
+    "new_api_keys",
+]
+
+STACK_IDENTITIES: tuple[str, ...] = (
+    "admin",
+    "orchestrator",
+    "assistant",
+    "handler-runtime",
+    "storage",
+    "llm",
+    "web-collector",
+    "telegram-collector",
+    "registry",
+)
+"""Callers that get a key in a local stack: the operator (admin UI, e2e harness) and every service that calls
+another one with its own token (ADR-0005 §5)."""
+
+
+def api_key_var(identity: str) -> str:
+    """``admin`` -> ``JANE_API_KEY_ADMIN`` (the key); ``+ "_SHA256"`` is its hash."""
+    return "JANE_API_KEY_" + identity.upper().replace("-", "_")
+
+
+def new_api_keys(existing: dict[str, str] | None = None) -> dict[str, str]:
+    """Keys (and their SHA-256) of every identity missing from ``existing``; existing keys are kept."""
+    out: dict[str, str] = {}
+    have = existing or {}
+    for identity in STACK_IDENTITIES:
+        var = api_key_var(identity)
+        key = have.get(var) or "jk_" + secrets.token_urlsafe(32)
+        out[var] = key
+        out[f"{var}_SHA256"] = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    return out
 
 
 def find_repo_root(start: Path | None = None) -> Path:

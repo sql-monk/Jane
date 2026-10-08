@@ -221,7 +221,23 @@ FAILED deploy/profiles/tests/test_profiles_harness.py::test_harness_collector_sc
 
 ## CI
 
-_(заповнюється після прогону)_
+CI [37819395884](https://github.com/sql-monk/Jane/actions/runs/37819395884) (`workflow_dispatch`, повний
+набір job, бо змінено compose) на `f21947f`: **12/12 job успішні**. Push-прогін 37819391925 того самого SHA
+скасовано правилом `concurrency` (його замінив повний прогін).
+
+```text
+$ gh run view 37819395884 --json status,conclusion,headSha,jobs
+completed success f21947f
+  lint: success   unit: success   web: success   isolation: success   contract: success
+  stack: success  adapters (minio|s3|mongodb|sqlserver): success   e2e: success   limits: success
+# з журналів job:
+limits: verdict: pass   results: .jane/limits/ci-20261008T175521Z
+e2e:    62 passed in 1224.11s (0:20:24)
+stack:  232 passed, 889 deselected in 214.18s (0:03:34)
+```
+
+`limits` і `e2e` піднімали стек профілю й e2e-стек уже зі зміненими compose-файлами — змінні оркестратора з
+типовим `true` поведінки не змінили. Останній коміт (лише цей розділ звіту) запушено з `[skip ci]`.
 
 ## Відомі обмеження
 

@@ -112,6 +112,9 @@ Checkout потоку A не використовується для злитт�
 `git diff --check` — exit 0. Commit hooks: `no leaks found` для обох документальних комітів.
 Найновіший завершений limits job [CI 37853683903](https://github.com/sql-monk/Jane/actions/runs/37853683903/job/113574852621)
 на `cdf261a` має `verdict: warn` (L2); попередження збережено в матриці, не підмінене `pass`.
+Під час завершення B-5/B-6 увесь цей CI завершився success: **12/12 job**, рядок e2e
+`75 passed in 1486.98s (0:24:46)`. Звірено: ті самі 75 PASSED test node, включно з усім active replay
+WP-13s. Матриця й сценарії оновлені цим найсвіжішим завершеним доказом; нових прогонів не запускали.
 
 Злиття зроблено в detached `integ-b` поверх нового origin `76a03f7`; два нові коміти потоку A збережено,
 конфліктів немає. Власна дельта — лише matrix/scenarios/open-requests і цей журнал. `main`, worktree/гілки

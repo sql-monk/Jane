@@ -208,7 +208,8 @@ CI на `5f77bdf` (код; наступні коміти — лише докум
 
 ## Rebase на інтеграційну ревізію і L6
 
-**Rebase.** `git rebase origin/codex/jane-integration` (на час rebase — `bf69429`, далі лише документація до `3ec9358`;
+**Rebase.** `git rebase origin/codex/jane-integration` (на час rebase — `bf69429`, далі лише документація до `3ec9358`,
+останній rebase — на `3ec9358` без конфліктів;
 у базі вже злито WP-14d, WP-13s, B1 `wp/01h-content-ref-policy`, M3 should-fix `69ab303`, WP-12d `bf69429`). Конфлікти
 два, обидві сторони збережено:
 
@@ -265,6 +266,47 @@ OK   blocker parallel invocations finished 4 == 4
 не встигнути до `wait`/`inspect` або не стосуватися PID 1, якщо OOM-killer вибрав дочірній процес; у другій спробі й
 локально (`--only L6`) та сама перевірка — `resource_exceeded`. Це нестабільна класифікація OOM у handler-runtime
 (WP-06), не дефект автентифікації; код пісочниці поза моїм дорученням, тож не правив — запит нижче.
+
+## Виправлення після рев'ю 1
+
+Рев'ю 1 на `0a5b56b`: changes requested; решту коду рецензент визнав коректним. Причину L6 знайшов і рецензент
+(гонка класифікації OOM у handler-runtime, виправляє окремий агент). Проміжний CI на перебазованій гілці
+(37856354197, SHA `c050ede`) я скасував після lint/unit/contract/web/web-mock-e2e/isolation/adapters (усі ✓), щоб
+повний прогін був один — на фінальному SHA.
+
+| # | Зауваження | Виправлення | Перевірка |
+|---|---|---|---|
+| 1 (блокер) | Без жодного успішного JWKS кожен запит знову звертався до IdP, невдача не запам'ятовувалась, запити чекали в черзі на lock (20 запитів → 20 завантажень, 20 warning) | `JwksCache`: час останньої **спроби** (`_attempted_at`), а не лише успіху; до IdP — не частіше одного запиту за cooldown з будь-якої причини (порожній чи застарілий кеш, невідомий `kid`, повтор після невдачі); той, хто дочекався lock після чужої спроби, не завантажує вдруге (лічильник спроб); без ключів — одразу 503 з `Retry-After` = cooldown, без нового запиту й без warning; відомий `kid` береться з кешу без очікування lock, поки інший запит оновлює кеш, і після невдалого оновлення (застарілі ключі лишаються в роботі); невідомий `kid` у межах cooldown — 401 без запиту. Docstring модуля й класу виправлено | `test_jwks_outage_asks_the_idp_once_per_cooldown` (IdP 503, cooldown 10, 20 запитів з `kid=zzz` → 1 завантаження, 1 warning, `Retry-After: 10`; через 9 с — ще 0; через 11 с і живий IdP — 200, 2 завантаження), `test_cached_keys_outlive_a_failed_refresh`. На старому коді обидва падають (`'5' == '10'`, `2 == 3`) |
+| 2 | Закріпити тестами варіанти шляхів і методи | без змін у коді | `test_only_the_exact_health_path_is_open[//v1/things, /V1/things, /v1/%74hings, /v1/health/../things, /v1/health/, /v1/health%2f]` → 401; `test_head_takes_the_get_scope_and_other_methods_need_a_row`: HEAD за рядком GET (401 / 403 / 200), OPTIONS поза таблицею → 401 без токена, 403 `operation is not mapped to a scope` з токеном |
+| 3 | Застарілий `authenticate()` у `jane_orchestrator/auth.py` | прибрано з сервісу; перенесено в `services/orchestrator/tests/orch_support.py` (тестовий помічник на `ApiKeyVerifier` jane-kit), `test_logic.py` імпортує його звідти; тест не змінено по суті | `test_logic.py` зелений |
+| 4 | Розв'язаний токен виконавця — `SecretStr` | `ExecutorConfig.token: SecretStr | None`; `all_executors()` кладе `SecretStr`; `executors.py` бере `get_secret_value()` лише для заголовка | `test_executor_tokens_come_from_secret_refs`: значення збігаються, `repr` виконавців не містить токена |
+| 5 | README registry: JWT без `actor` = `human` | у розділі «Автентифікація» registry явно: сервісний JWT асистента без claim `actor: llm` обходить обмеження для `llm`; налаштувати claim в IdP або дати асистенту `api_key` з `"actor": "llm"` (код не змінено) | — |
+
+Також у README jane-kit — правила JWKS (cooldown, 503 з `Retry-After`, `0` вимикає захист).
+
+```text
+$ uv run --all-packages ruff check . ; ruff format --check .
+444 files already formatted
+$ uv run --all-packages mypy libs/jane-kit/src libs/jane-kit/tests ; …orchestrator… ; …registry…
+mypy libs/jane-kit: Success: no issues found in 30 source files
+mypy services/orchestrator: Success: no issues found in 31 source files
+mypy services/registry: Success: no issues found in 28 source files
+$ uv run --all-packages pytest libs/jane-kit/tests/test_auth.py libs/jane-kit/tests/test_auth_scopes.py     services/*/tests/test_auth.py infra/tests/test_auth_config.py     services/orchestrator/tests/test_logic.py services/orchestrator/tests/test_executors.py -q
+98 passed, 1 skipped, 2 warnings in 12.76s
+# skipped: services/llm/tests/test_auth.py[postgres] - dev stack PostgreSQL not running (integration-параметр)
+$ pytest libs/jane-kit/tests/test_auth.py -k "outage or outlive or exact_health or head_takes" -v
+test_jwks_outage_asks_the_idp_once_per_cooldown PASSED
+test_cached_keys_outlive_a_failed_refresh PASSED
+test_only_the_exact_health_path_is_open[//v1/things] PASSED
+test_only_the_exact_health_path_is_open[/V1/things] PASSED
+test_only_the_exact_health_path_is_open[/v1/%74hings] PASSED
+test_only_the_exact_health_path_is_open[/v1/health/../things] PASSED
+test_only_the_exact_health_path_is_open[/v1/health/] PASSED
+test_only_the_exact_health_path_is_open[/v1/health%2f] PASSED
+test_head_takes_the_get_scope_and_other_methods_need_a_row PASSED
+```
+
+FINAL_CI_PLACEHOLDER
 
 ## Конфігурація й ліміти
 

@@ -703,3 +703,14 @@ R-04/R-06, S-M2-10, WP-14 `dev-laptop` ×3 на вільному хості та
 | M3 should-fix | `wp/m3-should-fix` `6b67f1a` | 4 | п. 4 TOCTOU у процесі; п. 5–7 попереду |
 | WP-12d рев'ю | `wp/12d-real-reprocessing` `4a080e1` | 0 | рев'ю перервано на перепідйомі real-стеку |
 
+## Розподіл на два потоки (2026-10-09)
+
+Рішення людини: роботу до M3 ведуть два координатори паралельно.
+- **Потік A** (сесія Claude 7): B2 автентифікація (`wp/01g-service-auth`), B1 політика ContentRef
+  (`wp/01h-content-ref-policy`) і фінальний gate M3 (CI на фінальній ревізії, зведення матриці, real-прогін адмінки,
+  рев'ю дельти, цей файл).
+- **Потік B** (інший координатор): WP-12d, WP-13s, WP-14d, M3 should-fix — доручення
+  [HANDOFF-2026-10-09-stream-b.md](HANDOFF-2026-10-09-stream-b.md); журнал потоку — `docs/delivery/M3/stream-b.md`.
+  Злиття потоку B — з worktree `.claude/worktrees/integ-b` (`push origin HEAD:codex/jane-integration`), потік A перед
+  кожним своїм злиттям робить `git pull --ff-only`.
+

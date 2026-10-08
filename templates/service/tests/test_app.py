@@ -6,6 +6,7 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
+from jane_kit.auth import sha256_hex
 from jane_template_service.app import build_app
 from jane_template_service.settings import Settings
 
@@ -109,3 +110,29 @@ def test_missing_idempotency_key_rejected(client: TestClient) -> None:
     r = client.post("/v1/examples/jobs", json={})
     assert r.status_code == 422
     assert r.json()["errors"][0]["parameter"] == "Idempotency-Key"
+
+
+def test_example_and_job_routes_require_the_operation_scope() -> None:
+    settings = Settings(
+        log_format="console",
+        auth_mode="api_key",
+        api_keys=[
+            {"name": "bare", "sha256": sha256_hex("template-bare"), "scopes": []},
+            {"name": "caller", "sha256": sha256_hex("template-caller"), "scopes": ["handler:invoke"]},
+        ],
+    )
+    with TestClient(build_app(settings)) as c:
+        assert c.get("/v1/health").status_code == 200
+        assert c.post("/v1/examples/jobs", json={}).status_code == 401
+        bare = {"Authorization": "Bearer template-bare", "Idempotency-Key": "scope-bare"}
+        assert c.get("/v1/info", headers=bare).status_code == 200
+        assert c.post("/v1/examples/jobs", json={}, headers=bare).status_code == 403
+        caller = {"Authorization": "Bearer template-caller", "Idempotency-Key": "scope-caller"}
+        job = c.post("/v1/examples/jobs", json={"steps": 1000, "step_delay_ms": 50}, headers=caller)
+        assert job.status_code == 202
+        job_url = job.headers["Location"]
+        assert c.get(job_url).status_code == 401
+        assert c.get(job_url, headers=bare).status_code == 403
+        assert c.get(job_url, headers=caller).status_code == 200
+        assert c.post(f"{job_url}/cancel", headers=bare).status_code == 403
+        assert c.post(f"{job_url}/cancel", headers=caller).status_code == 202

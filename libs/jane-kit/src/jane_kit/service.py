@@ -16,9 +16,9 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 
-from jane_kit.auth import Authenticator, ScopeTable, check_scopes, install_auth
+from jane_kit.auth import Authenticator, ScopeTable, authorize, check_scopes, install_auth
 from jane_kit.config import JaneSettings, ResolvedLimits
 from jane_kit.errors import install_error_handlers
 from jane_kit.health import HealthRegistry, ServiceInfo, install_health
@@ -98,7 +98,14 @@ def create_app(
             limits=limits.platform_limits() if limits is not None else None,
         )
 
-    app = FastAPI(title=title or settings.service_name, version=version, lifespan=_lifespan, **fastapi_kwargs)
+    dependencies = [Depends(authorize), *(fastapi_kwargs.pop("dependencies", None) or [])]
+    app = FastAPI(
+        title=title or settings.service_name,
+        version=version,
+        lifespan=_lifespan,
+        dependencies=dependencies,
+        **fastapi_kwargs,
+    )
     app.state.settings = settings
     app.state.health = HealthRegistry(check_timeout_s=settings.health_check_timeout_ms / 1000)
     install_error_handlers(app)

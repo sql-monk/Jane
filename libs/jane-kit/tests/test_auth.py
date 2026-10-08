@@ -428,3 +428,22 @@ def test_jwt_with_jwks_served_over_local_http(idp: Idp) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_routes_of_included_routers_are_checked_too() -> None:
+    from jane_kit.jobs import JobRunner, jobs_router
+
+    def make(table: dict[str, Any]) -> FastAPI:
+        app = build(settings(auth_mode="api_key", api_keys=keys_doc()), scopes=table)
+        app.include_router(jobs_router(JobRunner()))
+        return app
+
+    partial = make(SCOPES)
+    assert unmapped_routes(partial, SCOPES) == ["GET /v1/jobs/{job_id}", "POST /v1/jobs/{job_id}/cancel"]
+    with pytest.raises(AuthConfigError, match="/v1/jobs"), TestClient(partial):
+        pass
+    table = {**SCOPES, "GET /v1/jobs/{job_id}": "storage:read", "POST /v1/jobs/{job_id}/cancel": "storage:write"}
+    with TestClient(make(table)) as c:
+        assert c.get("/v1/jobs/job_x", headers=bearer("key-bare")).status_code == 403
+        assert c.get("/v1/jobs/job_x", headers=bearer("key-reader")).status_code == 404  # authorized, no job
+        assert c.post("/v1/jobs/job_x/cancel", headers=bearer("key-reader")).status_code == 403

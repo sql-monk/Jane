@@ -46,7 +46,6 @@ import jwt
 import yaml
 from fastapi import FastAPI, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
-from starlette.routing import BaseRoute, Match
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from jane_kit.errors import Forbidden, JaneError, ServiceUnavailable, Unauthenticated, problem_response
@@ -63,6 +62,7 @@ __all__ = [
     "Principal",
     "ScopeTable",
     "SecretRefError",
+    "authorize",
     "bearer_header",
     "check_scopes",
     "install_auth",
@@ -619,63 +619,41 @@ def _normalize(table: ScopeTable) -> dict[str, tuple[str, ...]]:
     return out
 
 
-def _route_methods(route: BaseRoute) -> list[tuple[str, str]]:
-    path = getattr(route, "path", None)
-    methods = getattr(route, "methods", None) or ()
-    if not isinstance(path, str):
-        return []
-    return [(m, path) for m in sorted(methods) if m not in {"HEAD", "OPTIONS"}]
+_HTTP_METHODS = ("get", "put", "post", "delete", "patch")
+
+
+def _routes(app: FastAPI) -> set[tuple[str, str]]:
+    """``(METHOD, path template)`` of every operation: the routes of the application (also those hidden from
+    the schema) and, for routers included with a prefix, the operations of its OpenAPI document."""
+    out: set[tuple[str, str]] = set()
+    for route in app.router.routes:
+        path = getattr(route, "path", None)
+        if isinstance(path, str):
+            out |= {(m, path) for m in getattr(route, "methods", None) or () if m not in {"HEAD", "OPTIONS"}}
+    try:
+        paths = app.openapi().get("paths", {})
+    except Exception:  # a schema problem must not hide routes from the check: those found above stay
+        log.warning("OpenAPI document of the service cannot be built; scope check uses the top-level routes")
+        paths = {}
+    for path, item in paths.items():
+        out |= {(m.upper(), path) for m in _HTTP_METHODS if m in item}
+    return out
 
 
 def unmapped_routes(app: FastAPI, table: ScopeTable, *, open_paths: Iterable[str] = OPEN_PATHS) -> list[str]:
     """``"METHOD /path"`` of routes that the scope table (plus :data:`BUILTIN_SCOPES`) does not cover."""
     known = {**BUILTIN_SCOPES, **_normalize(table)}
     skip = set(open_paths)
-    return [
-        f"{m} {p}"
-        for route in app.router.routes
-        for m, p in _route_methods(route)
-        if p not in skip and f"{m} {p}" not in known
-    ]
-
-
-class _Unmapped:
-    pass
-
-
-UNMAPPED = _Unmapped()
+    return sorted(f"{m} {p}" for m, p in _routes(app) if p not in skip and f"{m} {p}" not in known)
 
 
 class AuthMiddleware:
-    """ASGI middleware: authenticates every request except open paths; with a scope table also authorizes."""
+    """ASGI middleware: authenticates every request except the open paths (401 ``unauthenticated``)."""
 
-    def __init__(
-        self,
-        app: ASGIApp,
-        *,
-        authenticator: Authenticator,
-        routes: Callable[[], Sequence[BaseRoute]],
-        open_paths: frozenset[str],
-        scopes: dict[str, tuple[str, ...]] | None,
-    ) -> None:
+    def __init__(self, app: ASGIApp, *, authenticator: Authenticator, open_paths: frozenset[str]) -> None:
         self.app = app
         self.auth = authenticator
-        self.routes = routes
         self.open_paths = open_paths
-        self.scopes = scopes
-
-    def _required(self, scope: Scope) -> tuple[str, ...] | _Unmapped | None:
-        assert self.scopes is not None
-        method = scope["method"]
-        for route in self.routes():
-            match, _ = route.matches(scope)
-            if match == Match.FULL:
-                path = getattr(route, "path", "")
-                key = f"{method} {path}"
-                if key not in self.scopes and method == "HEAD":
-                    key = f"GET {path}"
-                return self.scopes.get(key, UNMAPPED)
-        return None  # no route: the application answers 404/405
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http" or scope["path"] in self.open_paths:
@@ -686,23 +664,34 @@ class AuthMiddleware:
             if len(values) > 1:
                 raise _unauthenticated("only one Authorization header is allowed", "invalid_request")
             header = values[0].decode("latin-1") if values else None
-            principal = await self.auth.authenticate(header)
-            scope.setdefault("state", {})["principal"] = principal
-            if self.scopes is not None:
-                required = self._required(scope)
-                if isinstance(required, _Unmapped):
-                    log.error(
-                        "operation has no scope in the service's table - denied",
-                        extra={"method": scope["method"], "path": scope["path"]},
-                    )
-                    raise Forbidden("operation is not mapped to a scope")
-                if required:
-                    principal.require(*required)
+            scope.setdefault("state", {})["principal"] = await self.auth.authenticate(header)
         except JaneError as exc:
             response = problem_response(exc.to_problem(instance=scope["path"]), exc.headers or None)
             await response(scope, receive, send)
             return
         await self.app(scope, receive, send)
+
+
+async def authorize(request: Request) -> None:
+    """Application-wide dependency of ``create_app``: the scope of the matched operation from the service's
+    table (403 ``forbidden``). An operation missing from the table is denied (fail closed)."""
+    table: dict[str, tuple[str, ...]] | None = getattr(request.app.state, "auth_scopes", None)
+    if table is None or request.scope["path"] in request.app.state.auth_open_paths:
+        return
+    route = request.scope.get("route")
+    path = getattr(route, "path", None)
+    method = request.method
+    key = f"{method} {path}"
+    if key not in table and method == "HEAD":
+        key = f"GET {path}"
+    required = table.get(key)
+    if required is None:
+        log.error(
+            "operation has no scope in the service's table - denied",
+            extra={"method": method, "path": request.scope["path"], "route": path},
+        )
+        raise Forbidden("operation is not mapped to a scope")
+    principal_of(request).require(*required)
 
 
 def install_auth(
@@ -712,7 +701,8 @@ def install_auth(
     scopes: ScopeTable | None = None,
     authenticator: Authenticator | None = None,
 ) -> Authenticator:
-    """Add authentication (and, with ``scopes``, authorization) to ``app``; called by ``create_app``.
+    """Add authentication to ``app`` and remember its scope table; called by ``create_app``, which also
+    registers :func:`authorize` as an application-wide dependency.
 
     Raises :class:`AuthConfigError` for an incomplete configuration. ``scopes=None`` leaves the scope checks
     to the handlers (:func:`require`, :func:`principal_of`); with a table every route must be listed
@@ -725,18 +715,11 @@ def install_auth(
             f"auth_mode=none is for local tests and listens on loopback only, but host={host}; "
             "use api_key or jwt (or set auth_none_allow_remote=true in an isolated test network)"
         )
-    open_paths = OPEN_PATHS | ({"/metrics"} if settings.metrics_public else set())
-    table = None if scopes is None else {**BUILTIN_SCOPES, **_normalize(scopes)}
+    open_paths = frozenset(OPEN_PATHS | ({"/metrics"} if settings.metrics_public else set()))
     app.state.auth = auth
-    app.state.auth_scopes = table
+    app.state.auth_scopes = None if scopes is None else {**BUILTIN_SCOPES, **_normalize(scopes)}
     app.state.auth_open_paths = open_paths
-    app.add_middleware(
-        AuthMiddleware,
-        authenticator=auth,
-        routes=lambda: app.router.routes,
-        open_paths=frozenset(open_paths),
-        scopes=table,
-    )
+    app.add_middleware(AuthMiddleware, authenticator=auth, open_paths=open_paths)
     return auth
 
 

@@ -1,6 +1,6 @@
 # WP-01h (M3, B1). Політика читання ContentRef
 
-**Гілка:** `wp/01h-content-ref-policy` · **Ревізія коду:** `aa8c5de` · **База:** `codex/jane-integration` `03a31fa`
+**Гілка:** `wp/01h-content-ref-policy` · **Ревізія коду:** `0b1cc75` (після рев'ю 1; до нього — `aa8c5de`) · **База:** `codex/jane-integration` `03a31fa`
 (перебазовано з `3c98542` за вказівкою координатора; WP-13r/13t уже в базі) · **Стан:** review
 
 Наскрізне доручення координатора за фінальним рев'ю M3 (блокер): `.jane-wp` немає, шляхи — з доручення.
@@ -98,9 +98,9 @@ assistant — `s3://` без `download_url` тепер 422 (було 501), не�
 | шлях поза коренями | `test_paths_outside_the_roots_are_refused` | так | так | так |
 | `..` (і `%2E%2E`) | так | так | так | так |
 | symlink назовні (файл і каталог) | `test_symlink_out_of_a_root_is_refused` | так* | так* | так* |
-| хост поза allowlist (інший порт, 169.254.169.254, userinfo, ftp/file, IPv6, фрагмент) | `test_download_hosts_outside_the_allowlist_are_refused_before_any_request` | так | так | так |
+| хост поза allowlist (інший порт, 169.254.169.254, userinfo, ftp/file, IPv6, фрагмент); IDN звіряється в punycode | `test_download_hosts_outside_the_allowlist_are_refused_before_any_request`, `test_internationalized_hosts_are_compared_in_punycode` | так | так | так |
 | редирект на інший хост (справжній HTTP; другий хост не отримує запиту) | `test_redirects_are_not_followed`, `test_real_http_ignores_proxy_env_and_redirects` | так | так | так |
-| перевищення розміру (потік понад ліміт за заниженого `size_bytes`; `Content-Length`; задекларований `size_bytes`) | `test_download_size_limit_and_statuses`, `test_file_missing_size_and_digest` | `test_download_size_comes_from_gateway_limits` | `test_download_size_comes_from_content_limits` | `test_download_size_comes_from_package_limits` |
+| перевищення розміру: потік без `Content-Length` (і з заниженим) за заниженого `size_bytes` — обрізання під час потоку; завищений `Content-Length`; задекларований `size_bytes`; файл | `test_streamed_body_is_cut_at_the_limit[no-content-length\|understated-content-length]`, `test_real_http_ignores_proxy_env_and_redirects` (chunked через справжній HTTP), `test_download_size_limit_and_statuses`, `test_file_missing_size_and_digest` | `test_download_size_comes_from_gateway_limits` (chunked `/big`) | `test_download_size_comes_from_content_limits` (chunked `/big`) | `test_download_size_comes_from_package_limits` (chunked `/big`) |
 | дозволені `file://` і `download_url` — успіх | так | так (вміст дійшов до провайдера) | так (вміст дійшов до LLM) | так (екстрактор `success`) |
 | тайм-аут, 404/5xx/403, gzip, base64, sha256 | так | — | тайм-аут пошуку з `limits.search` | — |
 
@@ -247,3 +247,83 @@ llm (`test_r_04_llm_replay_while_invocation_is_running[sync|async]`), assistant
 | агент автентифікації | `handler.v1` runtime і llm тепер читають RAW з тома; доступ має обмежуватись автентифікованими викликачами | межа довіри для `file://` з `objects/` |
 | WP-13 | `tests/e2e/compose.e2e.yaml`: allowlist llm/assistant, корінь runtime звужено до `objects/` | у вашій власності, зміни мінімальні |
 | агент документації | ті самі compose-файли: мої рядки — лише змінні `*_BLOB_ROOTS`/`*_DOWNLOAD_HOST_ALLOWLIST` і том `storage-data:ro` у runtime/llm бази | зведення конфліктів |
+
+## Виправлення після рев'ю 1
+
+1. **(блокер) Обмеження розміру під час потоку не було доведене тестом.** Усі «великі» відповіді в тестах мали
+   `Content-Length`, тож спрацьовував ранній відсів за заголовком, і мутант без перевірки в циклі
+   (`if len(buf) > max_bytes: raise _too_large(...)` у `ContentReader._download`) виживав. Додано:
+   - jane-kit `test_streamed_body_is_cut_at_the_limit[no-content-length|understated-content-length]` — тіло
+     потоком (`httpx.AsyncByteStream`) без `Content-Length` і з заниженим `Content-Length: 10`, `size_bytes` занижено
+     → 422 `limit_exceeded`, `details == {"path": "test.max_bytes", "limit": 5000}`, і з потоку прочитано не
+     більше ~ліміту (`sent <= 6000` зі 100 000);
+   - jane-kit `test_real_http_ignores_proxy_env_and_redirects` — ще й chunked `StreamingResponse` через справжній
+     HTTP → 422 `limit_exceeded` з `details`;
+   - у сервісних тестах `/big` тепер `StreamingResponse` (chunked, без `Content-Length`), тож llm, assistant і
+     handler-runtime доводять обрізання під час потоку з лімітами сервісу; коментарі виправлено.
+   Рядок таблиці тестів вище виправлено.
+2. **(дрібне) IDN.** `httpx.URL.host` декодує punycode, тож `http://xn--bcher-kva.example/` відхилявся навіть за
+   такого запису в allowlist. Тепер хост звіряється за `target.raw_host` — ASCII-формою, з якою httpx і
+   з'єднується; записи allowlist і так лише ASCII, тож IDN дозволяється записом у punycode `xn--…`, а URL з
+   не-ASCII символами відхиляється раніше (`_UNSAFE_URL`). Тест
+   `test_internationalized_hosts_are_compared_in_punycode` (дозволений `xn--bcher-kva.example` проходить і запит
+   іде саме на цей `raw_host`; `bücher.example`, `xn--bcher-kva.example.evil`, `bcher-kva.example` — 422). Описано в
+   README jane-kit і в рядках `*_DOWNLOAD_HOST_ALLOWLIST` README трьох сервісів.
+
+Мутаційна перевірка (скрипт підміняє файл, запускає тести політики, відновлює файл байт-у-байт):
+
+```text
+$ (mutant: in-stream check removed) pytest libs/jane-kit/tests/test_content.py services/llm/tests/test_content_policy.py services/assistant/tests/test_content_policy.py services/handler-runtime/tests/test_content_policy.py -m 'not integration'
+FAILED libs/jane-kit/tests/test_content.py::test_streamed_body_is_cut_at_the_limit[no-content-length]
+FAILED libs/jane-kit/tests/test_content.py::test_streamed_body_is_cut_at_the_limit[understated-content-length]
+FAILED libs/jane-kit/tests/test_content.py::test_real_http_ignores_proxy_env_and_redirects
+FAILED services/llm/tests/test_content_policy.py::test_download_size_comes_from_gateway_limits[memory]
+FAILED services/assistant/tests/test_content_policy.py::test_download_size_comes_from_content_limits
+FAILED services/handler-runtime/tests/test_content_policy.py::test_download_size_comes_from_package_limits
+6 failed, 29 passed, 5 deselected in 32.35s
+exit: 1
+$ (original) pytest <ті самі файли> -m 'not integration'
+35 passed, 5 deselected in 11.92s
+exit: 0
+
+$ (mutant: target.host замість raw_host) pytest libs/jane-kit/tests/test_content.py -k internationalized
+FAILED libs/jane-kit/tests/test_content.py::test_internationalized_hosts_are_compared_in_punycode
+1 failed, 18 deselected in 0.72s
+$ (original) pytest libs/jane-kit/tests/test_content.py -k internationalized
+1 passed, 18 deselected in 0.76s
+```
+
+(Мутант падає з `validation_failed` замість `limit_exceeded`: без перевірки в циклі все тіло дочитується, і
+спрацьовує лише пізня звірка `size_bytes`.)
+
+Перевірки після виправлень (локально, Windows 11, Python 3.12.12):
+
+```text
+$ uv run ruff check . && uv run ruff format --check .
+All checks passed!
+420 files already formatted
+$ uv run mypy <src> <tests>   # jane-kit, llm, assistant, handler-runtime
+Success: no issues found in 26 source files
+Success: no issues found in 25 source files
+Success: no issues found in 35 source files
+Success: no issues found in 24 source files
+$ just test jane-kit
+============================ 161 passed in 18.99s =============================
+$ just test llm
+===================== 62 passed, 39 deselected in 29.66s ======================
+$ just test assistant
+================= 73 passed, 5 deselected in 96.07s (0:01:36) =================
+$ just test handler-runtime
+===================== 48 passed, 13 deselected in 49.49s ======================
+```
+
+CI: push `0b1cc75` → run [37852086269](https://github.com/sql-monk/Jane/actions/runs/37852086269) (lint, unit,
+contract; повний e2e не потрібен — compose не змінювався).
+
+Результат — **success** (`gh run view 37852086269`):
+
+```text
+completed success 0b1cc7537baf496b55745d629462982e3043e916
+lint: success   unit: success   web: success   contract: success   isolation: success
+limits, e2e, stack, adapters: skipped (push у wp/**; повний прогін — 37846393926 на aa8c5de, compose з того часу не змінювався)
+```

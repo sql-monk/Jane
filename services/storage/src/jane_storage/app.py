@@ -33,6 +33,7 @@ from fastapi.responses import JSONResponse
 from jsonschema import Draft202012Validator
 
 from jane_contracts.storage_adapter import AdapterError, EntitySnapshot, HistoryEvent, ObjectRecord
+from jane_kit.auth_scopes import HANDLER, STORAGE, merge
 from jane_kit.config import LimitError, LimitLayer
 from jane_kit.contracts import ContractViolation, OpenAPISpec, contracts_dir
 from jane_kit.errors import FieldError, JaneError, NotFound, ValidationFailed
@@ -246,6 +247,7 @@ def build_app(
         lifespan=lifespan,
         capabilities=capabilities,
         limits=resolved,
+        auth_scopes=merge(HANDLER, STORAGE),  # ADR-0005 scopes per operation
     )
     app.state.limits = resolved
     app.state.registry = registry

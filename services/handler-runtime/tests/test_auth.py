@@ -35,7 +35,18 @@ def test_runtime_needs_a_token_and_the_operation_scope(subprocess_settings: Sett
             "/v1/test-runs", json={}, headers=auth("k-runtime-invoker", **{"Idempotency-Key": "t-2"})
         )
         assert denied.status_code == 403 and denied.json()["detail"] == "scope handler:test required"
-        assert c.post("/v1/invocations", json={}, headers=auth("k-runtime-tester")).status_code == 403
+        # invocations read RAW of every source through file:// (B1 ContentRef roots): never without handler:invoke
+        anonymous = c.post("/v1/invocations", json={}, headers={"Idempotency-Key": "i-1"})
+        assert anonymous.status_code == 401 and anonymous.json()["code"] == "unauthenticated"
+        assert c.get("/v1/invocations/inv_x").status_code == 401
+        tester = c.post(
+            "/v1/invocations", json={}, headers=auth("k-runtime-tester", **{"Idempotency-Key": "i-2"})
+        )
+        assert tester.status_code == 403 and tester.json()["detail"] == "scope handler:invoke required"
+        registry = c.post(
+            "/v1/invocations", json={}, headers=auth("k-runtime-registry", **{"Idempotency-Key": "i-3"})
+        )
+        assert registry.status_code == 403
         assert c.get("/v1/invocations/inv_x", headers=auth("k-runtime-invoker")).status_code == 404
         assert c.get("/v1/jobs/job_x", headers=auth("k-runtime-tester")).status_code == 404
         assert c.get("/v1/jobs/job_x", headers=auth("k-runtime-registry")).status_code == 403

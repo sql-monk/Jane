@@ -34,5 +34,17 @@ def test_llm_needs_a_token_and_the_operation_scope(make_client: Callable[..., Te
     assert c.get("/v1/budgets", headers=auth("k-llm-assistant")).status_code == 403
     assert c.get("/v1/budgets", headers=auth("k-llm-admin")).status_code == 200
     assert c.put("/v1/providers/x", json={}, headers=auth("k-llm-assistant")).status_code == 403
-    assert c.post("/v1/invocations", json={}, headers=auth("k-llm-assistant")).status_code == 403
+    # handler.v1 invocations read RAW of every source through file:// (B1 ContentRef roots): handler:invoke only
+    anonymous = c.post("/v1/invocations", json={}, headers={"Idempotency-Key": "i-1"})
+    assert anonymous.status_code == 401 and anonymous.json()["code"] == "unauthenticated"
+    assert c.get("/v1/invocations/inv_x").status_code == 401
+    for token in ("k-llm-assistant", "k-llm-admin", "k-llm-nobody"):  # llm:invoke / llm:admin are not enough
+        r = c.post("/v1/invocations", json={}, headers={**auth(token), "Idempotency-Key": f"i-{token}"})
+        assert r.status_code == 403 and r.json()["detail"] == "scope handler:invoke required", token
+    assert (
+        c.post(
+            "/v1/test-runs", json={}, headers={**auth("k-llm-admin"), "Idempotency-Key": "t-1"}
+        ).status_code
+        == 403
+    )
     assert c.get("/v1/jobs/job_x", headers=auth("k-llm-assistant")).status_code == 404

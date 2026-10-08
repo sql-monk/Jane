@@ -8,8 +8,6 @@ Unpacking is bounded by ``PackageLimits``; verified packages are cached by diges
 from __future__ import annotations
 
 import asyncio
-import base64
-import hashlib
 import shutil
 import tempfile
 import threading
@@ -18,7 +16,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
 
 import httpx
 
@@ -31,6 +28,7 @@ from jane_extractor_sdk.package import (
     load_manifest,
     safe_unpack,
 )
+from jane_kit.content import ContentReader
 from jane_kit.errors import JaneError, NotFound, UpstreamUnavailable, ValidationFailed
 
 from .settings import PackageLimits, Settings
@@ -59,82 +57,28 @@ class LoadedPackage:
 
 
 class ContentFetcher:
-    """Reads ``ContentRef`` values: inline, ``file://`` (only under configured roots) or ``download_url``.
+    """Reads ``ContentRef`` values with ``jane_kit.content.ContentReader``: inline, ``file://`` only strictly inside
+    ``JANE_HANDLER_RUNTIME_BLOB_ROOTS`` (resolved path, no ``..``/symlink escape), ``download_url`` only to hosts of
+    ``JANE_HANDLER_RUNTIME_DOWNLOAD_HOST_ALLOWLIST`` without redirects; ``size_bytes`` and ``sha256`` are verified.
 
     ``s3://`` without ``download_url`` is not readable: the runtime holds no storage credentials (ADR-0004/0006).
     """
 
     def __init__(
-        self, settings: Settings, request_timeout_s: float, transport: httpx.AsyncBaseTransport | None = None
+        self, settings: Settings, request_timeout_ms: int, transport: httpx.AsyncBaseTransport | None = None
     ):
-        self.roots = [p.resolve() for p in settings.blob_roots]
-        self.timeout = request_timeout_s
-        self.transport = transport
+        self.reader = ContentReader(
+            timeout_ms=request_timeout_ms,
+            blob_roots=settings.blob_roots,
+            download_host_allowlist=settings.download_host_allowlist,
+            settings_prefix="JANE_HANDLER_RUNTIME_",
+            transport=transport,
+        )
 
-    def _file(self, uri: str, limit: int) -> bytes:
-        parsed = urlparse(uri)
-        raw = unquote(parsed.path)
-        if parsed.netloc and parsed.netloc != "localhost":
-            raw = f"//{parsed.netloc}{raw}"
-        if len(raw) > 2 and raw[0] == "/" and raw[2] == ":":  # file:///C:/x on Windows
-            raw = raw[1:]
-        path = Path(raw).resolve()
-        if not any(path.is_relative_to(root) for root in self.roots):
-            raise ValidationFailed(
-                "file:// content outside the allowed roots (JANE_HANDLER_RUNTIME_BLOB_ROOTS)",
-                details={"uri": uri},
-            )
-        if not path.is_file():
-            raise NotFound(f"blob not found: {uri}")
-        if path.stat().st_size > limit:
-            raise JaneError(f"blob is larger than {limit} bytes", code="payload_too_large")
-        return path.read_bytes()
-
-    async def _download(self, url: str, limit: int) -> bytes:
-        try:
-            async with (
-                httpx.AsyncClient(
-                    timeout=self.timeout, transport=self.transport, follow_redirects=True
-                ) as client,
-                client.stream("GET", url) as response,
-            ):
-                if response.status_code >= 400:
-                    raise UpstreamUnavailable(f"download_url returned HTTP {response.status_code}")
-                buf = bytearray()
-                async for chunk in response.aiter_bytes():
-                    buf.extend(chunk)
-                    if len(buf) > limit:
-                        raise JaneError(f"blob is larger than {limit} bytes", code="payload_too_large")
-                return bytes(buf)
-        except httpx.HTTPError as exc:
-            raise UpstreamUnavailable(f"cannot download blob: {exc}") from exc
-
-    async def read(self, ref: Mapping[str, Any], limit: int) -> bytes:
-        kind = ref.get("kind")
-        if kind == "inline":
-            data = str(ref.get("data", ""))
-            raw = base64.b64decode(data) if ref.get("encoding") == "base64" else data.encode("utf-8")
-            if len(raw) > limit:
-                raise JaneError(f"content is larger than {limit} bytes", code="payload_too_large")
-        elif kind == "blob":
-            uri = str(ref.get("uri", ""))
-            if ref.get("download_url"):
-                raw = await self._download(str(ref["download_url"]), limit)
-            elif uri.startswith("file://"):
-                raw = await asyncio.to_thread(self._file, uri, limit)
-            else:
-                raise ValidationFailed(
-                    "blob without download_url cannot be read by handler-runtime (no storage credentials)",
-                    details={"uri": uri},
-                )
-            if "size_bytes" in ref and int(ref["size_bytes"]) != len(raw):
-                raise ValidationFailed("blob size_bytes does not match the content", details={"uri": uri})
-        else:
-            raise ValidationFailed(f"unknown content kind {kind!r}")
-        expected = ref.get("sha256")
-        if expected and hashlib.sha256(raw).hexdigest() != expected:
-            raise ValidationFailed("content sha256 does not match", details={"kind": kind})
-        return raw
+    async def read(
+        self, ref: Mapping[str, Any], limit: int, *, limit_name: str = "packages.max_input_bytes"
+    ) -> bytes:
+        return await self.reader.read(ref, max_bytes=limit, limit=limit_name)
 
 
 class PackageStore:
@@ -216,7 +160,9 @@ class PackageStore:
     async def load(self, handler: Mapping[str, Any], archive_ref: Mapping[str, Any] | None) -> LoadedPackage:
         expected = handler.get("digest")
         if archive_ref is not None:
-            archive = await self.fetcher.read(archive_ref, self.limits.max_archive_bytes)
+            archive = await self.fetcher.read(
+                archive_ref, self.limits.max_archive_bytes, limit_name="packages.max_archive_bytes"
+            )
             loaded = await asyncio.to_thread(self._from_archive_bytes, archive, "archive", expected)
         else:
             loaded = await self._from_registry(handler)

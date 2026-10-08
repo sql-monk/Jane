@@ -55,7 +55,7 @@ def build_runtime(
     limits = resolved.limits
     timeout_s = limits.timeouts.request_timeout_ms / 1000
     schemas = ContractSchemas(find_contracts_dir(settings.contracts_dir))
-    fetcher = ContentFetcher(settings, timeout_s, transport=download_transport)
+    fetcher = ContentFetcher(settings, limits.timeouts.request_timeout_ms, transport=download_transport)
     store = PackageStore(
         settings, limits.packages, fetcher, registry_transport=registry_transport, request_timeout_s=timeout_s
     )

@@ -11,7 +11,8 @@
 
 ## Як це працює
 
-1. **Пакет**: `package_archive` (ContentRef: inline base64 zip, `file://` у дозволених теках або `download_url`)
+1. **Пакет**: `package_archive` (ContentRef: inline base64 zip, `file://` у дозволених теках або `download_url` на
+   дозволений хост — див. «Політика ContentRef»)
    або репозиторій (`GET /v1/packages/{id}/versions/{v}/archive`, якщо задано `JANE_HANDLER_RUNTIME_REGISTRY_URL`).
    Перевіряються `handler.digest` (`sha256:` байтів архіву), `ContentRef.sha256`/`size_bytes`, `ETag` репозиторію;
    архів розпаковується з перевіркою шляхів (`..`, абсолютні, симлінки), кількості файлів і розміру; кеш — за дайджестом.
@@ -179,9 +180,22 @@ FS лише для читання, користувач 65534, відсутні�
 | `REGISTRY_URL` / `REGISTRY_TOKEN` | — | репозиторій пакетів і bearer-токен (лише з середовища) |
 | `PACKAGE_CACHE_DIR` | тимчасова тека | кеш перевірених пакетів за дайджестом |
 | `BLOB_ROOTS` | `[]` | теки, з яких дозволено читати `file://` (JSON-масив); порожньо — `file://` заборонено |
+| `DOWNLOAD_HOST_ALLOWLIST` | `[]` | `hostname` (будь-який порт) або `hostname:port`, куди може вести `download_url` (JSON-масив); порожньо — завантаження заборонено |
 | `STATE_DSN` | — (стан у пам'яті) | PostgreSQL для спільного стану кількох екземплярів (секрет — лише з середовища) |
 | `STATE_SCHEMA` | `jane_handler_runtime` | схема таблиць стану |
 | `CONTRACTS_DIR` | пошук угору від пакета (`JANE_CONTRACTS_DIR`) | `contracts/` зі схемами; в образі — `/app/contracts` |
+
+**Політика ContentRef (WP-01h).** `package_archive` і вміст входів (`material.content`, `entities_ref`,
+`data_ref`) читає спільний `jane_kit.content.ContentReader`: `inline` (utf-8/base64); `file://` — лише строго
+всередині `BLOB_ROOTS` (шлях спершу розв'язується з `..` і symlink, читається саме розв'язаний звичайний файл,
+`file://host/…` і UNC відхиляються); `download_url` — лише `http(s)` на хост із `DOWNLOAD_HOST_ALLOWLIST`, **без
+редиректів** (раніше редиректи виконувались), без проксі й `.netrc` із середовища, лише незакодоване тіло, обрізання
+на `packages.max_input_bytes` / `packages.max_archive_bytes` під час завантаження, усе завантаження — у межах
+`timeouts.request_timeout_ms`; `s3://` без `download_url` — 422. Перевіряються `size_bytes` blob і `sha256`.
+Відмови — до запуску пісочниці: політика чи невідповідність — 422 `validation_failed`; понад ліміт — 422
+`limit_exceeded` (`details.path`; раніше 413 `payload_too_large`); файла немає чи 404 — 404 `not_found`; мережа,
+тайм-аут, 5xx — 502 `upstream_unavailable` (повторюваний), редирект чи інший 4xx — 502 неповторюваний. `detail` без
+шляхів і вмісту. Тести: `tests/test_content_policy.py`.
 
 ## Ліміти
 
@@ -202,7 +216,7 @@ jane-kit) → `JANE_HANDLER_RUNTIME_LIMITS__<ГРУПА>__<ПАРАМЕТР>` �
 | `sandbox.tmpfs_mb` | 64 | 1024 | `/tmp` (tmpfs, `noexec`); 0 — без `/tmp` |
 | `timeouts.invocation_timeout_ms` | 60000 | 900000 | весь виклик пісочниці |
 | `timeouts.sync_response_max_ms` | 25000 | — | далі sync-виклик стає 202 + Job |
-| `timeouts.request_timeout_ms` | 30000 | — | репозиторій і `download_url` |
+| `timeouts.request_timeout_ms` | 30000 | — | репозиторій і все завантаження за `download_url` (з'єднання включно) |
 | `concurrency.max_parallel_invocations` | 2 | — | одночасні пісочниці в екземплярі |
 | `packages.max_archive_bytes` | 52428800 | — | розмір zip пакета |
 | `packages.max_unpacked_bytes` | 209715200 | — | розмір після розпакування |

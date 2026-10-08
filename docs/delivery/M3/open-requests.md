@@ -1,0 +1,93 @@
+# Запити між власниками після M3
+
+Зведення B-6 на 2026-10-09 для `codex/jane-integration`. Це беклог узгоджень, а не розширення поточного M3.
+Повторні запити об'єднано; старий напис «відкрито» у звіті не переноситься автоматично, якщо код уже виправлено.
+
+Джерела: [фінальне рев'ю, частина C](final-review.md#частина-c--тз-4-безпека-відкриті-питання),
+[status.md: відкриті запити](../status.md#відкриті-запити-між-власниками) і
+[наскрізні питання](../status.md#наскрізні-питання) (лише прочитано), розділи запитів звітів WP-00…WP-14 та
+M3. Підтвердження закриття — коротка звірка коду й уже записаних доказів, без нових тестів.
+Зміни `contracts/` після погодження проходять `contract-guardian` і оновлення споживачів за правилами проєкту.
+
+## До завершення M3
+
+| Від → кому | Запит | Стан / джерело |
+|---|---|---|
+| Фінальне рев'ю / WP-09 / B1 → потік A, WP-01g | B2: автентифікація та scopes у всіх 8 сервісах, JWT; захист викликів читання RAW | **Очікує прийняття потоком A.** Джерела: [частина C](final-review.md), [B1](01h-content-policy.md). Звіт B2 буде включено лише після появи `merge: accept B2` в історії інтеграційної гілки |
+| Потік A → потік B | B-7: real-адмінка бере ключ зі стек-файлу, один повний real-прогін через Caddy; scopes у шаблоні сервісу. B-8: ADR за рішеннями B2 | **Залежить від злиття B2**, [друга черга](../HANDOFF-2026-10-09-stream-b-2.md). Це gate поточного M3, а не перенесений після M3 запит |
+| Should-fix / WP-12d → потік A | CI зведеної ревізії, заповнення блоку «Фінальна ревізія», статус і фінальне рев'ю дельти | **Залишається потоку A**; [журнал](stream-b.md), [матриця](../../acceptance/matrix.md). Merge до `main` — людина |
+
+## Відкрито — після M3
+
+| ID | Від → кому | Суть запиту | Стан | Джерело |
+|---|---|---|---|---|
+| R01 | WP-07 → WP-00 | Опис `DeliveryRecord.acks`, простір імен етапу в storage, `format.raw` original/html/json, узгоджені default та приклад `storage-files.json` | Відкрито — після M3, пакет контрактних уточнень | [WP-07](../WP-07.md), [status](../status.md) |
+| R02 | WP-06 → WP-00 | `/v1/connections*` у handler.v1 необов'язкові для виконавців без підключень | Відкрито — після M3 | [WP-06](../WP-06.md) |
+| R03 | WP-02 → WP-00 | Чи викликається `on_fetched` для non-2xx, чи `ctx.fetch` ділиться ресурсами ядра; конвенція `kind=http` / `params.auth_scheme` / `header_name` | Відкрито — після M3 | [WP-02](../WP-02.md) |
+| R04 | WP-04 → WP-00 | 404 у `/v1/fetches`, `CollectorState.cursors.pts`, 503 для зайнятого сховища; монотонність sequence кількох редагувань за секунду | Відкрито — після M3 | [WP-04](../WP-04.md) |
+| R05 | WP-09 → WP-00 | Форма входу `select: problems`, виходу storage-етапу, `ProblemGroup.note` та PATCH-відповіді; правила активації `collector.rules` | Відкрито — після M3 | [WP-09](../WP-09.md), [WP-12](../WP-12.md) |
+| R06 | WP-09 / WP-12d / should-fix → WP-00, WP-07, WP-09 | Фільтр storage за кількома `material_id`; точний вибір RAW `object_id` / `observation_id` у `ReprocessRequest`. Нинішній `material_ids` обирає спостереження цього джерела в часовому вікні | Відкрито — після M3; source-фільтр і збережений id прикладу закриті окремо нижче | [WP-09](../WP-09.md), [WP-12](../WP-12.md), [should-fix](m3-should-fix.md) |
+| R07 | WP-10 → WP-00 | Узгодити перетворення виходу LLM в `EntityRecord`, `BudgetStatus.exhausted` та найконкретніший бюджет із запиту | Відкрито — після M3 | [WP-10](../WP-10.md) |
+| R08 | WP-11 / WP-12 → WP-00 | Пропозиція у `ImprovementResult` для `proposal_only`, `llm.min_onboarding_confidence`, явне `session_id` / `Job.links.session`, приклади результату успішної job та ETag | Відкрито — після M3 | [WP-11](../WP-11.md), [WP-12](../WP-12.md) |
+| R09 | WP-13s → WP-00 | Явно описати 409 `idempotency_in_progress` для `POST /v1/completions`; нині sync e2e перевіряє Problem напряму за загальною конвенцією | Відкрито — після M3 | [WP-13, WP-13s](../WP-13.md) |
+| R10 | WP-05 / WP-07 → WP-00 | Задокументувати канонічний ZIP, ілюстративні digest прикладів, код недоступного runtime-профілю та `jane-package.json` лише у `manifest_changes` diff | Відкрито — після M3; реалізація ZIP закрита нижче | [WP-05](../WP-05.md), [WP-07](../WP-07.md) |
+| R11 | WP-08 → WP-00 | Опис CAS/події у знімку `pending` для object storage; гарантії й залежний від адаптера порядок `list_entities` | Відкрито — після M3 | [WP-08](../WP-08.md) |
+| R12 | WP-01b / WP-14 → WP-10, за потреби WP-00 | Семантика `provider.*` проти контрактних `timeouts.*` / `retries`; окремий тайм-аут моделі й доля стекового перекриття `JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS` | Відкрито — після M3 | [WP-01](../WP-01.md), [WP-14](../WP-14.md), [тріаж C](final-review.md) |
+| R13 | WP-14 → WP-11, WP-10, WP-00 | Єдина семантика бюджету `amount: 0`, `period`, `run_id`; асистент має рахувати run-бюджет і дочекатися довгого LLM-виклику (async job або окремий timeout); приклад `0 / run` | Відкрито — після M3 | [WP-14](../WP-14.md), [тріаж C](final-review.md) |
+| R14 | WP-01b → WP-11, WP-07 | Узгодити загальні timeouts/retries профілю з `clients.*` асистента й backoff storage при `CONFLICT` | Відкрито — після M3 | [WP-01](../WP-01.md) |
+| R15 | WP-02 / WP-14 → WP-02, WP-01, координатор | Спільний per-host лімітер **між екземплярами** та визначення рівня platform; процесний лімітер одночасних зборів уже виправлено WP-02c | Відкрито — після M3; не тотожне закритому L1/L2 одного процесу | [WP-02](../WP-02.md), [WP-14](../WP-14.md), [тріаж C](final-review.md) |
+| R16 | Рев'ю WP-10 / WP-07 → WP-00, власники підключень | Узгодити ADR-0006 і приклади з prefix `env:`, каталогом `file:` та host allowlist; звести залишкові відмінності політик сервісів | Відкрито — після M3, документальне узгодження/аудит; виправлення TOCTOU закрито нижче | [status](../status.md), [WP-07](../WP-07.md), [WP-10](../WP-10.md) |
+| R17 | WP-04 / WP-11 / WP-07 → WP-01 | Спільні SQLite/PG JobStore/IdempotencyStore з lease/fencing, ContractSchemas/RulesLoader, connection/secret policy у jane-kit; прибрати дублювання власних реалізацій | Відкрито — після M3, окремий рефакторинг | [WP-04](../WP-04.md), [WP-11](../WP-11.md), [WP-07](../WP-07.md), [тріаж C](final-review.md) |
+| R18 | WP-00 / WP-07 → WP-01, власники producer/consumer | Спільний запис/життєвий цикл `ContentRef` і transit cleanup. B1 закриває безпечне **читання** у llm/assistant/runtime, не всю producer-частину ADR-0004 | Відкрито — після M3, уточнити окремий обсяг | [WP-00](../WP-00.md), [WP-07](../WP-07.md), [B1](01h-content-policy.md) |
+| R19 | B1 → WP-07, координатор | Чи дозволений маршрут `from_stage` → storage з persistent `file://` RAW; storage базового стеку не має `JANE_STORAGE_CONTENT_FILES_DIR` | Відкрито — після M3; спочатку рішення про маршрут, потім конфігурація за потреби | [B1, запити](01h-content-policy.md) |
+| R20 | WP-01b → WP-02, WP-04 | Перехід колекторів із власного `translate_layer` на спільний шар jane-kit з однаковою перевіркою помилок профілю | Відкрито — після M3 | [WP-01](../WP-01.md) |
+| R21 | WP-08 → WP-07 | `chunk_bytes` / `retry_max_attempts` у `ServiceLimits.adapters` | Відкрито — після M3, необов'язково | [WP-08](../WP-08.md) |
+| R22 | WP-03 → WP-00, WP-02 | Розширення `api_feed`: POST/body та випуск JSON Material; зарезервовані варіанти мають лишатися явно unsupported до реалізації | Відкрито — після M3, нове контрактне рішення | [WP-03](../WP-03.md) |
+| R23 | WP-03 → WP-02 | Семантика `lastmod` / повторного обходу listing та інкрементальності стратегій | Відкрито — після M3 | [WP-03](../WP-03.md) |
+| R24 | WP-12 → WP-11, WP-00 | API списку onboarding/improvement job для відновлення UI після перезавантаження | Відкрито — після M3 | [WP-12](../WP-12.md) |
+| R25 | WP-13 → WP-00, WP-09 | Відкрити в trace `available_at` / історію claim-attempt, щоб R-03 доводив причинність backoff точніше за межі API-опитування | Відкрито — після M3, необов'язкова діагностика | [WP-13](../WP-13.md), [сценарії R-03](../../acceptance/scenarios.md#надійність) |
+| R26 | WP-12d → WP-12, координатор | Повне real UI-покриття onboarding: пошук static, уточнення, пропозиції й прийняття; нині рядок 10 частковий, backend S-M2-06 пройшов | Відкрито — після M3; навмисний мок рядка 18 зберігається | [WP-12d](../WP-12.md), [матриця](../../acceptance/matrix.md) |
+| R27 | WP-00 / WP-02 / WP-14 → WP-01 | Автоматичні PR compat/self-test, зручні aliases контрактних команд, `contracts/python` у workspace (нині path dependency), types для `examples`/`deploy/profiles` | Відкрито — після M3, частково необов'язково. Лінтер контрактів та offline unit у `just check` уже є | [WP-00](../WP-00.md), [WP-02](../WP-02.md), [WP-14](../WP-14.md) |
+| R28 | WP-00 / WP-06 → WP-05, координатор | Оновити чернетку скіла `jane-handler-package` за реалізованими SDK/registry, канонічним архівом і secret scan | Відкрито — після M3 | [WP-00](../WP-00.md), [WP-06](../WP-06.md) |
+| R29 | WP-13s → WP-10 | Додати `py.typed`, щоб тести імпортували `HOLD_LOG_MESSAGE` без приглушення type checker | Відкрито — після M3, необов'язково | [WP-13s](../WP-13.md) |
+| R30 | Ручна перевірка Telegram → WP-04 | Пропускати службові повідомлення з порожнім текстом або позначати metadata; точність `by_strategy` для дочитування історії без `pts` | Відкрито — після M3, рішення власника | [WP-04, реальний Telegram](../WP-04.md#перевірка-на-реальному-telegram-координатор-2026-09-30) |
+| R31 | WP-14 → людина, координатор | Вимірювання `dev-laptop` / `single-node`, навантаження/SLA та реальні LLM/AWS/IdP/Telegram edge cases, якщо вони стануть цільовими | Відкрито — після M3, за окремим рішенням. `dev-laptop` ×3 виключено з M3 рішенням 2026-10-08; `ci` прийнято наживо | [WP-14](../WP-14.md), [неперевірені зовнішні системи](../../acceptance/matrix.md#не-перевірено-на-реальних-сервісах) |
+
+## Закриті або частково закриті запити зі старих звітів
+
+| Від → кому | Запит | Хто / де закрив; коротка звірка |
+|---|---|---|
+| Частина C / WP-07 → WP-01, WP-06/10/11 | B1: безпечний читач ContentRef, SSRF runtime; доступ runtime до files RAW | **Закрито WP-01h, merge `cdf261a`**. `ContentReader` імпортують runtime/packages, llm/packages/handler, assistant/content; у compose RO `storage-data` і корені `objects/`. [B1](01h-content-policy.md), [код runtime](../../../services/handler-runtime/src/jane_handler_runtime/packages.py), [compose](../../../infra/compose.yaml). Writer — R18; storage `from_stage` — R19 |
+| B1 → WP-13 / агент документації | Allowlist e2e, звужений root runtime; звести compose-зміни | **Закрито інтеграцією B1**: [e2e overlay](../../../tests/e2e/compose.e2e.yaml), [compose](../../../infra/compose.yaml); [звіт B1](01h-content-policy.md) |
+| WP-05 / WP-07 / WP-14 → WP-06 | Канонічний `build_archive` SDK | **Закрито M3 should-fix, merge `69ab303`**: ZIP_STORED, sorted entries, дата 1980, атрибути 0644 у [package.py](../../../libs/extractor-sdk/src/jane_extractor_sdk/package.py). Документальні уточнення — R10; [звіт](m3-should-fix.md) |
+| Частина C → WP-02/04/09/10 | Egress link-local/metadata Web Collector, TOCTOU secret files, malformed port llm, keep-alive orchestrator | **Закрито M3 should-fix `69ab303`**: [egress.py](../../../services/web-collector/src/jane_web_collector/egress.py), [secret_files llm](../../../services/llm/src/jane_llm/secret_files.py), [secret_files Telegram](../../../services/telegram-collector/src/jane_telegram_collector/secret_files.py), [connections llm](../../../services/llm/src/jane_llm/connections.py), [executors](../../../services/orchestrator/src/jane_orchestrator/executors.py); [докази](m3-should-fix.md) |
+| WP-12d / WP-13 → WP-09 | RAW-фільтр джерела, `ProblemGroup.samples[].stored_object_id` | **Закрито M3 should-fix `69ab303`**: [engine.py](../../../services/orchestrator/src/jane_orchestrator/engine.py) передає `source_id` й зберігає id RAW; неоднозначність зберігається, id не вгадується. [Звіт](m3-should-fix.md). Точний вибір ревізії у запиті — R06 |
+| Should-fix → WP-12d | Зняти `test.fail` для source-фільтра після real-контролю | **Закрито WP-12d `b6777fb`, merge `bf69429`**: [тест](../../../web/admin/e2e/hybrid-m2-cycle.spec.ts) з точними asserts; [WP-12](../WP-12.md): `1 passed (33.6s)` на backend `69ab303` |
+| WP-13r → WP-10 / WP-11 / WP-13 | Active replay completions і onboarding/improvement; unavailable orchestrator не валить оплачений unknown analysis | **Закрито WP-13s, merge `86cdece`**: [active replay](../../../tests/e2e/test_r04_active_replays.py), [unknown.py](../../../services/assistant/src/jane_assistant/unknown.py) ловить RemoteError/JaneError/httpx.HTTPError. [CI 37847417132](https://github.com/sql-monk/Jane/actions/runs/37847417132): 75 passed; [звіт](../WP-13.md) |
+| WP-13 / частина A → WP-05 / WP-13 | Registry замість тимчасового package-host, pinned storage/LLM/rules forks, cache identity LLM | **Закрито WP-13t, WP-07c/10d/13**: [registry fixtures](../../../tests/e2e/jane_e2e/registry.py), [типи пакетів](../../../tests/e2e/test_m2_registry_types.py); чинні етапи мають package id/version/digest; [матриця](../../acceptance/matrix.md), [WP-13](../WP-13.md) |
+| WP-07 / WP-08 / WP-01 → WP-01 | Адаптери у workspace/types і 4 CI integration jobs | **Закрито координатором/WP-01**: [pyproject.toml](../../../pyproject.toml) `services/storage/adapters/*`, [dev.py](../../../scripts/dev.py) members, [CI](../../../.github/workflows/ci.yml) matrix sqlserver/mongodb/minio/s3; [status](../status.md) |
+| WP-00 / WP-06 → WP-05 / WP-06 | Опублікований runtime profile, перевірка залежностей registry, export → isolated runtime | **Закрито WP-05/06**: [profiles.py](../../../services/registry/src/jane_registry/profiles.py), [runtime profile](../../../services/handler-runtime/src/jane_handler_runtime/profiles/python-extractor-1.json), [registry e2e](../../../tests/e2e/test_m2_registry.py); [WP-05](../WP-05.md), [WP-06](../WP-06.md) |
+| WP-09 → WP-05 | kind, auto_changes_allowed, status, test_status, digest | **Закрито WP-05**: [service.py](../../../services/registry/src/jane_registry/service.py) package/version views; [app.py](../../../services/registry/src/jane_registry/app.py) фільтри, fork/approve; [WP-05](../WP-05.md) |
+| WP-09 → WP-02 / WP-04 | Ідемпотентні collections, max_unacked з запиту, rules_ref без registry | **Закрито WP-02/04**: [crawler.py](../../../services/web-collector/src/jane_web_collector/crawler.py), [Telegram app](../../../services/telegram-collector/src/jane_telegram_collector/app.py), [R-04](../../../tests/e2e/test_r04_idempotency.py); [WP-02](../WP-02.md), [WP-04](../WP-04.md) |
+| WP-07 / WP-10 / WP-04 → WP-09 | delivery_key/idempotency, handler digest, connections/budgets/context trace, sync telegram_account | **Закрито WP-09**: [engine.py](../../../services/orchestrator/src/jane_orchestrator/engine.py) invocations і sync; [WP-09](../WP-09.md). Flood-wait retry semantics потребують окремого остаточного узгодження, див. нижче |
+| WP-11 / WP-01 / WP-14 → WP-01a / WP-12 | Усі сервіси в compose/proxy, packageManager і CSP, real UI через Caddy | **Закрито WP-01a/WP-12**: [compose](../../../infra/compose.yaml), [Caddyfile](../../../infra/proxy/Caddyfile), [package.json](../../../web/admin/package.json); [WP-12](../WP-12.md). Зведений real gate після B2 — поточний B-7 |
+| WP-09 / WP-14 → WP-01b / WP-02 | PlatformLimits для всіх сервісів; per-host лімітер одного процесу; CI limits job | **Закрито WP-01b/WP-02c/WP-14**: [config](../../../libs/jane-kit/src/jane_kit/config.py), [host limiter](../../../services/web-collector/src/jane_web_collector/host_limits.py), [CI](../../../.github/workflows/ci.yml); `ci` прийнято наживо. [WP-14](../WP-14.md). Межа між екземплярами — R15 |
+| WP-14 / частина B → WP-01 / WP-14d | Точки входу, scheduler env, dump/restore, offline unit, профілі/операційні приклади | **Закрито WP-14d, merge `0507ef9`**: [README](../../../README.md), [dev.py](../../../scripts/dev.py) EXTRA_UNIT_PATHS, [compose](../../../infra/compose.yaml), [операції](../../operations/README.md); [WP-14](../WP-14.md). Types extras — R27 |
+| WP-13 / WP-14 → WP-01e / координатор | Керована зміна цін testsite; зареєстровані product/price пакети, запуск demo/Telegram прикладів | **Закрито WP-01e/WP-14/13**: [testsite](../../../tests/fixtures/testsite), [prices e2e](../../../tests/e2e/test_m2_prices.py), [examples](../../../examples); [WP-14](../WP-14.md). Реальний Telegram вручну — [WP-04](../WP-04.md); ширші живі перевірки — R31 |
+| WP-00 → WP-01 | LF, контрактний lint/codegen, ізольовані DB/roles і proxy | **Закрито WP-01**: [.gitattributes](../../../.gitattributes), [dev.py](../../../scripts/dev.py), [compose](../../../infra/compose.yaml); [WP-00](../WP-00.md), [WP-01](../WP-01.md). Увесь первісний запит jane-kit частково виконано: auth чекає B2, writer/refactor — R17/R18 |
+| WP-01d → WP-11 | Зняти lifecycle xfail після виправлення jane-kit | **Закрито в коді WP-11**: [test_process_e2e.py](../../../services/assistant/tests/test_process_e2e.py) містить `test_lifecycle_over_http`, `rg xfail services/assistant/tests` не знаходить позначок. Новий прогін у B-6 не запускався; [запит WP-01](../WP-01.md) |
+
+### Уточнення без підтвердженого закриття
+
+- **WP-04 → WP-09:** після `rate_limited` incremental має стартувати не раніше `retry_after_seconds`.
+  Синхронізація `telegram_account` реалізована; цей окремий сценарій у переглянутих доказах не зафіксований як
+  закритий. **Відкрито — після M3**, [WP-04](../WP-04.md), [WP-09](../WP-09.md).
+- **WP-05 → WP-09/WP-00:** агрегований `test_status` усіх прив'язок, коли перевірено не лише останню.
+  **Відкрито — після M3**, [WP-05](../WP-05.md); API списку та activation policy вже використовуються S-M2-07.
+- **WP-01c → WP-11:** актуальний опис UUID `INSTANCE_ID` та інший явний ID після рестарту.
+  README досі містить типовий `hostname-pid`, тому документальний запит **відкритий — після M3**;
+  [README асистента](../../../services/assistant/README.md), [WP-01](../WP-01.md).
+
+Правила «не тягнути httpx2», оновлювати jane-kit при зміні його контрактів, позначати isolation-тести,
+брати фікстури з testsite та викликати contract-guardian для `contracts/` — постійні правила, а не незавершені WP.
+Нові SLA, live доступи та додаткові стратегії потребують окремого доручення; B-6 їх не реалізує.

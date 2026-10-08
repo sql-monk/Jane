@@ -37,6 +37,15 @@
 Мережу блокує не хук, а сама пісочниця (`network_mode=none`: у контейнері лише `lo`); хук лише фіксує спробу для
 діагностики. stdout/stderr коду (обрізані до `max_output_bytes`) — у `diagnostics.logs_ref` (inline).
 
+Порядок класифікації `failed`: `timeout` (runtime убив за `wall_time_ms`/`invocation_timeout_ms`) → нестача пам'яті →
+`max_output_bytes` → лише потім розбір виводу раннера. Нестача пам'яті (`resource_exceeded`, `failure.details`:
+`memory_mb`, `exit_code`, `evidence`) — це `State.OOMKilled` рушія (`evidence: oom_killed`) **або** завершення
+SIGKILL (`exit_code` 137 = 128 + 9, бо cgroup OOM killer убиває дочірній Python, а PID 1 `timeout` повертає
+128 + сигнал), якого runtime не надсилав — ні тайм-аут, ні скасування (`evidence: sigkill`). Прапорець `OOMKilled`
+сам по собі ненадійний: рушій може ще не виставити його на момент `inspect` одразу після виходу. Звичайний ненульовий
+код без SIGKILL лишається `execution_error`. Backend `subprocess` ліміту пам'яті не має, тож SIGKILL там —
+`execution_error`.
+
 ## Профіль runtime `python-extractor@1`
 
 Образ: [`sandbox/python-extractor-1/Dockerfile`](sandbox/python-extractor-1/Dockerfile) (база

@@ -25,7 +25,14 @@ from jane_kit.errors import FieldError, JaneError, ServiceUnavailable, Validatio
 
 from .packages import ContentFetcher, LoadedPackage, PackageStore
 from .profiles import check_dependencies, load_profiles
-from .sandbox import INVOCATION_LABEL, Bundle, SandboxBackend, SandboxOutcome, SandboxUnavailable
+from .sandbox import (
+    INVOCATION_LABEL,
+    Bundle,
+    SandboxBackend,
+    SandboxOutcome,
+    SandboxUnavailable,
+    killed_by_sigkill,
+)
 from .schemas import ContractSchemas, validate_instance
 from .settings import DEFAULT_PROFILE, ServiceLimits, Settings, request_layer, resolve_service_limits
 
@@ -356,11 +363,14 @@ class Executor:
                 wall_time_ms=sandbox.wall_time_ms,
                 sandbox=dict(outcome.details),
             )
-        if outcome.oom_killed:
+        # Resource causes come before the runner output: a killed runner leaves no (or partial) output.
+        if outcome.oom_killed or self._memory_kill(outcome):
             return fail(
                 "resource_exceeded",
                 f"memory limit {sandbox.memory_mb} MB exceeded; sandbox killed",
                 memory_mb=sandbox.memory_mb,
+                exit_code=outcome.exit_code,
+                evidence="oom_killed" if outcome.oom_killed else "sigkill",
             )
         if outcome.stdout_truncated:
             return fail(
@@ -414,6 +424,16 @@ class Executor:
                 traceback=error.get("traceback"),
             )
         return self._success_like(prep, results, result, diagnostics, fail)
+
+    def _memory_kill(self, outcome: SandboxOutcome) -> bool:
+        """SIGKILL that the runtime did not send (no wall-time kill, no cancel) under a kernel memory limit:
+        the OOM killer, even when the engine has not (yet) reported ``OOMKilled``."""
+        return (
+            self.backend.enforces_memory_limit
+            and not outcome.timed_out
+            and not outcome.killed_by_runtime
+            and killed_by_sigkill(outcome.exit_code)
+        )
 
     def _success_like(
         self,

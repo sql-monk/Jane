@@ -30,6 +30,7 @@ __all__ = [
     "SandboxOutcome",
     "SandboxUnavailable",
     "SubprocessSandbox",
+    "killed_by_sigkill",
     "read_limited",
 ]
 
@@ -37,6 +38,14 @@ log = logging.getLogger(__name__)
 
 INVOCATION_LABEL = "io.jane.invocation-id"
 """Label (and subprocess key) that identifies the sandbox of an invocation, used to stop it on cancel."""
+
+SIGKILL = 9  # signal.SIGKILL does not exist on Windows
+
+
+def killed_by_sigkill(exit_code: int | None) -> bool:
+    """The sandbox process ended by SIGKILL: ``128 + 9`` (container / ``timeout`` as PID 1 report a child
+    killed by a signal this way) or ``-9`` (``Popen.returncode`` of a killed child on POSIX)."""
+    return exit_code in (128 + SIGKILL, -SIGKILL)
 
 
 class SandboxUnavailable(RuntimeError):
@@ -91,6 +100,10 @@ class SandboxOutcome:
     duration_ms: int
     timed_out: bool = False
     oom_killed: bool = False
+    """The engine reported an OOM kill (container state). Not reliable on its own: it can be missing even
+    when the kernel OOM killer stopped the process, see :attr:`SandboxBackend.enforces_memory_limit`."""
+    killed_by_runtime: bool = False
+    """The runtime itself force-stopped the sandbox for a reason other than wall time (job cancel)."""
     stdout_truncated: bool = False
     stderr_truncated: bool = False
     backend: str = ""
@@ -99,6 +112,10 @@ class SandboxOutcome:
 
 class SandboxBackend(Protocol):
     name: str
+    enforces_memory_limit: bool
+    """``memory_mb`` is a kernel (cgroup) limit of the sandbox. Then the only SIGKILL the runtime did not send
+    (no timeout, no cancel) is the OOM killer, and the executor classifies it as ``resource_exceeded`` even if
+    the engine did not report ``OOMKilled``."""
 
     def run(
         self, image: str, bundle: Bundle, limits: SandboxLimits, labels: Mapping[str, str]
@@ -124,9 +141,12 @@ def read_limited(stream: io.BufferedIOBase | None, limit: int) -> tuple[bytes, b
 
 class SubprocessSandbox:
     """Runs the runner as a local process. **No isolation** (no network block, no FS or memory limits):
-    only for trusted packages in local development and unit tests; refused unless explicitly allowed."""
+    only for trusted packages in local development and unit tests; refused unless explicitly allowed.
+
+    Without a memory limit a SIGKILL cannot be attributed to ``memory_mb``: it stays ``execution_error``."""
 
     name = "subprocess"
+    enforces_memory_limit = False
 
     def __init__(self, allowed: bool, kill_grace_ms: int = 0) -> None:
         self.allowed = allowed
@@ -195,6 +215,7 @@ class SubprocessSandbox:
                     stderr=stderr,
                     duration_ms=int((time.monotonic() - started) * 1000),
                     timed_out=timed_out,
+                    killed_by_runtime=killed,
                     stdout_truncated=out_trunc,
                     stderr_truncated=err_trunc,
                     backend=self.name,

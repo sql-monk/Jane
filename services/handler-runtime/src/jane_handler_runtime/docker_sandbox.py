@@ -11,13 +11,19 @@ Container settings - every number comes from ``limits.sandbox``:
   root with read-only modes; the volume is removed together with the container;
 * ``wall_time_ms``: the runtime kills the container when it is exceeded (``failed``/``timeout``), and inside the
   container ``timeout -s KILL`` fires ``kill_grace_ms`` later as a safety net if the runtime itself died;
-* stdout/stderr are read up to ``max_output_bytes``; OOM is taken from the container state.
+* stdout/stderr are read up to ``max_output_bytes``;
+* OOM: ``State.OOMKilled`` is only a hint - the engine may not have it set yet when the container is inspected
+  right after exit (the OOM event races the exit event), and the cgroup OOM killer usually stops the Python
+  child, so PID 1 (``timeout``) exits with ``128 + 9``. The outcome therefore also carries the exit code and
+  whether the runtime killed the container itself (cancel); the executor classifies an unexplained SIGKILL as
+  ``resource_exceeded`` (``enforces_memory_limit``).
 """
 
 from __future__ import annotations
 
 import contextlib
 import logging
+import threading
 import time
 import uuid
 from collections.abc import Iterator, Mapping
@@ -53,6 +59,7 @@ def _read_stream(chunks: Iterator[bytes], limit: int) -> tuple[bytes, bool]:
 
 class DockerSandbox:
     name = "docker"
+    enforces_memory_limit = True  # mem_limit == memswap_limit == limits.memory_mb on every container
 
     def __init__(
         self,
@@ -71,6 +78,10 @@ class DockerSandbox:
         self.user = user
         self.kill_grace_ms = kill_grace_ms
         self.extra_labels = dict(extra_labels or {})
+        # Invocations running in this process, and those of them the runtime stopped (cancel).
+        self._lock = threading.Lock()
+        self._running: set[str] = set()
+        self._killed: set[str] = set()
 
     @property
     def api(self) -> Any:
@@ -154,6 +165,9 @@ class DockerSandbox:
             raise SandboxUnavailable(f"cannot create sandbox container: {exc}") from exc
         cid = container["Id"]
         timed_out = False
+        key = labels.get(INVOCATION_LABEL, "")
+        with self._lock:
+            self._running.add(key)
         try:
             api.put_archive(cid, WORKDIR, bundle.tar())
             started = time.monotonic()
@@ -181,6 +195,8 @@ class DockerSandbox:
                 api.logs(cid, stdout=False, stderr=True, stream=True, follow=False), limits.max_output_bytes
             )
             state = api.inspect_container(cid).get("State", {})
+            with self._lock:
+                killed = key in self._killed
             return SandboxOutcome(
                 exit_code=exit_code,
                 stdout=stdout,
@@ -188,12 +204,16 @@ class DockerSandbox:
                 duration_ms=duration_ms,
                 timed_out=timed_out,
                 oom_killed=bool(state.get("OOMKilled")),
+                killed_by_runtime=killed,
                 stdout_truncated=out_trunc,
                 stderr_truncated=err_trunc,
                 backend=self.name,
                 details={"container": name, "image": image},
             )
         finally:
+            with self._lock:
+                self._running.discard(key)
+                self._killed.discard(key)
             try:
                 api.remove_container(cid, v=True, force=True)
             except (NotFound, APIError) as exc:  # pragma: no cover - best effort
@@ -202,7 +222,14 @@ class DockerSandbox:
                 )
 
     def kill(self, invocation_id: str) -> int:
-        """Stop the sandbox of an invocation (job cancel), on this engine, by label."""
+        """Stop the sandbox of an invocation (job cancel), on this engine, by label.
+
+        A run of this process is marked first, so its outcome says the runtime (not the OOM killer) sent the
+        SIGKILL. A container of another instance on a shared engine is killed too; that instance discards the
+        result of a cancelled job anyway."""
+        with self._lock:
+            if invocation_id in self._running:
+                self._killed.add(invocation_id)
         filters = {"label": [f"{INVOCATION_LABEL}={invocation_id}"]}
         killed = 0
         for c in self.api.containers(filters=filters):

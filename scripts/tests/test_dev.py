@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from argparse import Namespace
 from pathlib import Path
 from types import ModuleType
@@ -25,6 +26,14 @@ def load(name: str) -> ModuleType:
 
 
 dev = load("dev")
+
+
+def test_workspace_members_cover_every_locked_package() -> None:
+    lock = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
+    actual = dev.members()
+    assert ROOT / "contracts" / "python" in actual
+    assert len(actual) == len(set(actual))
+    assert {dev.member_name(path) for path in actual} == set(lock["manifest"]["members"])
 
 
 def test_new_service_renders_every_name(tmp_path: Path) -> None:

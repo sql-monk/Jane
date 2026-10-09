@@ -83,17 +83,21 @@ README. Зокрема для Web Collector має виконуватись `TTL
 
 ## Монорепозиторій
 
-- uv workspace, члени — за шаблонами `libs/*`, `services/*`, `templates/service`, `tests/fixtures/testsite`.
+- uv workspace, члени — `contracts/python` і шаблони `libs/*`, `services/*`,
+  `services/storage/adapters/*`, `templates/service`, `tests/fixtures/testsite`.
   Новий сервіс (`services/<ім'я>/pyproject.toml`) стає членом без змін кореневого `pyproject.toml`;
   `uv.lock` оновлює `uv lock` (його дозволено змінювати кожному WP).
 - Залежність від спільної бібліотеки: `dependencies = ["jane-kit"]` + `[tool.uv.sources] jane-kit = { workspace = true }`.
-- `jane-contracts` (`contracts/python`, Protocol-и WP-00) — **не** член workspace, а path-залежність:
-  `jane-contracts = { path = "<відносний шлях>/contracts/python", editable = true }` (web-collector, storage і
-  його адаптери). uv не дозволяє члену workspace бути path-джерелом (`Workspace members must be declared as
-  workspace sources`), тож перенесення в `members` можливе лише разом із заміною джерела на `{ workspace = true }`
-  в усіх споживачах однією зміною. `contracts/` перевіряє лінтер WP-00; `just lint` / `just fmt` також
-  явно перевіряють / виправляють формат `contracts/python`. Перевірки правил ruff і mypy workspace
-  решту `contracts/` пропускають.
+- `jane-contracts` (`contracts/python`, Protocol-и WP-00) — член workspace. Споживач додає `"jane-contracts"`
+  у `dependencies`; спільне джерело `[tool.uv.sources] jane-contracts = { workspace = true }` у кореневому
+  `pyproject.toml` успадковують усі члени workspace, включно з вкладеними адаптерами storage.
+  Їхні власні path-джерела `jane-storage` і `jane-storage-s3` лишаються: uv 0.12.13 під час збирання
+  вкладеного проєкту не знаходить зовнішній workspace, тому локальний `workspace = true` в адаптері
+  дає помилку discovery. Для `jane-contracts` не додавайте локальний path-override чи workspace-override.
+  `members()` у `scripts/dev.py` читає ті самі шаблони з кореневого `pyproject.toml`;
+  `just types` перевіряє також `contracts/python/src`. `contracts/` перевіряє лінтер WP-00;
+  `just lint` / `just fmt` явно перевіряють / виправляють формат `contracts/python`.
+  Перевірки правил ruff і mypy workspace решту `contracts/` пропускають.
 - Маркери pytest: `contract`, `integration`, `isolation`; решта — unit. Тести кожного пакета — у його `tests/`
   (режим `--import-mode=importlib`, однакові імена файлів у різних пакетах дозволені).
 - Згенерований код — у теках `_generated/` (ruff і mypy їх пропускають).

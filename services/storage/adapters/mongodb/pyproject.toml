@@ -22,7 +22,6 @@ mongodb = "jane_storage_mongodb:MongoAdapter"
 # A path (not workspace) source: uv does not treat a project nested in another member as a workspace
 # member when building it, see services/storage/README.md.
 jane-storage = { path = "../..", editable = true }
-jane-contracts = { path = "../../../../contracts/python", editable = true }
 
 [build-system]
 requires = ["hatchling>=1.25"]

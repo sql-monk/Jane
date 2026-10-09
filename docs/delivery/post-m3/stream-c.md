@@ -239,3 +239,15 @@ Readonly `git diff bb1982b 22f8366 -- services/telegram-collector libs/jane-kit 
 Branch CI не названо зеленим. Прийняте незалежним review злиття C-2 збережено; фінальне закриття
 коду C-2/C-3 чекає окремого точного integration CI. Повний C dispatch досі 0, не дубльовано
 ні branch run, ні B final run; локальні повні набори та успішні targeted gates не повторювались.
+
+### Запит C-2 до storage — виконано власником
+
+2026-10-09 16:42 (Київ): origin підтвердив accepted WP-19a — авторський документальний коміт
+`251419212656ca867221f9373e97ae749739fa76`, merge
+`f4c62bbd9774203e6eeff9de4aab2ca81ce4dd37`, запис A `cb7434b`.
+У `services/storage/README.md` власник вилучив саме jane-contracts path-override,
+додав root workspace inheritance та посилання на DEVELOPMENT; jane-storage path source збережено.
+Звіт — [workspace-doc-followup.md](../WP-19/workspace-doc-followup.md).
+Readonly diff звірено: лише README і звіт; додаткові тести/review для документів не потрібні.
+Цей документальний запит закрито. Telegram CI owner request лишається відкритим;
+фінальний B run ще виконує e2e, C dispatch count 0, cleanup C-4 не починався.

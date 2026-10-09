@@ -39,28 +39,44 @@
     },
     "02": {
       "name": "web-collector-core",
-      "allow": ["services/web-collector/**"],
-      "deny": ["services/web-collector/strategies/discovery/**"]
+      "allow": [
+        "services/web-collector/**"
+      ],
+      "deny": [
+        "services/web-collector/strategies/discovery/**"
+      ]
     },
     "03": {
       "name": "web-collector-discovery",
-      "allow": ["services/web-collector/strategies/discovery/**"]
+      "allow": [
+        "services/web-collector/strategies/discovery/**"
+      ]
     },
     "04": {
       "name": "telegram-collector",
-      "allow": ["services/telegram-collector/**"]
+      "allow": [
+        "services/telegram-collector/**"
+      ]
     },
     "05": {
       "name": "registry",
-      "allow": ["services/registry/**", ".claude/skills/jane-handler-package/**"]
+      "allow": [
+        "services/registry/**",
+        ".claude/skills/jane-handler-package/**"
+      ]
     },
     "06": {
       "name": "handler-runtime",
-      "allow": ["services/handler-runtime/**", "libs/extractor-sdk/**"]
+      "allow": [
+        "services/handler-runtime/**",
+        "libs/extractor-sdk/**"
+      ]
     },
     "07": {
       "name": "storage-core",
-      "allow": ["services/storage/**"],
+      "allow": [
+        "services/storage/**"
+      ],
       "deny": [
         "services/storage/adapters/sqlserver/**",
         "services/storage/adapters/mongodb/**",
@@ -79,27 +95,100 @@
     },
     "09": {
       "name": "orchestrator",
-      "allow": ["services/orchestrator/**"]
+      "allow": [
+        "services/orchestrator/**"
+      ]
     },
     "10": {
       "name": "llm",
-      "allow": ["services/llm/**"]
+      "allow": [
+        "services/llm/**"
+      ]
     },
     "11": {
       "name": "assistant",
-      "allow": ["services/assistant/**"]
+      "allow": [
+        "services/assistant/**"
+      ]
     },
     "12": {
       "name": "admin",
-      "allow": ["web/admin/**"]
+      "allow": [
+        "web/admin/**"
+      ]
     },
     "13": {
       "name": "integration-acceptance",
-      "allow": ["tests/e2e/**", "docs/acceptance/**"]
+      "allow": [
+        "tests/e2e/**",
+        "docs/acceptance/**"
+      ]
     },
     "14": {
       "name": "limit-profiles-ops",
-      "allow": ["deploy/profiles/**", "docs/operations/**", "examples/**"]
+      "allow": [
+        "deploy/profiles/**",
+        "docs/operations/**",
+        "examples/**"
+      ]
+    },
+    "15": {
+      "name": "post-m3-llm-assistant",
+      "allow": [
+        "services/llm/**",
+        "services/assistant/**",
+        "contracts/**",
+        "web/admin/src/api/generated/**"
+      ]
+    },
+    "16": {
+      "name": "post-m3-collectors",
+      "allow": [
+        "services/web-collector/**",
+        "services/telegram-collector/**",
+        "contracts/**",
+        "web/admin/src/api/generated/**"
+      ]
+    },
+    "17": {
+      "name": "post-m3-orchestrator-registry-storage",
+      "allow": [
+        "services/orchestrator/**",
+        "services/registry/**",
+        "services/storage/**",
+        "services/handler-runtime/**",
+        "contracts/**",
+        "web/admin/src/api/generated/**",
+        "infra/compose.yaml"
+      ]
+    },
+    "18": {
+      "name": "post-m3-kit-tooling",
+      "allow": [
+        "libs/jane-kit/**",
+        "contracts/python/**",
+        "contracts/tools/**",
+        "scripts/**",
+        "justfile",
+        "pyproject.toml",
+        ".github/**",
+        "DEVELOPMENT.md"
+      ]
+    },
+    "19": {
+      "name": "post-m3-shared-stores-contentref",
+      "allow": [
+        "libs/jane-kit/**",
+        "services/**",
+        "templates/service/**",
+        "infra/compose.yaml"
+      ]
+    },
+    "20": {
+      "name": "post-m3-admin",
+      "allow": [
+        "web/admin/**"
+      ]
     }
   }
 }

@@ -64,7 +64,7 @@ B1, B2; решта (пакет уточнень контрактів через 
 
 | Інкремент | Гілка | Закриває | Стан / доказ |
 |---|---|---|---|
-| WP-01g | `wp/01g2-service-auth` | B2: автентифікація й scopes у jane-kit, усі 8 сервісів, сервісні токени, стеки в `api_key` | Виправлення r1 підтверджено A: [37 passed і мутант 2 failed](01g-auth-coordinator.md); CI 37857870977 ще виконує e2e, злиття очікує його завершення |
+| WP-01g | `wp/01g2-service-auth` | B2: автентифікація й scopes у jane-kit, усі 8 сервісів, сервісні токени, стеки в `api_key` | Прийнято, злито `5fd7acd`; [37 passed і мутант 2 failed](01g-auth-coordinator.md); CI 37857870977 — 13/13, e2e 75 passed |
 | WP-01h | `wp/01h-content-ref-policy` | B1 + SSRF runtime: спільний читач ContentRef з коренями й allowlist | Прийнято, злито `cdf261a`; C-1 підтвердив закриття у погодженій моделі довіри |
 | WP-13r | `wp/13r-r04-active-replays` | R-04 під час активної роботи (7 виконавців) | Прийнято, злито `08b4110`; C-1 підтвердив |
 | WP-13s | `wp/13s-r04-completions` | R-04 для LLM completions і асистента; затримка фейкового LLM; дефект WP-11 `unknown.py` | Прийнято, злито `86cdece`; C-1 підтвердив |
@@ -73,6 +73,7 @@ B1, B2; решта (пакет уточнень контрактів через 
 | M3 should-fix | `wp/m3-should-fix` | SDK-архів, keep-alive, політика адрес Web Collector, TOCTOU, порт llm; source_id/stored_object_id повторної обробки | Прийнято, злито `69ab303`; C-1 підтвердив |
 | WP-12d | `wp/12d2-real-reprocessing` | S-M2-10: адмінка на реальному API | Прийнято, злито `bf69429`; C-1 підтвердив із неблокувальним C-W2 |
 | WP-06c | `wp/06c-oom-classification` | OOM: SIGKILL за memory limit без OOMKilled | Прийнято, злито `041e20d`; C-1 підтвердив розрізнення evidence sigkill/oom_killed |
+| WP-06d | `wp/06d-async-network-test` | Windows network sandbox test очікує кінцеву job після дозволеного 202 | Прийнято, злито `3e13f68`; незалежне рев'ю r1 accepted, два адресні прогони по 2 passed, assertions збережено; [звіт](../WP-06.md#wp-06d--network-violation-тест-із-дозволеним-202-2026-10-09) |
 
 [Фінальне рев'ю дельти C-1](final-review-delta.md) опубліковано `22ce98e`: нових блокерів M3 немає.
 Після B2 залишаються B-7/B-8 (один real-прогін адмінки на зведеній ревізії), відтворення C-2,

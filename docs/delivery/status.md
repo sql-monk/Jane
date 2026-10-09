@@ -753,3 +753,30 @@ r1 → виправлення на `origin/wp/01g2-service-auth`, CI 37857870977
   й push; далі B-7/B-8 та C-2, один фінальний CI, заповнення матриці/приймання WP-13 і WP-14.
   M3 ще не досягнуто; `main` не змінюється агентом.
 
+### B2 прийнято й злито потоком A (2026-10-09)
+
+- `5fd7acd`: **merge: accept B2 / WP-01g service authentication**; push до origin виконано.
+  [CI 37857870977](https://github.com/sql-monk/Jane/actions/runs/37857870977) на `7b41bf4` — 13/13 job success,
+  e2e `75 passed in 1403.48s (0:23:23)`, без skip/xfail, `JANE_E2E_REQUIRED=1`; limits — warn (L2 jitter).
+  Маркер розблоковує B-7/B-8/B-9 і відтворення C-2. Злиття без конфліктів; OOM/WP-06c збережено.
+- На тотожному коді кандидата: ruff — All checks passed; auth/scopes/content `65 passed`,
+  orchestrator unit/contract `32 passed, 48 deselected`; runtime auth/classification `15 passed`.
+- Runtime unit/contract: **62 passed, 1 failed, 13 deselected** — network sandbox test отримав 202, бо
+  Windows-виконання вийшло за sync budget; job завершилась з правильним sandbox_violation.
+  Це припущення тесту про синхронність; окремий інкремент WP-06 зберігає assertions і чекає async job.
+  Повний протокол — [01g-auth-coordinator.md](M3/01g-auth-coordinator.md).
+- Фінальний M3 лишається відкритим: B-7/B-8, один real-admin прогін, C-2, виправлення очікування WP-06,
+  один CI на остаточній зведеній ревізії та заповнення фінального блоку матриці.
+
+### WP-06d прийнято; A чекає фінальних злиттів B/C (2026-10-09)
+
+- `3e13f68`: злито WP-06d — network sandbox test читає кінцевий result після HTTP 202; sync і async
+  параметри, усі перевірки failed/sandbox_violation/socket events збережено. Продукційний код незмінний.
+  Авторський і незалежний адресні прогони: **2 passed** (8.07s / 7.90s); ruff/format/mypy (26 файлів) —
+  без помилок, check-diff фактичної бази — 2 файли, 0 поза власністю. Незалежне рев'ю r1 — **accepted**.
+  Звіт — [WP-06, WP-06d](WP-06.md#wp-06d--network-violation-тест-із-дозволеним-202-2026-10-09).
+- Уточнення людини: потоки B і C **вже працюють**, A має дочекатися їхніх злиттів.
+  До появи B-7/B-8 із real-admin receipt і C-2 фінальний workflow_dispatch не запускається.
+- Закрито локальне припущення тесту про синхронність; повний Windows-набір вдруге не повторювався.
+  M3 лишається відкритим тільки до решти фінальних доказів і зведеного CI/матриці.
+

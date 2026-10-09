@@ -251,3 +251,26 @@ Branch CI не названо зеленим. Прийняте незалежн�
 Readonly diff звірено: лише README і звіт; додаткові тести/review для документів не потрібні.
 Цей документальний запит закрито. Telegram CI owner request лишається відкритим;
 фінальний B run ще виконує e2e, C dispatch count 0, cleanup C-4 не починався.
+
+## Фінальний CI B успішний; C очікує прийнятого Telegram follow-up
+
+2026-10-09 17:02 (Київ): actual `gh run view`
+[37937013460](https://github.com/sql-monk/Jane/actions/runs/37937013460) для точного
+`bb1982b9f6b1e2593fb2f1ab60a436e6945f15b1`: **completed / success**, усі 14 jobs.
+contracts-compat, lint, unit, web, web-mock-e2e, contract, isolation, stack, limits, e2e,
+adapters mongodb/s3/sqlserver/minio — success. Повні метадані й steps збережено в
+`.jane/stream-b-final-ci-37937013460.json` checkout `integ-c`.
+Origin-журнал B підтверджує accepted B-1…B-5; цей SHA передує C-2 і не підміняє потрібного CI C.
+Повний real22 браузерний набір workflow не запускає; його проходження тут не заявляється.
+
+Власник A взяв Telegram CI-запит у WP-19b: code `2e68cf7`, звіт/HEAD
+`b29a0406645c6b846211cade14a2a5d9ae697e76`; old-fail/new-pass відтворення вже є,
+але незалежне review та branch CI ще тривають, прийнятого злиття немає.
+Origin `50f5e23` містить запит перевірити виправлення єдиним фінальним CI C.
+Щоб цей run перевірив усунення відомої гонки, C чекає accepted WP-19b в integration;
+свої успішні перевірки та чуже review не повторює. Код C-2/C-3 уже є у свіжій integration,
+що підтверджено ancestry-перевіркою.
+
+**Фінальний C dispatch count 0, intent/run ID ще не створено.** Перед майбутнім dispatch
+перевірити свіжі journal/state/gh runs, зафіксувати expected SHA й intent, потім виконати лише один run.
+C-4 чекає цього CI success; людський cleanup script лишається незміненим, -Apply не виконувався.

@@ -366,3 +366,26 @@ WP-19 marker `ee78fc5` і WP-19b `88ec168` є в integration. Гейт C-4 ві�
 bounds/reparse/orphan safeguards і збереження .jane; до застосування — незалежний reviewer ≤2 раунди.
 Force-with-lease також не використовується: для remote race потрібен no-force CAS guard або
 refs залишаються з явною причиною. Код кандидата й fixture checks ще не прийняті.
+
+### C-4: незалежне review R1 — changes requested
+
+Рецензент `c3_review` (не автор C-4) прочитав ignored candidate SHA256
+`5999F1FC372C4EC77D4E07613FB382ECF17D03139BC4AED2B094A92EED1DD6C5`.
+Перший прохід рахується R1, навіть до фінального commit звіту; verdict — **changes requested**.
+Два дефекти з readonly оцінки коду:
+
+1. Remote deletion після архівування не перевіряла checked-out refs повторно. Чинний pre-push hook
+   міг відкрити worktree цільової гілки під час archive/delete. Потрібна live перевірка перед
+   existing hook і після нього; checkout має блокувати видалення на origin.
+2. Планування `Get-ArchiveName` не резервувало tag names: різні local/remote tips однієї гілки
+   отримували одну назву archive/branch, друга дія блокувалась після першого push.
+   Потрібні planned reservations за SHA й окремі immutable tags для різних tips.
+
+Fixture-репро рецензента в R1 ще не виконано; автор додасть actual regression cases до fixes.
+Далі лише незалежний R2 для frozen script hash/report SHA. Якщо R2 знайде дефект, автор виправляє,
+координатор сам виконує точне repro без третього раунду. Реального Apply і копіювання кандидата
+до людського скрипта ще не було.
+
+Авторський readonly dry-run виявив, що 13 orphan agent-* каталогів містять також source/public/scripts,
+package.json/README. Старе припущення «лише node_modules» більше не відповідає фактам;
+unknown content guard правильно лишає ці каталоги. Їхнє видалення не буде заявлено виконаним.

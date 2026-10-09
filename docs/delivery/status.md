@@ -879,5 +879,9 @@ r1 → виправлення на `origin/wp/01g2-service-auth`, CI 37857870977
   падіння `test_two_instances_share_state_and_take_over_after_kill`: коротка перша сторінка залишила
   acknowledged=1 / emitted=11 при queue=10, а споживач уже чекав emitted>=12 без подальших ACK.
   A взяв запит власнику Telegram у **новий WP-19b**, `wp/19b-telegram-pagination-test`, окремий checkout.
-  Виконавець готує детерміноване old-fail/new-pass відтворення й мінімальний fix споживання сторінок;
-  далі незалежне рев'ю саме цього інкремента й branch CI. Оригінальний WP-19 лишається accepted.
+  Код заморожено на `2e68cf7`, HEAD/звіт `b29a040`: old-fail (1 failed) / new-pass (1 passed)
+  відтворено на двох реальних OS processes із першою сторінкою limit=1; threshold=12, timeout=20,
+  queue=10 і exactly-once=80 збережено. Незалежне R1 цього інкремента триває;
+  [автоматичний branch CI 37940359810](https://github.com/sql-monk/Jane/actions/runs/37940359810) ще in_progress.
+  **WP-19b ще не accepted.** Запит до C: фінальний CI виконати на SHA з прийнятим WP-19b,
+  щоб перевірити усунення зафіксованої гонки споживача. Оригінальний WP-19 лишається accepted.

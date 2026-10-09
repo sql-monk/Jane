@@ -389,3 +389,18 @@ Fixture-репро рецензента в R1 ще не виконано; авт
 Авторський readonly dry-run виявив, що 13 orphan agent-* каталогів містять також source/public/scripts,
 package.json/README. Старе припущення «лише node_modules» більше не відповідає фактам;
 unknown content guard правильно лишає ці каталоги. Їхнє видалення не буде заявлено виконаним.
+
+### C-4: заморожений кандидат; R2 триває
+
+Авторський report SHA `d9b3c86afb1c9f5a14ce78500457e51a9bf0bb24` запушено у
+`wp/23d-cleanup-safety`; exact ls-remote збігається, tracked checkout чистий.
+Frozen ignored script SHA256
+`76711FBD434E8ACCE191DD246260B3D8649DE9DE48537DCB8E40DD052ADFCA58` звірено координатором.
+Parser 0 errors; actual author fixtures підтвердили dry-run без мутацій, immutable divergent
+tags, .jane archive, dirty/unmerged/reparse/unknown keep та failures archive push/hook/remote races.
+Реальний author dry-run лише планує дії; фактичних видалень/тегів 0.
+
+Той самий незалежний `c3_review` виконує **R2**, останній reviewer pass для цього hash/report SHA;
+автор не змінює frozen код. Нового workflow_dispatch немає. Людський script ще на original hash,
+review verdict, coordinator copy/dry-run/Apply очікуються. За дефекту R2 далі лише авторський fix
+і coordinator exact repro, без R3.

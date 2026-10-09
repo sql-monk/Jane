@@ -60,7 +60,9 @@
 тести з проблемних прикладів (`origin: problem_sample`), регресії на успішних прикладах і тести з
 параметрами кожної прив'язки (`listTasks?package_id=` + `getTask`). Ламає прив'язки інших джерел або
 несумісно змінює схему спільного пакета → форк для цього джерела (`policy.allow_fork`), інакше
-`unresolved`. `auto_changes_allowed = false` → `proposal_only`, нічого не публікується.
+`unresolved`. `auto_changes_allowed = false` → `proposal_only`, нічого не публікується, а сама пропозиція —
+у `ImprovementResult.proposal` (`based_on`, запропонована `version`, `manifest`, змінені `files` у формі
+`PublishRequest.files` registry, `diff` коду й схем): користувач переглядає й за бажання публікує її сам.
 `policy.approval = auto_after_checks` → погодження й `auto_activate` на всіх цільових прив'язках; якщо
 оркестратор відмовив на одній — уже активовані відкочуються (`kind: rollback`). Стан групи проблем
 (`in_progress` → `resolved` / `unresolved` з поясненням) оновлюється в оркестраторі — так невирішене видно
@@ -243,6 +245,7 @@ JANE_ASSISTANT_API_KEYS=[{"name": "admin", "sha256": "<sha256 hex ключа>", 
 | `state.pool_max_size` / `connect_timeout_ms` | 10 / 10000 | з'єднання з PostgreSQL |
 | `onboarding.requests_overhead_ratio` | 0.05 | запас запитів понад оцінку матеріалів |
 | `improvement.max_problem_samples`, `max_successful_examples`, `max_sample_chars`, `max_file_chars` | 10, 5, 6000, 20000 | обсяг даних для моделі |
+| `improvement.max_proposal_bytes` | 1048576 | `proposal_only`: обсяг змінених файлів у `ImprovementResult.proposal.files` (код і схеми першими, далі тестові матеріали; решта — в `omitted_files`) і розмір `diff` |
 | `unknown.min_confidence`, `max_sample_chars` | 0.6, 6000 | нижче — пропозиція `none` |
 | `transfer.inline_max_bytes` | 262144 | чернетка пакета до runtime inline; більша — `payload_too_large` |
 | `content.max_material_bytes` | 16777216 | найбільший вміст одного матеріалу (inline, `file://`, `download_url`); більший — `limit_exceeded` |

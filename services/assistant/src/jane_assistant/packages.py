@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import copy
+import difflib
 import hashlib
 import io
 import json
@@ -77,6 +78,14 @@ def strip_material(material: dict[str, Any]) -> dict[str, Any]:
     return {k: copy.deepcopy(material[k]) for k in keep if k in material}
 
 
+def file_entry(data: bytes) -> dict[str, str]:
+    """A package file as in ``registry.v1`` ``PublishRequest.files``: UTF-8 text, else base64."""
+    try:
+        return {"encoding": "utf-8", "data": data.decode("utf-8")}
+    except UnicodeDecodeError:
+        return {"encoding": "base64", "data": base64.b64encode(data).decode()}
+
+
 def expected_output(entities: list[dict[str, Any]]) -> dict[str, Any]:
     """``expected.json`` of a test: entities without observation/provenance."""
     return {
@@ -129,15 +138,61 @@ class PackageDraft:
 
     def publish_body(self) -> dict[str, Any]:
         """``registry.v1`` ``PublishRequest``: manifest + files (jane-package.json comes from manifest)."""
-        files = {}
-        for path, data in sorted(self.files.items()):
-            if path == MANIFEST:
-                continue
-            try:
-                files[path] = {"encoding": "utf-8", "data": data.decode("utf-8")}
-            except UnicodeDecodeError:
-                files[path] = {"encoding": "base64", "data": base64.b64encode(data).decode()}
+        files = {path: file_entry(data) for path, data in sorted(self.files.items()) if path != MANIFEST}
         return {"manifest": self.manifest, "files": files}
+
+    def proposal(
+        self,
+        base: PackageDraft,
+        based_on: dict[str, str],
+        *,
+        schema_change: str,
+        change_summary: str,
+        max_bytes: int,
+    ) -> dict[str, Any]:
+        """``assistant.v1`` ``ImprovementProposal``: this unpublished version as changes against ``base``.
+
+        ``files`` - changed and added files in the form of ``PublishRequest.files`` (code and schemas first, then
+        tests), while they fit into ``max_bytes``; the rest is listed in ``omitted_files``. ``diff`` - unified diff
+        of the changed text files under ``src/`` and ``schemas/`` (cut at ``max_bytes``)."""
+        changed = [p for p, data in self.files.items() if p != MANIFEST and base.files.get(p) != data]
+        changed.sort(key=lambda p: (not p.startswith(("src/", "schemas/")), p))
+        files: dict[str, dict[str, str]] = {}
+        omitted: list[str] = []
+        used = 0
+        for path in changed:
+            entry = file_entry(self.files[path])
+            if used + len(entry["data"]) > max_bytes:
+                omitted.append(path)
+                continue
+            files[path] = entry
+            used += len(entry["data"])
+        diff = "".join(
+            "".join(
+                difflib.unified_diff(
+                    base.text(path).splitlines(keepends=True),
+                    self.text(path).splitlines(keepends=True),
+                    fromfile=f"a/{path}" if path in base.files else "/dev/null",
+                    tofile=f"b/{path}",
+                )
+            )
+            for path in changed
+            if path.startswith(("src/", "schemas/"))
+        )
+        if len(diff) > max_bytes:
+            diff = diff[:max_bytes] + "\n[... diff cut at improvement.max_proposal_bytes]\n"
+        out: dict[str, Any] = {
+            "based_on": based_on,
+            "version": self.manifest["version"],
+            "schema_change": schema_change,
+            "change_summary": change_summary,
+            "manifest": self.manifest,
+            "files": files,
+            "diff": diff,
+        }
+        if omitted:
+            out["omitted_files"] = omitted
+        return out
 
     def archive(self) -> bytes:
         """Deterministic zip (sorted paths, fixed timestamps) with ``jane-package.json``."""

@@ -207,6 +207,9 @@ class ImprovementLimits(Limits):
     max_successful_examples: int = Field(default=5, ge=0)
     max_file_chars: int = Field(default=20_000, ge=200)
     """Package source file passed to the model (longer files are cut)."""
+    max_proposal_bytes: int = Field(default=1_048_576, ge=1_024)
+    """``proposal_only``: the changed files carried in ``ImprovementResult.proposal.files`` (code and schemas
+    first, then test fixtures; the rest is listed in ``omitted_files``) and the size of its ``diff``."""
 
 
 class UnknownLimits(Limits):

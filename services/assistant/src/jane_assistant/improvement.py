@@ -9,7 +9,8 @@
 3. A version that breaks bindings of other sources (or changes the schema incompatibly while the
    package is shared) becomes a fork for this source when ``policy.allow_fork``; otherwise the run is
    unresolved.
-4. ``auto_changes_allowed = false`` -> proposal only, nothing is published. ``policy.approval =
+4. ``auto_changes_allowed = false`` -> proposal only, nothing is published; the result carries the proposal
+   (``ImprovementResult.proposal``: changed files, manifest and diff against the improved version). ``policy.approval =
    auto_after_checks`` -> the version is approved and auto-activated on its bindings (the
    orchestrator re-checks the source policy); a partial activation is rolled back.
 5. Attempts (``limits.llm.max_improvement_attempts``) and spend (``limits.llm.budget``) are bounded;
@@ -20,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
@@ -366,8 +368,6 @@ async def improve_draft(
 
 
 def _is_slug(value: str) -> bool:
-    import re
-
     return re.match(_ENTITY_SLUG, value) is not None
 
 
@@ -456,8 +456,11 @@ async def run_improvement(
         raise ValidationFailed(
             f"{package_id} is a {package.get('kind')} package; improvement supports extractors"
         )
-    files, _digest = await nb.registry.archive_files(package_id, version)
+    files, digest = await nb.registry.archive_files(package_id, version)
     base = PackageDraft.from_files(files)
+    based_on = {"package_id": package_id, "version": version}
+    if digest and re.fullmatch(r"sha256:[a-f0-9]{64}", digest):
+        based_on["digest"] = digest
     await progress(1, "package loaded")
     problems = [
         await load_case(nb, s, f"p{i + 1}", limits.improvement.max_sample_chars)
@@ -527,7 +530,15 @@ async def run_improvement(
                 "note": f"automatic changes of {package_id} are forbidden; proposal {out.draft.manifest['version']} needs a manual change",
             },
         )
-        return result("proposal_only", version=out.draft.ref, activated=False, **common)
+        # Nothing is published: the proposal itself goes to the user (review, manual publication).
+        proposal = out.draft.proposal(
+            base,
+            based_on,
+            schema_change=out.schema_change,
+            change_summary=out.change_summary,
+            max_bytes=limits.improvement.max_proposal_bytes,
+        )
+        return result("proposal_only", version=out.draft.ref, activated=False, proposal=proposal, **common)
 
     draft = out.draft
     targets = [b for b in bindings if b.own] if needs_fork else bindings
@@ -647,8 +658,6 @@ async def _auto_activate(
 
 
 def _semver_key(v: str) -> tuple[int, int, int, int]:
-    import re
-
     m = re.match(r"^(\d+)\.(\d+)\.(\d+)(-)?", v)
     if not m:
         return (0, 0, 0, 0)

@@ -737,6 +737,57 @@ components:
           description: Пропозиція розширити очікувані типи даних джерела (приймає користувач).
         costs:
           $ref: '../schemas/handler-result.schema.json#/$defs/Money'
+        proposal:
+          description: Є лише за `outcome = proposal_only` — сама пропозиція (версію не опубліковано).
+          $ref: '#/components/schemas/ImprovementProposal'
+    ImprovementProposal:
+      type: object
+      description: |
+        Зміна пакета, якому заборонено автоматичні зміни (`auto_changes_allowed = false`): кандидат пройшов
+        тести, але асистент його не публікує. Користувач переглядає `diff` і, якщо погоджується, сам публікує
+        версію (`registry.v1` `publishPackageVersion` з `manifest` і файлами `based_on` + `files`).
+      required: [based_on, version, manifest, files]
+      properties:
+        based_on:
+          description: Версія, яку вдосконалено.
+          $ref: '../schemas/common/package-ref.schema.json'
+        version:
+          type: string
+          description: Запропонований номер версії (SemVer за характером зміни схеми); не опублікована.
+        schema_change:
+          type: string
+          enum: [none, additive, breaking]
+        change_summary:
+          type: string
+        manifest:
+          description: Маніфест запропонованої версії (з новими тестами з проблемних прикладів і походженням `llm`).
+          $ref: '../schemas/package-manifest.schema.json'
+        files:
+          type: object
+          description: |
+            Змінені й додані файли відносно `based_on` у формі `PublishRequest.files` registry: спершу код і схеми
+            (`src/`, `schemas/`), потім тестові матеріали — доки вміщуються в `improvement.max_proposal_bytes`
+            асистента; решта — в `omitted_files`. Незмінені файли беруться з `based_on`.
+          propertyNames:
+            $ref: '../schemas/package-manifest.schema.json#/$defs/PackagePath'
+          additionalProperties:
+            type: object
+            additionalProperties: false
+            required: [encoding, data]
+            properties:
+              encoding:
+                type: string
+                enum: [utf-8, base64]
+              data:
+                type: string
+        omitted_files:
+          type: array
+          items:
+            type: string
+          description: Змінені файли, що не вмістились у `files` (зазвичай великі тестові матеріали).
+        diff:
+          type: string
+          description: Unified diff змінених текстових файлів `src/` і `schemas/` для перегляду (обрізається за тим самим лімітом).
     UnknownMaterialRequest:
       type: object
       additionalProperties: false

@@ -75,7 +75,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     resolved = resolve_service_limits(settings)
     limits = resolved.limits
     state = StateStore(settings.state_dir / "state.db", busy_timeout_ms=settings.state_busy_timeout_ms)
-    schemas = ContractSchemas.locate(settings.contracts_dir)
+    schemas = ContractSchemas.for_service(settings.contracts_dir)
     factory = load_factory(settings)
     policy = settings.connection_policy()
     runner = JobRunner(store=SqliteJobStore(state, settings.instance_id), limits=limits.jobs)

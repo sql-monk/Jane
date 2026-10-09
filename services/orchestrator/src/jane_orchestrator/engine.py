@@ -41,8 +41,10 @@ __all__ = ["Engine", "Worker"]
 log = logging.getLogger(__name__)
 
 TERMINAL_JOB = {"succeeded", "failed", "cancelled"}
-NO_CONNECTIONS_STATUSES = (404, 405, 501)
-"""Answers of ``PUT /v1/connections/{id}`` meaning "this executor has no managed connections" (handler.v1)."""
+NO_CONNECTIONS_STATUSES = (501,)
+"""Answer of ``PUT /v1/connections/{id}`` meaning "this executor has no managed connections": the explicit
+``501 not_implemented`` of handler.v1. A 404/405 (no such path, an ingress during a restart) is not taken as that:
+it stays a visible ``failed`` sync, so a collector never starts without a connection that silently vanished."""
 
 
 def _ms(value: int) -> timedelta:
@@ -1466,10 +1468,10 @@ class Engine:
                         )
                 except ExecutorError as exc:
                     message = str(exc)
-                    if exc.status in NO_CONNECTIONS_STATUSES:
+                    if exc.status in NO_CONNECTIONS_STATUSES and exc.code == "not_implemented":
                         # handler.v1: /v1/connections* are optional for an executor without managed
-                        # connections (handler-runtime answers PUT with 501). Not a failed sync: the
-                        # executor simply does not take part, so it is dropped from the sync list.
+                        # connections (handler-runtime answers PUT with 501 not_implemented). Not a failed
+                        # sync: the executor simply does not take part, so it is dropped from the sync list.
                         unused = True
                         log.info(
                             "executor does not use managed connections",

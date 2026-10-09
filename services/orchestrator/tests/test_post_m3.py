@@ -294,11 +294,10 @@ def test_auto_activate_requires_tests_passed_on_every_context(
 
 
 # ------------------------------------------------------------------ R02: executors without connections
-@pytest.mark.parametrize("status", [501, 404])
 def test_executor_without_managed_connections_is_not_required(
-    make_client: Any, neighbours: Neighbours, status: int
+    make_client: Any, neighbours: Neighbours
 ) -> None:
-    neighbours.runtime.connections_unsupported = status  # handler-runtime: PUT -> 501 (or no such path)
+    neighbours.runtime.connections_unsupported = 501  # handler-runtime: PUT -> 501 not_implemented
     client = make_client()
     conn = {"connection_id": "results-pg", "kind": "postgresql", "params": {"host": "postgres", "port": 5432}}
     assert client.put("/v1/connections/results-pg", json=conn).status_code == 200
@@ -316,3 +315,30 @@ def test_executor_without_managed_connections_is_not_required(
     setup(client)
     run = run_catalog(client)  # extraction on the runtime works without its connections
     assert run["status"] == "succeeded"
+
+
+@pytest.mark.parametrize("status", [404, 405])
+def test_missing_connections_path_stays_a_visible_failed_sync(
+    make_client: Any, neighbours: Neighbours, status: int
+) -> None:
+    """Only the explicit 501 not_implemented means "no managed connections". A 404/405 (e.g. an ingress while
+    the executor restarts) must not make the executor silently disappear from the sync list (review of WP-17)."""
+    neighbours.storage.connections_unsupported = status
+    client = make_client()
+    conn = {"connection_id": "results-pg", "kind": "postgresql", "params": {"host": "postgres", "port": 5432}}
+    assert client.put("/v1/connections/results-pg", json=conn).status_code == 200
+    view = wait_until(
+        lambda: (
+            (v := client.get("/v1/connections/results-pg").json())
+            and {e["executor"]: e for e in v["executors"]}.get("storage", {}).get("sync_status") == "failed"
+            and v
+        )
+    )
+    storage = next(e for e in view["executors"] if e["executor"] == "storage")
+    assert f"HTTP {status}" in storage["message"]
+    assert {e["executor"] for e in view["executors"]} == {
+        "web-collector",
+        "handler-runtime",
+        "storage",
+        "llm",
+    }

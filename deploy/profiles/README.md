@@ -53,13 +53,29 @@ uv run --all-packages python deploy/profiles/harness/limits_harness.py run --pro
    `orchestrator:admin`), перевірка — `GET /v1/limits/effective?source_id=&task_id=&stage_id=`. Ефективні ліміти
    етапу (platform → source → task → stage, `hard_caps` зверху) оркестратор передає в кожен виклик колектора
    й обробника, тож runtime і storage отримують `sandbox`, `timeouts` тощо з профілю в запиті.
-2. **Web Collector і Telegram Collector** приймають увесь профіль як `JANE_*_LIMITS_FILE` (групи, яких не
-   моделюють, ігнорують) — це їхні ліміти й для автономних викликів.
-3. **storage, handler-runtime, registry, llm, assistant** з WP-01b теж приймають увесь профіль як
-   `JANE_<СЕРВІС>_LIMITS_FILE`: ліміти контракту, які сервіс моделює, беруть значення профілю (`/v1/info` →
-   `limits.profile`, `limits.defaults`), решту ігнорують із рядком журналу старту
-   `platform limits profile applied partially`; опечатка в профілі — `LimitError`, сервіс не стартує. Значення
-   з запитів оркестратора й надалі звужуються стелями (`hard_caps`) профілю.
+2. **Решта сервісів** — Web Collector, Telegram Collector, storage, handler-runtime, registry, llm, assistant —
+   приймають увесь профіль як `JANE_<СЕРВІС>_LIMITS_FILE` через спільний шар jane-kit (з WP-01b; колектори — з
+   R20, WP-16, замість власного `translate_layer`): ліміти контракту, які сервіс моделює, беруть значення профілю
+   (`/v1/info` → `limits.profile`, `limits.defaults`), решту ігнорують із рядком журналу старту
+   `platform limits profile applied partially` (`ResolvedLimits.ignored`); опечатка в профілі — `LimitError`,
+   сервіс не стартує. Для колекторів це й ліміти автономних викликів. Значення з запитів оркестратора й надалі
+   звужуються стелями (`hard_caps`) профілю. Перевіряють `test_every_service_takes_the_whole_profile_as_limits_file`
+   і `test_a_typo_in_the_profile_stops_every_service`.
+3. **storage не бере контрактний `retries` профілю** (WP-17, R14): це політика викликача (повтор запиту з тим самим
+   `Idempotency-Key`), тож storage перелічує `retries.*` як `ignored`, а `HandlerInvocation.limits.retries` теж не
+   застосовує. Повтори ядра при `CONFLICT` (паралельний запис змінив версію сутності) керуються власною групою
+   storage `limits.conflict_retries` (`JANE_STORAGE_LIMITS__CONFLICT_RETRIES__*`, типово 4 спроби, 200 мс →
+   10 000 мс, множник 2, jitter) — однаково з профілем і без нього. Профільний backoff до 60 с на `CONFLICT` не
+   діє (`test_storage_ignores_the_profile_retries_and_keeps_its_conflict_backoff`).
+
+**Область дії `concurrency`.** `max_parallel_fetches` — одночасні завантаження **одного збору** Web Collector
+(кожен збір має власну межу, див. README колектора), а не всього екземпляра: N одночасних зборів на екземплярі
+можуть разом тримати до N × значення завантажень. Між зборами їх узгоджує лише ліміт на хост
+`max_parallel_fetches_per_host` (для одного хоста: усі збори, `POST /v1/fetches` і всі екземпляри зі спільним
+каталогом стану, R15), а `hard_caps.concurrency.max_parallel_fetches` — значення одного збору. Тож значення
+профілів (`ci` 4, `dev-laptop` 8, `single-node` 32) розраховані на один збір, а навантаження екземпляра визначає
+ще й кількість одночасних зборів (`max_parallel_runs_per_task` оркестратора та кількість завдань).
+`max_parallel_invocations` — одночасні пісочниці одного екземпляра handler-runtime.
 
 `compose.stack.yaml` робить саме це: монтує профіль як `LIMITS_FILE` у **всі** сервіси застосунку (orchestrator,
 колектори, storage, handler-runtime, registry, llm, assistant), генерує виконавців оркестратора

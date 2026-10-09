@@ -25,13 +25,17 @@ import stack as jane_stack
 import yaml
 
 from jane_extractor_sdk.testing import assert_package_tests_pass, run_local
+from jane_kit.config import LimitError
 
 PROFILES = Path(__file__).resolve().parents[1]
 MEASURED = ("dev-laptop", "ci")
 PROFILE_NAMES = tuple(sorted(p.stem for p in PROFILES.glob("*.json") if p.name != "thresholds.json"))
 """Every profile document of deploy/profiles; the profile tests run for each of them (single-node too)."""
 JANE_KIT_SERVICES = ("storage", "handler_runtime", "registry", "llm", "assistant")
-"""Services whose platform file is the shared jane-kit layer (WP-01b): unmodelled contract limits are ignored."""
+"""Services that took the platform file as the shared jane-kit layer since WP-01b (the collectors since R20, WP-16):
+unmodelled contract limits are ignored and listed, a typo stops the service."""
+PROFILE_SERVICES = ("web_collector", "telegram_collector", *JANE_KIT_SERVICES)
+"""Every service that applies a profile mounted as its ``LIMITS_FILE`` (the orchestrator only seeds its DB from it)."""
 LIMITS_FILE_ENV = {
     "storage": "JANE_STORAGE_LIMITS_FILE",
     "handler-runtime": "JANE_HANDLER_RUNTIME_LIMITS_FILE",
@@ -203,10 +207,12 @@ def test_dev_laptop_sandbox_wall_time_covers_the_observed_docker_desktop_cold_st
 
 
 @pytest.mark.parametrize("profile", PROFILE_NAMES)
-@pytest.mark.parametrize("name", ["orchestrator", "web_collector", "telegram_collector", *JANE_KIT_SERVICES])
+@pytest.mark.parametrize("name", ["orchestrator", *PROFILE_SERVICES])
 def test_every_service_takes_the_whole_profile_as_limits_file(name: str, profile: str) -> None:
     """One profile for every service (criterion 13): the whole document is a valid ``LIMITS_FILE`` and each
-    service applies the contract limits it models with the profile's values (as ``/v1/info`` publishes)."""
+    service applies the contract limits it models with the profile's values (as ``/v1/info`` publishes). Every
+    other limit of the profile is listed as ignored (start-up log ``platform limits profile applied partially``) -
+    by the collectors too, which resolve the profile through jane-kit since R20 (WP-16)."""
     settings = importlib.import_module(f"jane_{name}.settings")
     path = jane_stack.profile_path(profile)
     resolved = settings.resolve_service_limits(
@@ -220,8 +226,43 @@ def test_every_service_takes_the_whole_profile_as_limits_file(name: str, profile
     applied = leaves(resolved.platform_limits()["defaults"])
     assert resolved.profile == profile
     assert applied and {p: applied[p] for p in applied} == {p: wanted.get(p) for p in applied}
-    if name in JANE_KIT_SERVICES:  # the collectors drop unmodelled groups silently (translate_layer)
-        assert set(resolved.ignored) == set(wanted) - set(applied)
+    assert set(resolved.ignored) == set(wanted) - set(applied)
+
+
+@pytest.mark.parametrize("name", PROFILE_SERVICES)
+def test_a_typo_in_the_profile_stops_every_service(name: str, tmp_path: Path) -> None:
+    """An unknown limit in the profile is an error at start-up for every service (the collectors used to drop it
+    silently before R20), so a misspelt limit cannot fall back to the service default unnoticed."""
+    doc = load("ci")
+    doc["defaults"]["concurrency"]["max_paralel_fetches"] = 3
+    path = tmp_path / "typo.json"
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    settings = importlib.import_module(f"jane_{name}.settings")
+    with pytest.raises(LimitError, match=r"concurrency\.max_paralel_fetches"):
+        settings.resolve_service_limits(
+            settings.Settings.model_construct().model_copy(update={"limits_file": path})
+        )
+
+
+@pytest.mark.parametrize("profile", PROFILE_NAMES)
+def test_storage_ignores_the_profile_retries_and_keeps_its_conflict_backoff(profile: str) -> None:
+    """WP-17 (R14): the contract ``retries`` of a profile is the policy of the caller (re-sending a request), so
+    storage lists it as ignored; its own retries on ``CONFLICT`` (``limits.conflict_retries``) keep the service
+    defaults whatever the profile says."""
+    settings = jane_module("storage.settings")
+    resolved = settings.resolve_service_limits(
+        settings.Settings.model_construct().model_copy(
+            update={"limits_file": jane_stack.profile_path(profile)}
+        )
+    )
+    retries = {f"retries.{field}" for field in load(profile)["defaults"]["retries"]}
+    assert retries and retries <= set(resolved.ignored), resolved.ignored
+    assert "retries" not in resolved.platform_limits()["defaults"]
+    assert resolved.limits.conflict_retries == settings.ConflictRetries()
+    assert (
+        resolved.limits.conflict_retries.max_backoff_ms
+        != load(profile)["defaults"]["retries"]["max_backoff_ms"]
+    )
 
 
 @pytest.mark.parametrize("profile", PROFILE_NAMES)

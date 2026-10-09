@@ -21,11 +21,25 @@ directions. Exit code 1 if any BREAKING finding. With --oasdiff also runs `oasdi
 (binary on PATH or the tufin/oasdiff Docker image) for every OpenAPI document; a document it does
 not pass (ERR-level change, or oasdiff itself failed) also gives exit code 1. Without both oasdiff
 and Docker that step is skipped with a note.
+
+oasdiff version. Its verdict is the exit code of the CI job `contracts-compat`, so the Docker image is
+pinned: OASDIFF_IMAGE below (release tag + digest of its multi-arch index), checked with
+`just contracts-compat <base> --oasdiff` before it was pinned. Another image (a newer release to try, a
+mirror) - environment variable JANE_OASDIFF_IMAGE, e.g.
+
+    JANE_OASDIFF_IMAGE=tufin/oasdiff:v1.33.0 uv run contracts/tools/compat.py --base main --oasdiff
+
+To move the pin: pick a release tag, read its digest (`docker buildx imagetools inspect tufin/oasdiff:<tag>`),
+run the command above with `<tag>@<digest>` against the base branch (0 breaking expected for an unchanged
+tree), then update OASDIFF_IMAGE. An `oasdiff` binary on PATH takes precedence and is used as installed
+(not pinned; its version is printed) - CI has none and runs the pinned image.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
+import re
 import shutil
 import subprocess
 import sys
@@ -43,6 +57,15 @@ from _common import CONTRACTS_DIR, HTTP_METHODS, deref, load_uri, pointer_get  #
 REPO_DIR = CONTRACTS_DIR.parent
 TRACKED = ("contracts/schemas", "contracts/openapi")
 EXPORTED = (*TRACKED, "contracts/examples")  # examples are $ref'd by OpenAPI (needed by oasdiff)
+OASDIFF_IMAGE_ENV = "JANE_OASDIFF_IMAGE"
+OASDIFF_IMAGE = "tufin/oasdiff:v1.33.0@sha256:6263a96dd2ef0726c54e21fea9b8e1607eac4841add0079324b424c1f52b819c"
+"""Default oasdiff image (`oasdiff version v1.33.0`, pinned 2026-10-09, WP-21); see the module docstring."""
+PINNED_IMAGE = re.compile(r"^[^\s@]+:[^\s@:/]+@sha256:[0-9a-f]{64}$")
+
+
+def oasdiff_image() -> str:
+    """Docker image of oasdiff: ``JANE_OASDIFF_IMAGE`` if set, otherwise the pinned default."""
+    return os.environ.get(OASDIFF_IMAGE_ENV, "").strip() or OASDIFF_IMAGE
 
 
 @dataclass
@@ -258,6 +281,15 @@ def run_oasdiff(base_root: Path, names: list[str]) -> tuple[list[str], int]:
     failed = 0
     binary = shutil.which("oasdiff")
     docker = shutil.which("docker")
+    image = oasdiff_image()
+    if binary:
+        version = subprocess.run([binary, "--version"], capture_output=True, text=True, encoding="utf-8",
+                                 errors="replace", check=False)
+        out.append(f"oasdiff: binary {binary} ({(version.stdout + version.stderr).strip() or 'unknown version'};"
+                   " not pinned)")
+    elif docker:
+        source = OASDIFF_IMAGE_ENV if os.environ.get(OASDIFF_IMAGE_ENV, "").strip() else "pinned default"
+        out.append(f"oasdiff: docker image {image} ({source})")
     for name in names:
         old = base_root / "contracts" / "openapi" / name
         new = CONTRACTS_DIR / "openapi" / name
@@ -265,7 +297,7 @@ def run_oasdiff(base_root: Path, names: list[str]) -> tuple[list[str], int]:
             cmd = [binary, "breaking", str(old), str(new), "--fail-on", "ERR"]
         elif docker:
             cmd = [docker, "run", "--rm", "-v", f"{base_root / 'contracts'}:/base:ro", "-v", f"{CONTRACTS_DIR}:/rev:ro",
-                   "tufin/oasdiff", "breaking", f"/base/openapi/{name}", f"/rev/openapi/{name}", "--fail-on", "ERR"]
+                   image, "breaking", f"/base/openapi/{name}", f"/rev/openapi/{name}", "--fail-on", "ERR"]
         else:
             return ["oasdiff: skipped (neither oasdiff nor docker found)"], 0
         proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
@@ -334,6 +366,9 @@ def self_test() -> int:
         comp.schema(same, p.as_uri(), same, p.as_uri(), "same", "both")
         print(f"[{'ok' if not comp.findings else 'FAIL'}] identical schema has no findings")
         failures += 1 if comp.findings else 0
+    pinned = bool(PINNED_IMAGE.match(OASDIFF_IMAGE))
+    print(f"[{'ok' if pinned else 'FAIL'}] default oasdiff image is pinned by tag and digest: {OASDIFF_IMAGE}")
+    failures += 0 if pinned else 1
     return 1 if failures else 0
 
 

@@ -50,6 +50,13 @@ const executors = [
 // Model aliases of the source assistant on the TEST stack only. The real-mode specs point them at a
 // deterministic fake provider through the LLM API (e2e/seed.ts), so aliases of a shared stack stay untouched.
 const ASSISTANT_ALIASES = { cheap: "e2e-admin-cheap", strong: "e2e-admin-strong" };
+// Onboarding by name (R26, as S-M2-06 in tests/e2e/compose.e2e.yaml): the static search provider of the assistant
+// (a SUBSTITUTE of a web search) with the test site and a second match of the same name; one material per
+// classification request, so that a scripted answer of the fake LLM classifies exactly that material.
+const ASSISTANT_SEARCH_FILE = path.join(repoRoot, "tests", "e2e", "config", "assistant-search.json");
+const LLM_REQUESTS_PER_MINUTE = process.env.JANE_ADMIN_E2E_LLM_MAX_REQUESTS_PER_MINUTE ?? "120";
+if (!/^[1-9][0-9]*$/.test(LLM_REQUESTS_PER_MINUTE))
+  throw new Error("JANE_ADMIN_E2E_LLM_MAX_REQUESTS_PER_MINUTE must be a positive integer");
 const schemaRetries = Number(process.env.JANE_ADMIN_E2E_SCHEMA_RETRIES ?? "1");
 if (!Number.isInteger(schemaRetries) || schemaRetries < 0)
   throw new Error("JANE_ADMIN_E2E_SCHEMA_RETRIES must be a non-negative integer");
@@ -80,6 +87,7 @@ const override = {
       environment: {
         JANE_LLM_REGISTRY_URL: "http://registry:8000",
         JANE_LLM_LIMITS__GATEWAY__MAX_SCHEMA_RETRIES: String(schemaRetries),
+        JANE_LLM_LIMITS__LLM__MAX_REQUESTS_PER_MINUTE: LLM_REQUESTS_PER_MINUTE,
       },
     },
     assistant: {
@@ -89,7 +97,20 @@ const override = {
         JANE_ASSISTANT_COLLECTOR_WEB_URL: "http://web-collector:8101",
         JANE_ASSISTANT_LLM_MODEL_CHEAP: ASSISTANT_ALIASES.cheap,
         JANE_ASSISTANT_LLM_MODEL_STRONG: ASSISTANT_ALIASES.strong,
+        JANE_ASSISTANT_SEARCH_PROVIDER: "static",
+        JANE_ASSISTANT_SEARCH_STATIC_FILE: "/cfg/assistant-search.json",
+        JANE_ASSISTANT_LIMITS__ONBOARDING__SAMPLE_BATCH_SIZE: "1",
+        JANE_ASSISTANT_LIMITS__ONBOARDING__POLL_PAGE_FACTOR: "10",
+        JANE_ASSISTANT_LIMITS__LLM__MAX_REQUESTS_PER_MINUTE: LLM_REQUESTS_PER_MINUTE,
       },
+      volumes: [
+        {
+          type: "bind",
+          source: ASSISTANT_SEARCH_FILE,
+          target: "/cfg/assistant-search.json",
+          read_only: true,
+        },
+      ],
     },
   },
 };

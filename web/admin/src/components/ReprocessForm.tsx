@@ -1,4 +1,6 @@
 // Re-processing of stored RAW materials by task stages (orchestrator POST /v1/reprocessing -> 202 Job).
+// `stored_materials` (task-config.schema.json TaskInput): `material_ids` takes every stored observation of these
+// materials in the since/until window; the exact choice is `object_ids` (these stored RAW) or `observation_ids`.
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -7,14 +9,43 @@ import { newIdempotencyKey, unwrap } from "../api/client";
 import type { Job, ReprocessRequest } from "../api/types";
 import { ErrorBox, Field } from "./ui";
 
+/** One stored RAW object (storage.v1 StoredObject) the user picked, e.g. a row of the materials page. */
+export interface StoredSelection {
+  object_id: string;
+  material_id?: string | undefined;
+  observation_id?: string | undefined;
+}
+
+type SelectionMode = "material" | "object" | "observation";
+
+const MODE_LABELS: Record<SelectionMode, string> = {
+  material: "усі збережені спостереження матеріалу (material_ids)",
+  object: "лише цей збережений RAW (object_ids)",
+  observation: "лише це спостереження матеріалу (observation_ids)",
+};
+
+function idList(text: string): string[] {
+  return text
+    .split(/[\s,]+/)
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
 export function ReprocessForm({
   taskId = "",
   storageConnectionId = "",
   materialIds,
+  objectIds,
+  stored,
 }: {
   taskId?: string;
   storageConnectionId?: string;
+  /** Every stored observation of these materials. */
   materialIds?: string[];
+  /** Exactly these stored RAW objects (e.g. the RAW of problem samples). */
+  objectIds?: string[];
+  /** A stored object: the user chooses the material, this RAW only or its observation only. */
+  stored?: StoredSelection;
 }) {
   const api = useApi();
   const navigate = useNavigate();
@@ -23,8 +54,19 @@ export function ReprocessForm({
   const [fromStage, setFromStage] = useState("");
   const [since, setSince] = useState("");
   const [until, setUntil] = useState("");
+  const [exactObjects, setExactObjects] = useState("");
+  const [exactObservations, setExactObservations] = useState("");
   const [testMode, setTestMode] = useState(false);
   const [reason, setReason] = useState("");
+  const modes: SelectionMode[] = stored
+    ? [
+        ...(stored.material_id ? (["material"] as const) : []),
+        "object",
+        ...(stored.material_id && stored.observation_id ? (["observation"] as const) : []),
+      ]
+    : [];
+  // The default keeps the long-standing meaning of the row action (all observations of the material).
+  const [mode, setMode] = useState<SelectionMode>(modes[0] ?? "object");
 
   const start = useMutation({
     mutationFn: (body: ReprocessRequest) =>
@@ -37,15 +79,29 @@ export function ReprocessForm({
     onSuccess: (job) => navigate(`/runs/${encodeURIComponent(job.job_id)}`),
   });
 
+  const fixed = Boolean(stored || materialIds?.length || objectIds?.length);
+
   const submit = () => {
-    const stored: ReprocessRequest["stored_materials"] = {};
-    if (connection) stored.storage_connection_id = connection;
-    if (since) stored.since = since;
-    if (until) stored.until = until;
-    if (materialIds?.length) stored.material_ids = materialIds;
+    const selection: ReprocessRequest["stored_materials"] = {};
+    if (connection) selection.storage_connection_id = connection;
+    if (stored) {
+      if (mode === "object") selection.object_ids = [stored.object_id];
+      else if (stored.material_id) selection.material_ids = [stored.material_id];
+      if (mode === "observation" && stored.observation_id)
+        selection.observation_ids = [stored.observation_id];
+    } else if (objectIds?.length) {
+      selection.object_ids = objectIds;
+    } else if (materialIds?.length) {
+      selection.material_ids = materialIds;
+    } else {
+      if (since) selection.since = since;
+      if (until) selection.until = until;
+      if (idList(exactObjects).length) selection.object_ids = idList(exactObjects);
+      if (idList(exactObservations).length) selection.observation_ids = idList(exactObservations);
+    }
     start.mutate({
       task_id: task,
-      stored_materials: stored,
+      stored_materials: selection,
       ...(fromStage ? { from_stage: fromStage } : {}),
       ...(testMode ? { test_mode: true } : {}),
       ...(reason ? { reason } : {}),
@@ -75,11 +131,41 @@ export function ReprocessForm({
             placeholder="extract-products"
           />
         </Field>
-        {materialIds?.length ? (
+        {stored ? (
+          <>
+            <p>
+              Об'єкт RAW: <code>{stored.object_id}</code>
+              {stored.material_id ? (
+                <>
+                  , матеріал <code>{stored.material_id}</code>
+                </>
+              ) : null}
+              {stored.observation_id ? (
+                <>
+                  , спостереження <code>{stored.observation_id}</code>
+                </>
+              ) : null}
+            </p>
+            <Field label="Що обробити">
+              <select value={mode} onChange={(e) => setMode(e.target.value as SelectionMode)}>
+                {modes.map((m) => (
+                  <option key={m} value={m}>
+                    {MODE_LABELS[m]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </>
+        ) : objectIds?.length ? (
+          <p>
+            Збережені RAW (object_ids): <code>{objectIds.join(", ")}</code>
+          </p>
+        ) : materialIds?.length ? (
           <p>
             Матеріали: <code>{materialIds.join(", ")}</code>
           </p>
-        ) : (
+        ) : null}
+        {!fixed ? (
           <>
             <Field label="Збережені з (RFC 3339)">
               <input
@@ -91,8 +177,14 @@ export function ReprocessForm({
             <Field label="Збережені до (RFC 3339)">
               <input value={until} onChange={(e) => setUntil(e.target.value)} />
             </Field>
+            <Field label="Точний вибір: RAW object_ids" hint="через кому або пробіл; необов'язково">
+              <input value={exactObjects} onChange={(e) => setExactObjects(e.target.value)} />
+            </Field>
+            <Field label="Точний вибір: observation_ids" hint="через кому або пробіл; необов'язково">
+              <input value={exactObservations} onChange={(e) => setExactObservations(e.target.value)} />
+            </Field>
           </>
-        )}
+        ) : null}
         <Field label="Причина">
           <input value={reason} onChange={(e) => setReason(e.target.value)} />
         </Field>

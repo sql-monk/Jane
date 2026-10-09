@@ -19,17 +19,27 @@ interface Page<T> {
   next_cursor?: string | null;
 }
 
-/** Cursor pagination (`?limit=&cursor=` -> `{items, next_cursor}`), page size from config. */
+/**
+ * Cursor pagination (`?limit=&cursor=` -> `{items, next_cursor}`), page size from config. `refetchWhile` - poll the
+ * loaded pages with the job backoff (config.polling) while it holds for the items, e.g. while a listed job runs.
+ */
 export function useCursorList<T>(
   key: QueryKey,
   fetchPage: (cursor: string | undefined, limit: number) => Promise<Page<T>>,
+  refetchWhile?: (items: T[]) => boolean,
 ) {
-  const { page_size } = useConfig();
+  const { page_size, polling } = useConfig();
   const query = useInfiniteQuery({
     queryKey: [...key, page_size],
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) => fetchPage(pageParam, page_size),
     getNextPageParam: (last) => last.next_cursor ?? undefined,
+    refetchInterval: (q) => {
+      const items = q.state.data?.pages.flatMap((p) => p.items) ?? [];
+      return refetchWhile && !q.state.error && refetchWhile(items)
+        ? pollDelay(q.state.dataUpdateCount, polling)
+        : false;
+    },
   });
   const items = query.data?.pages.flatMap((p) => p.items) ?? [];
   return {

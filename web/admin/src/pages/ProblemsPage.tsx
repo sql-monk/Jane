@@ -7,8 +7,10 @@ import { newIdempotencyKey, unwrap, type ApiClients } from "../api/client";
 import { useCursorList } from "../api/hooks";
 import type { ImprovementRequest, Job, ProblemGroup, ProblemGroupStatus } from "../api/types";
 import { ConnectionPicker } from "../components/ConnectionPicker";
+import { ImprovementRunList } from "../components/ImprovementRuns";
 import { JobPanel } from "../components/JobPanel";
 import { ImprovementResultView } from "../components/ImprovementResultView";
+import { ReprocessForm } from "../components/ReprocessForm";
 import {
   ErrorBox,
   Field,
@@ -95,6 +97,7 @@ function ProblemGroups() {
           { header: "Кількість", cell: (g) => g.count },
           { header: "Стан", cell: (g) => <Status value={g.status} /> },
           { header: "Остання", cell: (g) => formatDate(g.last_seen_at) },
+          { header: "Примітка", cell: (g) => g.note ?? "—" },
           {
             header: "",
             cell: (g) => (
@@ -127,6 +130,13 @@ function ProblemGroupDetail({
   const [allowFork, setAllowFork] = useState(true);
   const [attempts, setAttempts] = useState("");
   const [jobId, setJobId] = useState<string | null>(group.assistant_job_id ?? null);
+  const [note, setNote] = useState(group.note ?? "");
+  // A newer state of the group (re-opened from the list, or the PATCH answer) brings its own note.
+  const [noteOf, setNoteOf] = useState(group.note);
+  if (noteOf !== group.note) {
+    setNoteOf(group.note);
+    setNote(group.note ?? "");
+  }
 
   const bindings = useQuery({
     queryKey: ["tasks", "bindings", group.package?.package_id],
@@ -188,7 +198,19 @@ function ProblemGroupDetail({
       await patch.mutateAsync({ assistant_job_id: job.job_id });
       return job;
     },
-    onSuccess: (job) => setJobId(job.job_id),
+    onSuccess: (job) => {
+      setJobId(job.job_id);
+      void queryClient.invalidateQueries({ queryKey: ["improvement-runs"] });
+    },
+  });
+
+  // Reprocessing of exactly the stored RAW of the samples (stored_materials.object_ids), e.g. to check a fix.
+  const sampleRaw = useMutation({
+    mutationFn: async () => {
+      const objectIds = await storedSampleObjects(api, storage, group.source_id, samples);
+      if (objectIds.length === 0) throw new NoStoredSamples(storage);
+      return objectIds;
+    },
   });
 
   return (
@@ -205,6 +227,11 @@ function ProblemGroupDetail({
           "—"
         )}
       </p>
+      {group.note ? (
+        <p>
+          Примітка: <span data-testid="group-note">{group.note}</span>
+        </p>
+      ) : null}
       {group.status === "unresolved" ? (
         <Notice tone="warn">
           Автоматичне вдосконалення не впоралося в межах спроб і бюджету — потрібне рішення людини.
@@ -253,6 +280,19 @@ function ProblemGroupDetail({
           disabled={patch.isPending}
         >
           Відкрити знову
+        </button>
+      </div>
+      <div className="inline-form">
+        <Field label="Примітка до групи">
+          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={4000} />
+        </Field>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => patch.mutate({ note })}
+          disabled={patch.isPending || note === (group.note ?? "")}
+        >
+          Зберегти примітку
         </button>
       </div>
       <ErrorBox error={patch.error} title="Не вдалося змінити групу" />
@@ -304,8 +344,44 @@ function ProblemGroupDetail({
       ) : (
         <ErrorBox error={improve.error} title="Не вдалося запустити вдосконалення" />
       )}
+      <h3>Повторна обробка RAW прикладів</h3>
+      <p className="muted">
+        Точно ці збережені RAW (stored_materials.object_ids) з обраного вище сховища, наприклад щоб перевірити
+        активовану версію на проблемних прикладах.
+      </p>
+      <button
+        type="button"
+        className="btn"
+        disabled={!storage || samples.length === 0 || sampleRaw.isPending}
+        onClick={() => sampleRaw.mutate()}
+      >
+        Підготувати повторну обробку прикладів
+      </button>
+      {sampleRaw.error instanceof NoStoredSamples ? (
+        <Notice tone="warn">
+          RAW прикладів недоступний у сховищі <code>{sampleRaw.error.connection}</code>.
+        </Notice>
+      ) : (
+        <ErrorBox error={sampleRaw.error} title="RAW прикладів не знайдено" />
+      )}
+      {sampleRaw.data ? (
+        <ReprocessForm
+          key={sampleRaw.data.join(",")}
+          taskId={bindingList[0]?.task_id ?? ""}
+          storageConnectionId={storage}
+          objectIds={sampleRaw.data}
+        />
+      ) : null}
+      <h3>Запуски асистента для групи</h3>
+      <ImprovementRunList
+        filter={{ problem_group_id: group.group_id }}
+        label="Запуски асистента для групи"
+        selected={jobId}
+        onOpen={setJobId}
+      />
       {jobId ? (
         <JobPanel
+          key={jobId}
           service="assistant"
           client={api.assistant}
           jobId={jobId}

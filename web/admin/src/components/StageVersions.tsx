@@ -1,35 +1,74 @@
 // Activation and rollback of package versions in task stages, with audit (orchestrator activations API).
+// Handler stages switch `stages[].handler`; collect stages switch the collector rules (`stages[].collector.rules`,
+// a `collector-rules` package) - the stage's own rules or, when it has none, `Source.collector_rules`.
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useApi } from "../app/context";
 import { newIdempotencyKey, unwrap } from "../api/client";
-import type { Activation, ActivationRequest, Stage, TaskConfig } from "../api/types";
+import type { Activation, ActivationRequest, PackageRef, Stage, TaskConfig } from "../api/types";
 import { formatDate, refLabel } from "../lib/format";
 import { ErrorBox, Field, Notice, ReasonAction, Section, Table } from "./ui";
 
 export function StageVersions({ task }: { task: TaskConfig }) {
-  const stages = task.stages.filter((s) => s.kind === "handler" && s.handler);
+  const api = useApi();
+  const stages = task.stages.filter((s) => (s.kind === "handler" && s.handler) || s.kind === "collect");
+  const sourceId = task.input.source_id;
+  // A collect stage without its own rules uses the rules of the task's source.
+  const needsSource = stages.some((s) => s.kind === "collect" && !s.collector?.rules);
+  const source = useQuery({
+    queryKey: ["source", sourceId],
+    enabled: needsSource && Boolean(sourceId),
+    queryFn: () =>
+      unwrap(api.orchestrator.GET("/v1/sources/{source_id}", { params: { path: { source_id: sourceId } } })),
+  });
   return (
     <>
       <Notice>
         Активувати можна лише погоджену (approved) версію. Відкат повертає попередню активацію. Кожна дія
-        потрапляє в журнал аудиту.
+        потрапляє в журнал аудиту. Для етапу збору (collect) активується версія правил колектора.
       </Notice>
-      {stages.map((stage) => (
-        <StageVersionCard key={stage.stage_id} taskId={task.task_id} stage={stage} />
-      ))}
+      <ErrorBox error={source.error} title="Правила джерела недоступні" />
+      {stages.map((stage) =>
+        stage.kind === "collect" ? (
+          <StageVersionCard
+            key={stage.stage_id}
+            taskId={task.task_id}
+            stage={stage}
+            current={stage.collector?.rules ?? source.data?.collector_rules}
+            inherited={!stage.collector?.rules}
+          />
+        ) : (
+          <StageVersionCard
+            key={stage.stage_id}
+            taskId={task.task_id}
+            stage={stage}
+            current={stage.handler}
+          />
+        ),
+      )}
     </>
   );
 }
 
-function StageVersionCard({ taskId, stage }: { taskId: string; stage: Stage }) {
+function StageVersionCard({
+  taskId,
+  stage,
+  current,
+  inherited = false,
+}: {
+  taskId: string;
+  stage: Stage;
+  current: PackageRef | undefined;
+  inherited?: boolean;
+}) {
   const api = useApi();
   const queryClient = useQueryClient();
-  const handler = stage.handler;
-  const currentPackage = handler?.package_id ?? "";
+  const isCollect = stage.kind === "collect";
+  const currentPackage = current?.package_id ?? "";
   // The stage may be switched to an independent fork of its package (ТЗ §7, §10): pick the package, then its version.
-  const [packageId, setPackageId] = useState(currentPackage);
+  const [picked, setPicked] = useState<string | null>(null);
+  const packageId = picked ?? currentPackage;
   const [version, setVersion] = useState("");
   const [last, setLast] = useState<Activation | null>(null);
 
@@ -88,29 +127,48 @@ function StageVersionCard({ taskId, stage }: { taskId: string; stage: Stage }) {
     <Section
       title={`Етап ${stage.stage_id}`}
       actions={
-        <Link to={`/tasks?package_id=${encodeURIComponent(currentPackage)}`}>Усі прив'язки пакета</Link>
+        currentPackage && !isCollect ? (
+          <Link to={`/tasks?package_id=${encodeURIComponent(currentPackage)}`}>Усі прив'язки пакета</Link>
+        ) : null
       }
     >
       <p>
-        Поточна версія: <strong data-testid={`current-${stage.stage_id}`}>{refLabel(handler)}</strong>{" "}
-        <Link to={`/packages/${encodeURIComponent(currentPackage)}`}>пакет</Link>
+        {isCollect ? "Поточні правила колектора" : "Поточна версія"}:{" "}
+        <strong data-testid={`current-${stage.stage_id}`}>{refLabel(current)}</strong>{" "}
+        {isCollect && inherited && current ? <span className="muted">(правила джерела) </span> : null}
+        {currentPackage ? <Link to={`/packages/${encodeURIComponent(currentPackage)}`}>пакет</Link> : null}
       </p>
+      {isCollect && !current ? (
+        <p className="muted">Правила ще не прив'язано: оберіть пакет правил колектора (collector-rules).</p>
+      ) : null}
       <div className="inline-form">
-        <Field label="Пакет (поточний або його форк)">
-          <select
-            aria-label={`Пакет для ${stage.stage_id}`}
-            value={packageId}
-            onChange={(e) => {
-              setPackageId(e.target.value);
-              setVersion("");
-            }}
-          >
-            {candidates.map((id) => (
-              <option key={id} value={id}>
-                {id === currentPackage ? `${id} (поточний)` : `${id} (форк)`}
-              </option>
-            ))}
-          </select>
+        <Field label={isCollect ? "Пакет правил (поточний або його форк)" : "Пакет (поточний або його форк)"}>
+          {isCollect && !currentPackage ? (
+            <input
+              aria-label={`Пакет для ${stage.stage_id}`}
+              value={packageId}
+              onChange={(e) => {
+                setPicked(e.target.value.trim());
+                setVersion("");
+              }}
+              placeholder="package_id (collector-rules)"
+            />
+          ) : (
+            <select
+              aria-label={`Пакет для ${stage.stage_id}`}
+              value={packageId}
+              onChange={(e) => {
+                setPicked(e.target.value);
+                setVersion("");
+              }}
+            >
+              {candidates.map((id) => (
+                <option key={id} value={id}>
+                  {id === currentPackage ? `${id} (поточний)` : `${id} (форк)`}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
         <Field label="Погоджена версія">
           <select
@@ -121,7 +179,7 @@ function StageVersionCard({ taskId, stage }: { taskId: string; stage: Stage }) {
             <option value="">—</option>
             {approved.map((v) => (
               <option key={v.version} value={v.version}>
-                {v.version} ({v.test_status})
+                {v.version} ({v.test_summary?.status ?? v.test_status})
               </option>
             ))}
           </select>

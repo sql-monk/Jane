@@ -378,7 +378,13 @@ function VersionDetail({ pkg, version }: { pkg: Package; version: string }) {
           <KeyValue
             rows={[
               ["Статус", <Status value={v.status} />],
-              ["Тести", <Status value={v.test_status} />],
+              ["Тести (останній звіт)", <Status value={v.test_status} />],
+              [
+                "Тести на всіх контекстах",
+                <span data-testid="test-summary-status">
+                  <Status value={v.test_summary?.status ?? null} />
+                </span>,
+              ],
               ["Дайджест", <code>{v.digest}</code>],
               ["Розмір", formatBytes(v.size_bytes)],
               ["Автор", v.created_by ?? "—"],
@@ -453,6 +459,26 @@ function VersionDetail({ pkg, version }: { pkg: Package; version: string }) {
               title="Прогін тестів"
               renderResult={(result) => <TestReportView report={result as unknown as TestReport} />}
             />
+          ) : null}
+          {v.test_summary?.contexts.length ? (
+            <Section title="Підсумок тестів за контекстами">
+              <p className="muted">
+                Для кожного контексту (власні тести, прогін на прив'язках етапу) діє останній звіт; версія
+                пройшла всюди, лише якщо пройшов останній звіт кожного контексту.
+              </p>
+              <Table
+                label="Тести за контекстами"
+                rows={v.test_summary.contexts}
+                rowKey={(c, i) => `${c.context ?? ""}-${i}`}
+                columns={[
+                  { header: "Контекст", cell: (c) => c.context ?? "без контексту" },
+                  { header: "Стан", cell: (c) => <Status value={c.test_status} /> },
+                  { header: "Звітів", cell: (c) => String(c.reports) },
+                  { header: "Виконавець", cell: (c) => c.runner ?? "—" },
+                  { header: "Останній звіт", cell: (c) => formatDate(c.recorded_at) },
+                ]}
+              />
+            </Section>
           ) : null}
           {(v.test_reports ?? []).length ? (
             <Section title="Записані звіти тестів">

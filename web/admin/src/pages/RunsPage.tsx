@@ -7,6 +7,7 @@ import { safeProblemCode } from "../api/problem";
 import { TERMINAL_JOB_STATUSES, pollDelay, useCursorList } from "../api/hooks";
 import { useConfig } from "../app/context";
 import type { JobStatus, Run, StageItem } from "../api/types";
+import { AttemptHistory } from "../components/AttemptHistory";
 import { ReprocessForm } from "../components/ReprocessForm";
 import {
   ErrorBox,
@@ -22,7 +23,7 @@ import {
   Table,
   Tabs,
 } from "../components/ui";
-import { formatDate, formatMoney, refLabel } from "../lib/format";
+import { formatDate, formatInstant, formatMoney, refLabel } from "../lib/format";
 
 const JOB_STATUSES: JobStatus[] = ["queued", "running", "cancelling", "succeeded", "failed", "cancelled"];
 const ITEM_STATUSES: NonNullable<StageItem["status"]>[] = [
@@ -270,8 +271,23 @@ function RunItems({ runId }: { runId: string }) {
           { header: "Стан", cell: (i) => <Status value={i.status} /> },
           { header: "Результат", cell: (i) => <Status value={i.result_status ?? null} /> },
           { header: "Спроби", cell: (i) => i.attempts },
+          { header: "Доступний з", cell: (i) => formatInstant(i.available_at) },
+          {
+            header: "Історія спроб",
+            cell: (i) => <AttemptHistory history={i.attempt_history} label={`Історія спроб ${i.item_id}`} />,
+          },
           { header: "Пакет", cell: (i) => refLabel(i.handler) },
-          { header: "Помилка", cell: (i) => (i.error ? "Помилка елемента" : "—") },
+          {
+            header: "Помилка",
+            cell: (i) =>
+              i.error ? (
+                <>
+                  Помилка елемента (<code>{safeProblemCode(i.error.code)}</code>)
+                </>
+              ) : (
+                "—"
+              ),
+          },
         ]}
       />
       <LoadMore hasMore={list.hasMore} loading={list.loadingMore} onClick={list.loadMore} />

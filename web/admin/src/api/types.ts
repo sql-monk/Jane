@@ -31,6 +31,7 @@ export type TaskValidation = Ok<Orch["/v1/task-validations"]["post"]>;
 export type RunRequest = Body<Orch["/v1/tasks/{task_id}/runs"]["post"]>;
 export type Run = Ok<Orch["/v1/runs/{run_id}"]["get"]>;
 export type StageItem = ItemOf<Ok<Orch["/v1/runs/{run_id}/items"]["get"]>>;
+export type AttemptEvent = NonNullable<StageItem["attempt_history"]>[number];
 export type MaterialTrace = Ok<Orch["/v1/materials/{material_id}/trace"]["get"]>;
 export type UnknownMaterial = ItemOf<Ok<Orch["/v1/unknown-materials"]["get"]>>;
 export type ProblemGroup = ItemOf<Ok<Orch["/v1/problem-groups"]["get"]>>;
@@ -65,6 +66,7 @@ export type HandlerKind = Package["kind"];
 export type VersionStatus = PackageVersion["status"];
 export type TestResultsRecord = NonNullable<PackageVersion["test_reports"]>[number];
 export type TestReport = TestResultsRecord["report"];
+export type TestSummary = NonNullable<PackageVersion["test_summary"]>;
 
 // storage.v1
 export type StoredObject = ItemOf<Ok<Sto["/v1/objects"]["get"]>>;
@@ -86,10 +88,15 @@ export type ConnectionTestResult = Ok<Hdl["/v1/connections/{connection_id}/test"
 // assistant.v1
 export type OnboardingRequest = Body<Asst["/v1/onboarding-sessions"]["post"]>;
 export type OnboardingSession = Ok<Asst["/v1/onboarding-sessions/{session_id}"]["get"]>;
+export type OnboardingSessionSummary = ItemOf<Ok<Asst["/v1/onboarding-sessions"]["get"]>>;
+export type OnboardingStatus = OnboardingSession["status"];
 export type Proposal = NonNullable<OnboardingSession["proposals"]>[number];
 export type ImprovementRequest = Body<Asst["/v1/improvement-runs"]["post"]>;
+export type ImprovementRun = ItemOf<Ok<Asst["/v1/improvement-runs"]["get"]>>;
+export type AssistantInfo = Ok<Asst["/v1/info"]["get"]>;
 // Job.result shapes documented in assistant.v1 components.
 export type ImprovementResult = AsstComponents["schemas"]["ImprovementResult"];
+export type ImprovementProposal = AsstComponents["schemas"]["ImprovementProposal"];
 export type AcceptanceResult = AsstComponents["schemas"]["AcceptanceResult"];
 
 // collector.v1

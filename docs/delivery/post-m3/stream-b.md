@@ -815,3 +815,17 @@ Python порівняв bytes `git show <base>:<path>` і `git show <head>:<path
 Усі злиття B завершені. Перед dispatch `gh run list --branch codex/jane-integration --event workflow_dispatch --limit 3` повернув лише старі M3 runs 37884090704 / 37876793244 / 37863992541; dispatch count потоку B = 0. Тепер зарезервовано **один** `gh workflow run ci --ref codex/jane-integration`; після виконання відразу записати run ID / точний head SHA, не створювати дубліката. Якщо цей запис читається після перезапуску, спочатку перевірити gh run list і свіжі workflow_dispatch runs.
 
 C серіалізує власний фінальний dispatch після завершення B, щоб concurrency cancel-in-progress не скасував наш run. Підсумковий A чекає B/C. Локальні full check/e2e не виконуються. Фінальний workflow включає API e2e, stack/adapters, isolation, ci limits і admin mock regression; full real22 браузерний набір цей workflow не запускає, зеленість усіх 22 real тут не заявляється.
+
+
+### Фінальний CI B запущено (dispatch count: 1)
+
+Run ID **37937013460**, head SHA **bb1982b9f6b1e2593fb2f1ab60a436e6945f15b1**, URL https://github.com/sql-monk/Jane/actions/runs/37937013460 ; workflow_dispatch 2026-10-09T13:27:50Z. Стан одразу після dispatch: queued, conclusion порожній. Це єдиний фінальний dispatch потоку B; heartbeat має продовжувати **цей** run і не запускати інший. Accepted B-5 підтверджено окремим review; фінальний CI ще не перевірений.
+
+```text
+$ gh workflow run ci --repo sql-monk/Jane --ref codex/jane-integration
+https://github.com/sql-monk/Jane/actions/runs/37937013460
+EXIT_CODE=0
+$ gh run list --repo sql-monk/Jane --branch codex/jane-integration --event workflow_dispatch --limit 3 --json databaseId,headSha,status,conclusion,url,createdAt
+{ "databaseId": 37937013460, "headSha": "bb1982b9f6b1e2593fb2f1ab60a436e6945f15b1", "status": "queued", "conclusion": "", "createdAt": "2026-10-09T13:27:50Z", "url": "https://github.com/sql-monk/Jane/actions/runs/37937013460" }
+EXIT_CODE=0
+```

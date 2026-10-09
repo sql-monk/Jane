@@ -1,19 +1,27 @@
-// Assistant sessions: onboarding a source by name or URL, proposals with coverage/cost/risks (ТЗ §8, assistant.v1).
-import { useState } from "react";
+// Assistant: onboarding sessions (search, disambiguation, proposals with coverage/cost/risks, acceptance) and
+// improvement runs (ТЗ §8, §9, assistant.v1). Sessions and runs come from the assistant's list endpoints
+// (GET /v1/onboarding-sessions, GET /v1/improvement-runs), so the page restores its state after a reload; the
+// open session / run is kept in the URL (`?session=`, `?tab=improvement&job=`), nothing in browser storage.
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useApi, useConfig } from "../app/context";
 import { newIdempotencyKey, unwrap } from "../api/client";
-import { pollDelay } from "../api/hooks";
+import { pollDelay, useCursorList } from "../api/hooks";
+import { safeProblemCode } from "../api/problem";
 import type {
   AcceptanceResult,
   Job,
+  JobStatus,
   OnboardingRequest,
   OnboardingSession,
+  OnboardingStatus,
   Proposal,
   Source,
   TaskConfig,
 } from "../api/types";
+import { ImprovementRunList } from "../components/ImprovementRuns";
+import { ImprovementResultView } from "../components/ImprovementResultView";
 import { JobPanel, TestReportView } from "../components/JobPanel";
 import { JsonEditor, checkJson } from "../components/JsonEditor";
 import {
@@ -22,41 +30,38 @@ import {
   JsonView,
   KeyValue,
   Loading,
+  LoadMore,
   Notice,
   Page,
   Section,
   Status,
   Table,
+  Tabs,
 } from "../components/ui";
 import { formatDate, formatMoney, refLabel } from "../lib/format";
 import { STRATEGY_LABELS } from "./RulesEditorPage";
 
-const RECENT_ITEM = "jane.admin.recent_onboarding_sessions";
 const ACTIVE_STATUSES = new Set(["resolving", "sampling", "analyzing", "applying"]);
+const ONBOARDING_STATUSES: OnboardingStatus[] = [
+  "resolving",
+  "needs_disambiguation",
+  "sampling",
+  "analyzing",
+  "proposals_ready",
+  "insufficient_sample",
+  "applying",
+  "completed",
+  "failed",
+  "cancelled",
+];
+const JOB_STATUSES: JobStatus[] = ["queued", "running", "cancelling", "succeeded", "failed", "cancelled"];
 
-// Per-viewer convenience only (the assistant has no list endpoint yet, see WP-12 report).
-function readRecent(): string[] {
-  try {
-    const raw = window.localStorage.getItem(RECENT_ITEM);
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string").slice(0, 20) : [];
-  } catch {
-    return [];
-  }
-}
+type AssistantTab = "onboarding" | "improvement";
 
-function rememberSession(id: string): string[] {
-  const next = [id, ...readRecent().filter((x) => x !== id)].slice(0, 20);
-  try {
-    window.localStorage.setItem(RECENT_ITEM, JSON.stringify(next));
-  } catch {
-    /* storage unavailable */
-  }
-  return next;
-}
-
-/** The onboarding Job points at its session through `links` (any link to /v1/onboarding-sessions/{id}). */
+/** The session of an onboarding Job: `labels.session_id`, or its `links.session` (/v1/onboarding-sessions/{id}). */
 export function sessionIdFromJob(job: Job): string | null {
+  const label = job.labels?.["session_id"];
+  if (label) return label;
   for (const link of Object.values(job.links ?? {})) {
     const match = /\/v1\/onboarding-sessions\/([^/?#]+)/.exec(link);
     if (match?.[1]) return decodeURIComponent(match[1]);
@@ -64,11 +69,87 @@ export function sessionIdFromJob(job: Job): string | null {
   return null;
 }
 
+function percent(value: number | undefined): string {
+  return value === undefined ? "—" : `${Math.round(value * 100)}%`;
+}
+
 export function AssistantPage() {
+  const [params, setParams] = useSearchParams();
+  const tab: AssistantTab = params.get("tab") === "improvement" ? "improvement" : "onboarding";
+  const update = (changes: Record<string, string | null>) => {
+    const next = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    setParams(next);
+  };
+  return (
+    <Page title="Асистент">
+      <Tabs<AssistantTab>
+        tabs={[
+          ["onboarding", "Підключення джерел"],
+          ["improvement", "Запуски вдосконалення"],
+        ]}
+        active={tab}
+        onChange={(t) => update({ tab: t === "onboarding" ? null : t })}
+      />
+      {tab === "onboarding" ? (
+        <Onboarding sessionId={params.get("session")} onOpen={(id) => update({ session: id })} />
+      ) : (
+        <ImprovementRuns jobId={params.get("job")} onOpen={(id) => update({ job: id })} />
+      )}
+    </Page>
+  );
+}
+
+/** Research limits of the assistant (GET /v1/info -> limits, PlatformLimits): the ТЗ §8 sampling threshold. */
+function OnboardingLimits() {
   const api = useApi();
-  const [recent, setRecent] = useState<string[]>(readRecent);
-  const [sessionId, setSessionId] = useState<string | null>(recent[0] ?? null);
-  const [manualId, setManualId] = useState("");
+  const info = useQuery({
+    queryKey: ["info", "assistant"],
+    queryFn: () => unwrap(api.assistant.GET("/v1/info")),
+  });
+  const defaults = info.data?.limits?.defaults.llm;
+  const caps = info.data?.limits?.hard_caps?.llm;
+  const budget = defaults?.budget;
+  return (
+    <Section title="Ліміти дослідження">
+      {info.isLoading ? <Loading /> : null}
+      <ErrorBox error={info.error} title="Ліміти асистента недоступні" />
+      {info.data ? (
+        <KeyValue
+          rows={[
+            [
+              "Поріг достатності вибірки (min_onboarding_confidence)",
+              <span data-testid="min-onboarding-confidence">
+                {percent(defaults?.min_onboarding_confidence)}
+                {caps?.min_onboarding_confidence !== undefined
+                  ? ` (стеля ${percent(caps.min_onboarding_confidence)})`
+                  : ""}
+              </span>,
+            ],
+            [
+              "Макс. сторінок вибірки (max_onboarding_samples)",
+              String(defaults?.max_onboarding_samples ?? "—"),
+            ],
+            ["Бюджет LLM асистента", budget ? `${formatMoney(budget)} / ${budget.period}` : "—"],
+            ["Профіль лімітів", info.data.limits?.profile ?? "—"],
+          ]}
+        />
+      ) : null}
+      <p className="muted">
+        Асистент добирає вибірку, доки впевненість не досягне порога; не досягнуто в межах бюджету й
+        max_onboarding_samples — сесія insufficient_sample. Поріг можна змінити для одного підключення нижче
+        (hard_caps обмежують його зверху).
+      </p>
+    </Section>
+  );
+}
+
+function Onboarding({ sessionId, onOpen }: { sessionId: string | null; onOpen: (id: string) => void }) {
+  const api = useApi();
+  const queryClient = useQueryClient();
   const [startJob, setStartJob] = useState<string | null>(null);
   const [form, setForm] = useState({
     query: "",
@@ -77,6 +158,7 @@ export function AssistantPage() {
     amount: "",
     currency: "USD",
     samples: "",
+    confidence: "",
     auto_activation: false,
     hints: "",
   });
@@ -84,6 +166,13 @@ export function AssistantPage() {
 
   const start = useMutation({
     mutationFn: () => {
+      const limits: NonNullable<OnboardingRequest["limits"]> = {
+        ...(form.amount
+          ? { budget: { amount: Number(form.amount), currency: form.currency, period: "total" as const } }
+          : {}),
+        ...(form.samples ? { max_onboarding_samples: Number.parseInt(form.samples, 10) } : {}),
+        ...(form.confidence ? { min_onboarding_confidence: Number(form.confidence) } : {}),
+      };
       const body: OnboardingRequest = {
         query: form.query,
         ...(form.source_kind ? { source_kind: form.source_kind } : {}),
@@ -95,22 +184,7 @@ export function AssistantPage() {
                 .filter(Boolean),
             }
           : {}),
-        ...(form.amount || form.samples
-          ? {
-              limits: {
-                ...(form.amount
-                  ? {
-                      budget: {
-                        amount: Number(form.amount),
-                        currency: form.currency,
-                        period: "total" as const,
-                      },
-                    }
-                  : {}),
-                ...(form.samples ? { max_onboarding_samples: Number.parseInt(form.samples, 10) } : {}),
-              },
-            }
-          : {}),
+        ...(Object.keys(limits).length ? { limits } : {}),
         ...(hints.value && typeof hints.value === "object"
           ? { crawl_hints: hints.value as Record<string, unknown> }
           : {}),
@@ -125,16 +199,15 @@ export function AssistantPage() {
     },
     onSuccess: (job) => {
       setStartJob(job.job_id);
+      void queryClient.invalidateQueries({ queryKey: ["onboarding-sessions"] });
       const id = sessionIdFromJob(job);
-      if (id) {
-        setRecent(rememberSession(id));
-        setSessionId(id);
-      }
+      if (id) onOpen(id);
     },
   });
 
   return (
-    <Page title="Асистент: підключення джерела">
+    <>
+      <OnboardingLimits />
       <Section title="Нове підключення">
         <p className="muted">
           Достатньо назви сайту чи Telegram-каналу або точного посилання. Асистент збирає різноманітну вибірку
@@ -191,6 +264,19 @@ export function AssistantPage() {
               onChange={(e) => setForm({ ...form, samples: e.target.value })}
             />
           </Field>
+          <Field
+            label="Поріг впевненості вибірки"
+            hint="0–1; порожньо — поріг асистента (min_onboarding_confidence)"
+          >
+            <input
+              type="number"
+              min={0.01}
+              max={1}
+              step="0.05"
+              value={form.confidence}
+              onChange={(e) => setForm({ ...form, confidence: e.target.value })}
+            />
+          </Field>
           <label className="checkbox">
             <input
               type="checkbox"
@@ -221,7 +307,46 @@ export function AssistantPage() {
           <JobPanel service="assistant" client={api.assistant} jobId={startJob} title="Підключення джерела" />
         ) : null}
       </Section>
-      <Section title="Сесії">
+      <SessionList selected={sessionId} onOpen={onOpen} />
+      {sessionId ? <SessionView key={sessionId} sessionId={sessionId} shownJob={startJob} /> : null}
+    </>
+  );
+}
+
+/** Sessions of the assistant, newest first (GET /v1/onboarding-sessions, cursor pagination). */
+function SessionList({ selected, onOpen }: { selected: string | null; onOpen: (id: string) => void }) {
+  const api = useApi();
+  const [status, setStatus] = useState<OnboardingStatus | "">("");
+  const [manualId, setManualId] = useState("");
+  const list = useCursorList(["onboarding-sessions", status], (cursor, limit) =>
+    unwrap(
+      api.assistant.GET("/v1/onboarding-sessions", {
+        params: {
+          query: { limit, ...(cursor ? { cursor } : {}), ...(status ? { status: [status] } : {}) },
+        },
+      }),
+    ),
+  );
+  return (
+    <Section
+      title="Сесії"
+      actions={
+        <button type="button" className="btn btn-small" onClick={list.refetch}>
+          Оновити список
+        </button>
+      }
+    >
+      <div className="filters">
+        <Field label="Стан сесії">
+          <select value={status} onChange={(e) => setStatus(e.target.value as OnboardingStatus | "")}>
+            <option value="">усі</option>
+            {ONBOARDING_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </Field>
         <div className="inline-form">
           <Field label="Відкрити сесію за ідентифікатором">
             <input value={manualId} onChange={(e) => setManualId(e.target.value)} placeholder="onb_…" />
@@ -231,36 +356,122 @@ export function AssistantPage() {
             className="btn"
             disabled={!manualId.trim()}
             onClick={() => {
-              setRecent(rememberSession(manualId.trim()));
-              setSessionId(manualId.trim());
+              onOpen(manualId.trim());
               setManualId("");
             }}
           >
             Відкрити
           </button>
         </div>
-        {recent.length ? (
-          <p>
-            Нещодавні:{" "}
-            {recent.map((id) => (
+      </div>
+      {list.isLoading ? <Loading /> : null}
+      <ErrorBox error={list.error} title="Список сесій недоступний" />
+      <Table
+        label="Сесії підключення"
+        rows={list.items}
+        rowKey={(s) => s.session_id}
+        empty="Сесій ще немає"
+        columns={[
+          {
+            header: "Сесія",
+            cell: (s) => (
               <button
-                key={id}
                 type="button"
-                className={id === sessionId ? "link link-active" : "link"}
-                onClick={() => setSessionId(id)}
+                className={s.session_id === selected ? "link link-active" : "link"}
+                onClick={() => onOpen(s.session_id)}
               >
-                {id}
+                {s.session_id}
               </button>
-            ))}
-          </p>
-        ) : null}
-      </Section>
-      {sessionId ? <SessionView key={sessionId} sessionId={sessionId} /> : null}
-    </Page>
+            ),
+          },
+          { header: "Запит", cell: (s) => s.query },
+          { header: "Стан", cell: (s) => <Status value={s.status} /> },
+          { header: "Варіантів", cell: (s) => String(s.proposal_count ?? "—") },
+          { header: "Витрати LLM", cell: (s) => formatMoney(s.costs) },
+          { header: "Створено", cell: (s) => formatDate(s.created_at) },
+          {
+            header: "Помилка",
+            cell: (s) => (s.error ? <code>{safeProblemCode(s.error.code)}</code> : "—"),
+          },
+        ]}
+      />
+      <LoadMore hasMore={list.hasMore} loading={list.loadingMore} onClick={list.loadMore} />
+    </Section>
   );
 }
 
-function SessionView({ sessionId }: { sessionId: string }) {
+/** Improvement runs of the assistant with filters; the chosen run's result (ImprovementResult, proposal). */
+function ImprovementRuns({ jobId, onOpen }: { jobId: string | null; onOpen: (id: string) => void }) {
+  const api = useApi();
+  const [filter, setFilter] = useState({ package_id: "", source_id: "", problem_group_id: "", status: "" });
+  return (
+    <>
+      <Section title="Запуски вдосконалення екстракторів">
+        <p className="muted">
+          Job вдосконалення на проблемних прикладах (запускаються з розділу «Проблеми»), новіші першими.
+        </p>
+        <div className="filters">
+          <Field label="Пакет (package_id)">
+            <input
+              value={filter.package_id}
+              onChange={(e) => setFilter({ ...filter, package_id: e.target.value.trim() })}
+            />
+          </Field>
+          <Field label="Джерело (source_id)">
+            <input
+              value={filter.source_id}
+              onChange={(e) => setFilter({ ...filter, source_id: e.target.value.trim() })}
+            />
+          </Field>
+          <Field label="Група проблем (problem_group_id)">
+            <input
+              value={filter.problem_group_id}
+              onChange={(e) => setFilter({ ...filter, problem_group_id: e.target.value.trim() })}
+            />
+          </Field>
+          <Field label="Стан job">
+            <select value={filter.status} onChange={(e) => setFilter({ ...filter, status: e.target.value })}>
+              <option value="">усі</option>
+              {JOB_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <ImprovementRunList
+          filter={{
+            ...(filter.package_id ? { package_id: filter.package_id } : {}),
+            ...(filter.source_id ? { source_id: filter.source_id } : {}),
+            ...(filter.problem_group_id ? { problem_group_id: filter.problem_group_id } : {}),
+            ...(filter.status ? { status: filter.status as JobStatus } : {}),
+          }}
+          label="Запуски вдосконалення"
+          selected={jobId}
+          onOpen={onOpen}
+        />
+      </Section>
+      {jobId ? (
+        <JobPanel
+          key={jobId}
+          service="assistant"
+          client={api.assistant}
+          jobId={jobId}
+          title="Вдосконалення"
+          renderResult={(result) => <ImprovementResultView result={result} />}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/** Job.result of acceptProposal (AcceptanceResult); the other jobs of a session return the session itself. */
+function isAcceptance(result: Record<string, unknown>): boolean {
+  return Array.isArray(result["extractors"]) && typeof result["collector_rules"] === "object";
+}
+
+function SessionView({ sessionId, shownJob }: { sessionId: string; shownJob: string | null }) {
   const api = useApi();
   const { polling } = useConfig();
   const queryClient = useQueryClient();
@@ -301,9 +512,18 @@ function SessionView({ sessionId }: { sessionId: string }) {
           body: { activate, ...(sourceId ? { source_id: sourceId } : {}) },
         }),
       ) as Promise<Job>,
-    onSuccess: (job) => setAcceptJob(job.job_id),
+    onSuccess: (job) => {
+      setAcceptJob(job.job_id);
+      void queryClient.invalidateQueries({ queryKey: ["onboarding", sessionId] });
+    },
   });
   const s: OnboardingSession | undefined = session.data;
+  const status = s?.status;
+  // The list shows the stored state of every session: refresh it whenever this session changes its state.
+  useEffect(() => {
+    if (status) void queryClient.invalidateQueries({ queryKey: ["onboarding-sessions"] });
+  }, [status, queryClient]);
+  const lastJob = s?.job_id && s.job_id !== shownJob && s.job_id !== acceptJob ? s.job_id : null;
   return (
     <Section title={`Сесія ${sessionId}`}>
       {session.isLoading ? <Loading /> : null}
@@ -356,6 +576,7 @@ function SessionView({ sessionId }: { sessionId: string }) {
               Вибірка: {s.sample.materials ?? 0} матеріалів, {s.sample.distinct_types ?? 0} типів, впевненість{" "}
               {s.sample.confidence !== undefined ? `${Math.round(s.sample.confidence * 100)}%` : "—"}
               {s.sample.sufficient === false ? " — вибірки недостатньо" : ""}
+              {s.sample.message ? `. ${s.sample.message}` : ""}
             </Notice>
           ) : null}
           {s.analysis ? (
@@ -417,6 +638,23 @@ function SessionView({ sessionId }: { sessionId: string }) {
               jobId={acceptJob}
               title="Застосування варіанта"
               renderResult={(result) => <AcceptanceView result={result as unknown as AcceptanceResult} />}
+            />
+          ) : null}
+          {lastJob ? (
+            // After a reload: the latest job of the session (continuation after the choice, or the acceptance).
+            <JobPanel
+              key={lastJob}
+              service="assistant"
+              client={api.assistant}
+              jobId={lastJob}
+              title="Останній job сесії"
+              renderResult={(result) =>
+                isAcceptance(result) ? (
+                  <AcceptanceView result={result as unknown as AcceptanceResult} />
+                ) : (
+                  <p className="muted">Результат job — стан сесії вище.</p>
+                )
+              }
             />
           ) : null}
         </>
@@ -551,6 +789,19 @@ function AcceptanceView({ result }: { result: AcceptanceResult }) {
           {e.test_report ? <TestReportView report={e.test_report} /> : null}
         </div>
       ))}
+      {result.activated && result.source_draft ? (
+        <p>
+          Джерело:{" "}
+          <Link to={`/sources/${encodeURIComponent(result.source_draft.source_id)}`}>
+            {result.source_draft.source_id}
+          </Link>
+          {(result.task_drafts ?? []).map((t) => (
+            <span key={t.task_id}>
+              , завдання <Link to={`/tasks/${encodeURIComponent(t.task_id)}`}>{t.task_id}</Link>
+            </span>
+          ))}
+        </p>
+      ) : null}
       {result.source_draft && !result.activated ? (
         <div>
           <button
@@ -581,6 +832,9 @@ function AcceptanceView({ result }: { result: AcceptanceResult }) {
             </div>
           ))
         : null}
+      {createTask.data ? (
+        <Link to={`/tasks/${encodeURIComponent(createTask.data.task_id)}`}> Завдання створено</Link>
+      ) : null}
       <ErrorBox error={createTask.error} />
     </div>
   );

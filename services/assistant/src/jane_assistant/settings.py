@@ -157,11 +157,13 @@ class LlmLimits(Limits):
     budget: Budget = Budget()
     max_improvement_attempts: int = Field(default=3, ge=0)
     max_onboarding_samples: int = Field(default=60, ge=1)
+    min_onboarding_confidence: float = Field(default=0.8, gt=0, le=1)
+    """Contract ``llm.min_onboarding_confidence`` (WP-15): sampling stops once the sample-coverage confidence
+    reaches it; below it within the budget the session is ``insufficient_sample``. Before WP-15 it was the
+    internal ``onboarding.min_confidence``."""
 
 
 class OnboardingLimits(Limits):
-    min_confidence: float = Field(default=0.8, gt=0, le=1)
-    """Sampling stops once the sample-coverage confidence reaches this value."""
     min_distinct_types: int = Field(default=2, ge=1)
     """Do not trust coverage of a single material type while collection is still running."""
     sample_batch_size: int = Field(default=10, ge=1)

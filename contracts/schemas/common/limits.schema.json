@@ -84,7 +84,8 @@
         "max_output_tokens_per_request": { "type": "integer", "minimum": 1 },
         "budget": { "$ref": "#/$defs/Budget" },
         "max_improvement_attempts": { "type": "integer", "minimum": 0, "description": "Скільки спроб вдосконалення екстрактора на одну групу проблем." },
-        "max_onboarding_samples": { "type": "integer", "minimum": 1, "description": "Верхня межа вибірки під час дослідження джерела (фактична кількість адаптивна)." }
+        "max_onboarding_samples": { "type": "integer", "minimum": 1, "description": "Верхня межа вибірки під час дослідження джерела (фактична кількість адаптивна)." },
+        "min_onboarding_confidence": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Поріг достатньої впевненості вибірки під час дослідження джерела (ТЗ §8): асистент вибирає матеріали, доки оцінка впевненості не досягне порога; не досягнуто в межах бюджету й max_onboarding_samples — сесія insufficient_sample. Вищий поріг — більша вибірка й витрати, тому hard_caps обмежують його зверху. Типово 0.8." }
       }
     },
     "transfer": {

@@ -48,6 +48,8 @@ class LlmLimitsIn(Strict):
     budget: Budget | None = None
     max_improvement_attempts: int | None = Field(default=None, ge=0)
     max_onboarding_samples: int | None = Field(default=None, ge=1)
+    min_onboarding_confidence: float | None = Field(default=None, gt=0, le=1)
+    """The assistant's limit; accepted (the contract allows it in any ``limits.llm``), not used by the gateway."""
 
 
 class Provider(Strict):

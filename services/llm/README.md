@@ -204,6 +204,7 @@ JANE_LLM_API_KEYS=[{"name": "assistant", "sha256": "<sha256 hex ключа>", "s
 | `llm.max_requests_per_minute` | 60 | викликів провайдерів на хвилину для всієї платформи (усі екземпляри) |
 | `llm.max_input_tokens_per_request` | 100000 | оцінка вхідних токенів понад це — 422 `limit_exceeded` |
 | `llm.max_output_tokens_per_request` | 4096 | верхня межа `max_output_tokens` |
+| `llm.max_improvement_attempts`, `llm.max_onboarding_samples`, `llm.min_onboarding_confidence` | — | ліміти асистента: у `limits.llm` запиту чи профілі приймаються, шлюз їх не застосовує |
 | `gateway.default_max_output_tokens` | 1024 | якщо ні запит, ні пакет не задали |
 | `gateway.max_schema_retries` | 1 | типове й максимальне число повторів при виході не за схемою |
 | `gateway.chars_per_token_estimate` | 2.0 | оцінка вхідних токенів (символи / значення) для резерву бюджету |

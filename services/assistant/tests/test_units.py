@@ -184,18 +184,23 @@ def test_search_providers(tmp_path: Path) -> None:
 
 def test_limits_resolution_and_hard_caps(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("JANE_ASSISTANT_LIMITS__HARD_CAPS__LLM__MAX_IMPROVEMENT_ATTEMPTS", "2")
-    monkeypatch.setenv("JANE_ASSISTANT_LIMITS__ONBOARDING__MIN_CONFIDENCE", "0.7")
+    monkeypatch.setenv("JANE_ASSISTANT_LIMITS__LLM__MIN_ONBOARDING_CONFIDENCE", "0.7")
     resolved = resolve_service_limits(
         Settings(), *request_layer({"max_improvement_attempts": 5, "max_onboarding_samples": 10})
     )
     assert resolved.limits.llm.max_improvement_attempts == 2  # clamped by the platform hard cap
     assert resolved.limits.llm.max_onboarding_samples == 10
-    assert resolved.limits.onboarding.min_confidence == 0.7
+    assert (
+        resolved.limits.llm.min_onboarding_confidence == 0.7
+    )  # contract llm.min_onboarding_confidence (R08)
+    asked = resolve_service_limits(Settings(), *request_layer({"min_onboarding_confidence": 0.95}))
+    assert asked.limits.llm.min_onboarding_confidence == 0.95  # a request may ask for a stricter sample
     assert resolved.provenance()["llm.max_improvement_attempts"] == "hard_cap"
     with pytest.raises(LimitError):
         resolve_service_limits(Settings(), *request_layer({"unknown": 1}))
     info = resolve_service_limits(Settings()).platform_limits()
     assert info["defaults"]["llm"]["budget"] == {"amount": 2.0, "currency": "USD", "period": "run"}
+    assert info["defaults"]["llm"]["min_onboarding_confidence"] == 0.7  # visible in /v1/info
 
 
 def _llm_session(responder: Any, **limits: Any) -> LlmSession:

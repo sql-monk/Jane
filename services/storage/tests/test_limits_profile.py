@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from jane_storage.app import build_app
-from jane_storage.settings import Settings, resolve_service_limits
+from jane_storage.settings import ConflictRetries, Settings, resolve_service_limits
 
 PROFILES = Path(__file__).resolve().parents[3] / "deploy" / "profiles"
 
@@ -45,7 +45,10 @@ def test_whole_profile_is_accepted_and_its_storage_limits_apply(profile: tuple[P
     assert lim.transfer.max_request_body_bytes == want["transfer"]["max_request_body_bytes"]
     assert lim.timeouts.sync_response_max_ms == want["timeouts"]["sync_response_max_ms"] != 30_000
     assert lim.timeouts.request_timeout_ms == want["timeouts"]["request_timeout_ms"]
-    assert lim.retries.model_dump() == want["retries"]
+    # the profile's retries (backoff up to 60 s for calls between services) never reach the core's CONFLICT
+    # retries: they keep the service configuration (R14), and the contract path is listed as ignored
+    assert lim.conflict_retries == ConflictRetries()
+    assert {f"retries.{k}" for k in want["retries"]} <= set(resolved.ignored)
     assert lim.jobs.job_retention_seconds == want["transfer"]["job_retention_seconds"] != 86_400
     assert lim.idempotency.idempotency_ttl_seconds == want["transfer"]["idempotency_ttl_seconds"]
     # every contract limit storage has took the profile's value; the rest is ignored, not lost silently
@@ -67,13 +70,13 @@ def test_service_starts_with_the_profile(profile: tuple[Path, dict[str, Any]]) -
 
 
 def test_invocation_limits_stay_strict_with_the_profile(profile: tuple[Path, dict[str, Any]]) -> None:
-    """Only the platform file is lenient: an unknown ``HandlerInvocation.limits.retries`` field is still
+    """Only the platform file is lenient: an unknown ``HandlerInvocation.limits.timeouts`` field is still
     a ``LimitError`` (422 in ``/v1/invocations``)."""
     from jane_kit.config import LimitError, LimitLayer
 
     settings = Settings(log_format="console", limits_file=profile[0])
     with pytest.raises(LimitError, match="unknown limit"):
-        resolve_service_limits(settings, LimitLayer("request", {"retries": {"max_attempt": 1}}))
+        resolve_service_limits(settings, LimitLayer("request", {"timeouts": {"sync_response_max": 1}}))
 
 
 def test_profile_typo_still_fails_the_start(tmp_path: Path) -> None:

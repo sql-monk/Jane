@@ -19,11 +19,28 @@
 | Захист від запізнілих даних | Кожне поле пам'ятає порядок свого значення (`observed_at` → `sequence` → `observation_id`); старіше значення потрапляє лише в історію (`stale`, `partially_stale`) |
 | Актуальний стан та історія | `EntitySnapshot` з `version` + `HistoryEvent` на кожне прийняте оновлення (включно із запізнілими) |
 | Формати | RAW: `params.format.raw` → `entry.format.raw` → типова поведінка (ТЗ §5): вебсторінка HTML/XHTML — байт-у-байт у `.html`, будь-який інший RAW (Telegram, JSON API, стрічки) — JSON-документ Material із вбудованим вмістом (`.json`). Явні перевизначення: `original` (байти як є, розширення за медіатипом), `html` (лише для HTML), `json`. Сутності й інші результати — JSON; `format.entities: jsonl` (файловий адаптер — історія як JSON Lines) |
-| Конкурентні записи | Адаптер робить compare-and-swap за `version`; ядро повторює при `CONFLICT` за `limits.retries` |
+| Конкурентні записи | Адаптер робить compare-and-swap за `version`; ядро повторює при `CONFLICT` за `limits.conflict_retries` конфігурації сервісу (не за контрактним `retries` профілю чи запиту — це політика викликача) |
 | Режим тестування | `context.test_mode: true` — валідація без виклику адаптера, `WriteAck.status = simulated` |
 
 Злиття — чиста функція ядра (`jane_storage.merge`), адаптер дає лише атомарні примітиви, тому всі шість сховищ
 поводяться однаково.
+
+### Читання (storage.v1) і повторна обробка
+
+- **Простір імен.** Параметри етапу `prefix` (files, minio, s3, mongodb) і `schema` / `table_prefix` (postgresql,
+  sqlserver) перекривають однойменні `params` підключення лише під час запису. Читальний API (і повторна обробка
+  за `stored_materials.storage_connection_id`) бачить простір, який задають `params` самого підключення; щоб
+  читати дані з простору етапу, зареєструйте окреме підключення з тими самими `params.prefix` / `schema` /
+  `table_prefix` (`contracts/docs/storage-adapter.md`, «Простір імен»).
+- **Кілька матеріалів.** `GET /v1/objects?material_ids=a&material_ids=b` (разом із `material_id`, об'єднання
+  значень) — об'єкти будь-якого з перелічених матеріалів, сторінками в порядку `material_id`, далі в порядку
+  адаптера; курсор — лише для того самого запиту. Межа кількості — `objects.max_filter_material_ids`.
+- **Відновлений Material** (`GET /v1/objects/{id}`): для RAW у форматі `html`/`original` — постійне посилання
+  адаптера (`file://` у files, `s3://` у minio/s3) або inline до `transfer.inline_max_bytes`; для RAW, збереженого
+  JSON-документом Material (`format.raw: json` чи типова поведінка для не-вебсторінок), — **початковий** вміст,
+  вийнятий із документа, inline до `transfer.inline_max_bytes` (більший — без `material`: постійного посилання на
+  самі байти немає). Раніше тут повертався сам документ-обгортка, тож повторна обробка Telegram-повідомлень
+  отримувала JSON замість тексту.
 
 ## Запуск
 
@@ -93,20 +110,26 @@ entities = httpx.get(
 `JANE_STORAGE_LIMITS_FILE` (форма `PlatformLimits`; можна дати цілий профіль `deploy/profiles/<профіль>.json` —
 ліміти контракту, яких storage не має, ігноруються й перелічуються в журналі старту, опечатка чи некоректне
 значення — помилка старту; див. README jane-kit), стелі — `JANE_STORAGE_LIMITS__HARD_CAPS__…`. Ліміти з
-`HandlerInvocation.limits` (`retries`, `timeouts.sync_response_max_ms`, `timeouts.request_timeout_ms`) діють у межах
-стель. Типові значення:
+`HandlerInvocation.limits` (`timeouts.sync_response_max_ms`, `timeouts.request_timeout_ms`) діють у межах
+стель; решту полів документа лімітів етапу storage приймає й ігнорує. Контрактний `retries` (профілю чи етапу) —
+політика викликача (оркестратор повторює виклик з тим самим ключем), тому storage його не застосовує: профіль
+з backoff до 60 с не сповільнює повтори ядра при `CONFLICT`, вони мають власну групу `conflict_retries`
+(R14, WP-17). Типові значення:
 
 | Параметр | Типово | Призначення |
 |---|---|---|
-| `retries.max_attempts` / `initial_backoff_ms` / `max_backoff_ms` / `backoff_multiplier` / `jitter` | 4 / 200 / 10000 / 2.0 / true | повтори ядра при `CONFLICT` |
+| `conflict_retries.max_attempts` / `initial_backoff_ms` / `max_backoff_ms` / `backoff_multiplier` / `jitter` | 4 / 200 / 10000 / 2.0 / true | повтори ядра при `CONFLICT` (конкурентний запис тієї самої сутності); `JANE_STORAGE_LIMITS__CONFLICT_RETRIES__*`. Значення ті самі, що діяли до відокремлення |
 | `timeouts.sync_response_max_ms` | 30000 | довше — `202` + Job |
 | `timeouts.request_timeout_ms` | 30000 | читання blob (`download_url`, `s3://`) |
 | `transfer.max_request_body_bytes` | 16777216 | більше тіло — `413` |
 | `transfer.inline_max_bytes` | 1048576 | до цього розміру `GET /v1/objects/{id}` віддає вміст inline (якщо в адаптера немає URI) |
 | `transfer.idempotency_ttl_seconds` | 86400 | кеш ключів ідемпотентності в пам'яті (стійка дедуплікація — у сховищі, безстроково) |
 | `objects.max_object_bytes` | 104857600 | найбільший RAW/документ |
+| `objects.max_filter_material_ids` | 200 | скільки значень `material_id` + `material_ids` приймає один `GET /v1/objects`; більше — `422 limit_exceeded` |
 | `adapters.lock_timeout_ms` / `lock_stale_ms` / `lock_poll_ms` / `replace_retry_ms` | 30000 / 120000 / 10 / 5000 | файловий адаптер |
 | `adapters.pool_min_size` / `pool_max_size` / `connect_timeout_ms` / `command_timeout_ms` | 1 / 10 / 10000 / 30000 | PostgreSQL |
+| `adapters.chunk_bytes` | не задано (адаптер: 4194304) | MongoDB: розмір частини RAW для всіх підключень; `params.chunk_bytes` підключення має перевагу |
+| `adapters.retry_max_attempts` | не задано (адаптер: 3) | MinIO/S3: спроби botocore на запит для всіх підключень; `params.retry_max_attempts` підключення має перевагу |
 | `pages.default_page_size` / `max_page_size` | 50 / 500 | пагінація читального API |
 | `invocations.max_results_in_memory` | 10000 | `GET /v1/invocations/{id}` |
 | `jobs.max_concurrent_jobs` / `max_queued_jobs` / `job_timeout_ms` | 4 / 1000 / 3600000 | виконання викликів |
@@ -157,8 +180,12 @@ entities = httpx.get(
 
 Для `download_url` дозволені лише HTTP(S) URL без userinfo; порт звіряється з allowlist (типово 80/443).
 HTTP-перенаправлення не виконуються. Змінні HTTP-проксі середовища для цих завантажень не застосовуються.
-Каталог `JANE_STORAGE_CONTENT_FILES_DIR` має бути окремим спільним транзитним томом, доступним виробнику
-`ContentRef` і storage за однаковим шляхом. Не спрямовуйте його на `/`, `/run/secrets` або каталог конфігурації.
+Каталог `JANE_STORAGE_CONTENT_FILES_DIR` — або окремий спільний транзитний том, доступний виробнику `ContentRef` і
+storage за однаковим шляхом, або (R19) корінь RAW-об'єктів власного файлового адаптера: у базовому стеку
+`/var/lib/jane/storage/objects` (`infra/compose.yaml`). Тоді повторна обробка з `from_stage` = етап збереження
+(відновлений Material з persistent `file://` URI, ADR-0004 §3/§6) може зберегти RAW ще раз, наприклад в інше
+сховище; записи доставок, індекс і сутності адаптера поза цим коренем лишаються недоступними для читання.
+Не спрямовуйте його на `/`, `/run/secrets`, каталог конфігурації чи весь `base_path` адаптера.
 Якщо виробник використовує `s3://` з налаштованим `JANE_STORAGE_TRANSIT_CONNECTION_ID`, цей каталог не потрібний.
 Невідповідні адреси чи файли відхиляються до читання вмісту.
 Для підключень `s3`/`minio` з власним `params.endpoint` політика вимагає

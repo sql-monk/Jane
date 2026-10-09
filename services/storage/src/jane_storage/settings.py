@@ -99,6 +99,8 @@ class Transfer(Limits):
 class Objects(Limits):
     max_object_bytes: int = Field(default=100 * 1024 * 1024, ge=1)
     """Largest RAW / result document the service stores (content read into memory)."""
+    max_filter_material_ids: int = Field(default=200, ge=1)
+    """Most ``material_id`` values one ``GET /v1/objects`` may filter by (``material_id`` + ``material_ids``)."""
 
 
 class Adapters(Limits):
@@ -112,6 +114,25 @@ class Adapters(Limits):
     pool_max_size: int = Field(default=10, ge=1)
     connect_timeout_ms: int = Field(default=10_000, ge=1)
     command_timeout_ms: int = Field(default=30_000, ge=1)
+    chunk_bytes: int | None = Field(default=None, ge=1)
+    """MongoDB: size of one RAW chunk document for every connection that does not set ``params.chunk_bytes``
+    (unset: the adapter's own default, 4 MiB; the adapter rejects values above 15 MiB)."""
+    retry_max_attempts: int | None = Field(default=None, ge=1)
+    """MinIO/S3: botocore attempts per request for every connection that does not set
+    ``params.retry_max_attempts`` (unset: the adapter's own default, 3)."""
+
+
+CONNECTION_FIRST_OPTIONS = frozenset({"chunk_bytes", "retry_max_attempts"})
+"""Service-wide adapter defaults that a connection's own ``params`` override (the other ``adapters.*`` options
+are applied over the connection params)."""
+
+
+class ConflictRetries(RetryPolicy):
+    """Retries of the core on ``CONFLICT`` (a concurrent writer changed the entity version first).
+
+    Not the contract ``limits.retries``: that policy is the caller's (re-sending a request with the same
+    ``Idempotency-Key``), so neither a platform profile nor ``HandlerInvocation.limits`` changes this backoff.
+    The defaults are those that applied before the split (``RetryPolicy`` of jane-kit)."""
 
 
 class Invocations(Limits):
@@ -144,8 +165,9 @@ class ServiceLimits(Limits):
 
     jobs: JobLimits = JobLimits()
     idempotency: IdempotencyLimits = IdempotencyLimits()
-    retries: RetryPolicy = contract_field("retries", RetryPolicy())
-    """Contract ``limits.retries``: retries of the core on ``CONFLICT`` (concurrent writers)."""
+    conflict_retries: ConflictRetries = ConflictRetries()
+    """Retries of the core on ``CONFLICT`` (``JANE_STORAGE_LIMITS__CONFLICT_RETRIES__*``); the contract
+    ``limits.retries`` of a profile or an invocation is not used by storage (it is the caller's policy)."""
     timeouts: Timeouts = Timeouts()
     transfer: Transfer = Transfer()
     objects: Objects = Objects()

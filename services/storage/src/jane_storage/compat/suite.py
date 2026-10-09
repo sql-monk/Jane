@@ -64,7 +64,7 @@ T0 = datetime(2026, 9, 27, 10, 0, 0, tzinfo=UTC)
 ENTITY = "product"
 SCOPE = "compat-shop"
 COMPAT_RETRIES = RetryPolicy(max_attempts=20, initial_backoff_ms=1, max_backoff_ms=20, jitter=True)
-"""Retry policy of the core in the suite (the service reads it from ``limits.retries``)."""
+"""Retry policy of the core on ``CONFLICT`` in the suite (the service reads it from ``limits.conflict_retries``)."""
 PAGE_LIMITS = (1, 2, 3)
 
 

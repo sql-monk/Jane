@@ -270,8 +270,11 @@ paths:
         (`format.raw` пакета, `contracts/docs/storage-adapter.md`, «Формати RAW»): `html` / `original` —
         постійне посилання адаптера на ті самі байти (`file://` чи `s3://`, `store: persistent`) або inline
         до `limits.transfer.inline_max_bytes`; `json` (документ Material із вбудованим вмістом) — початковий
-        вміст, вийнятий із документа, inline до `limits.transfer.inline_max_bytes`. Якщо вміст не можна
-        віддати (більший за ліміт без постійного посилання), `material` відсутній.
+        вміст, вийнятий із документа, inline до `limits.transfer.inline_max_bytes`. Більший за ліміт вміст без
+        постійного посилання (`json`, а також адаптери без blob-URI: PostgreSQL, MongoDB, SQL Server) віддається
+        транзитним blob самого storage (`store: transit`, `expires_at` = зараз + `limits.transfer.transit_ttl_seconds`,
+        ADR-0004 §2), якщо в розгортанні налаштовано його транзитне сховище; без нього `material` відсутній
+        (байти — `getObjectContent`).
       responses:
         '200':
           description: Об'єкт і, для RAW, Material із посиланням на вміст (або inline-вмістом).
@@ -332,7 +335,9 @@ paths:
       tags: [objects]
       responses:
         '200':
-          description: Вміст; Content-Type — медіатип об'єкта; підтримується Range.
+          description: >-
+            Вміст; Content-Type — медіатип об'єкта (будь-який: `text/html`, `text/plain`, `application/json`,
+            `application/pdf`, `image/*`…; перелічені нижче — приклади, решта — `*/*`); підтримується Range.
           content:
             application/octet-stream:
               schema:
@@ -342,9 +347,18 @@ paths:
               schema:
                 type: string
               example: '<html><head><title>Kettle A-100</title></head></html>'
+            text/plain:
+              schema:
+                type: string
+              example: 'Event 1: concert at 19:00'
             application/json:
               schema: {}
               example: {}
+            '*/*':
+              schema:
+                type: string
+                description: Байти об'єкта в його медіатипі, без перетворень.
+              example: 'Kettle A-100 1299 UAH'
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '404':

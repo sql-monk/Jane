@@ -38,9 +38,15 @@
 - **Відновлений Material** (`GET /v1/objects/{id}`): для RAW у форматі `html`/`original` — постійне посилання
   адаптера (`file://` у files, `s3://` у minio/s3) або inline до `transfer.inline_max_bytes`; для RAW, збереженого
   JSON-документом Material (`format.raw: json` чи типова поведінка для не-вебсторінок), — **початковий** вміст,
-  вийнятий із документа, inline до `transfer.inline_max_bytes` (більший — без `material`: постійного посилання на
-  самі байти немає). Раніше тут повертався сам документ-обгортка, тож повторна обробка Telegram-повідомлень
-  отримувала JSON замість тексту.
+  вийнятий із документа, inline до `transfer.inline_max_bytes`. Більший за ліміт вміст без постійного посилання
+  (`json`, а також адаптери без blob-URI — PostgreSQL, MongoDB, SQL Server) з `JANE_STORAGE_TRANSIT_DIR`
+  віддається **транзитним blob** storage (R18, ADR-0004 §2): `file://<transit>/storage/РРРР/ММ/ДД/<object_id>-<sha>.…`,
+  `store: transit`, `expires_at` = зараз + `transfer.transit_ttl_seconds`; файл адресується вмістом (повторні
+  `GET` беруть той самий і продовжують його строк), storage видаляє прострочені кожні
+  `transfer.transit_cleanup_interval_seconds` і сам читає власні транзитні blob (повторна обробка з
+  `from_stage` = етап збереження). Без `JANE_STORAGE_TRANSIT_DIR` такий RAW — без `material` (байти —
+  `GET /v1/objects/{id}/content`). Раніше тут повертався сам документ-обгортка, тож повторна обробка
+  Telegram-повідомлень отримувала JSON замість тексту.
 
 ## Запуск
 
@@ -71,7 +77,11 @@ docker run -p 8107:8000 -v jane-storage:/var/lib/jane/storage \
 ]}
 ```
 
-Підключення можна також задати `PUT /v1/connections/{id}` (так їх синхронізує оркестратор).
+Підключення можна також задати `PUT /v1/connections/{id}` (так їх синхронізує оркестратор). Незмінене визначення
+(та сама ETag) не перевідкриває адаптер; змінене чи видалене — «відставляє» його: нові записи й читання відкривають
+новий адаптер, а виклики, що вже виконуються, завершуються на старому (тримають його через `AdapterPool.lease`), і
+той закривається після останнього з них. Раніше кожен `PUT` закривав адаптер, і запис, що йшов у цю мить, падав
+`execution_error` «adapter is not open» (`retryable: false`).
 
 Кілька екземплярів: стан запису — у сховищі (записи доставок, CAS за версією, для файлів — файли-блокування), тож
 екземпляри над одним сховищем не дублюють записів. У пам'яті екземпляра лише кеш ключів ідемпотентності (відхилення
@@ -126,6 +136,8 @@ entities = httpx.get(
 | `timeouts.request_timeout_ms` | 30000 | читання blob (`download_url`, `s3://`) |
 | `transfer.max_request_body_bytes` | 16777216 | більше тіло — `413` |
 | `transfer.inline_max_bytes` | 1048576 | до цього розміру `GET /v1/objects/{id}` віддає вміст inline (якщо в адаптера немає URI) |
+| `transfer.transit_ttl_seconds` | 604800 | контракт: скільки живе транзитний blob storage (`expires_at`) |
+| `transfer.transit_cleanup_interval_seconds` | 600 | як часто storage видаляє свої прострочені транзитні blob |
 | `transfer.idempotency_ttl_seconds` | 86400 | кеш ключів ідемпотентності в пам'яті (стійка дедуплікація — у сховищі, безстроково) |
 | `objects.max_object_bytes` | 104857600 | найбільший RAW/документ |
 | `objects.max_filter_material_ids` | 200 | скільки значень `material_id` + `material_ids` приймає один `GET /v1/objects`; більше — `422 limit_exceeded` |
@@ -176,10 +188,11 @@ entities = httpx.get(
 | Змінна | Типово | Дія |
 |---|---|---|
 | `JANE_STORAGE_SECRET_ENV_PREFIX` | `JANE_SECRET_` | `secret_refs` типу `env:` можуть називати лише змінні з цим префіксом; порожнє значення вимикає `env:` |
-| `JANE_STORAGE_SECRET_FILES_DIR` | `/run/secrets` | `secret_refs` типу `file:` можуть читати лише файли цього каталогу після розв'язання `..` і symlink; порожнє значення вимикає `file:` |
+| `JANE_STORAGE_SECRET_FILES_DIR` | `/run/secrets` | `secret_refs` типу `file:` можуть читати лише файли цього каталогу після розв'язання `..` і symlink (читання — через закріплені компоненти шляху, спільна політика `jane_kit.secrets`, R17); порожнє значення вимикає `file:` |
 | `JANE_STORAGE_CONNECTION_HOST_ALLOWLIST` | `[]` | JSON-список дозволених `hostname` або `hostname:port` для мережевих адрес підключень; порожній список забороняє всі такі підключення |
 | `JANE_STORAGE_CONTENT_FILES_DIR` | не задано | `ContentRef` з `file:///…` читається лише з цього каталогу після розв'язання symlink; без змінної локальні blob заборонені |
 | `JANE_STORAGE_DOWNLOAD_HOST_ALLOWLIST` | `[]` | JSON-список дозволених `hostname` або `hostname:port` для `ContentRef.download_url`; порожній список забороняє HTTP-завантаження |
+| `JANE_STORAGE_TRANSIT_DIR` | не задано | транзитне сховище storage (R18): великий RAW без постійного URI в `GET /v1/objects/{id}` — транзитний `file://` blob у `<каталог>/storage/`; без змінної — без `material`. Базовий стек: `/var/lib/jane/storage/transit` (handler-runtime і llm читають `…/transit/storage` у своїх `BLOB_ROOTS`) |
 
 Для `download_url` дозволені лише HTTP(S) URL без userinfo; порт звіряється з allowlist (типово 80/443).
 HTTP-перенаправлення не виконуються. Змінні HTTP-проксі середовища для цих завантажень не застосовуються.

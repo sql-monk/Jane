@@ -128,7 +128,10 @@ JANE_HANDLER_RUNTIME_STATE_SCHEMA=jane_handler_runtime                          
 `Idempotency-Replayed: true`) без повторного запуску пісочниці; job і результати читаються з будь-якого
 екземпляра; виклик, що ще виконується на іншому екземплярі, — 409 `idempotency_in_progress` (`retryable: true`);
 незавершене «захоплення» ключа впалим екземпляром звільняється через `state.in_progress_lease_ms`. Ключі
-пам'ятаються `transfer.idempotency_ttl_seconds`, job — `transfer.job_retention_seconds`.
+пам'ятаються `transfer.idempotency_ttl_seconds`, job — `transfer.job_retention_seconds`. Сховища — спільні
+`jane_kit.stores.postgres` (R17): heartbeat поновлює оренди лише job і «захоплень» цього процесу, запис ключа й
+job огороджено (`token` / оренда перевіряються і під час запису), таблиці `idempotency`/`jobs` мігруються на місці
+під advisory lock (кілька екземплярів можуть стартувати разом).
 
 Без `STATE_DSN` стан у пам'яті процесу (`InMemory*` jane-kit) — **лише для одного автономного екземпляра й CLI**:
 після рестарту ключі втрачаються, між екземплярами не видно. `GET /v1/info` → `capabilities.state`

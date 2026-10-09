@@ -10,17 +10,17 @@ Semantics of the WP-00 contract (``common.yaml#/components/parameters/Idempotenc
 * the key is 1-255 printable ASCII characters;
 * if the handler raises, the key is released so the client can retry.
 
-:class:`InMemoryIdempotencyStore` suits one instance and tests. Services running several instances
-implement :class:`IdempotencyStore` on their own database (e.g. PostgreSQL ``INSERT ... ON CONFLICT
-DO NOTHING``).
+:class:`InMemoryIdempotencyStore` suits one instance and tests. Services running several instances use the
+shared stores of :mod:`jane_kit.stores` (PostgreSQL / SQLite: per-claim token, lease renewed by heartbeat,
+take-over of a stopped instance's claim) on their own database.
 """
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import re
+import threading
 import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Mapping
@@ -102,7 +102,8 @@ class InMemoryIdempotencyStore:
         self.limits = limits or IdempotencyLimits()
         self._clock = clock
         self._records: OrderedDict[str, IdempotencyRecord] = OrderedDict()
-        self._lock = asyncio.Lock()
+        # a thread lock (no await inside): the store may be shared by apps on different event loops (tests)
+        self._lock = threading.Lock()
 
     def __len__(self) -> int:
         return len(self._records)
@@ -114,7 +115,7 @@ class InMemoryIdempotencyStore:
             self._records.popitem(last=False)
 
     async def begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
-        async with self._lock:
+        with self._lock:
             now = self._clock()
             self._evict(now)
             existing = self._records.get(key)
@@ -125,14 +126,14 @@ class InMemoryIdempotencyStore:
             return None
 
     async def complete(self, key: str, response: StoredResponse) -> None:
-        async with self._lock:
+        with self._lock:
             record = self._records.get(key)
             if record is not None:
                 record.state = "completed"
                 record.response = response
 
     async def release(self, key: str) -> None:
-        async with self._lock:
+        with self._lock:
             record = self._records.get(key)
             if record is not None and record.state == "in_progress":
                 del self._records[key]

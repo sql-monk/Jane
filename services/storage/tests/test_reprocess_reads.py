@@ -359,3 +359,79 @@ def test_service_wide_adapter_defaults_yield_to_connection_params(
     monkeypatch.delenv("JANE_STORAGE_LIMITS__ADAPTERS__RETRY_MAX_ATTEMPTS")
     default = resolve_service_limits(Settings(log_format="console")).limits.adapters
     assert {"chunk_bytes", "retry_max_attempts"}.isdisjoint(default.model_dump(exclude_none=True))
+
+
+# ------------------------------------------------------------------ R18 (WP-19): large RAW without a persistent URI
+def test_large_raw_without_persistent_uri_is_returned_as_a_transit_blob(
+    tmp_path: Path, storage_dir: Path, h: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A RAW over ``transfer.inline_max_bytes`` whose bytes have no persistent URI (here: ``format.raw json``; the
+    PostgreSQL/MongoDB/SQL Server adapters have none at all) keeps its ``material``: the content is a transit blob
+    of storage (``store: transit``, ``expires_at``) that a consumer reads within its ``BLOB_ROOTS`` and storage
+    itself can store again (reprocessing with ``from_stage`` = a storage stage). Without ``transit_dir`` the
+    contract's old answer stays: no ``material`` (see the test above)."""
+    import asyncio
+    from datetime import UTC, datetime
+
+    from jane_kit.content import ContentReader
+
+    monkeypatch.setenv("JANE_STORAGE_LIMITS__TRANSFER__INLINE_MAX_BYTES", "16")
+    monkeypatch.setenv("JANE_STORAGE_LIMITS__TRANSFER__TRANSIT_TTL_SECONDS", "3600")
+    transit = tmp_path / "transit"
+    settings = _two_files_settings(tmp_path, storage_dir, None).with_overrides(transit_dir=transit)
+    original = b'{"long": "' + b"x" * 64 + b'"}'
+    with TestClient(build_app(settings)) as c:
+        ack = _store(c, h, h.material(original, media_type="application/json"), "dk-json-transit")
+        object_id = ack["object"]["object_id"]
+        r = c.get(f"/v1/objects/{object_id}", params={"connection_id": "raw-files"})
+        assert r.status_code == 200
+        STORAGE_SPEC.validate_response("get", "/v1/objects/{object_id}", 200, r.json(), "application/json")
+        content = r.json()["material"]["content"]
+        assert content["kind"] == "blob" and content["store"] == "transit"
+        assert content["uri"].startswith("file://") and "/storage/" in content["uri"]
+        assert content["size_bytes"] == len(original)
+        assert content["sha256"] == hashlib.sha256(original).hexdigest()
+        expires = datetime.fromisoformat(content["expires_at"].replace("Z", "+00:00"))
+        assert 3500 < (expires - datetime.now(UTC)).total_seconds() <= 3600
+        again = c.get(f"/v1/objects/{object_id}", params={"connection_id": "raw-files"}).json()
+        assert again["material"]["content"]["uri"] == content["uri"]  # one content-addressed transit file
+        consumer = ContentReader(timeout_ms=1000, blob_roots=[transit])
+        assert asyncio.run(consumer.read(content, max_bytes=10_000)) == original
+        # storage reads its own transit blob: the restored Material can be stored again (R19 path)
+        stored_again = h.post(
+            c,
+            h.invocation(
+                [{"kind": "material", "material": r.json()["material"]}],
+                "dk-json-transit-again",
+                target="copy-files",
+            ),
+        ).json()
+        assert stored_again["status"] == "success", stored_again
+    assert len(list((transit / "storage").rglob("*.json"))) == 1
+
+
+def test_large_html_without_uri_keeps_its_material_through_the_api(
+    tmp_path: Path, h: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The WP-15 review case: an HTML page over ``inline_max_bytes`` from an adapter without a blob URI. The files
+    adapter is told it has none (``content_uri`` removed for this test) - the PostgreSQL adapter has none."""
+    from jane_storage_files import FilesystemAdapter
+
+    monkeypatch.setenv("JANE_STORAGE_LIMITS__TRANSFER__INLINE_MAX_BYTES", "64")
+    monkeypatch.delattr(FilesystemAdapter, "content_uri")
+    page = b"<html><body>" + b"<p>price 1299</p>" * 200 + b"</body></html>"
+    for transit in (None, tmp_path / "transit"):
+        settings = _two_files_settings(tmp_path, tmp_path / f"s-{transit is None}", None)
+        if transit is not None:
+            settings = settings.with_overrides(transit_dir=transit)
+        with TestClient(build_app(settings)) as c:
+            ack = _store(c, h, h.material(page), f"dk-html-{transit is None}")
+            body = c.get(
+                f"/v1/objects/{ack['object']['object_id']}", params={"connection_id": "raw-files"}
+            ).json()
+        if transit is None:
+            assert "material" not in body  # the contract's answer without a transit store
+        else:
+            assert body["material"]["content"]["kind"] == "blob"
+            assert body["material"]["content"]["size_bytes"] == len(page)
+            assert body["material"]["material_id"] == h.material(page)["material_id"]

@@ -1,17 +1,20 @@
-"""Material documents (``material.schema.json``) and content delivery (inline / transit blob, ADR-0004)."""
+"""Material documents (``material.schema.json``) and content delivery (inline / transit blob, ADR-0004).
+
+Writing the ``ContentRef`` (inline or a transit blob with ``expires_at``) and the transit cleaner are jane-kit's
+shared :mod:`jane_kit.content` (R18); this module builds the Material around it.
+"""
 
 from __future__ import annotations
 
-import base64
 import hashlib
-import os
 import secrets
 import time
 from collections.abc import Mapping
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from jane_kit.content import ContentTooLarge, ContentWriter, FileTransitStore
 
 from .fetcher import HttpResult
 from .urls import material_id
@@ -38,16 +41,10 @@ TEXT_TYPES = frozenset(
     }
 )
 UTF8_NAMES = frozenset({None, "utf-8", "utf8", "us-ascii", "ascii"})
-EXTENSIONS = {
-    "text/html": ".html",
-    "application/json": ".json",
-    "application/pdf": ".pdf",
-    "text/plain": ".txt",
-}
 
 
-class MaterialTooLarge(Exception):
-    """Content above ``transfer.inline_max_bytes`` and no blob store configured (``limit_exceeded``)."""
+MaterialTooLarge = ContentTooLarge
+"""Content above ``transfer.inline_max_bytes`` and no blob store configured (``limit_exceeded``)."""
 
 
 def rfc3339(dt: datetime) -> str:
@@ -92,41 +89,16 @@ def content_kind(media_type: str, url: str) -> str:
     return "file"
 
 
-class TransitStore:
-    """Transit blobs on a local/shared directory (``file://`` URIs, single node or shared volume)."""
+class TransitStore(FileTransitStore):
+    """Transit blobs of this collector (``<root>/web-collector/...``, ``file://`` URIs) - jane-kit's shared writer and
+    cleaner (R18, ADR-0004)."""
 
     def __init__(self, root: Path) -> None:
-        self.root = root.resolve()
-
-    def put(self, observation_id: str, body: bytes, media_type: str, now: datetime) -> Path:
-        folder = self.root / "web-collector" / f"{now:%Y}" / f"{now:%m}" / f"{now:%d}"
-        folder.mkdir(parents=True, exist_ok=True)
-        path = folder / f"{observation_id}{EXTENSIONS.get(media_type, '.bin')}"
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_bytes(body)
-        os.replace(tmp, path)
-        return path
-
-    def cleanup(self, ttl_seconds: int) -> int:
-        """Remove transit files older than their TTL (the producer's cleaner, ADR-0004)."""
-        cutoff = time.time() - ttl_seconds
-        removed = 0
-        base = self.root / "web-collector"
-        if not base.is_dir():
-            return 0
-        for path in base.rglob("*"):
-            if path.is_file() and path.stat().st_mtime < cutoff:
-                path.unlink(missing_ok=True)
-                removed += 1
-        return removed
+        super().__init__(root, "web-collector")
 
 
-@dataclass
-class Delivery:
-    mode: str  # auto | inline | blob
-    inline_max_bytes: int
-    transit_ttl_seconds: int
-    store: TransitStore | None
+Delivery = ContentWriter
+"""Content delivery of the collector (``content_delivery`` auto | inline | blob, ADR-0004)."""
 
 
 def _content_ref(
@@ -137,44 +109,8 @@ def _content_ref(
     fetched_at: datetime,
     delivery: Delivery,
 ) -> dict[str, Any]:
-    digest = hashlib.sha256(body).hexdigest()
-    use_blob = delivery.mode == "blob" or (delivery.mode == "auto" and len(body) > delivery.inline_max_bytes)
-    if use_blob:
-        if delivery.store is None:
-            raise MaterialTooLarge(
-                f"{len(body)} bytes > transfer.inline_max_bytes={delivery.inline_max_bytes} and no blob store configured"
-                if delivery.mode == "auto"
-                else "content_delivery=blob but no blob store configured"
-            )
-        path = delivery.store.put(observation_id, body, media_type, fetched_at)
-        ref: dict[str, Any] = {
-            "kind": "blob",
-            "uri": path.as_uri(),
-            "media_type": media_type,
-            "size_bytes": len(body),
-            "sha256": digest,
-            "store": "transit",
-            "expires_at": rfc3339(fetched_at + timedelta(seconds=delivery.transit_ttl_seconds)),
-        }
-        if charset:
-            ref["charset"] = charset
-        return ref
-    if delivery.mode == "inline" and len(body) > delivery.inline_max_bytes:
-        raise MaterialTooLarge(f"{len(body)} bytes > transfer.inline_max_bytes={delivery.inline_max_bytes}")
-    ref = {"kind": "inline", "media_type": media_type, "size_bytes": len(body), "sha256": digest}
-    if charset:
-        ref["charset"] = charset
-    text: str | None = None
-    if is_text(media_type) and charset in UTF8_NAMES:
-        try:
-            text = body.decode("utf-8")
-        except UnicodeDecodeError:
-            text = None
-    if text is not None:
-        ref.update(encoding="utf-8", data=text)
-    else:
-        ref.update(encoding="base64", data=base64.b64encode(body).decode("ascii"))
-    return ref
+    text = is_text(media_type) and charset in UTF8_NAMES
+    return delivery.ref(body, media_type, observation_id, fetched_at, text=text, charset=charset)
 
 
 def build_material(

@@ -11,21 +11,21 @@
 * a service message of the channel (channel created, message pinned...) is a material too, with its action in
   ``metadata.service_action`` (R30);
 * content: the message text (``text/plain``, UTF-8) inline, or a transit blob (``file://``) if asked or larger
-  than ``transfer.inline_max_bytes``; downloaded media go to ``attachments`` the same way.
+  than ``transfer.inline_max_bytes``; downloaded media go to ``attachments`` the same way. The ``ContentRef``
+  writer and the transit cleaner are jane-kit's shared :mod:`jane_kit.content` (R18).
 """
 
 from __future__ import annotations
 
-import base64
 import hashlib
-import os
 import secrets
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from jane_kit.content import ContentTooLarge, ContentWriter, FileTransitStore
 
 from .client import ChannelInfo, TgMedia, TgMessage
 
@@ -40,12 +40,6 @@ __all__ = [
     "revision_sequence",
     "rfc3339",
 ]
-
-EXTENSIONS = {"text/plain": ".txt", "image/jpeg": ".jpg", "image/png": ".png", "video/mp4": ".mp4"}
-
-
-class ContentTooLarge(Exception):
-    """Content above ``transfer.inline_max_bytes`` and no blob store (or ``content_delivery=inline``)."""
 
 
 def rfc3339(dt: datetime) -> str:
@@ -110,92 +104,21 @@ def message_sha(msg: TgMessage) -> str:
     return hashlib.sha256(msg.text.encode("utf-8")).hexdigest()
 
 
-class TransitStore:
-    """Transit blobs on a local/shared directory (``file://`` URIs, single node or shared volume)."""
+class TransitStore(FileTransitStore):
+    """Transit blobs of this collector (``<root>/telegram-collector/...``, ``file://`` URIs) - jane-kit's shared writer
+    and cleaner (R18, ADR-0004)."""
 
     def __init__(self, root: Path) -> None:
-        self.root = root.resolve()
-
-    @property
-    def base(self) -> Path:
-        return self.root / "telegram-collector"
-
-    def put(self, name: str, body: bytes, media_type: str, now: datetime) -> Path:
-        folder = self.base / f"{now:%Y}" / f"{now:%m}" / f"{now:%d}"
-        folder.mkdir(parents=True, exist_ok=True)
-        path = folder / f"{name}{EXTENSIONS.get(media_type, '.bin')}"
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_bytes(body)
-        os.replace(tmp, path)
-        return path
-
-    def cleanup(self, ttl_seconds: int) -> int:
-        """Remove transit files older than their TTL (the producer's cleaner, ADR-0004)."""
-        cutoff = time.time() - ttl_seconds
-        removed = 0
-        if not self.base.is_dir():
-            return 0
-        for path in self.base.rglob("*"):
-            if path.is_file() and path.stat().st_mtime < cutoff:
-                path.unlink(missing_ok=True)
-                removed += 1
-        return removed
+        super().__init__(root, "telegram-collector")
 
 
-@dataclass
-class Delivery:
-    mode: str  # auto | inline | blob
-    inline_max_bytes: int
-    transit_ttl_seconds: int
-    store: TransitStore | None
+class Delivery(ContentWriter):
+    """Content delivery of the collector (``content_delivery`` auto | inline | blob, ADR-0004)."""
 
     def content_ref(
         self, body: bytes, media_type: str, name: str, now: datetime, *, text: bool
     ) -> dict[str, Any]:
-        digest = hashlib.sha256(body).hexdigest()
-        too_big = len(body) > self.inline_max_bytes
-        if self.mode == "inline" and too_big:
-            raise ContentTooLarge(
-                f"{len(body)} bytes > transfer.inline_max_bytes={self.inline_max_bytes} (content_delivery=inline)"
-            )
-        if self.mode == "blob" or (self.mode == "auto" and too_big):
-            if self.store is None:
-                raise ContentTooLarge(
-                    f"{len(body)} bytes > transfer.inline_max_bytes={self.inline_max_bytes} and no blob store configured"
-                    if self.mode == "auto"
-                    else "content_delivery=blob but no blob store configured"
-                )
-            path = self.store.put(name, body, media_type, now)
-            ref: dict[str, Any] = {
-                "kind": "blob",
-                "uri": path.as_uri(),
-                "media_type": media_type,
-                "size_bytes": len(body),
-                "sha256": digest,
-                "store": "transit",
-                "expires_at": rfc3339(now + timedelta(seconds=self.transit_ttl_seconds)),
-            }
-            if text:
-                ref["charset"] = "utf-8"
-            return ref
-        if text:
-            return {
-                "kind": "inline",
-                "media_type": media_type,
-                "charset": "utf-8",
-                "encoding": "utf-8",
-                "data": body.decode("utf-8"),
-                "size_bytes": len(body),
-                "sha256": digest,
-            }
-        return {
-            "kind": "inline",
-            "media_type": media_type,
-            "encoding": "base64",
-            "data": base64.b64encode(body).decode("ascii"),
-            "size_bytes": len(body),
-            "sha256": digest,
-        }
+        return self.ref(body, media_type, name, now, text=text, charset="utf-8" if text else None)
 
 
 def message_url(channel: ChannelInfo, message_id: int) -> str:

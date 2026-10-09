@@ -22,6 +22,7 @@ import httpx
 
 from jane_kit.auth import bearer_header, resolve_secret_ref
 from jane_kit.clients import ClientLimits, RemoteError, ServiceClient
+from jane_kit.content import inline_ref
 from jane_kit.errors import JaneError, Problem, UpstreamUnavailable
 
 from .settings import Settings
@@ -265,8 +266,9 @@ class StorageClient(_Base):
     async def material(self, connection_id: str, object_id: str) -> dict[str, Any]:
         """Material of a stored RAW object with its **original** content inline (UTF-8 text or base64).
 
-        ``getObject`` gives the Material with its content either inline or by reference, or (for content over
-        storage's inline limit) no ``material`` at all. A RAW stored with ``format.raw = json`` is the Material
+        ``getObject`` gives the Material with its content either inline or by reference (a persistent URI of the
+        adapter or, for content over storage's inline limit without one, storage's transit blob - R18), or, when
+        storage has no transit store, no ``material`` at all. A RAW stored with ``format.raw = json`` is the Material
         document itself (original content inside it), so its object bytes are not the original content:
 
         * ``material.content`` inline and not such a document -> taken as is (the original content);
@@ -301,17 +303,7 @@ class StorageClient(_Base):
 
 
 def _inline_content(data: bytes, media_type: str) -> dict[str, Any]:
-    try:
-        encoded = {"encoding": "utf-8", "data": data.decode("utf-8")}
-    except UnicodeDecodeError:
-        encoded = {"encoding": "base64", "data": base64.b64encode(data).decode()}
-    return {
-        "kind": "inline",
-        "media_type": media_type,
-        **encoded,
-        "sha256": hashlib.sha256(data).hexdigest(),
-        "size_bytes": len(data),
-    }
+    return inline_ref(data, media_type, text=True)  # jane-kit's shared ContentRef writer (R18)
 
 
 def _inline_bytes(content: Mapping[str, Any]) -> bytes:

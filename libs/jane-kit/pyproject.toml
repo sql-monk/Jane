@@ -17,6 +17,12 @@ dependencies = [
     "pyjwt[crypto]>=2.10",
 ]
 
+[project.optional-dependencies]
+# jane_kit.stores.postgres (shared PostgreSQL JobStore / IdempotencyStore)
+postgres = [
+    "psycopg[binary,pool]>=3.2",
+]
+
 [project.scripts]
 jane-codegen = "jane_kit.codegen:main"
 

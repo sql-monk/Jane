@@ -27,6 +27,7 @@ from .rules import ContractSchemas, RulesLoader, validate_rules
 from .settings import ServiceLimits, Settings, contract_layer, platform_layers, to_contract
 from .shared_hosts import SharedHosts, check_ttl
 from .state import StateStore
+from .stores import SqliteIdempotencyStore
 from .urls import Normalizer, Scope
 
 __all__ = ["Engine"]
@@ -49,8 +50,11 @@ class Engine:
         registry: Registry,
         schemas: ContractSchemas,
         runner: JobRunner,
+        *,
+        idempotency: SqliteIdempotencyStore | None = None,
     ) -> None:
         self.settings = settings
+        self.idempotency = idempotency
         self.connection_policy = settings.connection_policy()
         self.base = base_limits
         self.limits = base_limits.limits
@@ -144,6 +148,8 @@ class Engine:
         while True:
             try:
                 await self.resume_pending()
+                if self.idempotency is not None:
+                    await self.idempotency.heartbeat()  # this instance's Idempotency-Key claims stay leased
             except Exception:
                 log.exception("resume loop failed")
             await asyncio.sleep(interval)

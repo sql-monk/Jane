@@ -13,6 +13,7 @@ from jane_kit.config import JaneSettings, LimitLayer, Limits, ResolvedLimits, co
 from jane_kit.content import ContentReader, parse_host_allowlist
 from jane_kit.idempotency import IdempotencyLimits
 from jane_kit.jobs import JobLimits
+from jane_kit.stores import LeaseLimits
 from jane_llm.connections import ConnectionPolicy
 
 ENV_PREFIX = "JANE_LLM_"
@@ -171,6 +172,8 @@ class ServiceLimits(Limits):
     registry: RegistryLimits = RegistryLimits()
     jobs: JobLimits = JobLimits()
     idempotency: IdempotencyLimits = IdempotencyLimits()
+    state: LeaseLimits = LeaseLimits()
+    """Leases of the shared PostgreSQL state (R17): ``Idempotency-Key`` claims, jobs, heartbeat interval."""
 
 
 def resolve_service_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLimits[ServiceLimits]:

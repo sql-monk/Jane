@@ -6,6 +6,8 @@ TerminateProcess (no graceful shutdown), then a new process is started on the sa
 
 from __future__ import annotations
 
+import contextlib
+import sqlite3
 import time
 from typing import Any
 
@@ -25,7 +27,11 @@ SLOW_LIMITS: dict[str, Any] = {
 def test_crawl_resumes_after_kill(
     service_factory: ServiceFactory, site: Site, expected_sets: dict[str, set[str]]
 ) -> None:
-    first = service_factory()
+    # The collection lease in service_factory is 3 s. The host lease must also fit this bounded
+    # crash scenario: its production default is 120 s, so slots left by a killed request would
+    # correctly outlive drain(timeout=90). Keep the shared limiter enabled and its expiry real.
+    lease_settings = {"JANE_WEB_COLLECTOR_LIMITS__COLLECTOR__SHARED_HOST_TTL_SECONDS": "3"}
+    first = service_factory(**lease_settings)
     first.start()
     with httpx.Client(base_url=first.base, timeout=10) as api:
         cid = start(
@@ -44,16 +50,30 @@ def test_crawl_resumes_after_kill(
         assert len(acked) == 5
         api.get(f"/v1/collections/{cid}/materials", params={"after": page["next_cursor"], "limit": 1})
     first.kill()
+    with contextlib.closing(sqlite3.connect(first.state_dir / "state.db")) as db:
+        dead_owner = db.execute("SELECT owner FROM collections WHERE collection_id = ?", (cid,)).fetchone()[0]
+        dead_slots = db.execute(
+            "SELECT token, expires_at FROM host_slots WHERE instance_id = ?", (dead_owner,)
+        ).fetchall()
+    print(
+        f"crash host leases: owner={dead_owner}, killed_at={time.time()}, ttl_seconds=3, slots={dead_slots}"
+    )
     fetched_before = view["stats"]["fetched"]
     assert view["status"] == "running"
     requests_before = sum(site.requests.values())
 
-    second = service_factory(state_dir=first.state_dir)
+    second = service_factory(state_dir=first.state_dir, **lease_settings)
     second.start()
     with httpx.Client(base_url=second.base, timeout=10) as api:
         rest = drain(api, cid, timeout=90)
         done = wait_done(api, cid, timeout=30)
     assert done["status"] == "succeeded", done
+    with contextlib.closing(sqlite3.connect(first.state_dir / "state.db")) as db:
+        left = db.execute("SELECT COUNT(*) FROM host_slots WHERE instance_id = ?", (dead_owner,)).fetchone()[
+            0
+        ]
+    print(f"crash host leases after recovery: owner={dead_owner}, observed_at={time.time()}, slots={left}")
+    assert left == 0  # the dead instance's slots expired; nothing deleted them on its behalf
 
     got = {m["locator"]["canonical_url"] for m in acked} | {m["locator"]["canonical_url"] for m in rest}
     assert got == site.canonical(expected_sets["recursive"])

@@ -155,6 +155,10 @@ services:
       # stored by the files adapter keeps its persistent file:///var/lib/jane/storage/objects/... URI. Storage
       # may read only that RAW root of its own volume, not the adapter's deliveries, index or entities.
       JANE_STORAGE_CONTENT_FILES_DIR: /var/lib/jane/storage/objects
+      # R18 (ADR-0004 §2): a RAW over transfer.inline_max_bytes without a persistent URI (format.raw json, the
+      # PostgreSQL/MongoDB/SQL Server adapters) is returned by getObject as storage's transit blob
+      # file:///var/lib/jane/storage/transit/storage/...; storage removes it after transfer.transit_ttl_seconds.
+      JANE_STORAGE_TRANSIT_DIR: /var/lib/jane/storage/transit
       JANE_SECRET_DEV_PG_USER: jane_storage_results
       JANE_SECRET_DEV_PG_PASSWORD: ${JANE_PG_STORAGE_RESULTS_PASSWORD:?run `just up`}
     volumes:
@@ -187,8 +191,9 @@ services:
       JANE_HANDLER_RUNTIME_LOG_FORMAT: json
       # Reprocessing of stored RAW: the files adapter of storage references it as file:///var/lib/jane/storage/objects/...
       # (ADR-0004: file:// only on one node with a shared volume). The volume is read-only and only its RAW objects
-      # may be read (WP-01h policy), not the adapter's deliveries, index or entities.
-      JANE_HANDLER_RUNTIME_BLOB_ROOTS: '["/var/lib/jane/storage/objects"]'
+      # may be read (WP-01h policy), not the adapter's deliveries, index or entities; plus storage's transit blobs
+      # of large RAW without a persistent URI (R18).
+      JANE_HANDLER_RUNTIME_BLOB_ROOTS: '["/var/lib/jane/storage/objects", "/var/lib/jane/storage/transit/storage"]'
     volumes:
       - ${JANE_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
       - storage-data:/var/lib/jane/storage:ro
@@ -297,8 +302,9 @@ services:
       JANE_LLM_DATABASE_URL: postgresql://jane_llm:${JANE_PG_LLM_PASSWORD:?run `just up`}@postgres:5432/jane_llm
       JANE_LLM_FAKE_PROVIDER_ENABLED: "true"
       JANE_LLM_LOG_FORMAT: json
-      # Reprocessing from an LLM stage gets stored RAW as file:///var/lib/jane/storage/objects/... (as handler-runtime).
-      JANE_LLM_BLOB_ROOTS: '["/var/lib/jane/storage/objects"]'
+      # Reprocessing from an LLM stage gets stored RAW as file:///var/lib/jane/storage/objects/... or storage's transit
+      # blob of a large RAW without a persistent URI (as handler-runtime).
+      JANE_LLM_BLOB_ROOTS: '["/var/lib/jane/storage/objects", "/var/lib/jane/storage/transit/storage"]'
     volumes:
       - storage-data:/var/lib/jane/storage:ro
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_LLM:-}:8110"]

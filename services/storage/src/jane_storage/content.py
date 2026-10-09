@@ -12,7 +12,7 @@ import asyncio
 import base64
 import binascii
 import hashlib
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
@@ -48,11 +48,14 @@ class ContentReader:
         transit: TransitResolver | None = None,
         files_dir: Path | None = None,
         download_host_allowlist: list[str] | tuple[str, ...] = (),
+        extra_files_dirs: Sequence[Path] = (),
     ) -> None:
         self.max_bytes = max_bytes
         self.request_timeout_ms = request_timeout_ms
         self._transit = transit
-        self._files_dir = files_dir
+        self._files_dirs = tuple(d for d in (files_dir, *extra_files_dirs) if d is not None)
+        """Directories local blobs may come from: the operator's ``content_files_dir`` and this service's own
+        transit directory (R18)."""
         self._download_policy = ConnectionPolicy(host_allowlist=download_host_allowlist)
 
     async def read(self, ref: Mapping[str, Any]) -> bytes:
@@ -91,7 +94,7 @@ class ContentReader:
         uri = str(ref.get("uri", ""))
         parsed = urlparse(uri)
         if parsed.scheme == "file":
-            if self._files_dir is None:
+            if not self._files_dirs:
                 raise ContentError("local blob reading is disabled", retryable=False)
             if parsed.netloc or parsed.query or parsed.fragment or not parsed.path.startswith("/"):
                 raise ContentError("invalid local blob URI", retryable=False)
@@ -113,10 +116,9 @@ class ContentReader:
         raise ContentError("no transit connection configured and no download_url", retryable=False)
 
     def _read_allowed_file(self, path: Path) -> bytes:
-        assert self._files_dir is not None
-        base = self._files_dir.resolve(strict=True)
         path = path.resolve(strict=True)
-        if path == base or not path.is_relative_to(base) or not path.is_file():
+        bases = [d.resolve() for d in self._files_dirs]
+        if not path.is_file() or not any(path != base and path.is_relative_to(base) for base in bases):
             raise ContentError("local blob is outside the configured directory", retryable=False)
         size = path.stat().st_size
         if size > self.max_bytes:

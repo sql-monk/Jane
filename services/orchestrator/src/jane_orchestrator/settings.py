@@ -26,6 +26,7 @@ from jane_kit.clients import RetryPolicy
 from jane_kit.config import JaneSettings, LimitLayer, Limits, ResolvedLimits, contract_field, resolve_limits
 from jane_kit.idempotency import IdempotencyLimits
 from jane_kit.pagination import PageLimits
+from jane_kit.stores import ClaimLimits
 
 ENV_PREFIX = "JANE_ORCHESTRATOR_"
 log = logging.getLogger(__name__)
@@ -167,6 +168,8 @@ class ServiceLimits(Limits):
     contract: ContractDefaults = ContractDefaults()
     engine: EngineLimits = EngineLimits()
     idempotency: IdempotencyLimits = IdempotencyLimits()
+    claims: ClaimLimits = ClaimLimits()
+    """``Idempotency-Key`` claims of the shared store (R17): lease of a stopped instance's claim, renewal interval."""
     pages: PageLimits = PageLimits()
 
 

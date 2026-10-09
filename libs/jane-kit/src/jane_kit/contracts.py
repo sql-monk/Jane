@@ -250,10 +250,10 @@ class OpenAPISpec:
         content = resp.node.get("content") or {}
         if not content:
             return op
-        media = (content_type or "").split(";", 1)[0].strip()
-        if media not in content:
+        media = _media_key(content, (content_type or "").split(";", 1)[0].strip())
+        if media is None:
             raise ContractViolation(
-                f"{op.method} {op.path} {status}: content type {media!r} not in contract {sorted(content)}"
+                f"{op.method} {op.path} {status}: content type {content_type!r} not in contract {sorted(content)}"
             )
         if "schema" in content[media]:
             self.validate_at(
@@ -275,6 +275,16 @@ class OpenAPISpec:
         if "schema" in content[media]:
             self.validate_at(rb.child("content", media, "schema").ref, body, f"{op.method} {op.path} request")
         return op
+
+
+def _media_key(content: Mapping[str, Any], media: str) -> str | None:
+    """The ``content`` key describing ``media``: the exact type, else ``type/*``, else ``*/*`` (OpenAPI: the most
+    specific media range applies)."""
+    media = media.lower()
+    for key in (media, media.split("/", 1)[0] + "/*" if "/" in media else None, "*/*"):
+        if key is not None and key in content:
+            return key
+    return None
 
 
 def contracts_dir(start: Path | None = None) -> Path | None:

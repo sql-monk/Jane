@@ -22,7 +22,8 @@ import hashlib
 import json
 import logging
 import re
-from collections.abc import Iterable, Mapping, MutableMapping
+from collections.abc import AsyncIterator, Iterable, Mapping, MutableMapping
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -239,7 +240,13 @@ class ConnectionRegistry:
 
 
 class AdapterPool:
-    """Opened adapters per connection; implements ``jane_storage.handler.AdapterProvider``."""
+    """Opened adapters per connection; implements ``jane_storage.handler.AdapterProvider``.
+
+    One adapter per (connection, definition ETag, options). A changed definition (``PUT``) or a deleted connection
+    *retires* the connection's adapters: new work opens a new adapter, while work that already holds one through
+    :meth:`lease` finishes on it; a retired adapter is closed when its last lease ends. An unchanged ``PUT`` keeps
+    the open adapter.
+    """
 
     def __init__(
         self,
@@ -254,6 +261,10 @@ class AdapterPool:
         """Default options that are only defaults: a connection whose ``params`` set the same name keeps its value."""
         self._open: MutableMapping[tuple[str, str, str], StorageAdapter] = {}
         self._schema_ready: set[tuple[str, str, str]] = set()
+        self._users: dict[int, int] = {}
+        """Leases in progress per adapter (``id(adapter)``)."""
+        self._retired: dict[int, StorageAdapter] = {}
+        """Adapters no longer handed out, closed when their last lease ends."""
         self._lock = asyncio.Lock()
 
     def check(self, connection_id: str, adapter_kind: str) -> None:
@@ -265,8 +276,8 @@ class AdapterPool:
             )
         self.registry.ensure_allowed(connection_id, pointer="/connections/target")
 
-    async def adapter_for(
-        self, connection_id: str, adapter_kind: str, options: Mapping[str, Any]
+    async def _acquire(
+        self, connection_id: str, adapter_kind: str, options: Mapping[str, Any], *, hold: bool
     ) -> StorageAdapter:
         self.check(connection_id, adapter_kind)
         stored = self.registry.get(connection_id)
@@ -279,7 +290,7 @@ class AdapterPool:
         async with self._lock:
             adapter = self._open.get(key)
             if adapter is None:
-                await self._close_stale(connection_id, stored.etag)
+                await self._retire(connection_id, keep=stored.etag)
                 conn = self.registry.resolve(connection_id)
                 try:
                     adapter = create_adapter(adapter_kind)
@@ -298,26 +309,71 @@ class AdapterPool:
                 except AdapterError as exc:
                     raise self._redacted(exc, self.registry.secret_values(connection_id)) from None
                 self._schema_ready.add(key)
+            if hold:
+                self._users[id(adapter)] = self._users.get(id(adapter), 0) + 1
             return adapter
+
+    async def adapter_for(
+        self, connection_id: str, adapter_kind: str, options: Mapping[str, Any]
+    ) -> StorageAdapter:
+        """The opened adapter without a lease: a retirement may close it under the caller (prefer :meth:`lease`)."""
+        return await self._acquire(connection_id, adapter_kind, options, hold=False)
+
+    @asynccontextmanager
+    async def lease(
+        self, connection_id: str, adapter_kind: str, options: Mapping[str, Any]
+    ) -> AsyncIterator[StorageAdapter]:
+        """The opened adapter for the duration of the block: retiring it waits for the block to end."""
+        adapter = await self._acquire(connection_id, adapter_kind, options, hold=True)
+        try:
+            yield adapter
+        finally:
+            await self._release(adapter)
+
+    async def _release(self, adapter: StorageAdapter) -> None:
+        async with self._lock:
+            left = self._users.get(id(adapter), 1) - 1
+            if left > 0:
+                self._users[id(adapter)] = left
+                return
+            self._users.pop(id(adapter), None)
+            retired = self._retired.pop(id(adapter), None)
+        if retired is not None:
+            await self._close_quietly(retired)
 
     @staticmethod
     def _redacted(exc: AdapterError, secrets: Iterable[str]) -> AdapterError:
         """Driver messages may echo a login or a connection string: never pass secret values on."""
         return AdapterError(redact(str(exc), secrets), retryable=exc.retryable)
 
-    async def _close_stale(self, connection_id: str, etag: str | None) -> None:
-        for key in [k for k in self._open if k[0] == connection_id and k[1] != etag]:
+    @staticmethod
+    async def _close_quietly(adapter: StorageAdapter) -> None:
+        try:
+            await adapter.close()
+        except Exception:  # a retired adapter: nothing waits for it
+            log.warning("closing a retired adapter failed", exc_info=True)
+
+    async def _retire(self, connection_id: str, keep: str | None) -> None:
+        """Stop handing out the connection's adapters of another definition (``keep``: the current ETag); close
+        the ones nobody holds now, the others when their last lease ends. Caller holds the lock."""
+        for key in [k for k in self._open if k[0] == connection_id and k[1] != keep]:
             adapter = self._open.pop(key)
             self._schema_ready.discard(key)
-            await adapter.close()
+            if self._users.get(id(adapter), 0) > 0:
+                self._retired[id(adapter)] = adapter
+            else:
+                await self._close_quietly(adapter)
 
     async def forget(self, connection_id: str) -> None:
+        """The connection changed or was deleted: retire all its adapters (in-flight work finishes first)."""
         async with self._lock:
-            await self._close_stale(connection_id, None)
+            await self._retire(connection_id, None)
 
     async def close(self) -> None:
         async with self._lock:
-            for adapter in self._open.values():
-                await adapter.close()
+            for adapter in [*self._open.values(), *self._retired.values()]:
+                await self._close_quietly(adapter)
             self._open.clear()
+            self._retired.clear()
+            self._users.clear()
             self._schema_ready.clear()

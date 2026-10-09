@@ -2,7 +2,8 @@
 
 The orchestrator does not re-declare contract documents (Source, TaskConfig, Connection, PlatformLimits…)
 as its own models: request bodies are validated with the JSON Schemas of the contract, and violations
-become ``422 validation_failed`` with JSON-pointer ``errors``.
+become ``422 validation_failed`` with JSON-pointer ``errors``. The validators are jane-kit's shared
+:class:`jane_kit.schemas.ContractSchemas` (R17); pointers follow RFC 6901.
 """
 
 from __future__ import annotations
@@ -10,55 +11,48 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from jsonschema import Draft202012Validator
-
-from jane_kit.contracts import OpenAPISpec, contracts_dir
-from jane_kit.errors import FieldError, ValidationFailed
+from jane_kit.errors import FieldError
+from jane_kit.schemas import ContractSchemas as KitSchemas
+from jane_kit.schemas import ContractsNotFound
 
 __all__ = ["ContractSchemas"]
 
 MAX_ERRORS = 20  # reported per request (diagnostics size, not an operational limit)
 
 
-class ContractSchemas:
+class ContractSchemas(KitSchemas):
     def __init__(self, directory: Path | None = None) -> None:
-        root = directory or contracts_dir(Path(__file__).parent)
-        if root is None or not (root / "openapi" / "orchestrator.v1.yaml").is_file():
-            raise RuntimeError(
-                "contracts/openapi/orchestrator.v1.yaml not found: set JANE_CONTRACTS_DIR or "
-                "JANE_ORCHESTRATOR_CONTRACTS_DIR"
+        try:
+            located = KitSchemas.locate(
+                directory,
+                setting="JANE_ORCHESTRATOR_CONTRACTS_DIR",
+                marker="openapi/orchestrator.v1.yaml",
+                start=Path(__file__).parent,
+                fallbacks=(),
             )
-        self.root = root
-        self.spec = OpenAPISpec.load(root / "openapi" / "orchestrator.v1.yaml")
-        self._validators: dict[str, Draft202012Validator] = {}
-
-    def _validator(self, uri: str) -> Draft202012Validator:
-        if uri not in self._validators:
-            self._validators[uri] = Draft202012Validator({"$ref": uri}, registry=self.spec.registry)
-        return self._validators[uri]
-
-    def request_schema_uri(self, method: str, path: str, media: str = "application/json") -> str:
-        op = self.spec.operation(method, path)
-        rb = self.spec.follow(op.loc.child("requestBody"))
-        return rb.child("content", media, "schema").ref
+        except ContractsNotFound as exc:
+            raise RuntimeError(str(exc)) from None
+        super().__init__(located.root, openapi="orchestrator.v1.yaml")
 
     def schema_uri(self, relative: str) -> str:
         """URI of a schema relative to ``contracts/schemas`` (``source.schema.json``, ``x.json#/$defs/Y``)."""
-        path, _, fragment = relative.partition("#")
-        return (self.root / "schemas" / path).resolve().as_uri() + "#" + fragment
+        return self.uri(relative)
 
     def check(self, uri: str, instance: Any, prefix: str = "") -> list[FieldError]:
-        errors = sorted(self._validator(uri).iter_errors(instance), key=lambda e: list(e.absolute_path))
-        out = []
-        for e in errors[:MAX_ERRORS]:
-            pointer = prefix + "".join(f"/{p}" for p in e.absolute_path)
-            out.append(FieldError(pointer=pointer or "/", code="schema", message=e.message[:500]))
-        return out
+        return self.field_errors(uri, instance, prefix, limit=MAX_ERRORS, message_max=500)
 
-    def validate(self, uri: str, instance: Any, prefix: str = "") -> None:
-        errors = self.check(uri, instance, prefix)
-        if errors:
-            raise ValidationFailed("request body does not match the contract", errors=errors)
+    def validate(
+        self,
+        ref: str,
+        instance: Any,
+        prefix: str = "",
+        *,
+        detail: str = "request body does not match the contract",
+        **options: Any,
+    ) -> None:
+        super().validate(
+            ref, instance, prefix, detail=detail, **{"limit": MAX_ERRORS, "message_max": 500, **options}
+        )
 
     def validate_request(self, method: str, path: str, body: Any, media: str = "application/json") -> None:
         self.validate(self.request_schema_uri(method, path, media), body)

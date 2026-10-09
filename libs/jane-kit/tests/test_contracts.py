@@ -137,3 +137,20 @@ def test_rejects_openapi_30(tmp_path: Path) -> None:
     f.write_text("openapi: 3.0.3\ninfo: {title: x, version: '1'}\npaths: {}\n", encoding="utf-8")
     with pytest.raises(ValueError, match=r"3.1"):
         OpenAPISpec.load(f)
+
+
+def test_response_media_ranges_follow_openapi() -> None:
+    """``text/plain`` of ``getObjectContent`` is covered by its ``*/*`` entry; the exact type wins (WP-19)."""
+    from pathlib import Path as _Path
+
+    from jane_kit.contracts import OpenAPISpec, contracts_dir
+
+    root = contracts_dir(_Path(__file__).parent)
+    if root is None:
+        pytest.skip("contracts not available")
+    spec = OpenAPISpec.load(root / "openapi" / "storage.v1.yaml")
+    path = "/v1/objects/obj_01J9ZQ4C00000000000000D1/content"
+    for media in ("text/plain; charset=utf-8", "application/pdf", "image/png", "text/html"):
+        spec.validate_response("GET", path, 200, "bytes", media)
+    with pytest.raises(ContractViolation):
+        spec.validate_response("GET", "/v1/objects/obj_01J9ZQ4C00000000000000D1", 200, {}, "text/plain")

@@ -860,7 +860,8 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
           max_parallel_fetches: {
             type: "integer",
             minimum: 1,
-            description: "Одночасні завантаження одного збору колектора (на екземпляр).",
+            description:
+              "Одночасні завантаження одного збору колектора (на збір: кожен збір окремо, на будь-якому екземплярі; спільний для всіх зборів ліміт хоста — max_parallel_fetches_per_host).",
           },
           max_parallel_fetches_per_host: {
             type: "integer",
@@ -1099,7 +1100,7 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
       },
       PlatformLimits: {
         description:
-          "Ліміти рівня platform — найширшого рівня успадкування: типові значення й жорсткі стелі одного розгортання (профілю, docs/adr/0007-target-environments.md), однакові для всіх сервісів і всіх їхніх екземплярів. Нижчі рівні (source, task, stage, request) лише перекривають типові значення, hard_caps їх обмежують. Область дії ліміту задає його опис: «на екземпляр» (concurrency.max_parallel_fetches, max_parallel_invocations) — кожен екземпляр окремо; «на хост» (concurrency.max_parallel_fetches_per_host, rate.*_per_host) у Web Collector — хост джерела для всієї платформи, разом для всіх екземплярів колектора зі спільним сховищем стану (Telegram Collector застосовує rate.min_delay_ms_per_host до викликів API одного збору).",
+          "Ліміти рівня platform — найширшого рівня успадкування: типові значення й жорсткі стелі одного розгортання (профілю, docs/adr/0007-target-environments.md), однакові для всіх сервісів і всіх їхніх екземплярів. Нижчі рівні (source, task, stage, request) лише перекривають типові значення, hard_caps їх обмежують. Область дії ліміту задає його опис: «на збір» (concurrency.max_parallel_fetches) — кожен збір колектора окремо; «на екземпляр» (concurrency.max_parallel_invocations) — кожен екземпляр окремо; «на хост» (concurrency.max_parallel_fetches_per_host, rate.*_per_host) у Web Collector — хост джерела для всієї платформи, разом для всіх екземплярів колектора зі спільним сховищем стану (Telegram Collector застосовує rate.min_delay_ms_per_host до викликів API одного збору).",
         type: "object",
         additionalProperties: false,
         required: ["defaults"],

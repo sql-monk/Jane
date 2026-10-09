@@ -265,6 +265,13 @@ MIGRATIONS: list[str] = [
     ALTER TABLE items ADD COLUMN attempt_history jsonb NOT NULL DEFAULT '[]'::jsonb;
     ALTER TABLE problem_groups ADD COLUMN note text;
     """,
+    # 7 — Idempotency-Key claims of jane-kit's shared store (R17): claiming instance, token, lease
+    """
+    ALTER TABLE idempotency_keys ADD COLUMN IF NOT EXISTS lease_until timestamptz;
+    ALTER TABLE idempotency_keys ADD COLUMN IF NOT EXISTS owner text;
+    ALTER TABLE idempotency_keys ADD COLUMN IF NOT EXISTS token text;
+    CREATE INDEX IF NOT EXISTS idempotency_keys_expires_at ON idempotency_keys (expires_at);
+    """,
 ]
 
 

@@ -1,104 +1,38 @@
-"""jane-kit ``JobStore`` and ``IdempotencyStore`` on the collector's own SQLite state (shared by instances)."""
+"""jane-kit's shared SQLite ``JobStore`` / ``IdempotencyStore`` on the collector's own state file (R17).
+
+* jobs mirror their collections (``jane_kit.stores.sqlite.SqliteWorkJobStore``): the collection row (written in
+  lease-fenced transactions) is the source of truth; only the instance holding a collection's lease writes its job,
+  others may only request ``cancelling``; a terminal job status is stored only if the collection already has it;
+  a run interrupted by a graceful shutdown leaves the collection ``running`` and resumable by another instance; a
+  job cancelled before its run started ends the collection too;
+* ``Idempotency-Key`` claims carry this instance, a token and a lease
+  (``JANE_TELEGRAM_COLLECTOR_IDEMPOTENCY_LEASE_MS``) renewed by the resume loop.
+"""
 
 from __future__ import annotations
 
-import json
-from datetime import UTC, datetime
-
-from jane_kit.idempotency import IdempotencyRecord, StoredResponse
-from jane_kit.jobs import TERMINAL_STATUSES, Job, JobStatus
+from jane_kit.stores.sqlite import SqliteIdempotencyStore as _KitIdempotency
+from jane_kit.stores.sqlite import SqliteWorkJobStore
 
 from .state import StateStore
 
 __all__ = ["SqliteIdempotencyStore", "SqliteJobStore"]
 
 
-class SqliteJobStore:
-    """Jobs of collections, shared by all instances on the state file.
-
-    The collection row (written in lease-fenced transactions) is the source of truth; the job mirrors it:
-
-    * only the instance holding a collection's lease writes its job; others may only request ``cancelling``;
-    * a terminal job status is stored only if the collection already has that status. A run interrupted by
-      a graceful shutdown (the runner reports ``cancelled``) leaves the collection ``running`` and
-      resumable by another instance, so such a report is ignored.
-    """
+class SqliteJobStore(SqliteWorkJobStore):
+    """Jobs of collections, shared by all instances on the state file."""
 
     def __init__(self, state: StateStore, instance_id: str) -> None:
+        super().__init__(state, state, owner=instance_id, table="jobs", doc_column="body")
         self.state = state
         self.instance_id = instance_id
-
-    async def create(self, job: Job) -> None:
-        existing = self.state.get_job(job.job_id)
-        if existing is not None:  # resumed after a restart: keep the original creation data
-            old = Job.model_validate_json(existing)
-            job = job.model_copy(
-                update={
-                    "created_at": old.created_at,
-                    "started_at": old.started_at,
-                    "idempotency_key": old.idempotency_key,
-                    "labels": old.labels,
-                    "progress": old.progress,
-                    "cancellation": old.cancellation,
-                    "status": JobStatus.CANCELLING if old.status == JobStatus.CANCELLING else job.status,
-                }
-            )
-        self.state.put_job(job.job_id, job.model_dump_json())
-
-    async def get(self, job_id: str) -> Job | None:
-        body = self.state.get_job(job_id)
-        return Job.model_validate_json(body) if body else None
-
-    async def save(self, job: Job) -> None:
-        terminal = {s.value for s in TERMINAL_STATUSES}
-
-        def decide(owner: str | None, collection: str | None, current_body: str | None) -> str | None:
-            # evaluated inside one write transaction together with the collection row (atomic guard)
-            updated = job
-            if updated.status != JobStatus.CANCELLING and owner is not None and owner != self.instance_id:
-                return None  # a run that lost its lease must not overwrite the new owner's job
-            if updated.status in TERMINAL_STATUSES:
-                if collection is not None and collection != updated.status.value:
-                    if collection not in terminal:
-                        return None
-                    updated = updated.model_copy(update={"status": JobStatus(collection)})
-            elif updated.status != JobStatus.CANCELLING and current_body is not None:
-                current = Job.model_validate_json(current_body)
-                if current.status == JobStatus.CANCELLING:
-                    # progress of a run whose cancellation was requested elsewhere keeps the cancellation visible
-                    updated = updated.model_copy(
-                        update={"status": JobStatus.CANCELLING, "cancellation": current.cancellation}
-                    )
-            return updated.model_copy(update={"updated_at": datetime.now(UTC)}).model_dump_json()
-
-        self.state.update_job(job.job_id, decide)
+        self.migrate()
 
 
-class SqliteIdempotencyStore:
-    def __init__(self, state: StateStore) -> None:
-        self.state = state
-
-    async def begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
-        row = self.state.idem_begin(key, fingerprint, ttl_s)
-        if row is None:
-            return None
-        response = None
-        if row["response"]:
-            data = json.loads(row["response"])
-            response = StoredResponse(data["status_code"], data["body"], data.get("headers") or {})
-        return IdempotencyRecord(row["key"], row["fingerprint"], row["state"], row["expires_at"], response)
-
-    async def complete(self, key: str, response: StoredResponse) -> None:
-        self.state.idem_complete(
-            key,
-            json.dumps(
-                {
-                    "status_code": response.status_code,
-                    "body": response.body,
-                    "headers": dict(response.headers),
-                }
-            ),
+class SqliteIdempotencyStore(_KitIdempotency):
+    def __init__(self, state: StateStore, instance_id: str, in_progress_lease_s: float) -> None:
+        super().__init__(
+            state, owner=instance_id, in_progress_lease_s=in_progress_lease_s, table="idempotency"
         )
-
-    async def release(self, key: str) -> None:
-        self.state.idem_release(key)
+        self.state = state
+        self.migrate()

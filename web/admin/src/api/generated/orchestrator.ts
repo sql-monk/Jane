@@ -705,8 +705,8 @@ export interface components {
      *     збережені спостереження цих матеріалів у вікні `since`/`until`; точний вибір — `object_ids`
      *     (конкретні збережені RAW, наприклад `ProblemGroup.samples[].stored_object_id`) або `observation_ids`.
      *     `from_stage` — етап, з якого почати (типово — етапи після collect, як для нового збору); це може бути
-     *     й етап збереження (RAW зберігається ще раз, наприклад в інше сховище; storage має читати persistent
-     *     `file://` свого тому — `JANE_STORAGE_CONTENT_FILES_DIR`, ADR-0004).
+     *     й етап збереження (RAW зберігається ще раз, наприклад в інше сховище; Material передається як є, з
+     *     постійним `ContentRef` — ADR-0004; що з цього може прочитати storage, задає його конфігурація).
      */
     ReprocessRequest: {
       task_id: components["schemas"]["Slug"];

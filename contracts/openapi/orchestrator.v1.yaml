@@ -815,6 +815,41 @@ paths:
                         delivery_key: 1d7c2a9e5b0f4c3e8a6d2b1f0e9c8d7a
                         started_at: '2026-09-27T10:00:06Z'
                         finished_at: '2026-09-27T10:00:06Z'
+                        attempt_history:
+                          - event: claimed
+                            at: '2026-09-27T10:00:06.010Z'
+                            attempt: 1
+                          - event: completed
+                            at: '2026-09-27T10:00:06.420Z'
+                            attempt: 1
+                      - item_id: itm_01J9ZQ4B0000000000000002
+                        stage_id: extract-products
+                        material_id: web:0a1b2c3d4e5f60718293a4b5c6d7e8f9
+                        observation_id: obs_01J9ZQ4A0000000000000002
+                        status: retrying
+                        attempts: 1
+                        handler:
+                          package_id: shop-example.product-extractor
+                          version: 1.2.0
+                        delivery_key: 2e8d3b0f6c1a5d4f9b7e3c2a1f0d9e8b
+                        error:
+                          type: urn:jane:problem:upstream_unavailable
+                          title: Executor call failed
+                          status: 502
+                          code: upstream_unavailable
+                          retryable: true
+                        started_at: '2026-09-27T10:00:06Z'
+                        available_at: '2026-09-27T10:00:09.512Z'
+                        attempt_history:
+                          - event: claimed
+                            at: '2026-09-27T10:00:06.011Z'
+                            attempt: 1
+                          - event: retry_scheduled
+                            at: '2026-09-27T10:00:06.512Z'
+                            attempt: 1
+                            available_at: '2026-09-27T10:00:09.512Z'
+                            delay_ms: 3000
+                            code: upstream_unavailable
                     next_cursor: null
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
@@ -868,6 +903,25 @@ paths:
                               version: 1.2.0
                             invocation_id: inv_01J9ZQ4B00000000000000A1
                             result_status: success
+                            item_id: itm_01J9ZQ4B0000000000000001
+                            status: completed
+                            attempts: 2
+                            attempt_history:
+                              - event: claimed
+                                at: '2026-09-27T10:00:06.010Z'
+                                attempt: 1
+                              - event: retry_scheduled
+                                at: '2026-09-27T10:00:06.500Z'
+                                attempt: 1
+                                available_at: '2026-09-27T10:00:09.500Z'
+                                delay_ms: 3000
+                                code: upstream_unavailable
+                              - event: claimed
+                                at: '2026-09-27T10:00:09.530Z'
+                                attempt: 2
+                              - event: completed
+                                at: '2026-09-27T10:00:09.910Z'
+                                attempt: 2
                             outputs:
                               - kind: entity
                                 entity_type: product
@@ -1880,8 +1934,8 @@ components:
         збережені спостереження цих матеріалів у вікні `since`/`until`; точний вибір — `object_ids`
         (конкретні збережені RAW, наприклад `ProblemGroup.samples[].stored_object_id`) або `observation_ids`.
         `from_stage` — етап, з якого почати (типово — етапи після collect, як для нового збору); це може бути
-        й етап збереження (RAW зберігається ще раз, наприклад в інше сховище; storage має читати persistent
-        `file://` свого тому — `JANE_STORAGE_CONTENT_FILES_DIR`, ADR-0004).
+        й етап збереження (RAW зберігається ще раз, наприклад в інше сховище; Material передається як є, з
+        постійним `ContentRef` — ADR-0004; що з цього може прочитати storage, задає його конфігурація).
       properties:
         task_id:
           $ref: '../schemas/common/defs.schema.json#/$defs/Slug'

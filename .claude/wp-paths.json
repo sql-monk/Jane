@@ -181,13 +181,27 @@
         "libs/jane-kit/**",
         "services/**",
         "templates/service/**",
-        "infra/compose.yaml"
+        "infra/compose.yaml",
+        "contracts/**",
+        "web/admin/src/api/generated/**"
       ]
     },
     "20": {
       "name": "post-m3-admin",
       "allow": [
         "web/admin/**"
+      ]
+    },
+    "21": {
+      "name": "post-m3-followups",
+      "allow": [
+        "tests/e2e/**",
+        "docs/acceptance/**",
+        "deploy/profiles/**",
+        "docs/operations/**",
+        "examples/**",
+        "contracts/docs/**",
+        "contracts/tools/**"
       ]
     }
   }

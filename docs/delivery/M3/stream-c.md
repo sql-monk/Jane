@@ -3,14 +3,17 @@
 Доручення: [HANDOFF-2026-10-09-stream-c.md](../HANDOFF-2026-10-09-stream-c.md).
 Власний checkout: `C:\repos\Jane\.claude\worktrees\integ-c`, detached HEAD, без `.jane-wp`.
 
-## Поточний стан — C-4: B2/WP-06d переглянуто, очікує B-11
+## Поточний стан — C-6/C-4 завершено; C-5 очікує e2e
 
-- C-4, «Дельта 2»: один статичний прохід на `origin/codex/jane-integration` `3a4e29c`.
-  Злиття B2 `5fd7acd` і WP-06d `3e13f68` — без нових блокерів; код B2 та попередні інкременти збережено.
-- B-11 після повторного fetch ще не злито. За handoff пп. 1–2 завершено, проміжний результат публікується;
-  C зупиняється до B-11. C-N4 лишається відкрито, підтвердження зведеного real-admin входу ще немає.
-- Результат — розділ [«Дельта 2»](final-review-delta.md#дельта-2). CI, тести, Docker і нові worktree
-  у C-4 не запускались/не створювались. Власна дельта — лише final-review-delta.md і цей журнал.
+- C-6: [cleanup-plan.md](cleanup-plan.md) — лише план, жодних видалень. Зріз `19d58a1`: 29 remote refs,
+  70 worktree, чужий wp13f має 3 незакомічені документи. Кандидати після M3: 23 remote / 61 clean checkout /
+  95 local refs; сумнівні refs, dirty wp13f, main та координатори збережені.
+- C-4 завершено для B-11 `97ea4c4`; підсумковий статичний зріз `d37c522..19d58a1` — без нових
+  блокерів M3. C-N4 закрито real-receipt 16+1; sessionStorage дозволений ADR, C-N6 уточнює storage-критерій.
+- C-5: [CI 37863992541](https://github.com/sql-monk/Jane/actions/runs/37863992541) на `8d7683b`: **in_progress / очікує**;
+  limits **pass**, stack та решта завершених job success. Підсумок e2e ще не отримано.
+- Нового CI, тестів, Docker або видалень C не виконував. Змінюються лише три власні документи;
+  status.md/матриця — потоку A, main потік C не змінює.
 
 ### Завершені C-1/C-2
 
@@ -160,3 +163,62 @@ Warning auth-набору — Duplicate Operation ID у локальному GET
   Жодного pytest/lint/typecheck/CI dispatch, Docker або тимчасового worktree у цьому проході.
 - Наступна дія після B-11: доповнити «Дельта 2» лише перевіркою злитої адмінки/шаблону/ADR/беклогу й
   real-admin receipt. B2/WP-06d повторно не перевіряти. Status.md, фінальна матриця/CI й main — не власність C.
+
+## Четверта черга — C-5/C-6 і завершення C-4 (2026-10-09)
+
+Доручення: [HANDOFF-2026-10-09-stream-c-4.md](../HANDOFF-2026-10-09-stream-c-4.md).
+
+### C-5: CI 37863992541
+
+Точний SHA: **`8d7683bb6c9b2a8b7e19d660e6df8495e3b81b31`**; workflow — **in_progress / очікує**.
+Спостерігається вже запущений прогін; workflow_dispatch/rerun потік C не виконував.
+
+| Job | Висновок | Доказ |
+|---|---|---|
+| lint | **success** | [job 113606225585](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113606225585) |
+| web | **success** | [job 113606448563](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113606448563) |
+| unit | **success** | [job 113606448570](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113606448570) |
+| web-mock-e2e | **success** | [job 113606448663](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113606448663) |
+| isolation | **success** | [job 113607947534](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113607947534) |
+| contract | **success** | [job 113607947561](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113607947561) |
+| e2e | **in_progress** | [job 113608168969](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113608168969) |
+| limits | **success** | [job 113608168989](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113608168989) |
+| stack | **success** | [job 113608169010](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113608169010) |
+| adapters (minio) | **success** | [job 113608169024](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113608169024) |
+| adapters (s3) | **success** | [job 113608169097](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113608169097) |
+| adapters (mongodb) | **success** | [job 113608169098](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113608169098) |
+| adapters (sqlserver) | **success** | [job 113608169125](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113608169125) |
+
+**e2e ще виконується; N passed / 0 skipped/xfailed до завершення не заявляються.**
+
+Limits: **pass**, артефакт [limits-ci-37863992541-1](https://github.com/sql-monk/Jane/actions/runs/37863992541/artifacts/11588260101), `ci-20261009T002423Z/summary.md`.
+Усі перевірки L1–L8 мають ok, warn/блокерів немає. L1/L2 — 200 сторінок і rate ≈46/45.65 rps при
+цілі ≥25 та cap ≤51; L6 — cold start 5/5 без timeout, p95 0.353 s, timeout та OOM→resource_exceeded;
+L7 — memory peak 600.2 MiB, 0 OOM-killed containers/restarts; L8 — examples verified=true.
+
+Перемотування main за цим CI поки не підтверджується: чекаємо e2e.
+
+Безсекретні raw докази у власному ignored `.jane/`: `m3c-c5-run.json`, `m3c-c5-limits-summary.md`,
+`m3c-c5-artifacts/`; після завершення — `m3c-c5-e2e.txt` і `m3c-c5-e2e-evidence.json`.
+
+### C-6: план прибирання
+
+- [cleanup-plan.md](cleanup-plan.md) створено. Read-only inventory після появи B-11 оновлено на `19d58a1`.
+- Remote: 29 refs, 24 ancestor (включно із захищеною integration), 3 лише patch-equivalent, 2 незлиті.
+  Local: 109 refs, 98 ancestor; stale upstream локальної wp/01g-service-auth виключено з branch -d.
+- Worktree: 70 у заданому каталозі, 64 HEAD ancestor, 6 незлитих; на момент snapshot 68 чистих, 2 dirty:
+  чужий wp13f із 3 tracked документами і власний integ-c із новим планом. Координатори захищені.
+- Умовні готові групи: 23 remote refs / 61 clean worktree / 95 local refs. Ребазовані/перенесені
+  незлиті історії перелічено з причинами; потрібні ignored артефакти зберігаються перед майбутнім remove.
+- **Жодного видалення не виконано.** Чужі status читалися з --no-optional-locks; їхні index/файли не змінювалися.
+
+### C-4: B-11
+
+- B-11 `97ea4c4` fetched і fast-forward у власний integ-c; пізніші `86fef32`/`19d58a1` — документи.
+- Один статичний прохід по wrapper/fixture/scaffold/ADR/беклогу й сирих receipts. Ніякого повтору
+  B2/WP-06d або запуску UI/pytest. [Дельта 2](final-review-delta.md#дельта-2) завершена.
+- Сирі receipts: 16 passed + 1 failed на 7eed2e1; після Bearer у трьох GET одного тесту — 1 passed
+  на 48af2a1. UI/сервіси/wrapper/fixture й інші 16 сценаріїв незмінні. Не оголошено одним 17 passed прогоном.
+- C-N4 закрито: fixture входить за ключем цього stack, backend match/admin_key_consistent=true.
+  C-N6 пояснює дозволений ADR sessionStorage; HTML/URL/localStorage не повинні містити ключ.
+- Підсумкове незалежне статичне рев’ю d37c522..19d58a1 — без нових блокерів M3; C-W2 після M3.

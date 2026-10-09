@@ -1,0 +1,100 @@
+{
+  "summary": "Асистент із типовими лімітами й hard_caps профілю ci",
+  "value": {
+    "service": "assistant",
+    "version": "0.1.0",
+    "api_versions": ["v1"],
+    "capabilities": {},
+    "auth_mode": "jwt",
+    "limits": {
+      "profile": "ci",
+      "defaults": {
+        "concurrency": {
+          "max_parallel_fetches": 4,
+          "max_parallel_fetches_per_host": 2,
+          "max_parallel_invocations": 2,
+          "max_parallel_runs_per_task": 1,
+          "max_parallel_stage_items": 2
+        },
+        "rate": {
+          "requests_per_second_per_host": 50,
+          "min_delay_ms_per_host": 0,
+          "burst_per_host": 10,
+          "respect_crawl_delay": true
+        },
+        "crawl": {
+          "max_depth": 5,
+          "max_pages_per_run": 5000,
+          "max_bytes_per_run": 2147483648,
+          "max_material_bytes": 10485760,
+          "max_redirects": 5,
+          "max_links_per_page": 2000,
+          "max_seed_urls": 100000,
+          "max_frontier_size": 100000,
+          "revisit_interval_seconds": 86400
+        },
+        "timeouts": {
+          "connect_timeout_ms": 10000,
+          "request_timeout_ms": 30000,
+          "invocation_timeout_ms": 60000,
+          "stage_timeout_ms": 3600000,
+          "run_timeout_ms": 21600000,
+          "sync_response_max_ms": 25000
+        },
+        "retries": {
+          "max_attempts": 3,
+          "initial_backoff_ms": 1000,
+          "max_backoff_ms": 60000,
+          "backoff_multiplier": 2,
+          "jitter": true
+        },
+        "queue": {
+          "max_queue_depth": 10000,
+          "max_inflight_materials": 100,
+          "max_unacked_materials": 500
+        },
+        "sandbox": {
+          "cpu_cores": 1,
+          "memory_mb": 512,
+          "wall_time_ms": 30000,
+          "max_output_bytes": 4194304,
+          "max_processes": 16,
+          "tmpfs_mb": 64
+        },
+        "llm": {
+          "max_requests_per_minute": 20,
+          "max_input_tokens_per_request": 32000,
+          "max_output_tokens_per_request": 4096,
+          "budget": {
+            "amount": 0.01,
+            "currency": "USD",
+            "period": "day"
+          },
+          "max_improvement_attempts": 3,
+          "max_onboarding_samples": 60,
+          "min_onboarding_confidence": 0.8
+        },
+        "transfer": {
+          "inline_max_bytes": 262144,
+          "max_request_body_bytes": 16777216,
+          "transit_ttl_seconds": 604800,
+          "download_url_ttl_seconds": 3600,
+          "job_retention_seconds": 604800,
+          "idempotency_ttl_seconds": 86400
+        },
+        "telegram": {
+          "max_messages_per_run": 10000,
+          "max_media_bytes": 20971520,
+          "max_flood_wait_seconds": 600
+        }
+      },
+      "hard_caps": {
+        "sandbox": {
+          "memory_mb": 1024,
+          "cpu_cores": 1,
+          "wall_time_ms": 60000
+        }
+      }
+    }
+  }
+}

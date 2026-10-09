@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import {
   captureRequest,
   expect,
@@ -16,14 +14,6 @@ const SESSION = "onb_01J9ZY0000000000000000001";
 const SESSION_JOB = "job_01J9ZY0000000000000000JOB";
 const IMPROVEMENT_JOB = "job_01J9ZW00000000000000IMPROV";
 const RUN = "run_01J9ZQ3F8W2N4K7T5B6C1D0E9F";
-const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..");
-
-/** `contracts/examples/schemas/<relative>` (a standalone schema example, e.g. a PlatformLimits profile). */
-function schemaExample<T = Record<string, unknown>>(relative: string): T {
-  return JSON.parse(
-    readFileSync(path.join(REPO_ROOT, "contracts", "examples", "schemas", relative), "utf8"),
-  ) as T;
-}
 
 test.describe("post-M3 admin (WP-20) @mock", () => {
   test("assistant: sessions come from the list API and survive a reload; nothing is kept in localStorage", async ({
@@ -72,14 +62,14 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
 
   test("assistant: min_onboarding_confidence of the assistant is shown and can be set for one onboarding", async ({
     admin,
-    request,
   }) => {
-    // ServiceInfo contract example + the `ci` PlatformLimits profile example as the assistant's limits.
-    const info = await (await request.get(`${mockUrl("assistant")}/v1/info`)).json();
-    const profile = schemaExample("common/limits@PlatformLimits/ci.json");
-    await fulfillJson(admin, "/api/assistant/v1/info", { ...info, service: "assistant", limits: profile });
+    await preferExample(admin, "/api/assistant/v1/info", "assistantCi");
     await preferExample(admin, "/api/assistant/v1/onboarding-sessions", "onboarding", "POST");
-    await admin.goto("/assistant");
+    const [info] = await Promise.all([
+      admin.waitForResponse((r) => new URL(r.url()).pathname === "/api/assistant/v1/info"),
+      admin.goto("/assistant"),
+    ]);
+    expect(await info.json()).toEqual(openapiExample("assistant-info-ci"));
     await expect(admin.getByTestId("min-onboarding-confidence")).toHaveText("80%");
     await expect(admin.getByRole("region", { name: "Ліміти дослідження" })).toContainText("0.01 USD / day");
 

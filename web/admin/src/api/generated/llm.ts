@@ -382,7 +382,7 @@ export interface components {
       rate?: {
         /** @description Частота стартів запитів до одного хоста джерела; область дії — як у concurrency.max_parallel_fetches_per_host (уся платформа: усі збори, одноразові запити й екземпляри зі спільним сховищем стану). Інтервал між стартами = max(1 / requests_per_second_per_host, min_delay_ms_per_host, Crawl-delay за respect_crawl_delay); між активними на хості зборами діє найбільший інтервал. */
         requests_per_second_per_host?: number;
-        /** @description Мінімальний інтервал між стартами запитів до одного хоста джерела; область дії — як у requests_per_second_per_host. */
+        /** @description Мінімальний інтервал між стартами запитів до одного хоста джерела; область дії у Web Collector — як у requests_per_second_per_host. Telegram Collector (єдиний «хост» — API Telegram) застосовує його до викликів API одного збору. */
         min_delay_ms_per_host?: number;
         burst_per_host?: number;
         /** @description Враховувати Crawl-delay з robots.txt (може лише збільшити затримку). */
@@ -476,7 +476,7 @@ export interface components {
       /** @enum {string} */
       period: "run" | "day" | "week" | "month" | "total";
     };
-    /** @description Ліміти рівня platform — найширшого рівня успадкування: типові значення й жорсткі стелі одного розгортання (профілю, docs/adr/0007-target-environments.md), однакові для всіх сервісів і всіх їхніх екземплярів. Нижчі рівні (source, task, stage, request) лише перекривають типові значення, hard_caps їх обмежують. Область дії ліміту задає його опис: «на екземпляр» (concurrency.max_parallel_fetches, max_parallel_invocations) — кожен екземпляр окремо; «на хост» (concurrency.max_parallel_fetches_per_host, rate.*_per_host) — хост джерела для всієї платформи, разом для всіх екземплярів колектора зі спільним сховищем стану. */
+    /** @description Ліміти рівня platform — найширшого рівня успадкування: типові значення й жорсткі стелі одного розгортання (профілю, docs/adr/0007-target-environments.md), однакові для всіх сервісів і всіх їхніх екземплярів. Нижчі рівні (source, task, stage, request) лише перекривають типові значення, hard_caps їх обмежують. Область дії ліміту задає його опис: «на екземпляр» (concurrency.max_parallel_fetches, max_parallel_invocations) — кожен екземпляр окремо; «на хост» (concurrency.max_parallel_fetches_per_host, rate.*_per_host) у Web Collector — хост джерела для всієї платформи, разом для всіх екземплярів колектора зі спільним сховищем стану (Telegram Collector застосовує rate.min_delay_ms_per_host до викликів API одного збору). */
     PlatformLimits: {
       /** @description Ім'я профілю середовища, з якого взято значення (див. docs/adr/0007-target-environments.md). */
       profile?: string;

@@ -11,7 +11,6 @@ from __future__ import annotations
 import base64
 import copy
 import difflib
-import hashlib
 import io
 import json
 import re
@@ -20,6 +19,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
+
+from jane_kit.content import inline_ref
 
 __all__ = [
     "PackageDraft",
@@ -243,15 +244,7 @@ class PackageDraft:
         return buf.getvalue()
 
     def content_ref(self) -> dict[str, Any]:
-        data = self.archive()
-        return {
-            "kind": "inline",
-            "media_type": "application/zip",
-            "encoding": "base64",
-            "data": base64.b64encode(data).decode(),
-            "size_bytes": len(data),
-            "sha256": hashlib.sha256(data).hexdigest(),
-        }
+        return inline_ref(self.archive(), "application/zip")  # base64 (jane-kit's ContentRef writer, R18)
 
     @classmethod
     def from_files(cls, files: dict[str, bytes]) -> PackageDraft:

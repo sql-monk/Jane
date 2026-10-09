@@ -22,6 +22,7 @@ import httpx
 
 from jane_kit.auth import bearer_header, resolve_secret_ref
 from jane_kit.clients import ClientLimits, RemoteError, ServiceClient
+from jane_kit.content import inline_ref
 from jane_kit.errors import JaneError, Problem, UpstreamUnavailable
 
 from .settings import Settings
@@ -302,17 +303,7 @@ class StorageClient(_Base):
 
 
 def _inline_content(data: bytes, media_type: str) -> dict[str, Any]:
-    try:
-        encoded = {"encoding": "utf-8", "data": data.decode("utf-8")}
-    except UnicodeDecodeError:
-        encoded = {"encoding": "base64", "data": base64.b64encode(data).decode()}
-    return {
-        "kind": "inline",
-        "media_type": media_type,
-        **encoded,
-        "sha256": hashlib.sha256(data).hexdigest(),
-        "size_bytes": len(data),
-    }
+    return inline_ref(data, media_type, text=True)  # jane-kit's shared ContentRef writer (R18)
 
 
 def _inline_bytes(content: Mapping[str, Any]) -> bytes:

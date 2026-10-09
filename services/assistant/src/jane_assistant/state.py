@@ -40,6 +40,7 @@ from .settings import ServiceLimits
 
 __all__ = ["InMemoryState", "PostgresState", "ServiceState"]
 
+
 class JobLister(Protocol):
     async def page(
         self,

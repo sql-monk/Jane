@@ -35,6 +35,28 @@ web-collector для сайтів з автентифікацією) мають 
 7. Вбудованого сховища секретів із записом значень через адмінку у v1 **немає** (див. «Питання до
    людини» у звіті WP-00): оператор кладе секрет у середовище виконавця, адмінка задає посилання.
 
+### Чинні межі розв'язання (уточнення після M3)
+
+Для керованих підключень storage, llm, web-collector і telegram-collector `env:VAR` дозволений
+лише з налаштованим `secret_env_prefix` (типово `JANE_SECRET_`); `file:` — усередині
+`secret_files_dir` (типово `/run/secrets`, `None` вимикає), після перевірки розв'язаного шляху.
+`vault:` ці реалізації відхиляють. Наприклад, підключення PostgreSQL використовує
+`env:JANE_SECRET_PG_PASSWORD`, LLM — `env:JANE_SECRET_OPENAI_API_KEY`; оператор налаштовує відповідний
+префікс/каталог у середовищі кожного виконавця, без значень секретів у запитах.
+
+Секрет надсилається лише на дозволену адресу: storage використовує `connection_host_allowlist`,
+Telegram — `telegram_host_allowlist`, web — `connection_origin_allowlist` (типово порожні).
+Storage враховує й адреси з URI та типові адреси адаптерів. LLM звіряє origin `params.api_base` із `provider_api_base_allowlist`
+(типово `https://api.anthropic.com`). Приклади підключень самі не дають дозволу на мережевий доступ.
+Валідація визначення не відкриває з'єднання; test/run додатково розв'язує посилання й перевіряє доступ.
+Це окрема політика від `blob_roots` / `download_host_allowlist` для ContentRef і від стартових
+`auth.api_keys[].secret_ref` у B2, які не є керованими Connection.
+
+Джерела: [storage policy](../../services/storage/src/jane_storage/policy.py),
+[LLM settings](../../services/llm/src/jane_llm/settings.py),
+[web settings](../../services/web-collector/src/jane_web_collector/settings.py),
+[Telegram policy](../../services/telegram-collector/src/jane_telegram_collector/connections.py).
+
 ## Наслідки
 - Секрети не можуть потрапити в репозиторій пакетів, контракти чи БД оркестратора.
 - Оператор має доступ до середовища виконавців, щоб додати секрет (у dev — `.env` compose).

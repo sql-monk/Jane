@@ -12,7 +12,7 @@ import hashlib
 import json
 import logging
 from collections import OrderedDict
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -130,7 +130,50 @@ def version_wire(v: VersionRecord, *, full: bool = True) -> dict[str, Any]:
         out["files"] = v.files
         out["status_history"] = v.status_history
         out["test_reports"] = v.test_reports
+        out["test_summary"] = summarize_tests(v.test_reports)
     return out
+
+
+def report_status(report: Mapping[str, Any]) -> str:
+    """``TestStatus`` of one ``TestReport``: any failed case → failed, else any passed → passed, else unknown."""
+    if int(report.get("failed") or 0) > 0:
+        return "failed"
+    return "passed" if int(report.get("passed") or 0) > 0 else "unknown"
+
+
+def summarize_tests(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """``TestSummary`` (registry.v1): the latest report of every ``context`` and their aggregate.
+
+    ``passed`` only if the latest report of each context passed - a version tested on several bindings is
+    not ``passed`` because the last of them was; ``failed`` if the latest report of any context failed."""
+    latest: dict[str | None, Mapping[str, Any]] = {}
+    counts: dict[str | None, int] = {}
+    for record in records:  # in recording order
+        context = record.get("context")
+        key = str(context) if context is not None else None
+        latest[key] = record
+        counts[key] = counts.get(key, 0) + 1
+    contexts = []
+    for key, record in latest.items():
+        entry: dict[str, Any] = {
+            "test_status": report_status(record.get("report") or {}),
+            "reports": counts[key],
+        }
+        if key is not None:
+            entry["context"] = key
+        if record.get("recorded_at"):
+            entry["recorded_at"] = record["recorded_at"]
+        if record.get("runner"):
+            entry["runner"] = record["runner"]
+        contexts.append(entry)
+    statuses = {c["test_status"] for c in contexts}
+    if "failed" in statuses:
+        status = "failed"
+    elif statuses == {"passed"}:
+        status = "passed"
+    else:
+        status = "unknown"
+    return {"status": status, "contexts": contexts}
 
 
 @dataclass(frozen=True)
@@ -590,9 +633,7 @@ class RegistryService:
             )
         stored = dict(record)
         stored.setdefault("recorded_at", iso(now()))
-        report = record["report"]
-        test_status = "failed" if report["failed"] > 0 else ("passed" if report["passed"] > 0 else "unknown")
-        return await self.store.add_test_report(package_id, version, stored, test_status)
+        return await self.store.add_test_report(package_id, version, stored, report_status(record["report"]))
 
     # ------------------------------------------------------------------ forks
     async def fork(

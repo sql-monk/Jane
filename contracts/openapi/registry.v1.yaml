@@ -983,6 +983,41 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TestResultsRecord'
+        test_summary:
+          $ref: '#/components/schemas/TestSummary'
+    TestSummary:
+      type: object
+      description: |
+        Агрегат звітів тестів версії за контекстами (`TestResultsRecord.context`, наприклад
+        `bindings:<task_id>/<stage_id>` — прогін на прив'язках етапу, `tests` — власні тести пакета). На
+        відміну від `test_status` (стан останнього звіту) показує, чи пройшла версія **всюди**, де її
+        перевіряли (ТЗ §9: зміни спільного пакета перевіряються для всіх його прив'язок). Для кожного
+        контексту береться його останній звіт; звіти без `context` — один контекст без імені.
+        `status`: `failed` — останній звіт хоч одного контексту має провалені кейси; `passed` — останній
+        звіт кожного контексту пройшов (і звітів ≥ 1); інакше `unknown`. Віддається у повному поданні версії.
+      required: [status, contexts]
+      properties:
+        status:
+          $ref: '#/components/schemas/TestStatus'
+        contexts:
+          type: array
+          items:
+            type: object
+            required: [test_status, reports]
+            properties:
+              context:
+                type: string
+                description: Відсутнє — звіти без context.
+              test_status:
+                $ref: '#/components/schemas/TestStatus'
+              recorded_at:
+                $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+              runner:
+                type: string
+              reports:
+                type: integer
+                minimum: 1
+                description: Скільки звітів записано для цього контексту (діє останній).
     PackageVersionList:
       type: object
       required: [items, next_cursor]
@@ -1177,3 +1212,16 @@ components:
             at: '2026-09-27T10:15:00Z'
             by: admin@example.org
             reason: tests passed
+        test_summary:
+          status: passed
+          contexts:
+            - context: bindings:shop-catalog/extract-products
+              test_status: passed
+              recorded_at: '2026-09-27T10:10:00Z'
+              runner: assistant
+              reports: 1
+            - context: tests
+              test_status: passed
+              recorded_at: '2026-09-27T10:09:00Z'
+              runner: handler-runtime@0.1.0
+              reports: 2

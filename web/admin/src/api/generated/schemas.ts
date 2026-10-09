@@ -1413,7 +1413,8 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
         anyOf: [{ required: ["entities"] }, { required: ["entities_ref"] }],
       },
       DataInput: {
-        description: "Довільний JSON-результат попереднього етапу (наприклад, вихід LLM).",
+        description:
+          "Довільний JSON-результат попереднього етапу (наприклад, вихід LLM). Оркестратор також доставляє так вихід етапу збереження (data = WritesData) і діагностику проблемного елемента для select: problems (data = ProblemData, разом із MaterialInput вхідного матеріалу); форми — у $defs нижче, виконавець читає їх толерантно.",
         type: "object",
         required: ["kind"],
         properties: {
@@ -1423,6 +1424,42 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
           from_invocation_id: { $ref: "common/defs.schema.json#/$defs/Id" },
         },
         anyOf: [{ required: ["data"] }, { required: ["data_ref"] }],
+      },
+      ProblemData: {
+        description:
+          "DataInput.data для select: problems (task-config.schema.json, StageInput): проблемний результат етапу-джерела. Поля HandlerResult копіюються як є; невідомі поля читач ігнорує.",
+        type: "object",
+        required: ["problem"],
+        properties: {
+          problem: {
+            type: "object",
+            required: ["stage_id", "status"],
+            properties: {
+              stage_id: {
+                $ref: "common/defs.schema.json#/$defs/Slug",
+                description: "Етап, чий результат проблемний.",
+              },
+              status: { type: "string", enum: ["unrecognized", "failed"] },
+              invocation_id: { $ref: "common/defs.schema.json#/$defs/Id" },
+              handler: {
+                $ref: "common/package-ref.schema.json",
+                description: "Версія пакета, що дала результат (HandlerResult.handler).",
+              },
+              unrecognized: { $ref: "handler-result.schema.json#/properties/unrecognized" },
+              failure: { $ref: "handler-result.schema.json#/properties/failure" },
+              diagnostics: { $ref: "handler-result.schema.json#/$defs/Diagnostics" },
+            },
+          },
+        },
+      },
+      WritesData: {
+        description:
+          "DataInput.data для select: output від етапу збереження: підтвердження запису (HandlerResult.output.writes) як є.",
+        type: "object",
+        required: ["writes"],
+        properties: {
+          writes: { type: "array", items: { $ref: "handler-result.schema.json#/$defs/WriteAck" } },
+        },
       },
       InvocationContext: {
         type: "object",
@@ -2039,11 +2076,16 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
           writes: { type: "string", enum: ["raw", "entities", "raw_and_entities", "data"] },
           format: {
             description:
-              "Формат збереження, якщо адаптер його підтримує. За замовчуванням: RAW вебсторінок — html, інші — json (ТЗ §5).",
+              "Формат збереження, якщо адаптер його підтримує. Перевизначається params.format етапу (якщо params_schema пакета це дозволяє). Деталі — contracts/docs/storage-adapter.md, «Формати RAW».",
             type: "object",
             additionalProperties: false,
             properties: {
-              raw: { type: "string", enum: ["original", "html", "json"], default: "original" },
+              raw: {
+                type: "string",
+                enum: ["original", "html", "json"],
+                description:
+                  "Відсутнє значення — типова поведінка ТЗ §5 / §13.1 п.4: вебсторінка (text/html, application/xhtml+xml) зберігається як html, будь-який інший RAW — як json (документ Material із вбудованим вмістом). original — байти як отримано; html — лише для HTML-матеріалу (інакше HandlerResult.failed, invalid_params); json — документ Material.",
+              },
               entities: { type: "string", enum: ["json", "jsonl"], default: "json" },
             },
           },
@@ -2348,14 +2390,36 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
           },
           stored_materials: {
             description:
-              "Повторна обробка збережених RAW (ТЗ §10): фільтр збережених об'єктів замість нового збору.",
+              "Повторна обробка збережених RAW (ТЗ §10): фільтр збережених об'єктів замість нового збору. Завжди лише RAW джерела завдання (Material.source.source_id). Фільтри поєднуються через AND. material_ids обирає всі збережені спостереження цих матеріалів у часовому вікні since/until; точний вибір — object_ids (конкретні збережені RAW) або observation_ids (конкретні спостереження).",
             type: "object",
             additionalProperties: false,
             properties: {
               storage_connection_id: { $ref: "common/defs.schema.json#/$defs/Slug" },
-              since: { $ref: "common/defs.schema.json#/$defs/Timestamp" },
-              until: { $ref: "common/defs.schema.json#/$defs/Timestamp" },
-              material_ids: { type: "array", items: { $ref: "common/defs.schema.json#/$defs/Id" } },
+              since: {
+                $ref: "common/defs.schema.json#/$defs/Timestamp",
+                description: "Час збереження (stored_at) не раніше.",
+              },
+              until: {
+                $ref: "common/defs.schema.json#/$defs/Timestamp",
+                description: "Час збереження (stored_at) раніше за це значення.",
+              },
+              material_ids: {
+                type: "array",
+                items: { $ref: "common/defs.schema.json#/$defs/Id" },
+                description: "Усі збережені спостереження цих матеріалів (у межах since/until).",
+              },
+              object_ids: {
+                type: "array",
+                items: { $ref: "common/defs.schema.json#/$defs/Id" },
+                description:
+                  "Точний вибір: саме ці збережені RAW (StoredObjectRef.object_id у підключенні storage_connection_id), у заданому порядку; кожен читається через storage.v1 GET /v1/objects/{object_id}. Відсутній об'єкт завершує запуск помилкою not_found; RAW іншого джерела чи без відновлюваного Material пропускається. Кількість обмежує конфігурація оркестратора (більше — 422 limit_exceeded).",
+              },
+              observation_ids: {
+                type: "array",
+                items: { $ref: "common/defs.schema.json#/$defs/Id" },
+                description:
+                  "Точний вибір спостережень (Material.observation_id): лише RAW цих спостережень серед відібраних іншими фільтрами. Кілька збережених копій одного спостереження не вгадуються (одна копія обробляється, посилання на RAW не записується). Кількість обмежує конфігурація оркестратора.",
+              },
             },
           },
         },
@@ -2445,7 +2509,7 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
           from: { $ref: "common/defs.schema.json#/$defs/Slug" },
           select: {
             description:
-              "Що брати з етапу-джерела: output — вихід (collect: матеріали; extractor: сутності разом із матеріалом; llm: data); input_material — вхідний матеріал етапу-джерела (наприклад зберегти RAW лише успішно розібраних); problems — елементи зі статусом unrecognized або failed разом із матеріалом і діагностикою; unmatched_materials — матеріали collect-етапу, яким не відповідає жодна прив'язка (доставляються лише за ефективного forward_unknown_to_llm=true, інакше лише реєструються).",
+              "Що брати з етапу-джерела і в якій формі (HandlerInvocation.inputs): output — вихід: collect — MaterialInput; extractor/transform із сутностями — EntitiesInput (entities або entities_ref, from_invocation_id, material вхідного елемента); llm/transform із даними — DataInput (data або data_ref, from_invocation_id); етап збереження — DataInput з data = WritesData ({writes: [WriteAck…]}, handler-invocation.schema.json) і from_invocation_id; input_material — вхідний матеріал етапу-джерела як MaterialInput (наприклад зберегти RAW лише успішно розібраних); problems — елементи зі статусом unrecognized або failed: MaterialInput вхідного матеріалу (якщо він був) і DataInput з data = ProblemData ({problem: {stage_id, status, invocation_id, handler, unrecognized?, failure?, diagnostics?}}) і from_invocation_id; unmatched_materials — матеріали collect-етапу, яким не відповідає жодна прив'язка, як MaterialInput (доставляються лише за ефективного forward_unknown_to_llm=true, інакше лише реєструються).",
             type: "string",
             enum: ["output", "input_material", "problems", "unmatched_materials"],
             default: "output",

@@ -170,15 +170,19 @@ export interface paths {
     put?: never;
     /**
      * Активувати версію пакета в етапі (або відкотити до попередньої)
-     * @description Змінює `stages[].handler` завдання з аудитом.
+     * @description Змінює `stages[].handler` завдання з аудитом. Для етапу `kind: collect` активується версія
+     *     **правил колектора** (ТЗ §8, §10): змінюється `stages[].collector.rules`, пакет має бути
+     *     `kind: collector-rules` (інакше 422); `previous` — правила етапу або, якщо етап їх не задавав,
+     *     `Source.collector_rules` джерела (після активації чи відкату етап явно посилається на версію).
      *     - `activate` — людина активує версію; версія має бути `approved` у репозиторії.
      *     - `rollback` — повернення до попередньої активації (або до вказаної версії).
      *     - `auto_activate` — автоматична активація (асистент після перевірок). Приймається лише якщо
      *       політика дозволяє: `Source.change_policy.llm_versions = auto_after_checks` **і** пакет
-     *       має `auto_changes_allowed = true` **і** версія пройшла тести (`test_status = passed`) на
-     *       всіх прив'язках. Інакше — 403 `access_denied_by_policy` (у `details.reason`:
-     *       `source_policy`, `package_auto_changes_forbidden` або `tests_not_passed`), активація не
-     *       виконується.
+     *       має `auto_changes_allowed = true` **і** версія пройшла тести на всіх прив'язках: агрегат
+     *       registry `PackageVersion.test_summary.status = passed` (останній звіт кожного `context`
+     *       пройшов); якщо registry не віддає `test_summary` — `test_status = passed`. Інакше — 403
+     *       `access_denied_by_policy` (у `details.reason`: `source_policy`,
+     *       `package_auto_changes_forbidden` або `tests_not_passed`), активація не виконується.
      */
     post: operations["activateStageVersion"];
     delete?: never;
@@ -594,6 +598,39 @@ export interface components {
       error?: components["schemas"]["problem.schema"];
       started_at?: components["schemas"]["Timestamp"];
       finished_at?: components["schemas"]["Timestamp"];
+      /** @description Діагностика (R25). Найраніший момент, коли елемент у стані queued/retrying можна взяти в роботу (кінець backoff). */
+      available_at?: components["schemas"]["Timestamp"];
+      attempt_history?: components["schemas"]["AttemptHistory"];
+    };
+    /**
+     * @description Діагностика (R25): події взяття елемента в роботу й повторів у порядку часу — щоб довести, що повтор
+     *     почався не раніше backoff. Обмежена конфігурацією оркестратора (`engine.attempt_history_max`,
+     *     зберігаються перші події); не впливає на виконання.
+     */
+    AttemptHistory: components["schemas"]["AttemptEvent"][];
+    AttemptEvent: {
+      /**
+       * @description Розширюваний перелік (толерантний читач): `claimed` — воркер узяв елемент (нова спроба);
+       *     `lease_reclaimed` — оренду загиблого воркера перехоплено (не нова спроба); `retry_scheduled` —
+       *     повтор після помилки, елемент чекає до `available_at`; `in_progress_parked` — виконавець ще
+       *     обробляє той самий `delivery_key`, перевірка — після `available_at`; `completed`, `failed` — фінал.
+       * @example claimed
+       * @example lease_reclaimed
+       * @example retry_scheduled
+       * @example in_progress_parked
+       * @example completed
+       * @example failed
+       */
+      event: string;
+      at: components["schemas"]["Timestamp"];
+      /** @description Номер спроби (StageItem.attempts) на момент події. */
+      attempt?: number;
+      /** @description Для `retry_scheduled` / `in_progress_parked` — коли елемент знову можна взяти. */
+      available_at?: components["schemas"]["Timestamp"];
+      /** @description Затримка до `available_at` за політикою повторів (або engine-налаштуванням для in_progress). */
+      delay_ms?: number;
+      /** @description Код помилки (Problem.code), що спричинив повтор чи фінальну помилку. */
+      code?: string;
     };
     MaterialTrace: {
       material_id: string;
@@ -610,6 +647,13 @@ export interface components {
           handler?: components["schemas"]["package-ref.schema"];
           invocation_id?: string;
           result_status?: components["schemas"]["HandlerStatus"];
+          /** @description Діагностика (R25) — елемент запуску (StageItem.item_id). */
+          item_id?: string;
+          status?: components["schemas"]["ItemStatus"];
+          attempts?: number;
+          /** @description Діагностика (R25), як StageItem.available_at. */
+          available_at?: components["schemas"]["Timestamp"];
+          attempt_history?: components["schemas"]["AttemptHistory"];
           outputs?: {
             /** @enum {string} */
             kind: "entity" | "stored_object" | "data";
@@ -647,6 +691,8 @@ export interface components {
       last_seen_at?: components["schemas"]["Timestamp"];
       status: components["schemas"]["ProblemGroupStatus"];
       assistant_job_id?: string;
+      /** @description Останнє пояснення з `PATCH /v1/problem-groups/{group_id}` (людина чи асистент). */
+      note?: string;
       samples?: {
         material_id?: string;
         observation_id?: string;
@@ -654,6 +700,14 @@ export interface components {
         stored_object_id?: string;
       }[];
     };
+    /**
+     * @description Повторна обробка збережених RAW джерела завдання. `stored_materials.material_ids` обирає всі
+     *     збережені спостереження цих матеріалів у вікні `since`/`until`; точний вибір — `object_ids`
+     *     (конкретні збережені RAW, наприклад `ProblemGroup.samples[].stored_object_id`) або `observation_ids`.
+     *     `from_stage` — етап, з якого почати (типово — етапи після collect, як для нового збору); це може бути
+     *     й етап збереження (RAW зберігається ще раз, наприклад в інше сховище; storage має читати persistent
+     *     `file://` свого тому — `JANE_STORAGE_CONTENT_FILES_DIR`, ADR-0004).
+     */
     ReprocessRequest: {
       task_id: components["schemas"]["Slug"];
       stored_materials: components["schemas"]["stored_materials"];
@@ -1053,7 +1107,7 @@ export interface components {
     StageInput: {
       from: components["schemas"]["Slug"];
       /**
-       * @description Що брати з етапу-джерела: output — вихід (collect: матеріали; extractor: сутності разом із матеріалом; llm: data); input_material — вхідний матеріал етапу-джерела (наприклад зберегти RAW лише успішно розібраних); problems — елементи зі статусом unrecognized або failed разом із матеріалом і діагностикою; unmatched_materials — матеріали collect-етапу, яким не відповідає жодна прив'язка (доставляються лише за ефективного forward_unknown_to_llm=true, інакше лише реєструються).
+       * @description Що брати з етапу-джерела і в якій формі (HandlerInvocation.inputs): output — вихід: collect — MaterialInput; extractor/transform із сутностями — EntitiesInput (entities або entities_ref, from_invocation_id, material вхідного елемента); llm/transform із даними — DataInput (data або data_ref, from_invocation_id); етап збереження — DataInput з data = WritesData ({writes: [WriteAck…]}, handler-invocation.schema.json) і from_invocation_id; input_material — вхідний матеріал етапу-джерела як MaterialInput (наприклад зберегти RAW лише успішно розібраних); problems — елементи зі статусом unrecognized або failed: MaterialInput вхідного матеріалу (якщо він був) і DataInput з data = ProblemData ({problem: {stage_id, status, invocation_id, handler, unrecognized?, failure?, diagnostics?}}) і from_invocation_id; unmatched_materials — матеріали collect-етапу, яким не відповідає жодна прив'язка, як MaterialInput (доставляються лише за ефективного forward_unknown_to_llm=true, інакше лише реєструються).
        * @default output
        * @enum {string}
        */
@@ -1082,12 +1136,19 @@ export interface components {
       source_id: components["schemas"]["Slug"];
       /** @description Явний перелік матеріалів. Якщо задано — колектор отримує лише ці URL (стратегія seed_list без рекурсії) у межах scope джерела. Типово для завдань перевірки цін. Кількість обмежує limits.crawl.max_seed_urls (ефективне значення; перевищення — limit_exceeded), а не схема. */
       urls?: string[];
-      /** @description Повторна обробка збережених RAW (ТЗ §10): фільтр збережених об'єктів замість нового збору. */
+      /** @description Повторна обробка збережених RAW (ТЗ §10): фільтр збережених об'єктів замість нового збору. Завжди лише RAW джерела завдання (Material.source.source_id). Фільтри поєднуються через AND. material_ids обирає всі збережені спостереження цих матеріалів у часовому вікні since/until; точний вибір — object_ids (конкретні збережені RAW) або observation_ids (конкретні спостереження). */
       stored_materials?: {
         storage_connection_id?: components["schemas"]["Slug"];
+        /** @description Час збереження (stored_at) не раніше. */
         since?: components["schemas"]["Timestamp"];
+        /** @description Час збереження (stored_at) раніше за це значення. */
         until?: components["schemas"]["Timestamp"];
+        /** @description Усі збережені спостереження цих матеріалів (у межах since/until). */
         material_ids?: components["schemas"]["Id"][];
+        /** @description Точний вибір: саме ці збережені RAW (StoredObjectRef.object_id у підключенні storage_connection_id), у заданому порядку; кожен читається через storage.v1 GET /v1/objects/{object_id}. Відсутній об'єкт завершує запуск помилкою not_found; RAW іншого джерела чи без відновлюваного Material пропускається. Кількість обмежує конфігурація оркестратора (більше — 422 limit_exceeded). */
+        object_ids?: components["schemas"]["Id"][];
+        /** @description Точний вибір спостережень (Material.observation_id): лише RAW цих спостережень серед відібраних іншими фільтрами. Кілька збережених копій одного спостереження не вгадуються (одна копія обробляється, посилання на RAW не записується). Кількість обмежує конфігурація оркестратора. */
+        observation_ids?: components["schemas"]["Id"][];
       };
     };
     Stage: {
@@ -1140,12 +1201,19 @@ export interface components {
       forward_unknown_to_llm?: boolean;
       labels?: components["schemas"]["Labels"];
     };
-    /** @description Повторна обробка збережених RAW (ТЗ §10): фільтр збережених об'єктів замість нового збору. */
+    /** @description Повторна обробка збережених RAW (ТЗ §10): фільтр збережених об'єктів замість нового збору. Завжди лише RAW джерела завдання (Material.source.source_id). Фільтри поєднуються через AND. material_ids обирає всі збережені спостереження цих матеріалів у часовому вікні since/until; точний вибір — object_ids (конкретні збережені RAW) або observation_ids (конкретні спостереження). */
     stored_materials: {
       storage_connection_id?: components["schemas"]["Slug"];
+      /** @description Час збереження (stored_at) не раніше. */
       since?: components["schemas"]["Timestamp"];
+      /** @description Час збереження (stored_at) раніше за це значення. */
       until?: components["schemas"]["Timestamp"];
+      /** @description Усі збережені спостереження цих матеріалів (у межах since/until). */
       material_ids?: components["schemas"]["Id"][];
+      /** @description Точний вибір: саме ці збережені RAW (StoredObjectRef.object_id у підключенні storage_connection_id), у заданому порядку; кожен читається через storage.v1 GET /v1/objects/{object_id}. Відсутній об'єкт завершує запуск помилкою not_found; RAW іншого джерела чи без відновлюваного Material пропускається. Кількість обмежує конфігурація оркестратора (більше — 422 limit_exceeded). */
+      object_ids?: components["schemas"]["Id"][];
+      /** @description Точний вибір спостережень (Material.observation_id): лише RAW цих спостережень серед відібраних іншими фільтрами. Кілька збережених копій одного спостереження не вгадуються (одна копія обробляється, посилання на RAW не записується). Кількість обмежує конфігурація оркестратора. */
+      observation_ids?: components["schemas"]["Id"][];
     };
     /**
      * Job
@@ -2139,12 +2207,13 @@ export interface operations {
         "application/merge-patch+json": {
           status?: components["schemas"]["ProblemGroupStatus"];
           assistant_job_id?: components["schemas"]["Id"];
+          /** @description Пояснення людини чи асистента; зберігається й повертається в `ProblemGroup.note`. */
           note?: string;
         };
       };
     };
     responses: {
-      /** @description Оновлена група. */
+      /** @description Оновлена група (з `note`, якщо її задано цим або попереднім PATCH). */
       200: {
         headers: {
           [name: string]: unknown;

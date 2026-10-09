@@ -33,6 +33,60 @@
 Ключ доставки для сутностей — `delivery_key` виклику + індекс сутності у вході
 (`<delivery_key>#<n>`), для RAW — `delivery_key` виклику.
 
+Повтор при `CONFLICT` обмежує й розтягує в часі **власна конфігурація сервісу** storage
+(`limits.conflict_retries`, типово 4 спроби, backoff 200 мс × 2 до 10 с із jitter). Контрактний
+`limits.retries` — політика викликача (повтор виклику з тим самим `Idempotency-Key`), тому ні профіль
+платформи, ні `HandlerInvocation.limits` цей backoff не змінюють. Вичерпані спроби — `AdapterError(retryable=True)`
+→ `HandlerResult.failed` (`connection_error`, `retryable: true`): оркестратор повторить виклик тим самим ключем.
+
+## Записи доставок (`DeliveryRecord.acks`)
+
+`DeliveryRecord` зберігається адаптером атомарно з даними (для сутності — у тій самій транзакції чи CAS, що
+знімок і подія історії) і безстроково. `acks` — це підтвердження, які ядро поверне з `status: duplicate` на
+повторну доставку того самого ключа, тому всі шість адаптерів пишуть **однаковий** документ:
+
+| Доставка | Ключ | `acks` |
+|---|---|---|
+| Сутність (`commit_entity`) | `<delivery_key>#<n>` | рівно один документ `jane_storage.codec.entity_ack`: `{"entity": {"entity_type", "canonical_key", "version"}, "applied_fields": [...], "stale_fields": [...], "delivery_key": "<ключ>"}` — `version` знімка після цього коміту |
+| Об'єкт RAW чи документ результату (`record_delivery` після `put_object`) | `<delivery_key>` (перший RAW), `<delivery_key>#raw<n>` (наступні RAW, n ≥ 1), `<delivery_key>#data<n>` (документи `writes: data`, n ≥ 0); `jane_storage.keys` | рівно один документ `{"object": StoredObjectRef, "delivery_key": "<ключ>"}` |
+
+Повторна доставка: `WriteAck = {"status": "duplicate", "target": <поточна ціль>, **acks[0] без status/target**,
+"delivery_key"}`. Порожній `acks` можливий лише для доставки, коміт якої ще завершується (заявка без знімка в
+об'єктних сховищах) — тоді `WriteAck` має лише `status`, `target`, `delivery_key`. Поля `acks` не містять
+секретів і вмісту; читачі мають терпіти невідомі поля (толерантний читач).
+
+## Простір імен
+
+Підключення (`Connection.params`) задає місце в сховищі: каталог (`base_path`), базу, бакет. Параметри етапу
+з `params_schema` пакета вибирають простір **усередині** підключення:
+
+| Адаптер | Параметр етапу | Типово (якщо немає ні в етапі, ні в `params` підключення) |
+|---|---|---|
+| filesystem, minio, s3 | `prefix` (підкаталог / префікс ключів) | без префікса |
+| mongodb | `prefix` (префікс колекцій) | `jane_` |
+| postgresql, sqlserver | `schema`, `table_prefix` | `public` / `dbo`, `jane_` |
+
+Під час запису параметр етапу перекриває однойменний `params` підключення. Читальний API `storage.v1`
+(і повторна обробка за `stored_materials.storage_connection_id`) параметрів етапу не має: він бачить простір,
+заданий `params` самого підключення. Щоб читати дані з простору етапу, зареєструйте окреме підключення з тими
+самими `params.prefix` / `schema` / `table_prefix`. Окремого параметра простору імен у `storage.v1` немає
+(рішення WP-17, R01: контракт описує фактичну поведінку).
+
+## Формати RAW (`format.raw`)
+
+Формат RAW = `params.format.raw` етапу → `entry.format.raw` маніфесту → типова поведінка (ТЗ §5, §13.1 п.4):
+
+| Значення | Що зберігається | Медіатип / розширення |
+|---|---|---|
+| не задано | вебсторінка (`text/html`, `application/xhtml+xml`) — як `html`; будь-який інший RAW (Telegram, JSON API, стрічки) — як `json` | — |
+| `original` | байти як отримано | медіатип матеріалу; розширення за ним |
+| `html` | сторінка байт-у-байт; не-HTML матеріал → `HandlerResult.failed` (`invalid_params`) | `text/html`, `.html` |
+| `json` | JSON-документ Material із вбудованим вмістом (`content.encoding` utf-8/base64) | `application/json`, `.json` |
+
+Схема маніфесту не має `default` для `format.raw`: відсутнє значення — це саме типова поведінка вище, а не
+`original`. Відновлений Material (`GET /v1/objects/{id}`) для `json` містить **початковий** вміст із
+документа (inline), а не сам документ; для `html` / `original` — постійне посилання на ті самі байти.
+
 ## Об'єктні сховища (minio, s3) і файлова система
 
 Сутності зберігаються як JSON-документи з тією самою семантикою, що й у БД — злиття, `cleared`,

@@ -72,7 +72,7 @@
       ]
     },
     "DataInput": {
-      "description": "Довільний JSON-результат попереднього етапу (наприклад, вихід LLM).",
+      "description": "Довільний JSON-результат попереднього етапу (наприклад, вихід LLM). Оркестратор також доставляє так вихід етапу збереження (data = WritesData) і діагностику проблемного елемента для select: problems (data = ProblemData, разом із MaterialInput вхідного матеріалу); форми — у $defs нижче, виконавець читає їх толерантно.",
       "type": "object",
       "required": ["kind"],
       "properties": {
@@ -85,6 +85,34 @@
         { "required": ["data"] },
         { "required": ["data_ref"] }
       ]
+    },
+    "ProblemData": {
+      "description": "DataInput.data для select: problems (task-config.schema.json, StageInput): проблемний результат етапу-джерела. Поля HandlerResult копіюються як є; невідомі поля читач ігнорує.",
+      "type": "object",
+      "required": ["problem"],
+      "properties": {
+        "problem": {
+          "type": "object",
+          "required": ["stage_id", "status"],
+          "properties": {
+            "stage_id": { "$ref": "common/defs.schema.json#/$defs/Slug", "description": "Етап, чий результат проблемний." },
+            "status": { "type": "string", "enum": ["unrecognized", "failed"] },
+            "invocation_id": { "$ref": "common/defs.schema.json#/$defs/Id" },
+            "handler": { "$ref": "common/package-ref.schema.json", "description": "Версія пакета, що дала результат (HandlerResult.handler)." },
+            "unrecognized": { "$ref": "handler-result.schema.json#/properties/unrecognized" },
+            "failure": { "$ref": "handler-result.schema.json#/properties/failure" },
+            "diagnostics": { "$ref": "handler-result.schema.json#/$defs/Diagnostics" }
+          }
+        }
+      }
+    },
+    "WritesData": {
+      "description": "DataInput.data для select: output від етапу збереження: підтвердження запису (HandlerResult.output.writes) як є.",
+      "type": "object",
+      "required": ["writes"],
+      "properties": {
+        "writes": { "type": "array", "items": { "$ref": "handler-result.schema.json#/$defs/WriteAck" } }
+      }
     },
     "InvocationContext": {
       "type": "object",

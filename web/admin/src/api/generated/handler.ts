@@ -107,7 +107,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Підключення, відомі цьому виконавцю */
+    /**
+     * Підключення, відомі цьому виконавцю
+     * @description Необов'язково для виконавця без керованих підключень (див. опис API).
+     */
     get: operations["listConnections"];
     put?: never;
     post?: never;
@@ -132,6 +135,8 @@ export interface paths {
      * Створити або замінити підключення (секрети — лише посиланнями)
      * @description Викликає оркестратор, синхронізуючи реєстр підключень, або адміністратор автономного
      *     виконавця. Значення, схожі на секрети, у `params` відхиляються (`secret_detected`).
+     *     Виконавець без керованих підключень відповідає 501 `not_implemented` (або не має цього шляху —
+     *     404/405); клієнт не вважає це збоєм (див. опис API).
      */
     put: operations["putConnection"];
     post?: never;
@@ -694,7 +699,7 @@ export interface components {
         }
       | unknown
       | unknown;
-    /** @description Довільний JSON-результат попереднього етапу (наприклад, вихід LLM). */
+    /** @description Довільний JSON-результат попереднього етапу (наприклад, вихід LLM). Оркестратор також доставляє так вихід етапу збереження (data = WritesData) і діагностику проблемного елемента для select: problems (data = ProblemData, разом із MaterialInput вхідного матеріалу); форми — у $defs нижче, виконавець читає їх толерантно. */
     DataInput:
       | {
           /** @constant */
@@ -705,6 +710,92 @@ export interface components {
         }
       | unknown
       | unknown;
+    /** @description Заповнюється, коли status = unrecognized. */
+    unrecognized: {
+      /** @description true — частину даних розібрано (вони в output), false — формат не розпізнано взагалі. */
+      partial: boolean;
+      reason?: string;
+      /** @description Короткий відбиток характеру проблеми для групування (наприклад 'missing-selector:.price'). */
+      signature?: string;
+    };
+    /** @description Заповнюється, коли status = failed. */
+    failure: {
+      /** @enum {string} */
+      kind:
+        | "execution_error"
+        | "schema_mismatch"
+        | "timeout"
+        | "resource_exceeded"
+        | "sandbox_violation"
+        | "dependency_error"
+        | "connection_error"
+        | "budget_exhausted"
+        | "invalid_params";
+      message: string;
+      retryable?: boolean;
+      details?: Record<string, unknown>;
+    };
+    Diagnostics: {
+      messages?: components["schemas"]["DiagnosticMessage"][];
+      /** @description Невідповідності виходу схемі пакета (для failure.kind = schema_mismatch). */
+      validation_errors?: {
+        pointer: string;
+        message: string;
+        schema_pointer?: string;
+      }[];
+      metrics?: {
+        duration_ms?: number;
+        cpu_ms?: number;
+        peak_memory_mb?: number;
+        output_bytes?: number;
+      };
+      /** @description stdout/stderr виконання (обрізані до limits.sandbox.max_output_bytes). */
+      logs_ref?: components["schemas"]["content-ref.schema"];
+    };
+    /** @description Посилання на збережений об'єкт (RAW або документ результатів), за яким його можна прочитати через storage API або повторно обробити. */
+    StoredObjectRef: {
+      object_id: components["schemas"]["Id"];
+      adapter: string;
+      connection_id?: components["schemas"]["Slug"];
+      /** @description Адреса в термінах адаптера: path (files), table+id (SQL), collection+_id (MongoDB), bucket+key (S3/MinIO). */
+      locator?: {
+        [key: string]: string | number;
+      };
+      media_type?: components["schemas"]["MediaType"];
+      size_bytes?: number;
+      sha256?: components["schemas"]["Sha256Hex"];
+      /** @description Постійне посилання на вміст (store=persistent), якщо адаптер його надає. */
+      content?: components["schemas"]["content-ref.schema"];
+    };
+    /** @description Підтвердження запису обробником збереження. */
+    WriteAck: {
+      /**
+       * @description written — записано; duplicate — цей delivery_key уже записано, повтор без ефекту; stale — запізніле спостереження, лише в історії; partially_stale — частину полів застосовано, частину ні; simulated — test_mode, запису не було.
+       * @enum {string}
+       */
+      status: "written" | "duplicate" | "stale" | "partially_stale" | "simulated";
+      target: {
+        /**
+         * @example filesystem
+         * @example postgresql
+         * @example sqlserver
+         * @example mongodb
+         * @example minio
+         * @example s3
+         */
+        adapter: string;
+        connection_id?: components["schemas"]["Slug"];
+      };
+      object?: components["schemas"]["StoredObjectRef"];
+      entity?: {
+        entity_type?: string;
+        canonical_key?: string;
+        version?: number;
+      };
+      applied_fields?: string[];
+      stale_fields?: string[];
+      delivery_key?: string;
+    };
     /** @description Контекст простежуваності, що передається між етапами. Поля HTTP-заголовків W3C 'traceparent'/'tracestate' мають пріоритет, якщо є. */
     TraceContext: {
       trace_id?: string;
@@ -757,50 +848,6 @@ export interface components {
        * @enum {string}
        */
       mode?: "sync" | "async";
-    };
-    /** @description Посилання на збережений об'єкт (RAW або документ результатів), за яким його можна прочитати через storage API або повторно обробити. */
-    StoredObjectRef: {
-      object_id: components["schemas"]["Id"];
-      adapter: string;
-      connection_id?: components["schemas"]["Slug"];
-      /** @description Адреса в термінах адаптера: path (files), table+id (SQL), collection+_id (MongoDB), bucket+key (S3/MinIO). */
-      locator?: {
-        [key: string]: string | number;
-      };
-      media_type?: components["schemas"]["MediaType"];
-      size_bytes?: number;
-      sha256?: components["schemas"]["Sha256Hex"];
-      /** @description Постійне посилання на вміст (store=persistent), якщо адаптер його надає. */
-      content?: components["schemas"]["content-ref.schema"];
-    };
-    /** @description Підтвердження запису обробником збереження. */
-    WriteAck: {
-      /**
-       * @description written — записано; duplicate — цей delivery_key уже записано, повтор без ефекту; stale — запізніле спостереження, лише в історії; partially_stale — частину полів застосовано, частину ні; simulated — test_mode, запису не було.
-       * @enum {string}
-       */
-      status: "written" | "duplicate" | "stale" | "partially_stale" | "simulated";
-      target: {
-        /**
-         * @example filesystem
-         * @example postgresql
-         * @example sqlserver
-         * @example mongodb
-         * @example minio
-         * @example s3
-         */
-        adapter: string;
-        connection_id?: components["schemas"]["Slug"];
-      };
-      object?: components["schemas"]["StoredObjectRef"];
-      entity?: {
-        entity_type?: string;
-        canonical_key?: string;
-        version?: number;
-      };
-      applied_fields?: string[];
-      stale_fields?: string[];
-      delivery_key?: string;
     };
     Money: {
       amount: number;
@@ -887,23 +934,6 @@ export interface components {
       data?: unknown;
       data_ref?: components["schemas"]["content-ref.schema"];
       writes?: components["schemas"]["WriteAck"][];
-    };
-    Diagnostics: {
-      messages?: components["schemas"]["DiagnosticMessage"][];
-      /** @description Невідповідності виходу схемі пакета (для failure.kind = schema_mismatch). */
-      validation_errors?: {
-        pointer: string;
-        message: string;
-        schema_pointer?: string;
-      }[];
-      metrics?: {
-        duration_ms?: number;
-        cpu_ms?: number;
-        peak_memory_mb?: number;
-        output_bytes?: number;
-      };
-      /** @description stdout/stderr виконання (обрізані до limits.sandbox.max_output_bytes). */
-      logs_ref?: components["schemas"]["content-ref.schema"];
     };
     Usage: {
       llm?: {

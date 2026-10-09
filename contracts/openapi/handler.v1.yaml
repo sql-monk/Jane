@@ -16,6 +16,14 @@ info:
     Помилка виконання обробника — `200` зі `status: failed`; HTTP-помилка означає, що виклик не відбувся.
     Можливості конкретного виконавця (типи обробників, профілі runtime, адаптери, підтримка
     підключень) — `GET /v1/info` → `capabilities`.
+
+    **Підключення необов'язкові.** `/v1/connections*` обов'язкові лише для виконавця з керованими
+    підключеннями (`capabilities.connections: true`, наприклад storage і llm). Виконавець без підключень
+    (`capabilities.connections: false`, наприклад handler-runtime: екстрактори не отримують облікових
+    даних) може не реалізовувати ці шляхи зовсім (404/405) або відповідати як handler-runtime:
+    `GET /v1/connections` — порожня сторінка, `PUT` — 501 `not_implemented`, решта — 404. Клієнти (оркестратор)
+    не вимагають їх від такого виконавця: не синхронізують йому реєстр, а 404/405/501 на `PUT` вважають ознакою
+    «підключення не використовуються», а не збоєм синхронізації.
   license:
     name: Proprietary
     identifier: LicenseRef-Jane
@@ -276,6 +284,7 @@ paths:
       x-jane-scope: [connections:write, handler:invoke]
       operationId: listConnections
       summary: Підключення, відомі цьому виконавцю
+      description: Необов'язково для виконавця без керованих підключень (див. опис API).
       tags: [connections]
       parameters:
         - $ref: 'common.yaml#/components/parameters/Cursor'
@@ -324,6 +333,8 @@ paths:
       description: |
         Викликає оркестратор, синхронізуючи реєстр підключень, або адміністратор автономного
         виконавця. Значення, схожі на секрети, у `params` відхиляються (`secret_detected`).
+        Виконавець без керованих підключень відповідає 501 `not_implemented` (або не має цього шляху —
+        404/405); клієнт не вважає це збоєм (див. опис API).
       tags: [connections]
       parameters:
         - $ref: 'common.yaml#/components/parameters/IfMatch'

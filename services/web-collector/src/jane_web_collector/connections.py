@@ -14,15 +14,14 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
 
 from jane_kit.errors import FieldError, JaneError, ValidationFailed
+from jane_kit.rules import header_value_safe
+from jane_kit.secrets import OriginAllowlist, SecretPolicy
 
 __all__ = [
     "SUPPORTED_KINDS",
@@ -40,7 +39,6 @@ _SECRET_KEY = re.compile(
     r"(pass(word|wd)?|secret|token|api[_-]?key|authorization|cookie|private[_-]?key|credential)", re.I
 )
 _SECRET_VALUE = re.compile(r"^(bearer|basic)\s+\S+|-----BEGIN [A-Z ]*PRIVATE KEY-----", re.I)
-_ENV_NAME = re.compile(r"[A-Z_][A-Z0-9_]{0,127}\Z")
 _FORBIDDEN_DESTINATION_HEADERS = frozenset({"host", "content-length", "transfer-encoding"})
 _SAFE_RULE_HEADERS = frozenset({"accept", "accept-language", "cache-control"})
 _HEADER_NAME = re.compile(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+\Z")
@@ -55,97 +53,26 @@ def header_name_safe(value: object) -> bool:
     return isinstance(value, str) and _HEADER_NAME.fullmatch(value) is not None
 
 
-def header_value_safe(value: object) -> bool:
-    """HTTP header values must be visible ASCII, with no control characters to reach error text."""
-    return isinstance(value, str) and bool(value) and all(32 <= ord(char) <= 126 for char in value)
-
-
-def _origin(url: str, *, allow_path: bool = False) -> tuple[str, str, int] | None:
-    """An exact HTTP(S) origin; reject userinfo, paths and ambiguous authorities."""
-    try:
-        parts = urlsplit(url)
-        port = parts.port
-    except ValueError:
-        return None
-    if (
-        parts.scheme not in {"http", "https"}
-        or not parts.hostname
-        or parts.username is not None
-        or parts.password is not None
-        or (not allow_path and (parts.path not in {"", "/"} or parts.query or parts.fragment))
-        or port == 0
-        or "\\" in url
-        or any(c.isspace() for c in url)
-    ):
-        return None
-    return parts.scheme, parts.hostname.lower().rstrip("."), port or (443 if parts.scheme == "https" else 80)
-
-
 @dataclass(frozen=True)
-class ConnectionPolicy:
-    """Operator-controlled secret and authenticated destination boundaries."""
+class ConnectionPolicy(SecretPolicy):
+    """Operator-controlled secret and authenticated destination boundaries: jane-kit's shared secret policy
+    (R17: ``env:`` prefix, ``file:`` directory with pinned reading) and the exact origins a credential may go to."""
 
-    env_prefix: str = "JANE_SECRET_"
-    files_dir: Path | None = Path("/run/secrets")
     origin_allowlist: tuple[str, ...] = ()
-    _origins: frozenset[tuple[str, str, int]] = field(init=False, repr=False)
+    _origins: OriginAllowlist = field(init=False, repr=False, default=OriginAllowlist())
 
     def __post_init__(self) -> None:
-        parsed = [_origin(entry) for entry in self.origin_allowlist]
-        if any(origin is None for origin in parsed):
-            raise ValueError("connection_origin_allowlist entries must be exact HTTP(S) origins")
-        object.__setattr__(self, "_origins", frozenset(origin for origin in parsed if origin is not None))
+        try:
+            origins = OriginAllowlist(tuple(self.origin_allowlist))
+        except ValueError:
+            raise ValueError("connection_origin_allowlist entries must be exact HTTP(S) origins") from None
+        object.__setattr__(self, "_origins", origins)
 
     def origin_allowed(self, url: str) -> bool:
-        return (origin := _origin(url, allow_path=True)) is not None and origin in self._origins
-
-    def secret_file(self, ref: str) -> Path | None:
-        if self.files_dir is None or not ref.startswith("file:") or not ref[5:]:
-            return None
-        try:
-            path = Path(ref[5:]).resolve()
-            base = self.files_dir.resolve()
-        except (OSError, RuntimeError, ValueError):
-            return None
-        return path if path != base and path.is_relative_to(base) else None
-
-    def ref_error(self, ref: str) -> str | None:
-        if ref.startswith("env:"):
-            name = ref[4:]
-            if (
-                not self.env_prefix
-                or not _ENV_NAME.fullmatch(name)
-                or not name.startswith(self.env_prefix)
-                or name == self.env_prefix
-            ):
-                return "env: reference is outside the configured secret prefix"
-            return None
-        if ref.startswith("file:"):
-            if self.secret_file(ref) is None:
-                return "file: reference is outside the configured secret directory or files are disabled"
-            return None
-        return "secret reference scheme is not configured"
-
-    def resolve(self, ref: str) -> str | None:
-        if self.ref_error(ref) is not None:
-            return None
-        if ref.startswith("env:"):
-            return os.environ.get(ref[4:]) or None
-        path = self.secret_file(ref)
-        if path is None:
-            return None
-        try:
-            return path.read_text(encoding="utf-8").strip() or None
-        except (OSError, UnicodeDecodeError):
-            return None
+        return self._origins.allows(url)
 
     def validate_refs(self, body: Mapping[str, Any]) -> None:
-        refs = body.get("secret_refs") or {}
-        errors = [
-            FieldError(pointer=f"/secret_refs/{name}", message=message)
-            for name, ref in refs.items()
-            if (message := self.ref_error(ref)) is not None
-        ]
+        errors = self.violations(body.get("secret_refs"))
         if errors:
             raise ValidationFailed("secret reference is not allowed", errors=errors)
 

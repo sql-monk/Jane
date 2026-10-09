@@ -48,10 +48,9 @@ def test_whole_profile_is_accepted_and_its_assistant_limits_apply(
     lim, want = resolved.limits, doc["defaults"]
     assert resolved.profile == doc["profile"]
     llm = lim.llm.model_dump()
-    assert {k: llm[k] for k in want["llm"]} == want[
-        "llm"
-    ]  # every llm.* limit of the profile, incl. the budget
-    assert llm["min_onboarding_confidence"] == 0.8  # not in the profile: the assistant's default
+    # every llm.* limit of the profile, incl. the budget; a profile older than WP-15 lacks the confidence limit
+    assert {k: llm[k] for k in want["llm"]} == want["llm"]
+    assert llm["min_onboarding_confidence"] == want["llm"].get("min_onboarding_confidence", 0.8)
     assert lim.llm.max_input_tokens_per_request != 16_000  # not the default
     assert lim.transfer.inline_max_bytes == want["transfer"]["inline_max_bytes"]
     assert lim.clients.connect_timeout_ms == want["timeouts"]["connect_timeout_ms"]
@@ -60,9 +59,7 @@ def test_whole_profile_is_accepted_and_its_assistant_limits_apply(
     assert lim.jobs.job_retention_seconds == want["transfer"]["job_retention_seconds"] != 86_400
     assert lim.onboarding.min_distinct_types == 2  # assistant-only limits keep their defaults
     applied, wanted = leaves(resolved.platform_limits()["defaults"]), leaves(want)
-    assert set(applied) - set(wanted) == {
-        "llm.min_onboarding_confidence"
-    }  # a contract limit the profiles lack
+    assert set(applied) - set(wanted) <= {"llm.min_onboarding_confidence"}  # see above
     assert {p: applied[p] for p in applied if p in wanted} == {p: wanted[p] for p in applied if p in wanted}
     assert set(resolved.ignored) == set(wanted) - set(applied)
     assert {"sandbox.memory_mb", "crawl.max_depth", "timeouts.invocation_timeout_ms"} <= set(resolved.ignored)
@@ -89,5 +86,5 @@ def test_service_starts_with_the_profile(profile: tuple[Path, dict[str, Any]], s
         assert client.get("/v1/health").status_code == 200
         info = client.get("/v1/info").json()["limits"]
     assert info["profile"] == doc["profile"]
-    assert info["defaults"]["llm"] == {**doc["defaults"]["llm"], "min_onboarding_confidence": 0.8}
+    assert info["defaults"]["llm"] == {"min_onboarding_confidence": 0.8, **doc["defaults"]["llm"]}
     assert "sandbox" not in info["defaults"]

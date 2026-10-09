@@ -38,7 +38,7 @@ hostname і PID збігаються. Явний `<ПРЕФІКС>INSTANCE_ID` �
 | `jane_kit.schemas` | `ContractSchemas` — валідація за `contracts/schemas` (і, за потреби, одним OpenAPI): кеш валідаторів, `FieldError` з RFC 6901 вказівниками, `locate()` з назвою налаштування; `format_check` — як було в сервісі | `contracts/schemas/**` |
 | `jane_kit.rules` | Правила колекторів: `CollectorSchemas` (помилки `oneOf` — за дискримінатором `type`/`collector`), `RulesReport`, `RulesLoader` (локальний пакет/архів, registry з перевіркою `digest` і `files[].sha256`) | `collector.v1`, `collector-rules.schema.json` |
 | `jane_kit.clients` | `ServiceClient` (httpx): `timeouts.*_ms` і `RetryPolicy` з конфігурації, повтор лише для безпечних методів або з `Idempotency-Key` і лише retryable-помилок, `Retry-After`, `traceparent`, `wait_for_job` | `RetryPolicy` у limits |
-| `jane_kit.contracts` | `OpenAPISpec` (OpenAPI 3.1, `$ref` між файлами, `$ref` на path items), `ContractClient` — перевіряє кожну відповідь справжнього сервісу, `build_mock_app` — мок сусіда з прикладів контракту, `contracts_dir()`, `find_specs()` | `contracts/openapi/*.v1.yaml` |
+| `jane_kit.contracts` | `OpenAPISpec` (OpenAPI 3.1, `$ref` між файлами, `$ref` на path items; медіатип відповіді — точний, далі `type/*`, далі `*/*`), `ContractClient` — перевіряє кожну відповідь справжнього сервісу, `build_mock_app` — мок сусіда з прикладів контракту, `contracts_dir()`, `find_specs()` | `contracts/openapi/*.v1.yaml` |
 | `jane_kit.codegen` | `uv run jane-codegen client <spec> --out <pkg>/_generated/<svc>` — моделі Pydantic (datamodel-code-generator) + асинхронний клієнт на `ServiceClient` | — |
 | `jane_kit.auth` | автентифікація й scopes за ADR-0005: `none` / `api_key` / `jwt`, middleware (401) і залежність авторизації маршруту (403), `resolve_secret_ref` (`env:`/`file:`), `bearer_header` — див. «Автентифікація» | `common.yaml` `bearerAuth`, `Unauthenticated`, `Forbidden` |
 | `jane_kit.auth_scopes` | scope кожної операції кожного контракту (`COLLECTOR`, `HANDLER`, `STORAGE`, `LLM`, `ASSISTANT`, `REGISTRY`, `ORCHESTRATOR`), `merge()` для сервісу з кількома API | `contracts/openapi/*.v1.yaml` |
@@ -170,7 +170,9 @@ resolved.effective()  # {"limits": {...}, "provenance": {"crawl.max_depth": "tas
 попереднього формату без оренди дається одна оренда «пільги», після чого вони завершуються як осиротілі.
 
 `LeaseLimits` (типово): `in_progress_lease_ms` 900000, `job_lease_ms` 60000, `heartbeat_interval_ms` 15000 — для
-сервісів без власної групи; handler-runtime, assistant, registry зберігають свої налаштування оренд.
+сервісів без власної групи (llm: `limits.state`); `ClaimLimits` — лише оренда «захоплень» ключів і heartbeat
+(оркестратор: `limits.claims`); handler-runtime, assistant, registry зберігають свої налаштування оренд, колектори —
+`<ПРЕФІКС>IDEMPOTENCY_LEASE_MS`.
 `heartbeat_loop([store.heartbeat, ...], interval_s)` — фонова задача поновлення.
 
 ## Тести

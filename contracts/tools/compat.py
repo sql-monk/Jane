@@ -18,7 +18,9 @@ at --base (default: main) and reports:
 Direction matters: request bodies and parameters must not narrow; response bodies must not lose
 guaranteed fields; standalone schemas (used both ways, e.g. Material) are checked in both
 directions. Exit code 1 if any BREAKING finding. With --oasdiff also runs `oasdiff breaking`
-(binary on PATH or the tufin/oasdiff Docker image) for every OpenAPI document.
+(binary on PATH or the tufin/oasdiff Docker image) for every OpenAPI document; a document it does
+not pass (ERR-level change, or oasdiff itself failed) also gives exit code 1. Without both oasdiff
+and Docker that step is skipped with a note.
 """
 
 from __future__ import annotations
@@ -250,8 +252,10 @@ def export_base(base: str, dest: Path) -> list[str]:
     return files
 
 
-def run_oasdiff(base_root: Path, names: list[str]) -> list[str]:
+def run_oasdiff(base_root: Path, names: list[str]) -> tuple[list[str], int]:
+    """Output lines and the number of documents for which `oasdiff breaking --fail-on ERR` did not pass."""
     out = []
+    failed = 0
     binary = shutil.which("oasdiff")
     docker = shutil.which("docker")
     for name in names:
@@ -263,11 +267,12 @@ def run_oasdiff(base_root: Path, names: list[str]) -> list[str]:
             cmd = [docker, "run", "--rm", "-v", f"{base_root / 'contracts'}:/base:ro", "-v", f"{CONTRACTS_DIR}:/rev:ro",
                    "tufin/oasdiff", "breaking", f"/base/openapi/{name}", f"/rev/openapi/{name}", "--fail-on", "ERR"]
         else:
-            return ["oasdiff: skipped (neither oasdiff nor docker found)"]
+            return ["oasdiff: skipped (neither oasdiff nor docker found)"], 0
         proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
         status = "ok" if proc.returncode == 0 else f"exit {proc.returncode}"
+        failed += proc.returncode != 0
         out.append(f"oasdiff {name}: {status}\n{(proc.stdout + proc.stderr).strip()}")
-    return out
+    return out, failed
 
 
 def compare_trees(base_root: Path, base_files: list[str]) -> Comparator:
@@ -356,12 +361,16 @@ def main() -> int:
         warnings = [f for f in comp.findings if f.severity == "WARNING"]
         for f in breaking + warnings:
             print(f"{f.severity:8} {f.where}: {f.message}")
+        oasdiff_failed = 0
         if args.oasdiff:
             names = sorted({Path(f).name for f in base_files if f.startswith("contracts/openapi/") and f.endswith(".v1.yaml")})
-            for line in run_oasdiff(base_root, names):
+            lines, oasdiff_failed = run_oasdiff(base_root, names)
+            for line in lines:
                 print(line)
         print(f"\n{len(breaking)} breaking, {len(warnings)} warning(s).")
-        return 1 if breaking else 0
+        if oasdiff_failed:
+            print(f"oasdiff: {oasdiff_failed} document(s) did not pass `oasdiff breaking --fail-on ERR`.")
+        return 1 if breaking or oasdiff_failed else 0
 
 
 if __name__ == "__main__":

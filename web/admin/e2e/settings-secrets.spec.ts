@@ -20,7 +20,9 @@ test.describe("connections, LLM, limits and secrets @mock", () => {
     await fulfillJson(admin, "/api/orchestrator/v1/connections", list);
     await fulfillJson(admin, "/api/orchestrator/v1/connections/results-pg", list.items[0]);
     await admin.goto("/connections");
-    await expect(admin.getByRole("table", { name: "Підключення" })).toContainText("env:JANE_SECRET_RESULTS_PG_PASSWORD");
+    await expect(admin.getByRole("table", { name: "Підключення" })).toContainText(
+      "env:JANE_SECRET_RESULTS_PG_PASSWORD",
+    );
     await expectNoSecretLeak(admin, LEAKED);
     await admin.getByRole("button", { name: "results-pg" }).click();
     await expect(admin.getByLabel("connection_id")).toHaveValue("results-pg");

@@ -22,10 +22,17 @@ Harness — [`deploy/profiles/harness/limits_harness.py`](../../deploy/profiles/
 
 | L3 | паралельні запити до хоста | сторінки відповідають через `slow_ms`, частота знята запитом | запитів «у польоті» ≤ `max_parallel_fetches_per_host` | паралельність не використовується; ефективне значення ≠ профіль |
 | L4 | повтори, `Retry-After`, тайм-аут | 503 N разів → 200; 429 + `Retry-After`; сторінка довша за `request_timeout_ms` | кількість спроб = `min(N+1, max_attempts)`; проміжки ≥ ½ номінального backoff; 429 чекає `Retry-After`; тайм-аут: `max_attempts` спроб, кожна не коротша за 0,95·`request_timeout_ms`, код `source_unavailable` | проміжки не довші за backoff + інтервал + 2 с; спроба завершується близько тайм-ауту |
-| L5 | backpressure | 60 сторінок, `max_unacked_materials` = 5, споживач мовчить | запитано ≤ cap + `max_parallel_fetches`; `unacked` ≤ cap + паралельність − 1; `paused_by_backpressure`; після споживання — усі матеріали, `succeeded` | `unacked` > cap |
+| L5 | backpressure | **один збір**: 60 сторінок, `max_unacked_materials` = 5, споживач мовчить | запитано ≤ cap + `max_parallel_fetches` цього збору; `unacked` ≤ cap + паралельність − 1; `paused_by_backpressure`; після споживання — усі матеріали, `succeeded` | `unacked` > cap |
 | L6 | пісочниця | handler-runtime з профілем як `LIMITS_FILE`, службовий пакет `harness.sandbox-probe` (inline), ліміти профілю ще й у запиті, як від оркестратора | 5 холодних стартів без тайм-аутів, p95 ≤ частка `wall_time_ms`; сон > `wall_time_ms` → `timeout`; `memory_mb` + 256 МБ → `resource_exceeded`; одночасних пісочниць ≤ `max_parallel_invocations` | примусова зупинка пізніше ніж `wall_time` + 30 с; `/v1/info` runtime: `limits.profile` ≠ профіль або `limits.defaults.concurrency.max_parallel_invocations` ≠ профіль |
 | L7 | ресурси стеку | `docker stats` контейнерів проєкту кожні N с, `docker inspect` | пік сумарної пам'яті ≤ порога; жодного OOM-kill і рестарту | — |
 | L8 | наскрізно | [`examples/jane_examples.py`](../../examples/README.md) на тому самому стеку | `verify` прикладу `ok` | каталог і перевірка цін довші за поріг |
+
+Область дії лімітів у сценаріях. `concurrency.max_parallel_fetches` — межа **одного збору** Web Collector (кожен збір
+бере до стількох завантажень одночасно), а не екземпляра: два збори L2 разом можуть мати до 2 × `max_parallel_fetches`
+завантажень, і між зборами їх узгоджує лише спільний ліміт на хост (`max_parallel_fetches_per_host`, `rate.*_per_host` — для всіх
+зборів, fetch і екземплярів зі спільним каталогом стану). Тому межа L5 `cap + max_parallel_fetches` стосується
+одного збору; для кількох одночасних зборів вона множиться на їх кількість (див.
+[`deploy/profiles/README.md`](../../deploy/profiles/README.md), «Область дії `concurrency`»).
 
 Сусідня пара проміжків ловить короткий локальний сплеск, навіть коли сумарний темп за секунду
 ще в межі. Кількісна межа на проміжки < ½ інтервалу відхиляє регулярні близькі пари

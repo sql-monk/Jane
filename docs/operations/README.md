@@ -42,9 +42,12 @@
    `JANE_STACK_AUTH_ADMIN_API_KEY`), без токена відповідає лише `/v1/health` (і `/metrics`).
 4. Ліміти сервісу — типові значення з README сервісу, `<ПРЕФІКС>_LIMITS__<ГРУПА>__<ПОЛЕ>` або
    `<ПРЕФІКС>_LIMITS_FILE`. Увесь профіль `deploy/profiles/<profile>.json` як `LIMITS_FILE` приймає **кожен**
-   сервіс (storage, handler-runtime, registry, llm, assistant — з WP-01b): ліміти, яких сервіс не має,
-   ігноруються з рядком журналу старту, опечатка — помилка старту (колектори поки ігнорують і опечатки,
-   запит WP-01b до WP-02/WP-04); `GET /v1/info` → `limits.profile`.
+   сервіс (storage, handler-runtime, registry, llm, assistant — з WP-01b, колектори — з R20, WP-16): ліміти,
+   яких сервіс не має, ігноруються з рядком журналу старту, опечатка — помилка старту в усіх сервісах;
+   `GET /v1/info` → `limits.profile`. Контрактний `retries` профілю storage не бере (це політика викликача):
+   повтори при `CONFLICT` — власна група `limits.conflict_retries` storage (WP-17).
+   `concurrency.max_parallel_fetches` діє на **один збір** колектора, а не на екземпляр
+   (`deploy/profiles/README.md`, «Область дії `concurrency`»).
    orchestrator бере файл лише для першого заповнення документа лімітів у БД. Змінні
    `<ПРЕФІКС>_LIMITS__<ГРУПА>__<ПОЛЕ>` перекривають файл. Тайм-аут виклику моделі llm — власний ліміт
    `provider.request_timeout_ms` (типово 120 000), профіль його не змінює; для повільної моделі —

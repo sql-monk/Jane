@@ -102,6 +102,7 @@ _CONTRACT_LIMITS: dict[str, tuple[str, ...]] = {
         "budget.period",
         "max_improvement_attempts",
         "max_onboarding_samples",
+        "min_onboarding_confidence",
     ),
     "transfer": (
         "inline_max_bytes",

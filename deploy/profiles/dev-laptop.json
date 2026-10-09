@@ -63,7 +63,8 @@
         "period": "day"
       },
       "max_improvement_attempts": 3,
-      "max_onboarding_samples": 60
+      "max_onboarding_samples": 60,
+      "min_onboarding_confidence": 0.8
     },
     "transfer": {
       "inline_max_bytes": 262144,

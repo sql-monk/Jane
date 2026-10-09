@@ -75,7 +75,7 @@ from jane_e2e.stack import SANDBOX_PROJECT_LABEL, E2EStack
 from jane_e2e.steps import sandbox_limits
 from jane_e2e.verify import assert_effects_once, entities, objects_by_source
 from jane_extractor_sdk.package import build_archive
-from jane_llm.providers.fake import HOLD_LOG_MESSAGE  # type: ignore[import-untyped]
+from jane_llm.providers.fake import HOLD_LOG_MESSAGE
 from jane_telegram_collector.recorded import Recording  # type: ignore[import-untyped]
 
 pytestmark = [pytest.mark.e2e, pytest.mark.milestone("M2"), pytest.mark.criteria(8)]

@@ -43,7 +43,7 @@ uv **0.12.13**. `uv workspace list` у корені бачить 19 пакеті
 Спроба локального `workspace = true` для `jane-contracts` дає:
 
 ```text
-$ uv lock                                      (.jane/wp23b-lock-debug.txt)
+$ uv lock --no-cache --verbose                 (.jane/wp23b-lock-no-cache.txt)
 Using CPython 3.12.12
   × Failed to build `jane-storage-files @
   │ file:///C:/repos/Jane/.claude/worktrees/wp23b/services/storage/adapters/files`
@@ -208,6 +208,9 @@ PEP 723-залежності інструментів контрактів і в
   адаптерів описують кореневі `just up` / `just integration` / `just down`, які використовують
   root workspace; їхні CLI-аргументи не змінені. Нова централізована source-конфігурація призначена
   для root workspace та наявних frozen Docker build, які перевірені вище.
+- `services/storage/README.md:253` досі має старий path-override `jane-contracts`: копіювання цього
+  рядка у новий адаптер знову спричинить `Workspace members must be declared as workspace sources`.
+  Власник README має прибрати рядок; точний запит нижче. Автор C-2 цей чужий шлях не редагував.
 - Docker packaging перевірено на трьох класах build-контексту, а не на кожному сервісному образі;
   решта образів і весь e2e — фінальний CI інтеграції координатора. Повний `just check` і `just e2e`
   локально не запускалися.
@@ -222,5 +225,5 @@ PEP 723-залежності інструментів контрактів і в
 
 | Кому | Що потрібно | Навіщо |
 |---|---|---|
-| Власник `services/storage/README.md` / координатор | Оновити приклад pyproject адаптера в розділі «Адаптери»: прибрати рядок path-джерела `jane-contracts`, послатися на root source inheritance з DEVELOPMENT. Рядок path-джерела `jane-storage` зберегти | README поза шляхами C-2; старий override для `jane-contracts` тепер суперечить workspace membership |
+| Власник `services/storage/README.md` / WP-19 / координатор | У рядку 253 прикладу pyproject адаптера в розділі «Адаптери» прибрати `jane-contracts = { path = "../../../../contracts/python", editable = true }`, послатися на root source inheritance з DEVELOPMENT. Рядок path-джерела `jane-storage` зберегти | README поза шляхами C-2; копіювання старого override дає workspace/path conflict |
 | Координатор C | Призначити незалежного wp-reviewer; після прийняття злити інкремент та виконати один узгоджений фінальний workflow_dispatch інтеграції | Review та CI — умови прийняття, локальні targeted gates їх не підміняють |

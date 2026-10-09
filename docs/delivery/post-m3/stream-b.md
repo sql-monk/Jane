@@ -20,7 +20,7 @@ checkout потоку A. `main` і force push не використовують�
 
 | Завдання | Гілка / worktree | Стан |
 |---|---|---|
-| B-1: матриця й сценарії | `wp/22a-acceptance-matrix`, `wp22a` | accepted; `a967228` (документи) |
+| B-1: матриця й сценарії | `wp/22a-acceptance-matrix`, `wp22a` | accepted; `a967228` + `d969ca3` (документи) |
 | B-2: решта real-адмінки | `wp/22b-admin-real-coverage`, `wp22b` | accepted; `ffc6914`, review 1 |
 | B-3: дві репліки й L2 | `wp/22c-shared-host-replicas`, `wp22c` | accepted; `753f3e9`, review 1 |
 | B-4: приклад info з limits | `wp/22d-assistant-info-example`, `wp22d` | accepted; `256334c`, review 1, compatible |
@@ -498,3 +498,98 @@ Windows Edge teardown завис після всіх чотирьох ok; пер
 Product/backend defects поза ownership не виявлено. Потрібні незалежний reviewer і CI verdict перед прийманням; full integration CI виконує координатор.
 
 CI snapshot: https://github.com/sql-monk/Jane/actions/runs/37914973286 — in_progress, exact head ffc691423ea16463c1665af177ff7164cca8ee67.
+
+
+### Оновлення CI B-2
+
+[37914973286](https://github.com/sql-monk/Jane/actions/runs/37914973286), SHA `ffc691423ea16463c1665af177ff7164cca8ee67`: **completed / success**.
+
+## B-1: оновлення матриці після B-2 (accepted)
+
+Злиття: `c15a78e545e4eb81fa0c988b7e025c7e6f0f7a00`; документи без коду, тести й рев’ю не потрібні.
+
+
+Дата: 2026-10-09. Гілка: `wp/22f-acceptance-admin-followup`. База: `ba4c75a7fe1a132348e3d562a1330f2813183b66`.
+Коміт: `d969ca3286ed2fca582e83a9af877137ec2f42cb`; push власної гілки виконано.
+Worktree: `C:/repos/Jane/.claude/worktrees/wp22f`; `.jane-wp = 22`. Стан: готово до інтеграції координатором.
+
+### Результат
+
+- Оновлено лише `docs/acceptance/matrix.md` та `docs/acceptance/scenarios.md`: розділи «Після M3», S-M2-10 і рядок цього сценарію.
+- WP-20 лишився історичним доказом: 25 повністю / 0 частково / 1 навмисний мок із 26; real18, повний 18 passed на 3a3251c та адресні контролі на df7f252.
+- Прийнятий B-2 на ffc691423ea16463c1665af177ff7164cca8ee67: додано 4 @hybrid; структурний набір 22, локально виконано лише нові 4. Нового виконання тестів цей документальний інкремент не містить.
+- Mapping звірено з історичною таблицею WP-20, accepted-звітом B-2 та readonly кодом hybrid-post-m3.spec.ts: scenario 1 закриває №30/31 (human note + group RAW object_ids), scenario 2 — №33 (run-page manual object_ids/observation_ids), scenario 3 — gap package_id/status у №29, scenario 4 — №32 (retry_scheduled/available_at і claim не раніше цього часу). Чотири історично partial №30–33 і gap №29 більше не позначено актуальними mock-only межами.
+- Додано посилання на stream-b.md#b-2-accepted і CI37914973286. Readonly gh повернув completed / success на exact ffc691423ea16463c1665af177ff7164cca8ee67. Branch CI не представлено доказом повного real22; повний інтеграційний CI потоку очікується після B-5.
+- Локальне обмеження B-2 прозоре: Windows Edge завис після 4 ok; лише власний worker завершено вручну, Playwright після цього надрукував 4 passed (3.3m) та вийшов 0. Штатне завершення браузера не оголошено підтвердженим. Cleanup B-2: 0 контейнерів / томів / мереж власного project.
+- Блоки «Фінальна ревізія» M3 побайтово незмінні; принципи й усе після S-M2-11 у scenarios.md незмінні, зокрема обходи S-M3-02.
+- Коміт англійською із [skip ci] та Co-authored-by: Codex <noreply@openai.com>. Журнал потоку не редагувався; координатор переносить цей звіт.
+
+### Перевірки та справжній вивід
+
+Документи без коду: тести й незалежне рев’ю не запускались за спільними правилами post-m3/README.md. Contracts не змінювались; compatibility pass не застосовується.
+
+```text
+$ git branch --show-current
+wp/22f-acceptance-admin-followup
+$ git rev-parse HEAD
+d969ca3286ed2fca582e83a9af877137ec2f42cb
+$ python -X utf8 .claude/hooks/jane_wp.py check-diff ba4c75a7fe1a132348e3d562a1330f2813183b66
+WP-22: 2 changed file(s), 0 outside ownership
+exit=0
+
+$ git diff --check ba4c75a7fe1a132348e3d562a1330f2813183b66 HEAD
+(виводу немає)
+exit=0
+
+$ git diff --stat ba4c75a7fe1a132348e3d562a1330f2813183b66 HEAD
+ docs/acceptance/matrix.md    | 37 +++++++++++++++++++++++++--------
+ docs/acceptance/scenarios.md | 49 +++++++++++++++++++++++++++++++++++---------
+ 2 files changed, 67 insertions(+), 19 deletions(-)
+
+$ gh run view 37914973286 --repo sql-monk/Jane --json status,conclusion,headSha,headBranch,url
+{"conclusion":"success","headBranch":"wp/22b-admin-real-coverage","headSha":"ffc691423ea16463c1665af177ff7164cca8ee67","status":"completed","url":"https://github.com/sql-monk/Jane/actions/runs/37914973286"}
+exit=0
+
+$ git push -u origin wp/22f-acceptance-admin-followup
+branch 'wp/22f-acceptance-admin-followup' set up to track 'origin/wp/22f-acceptance-admin-followup'.
+remote:
+remote: Create a pull request for 'wp/22f-acceptance-admin-followup' on GitHub by visiting:
+remote:      https://github.com/sql-monk/Jane/pull/new/wp/22f-acceptance-admin-followup
+remote:
+To https://github.com/sql-monk/Jane.git
+ * [new branch]      wp/22f-acceptance-admin-followup -> wp/22f-acceptance-admin-followup
+exit=0
+
+$ git status --short
+(виводу немає)
+exit=0
+```
+
+Побайтове порівняння історичних блоків із базою через git show та UTF-8 Buffer.equals:
+
+```json
+{
+  "historicalBlocks": [
+    {
+      "path": "docs/acceptance/matrix.md",
+      "bytes": 2343,
+      "sha256": "1748f25c2ff94254e70cdf8935435523e3306012dad199195918d939173e0479",
+      "identical": true
+    },
+    {
+      "path": "docs/acceptance/scenarios.md",
+      "bytes": 424,
+      "sha256": "2af4ebc2be7699092509d46c84f6294e1f72952c3379943a39c280bd9e75d2ec",
+      "identical": true
+    }
+  ],
+  "principlesUnchanged": true,
+  "afterS_M2_11Unchanged": true
+}
+```
+
+Артефакти: `.jane/wp22f-check-diff.txt`, `.jane/wp22f-diff-check.txt`, `.jane/wp22f-stat.txt`, `.jane/wp22f-ci-summary.json`, `.jane/wp22f-history-check.txt`, `.jane/wp22f-commit.txt`, `.jane/wp22f-push.txt`.
+
+### Запити до інших власників
+
+Нових немає. Повний gate і B-5 веде координатор; main/merge/force не виконувались.

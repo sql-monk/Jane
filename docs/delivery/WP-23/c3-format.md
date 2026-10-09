@@ -104,11 +104,54 @@ WP-23: 3 changed file(s), 0 outside ownership
 exit=0
 ```
 
+## Додаткові gates contract-guardian
+
+Вимоги `.claude/agents/contract-guardian.md` перевірено на тому самому коді C-3 (`b4f966b`):
+обов'язковий Redocly та oasdiff щодо `main` (`37a30e294745a9001ff2f57c87c1013bfe087414`).
+Нових змін коду немає. Журнали: `.jane/wp23c-redocly.txt` і `.jane/wp23c-compat-main-oasdiff.txt`.
+
+```text
+$ uv run --script contracts/tools/check_contracts.py --require-redocly
+[ok] JSON Schema meta-validation and $refs
+[ok] OpenAPI 3.1 validation
+[ok] Jane API conventions and inline examples
+[ok] Standalone schema examples
+[ok] Python interfaces compile
+[ok] Mock server can serve every operation
+[ok] Autonomous APIs do not reference orchestrator/assistant contracts
+[ok] Redocly lint: ok (Woohoo! Your API descriptions are valid. 🎉)
+
+Checked: autonomy_checked_apis=5, invalid_examples=13, mock_routes=118, openapi_documents=8, openapi_examples=532, operations=118, python_files=3, schema_examples=46, schemas=16
+All contract checks passed.
+exit=0
+
+$ uv run --script contracts/tools/compat.py --base main --oasdiff
+Base: main (24 contract files); working tree: 24 files; added: 0
+oasdiff: docker image tufin/oasdiff:v1.33.0@sha256:6263a96dd2ef0726c54e21fea9b8e1607eac4841add0079324b424c1f52b819c (pinned default)
+oasdiff assistant.v1.yaml: ok
+No changes detected
+oasdiff collector.v1.yaml: ok
+No changes detected
+oasdiff handler.v1.yaml: ok
+No changes detected
+oasdiff llm.v1.yaml: ok
+No changes detected
+oasdiff orchestrator.v1.yaml: ok
+No changes detected
+oasdiff registry.v1.yaml: ok
+No changes detected
+oasdiff storage.v1.yaml: ok
+No changes detected
+
+0 breaking, 0 warning(s).
+exit=0
+```
+
 ## Відомі обмеження й неперевірені інтеграції
 
 Повні `just check` та e2e локально не запускалися відповідно до обов'язкових правил потоків.
-Повний CI після злиття проводить координатор. Redocly та oasdiff окремо не запускалися;
-зміни схем і OpenAPI відсутні. Нові тести не додавалися: малу зміну охоплення перевірено
+Повний CI після злиття проводить координатор. Зміни схем і OpenAPI відсутні.
+Нові тести не додавалися: малу зміну охоплення перевірено
 реальним Ruff, а наявні тести команд розробника виконано повністю.
 
 ## Запити до інших власників

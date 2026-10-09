@@ -193,6 +193,21 @@ class Session:
             out["error"] = self.error
         return out
 
+    def summary(self) -> dict[str, Any]:
+        """``OnboardingSessionSummary`` (``listOnboardingSessions``)."""
+        full = self.wire()
+        out: dict[str, Any] = {k: full[k] for k in ("session_id", "status", "query", "created_at")}
+        for k in ("selected_candidate_id", "costs", "job_id", "error"):
+            if k in full:
+                out[k] = full[k]
+        out["proposal_count"] = len(self.proposals)
+        return out
+
+    @property
+    def position(self) -> tuple[str, str]:
+        """Sort key of the list (newest first): ``created_at`` (fixed ``%Y-%m-%dT%H:%M:%SZ``), ``session_id``."""
+        return (self.created_at, self.session_id)
+
 
 def _plan_doc(p: ExtractorPlan) -> dict[str, Any]:
     return {
@@ -236,6 +251,11 @@ class SessionStore(Protocol):
     async def get(self, session_id: str) -> Session | None: ...
     async def save(self, session: Session) -> None: ...
     async def save_if(self, session: Session, expected: int) -> bool: ...
+    async def page(
+        self, *, statuses: frozenset[str] | None, after: tuple[str, str] | None, limit: int
+    ) -> list[Session]:
+        """Newest first by :attr:`Session.position`, strictly after the ``after`` position (the cursor)."""
+        ...
 
 
 class InMemorySessionStore:
@@ -260,6 +280,21 @@ class InMemorySessionStore:
             return False
         await self.save(session)
         return True
+
+    async def page(
+        self, *, statuses: frozenset[str] | None, after: tuple[str, str] | None, limit: int
+    ) -> list[Session]:
+        rows = sorted(((doc["created_at"], sid), version, doc) for sid, (version, doc) in self._items.items())
+        out: list[Session] = []
+        for position, version, doc in reversed(rows):
+            if after is not None and position >= after:
+                continue
+            if statuses and doc["status"] not in statuses:
+                continue
+            out.append(Session.from_doc(copy.deepcopy(doc), version))
+            if len(out) >= limit:
+                break
+        return out
 
 
 Progress = Callable[[int, str], Awaitable[None]]
@@ -300,6 +335,19 @@ class OnboardingService:
         if session is None:
             raise NotFound(f"onboarding session {session_id} not found")
         return await self._refresh(session)
+
+    async def page(
+        self, statuses: frozenset[str] | None, after: tuple[str, str] | None, limit: int
+    ) -> tuple[list[Session], tuple[str, str] | None]:
+        """One page of ``listOnboardingSessions`` (newest first) and the position after it (``None`` = last page).
+
+        Running sessions are refreshed like ``GET`` (a job that ended without its handler updating the session),
+        so the list never shows a session as running whose job already failed or was cancelled."""
+        found = await self.store.page(statuses=statuses, after=after, limit=limit + 1)
+        sessions = [await self._refresh(s) if s.status in RUNNING else s for s in found[:limit]]
+        if statuses:
+            sessions = [s for s in sessions if s.status in statuses]
+        return sessions, (found[limit - 1].position if len(found) > limit else None)
 
     async def select(self, session_id: str, candidate_id: str) -> Session:
         session = await self.get(session_id)
@@ -475,7 +523,13 @@ class OnboardingService:
         )
         source_id = slug(host or cand.telegram_username or session.query)
         llm = LlmSession(
-            self.nb.llm, limits.llm, "onboarding", session.session_id + (session.job_id or ""), source_id=None
+            self.nb.llm,
+            limits.llm,
+            "onboarding",
+            session.session_id + (session.job_id or ""),
+            source_id=None,
+            run_id=session.session_id,  # one onboarding run = the session, whichever job continues it
+            mode=self.settings.llm_completion_mode,
         )
 
         async def progress(done: int, message: str) -> None:

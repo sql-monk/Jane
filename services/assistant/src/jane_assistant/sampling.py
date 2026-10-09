@@ -203,6 +203,7 @@ async def sample_source(
 ) -> SampleResult:
     ob = limits.onboarding
     max_samples = limits.llm.max_onboarding_samples
+    min_confidence = limits.llm.min_onboarding_confidence  # contract limits.llm (R08, WP-15)
     fetch_bound = max_samples * ob.fetch_ratio
     request: dict[str, Any] = {
         "source_kind": source_kind,
@@ -264,7 +265,7 @@ async def sample_source(
                     samples,
                     ob.min_examples_per_type,
                     len(reserve),
-                    ob.min_confidence,
+                    min_confidence,
                     ob.min_distinct_types,
                 )
                 if not ended and not items and empty_polls >= ob.max_empty_polls:
@@ -278,7 +279,7 @@ async def sample_source(
                 unseen_shape = any(s.shape not in shapes for s in reserve)
                 if samples and not unseen_shape and not ended:
                     continue
-            if confidence >= ob.min_confidence and ended and not unseen_shape:
+            if confidence >= min_confidence and ended and not unseen_shape:
                 break
             if not reserve:
                 message = message or (
@@ -294,9 +295,7 @@ async def sample_source(
                 fetched = len(samples) + len(reserve)
                 batch_size = min(len(reserve), room, ob.sample_batch_size)
                 distinct = len({s.material_type for s in samples})
-                risk_confidence = 1.0 - (1.0 - ob.min_confidence) / max(
-                    1, ob.min_distinct_types - distinct + 1
-                )
+                risk_confidence = 1.0 - (1.0 - min_confidence) / max(1, ob.min_distinct_types - distinct + 1)
                 # Smallest next batch that could meet the threshold if its classifications
                 # resolve the current rare types. Re-evaluate after that batch.
                 if mean > 0:
@@ -304,7 +303,7 @@ async def sample_source(
                         optimistic = mean * (
                             1.0 - unseen_risk(len(samples) + additional, fetched, risk_confidence)
                         )
-                        if optimistic >= ob.min_confidence:
+                        if optimistic >= min_confidence:
                             batch_size = additional
                             break
             else:
@@ -323,14 +322,14 @@ async def sample_source(
                 samples,
                 ob.min_examples_per_type,
                 len(reserve),
-                ob.min_confidence,
+                min_confidence,
                 ob.min_distinct_types,
             )
             await progress(len(samples), f"sampled {len(samples)}, confidence {confidence:.2f}")
             # A high score over classified pages says nothing about types in later pages.
             # Only a closed stream with all observed URL shapes represented confirms diversity.
             unseen_shape = any(s.shape not in shapes for s in reserve)
-            if confidence >= ob.min_confidence and ended and not unseen_shape:
+            if confidence >= min_confidence and ended and not unseen_shape:
                 break
             if len(samples) >= max_samples:
                 message = f"reached limits.llm.max_onboarding_samples={max_samples} with confidence {confidence:.2f}"
@@ -344,7 +343,7 @@ async def sample_source(
         await collector.cancel(collection_id)
     sufficient = (
         message is None
-        and confidence >= ob.min_confidence
+        and confidence >= min_confidence
         and ended
         and not any(s.shape not in shapes for s in reserve)
     )

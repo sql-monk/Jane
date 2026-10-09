@@ -40,7 +40,14 @@ async def run_unknown(
         decode_text(raw, (material.get("format") or {}).get("charset")), limits.unknown.max_sample_chars
     )
     llm = LlmSession(
-        nb.llm, limits.llm, "unknown_material", job_id, source_id=req["source_id"], task_id=req.get("task_id")
+        nb.llm,
+        limits.llm,
+        "unknown_material",
+        job_id,
+        source_id=req["source_id"],
+        task_id=req.get("task_id"),
+        run_id=job_id,
+        mode=settings.llm_completion_mode,
     )
     try:
         out = await llm.ask(

@@ -52,16 +52,28 @@ def test_whole_profile_is_accepted_and_its_llm_limits_apply(
     assert lim.llm.max_input_tokens_per_request == want["llm"]["max_input_tokens_per_request"]
     assert lim.llm.max_output_tokens_per_request == want["llm"]["max_output_tokens_per_request"]
     assert lim.llm.budget.model_dump() == want["llm"]["budget"]
-    # provider calls are declared as contract timeouts.* / retries, so the profile governs them too
+    # provider calls: connection and retries are the contract's timeouts.connect_timeout_ms / retries (the profile
+    # sets them); one model call has the gateway's own timeout, not the profile's web-sized one (R12, WP-15)
     assert lim.provider.connect_timeout_ms == want["timeouts"]["connect_timeout_ms"]
-    assert lim.provider.request_timeout_ms == want["timeouts"]["request_timeout_ms"]
+    assert lim.provider.request_timeout_ms == 120_000 != want["timeouts"]["request_timeout_ms"]
     assert lim.provider.retries.model_dump() == want["retries"]
+    assert "timeouts.request_timeout_ms" in resolved.ignored
     assert lim.jobs.job_retention_seconds == want["transfer"]["job_retention_seconds"] != 86_400
     assert lim.gateway.default_max_output_tokens == 1_024  # service-only limits keep their defaults
     applied, wanted = leaves(resolved.platform_limits()["defaults"]), leaves(want)
     assert {p: applied[p] for p in applied} == {p: wanted[p] for p in applied}
     assert set(resolved.ignored) == set(wanted) - set(applied)
     assert {"llm.max_onboarding_samples", "sandbox.memory_mb", "crawl.max_depth"} <= set(resolved.ignored)
+
+
+def test_provider_call_timeout_is_set_only_by_the_service(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``provider.request_timeout_ms`` is internal: a profile cannot shorten it, the service's variable can."""
+    monkeypatch.setenv("JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS", "300000")
+    resolved = resolve_service_limits(settings)
+    assert resolved.limits.provider.request_timeout_ms == 300_000
+    assert "request_timeout_ms" not in resolved.platform_limits()["defaults"].get("timeouts", {})
 
 
 def test_profile_hard_caps_bound_the_request(

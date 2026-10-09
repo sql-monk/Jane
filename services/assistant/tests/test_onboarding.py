@@ -103,6 +103,8 @@ def test_new_source_by_name_to_proposals_package_and_tests(w: World) -> None:
     for req in w.llm.requests:
         assert "IGNORE ALL PREVIOUS" not in req["instructions"]
         assert req["scope"]["purpose"] == "onboarding"
+        assert req["scope"]["run_id"] == sid  # the session is the run of a period=run budget (R13)
+        assert req["limits"]["budget"] == {"amount": 2.0, "currency": "USD", "period": "run"}
     assert any(INJECTION[:40] in p.get("text", "") for req in w.llm.requests for p in req["data"])
 
     acc = w.api.post(

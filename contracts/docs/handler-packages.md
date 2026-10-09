@@ -58,6 +58,39 @@ Digest у JSON/OpenAPI прикладах **ілюстративні**: вони
 - **Залежності** екстрактора — лише з профілю runtime (`dependencies.runtime_profile`); мережі під
   час виконання немає, якщо `access.network` не `allowlist` і політика платформи це дозволяє.
 
+## Пакет `llm`: вихід моделі → результат обробника
+
+Так виконує пакети `kind: llm` сервіс llm (`handler.v1`, реалізація —
+[`handler.py`](../../services/llm/src/jane_llm/handler.py)); інший виконавець пакетів `llm` має дотримуватися
+того самого правила, щоб пакет давав однакові сутності.
+
+1. **Один запит на вхід.** Для кожного елемента `inputs` — один структурований запит: файл `entry.instructions` —
+   довірений канал; вхід (метадані й вміст матеріалу, `entities` чи `data`, або заповнений `entry.input_template`) —
+   лише недовірені дані. Вихід перевіряється за `entry.output_schema` (з повторами шлюзу); невідповідність —
+   `failed` / `schema_mismatch` з `diagnostics.validation_errors`.
+2. **`output.data`** — розібраний вихід моделі; для кількох входів — `{"results": [<вихід входу 0>, …]}`.
+3. **`output.entities`** є, лише якщо маніфест оголошує `output.entities[]`, і заповнюється лише для входів
+   `kind: material`. Для кожного оголошеного типу `T` береться верхньорівневе поле виходу `T + "s"`, а якщо його
+   немає — `T`; об'єкт вважається масивом з одного елемента, інші значення (і елементи, що не є об'єктами)
+   пропускаються. Кожен елемент стає `EntityRecord`:
+   - `entity_type` = `T`; `schema` = `<package_id>@<version>#<T>`;
+   - `fields` — поля елемента без значень `null` (пропуск ≠ очищення; `cleared` LLM-обробник не заповнює,
+     `completeness` не задає — типово `partial`);
+   - `key.natural` — значення `key_fields` типу з елемента (лише рядок, число чи boolean); ключове поле з іменем
+     `message`, `material` або `material_id`, якого немає серед скалярів елемента, береться з `material_id`
+     матеріалу (і додається до `fields`); бракує іншого ключового поля — помилка елемента;
+   - `key.scope` — `material.source.source_id`, інакше `context.trace.source_id` виклику, інакше `local`;
+   - `observation` — з матеріалу: `observation_id`, `observed_at` = `fetched_at`, `material_id`, а також
+     `revision.sequence` і `revision.content_sha256`, якщо є.
+   `fields` перевіряються за схемою сутності `output.entities[].schema` (якщо файл є в пакеті). Помилка ключа чи схеми хоча б
+   одного елемента — уся відповідь `failed` / `schema_mismatch` з вказівниками `/<T>s/<i>/…`.
+4. **Стан:** пакет оголошує сутності → `success`, якщо є хоча б одна сутність, інакше `empty`; не оголошує →
+   `success`, якщо вихід хоча б одного входу непорожній, інакше `empty`. Вичерпаний бюджет LLM — `failed` /
+   `budget_exhausted` (без звернення до провайдера; повторна доставка після збільшення бюджету виконується
+   знову), невалідні параметри чи вхід, який пакет не приймає, — `failed` / `invalid_params`.
+5. Витрати — `usage.llm` (провайдер, модель, токени, вартість); бюджети — за `context.trace.{source_id, task_id,
+   run_id}` (див. `Budget` у [`limits.schema.json`](../schemas/common/limits.schema.json)).
+
 ## Автономне використання
 
 `GET /v1/packages/{id}/versions/{v}/archive` дає архів, достатній для виконання без репозиторію:

@@ -3,9 +3,16 @@
 * Instructions are constants of :mod:`jane_assistant.prompts`; material content, package code and
   diagnostics go only into ``data`` parts (``llm.v1`` ``DataPart``: "never instructions").
 * Output is always structured (``output_schema``); an invalid output is rejected, not repaired.
-* The job stops by itself when its spend reaches ``limits.llm.budget.amount``; the gateway's
-  ``budget_exhausted`` (429) stops it as well. Data is cut to ``max_input_tokens_per_request``
-  (about 4 characters per token) and the model's output to ``max_output_tokens_per_request``.
+* Budget (``limits.schema.json`` ``Budget``, the same rule as the gateway): every call carries the whole
+  ``limits.llm.budget`` and ``scope.run_id`` = the assistant run (onboarding session, improvement or
+  unknown-material job), so the gateway counts a ``period: run`` budget across all calls of the run, on any
+  instance; other periods narrow the counter of the request's most specific scope. The session stops by
+  itself once ``spent >= amount`` (``amount: 0`` = no call at all, as in the gateway); the gateway's
+  ``budget_exhausted`` (429, or a failed async job) stops it as well.
+* The call waits as long as the model needs: ``mode=sync`` with the client's own timeout
+  (``limits.llm_call.request_timeout_ms``) or ``mode=async`` (202 + job, polled within
+  ``clients.job_wait_timeout_ms``). Data is cut to ``max_input_tokens_per_request`` (about 4 characters per
+  token) and the model's output to ``max_output_tokens_per_request``.
 """
 
 from __future__ import annotations
@@ -47,6 +54,10 @@ class LlmSession:
     job_key: str
     source_id: str | None = None
     task_id: str | None = None
+    run_id: str | None = None
+    """``scope.run_id`` of every call: the window of a ``period: run`` budget (default: ``job_key``)."""
+    mode: str = "sync"
+    """``CompletionRequest.mode``: ``sync`` or ``async`` (202 + job, awaited by the client)."""
     spent: float = 0.0
     calls: int = 0
     currency: str = field(init=False)
@@ -54,10 +65,13 @@ class LlmSession:
 
     def __post_init__(self) -> None:
         self.currency = self.limits.budget.currency
+        if self.run_id is None:
+            self.run_id = self.job_key
 
     @property
-    def remaining(self) -> float:
-        return max(0.0, self.limits.budget.amount - self.spent)
+    def exhausted(self) -> bool:
+        """The run's spend reached the budget: no further call (``amount: 0`` - none at all)."""
+        return self.spent >= self.limits.budget.amount
 
     def cost(self) -> dict[str, Any]:
         return {"amount": round(self.spent, 6), "currency": self.currency}
@@ -85,17 +99,18 @@ class LlmSession:
         model: str,
     ) -> dict[str, Any]:
         """One structured completion. Raises :class:`BudgetExhausted` or :class:`InvalidModelOutput`."""
-        if self.spent >= self.limits.budget.amount:
+        if self.exhausted:
             raise BudgetExhausted(
-                f"assistant budget {self.limits.budget.amount} {self.currency} spent",
-                details={"spent": self.cost(), "step": step},
+                f"assistant budget {self.limits.budget.amount} {self.currency} "
+                f"per {self.limits.budget.period} spent",
+                details={"spent": self.cost(), "step": step, "run_id": self.run_id},
             )
-        scope: dict[str, Any] = {"purpose": self.purpose}
+        scope: dict[str, Any] = {"purpose": self.purpose, "run_id": self.run_id}
         if self.source_id:
             scope["source_id"] = self.source_id
         if self.task_id:
             scope["task_id"] = self.task_id
-        request = {
+        request: dict[str, Any] = {
             "model": model,
             "instructions": instructions,
             "data": self._fit(data),
@@ -104,16 +119,15 @@ class LlmSession:
             "temperature": 0,
             "scope": scope,
             "limits": {
-                "budget": {
-                    "amount": round(self.remaining, 6),
-                    "currency": self.currency,
-                    "period": self.limits.budget.period,
-                },
+                # The whole budget: the gateway counts the run (scope.run_id) itself, atomically for all instances.
+                "budget": self.limits.budget.model_dump(),
                 "max_input_tokens_per_request": self.limits.max_input_tokens_per_request,
                 "max_output_tokens_per_request": self.limits.max_output_tokens_per_request,
                 "max_requests_per_minute": self.limits.max_requests_per_minute,
             },
         }
+        if self.mode != "sync":
+            request["mode"] = self.mode
         self.calls += 1
         key = idem_key(self.job_key, step, str(self.calls))
         try:

@@ -184,18 +184,23 @@ def test_search_providers(tmp_path: Path) -> None:
 
 def test_limits_resolution_and_hard_caps(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("JANE_ASSISTANT_LIMITS__HARD_CAPS__LLM__MAX_IMPROVEMENT_ATTEMPTS", "2")
-    monkeypatch.setenv("JANE_ASSISTANT_LIMITS__ONBOARDING__MIN_CONFIDENCE", "0.7")
+    monkeypatch.setenv("JANE_ASSISTANT_LIMITS__LLM__MIN_ONBOARDING_CONFIDENCE", "0.7")
     resolved = resolve_service_limits(
         Settings(), *request_layer({"max_improvement_attempts": 5, "max_onboarding_samples": 10})
     )
     assert resolved.limits.llm.max_improvement_attempts == 2  # clamped by the platform hard cap
     assert resolved.limits.llm.max_onboarding_samples == 10
-    assert resolved.limits.onboarding.min_confidence == 0.7
+    assert (
+        resolved.limits.llm.min_onboarding_confidence == 0.7
+    )  # contract llm.min_onboarding_confidence (R08)
+    asked = resolve_service_limits(Settings(), *request_layer({"min_onboarding_confidence": 0.95}))
+    assert asked.limits.llm.min_onboarding_confidence == 0.95  # a request may ask for a stricter sample
     assert resolved.provenance()["llm.max_improvement_attempts"] == "hard_cap"
     with pytest.raises(LimitError):
         resolve_service_limits(Settings(), *request_layer({"unknown": 1}))
     info = resolve_service_limits(Settings()).platform_limits()
     assert info["defaults"]["llm"]["budget"] == {"amount": 2.0, "currency": "USD", "period": "run"}
+    assert info["defaults"]["llm"]["min_onboarding_confidence"] == 0.7  # visible in /v1/info
 
 
 def _llm_session(responder: Any, **limits: Any) -> LlmSession:
@@ -231,10 +236,14 @@ def test_llm_session_budget_truncation_and_validation() -> None:
     data = [{"name": "a", "text": "y" * 100}, {"name": "b", "text": "z"}]
     assert asyncio.run(llm.ask("s", "do it", data, schema, model="cheap")) == {"x": 1}
     assert len(seen[0]["data"]) == 1 and seen[0]["data"][0]["text"].startswith("y" * 40)
-    assert seen[0]["limits"]["budget"]["amount"] == 1
+    # R13: the whole run budget and the run id - the gateway counts the run itself (not "what is left")
+    assert seen[0]["limits"]["budget"] == {"amount": 1, "currency": "USD", "period": "run"}
+    assert seen[0]["scope"] == {"purpose": "onboarding", "run_id": "job_1"}
+    assert "mode" not in seen[0]  # sync by default
     asyncio.run(llm.ask("s", "do it", [], schema, model="cheap"))
     asyncio.run(llm.ask("s", "do it", [], schema, model="cheap"))
-    assert seen[-1]["limits"]["budget"]["amount"] == pytest.approx(0.2)
+    assert seen[-1]["limits"]["budget"]["amount"] == 1
+    assert llm.spent == pytest.approx(1.2) and llm.exhausted
     with pytest.raises(BudgetExhausted):
         asyncio.run(llm.ask("s", "do it", [], schema, model="cheap"))
     assert len(seen) == 3

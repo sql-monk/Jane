@@ -167,7 +167,11 @@ just down -v --project jane-wp11
 із `JANE_ASSISTANT_DOWNLOAD_HOST_ALLOWLIST`, без редиректів, без проксі й `.netrc` із середовища, лише незакодоване
 тіло, обрізання на `content.max_material_bytes`, усе завантаження — у межах `content.fetch_timeout_ms`; `file://` —
 лише строго всередині `JANE_ASSISTANT_BLOB_ROOTS` (шлях спершу розв'язується з `..` і symlink, читається саме
-розв'язаний звичайний файл); `s3://` без `download_url` — 422. Перевіряються `size_bytes` blob і `sha256`. Відмова
+розв'язаний звичайний файл); `s3://` без `download_url` — 422. `material_ref` зі storage (`StorageClient.material`) завжди дає **початковий** вміст: inline
+`material.content` береться як є; інакше читаються байти об'єкта, а RAW, збережений як JSON-документ Material
+(`format.raw = json`), розгортається в цей Material з його внутрішнім вмістом (і коли storage не повертає `material`
+для великого вмісту); об'єкт без `material`, що не є таким документом, — 501 `not_implemented` (передайте приклад
+inline). Тести: `tests/test_storage_material.py`. Перевіряються `size_bytes` blob і `sha256`. Відмова
 завершує job помилкою (`validation_failed` / `limit_exceeded` — 422, `not_found` — 404, `upstream_unavailable` — 502)
 без шляхів і вмісту в `detail`, до LLM нічого не йде. Застосунок ставить свій читач для кожного запиту
 (`content.MaterialContentScope`), тож його успадковують і job, які запит запускає; поза застосунком

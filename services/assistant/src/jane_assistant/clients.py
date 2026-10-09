@@ -11,6 +11,7 @@ import base64
 import contextlib
 import hashlib
 import io
+import json
 import os
 import zipfile
 from collections.abc import Mapping
@@ -262,27 +263,88 @@ class StorageClient(_Base):
     name = "storage"
 
     async def material(self, connection_id: str, object_id: str) -> dict[str, Any]:
-        """Material of a stored RAW object with its content inlined (UTF-8 text or base64)."""
+        """Material of a stored RAW object with its **original** content inline (UTF-8 text or base64).
+
+        ``getObject`` gives the Material with its content either inline or by reference, or (for content over
+        storage's inline limit) no ``material`` at all. A RAW stored with ``format.raw = json`` is the Material
+        document itself (original content inside it), so its object bytes are not the original content:
+
+        * ``material.content`` inline and not such a document -> taken as is (the original content);
+        * otherwise the object bytes (``getObjectContent``): a stored Material document -> that Material with its
+          inner content; any other bytes -> the original content of ``material`` (media type of the material);
+        * no ``material`` and the object is not a Material document -> ``not_implemented``: the assistant cannot
+          rebuild the material without its metadata (pass the sample inline as ``material``).
+        """
         params = {"connection_id": connection_id}
         detail = await self.c.get_json(f"/v1/objects/{object_id}", params=params)
         material = dict(detail.get("material") or {})
-        if not material:
-            raise JaneError(f"stored object {object_id} has no material", code="validation_failed")
+        expected_id = material.get("material_id")
+        content = material.get("content") or {}
+        if content.get("kind") == "inline" and isinstance(content.get("data"), str):
+            data = _inline_bytes(content)
+            if (stored := _stored_material(data, expected_id)) is not None:
+                return stored  # an older storage inlined the Material document instead of its content
+            return material
         r = await self.c.request("GET", f"/v1/objects/{object_id}/content", params=params)
+        if (stored := _stored_material(r.content, expected_id)) is not None:
+            return stored
+        if not material:
+            raise JaneError(
+                f"stored object {object_id} comes without its material (storage omits it when the content is over "
+                "its inline limit) and is not a stored Material document; pass the sample inline as `material`",
+                code="not_implemented",
+                details={"storage_connection_id": connection_id, "object_id": object_id},
+            )
         media = (material.get("format") or {}).get("media_type") or "application/octet-stream"
-        try:
-            content = {"kind": "inline", "media_type": media, "encoding": "utf-8", "data": r.content.decode()}
-        except UnicodeDecodeError:
-            content = {
-                "kind": "inline",
-                "media_type": media,
-                "encoding": "base64",
-                "data": base64.b64encode(r.content).decode(),
-            }
-        content["sha256"] = hashlib.sha256(r.content).hexdigest()
-        content["size_bytes"] = len(r.content)
-        material["content"] = content
+        material["content"] = _inline_content(r.content, media)
         return material
+
+
+def _inline_content(data: bytes, media_type: str) -> dict[str, Any]:
+    try:
+        encoded = {"encoding": "utf-8", "data": data.decode("utf-8")}
+    except UnicodeDecodeError:
+        encoded = {"encoding": "base64", "data": base64.b64encode(data).decode()}
+    return {
+        "kind": "inline",
+        "media_type": media_type,
+        **encoded,
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "size_bytes": len(data),
+    }
+
+
+def _inline_bytes(content: Mapping[str, Any]) -> bytes:
+    data = str(content.get("data") or "")
+    if content.get("encoding") == "base64":
+        try:
+            return base64.b64decode(data, validate=True)
+        except ValueError:
+            return b""
+    return data.encode("utf-8")
+
+
+def _stored_material(data: bytes, material_id: str | None) -> dict[str, Any] | None:
+    """The Material document of a RAW stored with ``format.raw = json`` (its original content inline in it),
+    or ``None`` when ``data`` is something else (the original content itself)."""
+    if not data.lstrip().startswith(b"{"):
+        return None
+    try:
+        doc = json.loads(data)
+    except ValueError:
+        return None
+    inner = doc.get("content") if isinstance(doc, dict) else None
+    if (
+        not isinstance(inner, dict)
+        or not isinstance(inner.get("data"), str)
+        or not all(isinstance(doc.get(k), str) for k in ("material_id", "observation_id", "fetched_at"))
+        or (material_id is not None and doc["material_id"] != material_id)
+    ):
+        return None
+    media = str(
+        inner.get("media_type") or (doc.get("format") or {}).get("media_type") or "application/octet-stream"
+    )
+    return {**doc, "content": _inline_content(_inline_bytes(inner), media)}
 
 
 @dataclass

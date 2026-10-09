@@ -305,11 +305,12 @@ class FakeOrchestrator:
 class FakeStorage:
     def __init__(self, contracts: Path) -> None:
         self.app = ContractFake(contracts / "openapi" / "storage.v1.yaml", "storage")
-        self.objects: dict[str, tuple[dict[str, Any], bytes]] = {}
+        self.objects: dict[str, tuple[dict[str, Any] | None, bytes, str]] = {}
         self.app.on("getObject")(self.get_object)
         self.app.on("getObjectContent")(self.get_content)
 
     def put(self, object_id: str, mat: dict[str, Any]) -> None:
+        """RAW stored as the original HTML file (files adapter): Material with a ``file://`` blob reference."""
         data = mat["content"]["data"].encode()
         stored = {
             **mat,
@@ -323,32 +324,39 @@ class FakeStorage:
                 "expires_at": None,
             },
         }
-        self.objects[object_id] = (stored, data)
+        self.put_object(object_id, stored, data, "text/html")
+
+    def put_object(
+        self, object_id: str, material: dict[str, Any] | None, data: bytes, media_type: str
+    ) -> None:
+        """Any ``getObject`` answer the contract allows: ``material`` (or none) and the stored object's bytes."""
+        self.objects[object_id] = (material, data, media_type)
 
     def get_object(self, req: FakeRequest) -> Reply:
         obj = self.objects.get(req.path_params["object_id"])
         if obj is None:
             return problem(404, "not_found")
-        return Reply(
-            200,
-            {
-                "object": {
-                    "object_id": req.path_params["object_id"],
-                    "adapter": "filesystem",
-                    "connection_id": req.query["connection_id"],
-                    "media_type": "text/html",
-                    "size_bytes": len(obj[1]),
-                },
-                "stored_at": NOW,
-                "material": obj[0],
+        material, data, media_type = obj
+        body: dict[str, Any] = {
+            "object": {
+                "object_id": req.path_params["object_id"],
+                "adapter": "filesystem",
+                "connection_id": req.query["connection_id"],
+                "media_type": media_type,
+                "size_bytes": len(data),
             },
-        )
+            "stored_at": NOW,
+        }
+        if material is not None:
+            body["material"] = material
+        return Reply(200, body)
 
     def get_content(self, req: FakeRequest) -> Reply:
         obj = self.objects.get(req.path_params["object_id"])
         if obj is None:
             return problem(404, "not_found")
-        return Reply(200, raw=obj[1], media_type="text/html")
+        _, data, media_type = obj
+        return Reply(200, raw=data, media_type=media_type)
 
 
 _ = Registry  # referencing is used through OpenAPISpec.registry

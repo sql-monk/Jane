@@ -91,7 +91,9 @@ README. Зокрема для Web Collector має виконуватись `TTL
   `jane-contracts = { path = "<відносний шлях>/contracts/python", editable = true }` (web-collector, storage і
   його адаптери). uv не дозволяє члену workspace бути path-джерелом (`Workspace members must be declared as
   workspace sources`), тож перенесення в `members` можливе лише разом із заміною джерела на `{ workspace = true }`
-  в усіх споживачах однією зміною. `contracts/` перевіряє лінтер WP-00, не ruff/mypy workspace.
+  в усіх споживачах однією зміною. `contracts/` перевіряє лінтер WP-00; `just lint` / `just fmt` також
+  явно перевіряють / виправляють формат `contracts/python`. Перевірки правил ruff і mypy workspace
+  решту `contracts/` пропускають.
 - Маркери pytest: `contract`, `integration`, `isolation`; решта — unit. Тести кожного пакета — у його `tests/`
   (режим `--import-mode=importlib`, однакові імена файлів у різних пакетах дозволені).
 - Згенерований код — у теках `_generated/` (ruff і mypy їх пропускають).

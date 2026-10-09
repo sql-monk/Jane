@@ -18,7 +18,7 @@ Checkout координатора для злиттів — `.claude/worktrees/i
 |---|---|---|
 | C-1: CI й документація | `wp/23a-developer-docs`, `wp23a` | прийнято й запушено, merge `a5b1563` |
 | C-2: contracts/python у workspace | буде створено після приймання WP-19 | чекає маркера `merge: accept WP-19` в origin |
-| C-3: формат Python-контрактів | `wp/23c-contracts-format`, `wp23c` | виконує окремий субагент |
+| C-3: формат Python-контрактів | `wp/23c-contracts-format`, `wp23c` | прийнято й запушено, merge `0dc2ded` |
 | C-4: прибирання | `.jane/cleanup-post-m3.ps1` | останнім: після WP-19 і завершення потоку B |
 
 ## C-1: факти й перевірки
@@ -47,6 +47,47 @@ Merge made by the 'ort' strategy.
 $ git push origin HEAD:codex/jane-integration
 2366213..a5b1563  HEAD -> codex/jane-integration
 ```
+
+## C-3: форматування Python-контрактів
+
+Виконавець — субагент `c3_format`; фінальний SHA — `f80ddce606eb0ead0092573fef59fe70d4bc4bbd`,
+код — `d5232ce`. Незалежний `c3_review`: **accepted**, один раунд;
+`c3_contract`: **accepted / compatible**. Звіт — [c3-format.md](../WP-23/c3-format.md).
+Після `pull --ff-only` merge `0dc2ded` запушено в `origin/codex/jane-integration`.
+
+`contracts/` виключено з загального ruff; додавання явного `contracts/python` до format-команд
+`lint` і `fmt` охоплює всі три Python-файли. У `storage_adapter.py` лише перенесено сигнатуру
+`commit_entity`: AST, включно з docstrings, рівний `main`, базі інкременту й інтеграції.
+
+```text
+$ uvx --from rust-just just lint
+All checks passed!
+466 files already formatted
+All contract checks passed.
+exit=0
+$ uv run --all-packages pytest scripts/tests/test_dev.py -q
+31 passed in 12.68s
+exit=0
+$ незалежний прогін scripts/tests/test_dev.py
+31 passed in 47.37s
+exit=0
+$ uv run --script contracts/tools/check_contracts.py --require-redocly
+[ok] Redocly lint: ok (Woohoo! Your API descriptions are valid. 🎉)
+All contract checks passed.
+exit=0
+$ uv run --script contracts/tools/compat.py --base main --oasdiff
+[усі 7 API: ok; No changes detected]
+0 breaking, 0 warning(s).
+exit=0
+$ python .claude/hooks/jane_wp.py check-diff origin/codex/jane-integration
+WP-23: 3 changed file(s), 0 outside ownership
+exit=0
+```
+
+Сирі докази — `.jane/wp23c-*.txt` у `wp23c`; цільові перевірки й підсумки включено у Git-звіт.
+Push C-3 запустив автоматичний CI [37912943507](https://github.com/sql-monk/Jane/actions/runs/37912943507)
+на `b4f966b` (код той самий, фінальний `f80ddce` змінює лише звіт). Повний dispatch потоку C
+відкладено до закриття C-2, щоб виконати його один раз після всіх змін коду/збірки.
 
 ## Залежності й межі
 

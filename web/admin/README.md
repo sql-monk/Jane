@@ -42,11 +42,11 @@ pnpm store, Chromium і uv кешуються, HTML-звіт та артефак
 
 ## Режими e2e
 
-| Режим         | Як запустити                                                                    | Що виконується                                                                                         |
-| ------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Моки          | `pnpm e2e`                                                                      | 26 сценаріїв `@mock` із контрактними прикладами, 2 auth, маскування помилки; `@hybrid` пропускаються   |
-| Гібрид        | `JANE_ADMIN_TARGET_<API>=<url сервісу>` + `pnpm e2e -- --grep @hybrid`          | реальні orchestrator, registry, handler-runtime, storage, LLM, assistant; сценарії самі засівають дані |
-| Реальний стек | `pnpm e2e:real <url reverse proxy>` (`JANE_ADMIN_E2E_API_KEY` — справжній ключ) | auth, маскування помилки, `@hybrid` проти `<url>/api/<service>`; `@mock` пропускаються                 |
+| Режим         | Як запустити                                                           | Що виконується                                                                                         |
+| ------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Моки          | `pnpm e2e`                                                             | 26 сценаріїв `@mock` із контрактними прикладами, 2 auth, маскування помилки; `@hybrid` пропускаються   |
+| Гібрид        | `JANE_ADMIN_TARGET_<API>=<url сервісу>` + `pnpm e2e -- --grep @hybrid` | реальні orchestrator, registry, handler-runtime, storage, LLM, assistant; сценарії самі засівають дані |
+| Реальний стек | `pnpm e2e:real <url reverse proxy> --project <compose-project>`        | auth, маскування помилки, `@hybrid` проти `<url>/api/<service>`; `@mock` пропускаються                 |
 
 Для повного прогону на локальному Compose-стеку спочатку зберіть UI та підніміть потрібні профілі:
 
@@ -54,8 +54,16 @@ pnpm store, Chromium і uv кешуються, HTML-звіт та артефак
 corepack pnpm --dir web/admin build
 just up proxy storage registry handler-runtime web-collector orchestrator assistant llm --project jane-admin-real
 corepack pnpm --dir web/admin e2e:real:prepare jane-admin-real
-corepack pnpm --dir web/admin e2e:real http://127.0.0.1:<порт proxy з just env>
+corepack pnpm --dir web/admin e2e:real http://127.0.0.1:<порт proxy з just env> --project jane-admin-real
 ```
+
+`e2e:real` читає ключ адміністратора з `env.JANE_API_KEY_ADMIN` у
+`.jane/stack-<compose-project>.json`, який генерує `just up`. Той самий ключ `just env` показує як
+`JANE_STACK_AUTH_ADMIN_API_KEY`; його не потрібно копіювати в окрему змінну.
+Без `--project` можна задати `JANE_STACK_FILE`; інакше wrapper шукає єдиний стек цього checkout з адресою
+proxy, що збігається з переданим URL. Немає ключа, адреса не збігається або стек неоднозначний — запуск
+зупиняється до Playwright. Значення `JANE_ADMIN_E2E_API_KEY` для real-режиму завжди береться зі стек-файлу;
+wrapper не друкує ключ і не приймає незалежне значення цієї змінної як заміну.
 
 `e2e:real:prepare` читає створений `just up` файл `.jane/stack-<id>.json` і тимчасовим Compose
 override (лише для цього тестового проєкту, як `tests/e2e/compose.e2e.yaml`) задає: адреси реальних

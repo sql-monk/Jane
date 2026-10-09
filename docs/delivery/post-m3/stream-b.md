@@ -636,7 +636,7 @@ From https://github.com/sql-monk/Jane
 Already up to date.
 EXIT_CODE=0
 $ git merge --no-ff b76d7789ca3380a7d171d401e6c00e2b3a6ce50a -m "merge: accept WP-22e storage contract cleanup" -m "Co-authored-by: Codex <noreply@openai.com>"
-Merge made by the ort strategy.
+Merge made by the 'ort' strategy.
  docs/acceptance/matrix.md             | 17 ++++++++++++++---
  docs/acceptance/scenarios.md          | 29 ++++++++++++++++++-----------
  tests/e2e/jane_e2e/orchestration.py   |  6 +++---
@@ -829,3 +829,63 @@ $ gh run list --repo sql-monk/Jane --branch codex/jane-integration --event workf
 { "databaseId": 37937013460, "headSha": "bb1982b9f6b1e2593fb2f1ab60a436e6945f15b1", "status": "queued", "conclusion": "", "createdAt": "2026-10-09T13:27:50Z", "url": "https://github.com/sql-monk/Jane/actions/runs/37937013460" }
 EXIT_CODE=0
 ```
+
+
+### B-5: фактичний вивід незалежного review, раунд 1
+
+ВЕРДИКТ accepted на `b76d7789ca3380a7d171d401e6c00e2b3a6ce50a`; додано із повідомлення незалежного рецензента, без нового раунду чи повтору команд. Checkout `wp22e`.
+
+```text
+$ python -X utf8 .Codex/hooks/jane_wp.py check-diff b336922149c3b379f6946c82f6ee924b1720c56a --wp 22
+WP-22: 4 changed file(s), 0 outside ownership
+EXIT_CODE=0
+$ git diff --check b336922149c3b379f6946c82f6ee924b1720c56a HEAD
+[порожній stdout]
+EXIT_CODE=0
+$ uv run ruff check tests/e2e/jane_e2e/orchestration.py tests/e2e/test_reprocessing_stored.py
+All checks passed!
+EXIT_CODE=0
+$ uv run ruff format --check tests/e2e/jane_e2e/orchestration.py tests/e2e/test_reprocessing_stored.py
+2 files already formatted
+EXIT_CODE=0
+$ docker ps -a -q --filter label=com.docker.compose.project=jane-wp22e-storage-20261009
+[порожній stdout]
+EXIT_CODE=0
+$ docker ps -a -q --filter label=io.jane.e2e-project=jane-wp22e-storage-20261009
+[порожній stdout]
+EXIT_CODE=0
+$ docker volume ls -q --filter label=com.docker.compose.project=jane-wp22e-storage-20261009
+[порожній stdout]
+EXIT_CODE=0
+$ docker network ls -q --filter label=com.docker.compose.project=jane-wp22e-storage-20261009
+[порожній stdout]
+EXIT_CODE=0
+$ rg -n connections_synced tests/e2e
+tests/e2e\jane_e2e\orchestration.py:21:    "connections_synced",
+tests/e2e\jane_e2e\orchestration.py:51:def connections_synced(orch: JaneClient, executor: str) -> bool | None:
+tests/e2e\test_reliability_orchestrated.py:38:    connections_synced,
+tests/e2e\test_reliability_orchestrated.py:557:    wait_for("connections synced to storage", lambda: connections_synced(orch, "storage"), timeout_s=120)
+EXIT_CODE=0
+$ git rev-parse HEAD
+b76d7789ca3380a7d171d401e6c00e2b3a6ce50a
+$ git diff --name-only b336922149c3b379f6946c82f6ee924b1720c56a b76d7789ca3380a7d171d401e6c00e2b3a6ce50a
+docs/acceptance/matrix.md
+docs/acceptance/scenarios.md
+tests/e2e/jane_e2e/orchestration.py
+tests/e2e/test_reprocessing_stored.py
+$ git diff --name-only b336922149c3b379f6946c82f6ee924b1720c56a b76d7789ca3380a7d171d401e6c00e2b3a6ce50a -- .Codex/wp-paths.json .Codex/settings.json .Codex/hooks/ .claude/wp-paths.json .claude/settings.json .claude/hooks/ contracts/
+[порожній stdout]
+$ git merge-base --is-ancestor ee78fc5043382239d06bb73cbf4f1f64d038978d b336922149c3b379f6946c82f6ee924b1720c56a
+[порожній stdout]
+$ git status --short
+[порожній stdout]
+```
+
+Git-команди рецензента через Node execFile argv завершилися успішно з порожнім stderr. Node Buffer.equals без нормалізації між історичними заголовками:
+
+```text
+{ path: 'docs/acceptance/matrix.md', bytes: 2344, identical: true }
+{ path: 'docs/acceptance/scenarios.md', bytes: 425, identical: true }
+```
+
+E2e не запускався повторно: рецензент читав авторський raw log із двома PASSED і cleanup; listings перевіряв сам. Публікація початкового запису run ID отримала non-fast-forward через паралельне C-2 злиття `fdad210`; detached journal commit збережено на backup ref `codex/stream-b-ci-run-record-20261009`, перенесено cherry-pick після fresh checkout + pull --ff-only, без force. Опублікований запис run ID — `33dce02`; перевірюваний SHA CI незмінний `bb1982b`, він передує C-2, який має власний наступний фінальний CI.

@@ -263,7 +263,9 @@ JANE_LLM_API_KEYS=[{"name": "assistant", "sha256": "<sha256 hex ключа>", "s
 структурований запит: інструкції пакета → системний канал, вхід (метадані й вміст матеріалу або заповнений
 `input_template`) → дані. Вихід — `output.data`; для кожного `output.entities[]` маніфесту з типом `T` елементи
 масиву `T + "s"` (або `T`) стають сутностями; ключові поля `message`/`material`/`material_id` беруться з
-`material_id`; `observation` — з матеріалу; поля валідуються за схемою сутності. Стани: `success`, `empty`,
+`material_id`; `observation` — з матеріалу; поля валідуються за схемою сутності. Повне правило відображення —
+у контракті: [`contracts/docs/handler-packages.md`](../../contracts/docs/handler-packages.md) («Пакет `llm`: вихід
+моделі → результат обробника»). Стани: `success`, `empty`,
 `failed` (`schema_mismatch`, `budget_exhausted`, `invalid_params`). Повтор доставки — збережений результат із
 `duplicate: true`; `failed/budget_exhausted` під ключем не зберігається (повторна доставка після збільшення
 бюджету виконається). `POST /v1/test-runs` — тести маніфесту й `extra_cases` у `test_mode` (job → `TestReport`).

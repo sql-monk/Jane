@@ -1511,7 +1511,7 @@ export interface components {
     StageInput: {
       from: components["schemas"]["Slug"];
       /**
-       * @description Що брати з етапу-джерела: output — вихід (collect: матеріали; extractor: сутності разом із матеріалом; llm: data); input_material — вхідний матеріал етапу-джерела (наприклад зберегти RAW лише успішно розібраних); problems — елементи зі статусом unrecognized або failed разом із матеріалом і діагностикою; unmatched_materials — матеріали collect-етапу, яким не відповідає жодна прив'язка (доставляються лише за ефективного forward_unknown_to_llm=true, інакше лише реєструються).
+       * @description Що брати з етапу-джерела і в якій формі (HandlerInvocation.inputs): output — вихід: collect — MaterialInput; extractor/transform із сутностями — EntitiesInput (entities або entities_ref, from_invocation_id, material вхідного елемента); llm/transform із даними — DataInput (data або data_ref, from_invocation_id); етап збереження — DataInput з data = WritesData ({writes: [WriteAck…]}, handler-invocation.schema.json) і from_invocation_id; input_material — вхідний матеріал етапу-джерела як MaterialInput (наприклад зберегти RAW лише успішно розібраних); problems — елементи зі статусом unrecognized або failed: MaterialInput вхідного матеріалу (якщо він був) і DataInput з data = ProblemData ({problem: {stage_id, status, invocation_id, handler, unrecognized?, failure?, diagnostics?}}) і from_invocation_id; unmatched_materials — матеріали collect-етапу, яким не відповідає жодна прив'язка, як MaterialInput (доставляються лише за ефективного forward_unknown_to_llm=true, інакше лише реєструються).
        * @default output
        * @enum {string}
        */
@@ -1531,12 +1531,19 @@ export interface components {
       source_id: components["schemas"]["Slug"];
       /** @description Явний перелік матеріалів. Якщо задано — колектор отримує лише ці URL (стратегія seed_list без рекурсії) у межах scope джерела. Типово для завдань перевірки цін. Кількість обмежує limits.crawl.max_seed_urls (ефективне значення; перевищення — limit_exceeded), а не схема. */
       urls?: string[];
-      /** @description Повторна обробка збережених RAW (ТЗ §10): фільтр збережених об'єктів замість нового збору. */
+      /** @description Повторна обробка збережених RAW (ТЗ §10): фільтр збережених об'єктів замість нового збору. Завжди лише RAW джерела завдання (Material.source.source_id). Фільтри поєднуються через AND. material_ids обирає всі збережені спостереження цих матеріалів у часовому вікні since/until; точний вибір — object_ids (конкретні збережені RAW) або observation_ids (конкретні спостереження). */
       stored_materials?: {
         storage_connection_id?: components["schemas"]["Slug"];
+        /** @description Час збереження (stored_at) не раніше. */
         since?: components["schemas"]["Timestamp"];
+        /** @description Час збереження (stored_at) раніше за це значення. */
         until?: components["schemas"]["Timestamp"];
+        /** @description Усі збережені спостереження цих матеріалів (у межах since/until). */
         material_ids?: components["schemas"]["Id"][];
+        /** @description Точний вибір: саме ці збережені RAW (StoredObjectRef.object_id у підключенні storage_connection_id), у заданому порядку; кожен читається через storage.v1 GET /v1/objects/{object_id}. Відсутній об'єкт завершує запуск помилкою not_found; RAW іншого джерела чи без відновлюваного Material пропускається. Кількість обмежує конфігурація оркестратора (більше — 422 limit_exceeded). */
+        object_ids?: components["schemas"]["Id"][];
+        /** @description Точний вибір спостережень (Material.observation_id): лише RAW цих спостережень серед відібраних іншими фільтрами. Кілька збережених копій одного спостереження не вгадуються (одна копія обробляється, посилання на RAW не записується). Кількість обмежує конфігурація оркестратора. */
+        observation_ids?: components["schemas"]["Id"][];
       };
     };
     Stage: {

@@ -151,6 +151,12 @@ JANE_HANDLER_RUNTIME_STATE_SCHEMA=jane_handler_runtime                          
 | `GET`/`DELETE /v1/connections/{id}`, `POST …/test` | 404 `not_found` |
 | `GET /v1/health`, `/v1/info`, `/metrics` | `checks.sandbox` — пінг рушія, `checks.state` — сховище стану; `capabilities` — типи, профілі, backend, state |
 
+`/v1/connections*` для виконавця без підключень за handler.v1 **необов'язкові** (WP-17, R02): runtime їх
+реалізує лише як явну відмову вище. Оркестратор не вимагає їх: виконавцю з `capabilities.connections: false` у
+конфігурації реєстр не синхронізується (основний спосіб), а явна відповідь 501 `not_implemented` на `PUT`
+прибирає runtime зі списку синхронізації без статусу `failed`; виклики `POST /v1/invocations` від підключень не
+залежать.
+
 ## Тести
 
 ```

@@ -97,7 +97,15 @@ export interface paths {
       };
       cookie?: never;
     };
-    /** Метадані збереженого об'єкта і відновлений Material для повторної обробки */
+    /**
+     * Метадані збереженого об'єкта і відновлений Material для повторної обробки
+     * @description Для RAW — відновлений Material для повторної обробки. Вміст залежить від формату збереження
+     *     (`format.raw` пакета, `contracts/docs/storage-adapter.md`, «Формати RAW»): `html` / `original` —
+     *     постійне посилання адаптера на ті самі байти (`file://` чи `s3://`, `store: persistent`) або inline
+     *     до `limits.transfer.inline_max_bytes`; `json` (документ Material із вбудованим вмістом) — початковий
+     *     вміст, вийнятий із документа, inline до `limits.transfer.inline_max_bytes`. Якщо вміст не можна
+     *     віддати (більший за ліміт без постійного посилання), `material` відсутній.
+     */
     get: operations["getObject"];
     put?: never;
     post?: never;
@@ -148,6 +156,7 @@ export interface components {
     StoredObjectDetail: {
       object: components["schemas"]["StoredObjectRef"];
       stored_at: components["schemas"]["Timestamp"];
+      /** @description Відновлений Material (лише для RAW і лише якщо його вміст можна віддати, див. опис операції). */
       material?: components["schemas"]["material.schema"];
     };
     Health: {
@@ -808,7 +817,16 @@ export interface operations {
       query: {
         connection_id: components["parameters"]["ConnectionIdQuery"];
         source_id?: string;
+        /** @description Об'єкти одного матеріалу. Разом із `material_ids` значення об'єднуються. */
         material_id?: string;
+        /**
+         * @description Об'єкти будь-якого з кількох матеріалів (повторюваний параметр:
+         *     `material_ids=a&material_ids=b`); значення об'єднуються з `material_id`. Інші фільтри
+         *     діють для кожного значення. Порядок — за `material_id`, далі в порядку адаптера; `next_cursor`
+         *     чинний лише для того самого запиту (інакше 422). Кількість значень обмежує конфігурація сервісу
+         *     (storage: `objects.max_filter_material_ids`), більше — 422 `limit_exceeded`.
+         */
+        material_ids?: string[];
         since?: string;
         until?: string;
         /** @description Непрозорий курсор з `next_cursor` попередньої сторінки. */
@@ -835,6 +853,8 @@ export interface operations {
         };
       };
       401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+      422: components["responses"]["UnprocessableEntity"];
     };
   };
   getObject: {
@@ -850,7 +870,7 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description Об'єкт і, для RAW, Material із постійним посиланням на вміст. */
+      /** @description Об'єкт і, для RAW, Material із посиланням на вміст (або inline-вмістом). */
       200: {
         headers: {
           [name: string]: unknown;

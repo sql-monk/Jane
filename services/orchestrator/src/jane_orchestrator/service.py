@@ -41,6 +41,15 @@ class AccessDeniedByPolicy(JaneError):
     code = "access_denied_by_policy"
 
 
+def _tests_passed_everywhere(version: Mapping[str, Any]) -> bool:
+    """registry.v1 ``PackageVersion``: the aggregate over the latest report of every test context
+    (``test_summary.status``, WP-17); a registry without it - the latest report (``test_status``)."""
+    summary = version.get("test_summary")
+    if isinstance(summary, Mapping) and isinstance(summary.get("status"), str):
+        return bool(summary["status"] == "passed")
+    return version.get("test_status") == "passed"
+
+
 def _check_if_match(if_match: str | None, version: int) -> None:
     if if_match is not None and parse_etag(if_match) != version and if_match.strip() != "*":
         raise PreconditionFailed(f"If-Match {if_match} does not match current ETag {etag(version)}")
@@ -509,11 +518,7 @@ class Admin:
             if stage_id not in stages:
                 raise NotFound(f"stage '{stage_id}' not found in task '{task_id}'")
             stage = stages[stage_id]
-            if stage["kind"] != "handler":
-                raise ValidationFailed(
-                    "activations apply to handler stages",
-                    errors=[FieldError(parameter="stage_id", message="stage is not kind=handler")],
-                )
+            rules_stage = stage["kind"] == "collect"  # versions of collector rules (TZ §8, §10)
             read_version = int(row["version"])
             if kind == "rollback" and package is None:
                 last = conn.execute(
@@ -542,6 +547,19 @@ class Admin:
                 details={"reason": "source_policy"},
             )
         version = self._registry_get(f"/v1/packages/{package['package_id']}/versions/{package['version']}")
+        pkg: dict[str, Any] | None = None
+        if rules_stage:
+            pkg = self._registry_get(f"/v1/packages/{package['package_id']}")
+            if pkg.get("kind") != "collector-rules":
+                raise ValidationFailed(
+                    "a collect stage activates collector rules",
+                    errors=[
+                        FieldError(
+                            pointer="/package",
+                            message=f"package kind is {pkg.get('kind')!r}, not collector-rules",
+                        )
+                    ],
+                )
         if kind == "rollback" and version.get("status") == "yanked":
             raise Conflict(f"{package['package_id']}@{package['version']} is yanked")
         if kind == "activate" and version.get("status") != "approved":
@@ -549,11 +567,11 @@ class Admin:
                 f"{package['package_id']}@{package['version']} is not approved (status {version.get('status')})"
             )
         if kind == "auto_activate":
-            pkg = self._registry_get(f"/v1/packages/{package['package_id']}")
+            pkg = pkg or self._registry_get(f"/v1/packages/{package['package_id']}")
             reason = None
             if not pkg.get("auto_changes_allowed"):
                 reason = "package_auto_changes_forbidden"
-            elif version.get("test_status") != "passed":
+            elif not _tests_passed_everywhere(version):
                 reason = "tests_not_passed"
             if reason is not None:
                 raise AccessDeniedByPolicy(
@@ -572,10 +590,22 @@ class Admin:
             if int(row["version"]) != read_version:
                 raise Conflict("the task changed during activation; repeat the request", retryable=True)
             doc = dict(row["doc"])
-            current = dict(stage_map(doc)[stage_id]["handler"])
-            for s in doc["stages"]:
-                if s["stage_id"] == stage_id:
-                    s["handler"] = package
+            if rules_stage:
+                source_row = conn.execute(
+                    "SELECT doc FROM sources WHERE source_id = %s", (row["source_id"],)
+                ).fetchone()
+                own = (stage_map(doc)[stage_id].get("collector") or {}).get("rules")
+                inherited = ((source_row["doc"] if source_row else {}) or {}).get("collector_rules")
+                rules_ref = own or inherited
+                current = dict(rules_ref) if rules_ref else None
+            else:
+                current = dict(stage_map(doc)[stage_id]["handler"])
+            for st in doc["stages"]:
+                if st["stage_id"] == stage_id:
+                    if rules_stage:
+                        st["collector"] = {**st["collector"], "rules": package}
+                    else:
+                        st["handler"] = package
             conn.execute(
                 "UPDATE tasks SET doc = %s, version = version + 1, updated_at = now() WHERE task_id = %s",
                 (Jsonb(doc), task_id),
@@ -588,7 +618,7 @@ class Admin:
                     task_id,
                     stage_id,
                     Jsonb(package),
-                    Jsonb(current),
+                    Jsonb(current) if current is not None else None,
                     kind,
                     body.get("reason"),
                     actor,
@@ -603,8 +633,8 @@ class Admin:
                 {
                     "package_id": package["package_id"],
                     "version": package["version"],
-                    "previous": current.get("version"),
-                    "previous_package_id": current.get("package_id"),
+                    "previous": (current or {}).get("version"),
+                    "previous_package_id": (current or {}).get("package_id"),
                     "reason": body.get("reason"),
                 },
             )
@@ -641,6 +671,8 @@ class Admin:
             out["failure_kind"] = r["failure_kind"]
         if r["assistant_job_id"]:
             out["assistant_job_id"] = r["assistant_job_id"]
+        if r.get("note"):
+            out["note"] = r["note"]
         return out
 
     def list_problem_groups(
@@ -674,8 +706,9 @@ class Admin:
                 raise NotFound(f"problem group '{group_id}' not found")
             new = conn.execute(
                 "UPDATE problem_groups SET status = coalesce(%s, status),"
-                " assistant_job_id = coalesce(%s, assistant_job_id) WHERE group_id = %s RETURNING *",
-                (patch.get("status"), patch.get("assistant_job_id"), group_id),
+                " assistant_job_id = coalesce(%s, assistant_job_id), note = coalesce(%s, note)"
+                " WHERE group_id = %s RETURNING *",
+                (patch.get("status"), patch.get("assistant_job_id"), patch.get("note"), group_id),
             ).fetchone()
             self.core.audit(conn, actor, "problem_group.update", "problem_group", group_id, dict(patch))
         return self._group_view(new)

@@ -102,11 +102,11 @@
         "adapter": { "type": "string", "examples": ["filesystem", "postgresql", "sqlserver", "mongodb", "minio", "s3"], "description": "Тип адаптера; конкретне підключення задає етап через connections." },
         "writes": { "type": "string", "enum": ["raw", "entities", "raw_and_entities", "data"] },
         "format": {
-          "description": "Формат збереження, якщо адаптер його підтримує. За замовчуванням: RAW вебсторінок — html, інші — json (ТЗ §5).",
+          "description": "Формат збереження, якщо адаптер його підтримує. Перевизначається params.format етапу (якщо params_schema пакета це дозволяє). Деталі — contracts/docs/storage-adapter.md, «Формати RAW».",
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "raw": { "type": "string", "enum": ["original", "html", "json"], "default": "original" },
+            "raw": { "type": "string", "enum": ["original", "html", "json"], "description": "Відсутнє значення — типова поведінка ТЗ §5 / §13.1 п.4: вебсторінка (text/html, application/xhtml+xml) зберігається як html, будь-який інший RAW — як json (документ Material із вбудованим вмістом). original — байти як отримано; html — лише для HTML-матеріалу (інакше HandlerResult.failed, invalid_params); json — документ Material." },
             "entities": { "type": "string", "enum": ["json", "jsonl"], "default": "json" }
           }
         },

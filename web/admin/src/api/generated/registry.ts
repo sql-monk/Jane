@@ -403,6 +403,28 @@ export interface components {
         reason?: string;
       }[];
       test_reports?: components["schemas"]["TestResultsRecord"][];
+      test_summary?: components["schemas"]["TestSummary"];
+    };
+    /**
+     * @description Агрегат звітів тестів версії за контекстами (`TestResultsRecord.context`, наприклад
+     *     `bindings:<task_id>/<stage_id>` — прогін на прив'язках етапу, `tests` — власні тести пакета). На
+     *     відміну від `test_status` (стан останнього звіту) показує, чи пройшла версія **всюди**, де її
+     *     перевіряли (ТЗ §9: зміни спільного пакета перевіряються для всіх його прив'язок). Для кожного
+     *     контексту береться його останній звіт; звіти без `context` — один контекст без імені.
+     *     `status`: `failed` — останній звіт хоч одного контексту має провалені кейси; `passed` — останній
+     *     звіт кожного контексту пройшов (і звітів ≥ 1); інакше `unknown`. Віддається у повному поданні версії.
+     */
+    TestSummary: {
+      status: components["schemas"]["TestStatus"];
+      contexts: {
+        /** @description Відсутнє — звіти без context. */
+        context?: string;
+        test_status: components["schemas"]["TestStatus"];
+        recorded_at?: components["schemas"]["Timestamp"];
+        runner?: string;
+        /** @description Скільки звітів записано для цього контексту (діє останній). */
+        reports: number;
+      }[];
     };
     PackageVersionList: {
       items: components["schemas"]["PackageVersion"][];
@@ -715,10 +737,10 @@ export interface components {
       adapter: string;
       /** @enum {string} */
       writes: "raw" | "entities" | "raw_and_entities" | "data";
-      /** @description Формат збереження, якщо адаптер його підтримує. За замовчуванням: RAW вебсторінок — html, інші — json (ТЗ §5). */
+      /** @description Формат збереження, якщо адаптер його підтримує. Перевизначається params.format етапу (якщо params_schema пакета це дозволяє). Деталі — contracts/docs/storage-adapter.md, «Формати RAW». */
       format?: {
         /**
-         * @default original
+         * @description Відсутнє значення — типова поведінка ТЗ §5 / §13.1 п.4: вебсторінка (text/html, application/xhtml+xml) зберігається як html, будь-який інший RAW — як json (документ Material із вбудованим вмістом). original — байти як отримано; html — лише для HTML-матеріалу (інакше HandlerResult.failed, invalid_params); json — документ Material.
          * @enum {string}
          */
         raw?: "original" | "html" | "json";

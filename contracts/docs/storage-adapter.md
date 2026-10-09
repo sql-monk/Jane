@@ -13,7 +13,7 @@
 | Канонічний ключ сутності (`EntityKey` → рядок) | Атомарний `commit_entity`: унікальність delivery_key + CAS за `version` + запис історії |
 | Злиття: часткове оновлення, `cleared`, порядок спостережень, визначення `stale_fields` — **чиста функція** | Ідемпотентний `put_object` за `object_key` |
 | Вибір формату: RAW вебсторінок — HTML, інше — JSON (перевизначається `format` у маніфесті/параметрах) | Зберігання байтів як є |
-| Повтор при `CONFLICT` (обмежено `limits.retries`) | Класифікація помилок: `AdapterError(retryable=…)` |
+| Повтор при `CONFLICT` (обмежено `limits.conflict_retries` конфігурації сервісу) | Класифікація помилок: `AdapterError(retryable=…)` |
 | `test_mode`: валідація без виклику адаптера, `WriteAck.status = simulated` | — |
 | Читальний API `storage.v1` | `list_*`, `get_*`, `read_*` |
 
@@ -32,6 +32,66 @@
 
 Ключ доставки для сутностей — `delivery_key` виклику + індекс сутності у вході
 (`<delivery_key>#<n>`), для RAW — `delivery_key` виклику.
+
+Повтор при `CONFLICT` обмежує й розтягує в часі **власна конфігурація сервісу** storage
+(`limits.conflict_retries`, типово 4 спроби, backoff 200 мс × 2 до 10 с із jitter). Контрактний
+`limits.retries` — політика викликача (повтор виклику з тим самим `Idempotency-Key`), тому ні профіль
+платформи, ні `HandlerInvocation.limits` цей backoff не змінюють. Вичерпані спроби — `AdapterError(retryable=True)`
+→ `HandlerResult.failed` (`connection_error`, `retryable: true`): оркестратор повторить виклик тим самим ключем.
+
+## Записи доставок (`DeliveryRecord.acks`)
+
+`DeliveryRecord` зберігається адаптером атомарно з даними (для сутності — у тій самій транзакції чи CAS, що
+знімок і подія історії) і безстроково. `acks` — це підтвердження, які ядро поверне з `status: duplicate` на
+повторну доставку того самого ключа, тому всі шість адаптерів пишуть **однаковий** документ:
+
+| Доставка | Ключ | `acks` |
+|---|---|---|
+| Сутність (`commit_entity`) | `<delivery_key>#<n>` | рівно один документ `jane_storage.codec.entity_ack`: `{"entity": {"entity_type", "canonical_key", "version"}, "applied_fields": [...], "stale_fields": [...], "delivery_key": "<ключ>"}` — `version` знімка після цього коміту |
+| Об'єкт RAW чи документ результату (`record_delivery` після `put_object`) | `<delivery_key>` (перший RAW), `<delivery_key>#raw<n>` (наступні RAW, n ≥ 1), `<delivery_key>#data<n>` (документи `writes: data`, n ≥ 0); `jane_storage.keys` | рівно один документ `{"object": StoredObjectRef, "delivery_key": "<ключ>"}` |
+
+Повторна доставка: `WriteAck = {"status": "duplicate", "target": <поточна ціль>, **acks[0] без status/target**,
+"delivery_key"}`. Порожній `acks` можливий лише для доставки, коміт якої ще завершується (заявка без знімка в
+об'єктних сховищах) — тоді `WriteAck` має лише `status`, `target`, `delivery_key`. Поля `acks` не містять
+секретів і вмісту; читачі мають терпіти невідомі поля (толерантний читач).
+
+## Простір імен
+
+Підключення (`Connection.params`) задає місце в сховищі: каталог (`base_path`), базу, бакет. Параметри етапу
+з `params_schema` пакета вибирають простір **усередині** підключення:
+
+| Адаптер | Параметр етапу | Типово (якщо немає ні в етапі, ні в `params` підключення) |
+|---|---|---|
+| filesystem, minio, s3 | `prefix` (підкаталог / префікс ключів) | без префікса |
+| mongodb | `prefix` (префікс колекцій) | `jane_` |
+| postgresql, sqlserver | `schema`, `table_prefix` | `public` / `dbo`, `jane_` |
+
+Під час запису параметр етапу перекриває однойменний `params` підключення. Читальний API `storage.v1`
+(і повторна обробка за `stored_materials.storage_connection_id`) параметрів етапу не має: він бачить простір,
+заданий `params` самого підключення. Щоб читати дані з простору етапу, зареєструйте окреме підключення з тими
+самими `params.prefix` / `schema` / `table_prefix`. Окремого параметра простору імен у `storage.v1` немає
+(рішення WP-17, R01: контракт описує фактичну поведінку).
+
+## Формати RAW (`format.raw`)
+
+Формат RAW = `params.format.raw` етапу → `entry.format.raw` маніфесту → типова поведінка (ТЗ §5, §13.1 п.4):
+
+| Значення | Що зберігається | Медіатип / розширення |
+|---|---|---|
+| не задано | вебсторінка (`text/html`, `application/xhtml+xml`) — як `html`; будь-який інший RAW (Telegram, JSON API, стрічки) — як `json` | — |
+| `original` | байти як отримано | медіатип матеріалу; розширення за ним |
+| `html` | сторінка байт-у-байт; не-HTML матеріал → `HandlerResult.failed` (`invalid_params`) | `text/html`, `.html` |
+| `json` | JSON-документ Material із вбудованим вмістом (`content.encoding` utf-8/base64) | `application/json`, `.json` |
+
+Схема маніфесту не має `default` для `format.raw`: відсутнє значення — це саме типова поведінка вище, а не
+`original`. Відновлений Material (`GET /v1/objects/{id}`) для `json` містить **початковий** вміст із
+документа (inline), а не сам документ; для `html` / `original` — постійне посилання на ті самі байти.
+
+Повторне збереження відновленого Material (повторна обробка з `from_stage` = етап збереження, R19): оркестратор
+передає persistent `ContentRef` як є (ADR-0004 §6). Для `file://` файлового адаптера storage читає вміст лише з
+каталогу `JANE_STORAGE_CONTENT_FILES_DIR`; у базовому стеку це корінь RAW-об'єктів власного тому
+(`/var/lib/jane/storage/objects`), а записи доставок, індекс і сутності адаптера поза ним недоступні. Без цього
+налаштування локальні blob вимкнено і такий виклик дає `HandlerResult.failed`.
 
 ## Об'єктні сховища (minio, s3) і файлова система
 
@@ -54,7 +114,7 @@
    Збій перенесення не губить подію: читання історії враховує `pending`, наступний читач/коміт
    повторює перенесення. Осиротіла подія не займає версію перед CAS знімка.
 4. При 412/тайм-ауті CAS адаптер звіряє знімок і нашу подію: застосований коміт → `COMMITTED`;
-   програна гонка → компенсація лише власної заявки й `CONFLICT`, ядро повторює за `limits.retries`.
+   програна гонка → компенсація лише власної заявки й `CONFLICT`, ядро повторює за `limits.conflict_retries`.
    Докладний протокол і межа умовного видалення MinIO —
    [S3 README](../../services/storage/adapters/s3/README.md#розкладка-й-атомарність).
 

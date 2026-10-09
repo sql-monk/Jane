@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import binascii
 import hashlib
 import json
 import logging
@@ -57,30 +58,79 @@ from .content import ContentReader
 from .handler import StorageHandler
 from .packages import PackageCatalog, StoragePackage
 from .registry_packages import RegistryPackages
-from .settings import ServiceLimits, Settings, resolve_service_limits
+from .settings import CONNECTION_FIRST_OPTIONS, ServiceLimits, Settings, resolve_service_limits
 
 log = logging.getLogger(__name__)
 
 REQUEST_LIMIT_PATHS = {
-    "retries",
     "timeouts.sync_response_max_ms",
     "timeouts.request_timeout_ms",
 }
-"""Parts of ``HandlerInvocation.limits`` this executor applies (min with its own hard caps)."""
+"""Parts of ``HandlerInvocation.limits`` this executor applies (min with its own hard caps). The stage's
+``retries`` is the caller's policy (the orchestrator re-sends with the same key) and is ignored here: the core's
+own ``CONFLICT`` retries come from ``limits.conflict_retries`` of the service configuration."""
 
 
 def _request_layer(limits: Mapping[str, Any] | None) -> LimitLayer | None:
     if not limits:
         return None
     picked: dict[str, Any] = {}
-    if isinstance(limits.get("retries"), Mapping):
-        picked["retries"] = dict(limits["retries"])
     timeouts = {
         k: v for k, v in dict(limits.get("timeouts") or {}).items() if f"timeouts.{k}" in REQUEST_LIMIT_PATHS
     }
     if timeouts:
         picked["timeouts"] = timeouts
     return LimitLayer("request", picked, name="invocation") if picked else None
+
+
+_MANY_CURSOR_PREFIX = "m1."
+"""Cursor of a listing over several ``material_id`` values (opaque to clients)."""
+
+
+def _many_cursor(cursor: str, count: int) -> tuple[int, str | None]:
+    """``(index of the material id, adapter cursor)`` of a multi-id listing cursor."""
+    try:
+        if not cursor.startswith(_MANY_CURSOR_PREFIX):
+            raise ValueError("not a multi-id cursor")
+        index, inner = json.loads(base64.urlsafe_b64decode(cursor[len(_MANY_CURSOR_PREFIX) :]))
+        if (
+            not isinstance(index, int)
+            or not 0 <= index < count
+            or not (inner is None or isinstance(inner, str))
+        ):
+            raise ValueError("cursor out of range")
+    except (ValueError, TypeError, binascii.Error) as exc:
+        raise ValidationFailed(
+            "invalid cursor for this material_id filter",
+            errors=[FieldError(parameter="cursor", message="use next_cursor of the same query")],
+        ) from exc
+    return index, inner
+
+
+def _inline(data: bytes) -> dict[str, str]:
+    """``encoding`` + ``data`` of an inline ContentRef (utf-8 when the bytes are valid UTF-8)."""
+    try:
+        return {"encoding": "utf-8", "data": data.decode("utf-8")}
+    except UnicodeDecodeError:
+        return {"encoding": "base64", "data": base64.b64encode(data).decode("ascii")}
+
+
+def _embedded_content(document: bytes) -> tuple[bytes, str | None] | None:
+    """Original content bytes (and media type) embedded in a RAW stored as a JSON Material document
+    (:func:`jane_storage.formats.build_raw_object`, ``format.raw: json``); ``None`` if it is not such a document."""
+    try:
+        doc = json.loads(document)
+        content = doc["content"]
+        if content["encoding"] == "base64":
+            data = base64.b64decode(content["data"], validate=True)
+        elif content["encoding"] == "utf-8":
+            data = str(content["data"]).encode("utf-8")
+        else:
+            return None
+    except (ValueError, TypeError, KeyError, binascii.Error):
+        return None
+    media_type = content.get("media_type")
+    return data, media_type if isinstance(media_type, str) else None
 
 
 def _fingerprint(body: Mapping[str, Any]) -> str:
@@ -174,7 +224,9 @@ def build_app(
     registry = ConnectionRegistry(validator=_connection_validator(root), policy=settings.connection_policy())
     if settings.connections_file is not None:
         registry.load_file(settings.connections_file)
-    pool = AdapterPool(registry, limits.adapters.model_dump())
+    pool = AdapterPool(
+        registry, limits.adapters.model_dump(exclude_none=True), connection_first=CONNECTION_FIRST_OPTIONS
+    )
     catalog = PackageCatalog.discover(settings.package_dirs)
     installed = frozenset(available_adapters())
     remote = (
@@ -205,7 +257,7 @@ def build_app(
             catalog,
             pool,
             reader,
-            retries=lim.retries,
+            retries=lim.conflict_retries,
             request_validator=_request_validator(root),
             registry=remote,
             archive_limits=lim.packages.archive_limits(),
@@ -588,27 +640,61 @@ def build_app(
         }
         return {k: v for k, v in out.items() if v is not None}
 
+    async def list_many(
+        adapter: Any, wanted: list[str], filters: Mapping[str, Any], cursor: str | None, size: int
+    ) -> tuple[list[ObjectRecord], str | None]:
+        """Objects of several ``material_id`` values: one adapter listing per id (sorted), with a cursor
+        ``(index of the id, adapter cursor)`` - every adapter supports the single-id filter, so the protocol
+        stays unchanged. Order: by ``material_id``, then the adapter's own order."""
+        index, inner = _many_cursor(cursor, len(wanted)) if cursor else (0, None)
+        page: list[ObjectRecord] = []
+        while index < len(wanted) and len(page) < size:
+            part, nxt = await call(
+                adapter.list_objects(
+                    material_id=wanted[index], cursor=inner, limit=size - len(page), **filters
+                )
+            )
+            page.extend(part)
+            if nxt is None or (not part and nxt == inner):
+                index, inner = index + 1, None
+            else:
+                inner = nxt
+        if index >= len(wanted):
+            return page, None
+        return page, _MANY_CURSOR_PREFIX + base64.urlsafe_b64encode(
+            json.dumps([index, inner]).encode()
+        ).decode("ascii")
+
     @app.get("/v1/objects", tags=["objects"])
     async def list_objects(
         connection_id: str,
         source_id: str | None = None,
         material_id: str | None = None,
+        material_ids: list[str] | None = Query(default=None),  # noqa: B008 - FastAPI query declaration
         since: datetime | None = None,
         until: datetime | None = None,
         cursor: str | None = None,
         limit: int | None = Query(default=None, ge=1),
     ) -> JSONResponse:
-        adapter = await reader(connection_id)
-        page, next_cursor = await call(
-            adapter.list_objects(
-                source_id=source_id,
-                material_id=material_id,
-                since=since,
-                until=until,
-                cursor=cursor,
-                limit=clamp_limit(limit, limits.pages),
+        wanted = sorted({*([material_id] if material_id else []), *(material_ids or [])})
+        cap = limits.objects.max_filter_material_ids
+        if len(wanted) > cap:
+            raise JaneError(
+                f"{len(wanted)} material ids exceed objects.max_filter_material_ids={cap}",
+                code="limit_exceeded",
+                errors=[FieldError(parameter="material_ids", message=f"at most {cap} values")],
             )
-        )
+        adapter = await reader(connection_id)
+        size = clamp_limit(limit, limits.pages)
+        filters = {"source_id": source_id, "since": since, "until": until}
+        if len(wanted) <= 1:
+            page, next_cursor = await call(
+                adapter.list_objects(
+                    material_id=wanted[0] if wanted else None, cursor=cursor, limit=size, **filters
+                )
+            )
+        else:
+            page, next_cursor = await list_many(adapter, wanted, filters, cursor, size)
         items = [
             {
                 "object": object_ref(rec, adapter.kind, connection_id),
@@ -643,7 +729,23 @@ def build_app(
             )
             content_uri = getattr(adapter, "content_uri", None)
             uri = content_uri(rec) if callable(content_uri) else None
-            if uri is not None:
+            if meta.get("stored_format") == "json":
+                # The object is the JSON document of the Material (format.raw json, or the TZ §5 default for a
+                # RAW that is not a web page): its bytes are not the material's content. Restore the original
+                # content embedded in the document; there is no persistent URI of those bytes.
+                original = _embedded_content(await call(adapter.read_object_content(object_id)))
+                if original is not None and len(original[0]) <= limits.transfer.inline_max_bytes:
+                    data, media_type = original
+                    material["content"] = {
+                        "kind": "inline",
+                        "media_type": media_type or material["format"].get("media_type") or rec.media_type,
+                        **_inline(data),
+                        "size_bytes": len(data),
+                        "sha256": hashlib.sha256(data).hexdigest(),
+                    }
+                else:
+                    material = {}
+            elif uri is not None:
                 material["content"] = {
                     "kind": "blob",
                     "uri": uri,
@@ -655,14 +757,10 @@ def build_app(
                 }
             elif rec.size_bytes <= limits.transfer.inline_max_bytes:
                 data = await call(adapter.read_object_content(object_id))
-                try:
-                    inline = {"encoding": "utf-8", "data": data.decode("utf-8")}
-                except UnicodeDecodeError:
-                    inline = {"encoding": "base64", "data": base64.b64encode(data).decode("ascii")}
                 material["content"] = {
                     "kind": "inline",
                     "media_type": rec.media_type,
-                    **inline,
+                    **_inline(data),
                     "size_bytes": rec.size_bytes,
                     "sha256": rec.sha256,
                 }

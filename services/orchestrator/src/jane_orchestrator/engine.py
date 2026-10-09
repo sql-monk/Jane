@@ -18,11 +18,12 @@ do the same work twice and a killed worker's work is taken over once its lease e
 from __future__ import annotations
 
 import logging
+import math
 import random
 import threading
 import time
 from collections.abc import Callable, Mapping
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from jane_orchestrator.common import delivery_key, new_id, now
@@ -40,10 +41,111 @@ __all__ = ["Engine", "Worker"]
 log = logging.getLogger(__name__)
 
 TERMINAL_JOB = {"succeeded", "failed", "cancelled"}
+NO_CONNECTIONS_STATUSES = (501,)
+"""Answer of ``PUT /v1/connections/{id}`` meaning "this executor has no managed connections": the explicit
+``501 not_implemented`` of handler.v1. A 404/405 (no such path, an ingress during a restart) is not taken as that:
+it stays a visible ``failed`` sync, so a collector never starts without a connection that silently vanished."""
 
 
 def _ms(value: int) -> timedelta:
     return timedelta(milliseconds=value)
+
+
+def _utc(expr: str) -> str:
+    """SQL text of a ``timestamptz`` expression as RFC 3339 UTC with ``Z`` (contract ``Timestamp``)."""
+    return f"to_char(({expr}) AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')"
+
+
+def _history_add(event_sql: str) -> str:
+    """SQL value of ``items.attempt_history`` with one more event while it holds fewer than the cap (the
+    first ``%s`` placeholder; ``engine.attempt_history_max``). Diagnostics only (R25)."""
+    return (
+        "CASE WHEN jsonb_array_length(items.attempt_history) < %s"
+        f" THEN items.attempt_history || jsonb_build_array({event_sql}) ELSE items.attempt_history END"
+    )
+
+
+_NEW_ATTEMPTS = """CASE WHEN c.old_status = 'running'
+                         OR (c.old_status = 'retrying' AND items.error->>'code' = 'idempotency_in_progress')
+                       THEN items.attempts
+                       ELSE items.attempts + 1 END"""
+"""Attempt number after a claim: a lease take-over or an in-progress replay is not a new attempt."""
+
+_DELAYED_EVENT = _history_add(
+    f"%s::jsonb || jsonb_build_object('at', {_utc('now()')}, 'available_at', {_utc('now() + %s')})"
+)
+"""Event of a parked or scheduled retry: placeholders cap, static fields (Jsonb), delay (interval)."""
+
+_FINAL_EVENT = _history_add(f"%s::jsonb || jsonb_build_object('at', {_utc('now()')})")
+"""Final event of an item: placeholders cap, static fields (Jsonb)."""
+
+
+_CLAIM_ITEM_SQL = "".join(
+    (
+        """
+    WITH c AS (
+        SELECT i.item_id, i.status AS old_status
+        FROM items i JOIN runs r ON r.run_id = i.run_id
+        WHERE r.status = 'running'
+          AND ((i.status IN ('queued', 'retrying') AND i.available_at <= now())
+               OR (i.status = 'running' AND i.lease_expires_at < now()))
+          AND (SELECT count(*) FROM items x
+               WHERE x.run_id = i.run_id AND x.stage_id = i.stage_id
+                 AND x.status = 'running' AND x.lease_expires_at >= now()) < i.parallel_limit
+        ORDER BY i.seq
+        LIMIT 1
+        FOR UPDATE OF i SKIP LOCKED
+    )
+    UPDATE items SET status = 'running', lease_owner = %s, lease_expires_at = now() + %s, attempts = """,
+        _NEW_ATTEMPTS,
+        """,
+        lease_reclaims = items.lease_reclaims + CASE WHEN c.old_status = 'running' THEN 1 ELSE 0 END,
+        started_at = coalesce(items.started_at, now()),
+        updated_at = now(),
+        attempt_history = """,
+        _history_add(
+            "jsonb_build_object('event', CASE WHEN c.old_status = 'running' THEN 'lease_reclaimed'"
+            f" ELSE 'claimed' END, 'at', {_utc('now()')}, 'attempt', {_NEW_ATTEMPTS})"
+        ),
+        """
+    FROM c WHERE items.item_id = c.item_id
+    RETURNING items.*, c.old_status
+    """,
+    )
+)
+"""Claim one item (placeholders: worker, lease interval, attempt history cap)."""
+
+
+_RETRY_SQL = "".join(
+    (
+        "UPDATE items SET status = 'retrying', lease_owner = NULL, lease_expires_at = NULL,"
+        " available_at = now() + %s, error = %s, updated_at = now(), attempt_history = ",
+        _DELAYED_EVENT,
+        " WHERE item_id = %s",
+    )
+)
+"""Schedule a retry or park an in-progress delivery (placeholders: delay, error, event values, item id)."""
+
+_FAIL_SQL = "".join(
+    (
+        "UPDATE items SET status = 'failed', lease_owner = NULL, lease_expires_at = NULL, payload = NULL,"
+        " error = %s, finished_at = now(), updated_at = now(), attempt_history = ",
+        _FINAL_EVENT,
+        " WHERE item_id = %s",
+    )
+)
+"""Fail an item without a handler result (placeholders: error, event values, item id)."""
+
+_COMPLETE_SQL = "".join(
+    (
+        "UPDATE items SET status = %s, result_status = %s, invocation_id = %s, handler = %s, outputs = %s,"
+        " lease_owner = NULL, lease_expires_at = NULL, payload = NULL, error = %s,"
+        " llm_cost = %s, llm_currency = %s, finished_at = now(), updated_at = now(), attempt_history = ",
+        _FINAL_EVENT,
+        " WHERE item_id = %s",
+    )
+)
+"""Record a handler result (placeholders: status ... llm_currency, event values, item id)."""
 
 
 def backoff_ms(retries: Mapping[str, Any], attempt: int) -> int:
@@ -55,6 +157,21 @@ def backoff_ms(retries: Mapping[str, Any], attempt: int) -> int:
     if retries.get("jitter"):
         base += random.uniform(0, base / 2)  # noqa: S311 - jitter, not crypto
     return int(min(base, cap if cap > 0 else base))
+
+
+def _stored_within(stored_at: Any, since: str | None, until: str | None) -> bool:
+    """``since <= stored_at < until`` (``storage.v1`` semantics of the listing filters) for an object read by id."""
+    if not (since or until):
+        return True
+    if not isinstance(stored_at, str):
+        return False
+    at = _instant(stored_at)
+    return (since is None or at >= _instant(since)) and (until is None or at < _instant(until))
+
+
+def _instant(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00").replace("z", "+00:00"))
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 class Heartbeat:
@@ -100,34 +217,7 @@ class Engine:
     def claim_item(self, worker: str) -> dict[str, Any] | None:
         with self.core.db.tx() as conn:
             row = conn.execute(
-                """
-                WITH c AS (
-                    SELECT i.item_id, i.status AS old_status
-                    FROM items i JOIN runs r ON r.run_id = i.run_id
-                    WHERE r.status = 'running'
-                      AND ((i.status IN ('queued', 'retrying') AND i.available_at <= now())
-                           OR (i.status = 'running' AND i.lease_expires_at < now()))
-                      AND (SELECT count(*) FROM items x
-                           WHERE x.run_id = i.run_id AND x.stage_id = i.stage_id
-                             AND x.status = 'running' AND x.lease_expires_at >= now()) < i.parallel_limit
-                    ORDER BY i.seq
-                    LIMIT 1
-                    FOR UPDATE OF i SKIP LOCKED
-                )
-                UPDATE items SET status = 'running', lease_owner = %s, lease_expires_at = now() + %s,
-                                 attempts = CASE WHEN c.old_status = 'running'
-                                                   OR (c.old_status = 'retrying' AND
-                                                       items.error->>'code' = 'idempotency_in_progress')
-                                                 THEN items.attempts
-                                                 ELSE items.attempts + 1 END,
-                                 lease_reclaims = items.lease_reclaims
-                                                  + CASE WHEN c.old_status = 'running' THEN 1 ELSE 0 END,
-                                 started_at = coalesce(items.started_at, now()),
-                                 updated_at = now()
-                FROM c WHERE items.item_id = c.item_id
-                RETURNING items.*, c.old_status
-                """,
-                (worker, self.lease),
+                _CLAIM_ITEM_SQL, (worker, self.lease, self.core.engine.attempt_history_max)
             ).fetchone()
         if row is not None and row["old_status"] == "running":
             self.core.metrics.inc("leases_expired")
@@ -324,6 +414,19 @@ class Engine:
         out["run_status"] = run["status"] if run else None
         return out
 
+    def _event(
+        self, event: str, item: Mapping[str, Any], delay_ms: int | None, err: Mapping[str, Any] | None
+    ) -> tuple[Any, ...]:
+        """Placeholder values of ``_DELAYED_EVENT`` (with ``delay_ms``) or ``_FINAL_EVENT``: cap, static fields
+        [, delay interval]. The timestamps come from the database clock, like ``available_at``."""
+        static: dict[str, Any] = {"event": event, "attempt": int(item["attempts"])}
+        if delay_ms is not None:
+            static["delay_ms"] = int(delay_ms)
+        if err and err.get("code"):
+            static["code"] = str(err["code"])
+        values: tuple[Any, ...] = (self.core.engine.attempt_history_max, Jsonb(static))
+        return (*values, _ms(delay_ms)) if delay_ms is not None else values
+
     def _park_in_progress(self, item: Mapping[str, Any], worker: str, err: dict[str, Any]) -> str:
         """Release the worker, retaining the delivery key and attempt until its result can be replayed."""
         delay = self.core.engine.idempotency_in_progress_retry_ms
@@ -331,9 +434,13 @@ class Engine:
             if self._lock_item(conn, item, worker) is None:
                 return "lease_lost"
             conn.execute(
-                "UPDATE items SET status = 'retrying', lease_owner = NULL, lease_expires_at = NULL,"
-                " available_at = now() + %s, error = %s, updated_at = now() WHERE item_id = %s",
-                (_ms(delay), Jsonb(err), item["item_id"]),
+                _RETRY_SQL,
+                (
+                    _ms(delay),
+                    Jsonb(err),
+                    *self._event("in_progress_parked", item, delay, err),
+                    item["item_id"],
+                ),
             )
         self.core.metrics.inc("items", outcome="retrying")
         log.info("in-progress delivery parked", extra={"item_id": item["item_id"], "delay_ms": delay})
@@ -357,9 +464,13 @@ class Engine:
                 if self._lock_item(conn, item, worker) is None:
                     return "lease_lost"
                 conn.execute(
-                    "UPDATE items SET status = 'retrying', lease_owner = NULL, lease_expires_at = NULL,"
-                    " available_at = now() + %s, error = %s, updated_at = now() WHERE item_id = %s",
-                    (_ms(delay), Jsonb(err), item["item_id"]),
+                    _RETRY_SQL,
+                    (
+                        _ms(delay),
+                        Jsonb(err),
+                        *self._event("retry_scheduled", item, delay, err),
+                        item["item_id"],
+                    ),
                 )
             self.core.metrics.inc("items", outcome="retrying")
             log.info(
@@ -383,9 +494,8 @@ class Engine:
             if self._lock_item(conn, item, worker) is None:
                 return "lease_lost"
             conn.execute(
-                "UPDATE items SET status = 'failed', lease_owner = NULL, lease_expires_at = NULL, payload = NULL,"
-                " error = %s, finished_at = now(), updated_at = now() WHERE item_id = %s",
-                (Jsonb(err), item["item_id"]),
+                _FAIL_SQL,
+                (Jsonb(err), *self._event("failed", item, None, err), item["item_id"]),
             )
             run_failed = stage.get("on_failure") == "fail_run" and self.runs.fail_run(
                 conn, run["run_id"], {**err, "details": {"stage_id": stage["stage_id"]}}
@@ -453,25 +563,23 @@ class Engine:
                         "UPDATE items SET stored_object_id = %s WHERE item_id = %s",
                         (next(iter(objects)), item["item_id"]),
                     )
+            final_error = (
+                problem("upstream_conflict", str((result.get("failure") or {}).get("message", "")), 502)
+                if final_failed
+                else None
+            )
             conn.execute(
-                "UPDATE items SET status = %s, result_status = %s, invocation_id = %s, handler = %s, outputs = %s,"
-                " lease_owner = NULL, lease_expires_at = NULL, payload = NULL, error = %s,"
-                " llm_cost = %s, llm_currency = %s, finished_at = now(), updated_at = now() WHERE item_id = %s",
+                _COMPLETE_SQL,
                 (
                     "failed" if final_failed else "completed",
                     status,
                     result.get("invocation_id"),
                     Jsonb(result.get("handler") or stage["handler"]),
                     Jsonb(self._outputs(result)),
-                    Jsonb(
-                        problem(
-                            "upstream_conflict", str((result.get("failure") or {}).get("message", "")), 502
-                        )
-                    )
-                    if final_failed
-                    else None,
+                    Jsonb(final_error) if final_error else None,
                     usage.get("amount"),
                     usage.get("currency"),
+                    *self._event("failed" if final_failed else "completed", item, None, final_error),
                     item["item_id"],
                 ),
             )
@@ -893,8 +1001,12 @@ class Engine:
         if restarts + 1 >= int(retries.get("max_attempts") or 1):
             return None
         after = error.get("retry_after_seconds")
+        if after is None:  # collectors also repeat it in details (Telegram flood wait, WP-04)
+            after = (error.get("details") or {}).get("retry_after_seconds")
         backoff = backoff_ms(retries, restarts + 1)
-        return max(int(after) * 1000, backoff) if isinstance(after, int | float) else backoff
+        if isinstance(after, int | float) and not isinstance(after, bool) and after > 0:
+            return max(math.ceil(after * 1000), backoff)  # never earlier than retry_after_seconds
+        return backoff
 
     def _connections_pending(self, run: Mapping[str, Any], executor: str) -> bool:
         """True while a connection the collection needs is still being pushed to this collector."""
@@ -1030,6 +1142,13 @@ class Engine:
         One storage connection usually keeps RAW of several sources, and the same URL (so the same
         ``material_id``) may be stored by each of them: the listing is filtered by ``source_id`` (storage.v1
         ``GET /v1/objects?source_id=``), and an object that still reports another source is skipped.
+
+        Selection (R06, filters combine with AND): ``material_ids`` - every stored observation of these materials
+        (passed to storage as the ``material_ids`` filter when there are at most
+        ``engine.stored_material_ids_per_request``, and always checked here); ``observation_ids`` - only these
+        observations; ``object_ids`` - exactly these stored objects, read one by one with ``GET /v1/objects/{id}``
+        (a missing one is a non-retryable 404 that fails the run), ``since``/``until`` then apply to their
+        ``stored_at``.
         """
         stored = run["input"]["stored_materials"]
         executor = self.core.executors.first("storage_read")
@@ -1045,27 +1164,45 @@ class Engine:
                 )
             return "failed"
         source_id = run["source_id"]
-        params: dict[str, Any] = {"connection_id": conn_id, "limit": capacity}
-        if source_id:
-            params["source_id"] = source_id
-        if run["feed_cursor"]:
-            params["cursor"] = run["feed_cursor"]
-        for key in ("since", "until"):
-            if stored.get(key):
-                params[key] = stored[key]
         wanted = set(stored.get("material_ids") or [])
-        page = self.core.executors.call(
-            executor, "GET", "/v1/objects", params=params, trace_id=run["trace_id"]
-        ).json()
+        observations = set(stored.get("observation_ids") or [])
+        object_ids = list(stored.get("object_ids") or [])
+        if object_ids:
+            # exact choice: these stored RAW objects, in the given order (the cursor is a list index)
+            start = int(run["feed_cursor"] or 0)
+            batch = object_ids[start : start + max(capacity, 1)]
+            candidates: list[tuple[str, dict[str, Any] | None]] = [(object_id, None) for object_id in batch]
+            nxt: str | None = str(start + len(batch)) if start + len(batch) < len(object_ids) else None
+        else:
+            params: dict[str, Any] = {"connection_id": conn_id, "limit": capacity}
+            if source_id:
+                params["source_id"] = source_id
+            if run["feed_cursor"]:
+                params["cursor"] = run["feed_cursor"]
+            for key in ("since", "until"):
+                if stored.get(key):
+                    params[key] = stored[key]
+            if wanted and len(wanted) <= self.core.engine.stored_material_ids_per_request:
+                # storage.v1 filter by several material ids; a storage without it ignores the parameter and the
+                # listing below is still filtered here
+                params["material_ids"] = sorted(wanted)
+            page = self.core.executors.call(
+                executor, "GET", "/v1/objects", params=params, trace_id=run["trace_id"]
+            ).json()
+            candidates = [
+                (obj["object"]["object_id"], obj.get("material") or {}) for obj in page.get("items") or []
+            ]
+            nxt = page.get("next_cursor")
         materials = []
         stored_objects: dict[str, str | None] = {}
-        for obj in page.get("items") or []:
-            mat_meta = obj.get("material") or {}
-            if wanted and mat_meta.get("material_id") not in wanted:
-                continue
-            if source_id and mat_meta.get("source_id") not in (None, source_id):
-                continue
-            object_id = obj["object"]["object_id"]
+        for object_id, mat_meta in candidates:
+            if mat_meta is not None:
+                if wanted and mat_meta.get("material_id") not in wanted:
+                    continue
+                if observations and mat_meta.get("observation_id") not in (None, *observations):
+                    continue
+                if source_id and mat_meta.get("source_id") not in (None, source_id):
+                    continue
             detail = self.core.executors.call(
                 executor,
                 "GET",
@@ -1078,13 +1215,20 @@ class Engine:
                 continue
             if source_id and (material.get("source") or {}).get("source_id") not in (None, source_id):
                 continue
+            if wanted and material.get("material_id") not in wanted:
+                continue
+            if observations and material.get("observation_id") not in observations:
+                continue
+            if object_ids and not _stored_within(
+                detail.get("stored_at"), stored.get("since"), stored.get("until")
+            ):
+                continue
             materials.append(material)
             observation_id = material["observation_id"]
             if observation_id not in stored_objects:
                 stored_objects[observation_id] = object_id
             elif stored_objects[observation_id] != object_id:
                 stored_objects[observation_id] = None  # distinct copies: never choose the last object
-        nxt = page.get("next_cursor")
         created = self._accept_materials(
             run, worker, materials, nxt, nxt is None, None, run["input"].get("from_stage"), stored_objects
         )
@@ -1306,13 +1450,17 @@ class Engine:
                 return done
             cfg = self.core.executors.configs.get(row["executor"])
             status, message = "synced", None
+            unused = False
             if cfg is None:
                 status, message = "failed", "executor is no longer configured"
             else:
                 try:
                     if row["op"] == "delete":
                         self.core.executors.call(
-                            cfg, "DELETE", f"/v1/connections/{row['connection_id']}", ok=(404,)
+                            cfg,
+                            "DELETE",
+                            f"/v1/connections/{row['connection_id']}",
+                            ok=(404, *NO_CONNECTIONS_STATUSES),
                         )
                     elif doc_row is not None:
                         self.core.executors.call(
@@ -1320,17 +1468,21 @@ class Engine:
                         )
                 except ExecutorError as exc:
                     message = str(exc)
-                    if exc.status == 501:
-                        status, message = (
-                            "failed",
-                            "executor does not use managed connections (not_implemented)",
+                    if exc.status in NO_CONNECTIONS_STATUSES and exc.code == "not_implemented":
+                        # handler.v1: /v1/connections* are optional for an executor without managed
+                        # connections (handler-runtime answers PUT with 501 not_implemented). Not a failed
+                        # sync: the executor simply does not take part, so it is dropped from the sync list.
+                        unused = True
+                        log.info(
+                            "executor does not use managed connections",
+                            extra={"executor": row["executor"], "status": exc.status},
                         )
                     elif exc.retryable and row["attempts"] < eng.sync_max_attempts:
                         status = "pending"
                     else:
                         status = "failed"
             with self.core.db.tx() as conn:
-                if row["op"] == "delete" and status == "synced":
+                if unused or (row["op"] == "delete" and status == "synced"):
                     conn.execute(
                         "DELETE FROM connection_sync WHERE connection_id = %s AND executor = %s AND lease_owner = %s",
                         (row["connection_id"], row["executor"], worker),

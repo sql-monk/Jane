@@ -105,7 +105,9 @@ test.describe("real registry: rules package, approval and independent fork @hybr
         return response.status();
       })
       .toBe(200);
-    const ported = await (await request.get(`${base}/v1/packages/${forkId}/versions/1.1.0`, { headers })).json();
+    const ported = await (
+      await request.get(`${base}/v1/packages/${forkId}/versions/1.1.0`, { headers })
+    ).json();
     expect(ported.manifest?.provenance?.upstream_port?.parent_version).toBe("1.1.0");
     await admin.goto(`/packages/${forkId}`);
     await admin.getByRole("tab", { name: "Відмінності" }).click();

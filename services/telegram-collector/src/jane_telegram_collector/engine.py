@@ -25,7 +25,17 @@ from .client import (
 )
 from .collector import LeaseLost, RunDeps, TelegramRun, new_stats
 from .connections import resolve_account
-from .materials import ContentTooLarge, Delivery, TransitStore, build_material, new_observation_id, rfc3339
+from .materials import (
+    ContentTooLarge,
+    Delivery,
+    TransitStore,
+    build_material,
+    material_id,
+    message_sha,
+    new_observation_id,
+    revision_sequence,
+    rfc3339,
+)
 from .rules import ContractSchemas, RulesLoader, validate_rules
 from .settings import ServiceLimits, Settings, contract_layer, platform_layers, to_contract
 from .state import StateStore
@@ -425,6 +435,9 @@ class Engine:
             transit_ttl_seconds=limits.transfer.transit_ttl_seconds,
             store=self.transit,
         )
+        # the revision number from the revisions this collector already emitted (any state_key, nothing written):
+        # the same text keeps its sequence, another text in the same second gets the next one (review 1, R04)
+        seen = self.state.latest_seen(material_id(channel.channel_id, msg.message_id))
         try:
             return build_material(
                 msg,
@@ -434,6 +447,7 @@ class Engine:
                 collector_version=__version__,
                 source_id=payload.get("source_id"),
                 rules_ref=rules_ref,
+                sequence=revision_sequence(msg, message_sha(msg), seen),
             )
         except ContentTooLarge as exc:
             raise JaneError(

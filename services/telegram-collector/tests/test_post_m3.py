@@ -22,7 +22,7 @@ from jsonschema import Draft202012Validator
 
 from jane_kit.contracts import ContractClient, OpenAPISpec
 from jane_telegram_collector.app import build_app
-from jane_telegram_collector.state import SCHEMA_VERSION
+from jane_telegram_collector.state import SCHEMA_VERSION, StateFileTooNew
 from jane_telegram_collector.testing import (
     CHANNEL_ID,
     REPO_ROOT,
@@ -136,3 +136,32 @@ def test_busy_state_store_answers_503_with_retry_after(
         api.get(f"/v1/collections/{cid}/materials", params={"after": page["next_cursor"]}).status_code == 200
     )
     assert api.delete("/v1/states/busy").status_code == 204
+
+
+def test_one_shot_fetch_numbers_revisions_like_collections(client: TestClient, channel: Recording) -> None:
+    """Review 1 of WP-16: a one-shot fetch takes the revision number from the revisions the collector already
+    emitted, so another text within the same second does not get the sequence of an earlier revision."""
+    edit_date = T0 + timedelta(days=1)
+    seconds = int(edit_date.timestamp())
+    channel.edit(7, "Event 7: moved to 20:00", edit_date=edit_date)
+    _, items = _collect(client)
+    first = next(m for m in items if m["locator"]["telegram"]["message_id"] == 7)
+    assert first["revision"]["sequence"] == seconds * 1000
+    channel.edit(7, "Event 7: moved to 21:00", edit_date=edit_date)  # the same second, another text
+    body = {"source_kind": "telegram", "telegram": {"channel_username": USERNAME, "message_id": 7}}
+    one = client.post("/v1/fetches", json=body).json()
+    assert one["revision"]["sequence"] == seconds * 1000 + 1
+    assert client.post("/v1/fetches", json=body).json()["revision"] == one["revision"]  # nothing written
+    _, items = _collect(client, mode="incremental")
+    assert [m["revision"]["sequence"] for m in items] == [one["revision"]["sequence"]]  # numbered alike
+
+
+def test_state_file_of_a_newer_version_is_refused(tmp_path: Path, channel: Recording) -> None:
+    settings = make_settings(tmp_path)
+    with TestClient(build_app(settings)):
+        pass
+    db = sqlite3.connect(settings.state_dir / "state.db")
+    db.execute(f"PRAGMA user_version = {SCHEMA_VERSION + 1}")
+    db.close()
+    with pytest.raises(StateFileTooNew, match="newer than this collector supports"):
+        build_app(settings)

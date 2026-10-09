@@ -117,6 +117,15 @@ def test_api_feed_items_in_incremental_runs_follow_revisit(client: TestClient, s
         httpx.put(control, json={"price": item["price"]}, timeout=10)
 
 
+REDIRECTS: dict[str, tuple[int, str]] = {
+    "/old-api": (307, "/api/v1/products"),
+    "/moved-api": (303, "/api/v1/products"),
+    "/out-api": (307, "http://elsewhere.example.org/api/v1/products"),  # another host, outside the scope
+    "/meta-api": (307, "http://169.254.169.254/latest/meta-data"),  # link-local: the cloud metadata service
+}
+"""POST redirects of the test site: path -> (status, Location)."""
+
+
 class PostingSite(Site):
     """``Site`` that also logs POST requests: ``(path, content-type, body)``."""
 
@@ -144,11 +153,13 @@ def post_site() -> Iterator[PostingSite]:
                     (self.path, self.headers.get("Content-Type", ""), self.rfile.read(length))
                 )
             path = urlsplit(self.path).path
-            if path in {"/old-api", "/moved-api"}:
-                status = 307 if path == "/old-api" else 303
+            if path in REDIRECTS:
+                status, location = REDIRECTS[path]
                 self.send_response(status)
                 query = urlsplit(self.path).query
-                self.send_header("Location", "/api/v1/products" + (f"?{query}" if query else ""))
+                if location.startswith("/"):
+                    location += f"?{query}" if query else ""
+                self.send_header("Location", location)
                 self.send_header("Content-Length", "0")
                 self.end_headers()
                 return
@@ -215,6 +226,49 @@ def test_api_feed_post_follows_redirects_by_their_method_rules(
     assert posted[0] == "/moved-api" and "/api/v1/products" not in posted  # 303: not repeated as POST
     assert post_site.requests["/api/v1/products"] == 1  # ... but continued with GET, without the body
     assert {urlsplit(p).query for p in posted[1:]} == {"page=2", "page=3", "page=4"}  # next pages: POST again
+
+
+OWNER_POLICY = {
+    "mode": "owner_policy",
+    "owner_policy": {"confirmed_owner": True, "justification": "the test owns this site and its API"},
+}
+
+
+@pytest.mark.parametrize(
+    ("path", "code", "extra"),
+    [
+        ("/private/api", "access_denied_by_policy", {}),  # robots.txt of the testsite: Disallow: /private/
+        ("/out-api", "out_of_scope", {}),  # 307 to another host outside the scope
+        # 307 to a link-local address that scope and the owner's robots policy allow: the egress policy refuses
+        ("/meta-api", "access_denied_by_policy", {"robots": OWNER_POLICY, "extra_domain": "169.254.169.254"}),
+    ],
+    ids=["robots", "redirect-out-of-scope", "redirect-egress"],
+)
+def test_api_feed_post_obeys_robots_scope_and_egress(
+    client: TestClient, post_site: PostingSite, path: str, code: str, extra: dict[str, Any]
+) -> None:
+    """Review 1 of WP-16: a POST of an API page goes through the same policy as any fetch of the core -
+    robots.txt, the scope of every redirect hop and the outbound address policy - and is refused, not sent."""
+    strategy = {**api(post_site), "url": post_site.url(path), "method": "POST", "body": {"q": 1}}
+    rules = web_rules(post_site, strategies=[strategy])
+    if "robots" in extra:
+        rules["robots"] = extra["robots"]
+    if "extra_domain" in extra:
+        rules["scope"]["allowed_domains"].append(extra["extra_domain"])
+    cid = start(
+        client, {"source_kind": "web", "source_id": "post-policy", "rules": rules, "limits": FAST_LIMITS}
+    )
+    assert drain(client, cid) == []
+    assert wait_done(client, cid)["status"] == "succeeded"
+    errs = client.get(f"/v1/collections/{cid}/errors").json()["items"]
+    assert [e["code"] for e in errs] == [code], errs
+    posted = [p[0] for p in post_site.posts]
+    if path == "/private/api":
+        assert posted == [] and post_site.requests["/robots.txt"] >= 1  # never sent, robots.txt was read
+    else:
+        assert posted == [path]  # the first hop only: the redirect target is refused before any request
+    if path == "/meta-api":
+        assert "egress policy" in errs[0]["message"]
 
 
 # ============================================================================================== R23: incremental

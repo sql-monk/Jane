@@ -25,7 +25,7 @@ from .materials import Delivery, MaterialTooLarge, TransitStore, build_material,
 from .robots import RobotsCache
 from .rules import ContractSchemas, RulesLoader, validate_rules
 from .settings import ServiceLimits, Settings, contract_layer, platform_layers, to_contract
-from .shared_hosts import SharedHosts
+from .shared_hosts import SharedHosts, check_ttl
 from .state import StateStore
 from .urls import Normalizer, Scope
 
@@ -75,16 +75,16 @@ class Engine:
         # one per-host schedule for every collection and one-shot fetch of this process (WP-02c), shared with the
         # other instances of the same state store (R15)
         collector = self.limits.collector
-        shared = (
-            SharedHosts(
+        shared = None
+        if collector.shared_host_limits:
+            # a renewal that waited one full lock wait must come before the TTL runs out (fails the start)
+            check_ttl(float(collector.shared_host_ttl_seconds), settings.state_busy_timeout_ms)
+            shared = SharedHosts(
                 state,
                 settings.instance_id,
                 poll_s=collector.shared_host_poll_ms / 1000,
                 ttl_s=float(collector.shared_host_ttl_seconds),
             )
-            if collector.shared_host_limits
-            else None
-        )
         self.host_limiter = HostLimiter(self.limits, shared)
         self.deps = RunDeps(
             state=state,
@@ -135,6 +135,8 @@ class Engine:
         await self.runner.shutdown()
         for cid in list(self.local):
             self.state.release(cid, self.settings.instance_id)
+        if self.host_limiter.shared is not None:
+            await self.host_limiter.shared.aclose()
         await self.client.aclose()
 
     async def _resume_loop(self) -> None:

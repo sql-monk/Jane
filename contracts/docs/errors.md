@@ -50,7 +50,7 @@
 | `schema_mismatch` | 422 | ні | Дані не відповідають схемі контракту пакета |
 | `out_of_scope` | 422 | ні | URL поза межами обходу |
 | `access_denied_by_policy` | 403 | ні | Заборонено `robots.txt` або політикою доступу |
-| `source_unavailable` | 502 | так | Джерело (сайт, Telegram) повернуло помилку або недоступне; `details.http_status` |
+| `source_unavailable` | 502 | так* | Джерело (сайт, Telegram) повернуло помилку або недоступне; `details.http_status` (web) або `details.reason` (Telegram). *Окремі випадки, які повтор не змінить (канал недоступний — `channel_unavailable`, сесію відхилено — `account_unauthorized`), мають `retryable: false`: рішення про повтор приймайте за полем `retryable` відповіді |
 | `upstream_unavailable` | 502 | так | Недоступний сусідній сервіс Jane або зовнішній провайдер (LLM, сховище) |
 | `internal_error` | 500 | так | Непередбачена помилка |
 | `not_implemented` | 501 | ні | Можливість не реалізована цим сервісом (див. `/v1/info` capabilities) |

@@ -691,15 +691,19 @@ class StateStore:
     # ------------------------------------------------------------------ per-host schedule of all instances (R15)
     def host_take_slot(
         self, host: str, instance_id: str, token: str, *, interval: float, parallel: int, ttl: float
-    ) -> float | None:
-        """One attempt of request ``token`` to start on ``host`` for the whole platform (R15), in one transaction:
+    ) -> tuple[bool, float]:
+        """One attempt of request ``token`` to start on ``host`` for the whole platform (R15), in one transaction.
 
-        register (renew) the limits of ``instance_id`` on the host; queue the request in arrival order
-        (``host_waiters``); if fewer requests than the smallest registered parallelism are in flight and no older
-        waiter is ahead for the free slots, take a slot and reserve the next start - at least the largest
-        registered interval after the previous start of any instance, not before a ``Retry-After``. Returns the
-        start (epoch seconds) or ``None`` (try again later). Expired registrations, slots and waiters (instances
-        that died) are dropped first."""
+        Registers (renews) the limits of ``instance_id`` on the host and queues the request in arrival order
+        (``host_waiters``). The request takes a slot only when it may start **now**: fewer requests than the
+        smallest registered parallelism are in flight, no older waiter is ahead of it for the free slots, and the
+        schedule allows a start - the largest registered interval after the previous start of any instance has
+        passed, and so has a ``Retry-After``. A slot is thus never held while waiting (review 1 of WP-16).
+
+        Returns ``(True, 0.0)`` when the slot is taken (the start is recorded as now), ``(False, seconds)`` when the
+        request is first in line but the schedule allows a start only in ``seconds``, ``(False, 0.0)`` when it waits
+        for a slot or an older waiter (try again after the poll interval). Expired registrations, slots and waiters
+        (instances that died: nothing renews them) are dropped first."""
         now = time.time()
         with self.tx() as db:
             db.execute("DELETE FROM host_slots WHERE host = ? AND expires_at <= ?", (host, now))
@@ -732,12 +736,7 @@ class StateStore:
             )
             busy = int(db.execute("SELECT COUNT(*) FROM host_slots WHERE host = ?", (host,)).fetchone()[0])
             if busy + ahead >= allowed:
-                return None
-            db.execute("DELETE FROM host_waiters WHERE host = ? AND token = ?", (host, token))
-            db.execute(
-                "INSERT INTO host_slots(host, token, instance_id, expires_at) VALUES (?, ?, ?, ?)",
-                (host, token, instance_id, now + ttl),
-            )
+                return False, 0.0
             interval_s = float(
                 db.execute("SELECT MAX(interval_s) FROM host_users WHERE host = ?", (host,)).fetchone()[0]
             )
@@ -745,13 +744,43 @@ class StateStore:
                 "SELECT last_start, not_before FROM host_schedule WHERE host = ?", (host,)
             ).fetchone()
             last, not_before = (float(row[0]), float(row[1])) if row else (0.0, 0.0)
-            start = max(now, last + interval_s, not_before)
+            due = max(last + interval_s, not_before)
+            if due > now:
+                return False, due - now  # first in line: keep the place, start when the schedule allows
+            db.execute("DELETE FROM host_waiters WHERE host = ? AND token = ?", (host, token))
+            db.execute(
+                "INSERT INTO host_slots(host, token, instance_id, expires_at) VALUES (?, ?, ?, ?)",
+                (host, token, instance_id, now + ttl),
+            )
             db.execute(
                 "INSERT INTO host_schedule(host, last_start, not_before) VALUES (?, ?, ?) "
                 "ON CONFLICT(host) DO UPDATE SET last_start = excluded.last_start",
-                (host, start, not_before),
+                (host, now, not_before),
             )
-            return start
+            return True, 0.0
+
+    def host_renew(
+        self,
+        instance_id: str,
+        registrations: Mapping[str, tuple[float, int]],
+        tokens: Sequence[str],
+        ttl: float,
+    ) -> None:
+        """Keep alive what a live instance holds (R15): its registrations on hosts (``host -> (interval, parallel)``,
+        re-created if they expired meanwhile), and the slots and places in line of ``tokens``. A killed instance
+        renews nothing, so its rows expire ``ttl`` seconds after its last renewal."""
+        expires = time.time() + ttl
+        with self.tx() as db:
+            for host, (interval, parallel) in registrations.items():
+                db.execute(
+                    "INSERT INTO host_users(host, instance_id, interval_s, parallel, expires_at) "
+                    "VALUES (?, ?, ?, ?, ?) ON CONFLICT(host, instance_id) DO UPDATE SET "
+                    "interval_s = excluded.interval_s, parallel = excluded.parallel, expires_at = excluded.expires_at",
+                    (host, instance_id, interval, parallel, expires),
+                )
+            for token in tokens:
+                db.execute("UPDATE host_slots SET expires_at = ? WHERE token = ?", (expires, token))
+                db.execute("UPDATE host_waiters SET expires_at = ? WHERE token = ?", (expires, token))
 
     def host_release_slot(self, host: str, token: str) -> None:
         """Give back the slot of ``token`` (or its place in line, if it never got one)."""

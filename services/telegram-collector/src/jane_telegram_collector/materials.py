@@ -224,7 +224,7 @@ def build_material(
     sequence: int | None = None,
 ) -> dict[str, Any]:
     """``sequence``: the revision number computed against the state (:func:`revision_sequence`); without it the
-    first number of the ``edit_date`` second (one-shot fetch, which keeps no state)."""
+    first number of the ``edit_date`` second."""
     fetched = now or datetime.now(UTC)
     body = msg.text.encode("utf-8")
     if sequence is None:

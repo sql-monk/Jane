@@ -179,9 +179,9 @@ class Collector(Limits):
     shared_host_poll_ms: int = Field(default=100, ge=10)
     """A request waiting for a host slot that other instances hold re-checks this often."""
     shared_host_ttl_seconds: int = Field(default=120, ge=1)
-    """A registration of an instance on a host, or a slot it holds, expires after this long without a renewal or
-    a release (an instance that was killed stops limiting the others); keep it above
-    ``timeouts.request_timeout_ms``."""
+    """How long the registration, slot or place in line of an instance that died keeps limiting the others. A live
+    instance renews them every TTL / 3 (also during long downloads, Retry-After and Crawl-delay waits), so the TTL
+    need not exceed them; start-up rule: TTL * 2/3 > ``STATE_BUSY_TIMEOUT_MS``."""
 
 
 class ServiceLimits(Limits):

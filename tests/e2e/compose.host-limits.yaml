@@ -1,0 +1,19 @@
+# L2 / R15: an isolated two-replica stack. The real testsite handler is instrumented, not replaced.
+services:
+  testsite:
+    command: ["python", "/app/host_probe.py"]
+    environment:
+      JANE_E2E_HOST_PROBE_GATE_TIMEOUT_S: ${JANE_E2E_HOST_PROBE_GATE_TIMEOUT_S:-120}
+    volumes:
+      - ../tests/e2e/jane_e2e/host_probe.py:/app/host_probe.py:ro
+
+  web-collector:
+    environment:
+      JANE_WEB_COLLECTOR_STATE_DIR: /var/lib/jane-web-collector
+      JANE_WEB_COLLECTOR_STATE_BUSY_TIMEOUT_MS: ${JANE_E2E_SHARED_HOST_BUSY_TIMEOUT_MS:-500}
+      JANE_WEB_COLLECTOR_LIMITS__COLLECTOR__SHARED_HOST_LIMITS: "true"
+      JANE_WEB_COLLECTOR_LIMITS__COLLECTOR__SHARED_HOST_TTL_SECONDS: ${JANE_E2E_SHARED_HOST_TTL_SECONDS:-8}
+      JANE_WEB_COLLECTOR_LIMITS__COLLECTOR__SHARED_HOST_POLL_MS: ${JANE_E2E_SHARED_HOST_POLL_MS:-50}
+    # Compose scales this service, retaining the same project-scoped volume for both replicas.
+    volumes:
+      - web-collector-data:/var/lib/jane-web-collector

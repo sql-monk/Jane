@@ -16,7 +16,7 @@ Checkout координатора для злиттів — `.claude/worktrees/i
 
 | Завдання | Гілка / worktree | Стан |
 |---|---|---|
-| C-1: CI й документація | `wp/23a-developer-docs`, `wp23a` | підготовлено; лише Markdown і коментар workflow |
+| C-1: CI й документація | `wp/23a-developer-docs`, `wp23a` | прийнято й запушено, merge `a5b1563` |
 | C-2: contracts/python у workspace | буде створено після приймання WP-19 | чекає маркера `merge: accept WP-19` в origin |
 | C-3: формат Python-контрактів | `wp/23c-contracts-format`, `wp23c` | виконує окремий субагент |
 | C-4: прибирання | `.jane/cleanup-post-m3.ps1` | останнім: після WP-19 і завершення потоку B |
@@ -39,6 +39,13 @@ $ перевірка локальних Markdown-посилань у README.md, 
 Local Markdown links: 29 checked, 0 missing
 $ git diff --check
 (порожній вивід, exit 0)
+$ python .claude/hooks/jane_wp.py check-diff origin/codex/jane-integration
+WP-23: 4 changed file(s), 0 outside ownership
+$ git merge --no-ff wp/23a-developer-docs -m 'merge: accept WP-23a developer documentation [skip ci]'
+Merge made by the 'ort' strategy.
+4 files changed, 88 insertions(+), 2 deletions(-)
+$ git push origin HEAD:codex/jane-integration
+2366213..a5b1563  HEAD -> codex/jane-integration
 ```
 
 ## Залежності й межі

@@ -322,7 +322,8 @@ export const ASSISTANT_MODEL_ALIASES = ["e2e-admin-cheap", "e2e-admin-strong"] a
  * A deterministic LLM in the real gateway through its public API (WP-10 provider `fake`, a substitute of the
  * external model): an `llm_provider` connection with scripted `responses` (first match by the data channel; no
  * match -> the minimal value valid for the output schema), a provider with non-zero prices (so that costs are
- * visible) and model aliases pointing at it. Every call is an idempotent PUT.
+ * visible) and model aliases pointing at it. Every call is an idempotent PUT. `pricing` (USD per million tokens)
+ * matters when a scenario makes many calls within the assistant's run budget (onboarding samples page by page).
  */
 export async function seedFakeLlm(
   request: APIRequestContext,
@@ -330,6 +331,7 @@ export async function seedFakeLlm(
   id: string,
   responses: unknown[],
   aliases: readonly string[],
+  pricing: { input_per_mtok: number; output_per_mtok: number } = { input_per_mtok: 50, output_per_mtok: 200 },
 ): Promise<void> {
   await jsonRequest(
     request,
@@ -357,7 +359,7 @@ export async function seedFakeLlm(
           model_id: "fake-deterministic-1",
           max_context_tokens: 128000,
           supports_structured_output: true,
-          pricing: { input_per_mtok: 50, output_per_mtok: 200, currency: "USD" },
+          pricing: { ...pricing, currency: "USD" },
         },
       ],
     },

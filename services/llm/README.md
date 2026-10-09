@@ -125,7 +125,7 @@ just down -v --project jane-wp10
 | `JANE_LLM_REGISTRY_URL` / `JANE_LLM_REGISTRY_TOKEN` | — | репозиторій обробників для пакетів за `handler` (архів `…/archive`); токен — власний ключ шлюзу (`registry:read`), лише з середовища, не журналюється |
 | `JANE_LLM_LOG_LEVEL` / `JANE_LLM_LOG_FORMAT` | `INFO` / `json` | журнали |
 | `JANE_LLM_AUTH_MODE` | `none` | `none` / `api_key` / `jwt` — див. «Автентифікація (ADR-0005)» |
-| `JANE_LLM_LIMITS_FILE` | — | файл `PlatformLimits` (`defaults`, `hard_caps`), зокрема цілий профіль `deploy/profiles/<профіль>.json`: ліміти контракту, яких сервіс не має, ігноруються (перелік — у журналі старту), опечатка чи некоректне значення — помилка старту. Увага: `timeouts.connect_timeout_ms`, `timeouts.request_timeout_ms` і `retries` профілю діють і на виклики провайдерів (`provider.*` оголошені як ці поля контракту), тобто замінюють типові 120 с тайм-ауту запиту |
+| `JANE_LLM_LIMITS_FILE` | — | файл `PlatformLimits` (`defaults`, `hard_caps`), зокрема цілий профіль `deploy/profiles/<профіль>.json`: ліміти контракту, яких сервіс не має, ігноруються (перелік — у журналі старту), опечатка чи некоректне значення — помилка старту. `timeouts.connect_timeout_ms` і `retries` профілю діють і на виклики провайдерів (`provider.connect_timeout_ms`, `provider.retries` оголошені як ці поля контракту); тайм-аут самого виклику моделі `provider.request_timeout_ms` — власний ліміт сервісу, профіль його не змінює (WP-15, R12) |
 | `JANE_LLM_LIMITS__<ГРУПА>__<ПАРАМЕТР>` | — | перевизначення, напр. `JANE_LLM_LIMITS__LLM__BUDGET__AMOUNT=5` |
 | `JANE_LLM_LIMITS__HARD_CAPS__…` | — | жорсткі стелі платформи |
 
@@ -214,8 +214,9 @@ JANE_LLM_API_KEYS=[{"name": "assistant", "sha256": "<sha256 hex ключа>", "s
 | `gateway.max_package_files` | 1000 | файлів в архіві пакета |
 | `fake.max_delay_ms` | 30000 | верхня межа затримки провайдера `fake` (`params.delay_ms`, `responses[].delay_ms`); довша скорочується до неї, `0` вимикає затримки (`JANE_LLM_LIMITS__FAKE__MAX_DELAY_MS`) |
 | пул PostgreSQL (`JANE_LLM_DB_POOL_MIN_SIZE` / `JANE_LLM_DB_POOL_MAX_SIZE`) | 1 / 10 | з'єднань на екземпляр (налаштування процесу, не `limits`) |
-| `provider.connect_timeout_ms` / `provider.request_timeout_ms` | 5000 / 120000 | тайм-аути викликів провайдера (контракт `timeouts.*`) |
-| `provider.retries.max_attempts` | 2 | спроби виклику провайдера (контракт `retries`) |
+| `provider.connect_timeout_ms` | 5000 | встановлення з'єднання з провайдером (контракт `timeouts.connect_timeout_ms`: профіль платформи задає й це значення) |
+| `provider.request_timeout_ms` | 120000 | один виклик моделі — очікування всієї генерації (власний ліміт, **не** контрактний `timeouts.request_timeout_ms`, розрахований на веб; змінюється лише `JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS` чи власним файлом лімітів). Найгірший час одного `createCompletion` ≈ (повтори за схемою + 1) × `provider.retries.max_attempts` × це значення + backoff — викликач (асистент: `llm_call.request_timeout_ms`) має чекати щонайменше стільки або брати `mode: async` |
+| `provider.retries.max_attempts` | 2 | спроби виклику провайдера (контракт `retries`: профіль платформи задає й їх) |
 | `registry.connect_timeout_ms` / `request_timeout_ms` / `max_attempts` | 5000 / 30000 / 3 | виклики репозиторію обробників |
 | `jobs.max_concurrent_jobs` / `max_queued_jobs` / `job_timeout_ms` | 4 / 1000 / 3600000 | асинхронні job (jane-kit) |
 | `idempotency.idempotency_ttl_seconds` | 86400 | скільки пам'ятається `Idempotency-Key` (контракт `transfer.idempotency_ttl_seconds`) |

@@ -140,6 +140,20 @@ class RegistryLimits(Limits):
         )
 
 
+class ProviderLimits(Limits):
+    """Calls of LLM providers (``providers/anthropic.py``).
+
+    Connection establishment and the retry policy are the platform's general HTTP limits (contract
+    ``timeouts.connect_timeout_ms``, ``retries``: a platform profile sets them). The time of one model call is the
+    gateway's own limit: a generation of ``max_output_tokens_per_request`` takes minutes, while the contract's
+    ``timeouts.request_timeout_ms`` is sized for web fetches and service calls (30 s in the profiles)."""
+
+    connect_timeout_ms: int = contract_field("timeouts.connect_timeout_ms", 5_000, ge=1)
+    request_timeout_ms: int = Field(default=120_000, ge=1)
+    """One provider HTTP call (waiting for the whole generation); not the contract's ``timeouts.request_timeout_ms``."""
+    retries: RetryPolicy = contract_field("retries", RetryPolicy(max_attempts=2, initial_backoff_ms=500))
+
+
 class FakeProviderLimits(Limits):
     """The deterministic test provider ``fake`` (internal, not in ``limits.schema.json``)."""
 
@@ -152,10 +166,8 @@ class ServiceLimits(Limits):
     llm: LlmLimits = LlmLimits()
     gateway: GatewayLimits = GatewayLimits()
     fake: FakeProviderLimits = FakeProviderLimits()
-    provider: ClientLimits = ClientLimits(
-        request_timeout_ms=120_000, retries=RetryPolicy(max_attempts=2, initial_backoff_ms=500)
-    )
-    """Timeouts and retries of calls to LLM providers (contract ``timeouts.*``, ``retries``)."""
+    provider: ProviderLimits = ProviderLimits()
+    """Calls to LLM providers: own ``request_timeout_ms``; contract ``timeouts.connect_timeout_ms`` and ``retries``."""
     registry: RegistryLimits = RegistryLimits()
     jobs: JobLimits = JobLimits()
     idempotency: IdempotencyLimits = IdempotencyLimits()
@@ -167,5 +179,6 @@ def resolve_service_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLi
 
     The platform file may be a whole platform profile (``deploy/profiles/<profile>.json``): contract limits
     this service does not have are ignored (``ResolvedLimits.ignored``, start-up log); typos fail. Its
-    ``timeouts.*`` and ``retries`` reach ``provider`` (declared as those contract fields)."""
+    ``timeouts.connect_timeout_ms`` and ``retries`` reach ``provider``; ``timeouts.request_timeout_ms`` does not
+    (the model call timeout is ``provider.request_timeout_ms``, ``JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS``)."""
     return resolve_limits(ServiceLimits, *settings.platform_layers(f"{ENV_PREFIX}LIMITS__"), *extra)

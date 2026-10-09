@@ -836,3 +836,11 @@ r1 → виправлення на `origin/wp/01g2-service-auth`, CI 37857870977
   вони не входять до прийнятого тегу M3. C-W2/R33 та інші [запити після M3](M3/open-requests.md)
   лишаються відкритими. План прибирання не виконувався; `main` координатор A не змінював.
 
+
+## Після M3 (2026-10-09)
+
+- Людина злила M3 у `main` (`5d93086`) і вирішила: профілі `dev-laptop` і `single-node` виключено з обсягу повністю (R31 закрито).
+- Беклог [M3/open-requests.md](M3/open-requests.md) виконується пакетами WP-15…21 (власність — `.claude/wp-paths.json`), кожен з незалежним wp-reviewer і contract-guardian (≤2 раунди; раунд 2 — перевірка координатором).
+- Злито в `codex/jane-integration`: п'ята черга потоку B `040fe6e` (R09–R11, R16, R28, R32-опис, R33); WP-18 `4d87516` (R27, R32-тест); WP-17 `539152d` (R01, R02, R05, R06, R14-storage, R19, R21, R25, rate_limited, test_summary); WP-15 `eff48bb` (R07, R08, R12, R13, R14-асистент, R24-API, R29, INSTANCE_ID); WP-16 `37a30e2` (R03, R04, R15, R20, R22, R23, R30). Повний CI [37884090704](https://github.com/sql-monk/Jane/actions/runs/37884090704) на `37a30e2` — success.
+- У роботі: WP-19 (R17, R18), WP-20 (адмінка: R24-UI, R26, нові поля WP-15/17), WP-21 (e2e R-03/R06/R01, профілі, `errors.md`, закріплення oasdiff).
+- Прибирання worktree/гілок: 61 worktree знято з реєстрації, докази — у `.jane/archive/worktrees/`; решта — скрипт людини `.jane/cleanup-post-m3.ps1` (dry-run за замовчуванням, незлиті гілки → теги `archive/*`).

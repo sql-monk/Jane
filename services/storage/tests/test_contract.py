@@ -113,6 +113,10 @@ def test_storage_read_api_matches_contract(client: TestClient, h: SimpleNamespac
         "/v1/entity-history", params={"connection_id": "raw-files", "entity_type": "product", "key": "x|{}"}
     )
     api.get("/v1/objects", params={"connection_id": "raw-files"})
+    several = {"connection_id": "raw-files", "material_ids": [h.material()["material_id"], "web:none"]}
+    assert len(api.get("/v1/objects", params=several).json()["items"]) == 1
+    assert api.get("/v1/objects", params={**several, "cursor": "bad"}).status_code == 422
+    assert api.get("/v1/objects", params={"connection_id": "nope"}).status_code == 404
     api.get(f"/v1/objects/{object_id}", params={"connection_id": "raw-files"})
     api.get("/v1/objects/obj_missing", params={"connection_id": "raw-files"})
     content = api.get(f"/v1/objects/{object_id}/content", params={"connection_id": "raw-files"})

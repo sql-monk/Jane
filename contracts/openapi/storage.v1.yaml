@@ -8,6 +8,11 @@ info:
     потрібен адмінці (перегляд матеріалів і результатів, ТЗ §10), оркестратору (повторна обробка
     збережених RAW) і стороннім застосункам. Кожен запит указує `connection_id` — конкретне
     підключення до сховища; сервіс storage читає лише через власні адаптери.
+
+    Простір імен: параметри етапу збереження `prefix` / `schema` / `table_prefix` (params_schema
+    пакета) перекривають однойменні `params` підключення лише під час запису. Читання цього API бачить
+    простір, який задають `params` самого підключення; дані з простору етапу читаються через окреме
+    підключення з тими самими `params` (`contracts/docs/storage-adapter.md`, «Простір імен»).
   license:
     name: Proprietary
     identifier: LicenseRef-Jane
@@ -174,8 +179,24 @@ paths:
         - name: material_id
           in: query
           required: false
+          description: Об'єкти одного матеріалу. Разом із `material_ids` значення об'єднуються.
           schema:
             type: string
+        - name: material_ids
+          in: query
+          required: false
+          description: |
+            Об'єкти будь-якого з кількох матеріалів (повторюваний параметр:
+            `material_ids=a&material_ids=b`); значення об'єднуються з `material_id`. Інші фільтри
+            діють для кожного значення. Порядок — за `material_id`, далі в порядку адаптера; `next_cursor`
+            чинний лише для того самого запиту (інакше 422). Кількість значень обмежує конфігурація сервісу
+            (storage: `objects.max_filter_material_ids`), більше — 422 `limit_exceeded`.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
         - name: since
           in: query
           required: false
@@ -227,6 +248,10 @@ paths:
                     next_cursor: null
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
   /v1/objects/{object_id}:
     parameters:
       - name: object_id
@@ -240,9 +265,16 @@ paths:
       operationId: getObject
       summary: Метадані збереженого об'єкта і відновлений Material для повторної обробки
       tags: [objects]
+      description: |
+        Для RAW — відновлений Material для повторної обробки. Вміст залежить від формату збереження
+        (`format.raw` пакета, `contracts/docs/storage-adapter.md`, «Формати RAW»): `html` / `original` —
+        постійне посилання адаптера на ті самі байти (`file://` чи `s3://`, `store: persistent`) або inline
+        до `limits.transfer.inline_max_bytes`; `json` (документ Material із вбудованим вмістом) — початковий
+        вміст, вийнятий із документа, inline до `limits.transfer.inline_max_bytes`. Якщо вміст не можна
+        віддати (більший за ліміт без постійного посилання), `material` відсутній.
       responses:
         '200':
-          description: Об'єкт і, для RAW, Material із постійним посиланням на вміст.
+          description: Об'єкт і, для RAW, Material із посиланням на вміст (або inline-вмістом).
           content:
             application/json:
               schema:
@@ -362,4 +394,5 @@ components:
         stored_at:
           $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
         material:
+          description: Відновлений Material (лише для RAW і лише якщо його вміст можна віддати, див. опис операції).
           $ref: '../schemas/material.schema.json'

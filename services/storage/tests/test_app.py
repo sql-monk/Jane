@@ -39,7 +39,8 @@ def test_health_and_info(client: TestClient) -> None:
     caps = info["capabilities"]
     assert {"filesystem", "postgresql"} <= set(caps["adapters"])
     assert {p["package_id"] for p in caps["packages"]} >= {"jane.storage-files", "jane.storage-postgresql"}
-    assert info["limits"]["defaults"]["retries"]["max_attempts"] == 4
+    # the contract limits.retries is the caller's policy; the core's CONFLICT retries are service-internal
+    assert "retries" not in info["limits"]["defaults"]
     assert info["limits"]["defaults"]["timeouts"]["sync_response_max_ms"] == 30000
 
 
@@ -219,12 +220,13 @@ def test_body_limit_and_async_mode(
 def test_request_limits_apply_within_hard_caps(
     settings: Settings, h: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("JANE_STORAGE_LIMITS__HARD_CAPS__RETRIES__MAX_ATTEMPTS", "3")
+    monkeypatch.setenv("JANE_STORAGE_LIMITS__HARD_CAPS__TIMEOUTS__SYNC_RESPONSE_MAX_MS", "60000")
     with TestClient(build_app(settings)) as c:
         body = h.invocation(
             [{"kind": "entities", "entities": [h.entity()]}],
             "dk-lim",
-            limits={"retries": {"max_attempts": 50}},
+            # retries is the stage policy of the caller: accepted and ignored by storage
+            limits={"timeouts": {"sync_response_max_ms": 999_999}, "retries": {"max_attempts": 50}},
         )
         assert h.post(c, body).status_code == 200
 

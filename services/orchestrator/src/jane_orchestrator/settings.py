@@ -61,8 +61,12 @@ class ExecutorConfig(BaseModel):
 
     @property
     def syncs_connections(self) -> bool:
+        """``sync_connections`` if set; otherwise collectors, handlers and llm, except an executor whose
+        ``capabilities.connections`` is ``false`` (handler.v1: ``/v1/connections*`` are optional for it)."""
         if self.sync_connections is not None:
             return self.sync_connections
+        if self.capabilities.get("connections") is False:
+            return False
         return self.role in {"collector", "handler", "llm"}
 
 
@@ -140,6 +144,15 @@ class EngineLimits(Limits):
     """Samples kept per problem group."""
     trace_outputs_max: int = Field(default=100, ge=0)
     """Output references (entity keys, stored object ids) recorded per item for the material trace."""
+    attempt_history_max: int = Field(default=20, ge=0)
+    """Diagnostic events (claims, scheduled retries, outcome) kept per item for ``attempt_history`` in run items
+    and the material trace; the first events are kept (0 — none)."""
+    stored_selection_max_ids: int = Field(default=10_000, ge=1)
+    """Most ``stored_materials.object_ids`` / ``observation_ids`` values of one run (more — 422 limit_exceeded)."""
+    stored_material_ids_per_request: int = Field(default=100, ge=0)
+    """Up to this many ``stored_materials.material_ids`` are passed to ``storage.v1 GET /v1/objects`` as the
+    ``material_ids`` filter (keep it within storage's ``objects.max_filter_material_ids``); with more, or 0, the
+    source's objects are listed and filtered here, as before WP-17."""
     db_pool_max: int = Field(default=10, ge=1)
     max_lease_reclaims: int = Field(default=5, ge=1)
     """Take-overs of an expired lease before an item is failed as poisonous (a worker keeps dying on it).

@@ -311,6 +311,52 @@ def test_test_results(client: TestClient, uid: Any) -> None:
     assert client.post(url, json=wrong, headers=key(f"t3-{pid}")).status_code == 422
 
 
+def test_test_summary_aggregates_the_latest_report_of_every_context(client: TestClient, uid: Any) -> None:
+    """WP-05 -> WP-09/WP-00: test_status follows the last report; test_summary says whether the version passed
+    on every binding (context) it was tested on, so a later passing binding cannot hide an earlier failing one."""
+    pid = uid("summary")
+    create(client, pid)
+    v = publish(client, pid).json()
+    assert v["test_summary"] == {"status": "unknown", "contexts": []}
+    url = f"/v1/packages/{pid}/versions/1.0.0/test-results"
+
+    def record(context: str, passed: int, failed: int, n: int) -> dict[str, Any]:
+        body = {
+            "runner": "assistant",
+            "context": context,
+            "report": {
+                "package": {"package_id": pid, "version": "1.0.0", "digest": v["digest"]},
+                "passed": passed,
+                "failed": failed,
+                "cases": [{"name": f"c{i}", "passed": i < passed} for i in range(passed + failed)],
+            },
+        }
+        r = client.post(url, json=body, headers=key(f"ts{n}-{pid}"))
+        assert r.status_code == 200, r.text
+        return dict(r.json())
+
+    first = record("bindings:shop-catalog/extract-products", 1, 1, 1)
+    assert first["test_status"] == first["test_summary"]["status"] == "failed"
+    later = record("bindings:other-shop/extract-products", 2, 0, 2)
+    assert later["test_status"] == "passed"  # the latest report alone
+    assert later["test_summary"]["status"] == "failed"  # ... but one binding still fails
+    assert {(c["context"], c["test_status"], c["reports"]) for c in later["test_summary"]["contexts"]} == {
+        ("bindings:shop-catalog/extract-products", "failed", 1),
+        ("bindings:other-shop/extract-products", "passed", 1),
+    }
+    fixed = record("bindings:shop-catalog/extract-products", 2, 0, 3)
+    assert fixed["test_summary"]["status"] == "passed"
+    contexts = {c["context"]: c for c in fixed["test_summary"]["contexts"]}
+    assert contexts["bindings:shop-catalog/extract-products"]["reports"] == 2
+    assert all(c["runner"] == "assistant" and c["recorded_at"] for c in contexts.values())
+    empty = record("tests", 0, 0, 4)  # nothing ran in this context: not a pass
+    assert empty["test_summary"]["status"] == "unknown"
+    view = client.get(f"/v1/packages/{pid}/versions/1.0.0").json()
+    assert view["test_summary"] == empty["test_summary"]
+    listed = client.get(f"/v1/packages/{pid}/versions").json()["items"][0]
+    assert "test_summary" not in listed  # the short form of a list has no reports
+
+
 def test_search(client: TestClient, uid: Any) -> None:
     pid = uid("search")
     create(client, pid)

@@ -539,15 +539,19 @@ paths:
       operationId: activateStageVersion
       summary: Активувати версію пакета в етапі (або відкотити до попередньої)
       description: |
-        Змінює `stages[].handler` завдання з аудитом.
+        Змінює `stages[].handler` завдання з аудитом. Для етапу `kind: collect` активується версія
+        **правил колектора** (ТЗ §8, §10): змінюється `stages[].collector.rules`, пакет має бути
+        `kind: collector-rules` (інакше 422); `previous` — правила етапу або, якщо етап їх не задавав,
+        `Source.collector_rules` джерела (після активації чи відкату етап явно посилається на версію).
         - `activate` — людина активує версію; версія має бути `approved` у репозиторії.
         - `rollback` — повернення до попередньої активації (або до вказаної версії).
         - `auto_activate` — автоматична активація (асистент після перевірок). Приймається лише якщо
           політика дозволяє: `Source.change_policy.llm_versions = auto_after_checks` **і** пакет
-          має `auto_changes_allowed = true` **і** версія пройшла тести (`test_status = passed`) на
-          всіх прив'язках. Інакше — 403 `access_denied_by_policy` (у `details.reason`:
-          `source_policy`, `package_auto_changes_forbidden` або `tests_not_passed`), активація не
-          виконується.
+          має `auto_changes_allowed = true` **і** версія пройшла тести на всіх прив'язках: агрегат
+          registry `PackageVersion.test_summary.status = passed` (останній звіт кожного `context`
+          пройшов); якщо registry не віддає `test_summary` — `test_status = passed`. Інакше — 403
+          `access_denied_by_policy` (у `details.reason`: `source_policy`,
+          `package_auto_changes_forbidden` або `tests_not_passed`), активація не виконується.
       tags: [tasks]
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -811,6 +815,41 @@ paths:
                         delivery_key: 1d7c2a9e5b0f4c3e8a6d2b1f0e9c8d7a
                         started_at: '2026-09-27T10:00:06Z'
                         finished_at: '2026-09-27T10:00:06Z'
+                        attempt_history:
+                          - event: claimed
+                            at: '2026-09-27T10:00:06.010Z'
+                            attempt: 1
+                          - event: completed
+                            at: '2026-09-27T10:00:06.420Z'
+                            attempt: 1
+                      - item_id: itm_01J9ZQ4B0000000000000002
+                        stage_id: extract-products
+                        material_id: web:0a1b2c3d4e5f60718293a4b5c6d7e8f9
+                        observation_id: obs_01J9ZQ4A0000000000000002
+                        status: retrying
+                        attempts: 1
+                        handler:
+                          package_id: shop-example.product-extractor
+                          version: 1.2.0
+                        delivery_key: 2e8d3b0f6c1a5d4f9b7e3c2a1f0d9e8b
+                        error:
+                          type: urn:jane:problem:upstream_unavailable
+                          title: Executor call failed
+                          status: 502
+                          code: upstream_unavailable
+                          retryable: true
+                        started_at: '2026-09-27T10:00:06Z'
+                        available_at: '2026-09-27T10:00:09.512Z'
+                        attempt_history:
+                          - event: claimed
+                            at: '2026-09-27T10:00:06.011Z'
+                            attempt: 1
+                          - event: retry_scheduled
+                            at: '2026-09-27T10:00:06.512Z'
+                            attempt: 1
+                            available_at: '2026-09-27T10:00:09.512Z'
+                            delay_ms: 3000
+                            code: upstream_unavailable
                     next_cursor: null
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
@@ -864,6 +903,25 @@ paths:
                               version: 1.2.0
                             invocation_id: inv_01J9ZQ4B00000000000000A1
                             result_status: success
+                            item_id: itm_01J9ZQ4B0000000000000001
+                            status: completed
+                            attempts: 2
+                            attempt_history:
+                              - event: claimed
+                                at: '2026-09-27T10:00:06.010Z'
+                                attempt: 1
+                              - event: retry_scheduled
+                                at: '2026-09-27T10:00:06.500Z'
+                                attempt: 1
+                                available_at: '2026-09-27T10:00:09.500Z'
+                                delay_ms: 3000
+                                code: upstream_unavailable
+                              - event: claimed
+                                at: '2026-09-27T10:00:09.530Z'
+                                attempt: 2
+                              - event: completed
+                                at: '2026-09-27T10:00:09.910Z'
+                                attempt: 2
                             outputs:
                               - kind: entity
                                 entity_type: product
@@ -1014,14 +1072,16 @@ paths:
                   $ref: '../schemas/common/defs.schema.json#/$defs/Id'
                 note:
                   type: string
+                  description: Пояснення людини чи асистента; зберігається й повертається в `ProblemGroup.note`.
             examples:
               inProgress:
                 value:
                   status: in_progress
                   assistant_job_id: job_01J9ZX0000000000000000IMP
+                  note: version shop-example.product-extractor@1.2.1 awaits manual approval
       responses:
         '200':
-          description: Оновлена група.
+          description: Оновлена група (з `note`, якщо її задано цим або попереднім PATCH).
           content:
             application/json:
               schema:
@@ -1039,6 +1099,7 @@ paths:
                     count: 37
                     status: in_progress
                     assistant_job_id: job_01J9ZX0000000000000000IMP
+                    note: version shop-example.product-extractor@1.2.1 awaits manual approval
                     first_seen_at: '2026-09-26T10:00:00Z'
                     last_seen_at: '2026-09-27T10:00:06Z'
                     samples: []
@@ -1069,6 +1130,16 @@ paths:
                     since: '2026-09-20T00:00:00Z'
                   from_stage: extract-products
                   reason: extractor 1.2.0 fixes price parsing
+              exactRaw:
+                summary: Точний вибір збережених RAW (наприклад RAW прикладу проблемної групи)
+                value:
+                  task_id: shop-catalog
+                  stored_materials:
+                    storage_connection_id: raw-files
+                    object_ids: [obj_01J9ZQ4C00000000000000D1]
+                  from_stage: extract-products
+                  test_mode: true
+                  reason: check the fix on the problem sample
       responses:
         '202':
           $ref: 'common.yaml#/components/responses/JobAccepted'
@@ -1674,6 +1745,47 @@ components:
           $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
         finished_at:
           $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        available_at:
+          description: Діагностика (R25). Найраніший момент, коли елемент у стані queued/retrying можна взяти в роботу (кінець backoff).
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        attempt_history:
+          $ref: '#/components/schemas/AttemptHistory'
+    AttemptHistory:
+      description: |
+        Діагностика (R25): події взяття елемента в роботу й повторів у порядку часу — щоб довести, що повтор
+        почався не раніше backoff. Обмежена конфігурацією оркестратора (`engine.attempt_history_max`,
+        зберігаються перші події); не впливає на виконання.
+      type: array
+      items:
+        $ref: '#/components/schemas/AttemptEvent'
+    AttemptEvent:
+      type: object
+      required: [event, at]
+      properties:
+        event:
+          type: string
+          description: |
+            Розширюваний перелік (толерантний читач): `claimed` — воркер узяв елемент (нова спроба);
+            `lease_reclaimed` — оренду загиблого воркера перехоплено (не нова спроба); `retry_scheduled` —
+            повтор після помилки, елемент чекає до `available_at`; `in_progress_parked` — виконавець ще
+            обробляє той самий `delivery_key`, перевірка — після `available_at`; `completed`, `failed` — фінал.
+          examples: [claimed, lease_reclaimed, retry_scheduled, in_progress_parked, completed, failed]
+        at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        attempt:
+          type: integer
+          minimum: 0
+          description: Номер спроби (StageItem.attempts) на момент події.
+        available_at:
+          description: Для `retry_scheduled` / `in_progress_parked` — коли елемент знову можна взяти.
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        delay_ms:
+          type: integer
+          minimum: 0
+          description: Затримка до `available_at` за політикою повторів (або engine-налаштуванням для in_progress).
+        code:
+          type: string
+          description: Код помилки (Problem.code), що спричинив повтор чи фінальну помилку.
     MaterialTrace:
       type: object
       required: [material_id, observations]
@@ -1714,6 +1826,19 @@ components:
                       type: string
                     result_status:
                       $ref: '../schemas/handler-result.schema.json#/$defs/HandlerStatus'
+                    item_id:
+                      description: Діагностика (R25) — елемент запуску (StageItem.item_id).
+                      type: string
+                    status:
+                      $ref: '#/components/schemas/ItemStatus'
+                    attempts:
+                      type: integer
+                      minimum: 0
+                    available_at:
+                      description: Діагностика (R25), як StageItem.available_at.
+                      $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+                    attempt_history:
+                      $ref: '#/components/schemas/AttemptHistory'
                     outputs:
                       type: array
                       items:
@@ -1784,6 +1909,9 @@ components:
           $ref: '#/components/schemas/ProblemGroupStatus'
         assistant_job_id:
           type: string
+        note:
+          type: string
+          description: Останнє пояснення з `PATCH /v1/problem-groups/{group_id}` (людина чи асистент).
         samples:
           type: array
           items:
@@ -1801,6 +1929,13 @@ components:
       type: object
       additionalProperties: false
       required: [task_id, stored_materials]
+      description: |
+        Повторна обробка збережених RAW джерела завдання. `stored_materials.material_ids` обирає всі
+        збережені спостереження цих матеріалів у вікні `since`/`until`; точний вибір — `object_ids`
+        (конкретні збережені RAW, наприклад `ProblemGroup.samples[].stored_object_id`) або `observation_ids`.
+        `from_stage` — етап, з якого почати (типово — етапи після collect, як для нового збору); це може бути
+        й етап збереження (RAW зберігається ще раз, наприклад в інше сховище; Material передається як є, з
+        постійним `ContentRef` — ADR-0004; що з цього може прочитати storage, задає його конфігурація).
       properties:
         task_id:
           $ref: '../schemas/common/defs.schema.json#/$defs/Slug'

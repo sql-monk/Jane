@@ -4,13 +4,12 @@
   "version": "1.0.0",
   "kind": "storage",
   "title": "File system storage",
-  "description": "RAW вебсторінок — HTML, інші результати — JSON (ТЗ §5).",
+  "description": "RAW вебсторінок — HTML, інші RAW — JSON-документ Material, сутності — JSON (ТЗ §5): format.raw не задано, тож діє типова поведінка.",
   "entry": {
     "executor": "storage",
     "adapter": "filesystem",
     "writes": "raw_and_entities",
     "format": {
-      "raw": "html",
       "entities": "json"
     }
   },

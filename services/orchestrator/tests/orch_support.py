@@ -166,6 +166,9 @@ class ContractFake:
         self.lock = threading.Lock()
         self.requests: list[tuple[str, str, Any]] = []
         self.connections: dict[str, Any] = {}
+        self.connections_unsupported: int | None = None
+        """handler.v1 executor without managed connections: answer PUT with this status (501 like
+        handler-runtime, or 404/405 when the path does not exist)."""
 
     async def _body(self, request: Request) -> Any:
         raw = await request.body()
@@ -190,6 +193,12 @@ class ContractFake:
 
     # --- shared connections endpoints (common.yaml Connection*)
     async def put_connection(self, request: Request) -> Response:
+        if self.connections_unsupported is not None:
+            await request.body()
+            with self.lock:
+                self.requests.append((request.method, request.url.path, None))
+            code = "not_implemented" if self.connections_unsupported == 501 else "not_found"
+            return problem(self.connections_unsupported, code, "no managed connections")
         body = await self._body(request)
         cid = request.path_params["connection_id"]
         created = cid not in self.connections
@@ -639,6 +648,10 @@ class FakeStorage(FakeHandler):
     def __init__(self) -> None:
         super().__init__({"*": self.write}, kind="storage")
         self.read_spec = SPECS["storage"]
+        self.list_queries: list[list[tuple[str, str]]] = []
+        """Query parameters of every ``GET /v1/objects`` (repeated parameters kept)."""
+        self.object_reads: list[str] = []
+        """``object_id`` of every ``GET /v1/objects/{object_id}``."""
 
     def write(self, body: dict[str, Any], _: dict[str, Any]) -> dict[str, Any]:
         target = (body.get("connections") or {}).get("target", "default")
@@ -697,9 +710,12 @@ class FakeStorage(FakeHandler):
         start = int(q.get("cursor", "0"))
         limit = int(q.get("limit", "50"))
 
+        self.list_queries.append(list(q.multi_items()))
+        material_filter = {*q.getlist("material_ids"), *([q["material_id"]] if "material_id" in q else [])}
+
         def wanted(material: dict[str, Any]) -> bool:
             source_ok = q.get("source_id") in (None, material["source"].get("source_id"))
-            return source_ok and q.get("material_id") in (None, material["material_id"])
+            return source_ok and (not material_filter or material["material_id"] in material_filter)
 
         with self.lock:
             matching = [oid for oid in self.object_order if wanted(self.stored_objects[oid]["material"])]
@@ -722,6 +738,8 @@ class FakeStorage(FakeHandler):
         )
 
     async def get_object(self, request: Request) -> Response:
+        with self.lock:
+            self.object_reads.append(request.path_params["object_id"])
         o = self.stored_objects.get(request.path_params["object_id"])
         if o is None:
             return problem(404, "not_found")
@@ -757,6 +775,7 @@ class FakeRegistry(ContractFake):
         test_status: str = "passed",
         auto: bool = True,
         kind: str = "extractor",
+        test_summary: dict[str, Any] | None = None,
     ) -> None:
         self.packages[package_id] = {
             "package_id": package_id,
@@ -775,6 +794,7 @@ class FakeRegistry(ContractFake):
             "status": status,
             "test_status": test_status,
             "created_at": "2026-09-01T00:00:00Z",
+            **({"test_summary": test_summary} if test_summary is not None else {}),
         }
 
     async def package(self, request: Request) -> Response:

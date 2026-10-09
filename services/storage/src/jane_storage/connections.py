@@ -242,10 +242,16 @@ class AdapterPool:
     """Opened adapters per connection; implements ``jane_storage.handler.AdapterProvider``."""
 
     def __init__(
-        self, registry: ConnectionRegistry, default_options: Mapping[str, Any] | None = None
+        self,
+        registry: ConnectionRegistry,
+        default_options: Mapping[str, Any] | None = None,
+        *,
+        connection_first: Iterable[str] = (),
     ) -> None:
         self.registry = registry
         self.default_options = dict(default_options or {})
+        self.connection_first = frozenset(connection_first)
+        """Default options that are only defaults: a connection whose ``params`` set the same name keeps its value."""
         self._open: MutableMapping[tuple[str, str, str], StorageAdapter] = {}
         self._schema_ready: set[tuple[str, str, str]] = set()
         self._lock = asyncio.Lock()
@@ -264,7 +270,11 @@ class AdapterPool:
     ) -> StorageAdapter:
         self.check(connection_id, adapter_kind)
         stored = self.registry.get(connection_id)
-        merged = {**self.default_options, **options}
+        params = stored.document.get("params") or {}
+        defaults = {
+            k: v for k, v in self.default_options.items() if k not in self.connection_first or k not in params
+        }
+        merged = {**defaults, **options}
         key = (connection_id, stored.etag, json.dumps(merged, sort_keys=True))
         async with self._lock:
             adapter = self._open.get(key)

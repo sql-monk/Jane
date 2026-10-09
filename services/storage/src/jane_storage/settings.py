@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import dataclasses
+import logging
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
@@ -17,6 +21,12 @@ from .packages import ArchiveLimits
 from .policy import AddressError, ConnectionPolicy, service_url
 
 ENV_PREFIX = "JANE_STORAGE_"
+LEGACY_RETRIES = "retries"
+"""Before WP-17 the core's CONFLICT retries were ``limits.retries``; in the service's own (non-shared) layers the
+old group is a deprecated alias of ``conflict_retries`` (``JANE_STORAGE_LIMITS__RETRIES__*``)."""
+
+log = logging.getLogger(__name__)
+_LEGACY_WARNED: set[str] = set()
 
 
 class Settings(JaneSettings):
@@ -99,6 +109,8 @@ class Transfer(Limits):
 class Objects(Limits):
     max_object_bytes: int = Field(default=100 * 1024 * 1024, ge=1)
     """Largest RAW / result document the service stores (content read into memory)."""
+    max_filter_material_ids: int = Field(default=200, ge=1)
+    """Most ``material_id`` values one ``GET /v1/objects`` may filter by (``material_id`` + ``material_ids``)."""
 
 
 class Adapters(Limits):
@@ -112,6 +124,25 @@ class Adapters(Limits):
     pool_max_size: int = Field(default=10, ge=1)
     connect_timeout_ms: int = Field(default=10_000, ge=1)
     command_timeout_ms: int = Field(default=30_000, ge=1)
+    chunk_bytes: int | None = Field(default=None, ge=1)
+    """MongoDB: size of one RAW chunk document for every connection that does not set ``params.chunk_bytes``
+    (unset: the adapter's own default, 4 MiB; the adapter rejects values above 15 MiB)."""
+    retry_max_attempts: int | None = Field(default=None, ge=1)
+    """MinIO/S3: botocore attempts per request for every connection that does not set
+    ``params.retry_max_attempts`` (unset: the adapter's own default, 3)."""
+
+
+CONNECTION_FIRST_OPTIONS = frozenset({"chunk_bytes", "retry_max_attempts"})
+"""Service-wide adapter defaults that a connection's own ``params`` override (the other ``adapters.*`` options
+are applied over the connection params)."""
+
+
+class ConflictRetries(RetryPolicy):
+    """Retries of the core on ``CONFLICT`` (a concurrent writer changed the entity version first).
+
+    Not the contract ``limits.retries``: that policy is the caller's (re-sending a request with the same
+    ``Idempotency-Key``), so neither a platform profile nor ``HandlerInvocation.limits`` changes this backoff.
+    The defaults are those that applied before the split (``RetryPolicy`` of jane-kit)."""
 
 
 class Invocations(Limits):
@@ -144,8 +175,9 @@ class ServiceLimits(Limits):
 
     jobs: JobLimits = JobLimits()
     idempotency: IdempotencyLimits = IdempotencyLimits()
-    retries: RetryPolicy = contract_field("retries", RetryPolicy())
-    """Contract ``limits.retries``: retries of the core on ``CONFLICT`` (concurrent writers)."""
+    conflict_retries: ConflictRetries = ConflictRetries()
+    """Retries of the core on ``CONFLICT`` (``JANE_STORAGE_LIMITS__CONFLICT_RETRIES__*``); the contract
+    ``limits.retries`` of a profile or an invocation is not used by storage (it is the caller's policy)."""
     timeouts: Timeouts = Timeouts()
     transfer: Transfer = Transfer()
     objects: Objects = Objects()
@@ -155,10 +187,41 @@ class ServiceLimits(Limits):
     packages: PackageLimits = PackageLimits()
 
 
+def _legacy_retries(layer: LimitLayer) -> LimitLayer:
+    """``retries`` of an environment layer as the deprecated alias of ``conflict_retries`` (values and hard caps).
+
+    A shared platform file keeps ``retries`` as the contract path of the caller's policy (ignored here); when both
+    groups set the same field, ``conflict_retries`` wins. Warned once per process and layer."""
+    if layer.shared:
+        return layer
+    docs: dict[str, dict[str, Any]] = {"values": dict(layer.values), "hard_caps": dict(layer.hard_caps)}
+    moved = []
+    for part, doc in docs.items():
+        old = doc.get(LEGACY_RETRIES)
+        if not isinstance(old, Mapping) or not old:
+            continue
+        del doc[LEGACY_RETRIES]
+        doc["conflict_retries"] = {**old, **dict(doc.get("conflict_retries") or {})}
+        moved.append(part)
+    if not moved:
+        return layer
+    if layer.label not in _LEGACY_WARNED:
+        _LEGACY_WARNED.add(layer.label)
+        log.warning(
+            "deprecated limits group 'retries' taken as 'conflict_retries': rename "
+            f"{ENV_PREFIX}LIMITS__RETRIES__* to {ENV_PREFIX}LIMITS__CONFLICT_RETRIES__*",
+            extra={"layer": layer.label, "parts": moved},
+        )
+    return dataclasses.replace(layer, values=docs["values"], hard_caps=docs["hard_caps"])
+
+
 def resolve_service_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLimits[ServiceLimits]:
     """Defaults <- platform file (``..._LIMITS_FILE``) <- ``JANE_STORAGE_LIMITS__*`` <- ``extra``
     (request layer from ``HandlerInvocation.limits``).
 
     The platform file may be a whole platform profile (``deploy/profiles/<profile>.json``): contract limits
-    storage does not have are ignored (``ResolvedLimits.ignored``, start-up log); typos fail."""
-    return resolve_limits(ServiceLimits, *settings.platform_layers(f"{ENV_PREFIX}LIMITS__"), *extra)
+    storage does not have are ignored (``ResolvedLimits.ignored``, start-up log); typos fail. The old
+    ``JANE_STORAGE_LIMITS__RETRIES__*`` (and ``HARD_CAPS__RETRIES__*``) still configure the CONFLICT retries, with a
+    deprecation warning (:func:`_legacy_retries`)."""
+    layers = [_legacy_retries(layer) for layer in settings.platform_layers(f"{ENV_PREFIX}LIMITS__")]
+    return resolve_limits(ServiceLimits, *layers, *extra)

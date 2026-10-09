@@ -26,8 +26,8 @@
 |---|---|
 | `just check` | lint + types + unit + contract (+ web, якщо є `web/*`) — те саме, що CI |
 | `just lint` / `just fmt` | ruff check + ruff format --check + лінтер контрактів / автовиправлення |
-| `just types` | mypy (strict) для кожного члена workspace, `scripts/`, `infra/tests/` |
-| `just unit` / `just contract` | тести без маркерів (+ офлайнові тести `examples/` і `deploy/profiles/` окремою сесією) / `@pytest.mark.contract` + лінтер `contracts/` |
+| `just types` | mypy (strict) для кожного члена workspace, `scripts/`, `infra/tests/`, а також `examples/` і `deploy/profiles/` (окремий запуск mypy на кожну теку: в обох є модуль `conftest`) |
+| `just unit` / `just contract` | тести без маркерів (+ офлайнові тести `examples/` і `deploy/profiles/` окремою сесією) / `@pytest.mark.contract` + лінтер `contracts/` + самоперевірка `compat.py --self-test` |
 | `just test <сервіс> [аргументи pytest]` | тести одного сервісу чи бібліотеки (`web-collector`, `jane-kit`, `testsite`) без `integration` |
 | `just integration [--project <ім'я>]` | тести `@pytest.mark.integration` проти стеку цього checkout (або названого проєкту; потрібен `just up`) |
 | `just isolation` | тести `@pytest.mark.isolation` (лише Linux; WP-06) |
@@ -39,12 +39,29 @@
 | `just gen-client <openapi.yaml> <тека>` | клієнт і моделі з контракту (`jane-codegen`) |
 | `just hooks` | встановити git pre-commit (gitleaks) |
 
+### Контракти (`contracts/`)
+
+Скорочення для інструментів WP-00 ([contracts/README.md](contracts/README.md), скіл `jane-contracts`). Інструменти —
+uv-скрипти зі своїми залежностями (`uv run --script contracts/tools/<інструмент>`), sync workspace не потрібен.
+
+| Команда | Що робить |
+|---|---|
+| `just contracts-check [--redocly]` | лише лінтер контрактів (те саме, що в `just lint` / `just contract`); `--redocly` — ще й Redocly через npx (потрібен Node) |
+| `just contracts-compat [ref] [--oasdiff]` | `compat.py --self-test`, потім зворотна сумісність `contracts/` відносно git-ref (типово `main`; у worktree краще `origin/main` або merge-base). `--oasdiff` — ще `oasdiff breaking --fail-on ERR` (бінарник у PATH або Docker-образ `tufin/oasdiff`); BREAKING або непройдений oasdiff → код 1 |
+| `just contracts-mock <api> [--port 4010] [--host 127.0.0.1]` | мок API з прикладів контракту (`contracts/tools/mock.py`, без Node) |
+| `just contracts-gen <api> <тека> [--models]` | асинхронний Python-клієнт одного контракту `contracts/openapi/<api>.v1.yaml` (`jane-codegen client --no-models`), напр. у `services/<я>/src/<пакет>/_generated/<api>`. `--models` додає моделі Pydantic, але datamodel-code-generator не приймає багатофайлові контракти Jane («Modular references require an output directory»), тож лише для однофайлових специфікацій |
+
 ## Монорепозиторій
 
 - uv workspace, члени — за шаблонами `libs/*`, `services/*`, `templates/service`, `tests/fixtures/testsite`.
   Новий сервіс (`services/<ім'я>/pyproject.toml`) стає членом без змін кореневого `pyproject.toml`;
   `uv.lock` оновлює `uv lock` (його дозволено змінювати кожному WP).
 - Залежність від спільної бібліотеки: `dependencies = ["jane-kit"]` + `[tool.uv.sources] jane-kit = { workspace = true }`.
+- `jane-contracts` (`contracts/python`, Protocol-и WP-00) — **не** член workspace, а path-залежність:
+  `jane-contracts = { path = "<відносний шлях>/contracts/python", editable = true }` (web-collector, storage і
+  його адаптери). uv не дозволяє члену workspace бути path-джерелом (`Workspace members must be declared as
+  workspace sources`), тож перенесення в `members` можливе лише разом із заміною джерела на `{ workspace = true }`
+  в усіх споживачах однією зміною. `contracts/` перевіряє лінтер WP-00, не ruff/mypy workspace.
 - Маркери pytest: `contract`, `integration`, `isolation`; решта — unit. Тести кожного пакета — у його `tests/`
   (режим `--import-mode=importlib`, однакові імена файлів у різних пакетах дозволені).
 - Згенерований код — у теках `_generated/` (ruff і mypy їх пропускають).
@@ -53,7 +70,9 @@
 ## CI
 
 `.github/workflows/ci.yml`, Linux runner: `lint` (ruff, mypy, gitleaks) → `unit` → `contract`; паралельно
-`web` (адмінка: install, lint, typecheck, test, build) та `isolation` (тести ізоляції пісочниці, plan.md §9);
+`web` (адмінка: install, lint, typecheck, test, build), `isolation` (тести ізоляції пісочниці, plan.md §9) і
+`contracts-compat` (`just contracts-compat <база> --oasdiff`; база — base-гілка PR, попередня вершина `main` для
+push у `main`, інакше merge-base з `origin/main`);
 `stack` — повний стек і інтеграційні тести, `adapters` — адаптери storage на SQL Server, MongoDB, MinIO, S3
 (на `main`, PR і вручну); `e2e` — приймальні сценарії (на `main` і вручну); `limits` — вимірювання профілю `ci`
 (лише вручну, `gh workflow run ci --ref <гілка>`).

@@ -36,7 +36,7 @@ types:
 unit *args:
     @unit
 
-# Contracts lint + contract tests; extra args go to pytest
+# Contracts lint + compat.py self-test + contract tests; extra args go to pytest
 contract *args:
     @contract
 
@@ -109,5 +109,5 @@ contracts-mock api *args:
     @contracts-mock
 
 # Python client of one contract: `just contracts-gen storage services/x/src/jane_x/_generated/storage`
-contracts-gen api out *args:
+contracts-gen api out:
     @contracts-gen

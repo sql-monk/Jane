@@ -32,6 +32,65 @@ paths:
   /v1/info:
     $ref: 'common.yaml#/components/pathItems/Info'
   /v1/onboarding-sessions:
+    get:
+      x-jane-scope: assistant:use
+      operationId: listOnboardingSessions
+      summary: Сесії підключення, новіші першими (відновлення стану адмінки після перезавантаження)
+      description: |
+        Курсорна пагінація (`limit`, `cursor` → `next_cursor`, `null` — сторінок більше немає). Порядок —
+        `created_at` спадно, за рівності — `session_id` спадно; курсор стабільний, поки сесії додаються.
+        Елементи — короткий стан сесії; повний (кандидати, вибірка, аналіз, варіанти) —
+        `GET /v1/onboarding-sessions/{session_id}`. Сесії без змін довше за налаштований строк зберігання
+        асистента (`state.session_retention_seconds`) видаляються.
+      tags: [onboarding]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+        - name: status
+          in: query
+          required: false
+          description: Лише сесії в цих станах (параметр можна повторити, наприклад `?status=sampling&status=analyzing`).
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/OnboardingStatus'
+      responses:
+        '200':
+          description: Сторінка сесій.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingSessionList'
+              examples:
+                page:
+                  value:
+                    items:
+                      - session_id: onb_01J9ZY0000000000000000002
+                        status: insufficient_sample
+                        query: https://tiny.example.test/
+                        proposal_count: 0
+                        costs:
+                          amount: 0.05
+                          currency: USD
+                        job_id: job_01J9ZY0000000000000000JO2
+                        created_at: '2026-09-27T10:00:00Z'
+                      - session_id: onb_01J9ZY0000000000000000001
+                        status: proposals_ready
+                        query: Shop Example kettles
+                        selected_candidate_id: cand_1
+                        proposal_count: 2
+                        costs:
+                          amount: 0.31
+                          currency: USD
+                        job_id: job_01J9ZY0000000000000000JOB
+                        created_at: '2026-09-27T09:00:00Z'
+                    next_cursor: WyIyMDI2LTA5LTI3VDA5OjAwOjAwWiIsIm9uYl8wMUo5WlkwMDAwMDAwMDAwMDAwMDAwMDAxIl0
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
     post:
       x-jane-scope: assistant:use
       operationId: startOnboarding
@@ -212,6 +271,80 @@ paths:
         '409':
           $ref: 'common.yaml#/components/responses/Conflict'
   /v1/improvement-runs:
+    get:
+      x-jane-scope: assistant:use
+      operationId: listImprovementRuns
+      summary: Запуски вдосконалення (job `kind = improvement`), новіші першими
+      description: |
+        Job, створені `startImprovement`, з `result` = `ImprovementResult` для завершених — щоб адмінка відновила
+        список після перезавантаження. Курсорна пагінація (`limit`, `cursor` → `next_cursor`); порядок —
+        `created_at` спадно, за рівності — `job_id` спадно. Фільтри — за мітками job (`labels.package_id`,
+        `labels.source_id`, `labels.problem_group_id`) і станом. Завершені job зберігаються
+        `limits.transfer.job_retention_seconds` асистента.
+      tags: [improvement]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+        - name: package_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: source_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: problem_group_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          description: Лише job у цих станах (параметр можна повторити).
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '../schemas/common/job.schema.json#/$defs/JobStatus'
+      responses:
+        '200':
+          description: Сторінка job вдосконалення.
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/JobList'
+              examples:
+                page:
+                  value:
+                    items:
+                      - job_id: job_01J9ZW00000000000000IMPROV
+                        kind: improvement
+                        status: succeeded
+                        created_at: '2026-09-27T10:00:00Z'
+                        finished_at: '2026-09-27T10:01:30Z'
+                        labels:
+                          package_id: shop-example.product-extractor
+                          source_id: shop-example
+                          problem_group_id: pg_01J9ZW0000000000000000001
+                        links:
+                          self: /v1/jobs/job_01J9ZW00000000000000IMPROV
+                          cancel: /v1/jobs/job_01J9ZW00000000000000IMPROV/cancel
+                        result:
+                          outcome: new_version
+                          version:
+                            package_id: shop-example.product-extractor
+                            version: 1.2.1
+                          attempts: 1
+                          activated: false
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
     post:
       x-jane-scope: assistant:use
       operationId: startImprovement
@@ -594,6 +727,45 @@ components:
           type: array
           items:
             type: string
+    OnboardingStatus:
+      type: string
+      enum: [resolving, needs_disambiguation, sampling, analyzing, proposals_ready, insufficient_sample, applying, completed, failed, cancelled]
+    OnboardingSessionSummary:
+      type: object
+      description: Короткий стан сесії для списку; повний — `OnboardingSession`.
+      required: [session_id, status, query, created_at]
+      properties:
+        session_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+        status:
+          $ref: '#/components/schemas/OnboardingStatus'
+        query:
+          type: string
+        selected_candidate_id:
+          type: string
+        proposal_count:
+          type: integer
+          minimum: 0
+          description: Скільки варіантів збору запропоновано.
+        costs:
+          $ref: '../schemas/handler-result.schema.json#/$defs/Money'
+        job_id:
+          type: string
+          description: Останній job сесії (`GET /v1/jobs/{job_id}`).
+        created_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        error:
+          $ref: '../schemas/common/problem.schema.json'
+    OnboardingSessionList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnboardingSessionSummary'
+        next_cursor:
+          $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
     OnboardingSession:
       type: object
       required: [session_id, status, query, created_at]
@@ -601,8 +773,7 @@ components:
         session_id:
           $ref: '../schemas/common/defs.schema.json#/$defs/Id'
         status:
-          type: string
-          enum: [resolving, needs_disambiguation, sampling, analyzing, proposals_ready, insufficient_sample, applying, completed, failed, cancelled]
+          $ref: '#/components/schemas/OnboardingStatus'
         query:
           type: string
         candidates:

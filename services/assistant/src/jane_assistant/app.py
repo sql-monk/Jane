@@ -8,21 +8,23 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Literal
 
 import httpx
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from jane_kit.auth_scopes import ASSISTANT
+from jane_kit.auth_scopes import ASSISTANT, merge
 from jane_kit.config import LimitError
-from jane_kit.errors import ValidationFailed
+from jane_kit.errors import FieldError, ValidationFailed
 from jane_kit.idempotency import IDEMPOTENCY_HEADER, StoredResponse, idempotent
-from jane_kit.jobs import JobContext, JobRunner, jobs_router
+from jane_kit.jobs import JobContext, JobRunner, JobStatus, jobs_router
+from jane_kit.pagination import clamp_limit, decode_cursor, encode_cursor
 from jane_kit.service import create_app
 
 from . import __version__
@@ -33,13 +35,53 @@ from .improvement import run_improvement
 from .onboarding import OnboardingService
 from .search import HttpJsonSearchProvider, NoSearchProvider, SearchProvider, StaticSearchProvider
 from .settings import ServiceLimits, Settings, request_layer, resolve_service_limits
-from .state import InMemoryState, PostgresState, ServiceState
+from .state import InMemoryState, PostgresState, ServiceState, job_position
 from .unknown import FlagOff, run_unknown
 
 log = logging.getLogger(__name__)
 
 SLUG = r"^[a-z0-9](?:[a-z0-9._-]{0,98}[a-z0-9])?$"
 SEMVER = r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
+
+
+SessionStatus = Literal[
+    "resolving",
+    "needs_disambiguation",
+    "sampling",
+    "analyzing",
+    "proposals_ready",
+    "insufficient_sample",
+    "applying",
+    "completed",
+    "failed",
+    "cancelled",
+]
+"""``OnboardingStatus`` of the contract."""
+
+STATUS_QUERY = Query(default=None)
+"""``?status=`` may repeat (a list); one module-level default (ruff B008)."""
+
+LIST_SCOPES = {
+    "GET /v1/onboarding-sessions": "assistant:use",
+    "GET /v1/improvement-runs": "assistant:use",
+}
+"""Scopes of the list operations added by WP-15 (R24) until ``jane_kit.auth_scopes.ASSISTANT`` lists them; merging
+is idempotent, so the table stays right after jane-kit adds them."""
+
+
+def _position[T](cursor: str | None, parse: Callable[[str], T]) -> tuple[T, str] | None:
+    """Position of a list cursor (``[sort value, id]``, see ``encode_cursor``); a foreign cursor is 422."""
+    if cursor is None:
+        return None
+    value = decode_cursor(cursor)
+    try:
+        if isinstance(value, list) and len(value) == 2 and all(isinstance(v, str) for v in value):
+            return parse(value[0]), value[1]
+    except ValueError:
+        pass
+    raise ValidationFailed(
+        "invalid cursor", errors=[FieldError(parameter="cursor", message="invalid cursor")]
+    )
 
 
 class _Strict(BaseModel):
@@ -237,7 +279,7 @@ def build_app(settings: Settings | None = None, deps: Dependencies | None = None
         lifespan=lifespan,
         capabilities=capabilities,
         limits=resolved,
-        auth_scopes=ASSISTANT,  # ADR-0005 scopes per operation
+        auth_scopes=merge(ASSISTANT, LIST_SCOPES),  # ADR-0005 scopes per operation
     )
     app.state.limits = resolved
     app.state.runner = runner
@@ -262,6 +304,50 @@ def build_app(settings: Settings | None = None, deps: Dependencies | None = None
             return accepted(job)
 
         return await idempotent(request, idem_store, handler, limits=limits.idempotency)
+
+    @app.get("/v1/onboarding-sessions", tags=["onboarding"], operation_id="listOnboardingSessions")
+    async def list_sessions(
+        limit: int | None = Query(default=None, ge=1),
+        cursor: str | None = Query(default=None, max_length=2048),
+        status: list[SessionStatus] | None = STATUS_QUERY,
+    ) -> JSONResponse:
+        after = _position(cursor, str)
+        sessions, last = await onboarding.page(
+            frozenset(status) if status else None, after, clamp_limit(limit, limits.pages)
+        )
+        return JSONResponse(
+            {
+                "items": [s.summary() for s in sessions],
+                "next_cursor": encode_cursor(list(last)) if last else None,
+            }
+        )
+
+    @app.get("/v1/improvement-runs", tags=["improvement"], operation_id="listImprovementRuns")
+    async def list_improvement_runs(
+        limit: int | None = Query(default=None, ge=1),
+        cursor: str | None = Query(default=None, max_length=2048),
+        package_id: str | None = None,
+        source_id: str | None = None,
+        problem_group_id: str | None = None,
+        status: list[JobStatus] | None = STATUS_QUERY,
+    ) -> JSONResponse:
+        position = _position(cursor, datetime.fromisoformat)
+        n = clamp_limit(limit, limits.pages)
+        wanted = {"package_id": package_id, "source_id": source_id, "problem_group_id": problem_group_id}
+        jobs = await state.job_list.page(
+            "improvement",
+            labels={k: v[:256] for k, v in wanted.items() if v},
+            statuses=frozenset(str(s) for s in status) if status else None,
+            after=position,
+            limit=n + 1,
+        )
+        last = job_position(jobs[n - 1]) if len(jobs) > n else None
+        return JSONResponse(
+            {
+                "items": [j.wire() for j in jobs[:n]],
+                "next_cursor": encode_cursor([last[0].isoformat(), last[1]]) if last else None,
+            }
+        )
 
     @app.get("/v1/onboarding-sessions/{session_id}", tags=["onboarding"], operation_id="getOnboardingSession")
     async def get_session(session_id: str) -> JSONResponse:

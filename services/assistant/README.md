@@ -68,6 +68,14 @@
 (`in_progress` → `resolved` / `unresolved` з поясненням) оновлюється в оркестраторі — так невирішене видно
 в адмінці. Нові типи сутностей лише пропонуються (`suggested_entity_types`).
 
+**Списки для відновлення адмінки** (WP-15, R24): `GET /v1/onboarding-sessions` — короткий стан сесій
+(`OnboardingSessionSummary`: стан, запит, обраний кандидат, кількість варіантів, витрати, останній `job_id`,
+помилка), новіші першими; `?status=` (можна повторити). `GET /v1/improvement-runs` — job вдосконалення (з
+`result` для завершених), новіші першими; фільтри `package_id`, `source_id`, `problem_group_id` (мітки job) і
+`status`. Обидва — курсорна пагінація (`limit` понад `pages.max_page_size` обрізається, `next_cursor: null` —
+остання сторінка, чужий курсор — 422). Запущені сесії у списку звіряються з їхнім job так само, як у `GET` сесії;
+job загиблого екземпляра список показує `failed` (як `GET /v1/jobs/{id}`).
+
 **Невідомі матеріали** (`POST /v1/unknown-materials`): `forward_unknown_to_llm = false` → 403
 `access_denied_by_policy` без жодного виклику LLM; інакше класифікація й пропозиція
 (`new_extractor`, `extend_rules`, `expand_entity_types`, `none`).
@@ -202,6 +210,8 @@ just down -v --project jane-wp11
 Scopes операцій (таблиця `ASSISTANT` з `jane_kit.auth_scopes`):
 
 - `assistant:use` — усі операції (`/v1/onboarding-sessions…`, `/v1/improvement-runs`, `/v1/unknown-materials`, `/v1/jobs/*`).
+  Два списки WP-15 (`GET /v1/onboarding-sessions`, `GET /v1/improvement-runs`) додає до таблиці сам сервіс
+  (`app.LIST_SCOPES`, `merge` з `ASSISTANT`), доки їх не внесено в `jane_kit.auth_scopes.ASSISTANT`.
 
 Сусідів асистент викликає власним токеном (`SERVICE_TOKEN_REF` або окремі `*_TOKEN_REF`), а не токеном користувача. Потрібні scopes ключа асистента: llm — `llm:invoke`; registry — `registry:read`, `registry:write`, `registry:approve` і `actor: llm`; колектори — `collector:read`, `collector:run`; handler-runtime — `handler:test`; storage — `storage:read`; orchestrator — `orchestrator:read`, `orchestrator:write`.
 
@@ -253,6 +263,7 @@ JANE_ASSISTANT_API_KEYS=[{"name": "admin", "sha256": "<sha256 hex ключа>", 
 | `search.request_timeout_ms` / `connect_timeout_ms` | 10000 / 5000 | виклики пошукового провайдера `http_json` |
 | `clients.*` (тайм-аути, повтори, опитування job) | див. jane-kit (30000 мс запит, 4 спроби) | виклики сусідів; це контрактні `timeouts.*` / `retries`, тож профіль платформи задає їх для коротких службових викликів |
 | `llm_call.request_timeout_ms` | 900000 | тайм-аут одного синхронного виклику LLM-шлюзу (власний ліміт: виклик моделі довший за службові). Має покривати найгірший випадок шлюзу: (повтори за схемою + 1) × спроби провайдера × тайм-аут провайдера — з типовими значеннями llm 2 × 2 × 120 с = 8 хв, зі спробами профілю 3 — 12 хв; 15 хв — і `gateway.reservation_ttl_seconds` шлюзу. З'єднання й повтори — з `clients.*` |
+| `pages.default_page_size` / `max_page_size` | 50 / 500 | сторінки `listOnboardingSessions` / `listImprovementRuns` (`limit` понад максимум обрізається) |
 | `jobs.*`, `idempotency.*` | див. jane-kit | job і ключі ідемпотентності |
 
 ## Приклад виклику зі стороннього застосунку

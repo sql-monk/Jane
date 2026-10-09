@@ -103,6 +103,10 @@ def test_every_operation_is_covered(w: World) -> None:
     w.result(job.json()["job_id"], "UnknownMaterialResult")
     api.get(f"/v1/jobs/{job.json()['job_id']}")
     api.post(f"/v1/jobs/{job.json()['job_id']}/cancel", json={"reason": "done already"})  # 200 terminal
+    sessions = api.get("/v1/onboarding-sessions", params={"limit": 1}).json()  # R24 lists
+    assert [s["session_id"] for s in sessions["items"]] == [sid] and sessions["next_cursor"] is None
+    runs = api.get("/v1/improvement-runs", params={"package_id": "nope.pkg"}).json()
+    assert [j["labels"]["package_id"] for j in runs["items"]] == ["nope.pkg"]
     assert api.uncovered() == []
 
 

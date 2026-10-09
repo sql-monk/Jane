@@ -30,6 +30,7 @@ from jane_kit.config import (
 from jane_kit.content import parse_host_allowlist
 from jane_kit.idempotency import IdempotencyLimits
 from jane_kit.jobs import JobLimits
+from jane_kit.pagination import PageLimits
 
 ENV_PREFIX = "JANE_ASSISTANT_"
 
@@ -283,6 +284,8 @@ class ServiceLimits(Limits):
     """Calls of the neighbours: contract ``timeouts.connect_timeout_ms`` / ``request_timeout_ms`` and ``retries``
     (a platform profile sets them); the LLM gateway's request timeout is ``llm_call`` instead."""
     llm_call: LlmCallLimits = LlmCallLimits()
+    pages: PageLimits = PageLimits()
+    """Cursor pages of ``listOnboardingSessions`` / ``listImprovementRuns``: default and largest ``limit``."""
     jobs: JobLimits = JobLimits()
     idempotency: IdempotencyLimits = IdempotencyLimits()
 

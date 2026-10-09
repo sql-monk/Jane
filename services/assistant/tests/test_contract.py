@@ -51,6 +51,9 @@ def test_every_operation_is_covered(w: World) -> None:
         headers={"Idempotency-Key": "a"},
     )
     sid = r.json()["labels"]["session_id"]
+    assert (
+        r.json()["links"]["session"] == f"/v1/onboarding-sessions/{sid}"
+    )  # documented in startOnboarding (R08)
     w.result(r.json()["job_id"], "OnboardingSession")
     sel = api.post(f"/v1/onboarding-sessions/{sid}/candidate-selection", json={"candidate_id": "cand_1"})
     w.result(sel.json()["job_id"], "OnboardingSession")
@@ -62,6 +65,8 @@ def test_every_operation_is_covered(w: World) -> None:
         json={"activate": False},
         headers={"Idempotency-Key": "b"},
     )
+    assert acc.json()["labels"]["session_id"] == sid
+    assert acc.json()["links"]["session"] == f"/v1/onboarding-sessions/{sid}"
     w.result(acc.json()["job_id"], "AcceptanceResult")
     api.post(
         f"/v1/onboarding-sessions/{sid}/proposals/p9/acceptance", json={}, headers={"Idempotency-Key": "b2"}
@@ -99,3 +104,31 @@ def test_every_operation_is_covered(w: World) -> None:
     api.get(f"/v1/jobs/{job.json()['job_id']}")
     api.post(f"/v1/jobs/{job.json()['job_id']}/cancel", json={"reason": "done already"})  # 200 terminal
     assert api.uncovered() == []
+
+
+JOB_RESULTS = {
+    "onboarding": "OnboardingSession",
+    "onboarding_acceptance": "AcceptanceResult",
+    "improvement": "ImprovementResult",
+    "unknown_material": "UnknownMaterialResult",
+}
+
+
+def test_succeeded_job_examples_carry_the_result_of_their_kind(contracts: Path) -> None:
+    """R08: the contract's examples of finished jobs (mocks serve them with ``Prefer: example=...``) hold a
+    valid result of the job's kind; session jobs link their session."""
+    spec = OpenAPISpec.load(contracts / "openapi" / "assistant.v1.yaml")
+    jobs = [
+        e["value"]
+        for e in spec.document["components"]["examples"].values()
+        if {"job_id", "kind"} <= set(e["value"])
+    ]
+    succeeded = [j for j in jobs if j["status"] == "succeeded"]
+    assert {j["kind"] for j in succeeded} == set(JOB_RESULTS)
+    assert any(j["result"].get("outcome") == "proposal_only" and "proposal" in j["result"] for j in succeeded)
+    for job in jobs:
+        OpenAPISpec.load(contracts / "openapi" / "common.yaml").validate_component("Job", job)
+        if job["status"] == "succeeded":
+            spec.validate_component(JOB_RESULTS[job["kind"]], job["result"])
+        if "session_id" in (job.get("labels") or {}):
+            assert job["links"]["session"] == f"/v1/onboarding-sessions/{job['labels']['session_id']}"

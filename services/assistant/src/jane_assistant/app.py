@@ -316,7 +316,12 @@ def build_app(settings: Settings | None = None, deps: Dependencies | None = None
                     progress=progress,
                 )
 
+            # Labels identify the run for the admin UI and the improvement-runs list (filters).
             labels = {"package_id": body.package.package_id}
+            if body.source_id:
+                labels["source_id"] = body.source_id[:256]
+            if body.problem_group_id:
+                labels["problem_group_id"] = body.problem_group_id[:256]
             job = await runner.submit(
                 "improvement", work, idempotency_key=request.headers.get(IDEMPOTENCY_HEADER), labels=labels
             )

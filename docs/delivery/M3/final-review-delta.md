@@ -7,7 +7,8 @@
 
 **Вердикт C-1: нових блокерів M3 у переглянутій дельті не знайдено.** Одну документальну неточність
 виправлено; залишаються неблокувальне зауваження й відомі обмеження нижче. Це не фінальне приймання M3:
-B2, фінальний CI, заповнення фінальної ревізії матриці та злиття в `main` належать потоку A/людині.
+Приймання B2 виконав потік A; фінальний CI, заповнення фінальної ревізії матриці та злиття в `main`
+належать потоку A/людині.
 
 ## Інкременти й вердикти
 
@@ -73,13 +74,78 @@ git diff --check
 exit 0; без виводу
 ```
 
-`uv sync` підготував лише власну `.venv`; запланований ContentReader repro скасовано до його запуску
+Під час C-1 `uv sync` підготував лише власну `.venv`; запланований ContentReader repro скасовано до його запуску
 за уточненням людини. Не запускалися pytest/just check/just e2e, backup/restore, новий CI або Docker-стеки.
 Код сервісів, контракти, матриця, status.md та чужі worktree потоком C не змінювались.
 
 ## Відтворення після B2
 
-**Ще не виконано.** На переглянутому `origin/codex/jane-integration` `041e20d` немає
-`merge: accept B2` / accepted WP-01g. Згідно з handoff після публікації C-1 потік C зупиняється
-й повідомляє людині; новий чистий клон, `just up`, 401/200, вхід адмінки та demo/telegram
-мають бути відтворені після B2 на тодішній ревізії. Backup/restore повторювати не потрібно.
+**C-2 завершено, 2026-10-09, із неперевіреним браузерним входом через недоступний інструмент.**
+B2 прийнято й злито потоком A `5fd7acd` з маркером `merge: accept B2`;
+CI [37857870977](https://github.com/sql-monk/Jane/actions/runs/37857870977) на коді
+`7b41bf4c6733f65a32340841a4f7dd7f61bad914` — 13/13 success,
+e2e `75 passed in 1403.48s`, без skipped/xfail/failed.
+Своя додаткова адресна перевірка C: auth 37 passed; JWKS-мутант падає на `20 == 1`, файл відновлено
+байт у байт; тимчасовий review-worktree прибрано. Деталі — [stream-c.md](stream-c.md).
+
+Чистий клон: `b3b11016de6d3bb2b421dd8cb8ccf4a66ee4c29e`, окремий тимчасовий каталог поза репозиторієм.
+Послідовність документів: README → DEVELOPMENT → examples → operations; для входу — README адмінки.
+Проєкти лише власні: `jane-m3c-dev-e09161a4` і `jane-m3c-examples-e09161a4`.
+
+| Документ | Команда / дія | Результат |
+|---|---|---|
+| DEVELOPMENT | `uv sync --all-packages` | exit 0, чистий клон до встановлення без змін |
+| DEVELOPMENT / infra | `uvx --from rust-just just up --project jane-m3c-dev-e09161a4` | exit 0; PostgreSQL/SQL Server/MongoDB/MinIO/S3/testsite/proxy піднято, ключ згенеровано |
+| web/admin README | з `web/admin`: `corepack pnpm install --frozen-lockfile`, `corepack pnpm build` | exit 0; Node 24, pnpm 11.27.1; production assets створено |
+| DEVELOPMENT / operations | `just up --project <P> proxy web-collector telegram-collector handler-runtime storage orchestrator registry llm assistant` (через документований uvx) | exit 0; усі вісім застосунків healthy |
+| DEVELOPMENT / web/admin README | `uvx --from rust-just just env --project <P> --format json` | exit 0; ключ адміністратора доступний як `auth.admin_api_key`, значення не публікується |
+| operations / web/admin README | GET через proxy `/api/<сервіс>/v1/health`, `/api/<сервіс>/v1/info`; Authorization Bearer із документованого ключа | для всіх восьми: health 200; info без ключа 401, із ключем 200 |
+| web/admin README | HTTP GET `/` і браузерний вхід за ключем | HTTP 200 із production assets; вхід **не перевірено** — браузерний міст не приєднав webview (C-N4) |
+| DEVELOPMENT | `uvx --from rust-just just down -v --project jane-m3c-dev-e09161a4` | exit 0; власних контейнерів, мереж і томів не залишилося |
+| examples | `uv run --all-packages python deploy/profiles/stack.py up --project jane-m3c-examples-e09161a4 --profile dev-laptop --telegram` | exit 0; реальні сервіси, Telegram із записаним backend |
+| examples | `uv run --all-packages python examples/jane_examples.py demo --project <P>` | exit 0; `ok: true`, 23 RAW, 16 сутностей; price-check за розкладом, 4 partial-оновлення, title збережено |
+| examples | `uv run --all-packages python examples/jane_examples.py telegram --project <P>` | exit 0; `ok: true`, історія 3 матеріали, зміни 2, у підсумку 5 RAW / 3 події; lecture_version 2; Telegram **З** |
+| examples | `uv run --all-packages python deploy/profiles/stack.py down --project <P>` | exit 0; `leftovers: {}`; власних контейнерів, мереж і томів не залишилося |
+| backup-restore | статичне звірення dump/restore й післявідновлювальних API-команд | API-перевірки вже вимагають ключ нового стеку; dump/restore виконуються клієнтами БД, B2 їх не змінює; повторної репетиції не було |
+
+`<P>` у dev-рядках — `jane-m3c-dev-e09161a4`, у examples — `jane-m3c-examples-e09161a4`.
+HTTP виконано невеликим Python-клієнтом із тими самими документованими URL/заголовком.
+Витяги фактичного виводу (форматування HTTP-рядків скорочено):
+
+```text
+web-collector      health=200 without_key=401 with_key=200
+telegram-collector health=200 without_key=401 with_key=200
+handler-runtime    health=200 without_key=401 with_key=200
+storage            health=200 without_key=401 with_key=200
+orchestrator       health=200 without_key=401 with_key=200
+registry           health=200 without_key=401 with_key=200
+llm                health=200 without_key=401 with_key=200
+assistant          health=200 without_key=401 with_key=200
+admin /: 200
+
+demo exit: 0
+"ok": true, "failures": [], "raw_objects": 23, "entities": 16
+"platform_profile": "dev-laptop"
+telegram exit: 0
+"ok": true, "failures": [], "raw_objects": 5
+"lecture_version": 2
+"substitute": "Telegram = recorded backend of telegram-collector (З)"
+examples-down exit: 0
+"leftovers": {}
+example cycle exit: 0
+Owned clean clone exists: False
+```
+
+Summary й повні логи збережено в ignored `.jane/m3c-c2-evidence.json`,
+`.jane/m3c-c2-examples-summary.json`, `.jane/m3c-c2-*.txt`. Ключі не потрапляють у звіт/коміт.
+Чистий клон перед видаленням мав порожній `git status --porcelain`; клон і власний review-worktree
+видалено, обидва compose-проєкти без контейнерів/мереж/томів. Чужі ресурси не прибиралися.
+
+| ID / рівень | Доказ | Власник / рішення |
+|---|---|---|
+| C-W3 — **варто, виправлено** | `examples/README.md:31` досі стверджував, що SDK build_archive використовує deflate й інший digest; виправлення `69ab303` уже перейшло на канонічний ZIP_STORED. | WP-14, документація. Твердження актуалізовано цим потоком, код і тести не змінювались. |
+| C-N4 — **примітка, межа інструмента** | Браузерний tab не створився: прихований виклик — timeout; видимий — `Timed out waiting for Browser webview to attach`. Доступний лише in-app browser. HTTP адмінки й API пройшли, вхід через UI не спостерігався. | Потік A / фінальний UI gate. Це не доказ помилки продукту; C не оголошує браузерний вхід перевіреним. |
+
+**Нових блокерів у виконаних сценаріях не знайдено.** C-2 — функціональне відтворення документації
+після B2; воно не замінює вимірювання лімітів dev-laptop або фінальний CI/real UI gate потоку A.
+Повний локальний `just check`/`just e2e`, новий CI і повторний backup/restore не запускались.

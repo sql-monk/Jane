@@ -225,6 +225,7 @@
         "contracts/tools/**",
         "pyproject.toml",
         "services/*/pyproject.toml",
+        "services/storage/adapters/*/pyproject.toml",
         "libs/*/pyproject.toml",
         "templates/service/pyproject.toml",
         "justfile",

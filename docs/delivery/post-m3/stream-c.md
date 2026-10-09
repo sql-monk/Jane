@@ -17,7 +17,7 @@ Checkout координатора для злиттів — `.claude/worktrees/i
 | Завдання | Гілка / worktree | Стан |
 |---|---|---|
 | C-1: CI й документація | `wp/23a-developer-docs`, `wp23a` | прийнято й запушено, merge `a5b1563` |
-| C-2: contracts/python у workspace | `wp/23b-contracts-workspace`, `wp23b` — створити після маркера | чекає WP-19; автоматичне продовження налаштовано |
+| C-2: contracts/python у workspace | `wp/23b-contracts-workspace`, `wp23b` | active після WP-19 `ee78fc5`; окремий виконавець |
 | C-3: формат Python-контрактів | `wp/23c-contracts-format`, `wp23c` | прийнято й запушено, merge `0dc2ded` |
 | C-4: прибирання | `.jane/cleanup-post-m3.ps1` | останнім: після WP-19, завершення B і фінального CI C |
 
@@ -100,7 +100,7 @@ Push C-3 запустив автоматичний CI [37912943507](https://gith
 
 ## Автоматичне продовження C-2 / C-4
 
-2026-10-09: останній fetch на `c9f3c81` не містить маркера `merge: accept WP-19`. Попередній
+Знімок перед продовженням, 2026-10-09 13:41: fetch на `c9f3c81` не містив маркера `merge: accept WP-19`. Попередній
 координатор A передав незавершений WP-19 наступному координатору — [handoff A](stream-a-handoff.md).
 Потік B прийняв B-1…B-4 і оновлення матриці, але B-5 та фінальний CI ще чекають WP-19.
 **C-2 не розпочато; C-4 не розпочато; cleanup script не змінювався, dry-run / -Apply не виконувались.**
@@ -131,3 +131,12 @@ thread `01a11ff4-80de-7d33-8aed-c1b486b53404`. Незмінний стан не 
    вимкнути лише heartbeat потоку C. `main`, force push і чужі автоматизації не змінювати.
 
 Checkout `integ-c`, `wp23a`, `wp23c` залишаються доступними; C-1/C-3 та їхні перевірки не повторювати.
+
+## C-2: старт після приймання WP-19
+
+2026-10-09 16:04: свіжий fetch підтвердив маркер `ee78fc5 merge: accept WP-19 shared stores and files
+ContentRef transit`, вершина integration — `2d4a101`. Гейт C-2 відкрито; cleanup C-4 досі не починався.
+Координатор додав до карти WP-23 точний відсутній шлях `services/storage/adapters/*/pyproject.toml`.
+Виконавець отримує окремий checkout `wp23b` від свіжої integration, `.jane-wp = 23` і звіт
+`docs/delivery/WP-23/c2-workspace.md`; незалежне рев'ю та required checks лишаються обов'язковими.
+Фінальний CI C ще не запускався (dispatch count 0); після злиття C-2 він буде запущений один раз.

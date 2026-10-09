@@ -19,10 +19,11 @@ Checkout координатора для злиттів — `.claude/worktrees/i
 | C-1: CI й документація | `wp/23a-developer-docs`, `wp23a` | прийнято й запушено, merge `a5b1563` |
 | C-2: contracts/python у workspace | `wp/23b-contracts-workspace`, `wp23b` | прийнято й запушено, merge `fdad210`; фінальний CI success |
 | C-3: формат Python-контрактів | `wp/23c-contracts-format`, `wp23c` | прийнято й запушено, merge `0dc2ded` |
-| C-4: прибирання | `wp/23d-cleanup-safety`, `wp23d` | active: окремий виконавець готує ignored копію; review / Apply ще не було |
+| C-4: прибирання | `wp/23d-cleanup-safety`, `wp23d` | прийнято R2, merge `81f8443`; coordinator dry-run / Apply exit 0, фактичний результат перевірено |
 
 Поточний фінальний CI C: **dispatch count 1**, run **37942655574**, SHA `133bb5a`; **success, 14/14 jobs**.
-C-4 виконується. Нижчі записи count 0 / C-4 not_started — історичні знімки до поточного стану.
+**C-1…C-4 закриті.** Один фінальний CI C success; cleanup застосовано й перевірено.
+Нижчі записи count 0 / C-4 not_started / pending review — історичні знімки до цього стану.
 
 ## C-1: факти й перевірки
 
@@ -404,3 +405,110 @@ tags, .jane archive, dirty/unmerged/reparse/unknown keep та failures archive p
 автор не змінює frozen код. Нового workflow_dispatch немає. Людський script ще на original hash,
 review verdict, coordinator copy/dry-run/Apply очікуються. За дефекту R2 далі лише авторський fix
 і coordinator exact repro, без R3.
+
+## C-4: accepted R2 і фактичне завершення cleanup
+
+Незалежний `c3_review` видав **accepted — R2** для author/report SHA
+`d9b3c86afb1c9f5a14ce78500457e51a9bf0bb24` та frozen script SHA256
+`76711FBD434E8ACCE191DD246260B3D8649DE9DE48537DCB8E40DD052ADFCA58`. Хеш незмінний до/після review;
+обидва зауваження R1 закрито. Parser 0 errors; task-scoped ownership 1 changed file,
+0 outside ownership; checkout автора чистий. Рецензент сам виконав 8 critical safety
+fixtures у власних isolated bare Git repositories та 2 додаткові cases — divergent
+tips без existing tag і custom `core.hooksPath`: **PASS**. Третього раунду не було.
+Сирі review logs у `wp23d/.jane/wp23d-review-595dcf7eede44e35ad7b3605f58c3dea/`
+та `wp23d/.jane/wp23d-review-d4bbcf14/`, файл `review-output.txt`.
+
+Після fresh fetch / `pull --ff-only` прийнято report-only merge
+`81f8443e04126bf33a3bf3688316f891e8db7680`, message
+`merge: accept WP-23d cleanup safety [skip ci]`, push integration успішний.
+Код cleanup лишається ignored, відповідно до handoff; його exact hash і реальні
+safety logs закріплено у [звіті автора](../WP-23/c4-cleanup.md) та цьому журналі.
+
+Координатор зберіг людський оригінал у
+`C:/repos/Jane/.jane/archive/cleanup-script-original-20261009T152445Z-c279fbb841734de5b8d1862ac1f50d77.ps1`;
+SHA256 `5D54EC5CAFA78D6BE0D9BC357601190CA7D05BBD3ADEF7F18FA4E014DCE6B78F` підтверджено після Apply.
+Перевірену ignored копію перенесено до `C:/repos/Jane/.jane/cleanup-post-m3.ps1`;
+людський файл після копіювання й після Apply має accepted SHA256 вище.
+
+Спочатку coordinator dry-run exit 0 на integration `81f8443`: план 3 worktrees,
+0 orphans, 103 local, 26 remote, 13 unique archive tags. Координатор прочитав actual
+PLAN і звірив resolved absolute bounds кожного worktree, відсутність protected refs
+у видаленні та archive tag для кожного незлитого tip. Dry-run нічого не видалив і
+не створив тегів; log — `integ-c/.jane/wp23d-coordinator-dry-run.txt`.
+Лише після accepted R2 / перевірки dry-run записано durable intent
+`2026-10-09T15:30:43.4082751Z`, **Apply attempts 1**, і виконано:
+
+```text
+$ pwsh -NoProfile -File C:/repos/Jane/.jane/cleanup-post-m3.ps1 -Apply
+preflight: integration=origin/codex/jane-integration SHA=81f8443e04126bf33a3bf3688316f891e8db7680 apply=True fetch=0
+planned totals: worktrees=3 orphans=0 local=103 remote=26 archives=13
+actual totals: {"worktreesRemoved":3,"worktreesKept":27,"orphansRemoved":0,"orphansKept":13,"localRemoved":103,"localKept":34,"remoteRemoved":26,"remoteKept":29,"tagsCreated":13,"tagsVerified":16,"failures":0}
+exit=0
+completedAt=2026-10-09T15:38:18.6978008Z
+```
+
+| Об'єкт | Фактично прибрано | Залишено | Підсумок |
+|---|---:|---:|---|
+| Registered worktrees | 3 | 27 | wp13r, wp13s2, wp13t: clean / merged; .jane архіви перевірено до remove |
+| Orphan agent-* | 0 | 13 | містять source/public/scripts/README, unknown content, не доведені node_modules-only залишки |
+| Local branches | 103 | 34 | exact planned SHA, checked-out / active refs збережено |
+| Origin branches | 26 | 29 | normal push delete, advertised-SHA guard/server CAS, чинні hooks виконано |
+| Archive tags | 13 створено | 13 unique exact local+origin | 16 успішних per-action перевірок; 3 shared local/remote tips повторно звірено |
+
+Помилок / permissions blocks — **0**. Force push, tag -f, force worktree remove,
+prune або residual delete fallback не використовувалися. Reparse worktrees wp12d/wp12e,
+dirty/unmerged/unknown або protected об'єкти лишаються з actual reason у log.
+Активні A/B/C checkout (`integ-a`, `integ-c`, `stream-b-coord`, усі wp22*/wp23*),
+WP15…23 та initial checked-out branches захищено; навіть refs трьох видалених
+checkout лишилися local+origin. Docker commands — 0.
+
+Перед кожним дозволеним `git worktree remove -- <absolute path>` .jane збережено
+унікальним архівом, без перезаписування попередніх evidence, з count/SHA256 checks:
+
+| Worktree | Файлів .jane | Збережений архів |
+|---|---:|---|
+| `wp13r` | 8 | `C:\repos\Jane\.jane\archive\worktrees\wp13r-20261009T1531472151374Z-ed35e10fff62457eb5fd83d81b8b7d02` |
+| `wp13s2` | 11 | `C:\repos\Jane\.jane\archive\worktrees\wp13s2-20261009T1532111168302Z-924b7acd22b64bcbba02da953ed6b18d` |
+| `wp13t` | 4 | `C:\repos\Jane\.jane\archive\worktrees\wp13t-20261009T1532328942376Z-60fbbd0dd27946b9b09ae434bb8818c7` |
+
+Незлиті tips збережено immutable archive tags **до** видалення відповідного ref;
+усі exact local+origin SHA координатор підтвердив одним післяопераційним inventory:
+
+| Archive tag | Точний SHA local + origin |
+|---|---|
+| `archive/wp/00d-auth-decisions` | `c301bbe37eeb15efbaf839a5e6d90a8b7cd10f9e` |
+| `archive/wp/01i-template-scopes` | `9fa705f4e1d9cf16918c247597bc9614c7805cbd` |
+| `archive/wp/02d-flaky-tests` | `4d480d547a68611d575a8abdffea142381d95032` |
+| `archive/wp/05a-timing-tests` | `7869dde64f5e1e04c99d6867271ecac5bb0e630d` |
+| `archive/wp/10c-package-cache-identity` | `787a863c8d26eb65c5fd7abcfd1b3cf96bc9c359` |
+| `archive/wp/12e-admin-auth-key` | `58c5eec42aeb6b636c7681fdb2aa29e5c97409bb` |
+| `archive/wp/13-assistant-flows` | `af1578ea6a1b8941b22fe6ffd153a5c176060dfc` |
+| `archive/wp/13-r04-idempotency` | `dc5248e5beafdb9f5ddb6924d402428ac9e4caf0` |
+| `archive/wp/13-registry-e2e` | `961afd2aeaa7cff9c3ccebddfbd821b0c24a66b2` |
+| `archive/wp/13-reliability` | `2110470907e28c85c3e99b6f0d22fbe54d0785de` |
+| `archive/wp/13f-r07-restarts` | `87a0c6a164cb0c84cab490884389f7d494c21984` |
+| `archive/wp/01g-service-auth` | `0a5b56b4bf9d6d94b850042f84eb42a49bf42ccf` |
+| `archive/wp/12d-real-reprocessing` | `4a080e1756cecf128ca4e57e96119cf876940222` |
+
+Післяопераційна перевірка порівняла before/after inventories усіх refs і registered
+worktrees: прибрано **тільки** planned 103/26 refs і 3 checkout, решта refs/SHA та
+checkout HEAD/branch незмінні; 30→27 registered worktrees. Main лишився на
+`37a30e294745a9001ff2f57c87c1013bfe087414`. Видалені paths відсутні, усі 13 unknown orphan каталоги існують,
+три evidence archives мають 8/11/4 файли. Accepted script та original backup hashes
+збігаються. Actual verification **PASS**, без повторного Apply чи full local tests.
+
+Ignored coordinator evidence: `stream-c-cleanup-apply.json` (intent/result),
+`wp23d-coordinator-apply.txt` (actual output), `wp23d-coordinator-before.json`,
+`wp23d-coordinator-verification.json` і `wp23d-coordinator-verification.txt`.
+Вони збережені у `integ-c/.jane/`; сам перевірений script — у human `.jane/` та wp23d.
+
+**Потік C завершено:** C-1/C-2/C-3 інтегровані; код C-2/C-3 має незалежне приймання,
+C-4 прийнято R2 й застосовано, єдиний final workflow_dispatch C
+[37942655574](https://github.com/sql-monk/Jane/actions/runs/37942655574) на
+`133bb5a0604ccbc3ce41a820216d4751f301a47b` — success 14/14.
+B-1…B-5 та final B success підтверджено, WP-19/19b markers присутні; інших залежних
+задач C немає. Зовнішні LLM/IdP/AWS/Telegram — **не перевірено на реальному сервісі**,
+dev-laptop/single-node виключені з обсягу, browser real22 не заявлено перевіреним.
+Цей результат передається A через integration journal для його підсумкового CI;
+чужі чати й heartbeat не змінювалися. Після публікації цього журналу координатор
+переводить лише `jane-c-wp-19-b` у PAUSED зі збереженням решти полів.

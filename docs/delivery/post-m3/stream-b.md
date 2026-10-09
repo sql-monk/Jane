@@ -24,7 +24,7 @@ checkout потоку A. `main` і force push не використовують�
 | B-2: решта real-адмінки | `wp/22b-admin-real-coverage`, `wp22b` | accepted; `ffc6914`, review 1 |
 | B-3: дві репліки й L2 | `wp/22c-shared-host-replicas`, `wp22c` | accepted; `753f3e9`, review 1 |
 | B-4: приклад info з limits | `wp/22d-assistant-info-example`, `wp22d` | accepted; `256334c`, review 1, compatible |
-| B-5: S-M3-02 після WP-19 | `wp/22e-storage-contract-cleanup` | очікує маркера `merge: accept WP-19` в origin |
+| B-5: S-M3-02 після WP-19 | `wp/22e-storage-contract-cleanup`, `wp22e` | виконання; база `b336922`, WP-19 прийнято `ee78fc5` |
 
 ## Початкові перевірки
 
@@ -609,3 +609,10 @@ exit=0
 2026-10-09 13:41 (Київ): `origin/codex/jane-integration` містить `c9f3c81` — [handoff потоку A](stream-a-handoff.md). WP-19 передано новому координатору від Claude; за handoff попереднього виконавця зупинено на чернетці звіту, потрібні завершені перевірки, незалежне рев’ю, guardian та full CI. Маркера `merge: accept WP-19` немає; B-5 не починався, фінальний dispatch потоку B — 0. Heartbeat залишається активним.
 
 Запит/узгодження до нового координатора A (handoff, крок 5): `tests/e2e/compose.e2e.yaml` потребує додавання `/var/lib/jane/storage/transit/storage` до `JANE_HANDLER_RUNTIME_BLOB_ROOTS` поряд із `objects/`, як у прийнятому базовому infra compose, щоб runtime читав транзитний blob storage. B-5 працюватиме від свіжої інтеграції **лише після маркера**: якщо A вже внесе цей рядок, не дублювати; якщо ні — доручити необхідну fixture-зміну виконавцю B-5 у його дозволених `tests/e2e/**`, із тим самим адресним прогоном/незалежним review. До приймання WP-19 цей код не змінювати.
+
+
+## B-5: виконання після приймання WP-19
+
+2026-10-09: fresh fetch підтвердив `ee78fc5 merge: accept WP-19 shared stores and files ContentRef transit`. Gate відкрито. Створено окремий worktree `wp22e`, гілку `wp/22e-storage-contract-cleanup` від `b336922149c3b379f6946c82f6ee924b1720c56a`, `.jane-wp = 22`; виконавець — окремий субагент `b5_storage_cleanup`. Власність: `tests/e2e/**`, `docs/acceptance/**`; журнал веде root. Код поки не прийнято, reviewer буде окремим.
+
+Storage transit allowlist уже інтегровано потоком A в `2d4a101`; повторна fixture-правка не потрібна. Виконавець прибирає лише обходи adapter lifetime і пряме text/plain читання поза ContractClient, зберігає assertions bytes/size/sha256 та історичну фінальну ревізію M3. Локально — лише S-M3-01/02, один успішний прогін; фінальний повний workflow dispatch count досі 0. Фоновий monitor залишається активним до accepted B-5 + CI success, дублікати роботи заборонені.

@@ -419,6 +419,7 @@ components:
   pathItems:
     Health:
       get:
+        x-jane-scope: []
         operationId: getHealth
         summary: Стан сервісу (liveness/readiness)
         tags: [system]
@@ -454,6 +455,7 @@ components:
                           message: connection refused
     Info:
       get:
+        x-jane-scope: []
         operationId: getServiceInfo
         summary: Версія, підтримувані версії API й можливості сервісу
         tags: [system]

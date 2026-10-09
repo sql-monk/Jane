@@ -110,9 +110,9 @@ docker run --rm -p 8000:8000 -e JANE_ASSISTANT_LLM_URL=http://llm:8000 jane-assi
 ### Кілька екземплярів
 
 Задайте `JANE_ASSISTANT_STATE_DSN` (PostgreSQL, власна схема `JANE_ASSISTANT_STATE_SCHEMA`, типово
-`jane_assistant`; таблиці створюються самі) і унікальний `JANE_ASSISTANT_INSTANCE_ID` кожному екземпляру
-(типово — `hostname-pid`). Тоді сесії підключення, job і ключі ідемпотентності спільні
-(`state.py`: `PostgresState`):
+`jane_assistant`; таблиці створюються самі). `JANE_ASSISTANT_INSTANCE_ID` можна не задавати: типовий ідентифікатор
+`<hostname>-<pid>-<uuid4 hex>` створюється заново для кожного запуску процесу (явний — див. нижче). Тоді сесії
+підключення, job і ключі ідемпотентності спільні (`state.py`: `PostgresState`):
 
 - будь-який екземпляр читає й продовжує сесію чи job іншого (`selectCandidate`, `acceptProposal`, `GET /v1/jobs`);
   повтор `Idempotency-Key` на іншому екземплярі повертає збережену відповідь;
@@ -121,8 +121,9 @@ docker run --rm -p 8000:8000 -e JANE_ASSISTANT_LLM_URL=http://llm:8000 jane-assi
 - job належить екземпляру, що його виконує, і тримає оренду (`limits.state.job_lease_ms`), яку той поновлює
   кожні `heartbeat_interval_ms`. Екземпляр убито → після закінчення оренди будь-який інший позначає job
   `failed` (`service_unavailable`, «instance … stopped …»), сесію — теж; завершений job більше не змінюється.
-  Типовий `instance_id` створюється заново для кожного запуску процесу, навіть якщо hostname і PID повторилися;
-  явно заданий `JANE_ASSISTANT_INSTANCE_ID` має бути унікальним для кожного одночасного екземпляра.
+  Типовий `instance_id` (`<hostname>-<pid>-<uuid4 hex>`, jane-kit `JaneSettings`) створюється заново для кожного
+  запуску процесу, навіть якщо hostname і PID повторилися (контейнер після рестарту знову має PID 1); явно заданий
+  `JANE_ASSISTANT_INSTANCE_ID` має бути унікальним для кожного одночасного екземпляра й відрізнятися після рестарту.
   Штатна зупинка → job `cancelled` з `cancellation.reason` «instance … shut down», сесія — `cancelled` з причиною;
 - `/v1/health` перевіряє `state`, `/v1/info` → `capabilities.state` = `postgresql`.
 
@@ -199,7 +200,7 @@ just down -v --project jane-wp11
 | `DEFAULT_STORAGE_PACKAGE` / `DEFAULT_STORAGE_CONNECTION` | — | `package_id@version` і `connection_id` етапу збереження в чернетці завдання |
 | `STATE_DSN` | — | PostgreSQL для спільного стану кількох екземплярів (секрет; без нього — пам'ять, один екземпляр) |
 | `STATE_SCHEMA` | `jane_assistant` | схема таблиць стану |
-| `INSTANCE_ID` | `hostname-pid` | власник job і оренд (унікальний для кожного екземпляра) |
+| `INSTANCE_ID` | `<hostname>-<pid>-<uuid4 hex>`, новий для кожного запуску | власник job і оренд. Явне значення має бути унікальним для кожного одночасного екземпляра **й іншим після рестарту**: з тим самим ID новий процес поновлював би оренди job загиблого (R-07) і ті назавжди лишалися б `running` |
 | `LIMITS_FILE` | — | файл `PlatformLimits` (TOML/JSON/YAML), зокрема цілий профіль `deploy/profiles/<профіль>.json`: ліміти контракту, яких асистент не має, ігноруються (перелік — у журналі старту), опечатка чи некоректне значення — помилка старту; `timeouts.connect_timeout_ms` / `request_timeout_ms` і `retries` профілю діють на виклики сусідів (`clients.*`), окрім тайм-ауту виклику моделі (`llm_call.request_timeout_ms`, власний ліміт асистента) |
 | `LIMITS__<ГРУПА>__<ПАРАМЕТР>` / `LIMITS__HARD_CAPS__…` | — | перевизначення й жорсткі стелі |
 

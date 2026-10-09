@@ -75,8 +75,8 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     registry = Registry.default(settings.discovery_path)
     schemas = ContractSchemas.locate(settings.contracts_dir)
     runner = JobRunner(store=SqliteJobStore(state, settings.instance_id), limits=limits.jobs)
-    idem_store = SqliteIdempotencyStore(state)
-    engine = Engine(settings, resolved, state, registry, schemas, runner)
+    idem_store = SqliteIdempotencyStore(state, settings.instance_id, settings.idempotency_lease_ms / 1000)
+    engine = Engine(settings, resolved, state, registry, schemas, runner, idempotency=idem_store)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

@@ -3,7 +3,8 @@
 Holds collections (runs) with their lease, the frontier (queue + per-run dedup: primary key
 ``(collection_id, url)``), strategy snapshots, the buffer of emitted-but-unacknowledged materials, URL
 errors, the per-``state_key`` URL history used for revisits (ETag, Last-Modified, content hash, outgoing
-links), managed connections, jobs, idempotency keys and the per-host schedule shared by the instances
+links), managed connections, jobs and idempotency keys (tables of jane-kit's shared SQLite stores, R17) and the
+per-host schedule shared by the instances
 (``host_users``, ``host_schedule``, ``host_slots``: :mod:`.shared_hosts`, R15).
 
 Every processed page is committed in one transaction (new URLs + page status + material + URL history +
@@ -653,40 +654,33 @@ class StateStore:
         )
         return [json.loads(r[0]) for r in rows]
 
-    # ------------------------------------------------------------------ jobs / idempotency (jane-kit protocols)
+    # ------------------------------------------------------------------ jobs (jane-kit shared stores, R17)
+    @contextmanager
+    def read(self) -> Iterator[sqlite3.Connection]:
+        """The connection for single-statement reads (no write lock; ``jane_kit.stores.sqlite``)."""
+        with self._lock:
+            yield self._db
+
     def get_job(self, job_id: str) -> str | None:
         row = self._one("SELECT body FROM jobs WHERE job_id = ?", (job_id,))
         return str(row[0]) if row else None
 
-    def put_job(self, job_id: str, body: str) -> None:
-        with self.tx() as db:
-            db.execute(
-                "INSERT INTO jobs(job_id, body) VALUES (?, ?) ON CONFLICT(job_id) DO UPDATE SET body = excluded.body",
-                (job_id, body),
-            )
+    def work_row(self, db: sqlite3.Connection, job_id: str) -> tuple[str | None, str] | None:
+        """``(owner, status)`` of the collection of a job (``jane_kit.stores.sqlite.WorkRows``)."""
+        row = db.execute(
+            "SELECT owner, status FROM collections WHERE collection_id = ?", (job_id,)
+        ).fetchone()
+        return (row[0], str(row[1])) if row else None
 
-    def idem_begin(self, key: str, fingerprint: str, ttl_s: float) -> sqlite3.Row | None:
+    def cancel_unstarted(self, db: sqlite3.Connection, job_id: str, owner: str) -> bool:
+        """A collection cancelled before its run started ends ``cancelled`` (only its lease holder)."""
         now = time.time()
-        with self.tx() as db:
-            db.execute("DELETE FROM idempotency WHERE expires_at <= ?", (now,))
-            row: sqlite3.Row | None = db.execute("SELECT * FROM idempotency WHERE key = ?", (key,)).fetchone()
-            if row is not None:
-                return row
-            db.execute(
-                "INSERT INTO idempotency(key, fingerprint, state, expires_at) VALUES (?, ?, 'in_progress', ?)",
-                (key, fingerprint, now + ttl_s),
-            )
-            return None
-
-    def idem_complete(self, key: str, response: str) -> None:
-        with self.tx() as db:
-            db.execute(
-                "UPDATE idempotency SET state = 'completed', response = ? WHERE key = ?", (response, key)
-            )
-
-    def idem_release(self, key: str) -> None:
-        with self.tx() as db:
-            db.execute("DELETE FROM idempotency WHERE key = ? AND state = 'in_progress'", (key,))
+        cur = db.execute(
+            "UPDATE collections SET status = 'cancelled', finished_at = ?, finished_ts = ?, lease_until = 0 "
+            "WHERE collection_id = ? AND status = 'queued' AND owner = ?",
+            (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)), now, job_id, owner),
+        )
+        return cur.rowcount == 1
 
     # ------------------------------------------------------------------ per-host schedule of all instances (R15)
     def host_take_slot(

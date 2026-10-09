@@ -84,6 +84,9 @@ class Settings(JaneSettings):
     """How often the owner renews the lease and checks for cancellation from other instances."""
     state_busy_timeout_ms: int = Field(default=10_000, ge=1)
     """How long a write waits for another process holding the SQLite lock."""
+    idempotency_lease_ms: int = Field(default=900_000, ge=1_000)
+    """An ``Idempotency-Key`` claim of a killed instance (not renewed for this long) can be claimed again; a live
+    instance renews its claims in the resume loop (R17)."""
 
     @model_validator(mode="after")
     def _lease_rules(self) -> Settings:

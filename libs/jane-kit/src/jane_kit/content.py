@@ -31,6 +31,22 @@ file path, a resolved path or content:
 Settings of a service (env prefix ``JANE_<SERVICE>_``): ``BLOB_ROOTS`` (JSON list of directories) and
 ``DOWNLOAD_HOST_ALLOWLIST`` (JSON list of ``hostname[:port]``); validate the allowlist with
 :func:`parse_host_allowlist` so that a typo stops the service at start.
+
+**Writing** (the producer part of ADR-0004, R18):
+
+* :func:`inline_ref` - an ``inline`` reference (``utf-8`` text when asked and decodable, else ``base64``) with
+  ``size_bytes`` and ``sha256``;
+* :class:`FileTransitStore` - transit blobs of one producer on a local/shared directory
+  (``<root>/<producer>/<YYYY>/<MM>/<DD>/<name><ext>``, written atomically, ``file://`` URIs, single node or a shared
+  volume) and the producer's cleaner (:meth:`FileTransitStore.cleanup`: files older than
+  ``limits.transfer.transit_ttl_seconds``);
+* :class:`ContentWriter` - the delivery decision of a producer: ``auto`` (inline up to
+  ``limits.transfer.inline_max_bytes``, else a transit blob with ``store: transit`` and ``expires_at``), ``inline``
+  (larger content is :class:`ContentTooLarge`, ``limit_exceeded``) or ``blob`` (always transit). Without a transit
+  store a blob cannot be written: :class:`ContentTooLarge` with a hint to configure one (ADR-0004 §7).
+
+Persistent objects (``store: persistent``) are written only by the storage handler with its adapters; S3/MinIO
+transit (bucket lifecycle) is not implemented by this module.
 """
 
 from __future__ import annotations
@@ -42,21 +58,31 @@ import errno
 import hashlib
 import os
 import re
+import secrets
 import stat
+import time
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
 import httpx
 
 from jane_kit.errors import LimitExceeded, NotFound, UpstreamUnavailable, ValidationFailed
+from jane_kit.secrets import parse_host_port
 
-__all__ = ["ContentReader", "parse_host_allowlist"]
+__all__ = [
+    "ContentReader",
+    "ContentTooLarge",
+    "ContentWriter",
+    "FileTransitStore",
+    "inline_ref",
+    "parse_host_allowlist",
+]
 
-_LABEL = r"(?!-)[A-Za-z0-9_-]{1,63}(?<!-)"
-_HOST_PORT = re.compile(rf"(?P<host>{_LABEL}(?:\.{_LABEL})*)(?::(?P<port>[0-9]{{1,5}}))?", re.ASCII)
 _UNSAFE_URL = re.compile(r"[^\x21-\x7e]|\\")
 """Anything but printable ASCII, or a backslash: URL parsers disagree on such values."""
 _DEFAULT_PORTS = {"http": 80, "https": 443}
@@ -69,13 +95,7 @@ _REFUSED_ERRNOS = {errno.ELOOP, errno.EACCES, errno.EPERM, errno.EISDIR, errno.E
 
 def _host_port(value: str) -> tuple[str, int | None] | None:
     """Strict ``hostname[:port]`` -> ``(lower-case host, port)``; anything else -> ``None``."""
-    m = _HOST_PORT.fullmatch(value) if len(value) <= 300 else None
-    if m is None or len(m["host"]) > 253:
-        return None
-    if m["port"] is None:
-        return m["host"].lower(), None
-    port = int(m["port"])
-    return (m["host"].lower(), port) if 0 < port < 65536 else None
+    return parse_host_port(value)
 
 
 def parse_host_allowlist(entries: Iterable[str]) -> frozenset[tuple[str, int | None]]:
@@ -317,3 +337,183 @@ def _check_response(resp: httpx.Response, name: str, max_bytes: int, limit: str)
     declared = resp.headers.get("content-length", "")
     if declared.isdigit() and int(declared) > max_bytes:
         raise _too_large(max_bytes, limit)
+
+
+# ================================================================================================ writing (R18)
+EXTENSIONS: Mapping[str, str] = {
+    "text/html": ".html",
+    "application/xhtml+xml": ".html",
+    "application/json": ".json",
+    "application/xml": ".xml",
+    "text/xml": ".xml",
+    "application/pdf": ".pdf",
+    "text/plain": ".txt",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+    "video/mp4": ".mp4",
+    "application/zip": ".zip",
+}
+"""File extension of a transit blob by media type (``.bin`` otherwise); only a convenience for operators."""
+
+_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,199}")
+"""Safe file name of a transit blob: no separators, no ``..``, no ``:`` (Windows)."""
+
+
+class ContentTooLarge(LimitExceeded):
+    """Content cannot be delivered: larger than ``transfer.inline_max_bytes`` with inline delivery, or a blob is
+    needed and no transit store is configured (``limit_exceeded``, ADR-0004 §7)."""
+
+
+def _rfc3339(dt: datetime) -> str:
+    return dt.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def inline_ref(
+    body: bytes, media_type: str, *, text: bool = False, charset: str | None = None
+) -> dict[str, Any]:
+    """``inline`` ContentRef of ``body``: ``utf-8`` data when ``text`` and the bytes decode, else ``base64``."""
+    ref: dict[str, Any] = {"kind": "inline", "media_type": media_type}
+    if charset:
+        ref["charset"] = charset
+    decoded: str | None = None
+    if text:
+        try:
+            decoded = body.decode("utf-8")
+        except UnicodeDecodeError:
+            decoded = None
+    if decoded is not None:
+        ref.update(encoding="utf-8", data=decoded)
+    else:
+        ref.update(encoding="base64", data=base64.b64encode(body).decode("ascii"))
+    ref.update(size_bytes=len(body), sha256=hashlib.sha256(body).hexdigest())
+    return ref
+
+
+class FileTransitStore:
+    """Transit blobs of one producer under ``<root>/<producer>/`` (``file://`` URIs; one node or a shared volume).
+
+    The consumers read them only inside their configured ``BLOB_ROOTS`` (:class:`ContentReader`); the producer
+    removes them after the TTL (:meth:`cleanup`, run by the producer's own periodic task).
+    """
+
+    def __init__(self, root: Path, producer: str) -> None:
+        if not _NAME.fullmatch(producer):
+            raise ValueError(f"invalid transit producer name {producer!r}")
+        self.root = root.resolve()
+        self.producer = producer
+
+    @property
+    def base(self) -> Path:
+        return self.root / self.producer
+
+    def put(self, name: str, body: bytes, media_type: str, now: datetime, *, reuse: bool = False) -> Path:
+        """Write ``body`` atomically as ``<base>/<YYYY>/<MM>/<DD>/<name><ext>``.
+
+        ``reuse`` (only for a content-addressed ``name``): an existing file of the same size is kept and only its
+        time is refreshed, so the cleaner keeps it for another TTL.
+        """
+        if not _NAME.fullmatch(name):
+            raise ValueError(f"invalid transit blob name {name!r}")
+        folder = self.base / f"{now:%Y}" / f"{now:%m}" / f"{now:%d}"
+        path = folder / f"{name}{EXTENSIONS.get(media_type, '.bin')}"
+        if reuse:
+            try:
+                if path.stat().st_size == len(body):
+                    os.utime(path)
+                    return path
+            except FileNotFoundError:
+                pass
+        for attempt in range(2):
+            folder.mkdir(parents=True, exist_ok=True)
+            tmp = folder / f".{path.name}.{secrets.token_hex(6)}.tmp"
+            try:
+                tmp.write_bytes(body)
+                os.replace(tmp, path)
+                return path
+            except FileNotFoundError:
+                if attempt:  # the cleaner removed the (empty) folder in between: create it once more
+                    raise
+            finally:
+                tmp.unlink(missing_ok=True)
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    def cleanup(self, ttl_seconds: float) -> int:
+        """Remove this producer's transit files older than ``ttl_seconds`` (and empty day folders); returns the
+        number of files removed. Files being written are newer than the TTL, so they are never touched."""
+        cutoff = time.time() - ttl_seconds
+        removed = 0
+        if not self.base.is_dir():
+            return 0
+        for path in sorted(self.base.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+            try:
+                if path.is_symlink() or path.is_file():
+                    if path.lstat().st_mtime < cutoff:
+                        path.unlink(missing_ok=True)
+                        removed += 1
+                elif path.is_dir() and not any(path.iterdir()) and path.lstat().st_mtime < cutoff:
+                    path.rmdir()
+            except OSError:
+                continue  # removed or written concurrently (another instance, a new blob): next round
+        return removed
+
+
+@dataclass
+class ContentWriter:
+    """Delivery of a producer's content as ContentRef (see the module docstring)."""
+
+    mode: Literal["auto", "inline", "blob"]
+    inline_max_bytes: int
+    transit_ttl_seconds: int
+    store: FileTransitStore | None
+
+    def ref(
+        self,
+        body: bytes,
+        media_type: str,
+        name: str,
+        now: datetime | None = None,
+        *,
+        text: bool = False,
+        charset: str | None = None,
+    ) -> dict[str, Any]:
+        """ContentRef of ``body``; ``name`` names the transit blob if one is written (unique per content)."""
+        now = now or datetime.now(UTC)
+        too_big = len(body) > self.inline_max_bytes
+        if self.mode == "inline" and too_big:
+            raise ContentTooLarge(
+                f"{len(body)} bytes > transfer.inline_max_bytes={self.inline_max_bytes} (content_delivery=inline)",
+                details={"path": "transfer.inline_max_bytes", "limit": self.inline_max_bytes},
+            )
+        if self.mode == "blob" or (self.mode == "auto" and too_big):
+            if self.store is None:
+                raise ContentTooLarge(
+                    f"{len(body)} bytes > transfer.inline_max_bytes={self.inline_max_bytes} and no blob store "
+                    "configured"
+                    if self.mode == "auto"
+                    else "content_delivery=blob but no blob store configured",
+                    details={"path": "transfer.inline_max_bytes", "limit": self.inline_max_bytes},
+                )
+            return self.blob(body, media_type, name, now, charset=charset)
+        return inline_ref(body, media_type, text=text, charset=charset)
+
+    def blob(
+        self, body: bytes, media_type: str, name: str, now: datetime, *, charset: str | None = None
+    ) -> dict[str, Any]:
+        """A transit blob of ``body`` (the store must be configured)."""
+        if self.store is None:
+            raise ContentTooLarge("no blob store configured")
+        path = self.store.put(name, body, media_type, now)
+        ref: dict[str, Any] = {
+            "kind": "blob",
+            "uri": path.as_uri(),
+            "media_type": media_type,
+            "size_bytes": len(body),
+            "sha256": hashlib.sha256(body).hexdigest(),
+            "store": "transit",
+            "expires_at": _rfc3339(now + timedelta(seconds=self.transit_ttl_seconds)),
+        }
+        if charset:
+            ref["charset"] = charset
+        return ref

@@ -148,3 +148,57 @@ def test_http_flow_202_poll_cancel() -> None:
         assert c.post(f"/v1/jobs/{job_id}/cancel").status_code == 200
         missing = c.get("/v1/jobs/unknown")
         assert missing.status_code == 404 and missing.json()["code"] == "not_found"
+
+
+async def test_memory_store_follows_the_shared_write_rules() -> None:
+    """The in-memory store decides like the shared stores (R17): terminal is final, cancellation is kept."""
+    from jane_kit.jobs import InMemoryJobStore, Job, JobCancellation, JobProgress
+
+    store = InMemoryJobStore()
+    job = Job(job_id="job_a", kind="demo", status=JobStatus.RUNNING)
+    await store.create(job)
+    await store.save(
+        job.model_copy(
+            update={
+                "status": JobStatus.CANCELLING,
+                "cancellation": JobCancellation(requested_at=job.created_at),
+            }
+        )
+    )
+    await store.save(job.model_copy(update={"progress": JobProgress(completed=2)}))  # an older snapshot
+    current = await store.get("job_a")
+    assert current is not None and current.status == JobStatus.CANCELLING and current.progress is not None
+    await store.save(job.model_copy(update={"status": JobStatus.SUCCEEDED, "result": {"x": 1}}))
+    done = await store.get("job_a")
+    assert done is not None and done.status == JobStatus.CANCELLED and done.result is None
+    assert done.finished_at is not None and done.cancellation is not None
+    await store.save(done.model_copy(update={"status": JobStatus.FAILED}))
+    assert (await store.get("job_a")) == done
+    await store.save(Job(job_id="unknown", kind="demo"))  # never created: nothing is written
+    assert await store.get("unknown") is None
+
+
+async def test_memory_store_page() -> None:
+    from jane_kit.jobs import InMemoryJobStore, Job
+
+    store = InMemoryJobStore()
+    jobs = [Job(job_id=f"job_{n}", kind="demo", labels={"s": "1" if n % 2 else "2"}) for n in range(4)]
+    for job in jobs:
+        await store.create(job)
+    await store.save(jobs[0].model_copy(update={"status": JobStatus.SUCCEEDED}))
+    page = await store.page("demo", labels={}, statuses=None, after=None, limit=2)
+    assert [j.job_id for j in page] == ["job_3", "job_2"]
+    rest = await store.page(
+        "demo", labels={}, statuses=None, after=(page[-1].created_at, page[-1].job_id), limit=5
+    )
+    assert [j.job_id for j in rest] == ["job_1", "job_0"]
+    assert [
+        j.job_id for j in await store.page("demo", labels={"s": "1"}, statuses=None, after=None, limit=5)
+    ] == [
+        "job_3",
+        "job_1",
+    ]
+    assert [
+        j.job_id for j in await store.page("demo", labels={}, statuses=["succeeded"], after=None, limit=5)
+    ] == ["job_0"]
+    assert await store.page("other", labels={}, statuses=None, after=None, limit=5) == []

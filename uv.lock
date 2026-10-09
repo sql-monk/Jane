@@ -890,12 +890,18 @@ dependencies = [
     { name = "uvicorn" },
 ]
 
+[package.optional-dependencies]
+postgres = [
+    { name = "psycopg", extra = ["binary", "pool"] },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "jsonschema", specifier = ">=4.23" },
     { name = "prometheus-client", specifier = ">=0.21" },
+    { name = "psycopg", extras = ["binary", "pool"], marker = "extra == 'postgres'", specifier = ">=3.2" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "pydantic-settings", specifier = ">=2.6" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.10" },
@@ -903,6 +909,7 @@ requires-dist = [
     { name = "referencing", specifier = ">=0.35" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
+provides-extras = ["postgres"]
 
 [[package]]
 name = "jane-llm"

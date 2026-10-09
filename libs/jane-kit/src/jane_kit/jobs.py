@@ -5,8 +5,18 @@
   the job is already terminal (:func:`jobs_router`);
 * statuses ``queued -> running -> succeeded|failed``; ``queued|running -> cancelling -> cancelled``.
 
-:class:`InMemoryJobStore` is for a single instance and tests. For several instances a service
-implements :class:`JobStore` on its own database; :class:`JobRunner` works with any store.
+:class:`InMemoryJobStore` is for a single instance and tests. For several instances use the shared stores of
+:mod:`jane_kit.stores` (PostgreSQL / SQLite, with leases and fencing) on the service's own database;
+:class:`JobRunner` works with any store. Every store follows the same write rules (:func:`decide_save`):
+
+* a terminal job (``succeeded|failed|cancelled``) never changes again;
+* any instance may request cancellation (``cancelling``) of a live job; every other write comes only from the
+  instance that owns the job and only while its lease is live (fencing: a run that lost the lease cannot
+  overwrite the job);
+* a cancellation committed first is kept: progress of the run keeps ``cancelling``, a later success or failure
+  of a stale snapshot ends the job ``cancelled``;
+* a job whose owner stopped renewing its lease ends ``failed`` (``service_unavailable``, retryable) - or
+  ``cancelled`` if cancellation had already been requested (:func:`orphaned`).
 """
 
 from __future__ import annotations
@@ -14,7 +24,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Protocol
@@ -36,12 +46,16 @@ __all__ = [
     "JobCancelledError",
     "JobContext",
     "JobLimits",
+    "JobPosition",
     "JobProgress",
     "JobRunner",
     "JobStatus",
     "JobStore",
     "accepted",
+    "decide_save",
     "jobs_router",
+    "orphaned",
+    "resumed",
 ]
 
 log = logging.getLogger(__name__)
@@ -134,8 +148,91 @@ class JobStore(Protocol):
     async def save(self, job: Job) -> None: ...
 
 
+def decide_save(current: Job | None, new: Job, *, mine: bool, live: bool) -> Job | None:
+    """The document a save of ``new`` writes over ``current`` (``None``: write nothing).
+
+    ``mine`` - the saving instance owns the job; ``live`` - the owner's lease has not expired.
+    """
+    if current is None or not live or current.status in TERMINAL_STATUSES:
+        return None
+    now = _now()
+    if new.status == JobStatus.CANCELLING:
+        if current.status == JobStatus.CANCELLING:
+            return None
+        cancellation = new.cancellation or JobCancellation(requested_at=now)
+        return current.model_copy(
+            update={"status": JobStatus.CANCELLING, "cancellation": cancellation, "updated_at": now}
+        )
+    if not mine:
+        return None
+    if current.status == JobStatus.CANCELLING:
+        if new.status in TERMINAL_STATUSES:
+            # the cancellation was committed first: a success or failure of an older snapshot cannot erase it
+            return new.model_copy(
+                update={
+                    "status": JobStatus.CANCELLED,
+                    "cancellation": current.cancellation,
+                    "finished_at": new.finished_at or now,
+                    "result": None,
+                    "error": None,
+                    "updated_at": now,
+                }
+            )
+        return new.model_copy(
+            update={"status": JobStatus.CANCELLING, "cancellation": current.cancellation, "updated_at": now}
+        )
+    if new.status in TERMINAL_STATUSES and new.finished_at is None:
+        return new.model_copy(update={"finished_at": now, "updated_at": now})
+    return new.model_copy(update={"updated_at": now})
+
+
+def orphaned(job: Job, owner: str | None) -> Job:
+    """Terminal state of a job whose owner stopped renewing its lease (killed, hung or partitioned)."""
+    now = _now()
+    if job.status == JobStatus.CANCELLING:
+        return job.model_copy(update={"status": JobStatus.CANCELLED, "finished_at": now, "updated_at": now})
+    error = JaneError(
+        f"instance {owner or 'unknown'} stopped while the job was {job.status} (job lease expired); "
+        "retry the request",
+        code="service_unavailable",
+        retryable=True,
+    )
+    return job.model_copy(
+        update={
+            "status": JobStatus.FAILED,
+            "finished_at": now,
+            "updated_at": now,
+            "error": error.to_problem(),
+        }
+    )
+
+
+def resumed(existing: Job, new: Job) -> Job:
+    """``new`` (a resubmission of the same ``job_id``) keeping what the existing job already recorded."""
+    return new.model_copy(
+        update={
+            "created_at": existing.created_at,
+            "started_at": existing.started_at,
+            "idempotency_key": existing.idempotency_key,
+            "labels": existing.labels,
+            "progress": existing.progress,
+            "cancellation": existing.cancellation,
+            "status": JobStatus.CANCELLING if existing.status == JobStatus.CANCELLING else new.status,
+            "updated_at": _now(),
+        }
+    )
+
+
+JobPosition = tuple[datetime, str]
+"""Cursor position in a job listing: ``(created_at, job_id)``, newest first."""
+
+
 class InMemoryJobStore:
-    """Single-instance store; drops finished jobs older than ``job_retention_seconds``."""
+    """Single-instance store; drops finished jobs older than ``job_retention_seconds``.
+
+    Writes follow :func:`decide_save` (this process owns every job and its lease never expires): a terminal job
+    never changes, a committed cancellation is kept.
+    """
 
     def __init__(self, limits: JobLimits | None = None) -> None:
         self.limits = limits or JobLimits()
@@ -152,14 +249,43 @@ class InMemoryJobStore:
 
     async def create(self, job: Job) -> None:
         self._gc()
-        self._jobs[job.job_id] = job.model_copy(deep=True)
+        existing = self._jobs.get(job.job_id)
+        self._jobs[job.job_id] = (resumed(existing, job) if existing is not None else job).model_copy(
+            deep=True
+        )
 
     async def get(self, job_id: str) -> Job | None:
         job = self._jobs.get(job_id)
         return job.model_copy(deep=True) if job else None
 
     async def save(self, job: Job) -> None:
-        self._jobs[job.job_id] = job.model_copy(deep=True, update={"updated_at": _now()})
+        saved = decide_save(self._jobs.get(job.job_id), job, mine=True, live=True)
+        if saved is not None:
+            self._jobs[job.job_id] = saved.model_copy(deep=True)
+
+    async def page(
+        self,
+        kind: str,
+        *,
+        labels: Mapping[str, str],
+        statuses: Iterable[str] | None,
+        after: JobPosition | None,
+        limit: int,
+    ) -> list[Job]:
+        """Jobs of ``kind`` carrying all ``labels``, newest first (``created_at``, then ``job_id``), strictly
+        after ``after`` (the same listing as :meth:`jane_kit.stores.PgJobStore.page`)."""
+        self._gc()
+        wanted = set(statuses or ())
+        found = [
+            job.model_copy(deep=True)
+            for job in self._jobs.values()
+            if job.kind == kind
+            and all((job.labels or {}).get(k) == v for k, v in labels.items())
+            and (not wanted or str(job.status) in wanted)
+            and (after is None or (job.created_at, job.job_id) < after)
+        ]
+        found.sort(key=lambda j: (j.created_at, j.job_id), reverse=True)
+        return found[:limit]
 
 
 class JobContext:

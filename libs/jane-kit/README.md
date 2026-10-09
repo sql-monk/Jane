@@ -32,7 +32,11 @@ hostname і PID збігаються. Явний `<ПРЕФІКС>INSTANCE_ID` �
 | `jane_kit.tracing` | `traceparent` (W3C): продовження траси, `trace_id` у журналах і Problem | конвенція простежуваності |
 | `jane_kit.logs` | JSON-журнали в stdout, `bind_context(trace_id=..., job_id=...)` через `contextvars` | — |
 | `jane_kit.metrics` | `Metrics` з окремим реєстром на застосунок, `/metrics`, HTTP-метрики за шаблоном маршруту | — |
-| `jane_kit.content` | `ContentReader` — читання `ContentRef` за явною політикою: `inline` (utf-8/base64); `download_url` лише `http(s)` на хости з allowlist (`hostname` / `hostname:port`, типово порожньо — вимкнено; хост звіряється в ASCII-формі, з якою йде з'єднання, тож IDN дозволяється записом у punycode `xn--…`, а URL з не-ASCII символами відхиляється), без редиректів, `trust_env=False`, лише `Content-Encoding: identity`, ліміт розміру під час потоку й тайм-аут усього завантаження; `file://` лише строго всередині коренів (типово немає — вимкнено), шлях спершу розв'язується (`..`, symlink) і читається розв'язаний звичайний файл; перевірка `size_bytes` blob і `sha256`; помилки — `JaneError` (422 `validation_failed` / `limit_exceeded`, 404, 502) без шляхів і вмісту; `parse_host_allowlist` — перевірка налаштування на старті. Налаштування сервісу: `<ПРЕФІКС>BLOB_ROOTS`, `<ПРЕФІКС>DOWNLOAD_HOST_ALLOWLIST`; ліміти розміру й тайм-аут — з лімітів сервісу | `schemas/common/content-ref.schema.json`, ADR-0004 |
+| `jane_kit.content` | `ContentReader` — читання `ContentRef` за явною політикою: `inline` (utf-8/base64); `download_url` лише `http(s)` на хости з allowlist (`hostname` / `hostname:port`, типово порожньо — вимкнено; хост звіряється в ASCII-формі, з якою йде з'єднання, тож IDN дозволяється записом у punycode `xn--…`, а URL з не-ASCII символами відхиляється), без редиректів, `trust_env=False`, лише `Content-Encoding: identity`, ліміт розміру під час потоку й тайм-аут усього завантаження; `file://` лише строго всередині коренів (типово немає — вимкнено), шлях спершу розв'язується (`..`, symlink) і читається розв'язаний звичайний файл; перевірка `size_bytes` blob і `sha256`; помилки — `JaneError` (422 `validation_failed` / `limit_exceeded`, 404, 502) без шляхів і вмісту; `parse_host_allowlist` — перевірка налаштування на старті. Налаштування сервісу: `<ПРЕФІКС>BLOB_ROOTS`, `<ПРЕФІКС>DOWNLOAD_HOST_ALLOWLIST`; ліміти розміру й тайм-аут — з лімітів сервісу. **Запис (R18):** `inline_ref`, `FileTransitStore` (транзитні blob виробника `<корінь>/<виробник>/<РРРР>/<ММ>/<ДД>/<ім'я>`, атомарний запис, `file://`, прибиральник `cleanup(transit_ttl_seconds)`), `ContentWriter` (`auto`/`inline`/`blob` за `transfer.inline_max_bytes`, `store: transit`, `expires_at`; без сховища — `ContentTooLarge` = 422 `limit_exceeded`) | `schemas/common/content-ref.schema.json`, ADR-0004 |
+| `jane_kit.stores` | Спільні `IdempotencyStore`/`JobStore` з орендою й fencing (R17): `stores.postgres` (`PgIdempotencyStore`, `PgJobStore`, `PgDatabase`, `migrate`; потрібен `jane-kit[postgres]`), `stores.sqlite` (`SqliteIdempotencyStore`, `SqliteJobStore`, `SqliteWorkJobStore` — job, що віддзеркалює орендований робочий рядок колектора); `LeaseLimits`, `heartbeat_loop` — див. «Кілька екземплярів» | `common.yaml` `IdempotencyKey`, `Job` |
+| `jane_kit.secrets` | Політика `secret_refs` керованих підключень (ADR-0006): `SecretPolicy` (`env:` лише з префіксом, типово `JANE_SECRET_`, і лише ім'я змінної; `file:` строго всередині каталогу, типово `/run/secrets`; `vault:` відхиляється; `violations` → `secret_ref_not_allowed`), `read_secret_file` (читання через закріплені компоненти шляху, без TOCTOU), `HostAllowlist` / `parse_host_port`, `OriginAllowlist` (точні `http(s)` origin) | `schemas/common/connection.schema.json`, ADR-0006 |
+| `jane_kit.schemas` | `ContractSchemas` — валідація за `contracts/schemas` (і, за потреби, одним OpenAPI): кеш валідаторів, `FieldError` з RFC 6901 вказівниками, `locate()` з назвою налаштування; `format_check` — як було в сервісі | `contracts/schemas/**` |
+| `jane_kit.rules` | Правила колекторів: `CollectorSchemas` (помилки `oneOf` — за дискримінатором `type`/`collector`), `RulesReport`, `RulesLoader` (локальний пакет/архів, registry з перевіркою `digest` і `files[].sha256`) | `collector.v1`, `collector-rules.schema.json` |
 | `jane_kit.clients` | `ServiceClient` (httpx): `timeouts.*_ms` і `RetryPolicy` з конфігурації, повтор лише для безпечних методів або з `Idempotency-Key` і лише retryable-помилок, `Retry-After`, `traceparent`, `wait_for_job` | `RetryPolicy` у limits |
 | `jane_kit.contracts` | `OpenAPISpec` (OpenAPI 3.1, `$ref` між файлами, `$ref` на path items), `ContractClient` — перевіряє кожну відповідь справжнього сервісу, `build_mock_app` — мок сусіда з прикладів контракту, `contracts_dir()`, `find_specs()` | `contracts/openapi/*.v1.yaml` |
 | `jane_kit.codegen` | `uv run jane-codegen client <spec> --out <pkg>/_generated/<svc>` — моделі Pydantic (datamodel-code-generator) + асинхронний клієнт на `ServiceClient` | — |
@@ -148,7 +152,26 @@ resolved.effective()  # {"limits": {...}, "provenance": {"crawl.max_depth": "tas
 ## Кілька екземплярів
 
 `InMemoryIdempotencyStore` і `InMemoryJobStore` — для одного екземпляра й тестів. Для кількох екземплярів
-сервіс реалізує протоколи `IdempotencyStore` і `JobStore` у власній БД; решта коду не змінюється.
+сервіс бере спільні реалізації `jane_kit.stores` у **власній** БД (код спільний, дані — ні, ADR-0009):
+
+| Сховище | Де | Поведінка |
+|---|---|---|
+| `PgIdempotencyStore` | PostgreSQL сервісу | `INSERT … ON CONFLICT DO NOTHING`; claim (`in_progress`) має `owner`, `token` і оренду `lease_until`, яку поновлює `heartbeat()` лише для claim **цього** процесу; прострочений ключ або claim зупиненого екземпляра (оренда минула) захоплюється знову; `complete`/`release` — лише з тим самим `token` (запит, чий claim перехопили, не перезапише новий); `gc()` прибирає прострочені ключі |
+| `PgJobStore` | PostgreSQL сервісу | `owner` + `lease_until`, поновлення `heartbeat()` лише для job цього процесу; запис за правилами `jane_kit.jobs.decide_save` під `SELECT … FOR UPDATE`; job з простроченою орендою → `failed` (`service_unavailable`, retryable) або `cancelled` (якщо скасування вже просили) під час `get`/`page`/`sweep`; `release_owned(reason)` — штатна зупинка; `page()` — список за kind/labels/статусами з курсором |
+| `SqliteIdempotencyStore`, `SqliteJobStore` | SQLite-файл стану (одна машина) | те саме в `BEGIN IMMEDIATE`; час — epoch-секунди |
+| `SqliteWorkJobStore` | SQLite-файл колектора | job віддзеркалює орендований робочий рядок (збір): пише лише власник оренди рядка, інші — лише `cancelling`; термінальний статус job — лише коли він уже в рядку; повторне подання того самого `job_id` (відновлення) зберігає записане; job, скасований до старту, завершує й рядок |
+
+Правила запису однакові для всіх сховищ, включно з in-memory: термінальний job більше не змінюється, скасування,
+зафіксоване першим, зберігається (прогрес лишає `cancelling`, пізній успіх старого знімка → `cancelled`).
+
+Міграції: `ddl()`/`migrate()` (`CREATE … IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, під `pg_advisory_xact_lock`) —
+ідемпотентні, кілька екземплярів можуть стартувати одночасно; наявні таблиці сервісів читаються без копіювання
+даних (`layout="json"` — одна колонка `response`, `doc_column` — колонка документа job); незавершеним рядкам
+попереднього формату без оренди дається одна оренда «пільги», після чого вони завершуються як осиротілі.
+
+`LeaseLimits` (типово): `in_progress_lease_ms` 900000, `job_lease_ms` 60000, `heartbeat_interval_ms` 15000 — для
+сервісів без власної групи; handler-runtime, assistant, registry зберігають свої налаштування оренд.
+`heartbeat_loop([store.heartbeat, ...], interval_s)` — фонова задача поновлення.
 
 ## Тести
 

@@ -140,3 +140,11 @@ ContentRef transit`, вершина integration — `2d4a101`. Гейт C-2 ві
 Виконавець отримує окремий checkout `wp23b` від свіжої integration, `.jane-wp = 23` і звіт
 `docs/delivery/WP-23/c2-workspace.md`; незалежне рев'ю та required checks лишаються обов'язковими.
 Фінальний CI C ще не запускався (dispatch count 0); після злиття C-2 він буде запущений один раз.
+
+### Черга фінального CI
+
+У `.github/workflows/ci.yml` concurrency group — `ci-${{ github.ref }}`, `cancel-in-progress: true`.
+Окремі dispatch B/C на `codex/jane-integration` скасували б попередній run. Тому після приймання C-2
+фінальний dispatch C чекатиме завершення фінального CI B; C не створює нового run, поки B працює.
+Він перевірить свіжий integration SHA з усіма змінами C-2/C-3. A за своїм handoff запускає підсумковий
+CI після завершення B/C. Це зберігає один повний dispatch C і не змінює workflow чи обсяг перевірок.

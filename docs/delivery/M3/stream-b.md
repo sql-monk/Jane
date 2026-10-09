@@ -225,3 +225,97 @@ UI і sandbox зібрано зі зведеного checkout; working tree до
 
 Потоку A залишено фінальний CI, status і блок фінальної ревізії матриці. Потік B у main не зливав,
 force push не робив, worktree/гілки `wp01g`/`wp01h` і `puluj-g-*` не чіпав.
+
+
+## П'ята черга
+
+Доручення: [HANDOFF-2026-10-09-stream-b-5.md](../HANDOFF-2026-10-09-stream-b-5.md).
+База всіх трьох WP-гілок — свіжа `dc75e0b2c20bef7d756d140aa8e398bc085b5627`.
+Після завершення ще раз виконано git fetch origin: інтеграція `e0f711857ae6418ac8da0f7b5bdc619da7b2ab6e`,
+у її status.md **немає «M3 — досягнуто»**. Тому власні гілки опубліковано, але в інтеграційну
+гілку п'яту чергу **не зливали**. До фінального gate A нічого не додано.
+
+| Завдання | Опублікована власна гілка | SHA вершини / стан |
+|---|---|---|
+| B-13 / R33 (C-W2) | `wp/12g-problem-raw-fallback` | `87536ae50e84d42c3617b813074186f24de84a2a`; готово, незалежне review accepted; код `3e6c9f8` |
+| B-14 / R32, контракти | `wp/00f-operation-scopes` | `ce05e1309c3c3b09d5d70a9b230ed54935e02148`; готово, contract-guardian compatible/accepted; scopes `68c56d9`, skill `2b99768` |
+| B-15 / R09/R10/R11/R16; B-16 / R28 | `wp/00g-contract-doc-clarifications` | `1156a7b4859778892ed85e3f1980df6876b3fcbd`; готово документаційно; основний `56c84fc`, решта env refs `2ed017c` |
+
+Зведення й цей журнал — **власна** `codex/jane-stream-b5-prepared` у checkout `b11-real`.
+Зведений commit перед журналом `6531c3a2e423a942cfefceeee1115cb8a28b3a0d`; додаткове злиття тут
+лише збирає власні інкременти, це не `codex/jane-integration`. При конфлікті двох append-звітів
+WP-00 збережено обидва хвости звіту; контракти злилися штатно.
+
+### Що підготовлено
+
+- **B-13:** fallback RAW вимагає observation_id й рівно один унікальний object_id у всіх сторінках;
+  без provenance/при неоднозначності показує «RAW прикладу недоступний» і не викликає improvement.
+  Відомий stored_object_id збережено. Mock-сусіди, справжня ProblemsPage; 4 випадки: немає observation,
+  неоднозначність на одній сторінці, на наступній сторінці, позитивний після кінця пагінації.
+- **B-14:** x-jane-scope у 102 захищених операціях, common [] у 14 health/info; ANY OF і scopes
+  точно за чинними READ-ONLY таблицями B2. Job/Connections розгорнуто зі спільними schema/parameter/
+  response/example refs; bearerAuth/поведінка сервісів незмінні. README й скіл узгоджено.
+- **B-15:** документаційний 409 completion через чинний Conflict/Problem; точні ZIP/digest/manifest_changes;
+  ADR-0006 й приклади з JANE_SECRET_ та file root/allowlists; CAS з pending, відновлення історії й
+  фактичний list_entities порядок адаптерів. JSON Schema й Protocol-и незмінні. У
+  [беклозі](open-requests.md) R09/R10/R11/R16/R28 закрито документаційно з посиланнями на коміти,
+  із явною позначкою, що гілки ще не злиті.
+- **B-16:** R28 готовий у тому самому docs інкременті: SDK/registry/canonical ZIP, посилання на реалізацію.
+  Необов'язковий R29 (`py.typed` LLM) залишено відкритим, код LLM не змінювався.
+
+### Мінімальні докази
+
+```text
+$ corepack pnpm --dir web/admin test src/pages/ProblemsPage.test.tsx
+Test Files  1 passed (1)
+Tests       4 passed (4)
+Duration    4.03s
+EXIT_CODE=0
+$ corepack pnpm --dir web/admin lint
+gen-api: 10 generated files are up to date
+All matched files use Prettier code style!
+EXIT_CODE=0
+$ corepack pnpm --dir web/admin typecheck
+$ tsc -p tsconfig.json
+EXIT_CODE=0
+```
+
+Адресний Vitest на коді `3e6c9f8`; перший прогін 2/2 через тестовий cleanup виправлено й повторено
+тільки цей файл. Авторські помилки типів fixtures виправлено, старих assertions не послаблено.
+Одне незалежне wp-reviewer: accepted, check-diff 2/0; повтору успішного тесту не було.
+Після B-15 штатний gen:api на `27fb8ca` змінив тільки llm.ts (+5 JSDoc/409); файл у WP-12 `87536ae`.
+На цьому зведенні повторено лише необхідні lint/gen/typecheck для оновленого споживача, exit 0;
+ProblemsPage/test тотожні перевіреним. Журнали: wp12e `.jane/b13-*.log`, b11-real `.jane/b15-gen-api.log`,
+`.jane/b5-web-lint.log`, `.jane/b5-web-types.log`.
+
+Єдиний contract-guardian прохід на **`27fb8ca1e4d239cb1d1720d93be507c545483c5b`**:
+
+```text
+$ uv run contracts/tools/check_contracts.py --require-redocly
+Checked: operations=116, openapi_examples=496, schema_examples=46, invalid_examples=13
+All contract checks passed.
+exit 0
+$ uv run contracts/tools/compat.py --base main --oasdiff
+7 API: ok
+0 breaking, 0 warning(s).
+exit 0
+```
+
+116 operations, scope mismatch 0 (102 protected +14 health/info). Guardian: **compatible / accepted**
+з трьома адресними docs/generated виправленнями `2ed017c`, `87536ae`, `2b99768`; їх перевірено статично,
+check/compat не повторювали. Фактичний повніший stdout і consumers — [WP-00](../WP-00.md#b-14--r32--scopes-операцій-openapi-підготовлено-для-злиття-після-m3-2026-10-09).
+Змінені docs: 176 локальних посилань, invalid 0. Документальні інкременти без окремих тестів/reviewers.
+Full real-suite / full CI / Docker — **0**. Service-code delta — **0**, тому full CI для цієї черги не потрібний.
+
+### Після оголошення M3
+
+1. Fetch origin, підтвердити «M3 — досягнуто» з SHA у status; rebase власних гілок на вершину,
+   зберігши їхні підготовлені SHA (без force push). Не повторювати успішні тести при docs-only дельті бази.
+2. R32 лишається **частковим**: окреме розширення jane-kit test_auth_scopes має звіряти значення
+   x-jane-scope з таблицею, з ANY OF та common pathItems. Робити лише після M3 **і звільнення шляху
+   потоком A**, у власній WP-01 гілці; нині jane-kit/тест не редагували й pytest не запускали.
+3. Злиття — лише з detached integ-b. Для цієї frontend/docs черги full CI не запускати;
+   якщо окремо згодом зміниться код сервісів — один після всіх злиттів. Main — людина.
+
+status.md, фінальну ревізію матриці, worktree wp01g/wp01h, їхні гілки та libs/jane-kit потік B
+не змінював. Жодного push в інтеграцію/main у п'ятій черзі, force push немає.

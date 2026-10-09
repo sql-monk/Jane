@@ -112,6 +112,7 @@ def test_an_interval_longer_than_the_ttl_keeps_applying(instances: tuple[SharedH
 
     async def scenario() -> None:
         await host.request(a, "a", 0.0, interval=3 * TTL)  # A stays registered on the host (no leave)
+        await asyncio.sleep(1.5 * TTL)  # longer than the TTL: only a renewal keeps A's registration
         await host.request(b, "b", 0.0)
         await asyncio.gather(a.aclose(), b.aclose())
 

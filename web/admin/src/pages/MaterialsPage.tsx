@@ -6,6 +6,7 @@ import { unwrap } from "../api/client";
 import { useCursorList } from "../api/hooks";
 import { ApiError, toProblem } from "../api/problem";
 import type { StoredObject } from "../api/types";
+import { AttemptHistory } from "../components/AttemptHistory";
 import { ConnectionPicker } from "../components/ConnectionPicker";
 import { ReprocessForm } from "../components/ReprocessForm";
 import {
@@ -21,7 +22,7 @@ import {
   Status,
   Table,
 } from "../components/ui";
-import { formatBytes, formatDate, refLabel } from "../lib/format";
+import { formatBytes, formatDate, formatInstant, refLabel } from "../lib/format";
 
 export function MaterialsPage() {
   const api = useApi();
@@ -114,8 +115,13 @@ export function MaterialsPage() {
       {reprocess ? (
         <Section title={`Повторна обробка ${reprocess.object.object_id}`}>
           <ReprocessForm
+            key={reprocess.object.object_id}
             storageConnectionId={connectionId}
-            materialIds={reprocess.material?.material_id ? [reprocess.material.material_id] : []}
+            stored={{
+              object_id: reprocess.object.object_id,
+              material_id: reprocess.material?.material_id,
+              observation_id: reprocess.material?.observation_id,
+            }}
           />
         </Section>
       ) : null}
@@ -228,6 +234,18 @@ export function MaterialTracePage() {
                   { header: "Етап", cell: (s) => s.stage_id },
                   { header: "Версія пакета", cell: (s) => refLabel(s.handler) },
                   { header: "Результат", cell: (s) => <Status value={s.result_status ?? null} /> },
+                  { header: "Стан елемента", cell: (s) => <Status value={s.status ?? null} /> },
+                  { header: "Спроби", cell: (s) => (s.attempts !== undefined ? String(s.attempts) : "—") },
+                  { header: "Доступний з", cell: (s) => formatInstant(s.available_at) },
+                  {
+                    header: "Історія спроб",
+                    cell: (s) => (
+                      <AttemptHistory
+                        history={s.attempt_history}
+                        label={`Історія спроб ${s.item_id ?? s.stage_id}`}
+                      />
+                    ),
+                  },
                   { header: "Виклик", cell: (s) => <code>{s.invocation_id ?? "—"}</code> },
                   {
                     header: "Виходи",

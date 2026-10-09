@@ -10,6 +10,14 @@ export function formatDate(value: string | null | undefined): string {
     .replace(/\.\d{3}Z$/, "Z");
 }
 
+/** Like formatDate, but keeps milliseconds (attempt diagnostics: a retry must start after its backoff). */
+export function formatInstant(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toISOString().replace("T", " ");
+}
+
 export function formatMoney(money: Money | null | undefined): string {
   if (!money) return "—";
   return `${money.amount

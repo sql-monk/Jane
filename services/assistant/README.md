@@ -73,8 +73,10 @@
 помилка), новіші першими; `?status=` (можна повторити). `GET /v1/improvement-runs` — job вдосконалення (з
 `result` для завершених), новіші першими; фільтри `package_id`, `source_id`, `problem_group_id` (мітки job) і
 `status`. Обидва — курсорна пагінація (`limit` понад `pages.max_page_size` обрізається, `next_cursor: null` —
-остання сторінка, чужий курсор — 422). Запущені сесії у списку звіряються з їхнім job так само, як у `GET` сесії;
-job загиблого екземпляра список показує `failed` (як `GET /v1/jobs/{id}`).
+остання сторінка, чужий курсор — 422: курсор — позиція `[час UTC з мікросекундами, id]`). Перед вибіркою
+запущені сесії звіряються з їхнім job так само, як у `GET` сесії, тож фільтр `status` бачить той самий стан
+(сесія загиблого job — під `failed`, не під `sampling`); job загиблого екземпляра список показує `failed` (як
+`GET /v1/jobs/{id}`). `created_at` сесії — з мікросекундами: нові елементи не потрапляють на наступні сторінки.
 
 **Невідомі матеріали** (`POST /v1/unknown-materials`): `forward_unknown_to_llm = false` → 403
 `access_denied_by_policy` без жодного виклику LLM; інакше класифікація й пропозиція
@@ -260,7 +262,7 @@ JANE_ASSISTANT_API_KEYS=[{"name": "admin", "sha256": "<sha256 hex ключа>", 
 | `state.pool_max_size` / `connect_timeout_ms` | 10 / 10000 | з'єднання з PostgreSQL |
 | `onboarding.requests_overhead_ratio` | 0.05 | запас запитів понад оцінку матеріалів |
 | `improvement.max_problem_samples`, `max_successful_examples`, `max_sample_chars`, `max_file_chars` | 10, 5, 6000, 20000 | обсяг даних для моделі |
-| `improvement.max_proposal_bytes` | 1048576 | `proposal_only`: обсяг змінених файлів у `ImprovementResult.proposal.files` (код і схеми першими, далі тестові матеріали; решта — в `omitted_files`) і розмір `diff` |
+| `improvement.max_proposal_bytes` | 1048576 | `proposal_only`: розмір усієї `ImprovementResult.proposal` (компактний JSON, байти UTF-8; якщо вміщається обов'язкова частина з маніфестом): по черзі код і схеми, `diff` (обрізається з позначкою), тестові матеріали; що не вмістилося — в `omitted_files` |
 | `unknown.min_confidence`, `max_sample_chars` | 0.6, 6000 | нижче — пропозиція `none` |
 | `transfer.inline_max_bytes` | 262144 | чернетка пакета до runtime inline; більша — `payload_too_large` |
 | `content.max_material_bytes` | 16777216 | найбільший вміст одного матеріалу (inline, `file://`, `download_url`); більший — `limit_exceeded` |

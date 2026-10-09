@@ -3,7 +3,8 @@
 A service passes the tables of the APIs it implements to ``create_app(auth_scopes=...)``, merged with
 :func:`merge` (storage = ``merge(HANDLER, STORAGE)``, llm = ``merge(HANDLER, LLM)``). Keys are
 ``"METHOD /path"`` exactly as in ``contracts/openapi/<api>.v1.yaml``; ``tests/test_auth_scopes.py`` keeps
-each table equal to its contract. A value is one scope or a tuple meaning "any of".
+each table equal to its contract: the same operations and, for each, the scopes of its ``x-jane-scope``.
+A value is one scope or a tuple meaning "any of".
 
 Rules behind the choices that ADR-0005 leaves open:
 

@@ -28,7 +28,7 @@ lint:
 fmt:
     @fmt
 
-# mypy for every workspace member
+# mypy for every workspace member, scripts/, infra/tests/, examples/, deploy/profiles/
 types:
     @types
 
@@ -36,7 +36,7 @@ types:
 unit *args:
     @unit
 
-# Contracts lint + contract tests; extra args go to pytest
+# Contracts lint + compat.py self-test + contract tests; extra args go to pytest
 contract *args:
     @contract
 
@@ -95,3 +95,19 @@ testsite *args:
 # Generate a client package from an OpenAPI contract
 gen-client spec out:
     @gen-client
+
+# Contracts linter alone (`--redocly` also requires the Redocly lint via npx)
+contracts-check *args:
+    @contracts-check
+
+# compat.py self-test + backward compatibility vs a git ref: `just contracts-compat [origin/main] [--oasdiff]`
+contracts-compat *args:
+    @contracts-compat
+
+# Example-driven mock of one API from contracts/: `just contracts-mock handler --port 4010`
+contracts-mock api *args:
+    @contracts-mock
+
+# Python client of one contract: `just contracts-gen storage services/x/src/jane_x/_generated/storage`
+contracts-gen api out:
+    @contracts-gen

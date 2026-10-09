@@ -3,7 +3,8 @@
     uv run --no-project python scripts/dev.py <command> [args]
 
 Commands: check, lint, fmt, types, unit, contract, test, integration, isolation, web,
-          e2e, up, down, ps, logs, env, new-service, hooks, testsite, gen-client, sync.
+          e2e, up, down, ps, logs, env, new-service, hooks, testsite, gen-client, sync,
+          contracts-check, contracts-compat, contracts-mock, contracts-gen.
 """
 
 from __future__ import annotations
@@ -28,8 +29,11 @@ STACK_DIR = ROOT / ".jane"
 UNIT_MARKERS = "not contract and not integration and not isolation"
 # Offline tests outside the workspace members and the root `testpaths`: examples (WP-14) and the limits
 # profiles with their harness. They need no Docker. A separate pytest session, because their conftest files
-# put generic module names (stack, check, metrics, jane_examples) on sys.path.
+# put generic module names (stack, check, metrics, jane_examples) on sys.path. `types` checks the same
+# directories, one mypy run each (both have a top-level `conftest` module).
 EXTRA_UNIT_PATHS = ("examples", "deploy/profiles")
+# WP-00 contract tools: PEP 723 scripts with their own dependencies (`uv run --script`, as in contracts/README).
+CONTRACT_TOOLS = Path("contracts") / "tools"
 
 for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
@@ -125,6 +129,9 @@ def cmd_types(_: argparse.Namespace) -> int:
         if targets:
             code = max(code, run(uv_run("mypy", *targets)).returncode)
     code = max(code, run(uv_run("mypy", "scripts", "infra/tests")).returncode)
+    for extra in EXTRA_UNIT_PATHS:
+        if (ROOT / extra).is_dir():
+            code = max(code, run(uv_run("mypy", extra)).returncode)
     return code
 
 
@@ -143,10 +150,60 @@ def cmd_unit(ns: argparse.Namespace) -> int:
     return result
 
 
+def contract_tool(name: str, *args: str) -> list[str]:
+    """``uv run --script contracts/tools/<name> <args>`` (the tools declare their own dependencies)."""
+    return ["uv", "run", "--script", (CONTRACT_TOOLS / name).as_posix(), *args]
+
+
+def compat_self_test() -> int:
+    """The comparator of compat.py on its built-in breaking cases (no git, milliseconds)."""
+    if not (ROOT / CONTRACT_TOOLS / "compat.py").is_file():
+        print("contracts compat: no contracts/tools/compat.py - skipped")
+        return 0
+    return run(contract_tool("compat.py", "--self-test")).returncode
+
+
 def cmd_contract(ns: argparse.Namespace) -> int:
     lint = run(uv_run("python", "scripts/contracts_lint.py")).returncode
+    self_test = compat_self_test()
     code = run(uv_run("pytest", "-m", "contract", *ns.pytest_args)).returncode
-    return max(lint, 0 if pytest_ok(code) else code)
+    return max(lint, self_test, 0 if pytest_ok(code) else code)
+
+
+def cmd_contracts_check(ns: argparse.Namespace) -> int:
+    """The contracts linter alone (as in `lint`/`contract`); `--redocly` also requires Redocly (Node/npx)."""
+    env = {"JANE_CONTRACTS_REDOCLY": "1"} if ns.redocly else None
+    return run(uv_run("python", "scripts/contracts_lint.py"), env=env).returncode
+
+
+def cmd_contracts_compat(ns: argparse.Namespace) -> int:
+    """Self-test of the comparator, then backward compatibility of contracts/ against a git ref."""
+    self_test = compat_self_test()
+    if self_test:
+        return self_test
+    args = ["--base", ns.base] + (["--oasdiff"] if ns.oasdiff else [])
+    return run(contract_tool("compat.py", *args)).returncode
+
+
+def cmd_contracts_mock(ns: argparse.Namespace) -> int:
+    return run(contract_tool("mock.py", ns.api, "--port", str(ns.port), "--host", ns.host)).returncode
+
+
+def contract_spec(api: str) -> Path:
+    spec = Path("contracts") / "openapi" / f"{api}.v1.yaml"
+    if not (ROOT / spec).is_file():
+        known = sorted(p.name.removesuffix(".v1.yaml") for p in (ROOT / spec.parent).glob("*.v1.yaml"))
+        sys.exit(f"unknown contract {api!r}; known: {', '.join(known) or '(none)'}")
+    return spec
+
+
+def cmd_contracts_gen(ns: argparse.Namespace) -> int:
+    """Python client of one contract (`jane-codegen client --no-models`), e.g. into `<pkg>/_generated/<api>`.
+
+    No Pydantic models: datamodel-code-generator does not take the multi-file Jane contracts (nor their
+    Redocly bundle): "Modular references require an output directory". `gen-client` stays for other specs."""
+    args = [contract_spec(ns.api).as_posix(), "--out", ns.out, "--no-models"]
+    return run(uv_run("jane-codegen", "client", *args)).returncode
 
 
 def cmd_integration(ns: argparse.Namespace) -> int:
@@ -688,7 +745,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     add("sync", cmd_sync, "uv sync --all-packages")
     add("lint", cmd_lint, "ruff check + format check + contracts lint")
     add("fmt", cmd_fmt, "ruff fix + format")
-    add("types", cmd_types, "mypy for every workspace member")
+    add("types", cmd_types, "mypy for workspace members, scripts, infra/tests, examples, deploy/profiles")
     add("unit", cmd_unit, "unit tests", True)
     add("contract", cmd_contract, "contracts lint + contract tests", True)
     p = add("integration", cmd_integration, "integration tests (need `just up`)", True)
@@ -734,6 +791,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     p = add("gen-client", cmd_gen_client, "generate a client package from an OpenAPI contract")
     p.add_argument("spec")
     p.add_argument("out")
+
+    p = add("contracts-check", cmd_contracts_check, "contracts linter (contracts/tools/check_contracts.py)")
+    p.add_argument("--redocly", action="store_true", help="also require the Redocly lint (Node/npx)")
+    p = add("contracts-compat", cmd_contracts_compat, "compat.py self-test + compatibility against a git ref")
+    p.add_argument("base", nargs="?", default="main", help="git ref to compare with (default: main)")
+    p.add_argument("--oasdiff", action="store_true", help="also run oasdiff breaking (binary or Docker)")
+    p = add("contracts-mock", cmd_contracts_mock, "example-driven mock of one API (contracts/tools/mock.py)")
+    p.add_argument("api", help="collector | handler | storage | registry | orchestrator | llm | assistant")
+    p.add_argument("--port", type=int, default=4010)
+    p.add_argument("--host", default="127.0.0.1")
+    p = add("contracts-gen", cmd_contracts_gen, "Python client of one contract (jane-codegen client)")
+    p.add_argument("api", help="contract name: contracts/openapi/<api>.v1.yaml")
+    p.add_argument("out", help="output package directory, e.g. services/<me>/src/<pkg>/_generated/<api>")
 
     ns, extra = ap.parse_known_args(from_just(list(sys.argv[1:] if argv is None else argv)))
     extra = [a for a in extra if a != "--"]

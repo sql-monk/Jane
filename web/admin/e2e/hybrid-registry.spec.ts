@@ -11,6 +11,7 @@ test.describe("real registry: rules package, approval and independent fork @hybr
     const registry = realServiceUrl("registry");
     test.skip(!registry, "JANE_ADMIN_TARGET_REGISTRY / JANE_ADMIN_API_TARGET is not set");
     const base = registry as string;
+    const headers = { Authorization: `Bearer ${API_KEY}` };
     const packageId = uniqueId("e2e-rules");
     const forkId = `${packageId}-fork`;
     const manifest = openapiExample<Record<string, unknown>>("manifest-rules");
@@ -80,7 +81,9 @@ test.describe("real registry: rules package, approval and independent fork @hybr
     await expect(admin.getByTestId("newer-parent-versions")).toContainText("1.1.0");
     await admin.getByRole("button", { name: "Порівняти з батьком 1.1.0" }).click();
     await expect(admin.getByLabel("Відмінності версій")).toContainText("rules.json");
-    const forkVersions = await (await request.get(`${base}/v1/packages/${forkId}/versions`)).json();
+    const forkResponse = await request.get(`${base}/v1/packages/${forkId}/versions`, { headers });
+    expect(forkResponse.status(), await forkResponse.text()).toBe(200);
+    const forkVersions = await forkResponse.json();
     expect(forkVersions.items.map((v: { version: string }) => v.version)).toEqual(["1.0.0"]);
 
     await admin.getByLabel("Версія батька").selectOption("1.1.0");
@@ -98,11 +101,11 @@ test.describe("real registry: rules package, approval and independent fork @hybr
     await expect(panel.locator(".job-head .badge")).toHaveText("succeeded", { timeout: 120_000 });
     await expect
       .poll(async () => {
-        const response = await request.get(`${base}/v1/packages/${forkId}/versions/1.1.0`);
+        const response = await request.get(`${base}/v1/packages/${forkId}/versions/1.1.0`, { headers });
         return response.status();
       })
       .toBe(200);
-    const ported = await (await request.get(`${base}/v1/packages/${forkId}/versions/1.1.0`)).json();
+    const ported = await (await request.get(`${base}/v1/packages/${forkId}/versions/1.1.0`, { headers })).json();
     expect(ported.manifest?.provenance?.upstream_port?.parent_version).toBe("1.1.0");
     await admin.goto(`/packages/${forkId}`);
     await admin.getByRole("tab", { name: "Відмінності" }).click();

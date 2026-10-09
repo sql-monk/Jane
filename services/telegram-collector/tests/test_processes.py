@@ -188,12 +188,23 @@ def test_two_instances_share_state_and_take_over_after_kill(
     with a.client() as api_a, b.client() as api_b:
         cid = start_slow(api_a, "shared", {"queue": {"max_unacked_materials": 10}})
         # the collection runs on A; B reads and acknowledges its materials from the shared state
-        body_ = page(api_b, cid, limit=10, wait_ms=5000)
-        received += body_["items"]
-        body_ = page(api_b, cid, body_["next_cursor"], limit=10, wait_ms=5000)  # acknowledges the first page
+        body_ = page(api_b, cid, limit=1, wait_ms=5000)
+        assert len(body_["items"]) == 1  # a short first page must not deadlock the consumer
         received += body_["items"]
         after = body_["next_cursor"]
-        wait_for(api_b, cid, lambda v: v["stats"]["emitted"] >= 12)
+
+        def consume_until_ready(view: dict[str, Any]) -> bool:
+            nonlocal after
+            if view["stats"]["emitted"] >= 12:
+                return True
+            # ACK each actual cursor until the producer reaches the original threshold. Pages may be short.
+            current = page(api_b, cid, after, limit=10, wait_ms=5000)
+            received.extend(current["items"])
+            after = current["next_cursor"] or after
+            return False
+
+        view = wait_for(api_b, cid, consume_until_ready)
+        print(f"short first page: 1 item; pre-kill stats: {view['stats']}")
         # the same Idempotency-Key through the other instance returns the same job
         again = api_b.post(
             "/v1/collections",
@@ -212,6 +223,7 @@ def test_two_instances_share_state_and_take_over_after_kill(
     assert view["status"] == "succeeded"
     assert_each_message_once(received, 80)
     assert '"resuming collection"' in b.log()
+    print(f"takeover succeeded: {view['stats']['emitted']} emitted; exactly-once 80 verified")
 
 
 def test_stalled_owner_is_fenced_out(service_factory: ServiceFactory, tmp_path: Path) -> None:

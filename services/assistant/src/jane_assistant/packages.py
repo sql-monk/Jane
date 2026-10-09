@@ -16,6 +16,7 @@ import io
 import json
 import re
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -86,6 +87,30 @@ def file_entry(data: bytes) -> dict[str, str]:
         return {"encoding": "base64", "data": base64.b64encode(data).decode()}
 
 
+def proposal_bytes(doc: Any) -> int:
+    """Size of an ``ImprovementProposal`` as counted by ``improvement.max_proposal_bytes``: compact UTF-8 JSON."""
+    return len(json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+
+
+DIFF_CUT = "\n[... diff cut at improvement.max_proposal_bytes]\n"
+
+
+def _fit_text(text: str, fits: Callable[[str], bool]) -> str:
+    """``text``, or its longest prefix + :data:`DIFF_CUT` that ``fits``, or ``""``."""
+    if fits(text):
+        return text
+    if not fits(DIFF_CUT):
+        return ""
+    low, high = 0, len(text)  # fits(text[:low] + cut) holds, text[:high] + cut does not (or high = len)
+    while high - low > 1:
+        mid = (low + high) // 2
+        if fits(text[:mid] + DIFF_CUT):
+            low = mid
+        else:
+            high = mid
+    return text[:low] + DIFF_CUT
+
+
 def expected_output(entities: list[dict[str, Any]]) -> dict[str, Any]:
     """``expected.json`` of a test: entities without observation/provenance."""
     return {
@@ -152,22 +177,40 @@ class PackageDraft:
     ) -> dict[str, Any]:
         """``assistant.v1`` ``ImprovementProposal``: this unpublished version as changes against ``base``.
 
-        ``files`` - changed and added files in the form of ``PublishRequest.files`` (code and schemas first, then
-        tests), while they fit into ``max_bytes``; the rest is listed in ``omitted_files``. ``diff`` - unified diff
-        of the changed text files under ``src/`` and ``schemas/`` (cut at ``max_bytes``)."""
-        changed = [p for p, data in self.files.items() if p != MANIFEST and base.files.get(p) != data]
-        changed.sort(key=lambda p: (not p.startswith(("src/", "schemas/")), p))
+        The whole proposal - as compact UTF-8 JSON - stays within ``max_bytes`` whenever its required part
+        (``based_on``, ``version``, ``manifest``...) fits. In that budget come, in this order: changed code and schema
+        files (``src/``, ``schemas/``, in the form of ``PublishRequest.files``), the unified ``diff`` of the changed
+        text files under ``src/`` and ``schemas/`` (cut with a marker if needed), then test fixtures and other files.
+        A file that does not fit is named in ``omitted_files`` (room for these names is reserved)."""
+        changed = sorted(p for p, data in self.files.items() if p != MANIFEST and base.files.get(p) != data)
+        code = [p for p in changed if p.startswith(("src/", "schemas/"))]
+        rest = [p for p in changed if p not in code]
+        head: dict[str, Any] = {
+            "based_on": based_on,
+            "version": self.manifest["version"],
+            "schema_change": schema_change,
+            "change_summary": change_summary,
+            "manifest": self.manifest,
+        }
+
+        def doc(files: dict[str, dict[str, str]], diff: str, omitted: list[str]) -> dict[str, Any]:
+            out = {**head, "files": files, "diff": diff}
+            if omitted:
+                out["omitted_files"] = omitted
+            return out
+
+        def fits(files: dict[str, dict[str, str]], diff: str, omitted: list[str]) -> bool:
+            return proposal_bytes(doc(files, diff, omitted)) <= max_bytes
+
         files: dict[str, dict[str, str]] = {}
         omitted: list[str] = []
-        used = 0
-        for path in changed:
-            entry = file_entry(self.files[path])
-            if used + len(entry["data"]) > max_bytes:
+        for i, path in enumerate(code):  # room for naming every file still undecided as omitted
+            trial = {**files, path: file_entry(self.files[path])}
+            if fits(trial, "", [*omitted, *code[i:], *rest]):
+                files = trial
+            else:
                 omitted.append(path)
-                continue
-            files[path] = entry
-            used += len(entry["data"])
-        diff = "".join(
+        full_diff = "".join(
             "".join(
                 difflib.unified_diff(
                     base.text(path).splitlines(keepends=True),
@@ -176,23 +219,16 @@ class PackageDraft:
                     tofile=f"b/{path}",
                 )
             )
-            for path in changed
-            if path.startswith(("src/", "schemas/"))
+            for path in code
         )
-        if len(diff) > max_bytes:
-            diff = diff[:max_bytes] + "\n[... diff cut at improvement.max_proposal_bytes]\n"
-        out: dict[str, Any] = {
-            "based_on": based_on,
-            "version": self.manifest["version"],
-            "schema_change": schema_change,
-            "change_summary": change_summary,
-            "manifest": self.manifest,
-            "files": files,
-            "diff": diff,
-        }
-        if omitted:
-            out["omitted_files"] = omitted
-        return out
+        diff = _fit_text(full_diff, lambda d: fits(files, d, [*omitted, *rest]))
+        for i, path in enumerate(rest):
+            trial = {**files, path: file_entry(self.files[path])}
+            if fits(trial, diff, [*omitted, *rest[i:]]):
+                files = trial
+            else:
+                omitted.append(path)
+        return doc(files, diff, omitted)
 
     def archive(self) -> bytes:
         """Deterministic zip (sorted paths, fixed timestamps) with ``jane-package.json``."""

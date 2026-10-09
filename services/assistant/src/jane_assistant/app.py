@@ -8,10 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Callable, Mapping
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any, Literal
 
 import httpx
@@ -21,10 +20,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from jane_kit.auth_scopes import ASSISTANT, merge
 from jane_kit.config import LimitError
-from jane_kit.errors import FieldError, ValidationFailed
+from jane_kit.errors import ValidationFailed
 from jane_kit.idempotency import IDEMPOTENCY_HEADER, StoredResponse, idempotent
 from jane_kit.jobs import JobContext, JobRunner, JobStatus, jobs_router
-from jane_kit.pagination import clamp_limit, decode_cursor, encode_cursor
+from jane_kit.pagination import clamp_limit
 from jane_kit.service import create_app
 
 from . import __version__
@@ -32,6 +31,7 @@ from .clients import Neighbours
 from .content import MaterialContent, MaterialContentScope
 from .guards import SchemaValidator
 from .improvement import run_improvement
+from .listing import decode_position, encode_position
 from .onboarding import OnboardingService
 from .search import HttpJsonSearchProvider, NoSearchProvider, SearchProvider, StaticSearchProvider
 from .settings import ServiceLimits, Settings, request_layer, resolve_service_limits
@@ -67,21 +67,6 @@ LIST_SCOPES = {
 }
 """Scopes of the list operations added by WP-15 (R24) until ``jane_kit.auth_scopes.ASSISTANT`` lists them; merging
 is idempotent, so the table stays right after jane-kit adds them."""
-
-
-def _position[T](cursor: str | None, parse: Callable[[str], T]) -> tuple[T, str] | None:
-    """Position of a list cursor (``[sort value, id]``, see ``encode_cursor``); a foreign cursor is 422."""
-    if cursor is None:
-        return None
-    value = decode_cursor(cursor)
-    try:
-        if isinstance(value, list) and len(value) == 2 and all(isinstance(v, str) for v in value):
-            return parse(value[0]), value[1]
-    except ValueError:
-        pass
-    raise ValidationFailed(
-        "invalid cursor", errors=[FieldError(parameter="cursor", message="invalid cursor")]
-    )
 
 
 class _Strict(BaseModel):
@@ -311,14 +296,14 @@ def build_app(settings: Settings | None = None, deps: Dependencies | None = None
         cursor: str | None = Query(default=None, max_length=2048),
         status: list[SessionStatus] | None = STATUS_QUERY,
     ) -> JSONResponse:
-        after = _position(cursor, str)
+        after = decode_position(cursor)
         sessions, last = await onboarding.page(
             frozenset(status) if status else None, after, clamp_limit(limit, limits.pages)
         )
         return JSONResponse(
             {
                 "items": [s.summary() for s in sessions],
-                "next_cursor": encode_cursor(list(last)) if last else None,
+                "next_cursor": encode_position(last) if last else None,
             }
         )
 
@@ -331,7 +316,7 @@ def build_app(settings: Settings | None = None, deps: Dependencies | None = None
         problem_group_id: str | None = None,
         status: list[JobStatus] | None = STATUS_QUERY,
     ) -> JSONResponse:
-        position = _position(cursor, datetime.fromisoformat)
+        position = decode_position(cursor)
         n = clamp_limit(limit, limits.pages)
         wanted = {"package_id": package_id, "source_id": source_id, "problem_group_id": problem_group_id}
         jobs = await state.job_list.page(
@@ -345,7 +330,7 @@ def build_app(settings: Settings | None = None, deps: Dependencies | None = None
         return JSONResponse(
             {
                 "items": [j.wire() for j in jobs[:n]],
-                "next_cursor": encode_cursor([last[0].isoformat(), last[1]]) if last else None,
+                "next_cursor": encode_position(last) if last else None,
             }
         )
 

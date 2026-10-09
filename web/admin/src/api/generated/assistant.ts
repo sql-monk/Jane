@@ -44,8 +44,9 @@ export interface paths {
     };
     /**
      * Сесії підключення, новіші першими (відновлення стану адмінки після перезавантаження)
-     * @description Курсорна пагінація (`limit`, `cursor` → `next_cursor`, `null` — сторінок більше немає). Порядок —
-     *     `created_at` спадно, за рівності — `session_id` спадно; курсор стабільний, поки сесії додаються.
+     * @description Курсорна пагінація (`limit`, `cursor` → `next_cursor`, `null` — сторінок більше немає; чужий курсор — 422).
+     *     Порядок — `created_at` спадно, за рівності — `session_id` спадно; нові сесії новіші за курсор, тож не
+     *     з'являються на наступних сторінках і не зсувають їх. Фільтр `status` бачить той самий стан, що й `GET` сесії.
      *     Елементи — короткий стан сесії; повний (кандидати, вибірка, аналіз, варіанти) —
      *     `GET /v1/onboarding-sessions/{session_id}`. Сесії без змін довше за налаштований строк зберігання
      *     асистента (`state.session_retention_seconds`) видаляються.
@@ -433,9 +434,10 @@ export interface components {
       /** @description Маніфест запропонованої версії (з новими тестами з проблемних прикладів і походженням `llm`). */
       manifest: components["schemas"]["package-manifest.schema"];
       /**
-       * @description Змінені й додані файли відносно `based_on` у формі `PublishRequest.files` registry: спершу код і схеми
-       *     (`src/`, `schemas/`), потім тестові матеріали — доки вміщуються в `improvement.max_proposal_bytes`
-       *     асистента; решта — в `omitted_files`. Незмінені файли беруться з `based_on`.
+       * @description Змінені й додані файли відносно `based_on` у формі `PublishRequest.files` registry. Уся пропозиція
+       *     (компактний JSON, байти UTF-8) не перевищує `improvement.max_proposal_bytes` асистента, якщо вміщається
+       *     її обов'язкова частина; у цій межі по черзі: код і схеми (`src/`, `schemas/`), `diff`, тестові матеріали
+       *     та інші файли. Те, що не вмістилося, — в `omitted_files`. Незмінені файли беруться з `based_on`.
        */
       files: {
         [key: string]: {
@@ -446,7 +448,7 @@ export interface components {
       };
       /** @description Змінені файли, що не вмістились у `files` (зазвичай великі тестові матеріали). */
       omitted_files?: string[];
-      /** @description Unified diff змінених текстових файлів `src/` і `schemas/` для перегляду (обрізається за тим самим лімітом). */
+      /** @description Unified diff змінених текстових файлів `src/` і `schemas/` для перегляду; якщо не вміщається в залишок межі — обрізаний із позначкою `[... diff cut at improvement.max_proposal_bytes]`. */
       diff?: string;
     };
     UnknownMaterialRequest: {

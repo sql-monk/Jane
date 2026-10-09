@@ -318,14 +318,18 @@ function SessionList({ selected, onOpen }: { selected: string | null; onOpen: (i
   const api = useApi();
   const [status, setStatus] = useState<OnboardingStatus | "">("");
   const [manualId, setManualId] = useState("");
-  const list = useCursorList(["onboarding-sessions", status], (cursor, limit) =>
-    unwrap(
-      api.assistant.GET("/v1/onboarding-sessions", {
-        params: {
-          query: { limit, ...(cursor ? { cursor } : {}), ...(status ? { status: [status] } : {}) },
-        },
-      }),
-    ),
+  const list = useCursorList(
+    ["onboarding-sessions", status],
+    (cursor, limit) =>
+      unwrap(
+        api.assistant.GET("/v1/onboarding-sessions", {
+          params: {
+            query: { limit, ...(cursor ? { cursor } : {}), ...(status ? { status: [status] } : {}) },
+          },
+        }),
+      ),
+    // sessions that are still searching, sampling, analysing or applying change their state by themselves
+    (sessions) => sessions.some((s) => ACTIVE_STATUSES.has(s.status)),
   );
   return (
     <Section

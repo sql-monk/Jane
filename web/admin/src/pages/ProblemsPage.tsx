@@ -131,6 +131,12 @@ function ProblemGroupDetail({
   const [attempts, setAttempts] = useState("");
   const [jobId, setJobId] = useState<string | null>(group.assistant_job_id ?? null);
   const [note, setNote] = useState(group.note ?? "");
+  // A newer state of the group (re-opened from the list, or the PATCH answer) brings its own note.
+  const [noteOf, setNoteOf] = useState(group.note);
+  if (noteOf !== group.note) {
+    setNoteOf(group.note);
+    setNote(group.note ?? "");
+  }
 
   const bindings = useQuery({
     queryKey: ["tasks", "bindings", group.package?.package_id],

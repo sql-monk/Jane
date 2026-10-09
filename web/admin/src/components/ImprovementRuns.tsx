@@ -3,7 +3,7 @@
 import { Link } from "react-router-dom";
 import { useApi } from "../app/context";
 import { unwrap } from "../api/client";
-import { useCursorList } from "../api/hooks";
+import { TERMINAL_JOB_STATUSES, useCursorList } from "../api/hooks";
 import type { ImprovementResult, ImprovementRun, JobStatus } from "../api/types";
 import { formatDate, refLabel } from "../lib/format";
 import { ErrorBox, Loading, LoadMore, Status, Table } from "./ui";
@@ -33,21 +33,25 @@ export function ImprovementRunList({
   onOpen: (jobId: string) => void;
 }) {
   const api = useApi();
-  const list = useCursorList(["improvement-runs", filter], (cursor, limit) =>
-    unwrap(
-      api.assistant.GET("/v1/improvement-runs", {
-        params: {
-          query: {
-            limit,
-            ...(cursor ? { cursor } : {}),
-            ...(filter.package_id ? { package_id: filter.package_id } : {}),
-            ...(filter.source_id ? { source_id: filter.source_id } : {}),
-            ...(filter.problem_group_id ? { problem_group_id: filter.problem_group_id } : {}),
-            ...(filter.status ? { status: [filter.status] } : {}),
+  const list = useCursorList(
+    ["improvement-runs", filter],
+    (cursor, limit) =>
+      unwrap(
+        api.assistant.GET("/v1/improvement-runs", {
+          params: {
+            query: {
+              limit,
+              ...(cursor ? { cursor } : {}),
+              ...(filter.package_id ? { package_id: filter.package_id } : {}),
+              ...(filter.source_id ? { source_id: filter.source_id } : {}),
+              ...(filter.problem_group_id ? { problem_group_id: filter.problem_group_id } : {}),
+              ...(filter.status ? { status: [filter.status] } : {}),
+            },
           },
-        },
-      }),
-    ),
+        }),
+      ),
+    // a listed run that is still going changes its state and result: follow it until it ends
+    (runs) => runs.some((run) => !TERMINAL_JOB_STATUSES.has(run.status)),
   );
   return (
     <>

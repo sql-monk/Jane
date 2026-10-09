@@ -86,7 +86,9 @@ exit=0
 
 Сирі докази — `.jane/wp23c-*.txt` у `wp23c`; цільові перевірки й підсумки включено у Git-звіт.
 Push C-3 запустив автоматичний CI [37912943507](https://github.com/sql-monk/Jane/actions/runs/37912943507)
-на `b4f966b` (код той самий, фінальний `f80ddce` змінює лише звіт). Повний dispatch потоку C
+на `b4f966b` (код той самий, фінальний `f80ddce` змінює лише звіт). Результат — **success**:
+`contracts-compat`, `lint`, `unit`, `web-mock-e2e`, `web`, `isolation`, `contract` — success;
+`stack`, `adapters`, `e2e`, `limits` — skipped за правилами push. Повний dispatch потоку C
 відкладено до закриття C-2, щоб виконати його один раз після всіх змін коду/збірки.
 
 ## Залежності й межі

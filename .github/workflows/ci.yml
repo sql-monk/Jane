@@ -71,6 +71,41 @@ jobs:
       - run: uv sync --all-packages --locked
       - run: just contract
 
+  # Backward compatibility of contracts/ (R27): compat.py self-test, then compat.py + oasdiff (Docker image
+  # tufin/oasdiff) against the revision the change starts from - the PR base branch, the previous tip of main
+  # for a push to main, otherwise the merge-base with main. Needs no workspace sync (uv scripts).
+  contracts-compat:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv tool install "rust-just==${JUST_VERSION}"
+      - name: Pick the base revision
+        id: base
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            base="origin/$PR_BASE"
+          elif [ "$GITHUB_REF" = refs/heads/main ] && git cat-file -e "${BEFORE:-none}^{commit}" 2>/dev/null; then
+            base="$BEFORE"
+          else
+            base="$(git merge-base origin/main HEAD)"
+          fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "contracts are compared with $base ($(git rev-parse --short "$base"))"
+      - name: Contracts compatibility (compat.py --oasdiff)
+        env:
+          BASE: ${{ steps.base.outputs.base }}
+        run: just contracts-compat "$BASE" --oasdiff
+
   # Admin UI (web/admin): pnpm install --frozen-lockfile, lint, typecheck, test, build (scripts/dev.py web).
   web:
     needs: lint

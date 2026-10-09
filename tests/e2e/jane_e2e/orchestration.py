@@ -18,6 +18,7 @@ __all__ = [
     "CONNECTIONS",
     "RULES_REF",
     "TESTSITE",
+    "connections_synced",
     "create_source",
     "create_task",
     "list_items",
@@ -45,6 +46,23 @@ def put_connections(orch: JaneClient) -> None:
     for conn in CONNECTIONS:
         r = orch.api("orchestrator").put(f"/v1/connections/{conn['connection_id']}", json=conn)
         assert r.status_code in (200, 201), r.text
+
+
+def connections_synced(orch: JaneClient, executor: str) -> bool | None:
+    """True when no registered connection waits to be pushed to ``executor`` (``PlatformConnection``), else None.
+
+    Every ``PUT /v1/connections/{id}`` (also with an unchanged document) makes the orchestrator push the
+    connection to its executors again; storage then reopens its adapter, and a write that runs at that moment
+    fails (``adapter is not open``, docs/delivery/WP-21.md). A scenario that writes to storage directly right after
+    :func:`put_connections` waits for this first."""
+    for conn in CONNECTIONS:
+        r = orch.api("orchestrator").get(f"/v1/connections/{conn['connection_id']}")
+        assert r.status_code == 200, r.text
+        if any(
+            e["executor"] == executor and e["sync_status"] == "pending" for e in r.json().get("executors", [])
+        ):
+            return None
+    return True
 
 
 def create_source(orch: JaneClient, source_id: str, **extra: Any) -> dict[str, Any]:

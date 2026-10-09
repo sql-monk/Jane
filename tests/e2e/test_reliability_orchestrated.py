@@ -33,9 +33,9 @@ import pytest
 
 from jane_e2e.clients import JaneClient
 from jane_e2e.orchestration import (
-    CONNECTIONS,
     RULES_REF,
     TESTSITE,
+    connections_synced,
     create_source,
     create_task,
     list_items,
@@ -97,18 +97,6 @@ def queue_idle(orch: JaneClient) -> bool | None:
         r = orch.api("orchestrator").get("/v1/runs", params={"status": status, "limit": 1})
         assert r.status_code == 200, r.text
         if r.json()["items"]:
-            return None
-    return True
-
-
-def connections_synced(orch: JaneClient, executor: str) -> bool | None:
-    """True when no registered connection waits to be pushed to ``executor`` (``PlatformConnection``)."""
-    for conn in CONNECTIONS:
-        r = orch.api("orchestrator").get(f"/v1/connections/{conn['connection_id']}")
-        assert r.status_code == 200, r.text
-        if any(
-            e["executor"] == executor and e["sync_status"] == "pending" for e in r.json().get("executors", [])
-        ):
             return None
     return True
 
@@ -436,6 +424,8 @@ R03_POLL_S = 0.1  # target period of the polling: the resolution of both bounds 
 # The orchestrator schedules `available_at = now() + delay` with now() = start of the retry transaction, so the
 # visible `retrying` state may be shorter than the delay by the duration of that transaction.
 R03_COMMIT_TOLERANCE_MS = 250
+# Events of `attempt_history` after which the item waits until their `available_at` (orchestrator.v1 AttemptEvent).
+DELAYED_EVENTS = frozenset({"retry_scheduled", "in_progress_parked"})
 
 
 class Poll(NamedTuple):
@@ -486,6 +476,49 @@ def retry_waits(polls: list[Poll], policy: dict[str, Any]) -> list[RetryWait]:
     return waits
 
 
+def db_ms(timestamp: str) -> float:
+    """``Timestamp`` of the orchestrator's attempt history (database clock, millisecond precision) in ms."""
+    return datetime.fromisoformat(timestamp).timestamp() * 1000
+
+
+class HistoryWait(NamedTuple):
+    """One wait of the item as its ``attempt_history`` records it (R25; database clock of the orchestrator)."""
+
+    event: str  # retry_scheduled | in_progress_parked
+    attempt: int  # attempt number at that event (StageItem.attempts)
+    delay_ms: int  # delay the orchestrator scheduled (`delay_ms` of the event)
+    code: str | None  # Problem.code that caused it
+    scheduled_ms: float  # `at` of the event: the retry transaction
+    available_ms: float  # `available_at` of the event: end of the backoff
+    available_at: str  # the same, as published
+    claimed_ms: float  # `at` of the next `claimed` event: the claim transaction
+    claimed_attempt: int  # attempt number of that claim
+
+
+def history_waits(history: list[dict[str, Any]]) -> list[HistoryWait]:
+    """Every delayed event of an attempt history paired with the claim that ended the wait (the next event)."""
+    waits: list[HistoryWait] = []
+    for n, event in enumerate(history):
+        if event["event"] not in DELAYED_EVENTS:
+            continue
+        claim = history[n + 1] if n + 1 < len(history) else None
+        assert claim is not None and claim["event"] == "claimed", (event, claim, history)
+        waits.append(
+            HistoryWait(
+                event=str(event["event"]),
+                attempt=int(event["attempt"]),
+                delay_ms=int(event["delay_ms"]),
+                code=event.get("code"),
+                scheduled_ms=db_ms(event["at"]),
+                available_ms=db_ms(event["available_at"]),
+                available_at=str(event["available_at"]),
+                claimed_ms=db_ms(claim["at"]),
+                claimed_attempt=int(claim["attempt"]),
+            )
+        )
+    return waits
+
+
 @pytest.mark.criteria(8)
 def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_duplicates(
     stack: E2EStack,
@@ -497,7 +530,11 @@ def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_dupl
     is already stored, its extraction still runs - and reconnected after two failed attempts of
     ``store-products``. That storage item is then the only unfinished item of the run, so a worker and the
     stage slot are free while it waits: frequent polling of the items API bounds each wait from both sides
-    and compares it with the configured backoff. After the partition the run completes, nothing twice."""
+    and compares it with the configured backoff. The item's claim history (``attempt_history``, R25: database
+    clock) records each scheduled retry with its ``available_at`` and the claim that ended it, so causality is
+    checked exactly: the policy delay was scheduled, no claim came before ``available_at``, and the polled
+    bounds agree with the recorded wait. The material trace shows the same history. After the partition the run
+    completes, nothing twice."""
     orch = orchestrated
     slow = registry_package(stack, SLOW_EXTRACTOR)
     policy = dict(R03_POLICY)
@@ -566,6 +603,18 @@ def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_dupl
         if p.item is not None and p.item["status"] == "retrying" and p.item.get("error")
     ]
     waits = retry_waits(polls, policy)
+    [retried] = [i for i in items if i["stage_id"] == "store-products"]
+    history = list(retried.get("attempt_history") or [])
+    recorded = history_waits(history)
+    trace = orch.api("orchestrator").get(f"/v1/materials/{retried['material_id']}/trace")
+    assert trace.status_code == 200, trace.text
+    traced = [
+        stage
+        for obs in trace.json()["observations"]
+        if obs["run_id"] == run
+        for stage in obs["stages"]
+        if stage["stage_id"] == "store-products"
+    ]
     latency_ms = sorted((p.received - p.sent) * 1000 for p in polls)
     print(
         f"\nR-03: polls={len(polls)} poll latency ms median={latency_ms[len(latency_ms) // 2]:.0f} "
@@ -574,6 +623,10 @@ def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_dupl
         f"\nR-03: failure details={sorted({str(e.get('detail'))[:120] for e in errors})}"
         "\nR-03: waits (attempt, policy delay ms, lower..upper ms, polls, isolated): "
         f"{[(w.attempt, w.delay_ms, round(w.lower_ms), round(w.upper_ms), w.polls, w.isolated) for w in waits]}"
+        "\nR-03: recorded waits (event, attempt, delay ms, scheduled..available ms, available..claimed ms, code): "
+        f"{[(w.event, w.attempt, w.delay_ms, round(w.available_ms - w.scheduled_ms), round(w.claimed_ms - w.available_ms), w.code) for w in recorded]}"
+        f"\nR-03: attempt history ({len(history)} events, cap {engine.get('attempt_history_max')}): "
+        f"{[(e['event'], e.get('attempt'), e['at']) for e in history]}"
     )
     assert final["status"] == "succeeded", final
     assert final["counters"]["materials"] == len(products), final
@@ -584,8 +637,9 @@ def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_dupl
     assert all(e.get("code") == "upstream_unavailable" for e in errors), errors
     assert all((e.get("details") or {}).get("executor") == "storage" for e in errors), errors
 
-    # backoff. The API exposes neither `available_at` nor a claim history, so each wait is known only between
-    # two bounds read by polling; the causal claim is limited to what these bounds prove.
+    # backoff, view 1: API polling (host clock). Each wait lies between two bounds read by polling, and the
+    # polls show that nothing else held the item (isolation); view 2 below - the recorded history - proves the
+    # causality exactly, and both views must agree.
     assert {1, 2} <= {w.attempt for w in waits}, (waits, polls)
     for w in waits:
         # isolated: no item of the run was running during the wait, so a worker and the stage slot were free
@@ -597,6 +651,54 @@ def test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_dupl
         assert w.lower_ms >= w.delay_ms / 2, w
         # and claimed within the order of the delay - the wait is not explained by something slower
         assert w.upper_ms <= 2 * w.delay_ms + 5_000, w
+
+    # backoff, view 2: the claim history of the item (R25, orchestrator.v1 `attempt_history` / `available_at`;
+    # database clock, millisecond precision). It is complete (below the configured cap) and starts with the
+    # first claim; the item finished with its last attempt and no lease was taken over.
+    history_cap = int(engine.get("attempt_history_max", 0))
+    assert 0 < len(history) < history_cap, (len(history), history_cap, history)
+    assert (history[0]["event"], history[0]["attempt"]) == ("claimed", 1), history
+    assert (history[-1]["event"], history[-1]["attempt"]) == ("completed", retried["attempts"]), history
+    assert not [e for e in history if e["event"] == "lease_reclaimed"], history
+    claims = [int(e["attempt"]) for e in history if e["event"] == "claimed"]
+    assert claims == sorted(claims) and set(claims) == set(range(1, retried["attempts"] + 1)), history
+    # the two failures during the partition were scheduled with the exact policy delays (jitter off)
+    partition = [w for w in recorded if w.event == "retry_scheduled" and w.attempt <= 2]
+    assert [w.attempt for w in partition] == [1, 2], recorded
+    by_attempt = {w.attempt: w for w in waits}
+    for r in partition:
+        assert r.code == "upstream_unavailable", r
+        assert r.delay_ms == backoff_ms(policy, r.attempt), (r, policy)
+        assert abs(r.available_ms - r.scheduled_ms - r.delay_ms) <= 1, r
+        assert r.claimed_attempt == r.attempt + 1, r
+        # claimed promptly once the backoff was over (a free worker looks for work every poll_ms): the wait is
+        # the backoff, not something slower
+        assert r.claimed_ms - r.available_ms <= r.delay_ms / 2, r
+        # the polled bounds (host clock) contain the recorded wait, up to the commit of the claim / retry
+        recorded_wait = r.claimed_ms - r.scheduled_ms
+        polled = by_attempt[r.attempt]
+        assert polled.lower_ms - R03_COMMIT_TOLERANCE_MS <= recorded_wait, (r, polled)
+        assert recorded_wait <= polled.upper_ms + R03_COMMIT_TOLERANCE_MS, (r, polled)
+    for r in recorded:
+        # causality, for every wait of the item: no claim before `available_at` (the claim query requires
+        # `available_at <= now()`); a scheduled retry always carries the policy delay
+        assert r.claimed_ms >= r.available_ms, r
+        if r.event == "retry_scheduled":
+            assert r.delay_ms == backoff_ms(policy, r.attempt), (r, policy)
+    # `available_at` that the polls saw on the waiting item is the one the history recorded for that attempt
+    scheduled: dict[int, set[str]] = {}
+    for r in recorded:
+        scheduled.setdefault(r.attempt, set()).add(r.available_at)
+    seen = {
+        (int(p.item["attempts"]), p.item.get("available_at"))
+        for p in polls
+        if p.item is not None and p.item["status"] == "retrying"
+    }
+    assert seen and all(at in scheduled.get(n, set()) for n, at in seen), (seen, scheduled)
+    # the material trace reports the same item and history (trace diagnostics of R25)
+    assert len(traced) == 1, trace.json()
+    keys = ("item_id", "status", "attempts", "attempt_history")
+    assert {k: traced[0].get(k) for k in keys} == {k: retried.get(k) for k in keys}, (traced, retried)
 
     # after the partition: everything completed within the policy, the retried item included, nothing twice
     assert all(i["status"] == "completed" and i["result_status"] == "success" for i in items), items

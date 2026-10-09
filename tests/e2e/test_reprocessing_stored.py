@@ -29,7 +29,6 @@ import pytest
 from jane_e2e.clients import JaneClient
 from jane_e2e.orchestration import (
     TESTSITE,
-    connections_synced,
     create_source,
     create_task,
     list_items,
@@ -77,11 +76,8 @@ def stored_content(storage: JaneClient, object_id: str) -> bytes:
 
 
 def stored_text(storage: JaneClient, object_id: str, media_type: str) -> bytes:
-    """``GET /v1/objects/{id}/content`` of a RAW kept in its original ``text/plain``. Explicit exception to the
-    contract-validating client: storage.v1 says "Content-Type - the object's media type" but lists only
-    ``application/octet-stream``, ``text/html`` and ``application/json`` (request to the contract owner in
-    docs/delivery/WP-21.md), so status, Content-Type and bytes are checked here directly."""
-    r = storage.http.get(f"/v1/objects/{object_id}/content", params={"connection_id": RAW})
+    """Read original RAW bytes through storage.v1 ``getObjectContent`` and check their exact media type."""
+    r = storage.api("storage").get(f"/v1/objects/{object_id}/content", params={"connection_id": RAW})
     assert r.status_code == 200, r.text
     assert r.headers["content-type"].split(";", 1)[0].strip() == media_type, r.headers
     return bytes(r.content)
@@ -216,12 +212,6 @@ def test_s_m3_02_telegram_json_raw_is_restored_and_reprocessed_with_its_sha256(
     require("telegram-collector", "storage", "orchestrator")
     collector, storage, orch = client("telegram-collector"), client("storage"), client("orchestrator")
     put_connections(orch)
-    # the orchestrator pushes raw-files to storage again; storage reopens the adapter, so the direct writes below
-    # start only when that push is done (see connections_synced)
-    deadline = time.monotonic() + 120
-    while connections_synced(orch, "storage") is None:
-        assert time.monotonic() < deadline, "connections are not synced to storage"
-        time.sleep(0.5)
     username = f"tg_raw_{run_id}"
     rec = Recording.create(
         stack.telegram_recordings_dir, channel_id="-1009876543210", username=username, title="RAW restore"

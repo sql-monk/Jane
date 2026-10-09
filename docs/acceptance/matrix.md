@@ -42,10 +42,21 @@
 | S-M2-10 / 4, 6, 7 (UI) | R26 і B-2: примітка людини, точні RAW приклади групи й ручні id запуску, retry timestamps, фільтри вдосконалення | WP-20: **25 повністю / 0 частково / 1 навмисний мок із 26**, історичний real18; B-2: **4 нові @hybrid пройшли локально**, структурний real-набір — **22**, повний інтеграційний CI очікується після B-5; [WP-20](../delivery/WP-20.md#команди-перевірки-та-їхній-вивід), [B-2 accepted](../delivery/post-m3/stream-b.md#b-2-accepted), подробиці нижче |
 | R-03 / 8 | `attempt_history` і `available_at` доводять причинність повторів: `claimed` → `retry_scheduled` → наступне `claimed` → `completed`; затримки 3000/6000 мс, взяття не раніше `available_at`, та сама історія в trace | CI 37905643300 / `test_r_03_partition_to_storage_isolated_retry_waits_for_backoff_without_duplicates PASSED`; [межі перевірки](scenarios.md#надійність) |
 | S-M3-01 / 6 | `stored_materials.object_ids` вибирає рівно два задані RAW-спостереження в заданому порядку; RAW не дублюються, історія результату посилається на вибране спостереження; відсутній id → `not_found` | CI 37905643300 / `test_s_m3_01_reprocessing_takes_exactly_the_given_stored_objects PASSED`; Р, [сценарій](scenarios.md#s-m3-01-повторна-обробка-точно-вибраних-raw) |
-| S-M3-02 / 1, 12 | JSON-RAW Telegram відновлює початковий `material.content`; повторна обробка у `format.raw: original` зберігає `text/plain` з байтами, розміром і `sha256` матеріалу колектора | CI 37905643300 / `test_s_m3_02_telegram_json_raw_is_restored_and_reprocessed_with_its_sha256 PASSED`; Р, Telegram backend — З; [сценарій і тимчасові обходи](scenarios.md#s-m3-02-telegram-json-raw-відновлення-й-той-самий-sha256) |
+| S-M3-02 / 1, 12 | JSON-RAW Telegram відновлює початковий `material.content`; повторна обробка у `format.raw: original` зберігає `text/plain` з байтами, розміром і `sha256` матеріалу колектора | CI 37905643300 / `test_s_m3_02_telegram_json_raw_is_restored_and_reprocessed_with_its_sha256 PASSED`; Р, Telegram backend — З; [сценарій після WP-19](scenarios.md#s-m3-02-telegram-json-raw-відновлення-й-той-самий-sha256) |
 
-У S-M3-02 ще збережено очікування `connections_synced` перед прямим записом і пряме HTTP-читання
-`text/plain` поза ContractClient — явні межі [WP-21](../delivery/WP-21.md#рішення); їх усунення — окремий B-5 після WP-19.
+Після [приймання WP-19](../delivery/WP-19.md#приймання-координатором-2026-10-09) B-5 прибрав очікування
+`connections_synced` перед прямим записом у S-M3-02 і перевів читання `text/plain` на ContractClient
+за storage.v1 `getObjectContent`. Точні Content-Type, байти, розмір і `sha256` перевіряються як раніше.
+Обходи [WP-21](../delivery/WP-21.md#рішення) тепер історичні; функціональна синхронізація R-03 перед
+partition збережена.
+
+Новий локальний доказ B-5 на базі `b336922` зі змінами інкременту: один адресний прогін
+`tests/e2e/test_reprocessing_stored.py`, `JANE_E2E_REQUIRED=1` — **`2 passed in 200.78s (0:03:20)`**,
+exit 0; обидва S-M3-01/02 — явні **PASSED**. Project `jane-wp22e-storage-20261009` прибрано через
+`down -v`; контейнерів, sandbox, томів і мереж залишилося 0. Вивід — у
+[журналі потоку B](../delivery/post-m3/stream-b.md); повний інтеграційний CI очікується.
+Реальні сервіси Jane — **Р**, записаний Telegram backend — **З**; реальний Telegram/LLM не перевірено.
+
 За [спільними правилами після M3](../delivery/post-m3/README.md#спільні-правила-для-всіх-потоків)
 `dev-laptop` і `single-node` **виключено з обсягу повністю**; історичні позначки M3 нижче не є відкритою роботою.
 

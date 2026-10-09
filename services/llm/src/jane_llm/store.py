@@ -2,7 +2,9 @@
 
 Everything that must be shared between instances lives here: configuration documents (providers, model
 aliases, budget definitions, connections), budget/rate counters with reservations, the usage ledger,
-handler results, ``Idempotency-Key`` records and jobs.
+handler results, ``Idempotency-Key`` records and jobs. The last two are jane-kit's shared stores (R17):
+``store.idempotency`` / ``store.jobs`` - in-memory ones for :class:`MemoryStore`, ``jane_kit.stores.postgres``
+(token-fenced claims, job leases renewed by the heartbeat, take-over after a crash) for :class:`PostgresStore`.
 
 * :class:`PostgresStore` — the production store (own schema, ``SELECT ... FOR UPDATE`` on counter rows,
   so several instances never overspend a budget together);
@@ -17,17 +19,18 @@ calls it through :func:`asyncio.to_thread`.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import threading
+import uuid
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, Protocol
 
-from jane_kit.idempotency import IdempotencyRecord, StoredResponse
-from jane_kit.jobs import Job
+from jane_kit.idempotency import IdempotencyLimits, IdempotencyStore, InMemoryIdempotencyStore
+from jane_kit.jobs import InMemoryJobStore, JobLimits, JobStore
+from jane_kit.stores import LeaseLimits
 
 ConfigKind = Literal["provider", "alias", "budget", "connection"]
 
@@ -161,14 +164,9 @@ class Store(Protocol):
     def save_invocation(self, invocation_id: str, result: dict[str, Any]) -> None: ...
     def get_invocation(self, invocation_id: str) -> dict[str, Any] | None: ...
 
-    # idempotency
-    def idem_begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None: ...
-    def idem_complete(self, key: str, response: StoredResponse) -> None: ...
-    def idem_release(self, key: str) -> None: ...
-
-    # jobs
-    def job_put(self, job: Job) -> None: ...
-    def job_get(self, job_id: str) -> Job | None: ...
+    # jane-kit stores of Idempotency-Key records and jobs (shared by the instances of this store)
+    idempotency: IdempotencyStore
+    jobs: JobStore
 
 
 def _now() -> datetime:
@@ -221,15 +219,15 @@ def _matches(rec: UsageRecord, q: UsageQuery) -> bool:
 class MemoryStore:
     """In-process store with the same semantics as :class:`PostgresStore` (tests, demos)."""
 
-    def __init__(self) -> None:
+    def __init__(self, jobs: JobLimits | None = None, idempotency: IdempotencyLimits | None = None) -> None:
         self._lock = threading.RLock()
         self._docs: dict[tuple[str, str], dict[str, Any]] = {}
         self._counters: dict[tuple[str, str, str], list[float]] = {}  # spent, reserved, requests
         self._reservations: dict[str, tuple[float, list[tuple[str, str, str]], datetime]] = {}
         self._usage: list[UsageRecord] = []
         self._invocations: dict[str, dict[str, Any]] = {}
-        self._idem: dict[str, tuple[IdempotencyRecord, datetime]] = {}
-        self._jobs: dict[str, str] = {}
+        self.idempotency: IdempotencyStore = InMemoryIdempotencyStore(idempotency)
+        self.jobs: JobStore = InMemoryJobStore(jobs)
 
     def migrate(self) -> None:
         return None
@@ -349,40 +347,6 @@ class MemoryStore:
         with self._lock:
             return self._invocations.get(invocation_id)
 
-    def idem_begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
-        with self._lock:
-            now = _now()
-            existing = self._idem.get(key)
-            if existing is not None and existing[1] > now:
-                return existing[0]
-            self._idem[key] = (
-                IdempotencyRecord(key, fingerprint, "in_progress", 0.0),
-                now + timedelta(seconds=ttl_s),
-            )
-            return None
-
-    def idem_complete(self, key: str, response: StoredResponse) -> None:
-        with self._lock:
-            entry = self._idem.get(key)
-            if entry is not None:
-                entry[0].state = "completed"
-                entry[0].response = response
-
-    def idem_release(self, key: str) -> None:
-        with self._lock:
-            entry = self._idem.get(key)
-            if entry is not None and entry[0].state == "in_progress":
-                del self._idem[key]
-
-    def job_put(self, job: Job) -> None:
-        with self._lock:
-            self._jobs[job.job_id] = job.model_dump_json()
-
-    def job_get(self, job_id: str) -> Job | None:
-        with self._lock:
-            raw = self._jobs.get(job_id)
-            return Job.model_validate_json(raw) if raw else None
-
 
 # ----------------------------------------------------------------------------- postgres
 _DDL = """
@@ -405,22 +369,50 @@ CREATE TABLE IF NOT EXISTS {s}.usage (
 CREATE INDEX IF NOT EXISTS usage_created_idx ON {s}.usage (created_at);
 CREATE TABLE IF NOT EXISTS {s}.invocations (
     invocation_id text PRIMARY KEY, result jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
-CREATE TABLE IF NOT EXISTS {s}.idempotency (
-    key text PRIMARY KEY, fingerprint text NOT NULL, state text NOT NULL, response jsonb,
-    expires_at timestamptz NOT NULL);
-CREATE TABLE IF NOT EXISTS {s}.jobs (
-    job_id text PRIMARY KEY, job jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now());
 """
 
 
 class PostgresStore:
     """Store in the service's own PostgreSQL schema; safe for several instances."""
 
-    def __init__(self, dsn: str, schema: str, *, min_size: int, max_size: int) -> None:
+    def __init__(
+        self,
+        dsn: str,
+        schema: str,
+        *,
+        min_size: int,
+        max_size: int,
+        owner: str | None = None,
+        leases: LeaseLimits | None = None,
+        job_retention_s: float | None = None,
+    ) -> None:
         from psycopg_pool import ConnectionPool  # local import: memory mode needs no driver
+
+        from jane_kit.stores.postgres import PgIdempotencyStore, PgJobStore, pool_tx
 
         self.schema = schema
         self.pool = ConnectionPool(dsn, min_size=min_size, max_size=max_size, open=True)
+        leases = leases or LeaseLimits()
+        owner = owner or f"llm-{uuid.uuid4().hex}"
+        tx = pool_tx(self.pool)
+        # the tables of WP-10 keep their layout: one ``response`` column, the job document in ``job``
+        self.pg_idempotency = PgIdempotencyStore(
+            tx,
+            owner=owner,
+            in_progress_lease_s=leases.in_progress_lease_ms / 1000,
+            schema=schema,
+            layout="json",
+        )
+        self.pg_jobs = PgJobStore(
+            tx,
+            owner=owner,
+            lease_s=leases.job_lease_ms / 1000,
+            retention_s=JobLimits().job_retention_seconds if job_retention_s is None else job_retention_s,
+            schema=schema,
+            doc_column="job",
+        )
+        self.idempotency: IdempotencyStore = self.pg_idempotency
+        self.jobs: JobStore = self.pg_jobs
 
     @contextmanager
     def _tx(self) -> Iterator[Any]:
@@ -435,6 +427,8 @@ class PostgresStore:
             cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"jane-llm-migrate-{self.schema}",))
             cur.execute(f'CREATE SCHEMA IF NOT EXISTS "{self.schema}"')
             cur.execute(_DDL.format(s=f'"{self.schema}"'))
+            for statement in (*self.pg_idempotency.ddl(), *self.pg_jobs.ddl()):
+                cur.execute(statement)
 
     def ping(self) -> bool:
         with self._tx() as cur:
@@ -669,94 +663,6 @@ class PostgresStore:
             )
             row = cur.fetchone()
             return dict(row[0]) if row else None
-
-    # -- idempotency
-    def idem_begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
-        now = _now()
-        with self._tx() as cur:
-            cur.execute(f"DELETE FROM {self._t('idempotency')} WHERE key=%s AND expires_at <= %s", (key, now))
-            cur.execute(
-                f"INSERT INTO {self._t('idempotency')} (key, fingerprint, state, expires_at) "
-                "VALUES (%s, %s, 'in_progress', %s) ON CONFLICT (key) DO NOTHING",
-                (key, fingerprint, now + timedelta(seconds=ttl_s)),
-            )
-            if cur.rowcount:
-                return None
-            cur.execute(
-                f"SELECT fingerprint, state, response FROM {self._t('idempotency')} WHERE key=%s", (key,)
-            )
-            row = cur.fetchone()
-            if row is None:  # released concurrently; treat as in progress (client retries)
-                return IdempotencyRecord(key, fingerprint, "in_progress", 0.0)
-            response = None
-            if row[2] is not None:
-                r = row[2]
-                response = StoredResponse(int(r["status_code"]), r["body"], dict(r.get("headers") or {}))
-            return IdempotencyRecord(key, row[0], row[1], 0.0, response)
-
-    def idem_complete(self, key: str, response: StoredResponse) -> None:
-        payload = {
-            "status_code": response.status_code,
-            "body": response.body,
-            "headers": dict(response.headers),
-        }
-        with self._tx() as cur:
-            cur.execute(
-                f"UPDATE {self._t('idempotency')} SET state='completed', response=%s WHERE key=%s",
-                (json.dumps(payload), key),
-            )
-
-    def idem_release(self, key: str) -> None:
-        with self._tx() as cur:
-            cur.execute(f"DELETE FROM {self._t('idempotency')} WHERE key=%s AND state='in_progress'", (key,))
-
-    # -- jobs
-    def job_put(self, job: Job) -> None:
-        with self._tx() as cur:
-            cur.execute(
-                f"INSERT INTO {self._t('jobs')} (job_id, job) VALUES (%s, %s) "
-                "ON CONFLICT (job_id) DO UPDATE SET job = EXCLUDED.job, updated_at = now()",
-                (job.job_id, job.model_dump_json()),
-            )
-
-    def job_get(self, job_id: str) -> Job | None:
-        with self._tx() as cur:
-            cur.execute(f"SELECT job FROM {self._t('jobs')} WHERE job_id=%s", (job_id,))
-            row = cur.fetchone()
-            return Job.model_validate(row[0]) if row else None
-
-
-# ----------------------------------------------------------------------------- async adapters (jane-kit)
-class StoreIdempotency:
-    """:class:`jane_kit.idempotency.IdempotencyStore` on top of a :class:`Store`."""
-
-    def __init__(self, store: Store) -> None:
-        self.store = store
-
-    async def begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
-        return await asyncio.to_thread(self.store.idem_begin, key, fingerprint, ttl_s)
-
-    async def complete(self, key: str, response: StoredResponse) -> None:
-        await asyncio.to_thread(self.store.idem_complete, key, response)
-
-    async def release(self, key: str) -> None:
-        await asyncio.to_thread(self.store.idem_release, key)
-
-
-class StoreJobs:
-    """:class:`jane_kit.jobs.JobStore` on top of a :class:`Store` (jobs visible to every instance)."""
-
-    def __init__(self, store: Store) -> None:
-        self.store = store
-
-    async def create(self, job: Job) -> None:
-        await asyncio.to_thread(self.store.job_put, job)
-
-    async def get(self, job_id: str) -> Job | None:
-        return await asyncio.to_thread(self.store.job_get, job_id)
-
-    async def save(self, job: Job) -> None:
-        await asyncio.to_thread(self.store.job_put, job.model_copy(update={"updated_at": _now()}))
 
 
 def iter_keys(checks: Iterable[BudgetCheck]) -> list[CounterKey]:

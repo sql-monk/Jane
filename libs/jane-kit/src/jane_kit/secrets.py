@@ -150,6 +150,11 @@ class SecretPolicy:
         The reader must still pin every component (:func:`read_secret_file`): resolving a pathname alone does
         not prevent a later replacement of the target or a parent directory.
         """
+        return self._inside(ref)
+
+    def _inside(self, ref: str) -> Path | None:
+        # not overridable on purpose: ``ref_error`` checks without calling ``secret_file``, and ``resolve`` asks
+        # ``secret_file`` exactly once, for the path it then reads
         if self.files_dir is None or not ref.startswith("file:") or not ref[5:]:
             return None
         try:
@@ -174,7 +179,7 @@ class SecretPolicy:
         if ref.startswith("file:"):
             if self.files_dir is None:
                 return "file: references are disabled"
-            if self.secret_file(ref) is None:
+            if self._inside(ref) is None:
                 return f"file: references must point to a file inside {self.files_dir}"
             return None
         if ref.startswith("vault:"):

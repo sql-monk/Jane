@@ -46,6 +46,12 @@ job — у спільному PostgreSQL, не в пам'яті процесу; 
 Межа точності: перевіряється резерв (оцінка), а списується фактична вартість; якщо фактичний виклик
 дорожчий за оцінку (див. «Бюджети»), витрати можуть перевищити ліміт на цю різницю для викликів, що вже
 йшли одночасно, — наступні виклики тоді зупиняються. Схема створюється при старті (під advisory lock).
+Ключі ідемпотентності й job — спільні сховища `jane_kit.stores.postgres` (R17) на тих самих таблицях
+`idempotency` / `jobs`: «захоплення» ключа й job належать екземпляру й мають оренду (`state.*`), яку поновлює
+heartbeat лише для цього процесу; job убитого екземпляра після оренди стає `failed` (`service_unavailable`,
+retryable) при читанні й під час прибирання на старті (раніше лишався `running` назавжди), ключ — знову доступний
+для повтору; запис відповіді й job огороджено (`token` / оренда). Рядки попереднього формату читаються без
+копіювання (стовпці `owner`, `lease_until`, `finished_at`, `token` додаються на місці).
 
 ## Тести
 
@@ -139,8 +145,10 @@ just down -v --project jane-wp10
 **Політика секретів (захист від витоку).** Підключення визначає, *куди* піде розв'язаний секрет, тому
 (поки автентифікацію не реалізовано — тим паче) сервіс обмежує: `env:`-посилання — лише змінні з префіксом
 `JANE_LLM_SECRET_ENV_PREFIX` (типово `JANE_SECRET_`, тобто не `PGPASSWORD`, не `JANE_LLM_DATABASE_URL`);
-`file:` — лише всередині `JANE_LLM_SECRET_FILES_DIR` (після розв'язання шляху, без `..`); `vault:` вимкнено;
-`params.api_base` — лише origin з `JANE_LLM_PROVIDER_API_BASE_ALLOWLIST` (типово офіційний хост Anthropic).
+`file:` — лише всередині `JANE_LLM_SECRET_FILES_DIR` (після розв'язання шляху, без `..`; читання через закріплені
+компоненти шляху); `vault:` вимкнено; `params.api_base` — лише origin з `JANE_LLM_PROVIDER_API_BASE_ALLOWLIST`
+(типово офіційний хост Anthropic; записи — точні origin `scheme://host[:port]`, типовий порт нормалізується, URL з
+userinfo, `\` чи пробілами відхиляється). Політика — спільна `jane_kit.secrets` (R17), як у storage й колекторах.
 Порушення — 422 при `PUT /v1/connections` і в seed-файлі; підключення, збережене в обхід API, під час виклику
 не отримує секретів і відхиляється (422). Тести: `test_connection_policy_rejects_exfiltration`.
 
@@ -221,6 +229,7 @@ JANE_LLM_API_KEYS=[{"name": "assistant", "sha256": "<sha256 hex ключа>", "s
 | `registry.connect_timeout_ms` / `request_timeout_ms` / `max_attempts` | 5000 / 30000 / 3 | виклики репозиторію обробників |
 | `jobs.max_concurrent_jobs` / `max_queued_jobs` / `job_timeout_ms` | 4 / 1000 / 3600000 | асинхронні job (jane-kit) |
 | `idempotency.idempotency_ttl_seconds` | 86400 | скільки пам'ятається `Idempotency-Key` (контракт `transfer.idempotency_ttl_seconds`) |
+| `state.in_progress_lease_ms` / `job_lease_ms` / `heartbeat_interval_ms` | 900000 / 60000 / 15000 | оренди спільного стану PostgreSQL (R17): «захоплення» ключа загиблого екземпляра, job загиблого екземпляра, як часто екземпляр поновлює свої оренди (`JANE_LLM_LIMITS__STATE__…`) |
 
 **Бюджети** (семантика зафіксована в контракті: `limits.schema.json` → `Budget`, `llm.v1` →
 `CompletionRequest.limits`, `BudgetStatus`). Бюджет платформи — збережене визначення або `llm.budget`; бюджети

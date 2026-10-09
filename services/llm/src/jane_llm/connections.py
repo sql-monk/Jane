@@ -8,24 +8,27 @@ be able to reference arbitrary process state or ship a secret to an arbitrary ho
 (from :class:`~jane_llm.settings.Settings`) restricts:
 
 * ``env:`` references to variables with a configured prefix (default ``JANE_SECRET_``);
-* ``file:`` references to files inside a configured directory (default ``/run/secrets``);
-* ``params.api_base`` to a configured allowlist of origins (default the official provider hosts).
+* ``file:`` references to files inside a configured directory (default ``/run/secrets``), read through pinned
+  path components;
+* ``params.api_base`` to a configured allowlist of exact origins (default the official provider hosts; no
+  userinfo, backslashes or whitespace).
+
+The secret part is jane-kit's shared :class:`jane_kit.secrets.SecretPolicy` (R17), the same as in storage and
+the collectors.
 
 The policy is enforced when a connection is stored (422) **and** when it is resolved for a call.
 """
 
 from __future__ import annotations
 
-import os
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
 from jane_kit.errors import FieldError
+from jane_kit.secrets import OriginAllowlist, SecretPolicy
 from jane_llm.providers.base import ResolvedConnection
-from jane_llm.secret_files import read_secret_file
 
 _SECRET_KEY_RE = re.compile(r"(?i)(pass(word|wd)?|secret|token|api[_-]?key|credential|private[_-]?key|auth)")
 _SECRET_VALUE_RES = [
@@ -39,78 +42,38 @@ FAKE_SCRIPTS_KEY = "responses"
 """Scripts of the ``fake`` provider may contain arbitrary text; exempt only when ``params.provider == "fake"``."""
 
 
-def origin(url: str) -> str:
-    parts = urlsplit(url.strip())
-    port = f":{parts.port}" if parts.port else ""
-    return f"{parts.scheme.lower()}://{(parts.hostname or '').lower()}{port}"
+def _parsable(url: str) -> bool:
+    try:
+        urlsplit(url.strip()).port  # noqa: B018 - a bad port ("...:99999", "...:abc") or bracket raises
+    except ValueError:
+        return False
+    return True
 
 
 @dataclass(frozen=True)
-class ConnectionPolicy:
-    env_prefix: str = "JANE_SECRET_"
-    files_dir: Path | None = Path("/run/secrets")
+class ConnectionPolicy(SecretPolicy):
+    """jane-kit's secret policy plus the allowed origins of ``params.api_base``."""
+
     api_base_allowlist: tuple[str, ...] = ("https://api.anthropic.com",)
-    _origins: frozenset[str] = field(init=False, repr=False, default=frozenset())
+    _api_bases: OriginAllowlist = field(init=False, repr=False, default=OriginAllowlist())
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "_origins", frozenset(origin(u) for u in self.api_base_allowlist))
-
-    def ref_error(self, ref: str) -> str | None:
-        """Why a secret reference is not allowed (``None`` if allowed)."""
-        if ref.startswith("env:"):
-            if not self.env_prefix or not ref[4:].startswith(self.env_prefix):
-                return f"env: references must name variables starting with {self.env_prefix!r}"
-            return None
-        if ref.startswith("file:"):
-            if self.files_dir is None:
-                return "file: references are disabled"
-            try:
-                path = Path(ref[5:]).resolve()
-                base = self.files_dir.resolve()
-            except (OSError, RuntimeError, ValueError):
-                return "file: reference is not a valid path"
-            if not path.is_relative_to(base):
-                return f"file: references must point inside {self.files_dir}"
-            return None
-        if ref.startswith("vault:"):
-            return "vault: references are not configured in this service"
-        return "unknown secret reference scheme"
-
-    def secret_file(self, ref: str) -> Path | None:
-        """Resolved path (``..`` and symlinks resolved) of an allowed ``file:`` reference, else ``None``.
-
-        The reader must still pin and check every filesystem component before reading this path;
-        resolving a pathname alone does not prevent a later target or parent replacement.
-        """
-        if self.files_dir is None or not ref.startswith("file:") or not ref[5:]:
-            return None
-        try:
-            path = Path(ref[5:]).resolve()
-            base = self.files_dir.resolve()
-        except (OSError, RuntimeError, ValueError):
-            return None
-        return path if path != base and path.is_relative_to(base) else None
+        object.__setattr__(self, "_api_bases", OriginAllowlist(tuple(self.api_base_allowlist)))
 
     def api_base_error(self, api_base: Any) -> str | None:
         if api_base is None:
             return None
-        allowed = f"api_base must be one of the allowed origins {sorted(self._origins)}"
+        allowed = f"api_base must be one of the allowed origins {sorted(self.api_base_allowlist)}"
         if not isinstance(api_base, str):
             return allowed
-        try:
-            parsed = origin(api_base)
-        except ValueError:  # bad port ("…:99999", "…:abc") or bracket: a validation error, not a 500
+        if not _parsable(api_base):  # a validation error, not a 500
             return f"api_base is not a valid URL; {allowed}"
-        return None if parsed in self._origins else allowed
+        return None if self._api_bases.allows(api_base.strip()) else allowed
 
-    def violations(self, doc: dict[str, Any]) -> list[FieldError]:
-        errors = []
-        for name, ref in (doc.get("secret_refs") or {}).items():
-            if msg := self.ref_error(str(ref)):
-                errors.append(
-                    FieldError(pointer=f"/secret_refs/{name}", code="secret_ref_not_allowed", message=msg)
-                )
-        params = doc.get("params") or {}
+    def violations(self, doc: Any, pointer: str = "/secret_refs") -> list[FieldError]:
+        """Violations of a Connection document: its ``secret_refs`` and ``params.api_base``."""
+        errors = super().violations((doc or {}).get("secret_refs"), pointer)
+        params = (doc or {}).get("params") or {}
         if msg := self.api_base_error(params.get("api_base")):
             errors.append(FieldError(pointer="/params/api_base", code="api_base_not_allowed", message=msg))
         return errors
@@ -118,16 +81,7 @@ class ConnectionPolicy:
 
 def resolve_ref(ref: str, policy: ConnectionPolicy) -> str | None:
     """Value of an allowed ``env:VAR`` / ``file:<path>``; ``None`` if missing or not allowed."""
-    if policy.ref_error(ref) is not None:
-        return None
-    if ref.startswith("env:"):
-        return os.environ.get(ref[4:]) or None
-    if ref.startswith("file:"):
-        path = policy.secret_file(ref)  # re-resolved now; the raw reference is never opened
-        if path is None:
-            return None
-        return read_secret_file(path)
-    return None
+    return policy.resolve(ref)
 
 
 def find_secret_like(params: dict[str, Any], prefix: str = "/params") -> list[FieldError]:

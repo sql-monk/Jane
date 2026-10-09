@@ -39,6 +39,7 @@ from jane_kit.idempotency import (
 from jane_kit.jobs import JobContext, JobRunner, jobs_router
 from jane_kit.pagination import PageLimits, clamp_limit, decode_cursor, encode_cursor
 from jane_kit.service import create_app
+from jane_kit.stores import heartbeat_loop
 from jane_llm import __version__
 from jane_llm.connections import find_secret_like, resolve_connection
 from jane_llm.gateway import Gateway, Scope, budget_key
@@ -48,8 +49,8 @@ from jane_llm.packages import PackageLoader
 from jane_llm.prompt import NonceFactory, new_nonce
 from jane_llm.providers import ADAPTERS, ProviderAdapter
 from jane_llm.providers.fake import FAKE_MODEL_ID, FAKE_PROVIDER_ID
-from jane_llm.settings import Settings, resolve_service_limits
-from jane_llm.store import MemoryStore, PostgresStore, Store, StoreIdempotency, StoreJobs, UsageQuery
+from jane_llm.settings import ServiceLimits, Settings, resolve_service_limits
+from jane_llm.store import MemoryStore, PostgresStore, Store, UsageQuery
 from jane_llm.testing import run_tests
 
 log = logging.getLogger(__name__)
@@ -73,12 +74,13 @@ FAKE_PROVIDER = {
 }
 
 
-def make_store(settings: Settings) -> Store:
+def make_store(settings: Settings, limits: ServiceLimits | None = None) -> Store:
+    limits = limits or resolve_service_limits(settings).limits
     if settings.store == "memory":
         log.warning(
             "store=memory: budgets and usage are per process; use store=postgres for several instances"
         )
-        return MemoryStore()
+        return MemoryStore(limits.jobs, limits.idempotency)
     if not settings.database_url:
         raise RuntimeError(
             "JANE_LLM_DATABASE_URL is required for store=postgres (or set JANE_LLM_STORE=memory)"
@@ -88,6 +90,9 @@ def make_store(settings: Settings) -> Store:
         settings.db_schema,
         min_size=settings.db_pool_min_size,
         max_size=settings.db_pool_max_size,
+        owner=settings.instance_id,
+        leases=limits.state,
+        job_retention_s=limits.jobs.job_retention_seconds,
     )
 
 
@@ -154,10 +159,10 @@ def build_app(
     settings = settings or Settings()
     resolved = resolve_service_limits(settings)
     limits = resolved.limits
-    store = store or make_store(settings)
+    store = store or make_store(settings, limits)
     policy = settings.connection_policy()
-    idem_store = StoreIdempotency(store)
-    runner = JobRunner(store=StoreJobs(store), limits=limits.jobs)
+    idem_store = store.idempotency
+    runner = JobRunner(store=store.jobs, limits=limits.jobs)
     adapters = adapters or ADAPTERS
     packages_dir = settings.packages_dir or (BUILTIN_PACKAGES if BUILTIN_PACKAGES.is_dir() else None)
     content = settings.content_reader(limits.gateway)
@@ -175,9 +180,35 @@ def build_app(
         await asyncio.to_thread(store.migrate)
         await asyncio.to_thread(seed, store, settings)
         log.info("configured limits", extra={"limits": resolved.effective(), "store": settings.store})
-        yield
-        await runner.shutdown()
-        await asyncio.to_thread(store.close)
+        # shared stores (R17): end jobs of stopped instances, then renew this instance's leases
+        sweep = getattr(store.jobs, "sweep", None)
+        if sweep is not None and (reaped := await sweep()):
+            log.warning("jobs of stopped instances ended", extra={"jobs": reaped})
+        beats = [
+            beat
+            for target, name in (
+                (store.jobs, "heartbeat"),
+                (store.idempotency, "heartbeat"),
+                (store.idempotency, "gc"),
+            )
+            if (beat := getattr(target, name, None)) is not None
+        ]
+        heartbeat = (
+            asyncio.create_task(
+                heartbeat_loop(beats, limits.state.heartbeat_interval_ms / 1000, name="llm state"),
+                name="llm-state-heartbeat",
+            )
+            if beats
+            else None
+        )
+        try:
+            yield
+        finally:
+            if heartbeat is not None:
+                heartbeat.cancel()
+                await asyncio.gather(heartbeat, return_exceptions=True)
+            await runner.shutdown()
+            await asyncio.to_thread(store.close)
 
     def capabilities() -> dict[str, Any]:
         return {

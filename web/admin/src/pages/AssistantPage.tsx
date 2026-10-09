@@ -163,9 +163,15 @@ function Onboarding({ sessionId, onOpen }: { sessionId: string | null; onOpen: (
     hints: "",
   });
   const hints = checkJson(form.hints);
+  const confidenceError =
+    form.confidence &&
+    (!Number.isFinite(Number(form.confidence)) || Number(form.confidence) <= 0 || Number(form.confidence) > 1)
+      ? "Поріг впевненості має бути більшим за 0 і не більшим за 1."
+      : null;
 
   const start = useMutation({
     mutationFn: () => {
+      if (confidenceError) throw new Error(confidenceError);
       const limits: NonNullable<OnboardingRequest["limits"]> = {
         ...(form.amount
           ? { budget: { amount: Number(form.amount), currency: form.currency, period: "total" as const } }
@@ -266,13 +272,13 @@ function Onboarding({ sessionId, onOpen }: { sessionId: string | null; onOpen: (
           </Field>
           <Field
             label="Поріг впевненості вибірки"
-            hint="0–1; порожньо — поріг асистента (min_onboarding_confidence)"
+            hint="Більше 0 і не більше 1; порожньо — поріг асистента (min_onboarding_confidence)"
           >
             <input
               type="number"
-              min={0.01}
+              min={0}
               max={1}
-              step="0.05"
+              step="any"
               value={form.confidence}
               onChange={(e) => setForm({ ...form, confidence: e.target.value })}
             />
@@ -286,6 +292,7 @@ function Onboarding({ sessionId, onOpen }: { sessionId: string | null; onOpen: (
             Дозволити автоматичну активацію
           </label>
         </div>
+        {confidenceError ? <p role="alert">{confidenceError}</p> : null}
         <Field label="Правила обходу від користувача (фрагмент CollectorRules, необов'язково)">
           <JsonEditor
             text={form.hints}
@@ -297,7 +304,9 @@ function Onboarding({ sessionId, onOpen }: { sessionId: string | null; onOpen: (
         <button
           type="button"
           className="btn btn-primary"
-          disabled={!form.query.trim() || Boolean(hints.parseError) || start.isPending}
+          disabled={
+            !form.query.trim() || Boolean(hints.parseError) || Boolean(confidenceError) || start.isPending
+          }
           onClick={() => start.mutate()}
         >
           Почати підключення

@@ -52,9 +52,9 @@ def connections_synced(orch: JaneClient, executor: str) -> bool | None:
     """True when no registered connection waits to be pushed to ``executor`` (``PlatformConnection``), else None.
 
     Every ``PUT /v1/connections/{id}`` (also with an unchanged document) makes the orchestrator push the
-    connection to its executors again; storage then reopens its adapter, and a write that runs at that moment
-    fails (``adapter is not open``, docs/delivery/WP-21.md). A scenario that writes to storage directly right after
-    :func:`put_connections` waits for this first."""
+    connection to its executors again. R-03 waits for these pushes before partitioning storage so a pending
+    connection delivery cannot occupy the worker needed to measure invocation retry backoff. Direct storage
+    writes need no such wait: WP-19 fixed adapter lifetime during connection updates."""
     for conn in CONNECTIONS:
         r = orch.api("orchestrator").get(f"/v1/connections/{conn['connection_id']}")
         assert r.status_code == 200, r.text

@@ -25,6 +25,13 @@ from .settings import Settings, resolve_service_limits
 
 log = logging.getLogger(__name__)
 
+# EXAMPLE: replace these rows with the scopes of the service's contract operations.
+AUTH_SCOPES = {
+    "POST /v1/examples/jobs": "handler:invoke",
+    "GET /v1/jobs/{job_id}": "handler:invoke",
+    "POST /v1/jobs/{job_id}/cancel": "handler:invoke",
+}
+
 
 class ExampleJobRequest(BaseModel):
     """EXAMPLE - delete together with the /v1/examples endpoint.
@@ -57,6 +64,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
         capabilities={"examples": ["jobs"]},
         limits=resolved,  # published in /v1/info as PlatformLimits (WP-00 ServiceInfo.limits)
+        auth_scopes=AUTH_SCOPES,
     )
     app.state.limits = resolved
     app.include_router(jobs_router(runner))

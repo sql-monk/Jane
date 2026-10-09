@@ -46,9 +46,10 @@
    ігноруються з рядком журналу старту, опечатка — помилка старту (колектори поки ігнорують і опечатки,
    запит WP-01b до WP-02/WP-04); `GET /v1/info` → `limits.profile`.
    orchestrator бере файл лише для першого заповнення документа лімітів у БД. Змінні
-   `<ПРЕФІКС>_LIMITS__<ГРУПА>__<ПОЛЕ>` перекривають файл. Для llm профіль задає й тайм-аут виклику провайдера
-   (`provider.request_timeout_ms` = `timeouts.request_timeout_ms` профілю, 30 с): для реальної моделі перекрийте
-   `JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS` (стек профілю — 120 000, див. `deploy/profiles/README.md`).
+   `<ПРЕФІКС>_LIMITS__<ГРУПА>__<ПОЛЕ>` перекривають файл. Тайм-аут виклику моделі llm — власний ліміт
+   `provider.request_timeout_ms` (типово 120 000), профіль його не змінює; для повільної моделі —
+   `JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS` (див. `deploy/profiles/README.md`). Асистент чекає виклик llm
+   за `llm_call.request_timeout_ms` (типово 900 000) або бере режим `async`.
 
 ## Спільний запуск (ланцюжок)
 

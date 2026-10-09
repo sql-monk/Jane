@@ -266,11 +266,62 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
     await expect(row).toContainText("ignored");
     await expect(admin.getByRole("alert")).toHaveCount(0);
 
-    // ---- both runs of the group on the assistant page, read back from the assistant (R24), also after a reload
+    // ---- 3. the package forbids automatic changes (registry PATCH with If-Match from the package page): the
+    //      assistant only proposes the fix - changed files, manifest and diff; nothing is published (R08/R24)
+    await admin.goto(`/packages/${extractor.package_id}`);
+    const autoChanges = admin.getByRole("checkbox", { name: /Дозволити автоматичні зміни цього пакета/ });
+    await expect(autoChanges).toBeChecked();
+    const forbidden = await captureRequest(
+      admin,
+      "PATCH",
+      `/api/registry/v1/packages/${extractor.package_id}`,
+      // a controlled checkbox: it changes when the registry answers the PATCH
+      () => autoChanges.click(),
+    );
+    expect(forbidden.body).toEqual({ auto_changes_allowed: false });
+    expect(forbidden.request.headers()["if-match"]).toBeTruthy();
+    await expect(autoChanges).not.toBeChecked();
+    await admin.goto("/problems");
+    await admin.getByLabel("Джерело").fill(sourceId);
+    await admin.getByLabel("Стан групи").selectOption("ignored");
+    await row.getByRole("button", { name: "Відкрити" }).click();
+    await admin.getByLabel("Сховище RAW прикладів").fill("raw-files");
+    const third = await captureRequest(admin, "POST", "/api/assistant/v1/improvement-runs", () =>
+      admin.getByRole("button", { name: "Запустити вдосконалення" }).click(),
+    );
+    expect(third.body["problem_samples"]).toEqual(first.body["problem_samples"]);
+    const proposed = admin.getByLabel("Вдосконалення", { exact: true }).getByLabel("Результат вдосконалення");
+    await expect(proposed).toContainText("proposal_only", { timeout: 300_000 });
+    await expect(proposed).toContainText("(не опубліковано)");
+    const proposal = proposed.getByLabel("Пропозиція асистента");
+    await expect(proposal).toContainText(`${extractor.package_id}@1.0.0`); // based_on
+    await expect(proposal.locator(".kv-row", { hasText: "Зміна схеми" })).toContainText("additive");
+    await expect(proposal.getByRole("table", { name: "Змінені файли пропозиції" })).toContainText(
+      "src/e2e_improvable_products/main.py",
+    );
+    await expect(proposal.getByLabel("Diff пропозиції").locator(".diff-add").first()).toBeVisible();
+    await expect(proposal.getByLabel("Diff пропозиції")).toContainText("OutOfStock");
+    await proposal.getByText("Маніфест запропонованої версії").click();
+    await expect(proposal.getByTestId("json-view")).toContainText('"created_by": "llm"');
+    const unchanged = await jsonRequest(request, "get", `${registry}/v1/packages/${extractor.package_id}`);
+    expect(unchanged["latest_version"]).toBe("1.1.0"); // the proposal is not published
+    await expect
+      .poll(async () => {
+        const group = await jsonRequest(
+          request,
+          "get",
+          `${orchestrator}/v1/problem-groups?source_id=${sourceId}`,
+        );
+        return (group["items"] as Array<Record<string, unknown>>)[0]?.["note"];
+      })
+      .toMatch(/automatic changes .* are forbidden; proposal/);
+
+    // ---- all runs of the group on the assistant page, read back from the assistant (R24), also after a reload
     await admin.goto("/assistant?tab=improvement");
     await admin.getByLabel("Група проблем (problem_group_id)").fill(groupId);
     const runs = admin.getByRole("table", { name: "Запуски вдосконалення" });
-    await expect(runs.getByRole("row")).toHaveCount(3);
+    await expect(runs.getByRole("row")).toHaveCount(4);
+    await expect(runs.getByRole("row", { name: /proposal_only/ })).toContainText("(не опубліковано)");
     await expect(runs.getByRole("row", { name: new RegExp(firstJob) })).toContainText("unresolved");
     const improvedRun = runs.getByRole("row", { name: /new_version/ });
     await expect(improvedRun).toContainText(`${extractor.package_id}@1.1.0`);

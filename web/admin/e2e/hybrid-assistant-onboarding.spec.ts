@@ -64,6 +64,8 @@ test.describe("real source onboarding in the admin @hybrid", () => {
     await admin.getByLabel("Назва або посилання").fill("testsite");
     await admin.getByLabel("Тип джерела (необов'язково)").fill("web");
     await admin.getByLabel("Бюджет дослідження").fill("1");
+    // the threshold is sent explicitly for this onboarding (the assistant's own value, so the sample is the same)
+    await admin.getByLabel("Поріг впевненості вибірки").fill(String(threshold));
     const hints = {
       scope: { path_prefixes: SECTION_PREFIXES },
       strategies: [{ type: "seed_list", urls: SECTION_PAGES.map((p) => site + p) }],
@@ -81,7 +83,10 @@ test.describe("real source onboarding in the admin @hybrid", () => {
     expect(started.body).toEqual({
       query: "testsite",
       source_kind: "web",
-      limits: { budget: { amount: 1, currency: "USD", period: "total" } },
+      limits: {
+        budget: { amount: 1, currency: "USD", period: "total" },
+        min_onboarding_confidence: threshold,
+      },
       crawl_hints: hints,
       auto_activation: false,
     });

@@ -210,6 +210,12 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
     await expect(row).toContainText("unresolved");
     await row.getByRole("button", { name: "Відкрити" }).click();
     await expect(admin.getByText("потрібне рішення людини")).toBeVisible();
+    // the assistant's explanation is kept in the group (ProblemGroup.note, WP-17) and shown with it
+    await expect(admin.getByTestId("group-note")).toContainText("limits.llm.max_improvement_attempts is 0");
+    await expect(row).toContainText("limits.llm.max_improvement_attempts is 0");
+    // the runs of this group come from the assistant (GET /v1/improvement-runs?problem_group_id=…, R24)
+    const groupRuns = admin.getByRole("table", { name: "Запуски асистента для групи" });
+    await expect(groupRuns.getByRole("row", { name: new RegExp(firstJob) })).toContainText("unresolved");
 
     // ---- 2. improvement with the default attempts: the fake LLM fixes the code; the new version passes the old
     //      tests, the problem sample and the binding in the real runtime; it is published for manual approval
@@ -258,6 +264,32 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
     expect(ignored.body).toEqual({ status: "ignored" });
     await admin.getByLabel("Стан групи").selectOption("ignored");
     await expect(row).toContainText("ignored");
+    await expect(admin.getByRole("alert")).toHaveCount(0);
+
+    // ---- both runs of the group on the assistant page, read back from the assistant (R24), also after a reload
+    await admin.goto("/assistant?tab=improvement");
+    await admin.getByLabel("Група проблем (problem_group_id)").fill(groupId);
+    const runs = admin.getByRole("table", { name: "Запуски вдосконалення" });
+    await expect(runs.getByRole("row")).toHaveCount(3);
+    await expect(runs.getByRole("row", { name: new RegExp(firstJob) })).toContainText("unresolved");
+    const improvedRun = runs.getByRole("row", { name: /new_version/ });
+    await expect(improvedRun).toContainText(`${extractor.package_id}@1.1.0`);
+    await expect(improvedRun).toContainText(sourceId);
+    await improvedRun.getByRole("button").first().click();
+    const restored = admin.getByLabel("Вдосконалення", { exact: true }).getByLabel("Результат вдосконалення");
+    await expect(restored).toContainText("new_version");
+    await admin.reload();
+    await expect(restored).toContainText(`${extractor.package_id}@1.1.0`);
+    await expect(restored).toContainText("offer");
+
+    // ---- the published version passed its tests on every context (registry test_summary, WP-17)
+    await admin.goto(`/packages/${extractor.package_id}?version=1.1.0`);
+    await expect(admin.getByTestId("test-summary-status")).toHaveText("passed");
+    const contexts = admin.getByRole("table", { name: "Тести за контекстами" });
+    await expect(
+      contexts.getByRole("row", { name: new RegExp(`bindings:${taskId}/extract-products`) }),
+    ).toContainText("passed");
+    await expect(contexts.getByRole("row", { name: /^tests/ })).toContainText("assistant");
     await expect(admin.getByRole("alert")).toHaveCount(0);
   });
 

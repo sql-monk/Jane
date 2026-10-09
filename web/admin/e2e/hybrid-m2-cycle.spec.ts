@@ -165,6 +165,13 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
     `${extractor.package_id}@${extractor.version}`,
   );
   await expect(traced.getByRole("row", { name: /store-products/ })).toContainText("results-pg");
+  // attempt diagnostics of the real orchestrator (R25): the item was claimed and completed
+  const tracedExtract = traced.getByRole("row", { name: /extract-products/ });
+  await expect(tracedExtract).toContainText("completed");
+  await tracedExtract.getByText(/^\d+ подій$/).click();
+  const attempts = tracedExtract.getByLabel(/^Історія спроб /).getByRole("listitem");
+  await expect(attempts.first()).toContainText("claimed");
+  await expect(attempts.last()).toContainText("completed");
   await admin.goto(`/runs/${runId}`);
   await admin.getByRole("tab", { name: "Помилки колектора" }).click();
   await expect(admin.getByRole("table", { name: "Помилки колектора" })).toContainText("404");
@@ -390,4 +397,34 @@ test("reprocessing one stored material takes only RAW of the task's source (WP-0
   // the set-up worked: the RAW of the task's own source was fed
   expect(fed.map((i) => i.observation_id)).toContain(`obs_${ownSource}`);
   expect(fed.map((i) => i.observation_id)).toEqual([`obs_${ownSource}`]);
+
+  // the exact choice (R06, WP-17): only this stored RAW object, stored_materials.object_ids
+  const own = await jsonRequest(
+    request,
+    "get",
+    `${storageUrl}/v1/objects?connection_id=raw-files&source_id=${ownSource}`,
+  );
+  const ownObject = (own["items"] as Array<{ object: { object_id: string } }>)[0]?.object.object_id;
+  await admin.goto(`/materials?connection_id=raw-files&source_id=${ownSource}`);
+  await materials.getByRole("button", { name: "Повторно обробити" }).click();
+  await form.getByLabel("Завдання").fill(taskId);
+  await form.getByLabel("Почати з етапу").fill("extract-products");
+  await form.getByLabel("Що обробити").selectOption("object");
+  const exact = await captureRequest(admin, "POST", "/api/orchestrator/v1/reprocessing", () =>
+    form.getByRole("button", { name: "Обробити повторно" }).click(),
+  );
+  expect(exact.body).toEqual({
+    task_id: taskId,
+    stored_materials: { storage_connection_id: "raw-files", object_ids: [ownObject] },
+    from_stage: "extract-products",
+  });
+  await expect(admin).toHaveURL(/\/runs\/run_/);
+  const exactRunId = admin.url().split("/").at(-1) as string;
+  expect(exactRunId).not.toBe(runId);
+  const exactRun = await waitRun(request, orchestratorUrl, exactRunId);
+  expect(exactRun["status"], JSON.stringify(exactRun)).toBe("succeeded");
+  const exactFed = (await runItems(request, orchestratorUrl, exactRunId)).filter(
+    (i) => i.stage_id === "extract-products",
+  );
+  expect(exactFed.map((i) => i.observation_id)).toEqual([`obs_${ownSource}`]);
 });

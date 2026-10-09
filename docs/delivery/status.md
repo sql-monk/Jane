@@ -874,3 +874,10 @@ r1 → виправлення на `origin/wp/01g2-service-auth`, CI 37857870977
   [Рецепт і докази](WP-19/workspace-doc-followup.md): `jane-contracts` успадковує root workspace source;
   path source `jane-storage` збережено. Лише README і звіт, ownership 2/0; за спільними правилами
   документальна зміна без повторних тестів/рев'ю. Код прийнятого WP-19 незмінний.
+
+- [Branch CI C-2 37936808211](https://github.com/sql-monk/Jane/actions/runs/37936808211) зафіксував
+  падіння `test_two_instances_share_state_and_take_over_after_kill`: коротка перша сторінка залишила
+  acknowledged=1 / emitted=11 при queue=10, а споживач уже чекав emitted>=12 без подальших ACK.
+  A взяв запит власнику Telegram у **новий WP-19b**, `wp/19b-telegram-pagination-test`, окремий checkout.
+  Виконавець готує детерміноване old-fail/new-pass відтворення й мінімальний fix споживання сторінок;
+  далі незалежне рев'ю саме цього інкремента й branch CI. Оригінальний WP-19 лишається accepted.

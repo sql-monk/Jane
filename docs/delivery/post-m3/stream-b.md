@@ -21,7 +21,7 @@ checkout потоку A. `main` і force push не використовують�
 | Завдання | Гілка / worktree | Стан |
 |---|---|---|
 | B-1: матриця й сценарії | `wp/22a-acceptance-matrix`, `wp22a` | accepted; `a967228` (документи) |
-| B-2: решта real-адмінки | `wp/22b-admin-real-coverage` | виконання; база `2366213` |
+| B-2: решта real-адмінки | `wp/22b-admin-real-coverage`, `wp22b` | accepted; `ffc6914`, review 1 |
 | B-3: дві репліки й L2 | `wp/22c-shared-host-replicas`, `wp22c` | accepted; `753f3e9`, review 1 |
 | B-4: приклад info з limits | `wp/22d-assistant-info-example`, `wp22d` | accepted; `256334c`, review 1, compatible |
 | B-5: S-M3-02 після WP-19 | `wp/22e-storage-contract-cleanup` | очікує маркера `merge: accept WP-19` в origin |
@@ -127,6 +127,8 @@ exit=0
 
 Рецензент сам виконав: check-diff — 4 changed / 0 outside; diff --check — exit 0; Ruff — All checks passed, 2 files already formatted; Docker — 0 контейнерів / 0 томів. Перевірено окремі PID і mounts, aggregate concurrency/rate, живе поновлення понад TTL, SIGKILL і обмежене TTL очікування. 50 мс допускається для окремого інтервалу, повний span перевіряється без накопичення допуску. Успішний e2e не повторювали.
 
+
+Авторський звіт B-3 перед незалежним рев’ю (поточний вердикт — accepted).
 
 Гілка: `wp/22c-shared-host-replicas`. База: `03a172d` (`origin/codex/jane-integration`). SHA: `753f3e9e4b9e48bf4b9beee57c7c1f1b7a4e8270`. Стан: **review** — незалежного wp-reviewer призначає координатор.
 
@@ -402,3 +404,97 @@ Native e2e runner completed EXIT_CODE=0 with1passed(3.4m).
 ### Запити до інших власників
 
 Нових немає. До accepted потрібні незалежні wp-reviewer, contract-guardian і рішення координатора за CI.
+
+
+### Оновлення CI B-4
+
+[37914220697](https://github.com/sql-monk/Jane/actions/runs/37914220697), SHA `256334c18d459634afb6ec2ff6a753cf8261e695`: **completed / success**.
+
+## B-2: accepted
+
+Злиття: `6bafc3eb9479d786fa8f9b9a59273c632309fc18`. Незалежний wp-reviewer: **accepted**, раунд 1 на `ffc691423ea16463c1665af177ff7164cca8ee67`.
+
+Рецензент сам виконав: ownership 4 changed / 0 outside; unit 4 passed; typecheck / changed-file ESLint / Prettier exit 0; diff чистий. Перевірено точні RAW selections, persistence note, package/status filters, retry timestamps і claim >= available_at. Real4 raw logs містять усі чотири ok; тестовий Windows teardown вручну завершив лише власний worker після assertions — це явне обмеження, не штатне завершення. Успішні e2e не повторювали. Cleanup підтверджено порожніми label-filtered Docker listings. Full real22 локально не запускали й не оголошували підтвердженим. CI37914973286 на момент review: lint/compat/web/mock-e2e success, unit триває; повний gate потоку — після B-5.
+
+Нижче — авторський звіт перед рев’ю; поточний вердикт наведено вище.
+
+
+Стан: **review**; незалежного wp-reviewer призначає координатор.
+Гілка: `wp/22b-admin-real-coverage`; база: `2366213` (свіжий origin/codex/jane-integration при створенні checkout).
+Commit: `ffc691423ea16463c1665af177ff7164cca8ee67`, pushed у свою гілку; clean working tree. `.jane-wp` = 22.
+
+### Результат
+
+- `web/admin/e2e/hybrid-post-m3.spec.ts`: чотири нові `@hybrid` сценарії через Caddy. Усі дані створюються публічними API; route/response mocks відсутні.
+- Людина зберігає `ProblemGroup.note`: PATCH body, реальний list readback, UI і reload. Кнопка групи готує рівно RAW проблемного прикладу; reprocess POST передає `stored_materials.object_ids`, реальний extractor обробляє тільки це спостереження.
+- На сторінці запуску ручні `object_ids` і `observation_ids`: точне тіло запиту, reprocessing run succeeded, лише вибраний out-of-stock RAW (контрольний in-stock RAW виключено).
+- Фільтри `package_id` / `status`: два реальні jobs різних пакетів одного джерела; правильні query params; чужий пакет і невідповідний статус відсутні. Jobs із `max_improvement_attempts: 0` не викликають LLM.
+- Реальний LLM gateway із явно тестовим зовнішнім `fake` провайдером `error: unavailable`: configured retry, failed після 2 спроб; `retry_scheduled`, delay 1000ms, `available_at` і наступний claim не раніше available_at; точні timestamps і код у UI запуску.
+- `AssistantPage.tsx`: confidence є порожнім або finite числом в (0,1]; пояснення помилки, вимкнена кнопка й guard перед POST. `step=any` дозволяє всі валідні значення контракту; tiny positive 0.005 дозволено.
+- `AssistantPage.test.tsx`: 4 targeted tests — invalid 0/-0.1/1.1 не відправляють POST; 0.005/1 і default перевіряють outbound body. Neighbour calls лишено pending, без вигаданих API-відповідей. README доповнено real-покриттям.
+
+### Реальний вивід
+
+`corepack pnpm --dir web/admin test src/pages/AssistantPage.test.tsx` (код 0; .jane/wp22b-unit.txt):
+
+```text
+ RUN  v5.0.2 C:/repos/Jane/.claude/worktrees/wp22b/web/admin
+
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  12:47:46
+   Duration  7.40s (tests 38%, environment 28%, transform 14%, import 12%, setup 7%)
+
+
+```
+
+`corepack pnpm --dir web/admin e2e:real http://127.0.0.1:53723 --project jane-wp22b-admin-20261009 --config=../../.jane/wp22b-edge.config.mts --reporter=list --output=../../.jane/wp22b-real-edge-fixed-results e2e/hybrid-post-m3.spec.ts`:
+
+```text
+e2e: real UI and API via http://127.0.0.1:53723 (tests tagged @mock are skipped)
+
+Running 4 tests using 1 worker
+
+(node:31072) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium] › e2e\hybrid-post-m3.spec.ts:167:3 › remaining post-M3 admin coverage @hybrid › human group note persists; group sample reprocessing sends exact object_ids (15.1s)
+  ok 2 [chromium] › e2e\hybrid-post-m3.spec.ts:201:3 › remaining post-M3 admin coverage @hybrid › run-page manual object_ids and observation_ids select one RAW, excluding the control sample (11.6s)
+  ok 3 [chromium] › e2e\hybrid-post-m3.spec.ts:228:3 › remaining post-M3 admin coverage @hybrid › improvement runs are filtered by package_id and job status against the real assistant (8.7s)
+  ok 4 [chromium] › e2e\hybrid-post-m3.spec.ts:299:3 › remaining post-M3 admin coverage @hybrid › run items show retry_scheduled and its real available_at after an unavailable fake provider (4.6s)
+
+  4 passed (3.3m)
+
+EXIT_CODE=0
+Teardown note: after all four tests reported ok, the stuck Windows Edge worker PID 31072 was terminated; Playwright then printed 4 passed and exited 0.
+
+```
+
+Final typecheck, changed-file ESLint та Prettier check — код 0 (.jane/wp22b-types-final.txt, wp22b-eslint-final.txt, wp22b-prettier-final.txt). Build — код 0 (.jane/wp22b-build.txt), Caddy підтверджено віддавав bundle `index-DkvzG82w.js`. Commit hook: no leaks found, scanned ~20927 bytes (.jane/wp22b-commit.txt).
+
+`python .claude/hooks/jane_wp.py check-diff 2366213` після commit:
+
+```text
+WP-22: 4 changed file(s), 0 outside ownership
+
+```
+
+### Падіння та обмеження
+
+Перший setup мав Caddy placeholder: `just up` зроблено до web-build. Власний proxy перебудовано після build; правильний Caddy html підтверджено, порт став 53723 (.jane/wp22b-proxy-rebuild.txt). Перший runner зупинено (0 completed; wp22b-e2e-first.txt, wp22b-e2e-first-abort.txt).
+
+Chromium channel runner впав у fixture.login `page.goto(/login)` з `net::ERR_ABORTED` (30.8s), тіло сценарію не виконувалось; збережено trace/error-context у wp22b-real-results-retry. Installed Edge дійшов до реальних API; перший scenario впав у новому helper: StoredObject.material.observation_id вкладений (helper виправлено за контрактом і реальною відповіддю). Error-context/trace у wp22b-real-edge-results. Після цього адресний real4 — усі чотири ok.
+
+Windows Edge teardown завис після всіх чотирьох ok; перевірено own worker PID 31072 і його браузер, завершено тільки цей worker. Playwright після цього надрукував 4 passed (3.3m), shell exit 0. Це обмеження локального runner, не штатне завершення браузера; деталі wp22b-browser-teardown.txt і wp22b-worker-teardown.txt. Linux Playwright image pull розпочато як fallback, потім зупинено; жоден browser container не створювався.
+
+Повний локальний just check/e2e і старий real18 не запускались. Структурний real-набір тепер 22, локально виконано лише нові 4; green all22 не стверджується. CI автоматично запущено після push; повний dispatch і приймання — координатор. Реальні LLM/IdP/пошук/AWS/Telegram — не перевірено на реальному сервісі (зовнішній LLM у retry є fake). Contracts не змінювались, compat pass не потрібний.
+
+### Cleanup
+
+`uvx --from rust-just just down -v --project jane-wp22b-admin-20261009` — код 0; контейнерів/томів/мереж цього project залишилось 0 (окремі label-filtered docker listings порожні, wp22b-cleanup-*.txt). Down output у wp22b-down.txt. Чужі puluj-g, jane-wp19 і B-3 проєкти не зачіпались.
+
+### Запити до інших власників
+
+Product/backend defects поза ownership не виявлено. Потрібні незалежний reviewer і CI verdict перед прийманням; full integration CI виконує координатор.
+
+CI snapshot: https://github.com/sql-monk/Jane/actions/runs/37914973286 — in_progress, exact head ffc691423ea16463c1665af177ff7164cca8ee67.

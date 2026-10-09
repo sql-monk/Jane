@@ -43,7 +43,7 @@
 | `unsupported_media_type` | 415 | ні | Непідтримуваний Content-Type |
 | `limit_exceeded` | 422 | ні | Запит перевищує ефективний ліміт або hard cap (`details.limit`, `details.path`) |
 | `rate_limited` | 429 | так | Перевищено частоту; заголовок `Retry-After` |
-| `budget_exhausted` | 429 | ні* | Вичерпано бюджет LLM (*повторювано після нового періоду; `details.period_resets_at`) |
+| `budget_exhausted` | 429 | ні* | Вичерпано бюджет LLM (`details.period`). *Календарне вікно (`day`/`week`/`month`) скидається: повтор має сенс після `details.period_resets_at`. Для `period: run` і `total` вікно не скидається (`period_resets_at` немає): повтор того самого запиту має сенс лише після збільшення бюджету (новий запуск має власне вікно `run`) — як повторна доставка в [handler-packages.md](handler-packages.md) |
 | `secret_detected` | 422 | ні | У пакеті, параметрах чи правилах знайдено схоже на секрет значення |
 | `dependency_not_allowed` | 422 | ні | Залежність пакета відсутня в профілі runtime |
 | `digest_mismatch` | 422 | ні | Дайджест пакета не збігається з очікуваним |

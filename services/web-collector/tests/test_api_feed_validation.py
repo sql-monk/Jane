@@ -1,8 +1,10 @@
 """API feed options that the schema permits must be reported honestly before a collection starts.
 
-The WP-03 strategy is a neighbour of the core and is not present on main yet. A protocol-compatible
-stand-in is registered only to make the type available; these tests exercise the real core validation
-and collection endpoint, and never execute the stand-in strategy.
+WP-02a rejected ``method: POST``/``body`` and ``emit_items_as_materials: true`` (``supported: false``, 422)
+while the core could not execute them. Since WP-16 (R22, ``DiscoveryContext`` 1.1: ``fetch(method="POST",
+body=...)`` and ``emit_material``) the core executes them, so validation reports them as supported and a
+collection with them is accepted. A protocol-compatible stand-in is registered only to make the type
+available here; the strategy itself is tested with the WP-03 package (``strategies/discovery/tests``).
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from jane_web_collector.discovery.builtin import SeedListStrategy
-from jane_web_collector.testing import Site, web_rules
+from jane_web_collector.testing import Site, wait_done, web_rules
 
 
 class AvailableApiFeed(SeedListStrategy):
@@ -50,31 +52,21 @@ def _rules(client: TestClient, site: Site, **options: Any) -> dict[str, Any]:
     ],
     ids=["post", "json-materials", "both"],
 )
-def test_unsupported_api_feed_options_are_rejected_before_collection(
+def test_api_feed_post_and_json_item_options_are_supported(
     client: TestClient, site: Site, options: dict[str, Any], pointers: list[str]
 ) -> None:
     rules = _rules(client, site, **options)
     report = client.post("/v1/rules/validations", json=rules)
     assert report.status_code == 200, report.text
-    body = report.json()
-    assert body["valid"] is True and body["supported"] is False
-    assert body["errors"] == []
-    assert [(w["pointer"], w["code"]) for w in body["warnings"]] == [
-        (pointer, "unsupported_strategy") for pointer in pointers
-    ]
+    assert report.json() == {"valid": True, "supported": True, "errors": [], "warnings": []}
 
     response = client.post(
         "/v1/collections",
         json={"source_kind": "web", "rules": rules},
         headers={"Idempotency-Key": f"api-feed-{'-'.join(pointers)}"},
     )
-    assert response.status_code == 422, response.text
-    problem = response.json()
-    assert problem["code"] == "validation_failed"
-    assert [(e["pointer"], e["code"]) for e in problem["errors"]] == [
-        ("/rules" + pointer, "unsupported_strategy") for pointer in pointers
-    ]
-    assert site.requests == {}
+    assert response.status_code == 202, response.text
+    assert wait_done(client, response.json()["job_id"])["status"] == "succeeded"
 
 
 @pytest.mark.parametrize("options", [{}, {"method": "GET"}], ids=["default", "explicit-get"])

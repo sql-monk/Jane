@@ -77,7 +77,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "mode": { "type": "string", "enum": ["never", "interval", "if_changed"], "default": "never", "description": "if_changed — умовні запити (ETag/If-Modified-Since); інтервал — limits.crawl.revisit_interval_seconds." }
+            "mode": { "type": "string", "enum": ["never", "interval", "if_changed"], "default": "never", "description": "Повторне відвідування URL, відомих з історії state_key, у зборі mode=incremental (у full завантажується все). never — відомі успішні URL не завантажуються (їхні збережені посилання продовжують рекурсію); interval — лише старші за limits.crawl.revisit_interval_seconds; if_changed — умовні запити (ETag/If-Modified-Since), 304 не видається. Для всіх режимів: lastmod кандидата (sitemap з use_lastmod_for_revisit, feed, api_feed з lastmod_path), пізніший за попереднє завантаження URL, змушує завантажити його знову; старіший чи відсутній lastmod не забороняє того, що дозволяє режим. Навігаційні документи (sitemap, стрічки, сторінки API) і сторінки списків listing читаються повністю в кожному зборі; URL, що минулого разу впали (4xx/5xx), пробуються знову." }
           }
         },
         "limits": { "$ref": "common/limits.schema.json", "description": "Рекомендовані ліміти для цього сайту (рівень source, якщо джерело не перевизначило)." }
@@ -197,7 +197,7 @@
         "urls": { "type": "array", "items": { "type": "string", "format": "uri" } },
         "use_robots_txt": { "type": "boolean", "default": true },
         "lastmod_since": { "$ref": "common/defs.schema.json#/$defs/Timestamp", "description": "Пропускати записи з lastmod раніше за цю дату." },
-        "use_lastmod_for_revisit": { "type": "boolean", "default": true }
+        "use_lastmod_for_revisit": { "type": "boolean", "default": true, "description": "Передавати lastmod записів ядру: у зборі mode=incremental запис, чий lastmod пізніший за попереднє завантаження URL, завантажується знову навіть за revisit.mode=never чи до спливання інтервалу (див. WebRules.revisit). false — lastmod sitemap на повторні відвідування не впливає." }
       }
     },
     "FeedStrategy": {
@@ -213,7 +213,7 @@
       }
     },
     "ListingStrategy": {
-      "description": "Сторінки категорій, пагінації або пошуку: із кожної сторінки списку беруться посилання на матеріали та посилання на наступну сторінку.",
+      "description": "Сторінки категорій, пагінації або пошуку: із кожної сторінки списку беруться посилання на матеріали та посилання на наступну сторінку. Сторінки списку, відомі стратегії, читаються повністю в кожному зборі (і в mode=incremental: їх не пропускає revisit і не запитують умовно), щоб знаходити нові елементи; самі елементи підлягають revisit.",
       "allOf": [ { "$ref": "#/$defs/StrategyCommon" } ],
       "type": "object",
       "unevaluatedProperties": false,
@@ -270,7 +270,7 @@
       }
     },
     "ApiFeedStrategy": {
-      "description": "Перелік матеріалів із документованого API або JSON-каналу сайту. Web Collector v1 виконує GET, якщо стратегія api_feed зареєстрована. POST і emit_items_as_materials: true зарезервовані: правила з ними валідні за схемою, але /v1/rules/validations повертає valid: true, supported: false, а запуск збору відхиляється HTTP 422 validation_failed.",
+      "description": "Перелік матеріалів із документованого API або JSON-каналу сайту. Сторінки API — навігаційні документи (через ту саму політику scope/robots/лімітів/бюджету ядра, що й решта запитів). Без emit_items_as_materials URL з url_path кожного елемента пропонуються ядру як кандидати в матеріали; з emit_items_as_materials: true кожен елемент сам видається як Material. Виконується Web Collector з версії контракту стратегій 1.1 (WP-16); раніше POST і emit_items_as_materials давали supported: false.",
       "allOf": [ { "$ref": "#/$defs/StrategyCommon" } ],
       "type": "object",
       "unevaluatedProperties": false,
@@ -278,12 +278,12 @@
       "properties": {
         "type": { "const": "api_feed" },
         "url": { "type": "string", "format": "uri" },
-        "method": { "type": "string", "enum": ["GET", "POST"], "default": "GET", "description": "GET — типовий виконуваний метод. POST зарезервований у Web Collector v1: schema-valid, але supported: false; збір відхиляється validation_failed." },
-        "body": { "description": "JSON-тіло для POST; опція зарезервована разом із POST і не виконується Web Collector v1." },
+        "method": { "type": "string", "enum": ["GET", "POST"], "default": "GET", "description": "Метод запиту сторінок API. POST надсилає body як JSON (Content-Type: application/json) на кожну сторінку; параметри пагінації (cursor_param, page_param) лишаються параметрами запиту URL, next_url_path дає URL наступної сторінки. POST має бути запитом лише на читання: ядро повторює його за тією самою політикою retries, що й GET; переадресація 307/308 повторює POST з тілом, 301/302/303 — продовжує GET без тіла." },
+        "body": { "description": "JSON-тіло для method: POST (будь-яке JSON-значення), однакове для всіх сторінок; для GET не використовується." },
         "items_path": { "type": "string", "description": "JSONPath до масиву елементів, наприклад '$.items'." },
         "url_path": { "type": "string", "description": "JSONPath до URL матеріалу в елементі, наприклад '$.url'." },
         "lastmod_path": { "type": "string" },
-        "emit_items_as_materials": { "type": "boolean", "default": false, "description": "true — зарезервована опція видачі кожного елемента JSON як окремого матеріалу (application/json). Web Collector v1 її не виконує: schema-valid, але supported: false; збір відхиляється validation_failed." },
+        "emit_items_as_materials": { "type": "boolean", "default": false, "description": "true — кожен елемент items_path видається як окремий Material: media_type application/json (елемент, серіалізований як JSON), content_kind json, material_id — від канонічного URL з url_path (той самий об'єкт, що й сторінка за цим URL), edited_at — з lastmod_path, discovery.parent_url — сторінка API, без http і locator.final_url. URL елементів не завантажуються; ядро закріплює їх у зборі, тож інша стратегія не завантажує той самий URL у цьому зборі (один матеріал на канонічний URL). У mode=incremental елементи підлягають revisit і dedup так само, як сторінки (if_changed — за зміною вмісту елемента)." },
         "pagination": {
           "type": "object",
           "additionalProperties": false,

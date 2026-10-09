@@ -925,7 +925,12 @@ components:
           type: boolean
         supported:
           type: boolean
-          description: false — правила валідні за схемою, але ця реалізація колектора не виконує стратегію або її опцію (зокрема api_feed POST чи emit_items_as_materials=true). Попередження містять точні JSON Pointer; запуск збору з такими правилами повертає 422 validation_failed.
+          description: |
+            false — правила валідні за схемою, але ця реалізація колектора не виконує стратегію або її опцію
+            (наприклад llm_explore, незареєстрована стратегія чи правила іншого колектора). Попередження містять
+            точні JSON Pointer (`code: unsupported_strategy`); запуск збору з такими правилами повертає 422
+            validation_failed. Опції api_feed `method: POST` і `emit_items_as_materials: true` Web Collector
+            виконує з WP-16.
         errors:
           type: array
           items:

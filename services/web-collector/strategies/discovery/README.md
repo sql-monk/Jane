@@ -39,9 +39,9 @@
 |---|---|---|
 | `sitemap` | `urls`, `use_robots_txt` (true), `lastmod_since`, `use_lastmod_for_revisit` (true) | `<urlset>`, `<sitemapindex>` (вкладені індекси), gzip (за сигнатурою, напр. `.gz` як `application/gzip`), текстові sitemap (URL на рядок), RSS/Atom як sitemap. Без `urls`: рядки `Sitemap:` у `/robots.txt` кожного origin правил (origin — з явних URL стратегій правил, інакше `scope.allowed_domains` з першою дозволеною схемою), а якщо їх немає (або `use_robots_txt=false`) — `/sitemap.xml`. `lastmod_since` пропускає записи зі старішим `lastmod` (записи без нього лишаються); `use_lastmod_for_revisit` передає `lastmod` ядру в кандидаті |
 | `feed` | `urls`, `autodiscover` (true) | RSS 2.0, RSS 1.0 (RDF), Atom; посилання запису: RSS `link` → `guid isPermaLink` → `rdf:about`, Atom `link rel=alternate` з урахуванням `xml:base`; `lastmod` — `atom:updated`/`dc:date`/`pubDate` або `updated`/`published`. `autodiscover`: `<link rel="alternate" type="application/rss+xml\|atom+xml\|rdf+xml">` на HTML-сторінці з `urls` і на всіх HTML-сторінках глибини 0, отриманих іншими стратегіями (seed-сторінки) |
-| `listing` | `start_urls`, `item_links`, `next_page`, `page_param` (`name`, `start`=1, `step`=1, `stop_when_empty`=true), `search` (`url_template` з `{query}`, `queries`) | Стартові сторінки = `start_urls` + сторінки пошуку для кожного запиту. З кожної сторінки списку (отриманої будь-якою стратегією): посилання `item_links` (без нього — усі `a[href]`, крім пагінації й самої сторінки) і наступна сторінка — через `page_param`, якщо задано, інакше `next_page` (типово `rel=next`). Ланцюжок зупиняється на не-2xx, на порожній сторінці (`stop_when_empty`), на повторі елементів попередньої сторінки й на глибині |
+| `listing` | `start_urls`, `item_links`, `next_page`, `page_param` (`name`, `start`=1, `step`=1, `stop_when_empty`=true), `search` (`url_template` з `{query}`, `queries`) | Стартові сторінки = `start_urls` + сторінки пошуку для кожного запиту. З кожної сторінки списку (отриманої будь-якою стратегією): посилання `item_links` (без нього — усі `a[href]`, крім пагінації й самої сторінки) і наступна сторінка — через `page_param`, якщо задано, інакше `next_page` (типово `rel=next`). Ланцюжок зупиняється на не-2xx, на порожній сторінці (`stop_when_empty`), на повторі елементів попередньої сторінки й на глибині. Відомі сторінки списку читаються повністю в кожному зборі, також в `incremental` (`refresh_on_revisit`, R23) |
 | `url_template` | `template` (RFC 6570, рівень 1), `variables` (`range` або `values`), `stop_after_consecutive_misses` | Змінні комбінуються в порядку появи в шаблоні (остання змінюється найшвидше), значення кодуються за RFC 6570. Без `stop_after_consecutive_misses` — усі URL одразу в чергу ядра (паралельно). З ним — послідовно через `ctx.fetch` (як матеріали): найглибша змінна зупиняється після N поспіль 404/410 і починається наступне значення зовнішніх змінних; інші помилки й відмови промахами не вважаються |
-| `api_feed` | `url`, `items_path`, `url_path`, `lastmod_path`, `pagination` (`none`, `next_url` + `next_url_path`, `cursor` + `cursor_path` + `cursor_param`, `page` + `page_param`) | Сторінки API (GET) — навігаційні документи; `url_path` кожного елемента — кандидат у матеріали (відносні URL — від адреси сторінки). Пагінація зупиняється без наступної сторінки, на повторі URL чи курсора, на сторінці без нових елементів, на не-2xx або не-JSON і на глибині. `method: POST` і `emit_items_as_materials: true` ядро v1 виконати не може — валідація повертає `supported: false`, а запит на збір отримує 422 до запуску job (див. «Відомі обмеження») |
+| `api_feed` | `url`, `method` (`GET`/`POST`), `body`, `items_path`, `url_path`, `lastmod_path`, `emit_items_as_materials`, `pagination` (`none`, `next_url` + `next_url_path`, `cursor` + `cursor_path` + `cursor_param`, `page` + `page_param`) | Сторінки API — навігаційні документи (GET або POST з `body` як JSON на кожну сторінку; параметри пагінації лишаються в URL); `url_path` кожного елемента — кандидат у матеріали (відносні URL — від адреси сторінки), а з `emit_items_as_materials: true` кожен елемент сам стає Material (`application/json`, без завантаження його URL; `edited_at` з `lastmod_path`). Пагінація зупиняється без наступної сторінки, на повторі URL чи курсора, на сторінці без нових елементів, на не-2xx або не-JSON і на глибині (R22) |
 
 JSONPath (`api_feed`) — підмножина без залежностей: `$`/`@`, `.name`, `['name']`, `[n]` (зокрема від'ємні),
 `[*]`, `.*`, `..name`, `..*`; шлях без `$` — від кореня (`items` = `$.items`). Фільтри, зрізи й об'єднання —
@@ -126,14 +126,12 @@ uv run --all-packages pytest services/web-collector/strategies # лише WP-03,
 
 ## Відомі обмеження
 
-- `api_feed`: `method: POST` (тіло запиту) і `emit_items_as_materials` потребують розширення `DiscoveryContext`
-  (запит до WP-00/WP-02). WP-02a повертає для цих schema-valid опцій `valid: true, supported: false` з точним
-  pointer; `POST /v1/collections` відповідає 422 до запуску job.
-- `use_lastmod_for_revisit`: `lastmod` передається ядру в кандидаті, але ядро v1 не використовує його для
-  рішення про повторне відвідування (запит до WP-02).
-- `listing` в `incremental`-зборі: відомі сторінки списків ядро пропускає (`revisit.mode=never`) або отримує
-  304 (`if_changed`) і не викликає `on_fetched`, тож нові елементи списку знаходить лише `recursive` (він
-  отримує збережені посилання). Повний збір (`mode=full`) не має цього обмеження.
+- `api_feed` з `method: POST`: ядро повторює запит за політикою `retries`, як GET, тож це має бути запит лише на
+  читання; параметри пагінації не переносяться в `body` (воно однакове для всіх сторінок).
+- `api_feed` з `emit_items_as_materials`: якщо URL елемента в цьому зборі вже отримала чи видала інша стратегія,
+  елемент не видається (один матеріал на канонічний URL; `stats.duplicates`).
+- `lastmod` лише **змушує** повторне відвідування (пізніший за попереднє завантаження); сайт із завжди «свіжим»
+  `lastmod` змусить перечитувати свої сторінки в кожному зборі (обмежено бюджетами).
 - Якщо сторінку списку інша стратегія отримала ще **до** того, як `listing` дізнався про неї (посилання
   `rel=next` з попередньої сторінки), ланцюжок на ній обривається: ядро не повертає вже отриманий ресурс.
   У комбінації з `recursive` посилання все одно обходяться.

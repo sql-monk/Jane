@@ -196,6 +196,11 @@ JANE_WEB_COLLECTOR_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 hex к�
   спостереження); `mode=incremental` + `revisit.mode=never` — відомі успішні URL не завантажуються (їхні збережені
   посилання продовжують обхід), `interval` — лише старші за `revisit_interval_seconds`, `if_changed` — умовні
   запити (ETag / If-Modified-Since), 304 не видається. URL, що минулого разу впали (4xx/5xx), пробуються знову.
+  `lastmod` кандидата (sitemap з `use_lastmod_for_revisit`, стрічка, `api_feed` з `lastmod_path`), пізніший за
+  попереднє завантаження URL, змушує завантажити його попри `never`/`interval` (лічильник `revisited_by_lastmod`);
+  старіший чи відсутній `lastmod` нічого не забороняє (R23). Навігаційні документи стратегій і сторінки списків
+  `listing` (хук `RefreshingStrategy`) читаються повністю в кожному зборі — без пропуску й без умовного запиту
+  (лічильник `refreshed`), тож нові елементи відомих категорій знаходяться в `incremental`.
 - **Тайм-аути** `timeouts.connect_timeout_ms` / `request_timeout_ms` застосовуються до кожного запиту з ефективних
   лімітів збору (з урахуванням `rules.limits`, `limits` запиту і `limits` стратегії), а не з платформних типових.
 - **Видача**: `GET /v1/collections/{id}/materials?after=<cursor>` підтверджує все до курсора включно
@@ -261,13 +266,25 @@ IPv4, вкладена в IPv6 (`::ffff:a.b.c.d`, NAT64 `64:ff9b::/96`, 6to4 `20
 
 Що дає ядро стратегії (`StrategyContext`, реалізує `DiscoveryContext`):
 
-- `ctx.fetch(url, kind=..., conditional=True)` — через ті самі scope, robots, ліміти, переадресації й бюджет.
-  Повертає `FetchedResource` (зокрема з 4xx-статусом — корисно для `url_template`), `None` для 304, для URL, уже
-  отриманого в цьому процесі, або для вже виданого матеріалу; `FetchRejected` — `out_of_scope`,
-  `access_denied_by_policy`, `limit_exceeded`. Ресурс, отриманий через `ctx.fetch`, передається в `on_fetched`
-  усіх **інших** стратегій. Навігаційні документи після рестарту можна отримати знову (стан — у `snapshot()`).
-- `on_fetched` викликається для кожної HTTP-відповіді з черги (будь-який статус; `resource.strategy_id` — хто
-  запропонував URL). Кандидати з `on_fetched` отримують `depth = resource.depth + 1`.
+- `ctx.fetch(url, kind=..., conditional=True, method="GET", body=None)` — через ті самі scope, robots, політику
+  адрес, ліміти на хост (спільні з усіма зборами, fetch і екземплярами зі спільним сховищем), повтори,
+  переадресації, розмір і бюджет збору; тайм-аути — з `limits` стратегії (повна таблиця — в
+  [`discovery-strategy.md`](../../contracts/docs/discovery-strategy.md), R03). Повертає `FetchedResource` з будь-яким
+  кінцевим статусом, крім 304 (зокрема 4xx — корисно для `url_template`); `None` — 304, URL уже отримано в цьому
+  процесі для збору або вже виданий матеріал, переадресація на відомий URL, збій після повторів (помилка — в
+  `/errors`); `FetchRejected` — `out_of_scope`, `access_denied_by_policy` (robots, політика адрес),
+  `limit_exceeded` (бюджет), `rate_limited` (джерело просить чекати довше за `collector.max_retry_after_seconds`
+  або 429 після повторів). `method="POST"` з JSON `body` — лише для `kind="navigation"` (сторінки API, R22).
+  Ресурс, отриманий через `ctx.fetch`, передається в `on_fetched` усіх **інших** стратегій. Навігаційні документи
+  після рестарту можна отримати знову (стан — у `snapshot()`).
+- `await ctx.emit_material(DiscoveredMaterial(...))` — вміст, який стратегія вже має (елемент JSON API), стає
+  Material за правилами сторінки: scope, глибина, один матеріал на канонічний URL у зборі, `revisit`/`dedup`,
+  backpressure (R22).
+- `on_fetched` викликається для кожної HTTP-відповіді з тілом, хай який статус (2xx, 4xx, 5xx без повторів;
+  `resource.strategy_id` — хто запропонував URL), але не для 304, пропущених `revisit`, дублікатів і збоїв.
+  Кандидати з `on_fetched` отримують `depth = resource.depth + 1`.
+- Необов'язковий хук `refresh_on_revisit(url) -> bool` (`RefreshingStrategy`): сторінка, з якої стратегія бере нові
+  матеріали, читається повністю в кожному зборі (так робить `listing`, R23).
 - `ctx.extract_links(resource, LinkSelector(...))` — css / xpath / rel через lxml (залежності `lxml`, `cssselect`
   уже є); `ctx.normalize`, `ctx.in_scope`, `ctx.section_for`, `ctx.limits` (ефективні, з `limits` стратегії),
   `ctx.is_cancelled()`.

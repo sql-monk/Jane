@@ -23,11 +23,14 @@ from typing import Any
 import httpx
 
 from jane_contracts.discovery import (
+    DiscoveredMaterial,
     DiscoveredUrl,
     DiscoveryStrategy,
     FetchedResource,
     FetchRejected,
+    HttpMethod,
     LinkSelector,
+    RefreshingStrategy,
     UrlKind,
 )
 from jane_kit.config import LimitLayer, ResolvedLimits
@@ -38,7 +41,15 @@ from .discovery.links import extract_hrefs, html_meta, is_html, parse_html
 from .discovery.registry import Registry
 from .fetcher import Fetcher, FetchError, HttpResult
 from .host_limits import HostLimiter
-from .materials import Delivery, MaterialTooLarge, TransitStore, build_material, new_observation_id, rfc3339
+from .materials import (
+    Delivery,
+    MaterialTooLarge,
+    TransitStore,
+    build_item_material,
+    build_material,
+    new_observation_id,
+    rfc3339,
+)
 from .robots import RobotsCache
 from .settings import ServiceLimits, to_contract
 from .state import FrontierRow, LeaseLost, StateStore
@@ -48,6 +59,8 @@ __all__ = ["NOT_FOUND_STATUSES", "CrawlRun", "LeaseLost", "RunDeps", "StrategyCo
 
 NOT_FOUND_STATUSES = frozenset({404, 410})
 """Source answers that mean "no such material": ``not_found`` in collection errors and in ``POST /v1/fetches``."""
+STRATEGY_REFUSALS = frozenset({"access_denied_by_policy", "rate_limited"})
+"""Fetch failures that ``DiscoveryContext.fetch`` raises as ``FetchRejected`` (the rest return ``None``)."""
 
 log = logging.getLogger(__name__)
 
@@ -116,11 +129,20 @@ class StrategyContext:
         self.log = logging.getLogger(f"jane_web_collector.strategy.{strategy_id}")
 
     async def fetch(
-        self, url: str, *, kind: UrlKind = "navigation", conditional: bool = True
+        self,
+        url: str,
+        *,
+        kind: UrlKind = "navigation",
+        conditional: bool = True,
+        method: HttpMethod = "GET",
+        body: Any = None,
     ) -> FetchedResource | None:
         return await self._run.fetch_for_strategy(
-            url, kind=kind, conditional=conditional, caller=self.strategy_id
+            url, kind=kind, conditional=conditional, caller=self.strategy_id, method=method, body=body
         )
+
+    async def emit_material(self, item: DiscoveredMaterial) -> bool:
+        return await self._run.emit_for_strategy(item, caller=self.strategy_id)
 
     def normalize(self, url: str, base: str | None = None) -> str:
         normalized = self._run.normalizer.normalize(url, base)
@@ -449,17 +471,42 @@ class CrawlRun:
             )
         return out
 
-    def _revisit_skip(self, prev: Mapping[str, Any] | None) -> bool:
+    def _revisit_skip(self, prev: Mapping[str, Any] | None, lastmod: str | None = None) -> bool:
+        """``incremental``: a URL known from the history of the ``state_key`` that ``revisit`` lets rest. A
+        ``lastmod`` of the candidate later than the previous fetch overrides that (the source says the URL changed
+        since); it never prevents a fetch ``revisit`` allows (R23)."""
         if self.mode != "incremental" or prev is None or not (prev.get("status") or 0) < 400:
             return False
         if self.revisit_mode == "never":
-            return True
-        if self.revisit_mode == "interval":
-            return time.time() - float(prev["fetched_at"]) < self.limits.crawl.revisit_interval_seconds
+            skip = True
+        elif self.revisit_mode == "interval":
+            skip = time.time() - float(prev["fetched_at"]) < self.limits.crawl.revisit_interval_seconds
+        else:
+            skip = False
+        if skip and _changed_after(lastmod, float(prev["fetched_at"])):
+            self.counters["revisited_by_lastmod"] = self.counters.get("revisited_by_lastmod", 0) + 1
+            return False
+        return skip
+
+    def _wants_refresh(self, url: str) -> bool:
+        """A strategy finds new materials on this page (``RefreshingStrategy``: listing pages): fetch it in full."""
+        for _, strategy, _, _ in self.strategies:
+            if isinstance(strategy, RefreshingStrategy):
+                try:
+                    if strategy.refresh_on_revisit(url):
+                        return True
+                except Exception:
+                    log.exception("strategy refresh_on_revisit failed", extra={"url": url})
         return False
 
     async def handle(
-        self, row: FrontierRow, *, caller: str | None = None, conditional: bool = True
+        self,
+        row: FrontierRow,
+        *,
+        caller: str | None = None,
+        conditional: bool = True,
+        method: str = "GET",
+        json_body: bytes | None = None,
     ) -> FetchedResource | None:
         """Fetch and process one admitted URL. Returns the resource (for ``ctx.fetch``) or ``None``."""
         url = row.url
@@ -478,7 +525,10 @@ class CrawlRun:
                 raise FetchRejected("access_denied_by_policy", f"{url}: disallowed by robots.txt")
             return None
         prev = self.state.url_state(self.state_key, url)
-        if caller is None and self._revisit_skip(prev):
+        refresh = self._wants_refresh(url)
+        if refresh and prev is not None:
+            self.counters["refreshed"] = self.counters.get("refreshed", 0) + 1
+        if caller is None and not refresh and self._revisit_skip(prev, row.lastmod):
             assert prev is not None
             with self._tx() as db:
                 self.stats["not_modified"] += 1
@@ -487,7 +537,7 @@ class CrawlRun:
                 self._persist(db)
             return None
         cond: dict[str, str] = {}
-        if prev and conditional and (self.revisit_mode == "if_changed" or caller is not None):
+        if prev and conditional and not refresh and (self.revisit_mode == "if_changed" or caller is not None):
             if prev.get("etag"):
                 cond["If-None-Match"] = prev["etag"]
             if prev.get("last_modified"):
@@ -519,7 +569,9 @@ class CrawlRun:
 
         try:
             timeouts = self.strategy_limits.get(row.strategy_id or "", self.limits).timeouts
-            result = await self.fetcher.get(url, check_hop=hop, conditional=cond, timeouts=timeouts)
+            result = await self.fetcher.get(
+                url, check_hop=hop, conditional=cond, timeouts=timeouts, method=method, json_body=json_body
+            )
         except RedirectDuplicate as dup:
             with self._tx() as db:
                 self.stats["fetched"] += 1
@@ -565,6 +617,9 @@ class CrawlRun:
                 )
                 self.state.mark_url(db, self.collection_id, url, "failed")
                 self._persist(db)
+            if caller is not None and exc.code in STRATEGY_REFUSALS:
+                # DiscoveryContext.fetch: a policy refusal or "the source asks to wait too long" (R03)
+                raise FetchRejected(exc.code, exc.message) from None
             return None
         return await self._process_result(row, result, prev, caller, claimed)
 
@@ -749,8 +804,23 @@ class CrawlRun:
         return out
 
     async def fetch_for_strategy(
-        self, url: str, *, kind: UrlKind, conditional: bool, caller: str
+        self,
+        url: str,
+        *,
+        kind: UrlKind,
+        conditional: bool,
+        caller: str,
+        method: str = "GET",
+        body: Any = None,
     ) -> FetchedResource | None:
+        method = method.upper()
+        if method not in {"GET", "POST"}:
+            raise ValueError(f"DiscoveryContext.fetch: method must be GET or POST, not {method!r}")
+        if method == "POST" and kind != "navigation":
+            raise ValueError("DiscoveryContext.fetch: POST is allowed for navigation documents only")
+        json_body = None
+        if method == "POST":
+            json_body = b"" if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
         canonical = self.normalizer.normalize(url)
         if canonical is None:
             raise FetchRejected("out_of_scope", f"not an HTTP(S) URL: {url}")
@@ -770,7 +840,108 @@ class CrawlRun:
         if budget := self._budget_left():
             raise FetchRejected("limit_exceeded", f"{budget} reached")
         row = FrontierRow(canonical, 0, 0, kind, caller, None, self.section_for(canonical))
-        return await self.handle(row, caller=caller, conditional=conditional)
+        return await self.handle(
+            row,
+            caller=caller,
+            conditional=conditional and method == "GET",
+            method=method,
+            json_body=json_body,
+        )
+
+    async def emit_for_strategy(self, item: DiscoveredMaterial, *, caller: str) -> bool:
+        """``DiscoveryContext.emit_material``: content a strategy already has (an API item) as a Material, under
+        the rules of a fetched page - scope, depth, one material per canonical URL in the collection, ``revisit``
+        and ``dedup`` against the URL history, backpressure, one fenced transaction (R22)."""
+        url = self.normalizer.normalize(item.url, item.parent_url)
+        if url is None:
+            return False
+        if self.scope_reason(url):
+            self.stats["skipped_out_of_scope"] += 1
+            return False
+        if item.depth > self._strategy_depth(caller):
+            self.counters["skipped_depth"] = self.counters.get("skipped_depth", 0) + 1
+            return False
+        lastmod = item.lastmod.isoformat() if item.lastmod else None
+        strat_priority, forced_section = self._strategy_priority(caller)
+        row = FrontierRow(
+            url=url,
+            priority=self.rule_priority(url) + strat_priority,
+            depth=item.depth,
+            kind="material",
+            strategy_id=caller,
+            parent_url=item.parent_url,
+            section=forced_section or item.section or self.section_for(url),
+            lastmod=lastmod,
+        )
+        content_sha = resource_sha(item.body)
+        prev = self.state.url_state(self.state_key, url)
+        unchanged = prev is not None and prev.get("content_sha256") == content_sha
+        rests = self._revisit_skip(prev, lastmod) or (
+            self.mode == "incremental" and self.revisit_mode == "if_changed" and unchanged
+        )
+        material: dict[str, Any] | None = None
+        error: str | None = None
+        if not rests and (self.dedup_key == "canonical_url" or not unchanged):
+            try:
+                material = build_item_material(
+                    item.body,
+                    media_type=item.media_type,
+                    url=url,
+                    canonical_url=url,
+                    fetched_at=item.fetched_at,
+                    observation_id=new_observation_id(),
+                    source_id=self.source_id,
+                    delivery=self.delivery,
+                    collector_version=self.deps.version,
+                    collection_id=self.collection_id,
+                    rules_ref=self.rules_ref,
+                    discovery={
+                        "strategy": self._strategy_type(caller),
+                        "parent_url": item.parent_url,
+                        "depth": item.depth,
+                        "section": row.section,
+                        "priority": row.priority,
+                    },
+                    edited_at=item.lastmod,
+                )
+            except MaterialTooLarge as exc:
+                error = str(exc)
+        async with self._material_commit_lock:
+            if material is not None:
+                await self._wait_backpressure()
+            if self.cancelled:
+                raise JobCancelledError(self.collection_id)
+            with self._tx() as db:
+                existing = self.state.frontier_row(self.collection_id, url)
+                if existing is not None and existing["status"] != "pending":
+                    self.stats["duplicates"] += 1  # the URL is (being) fetched or emitted in this collection
+                    self._persist(db)
+                    return False
+                if existing is None:
+                    self.insert_rows(db, [row])
+                done = material is not None or error is not None
+                self.state.mark_url(db, self.collection_id, url, "done" if done else "unchanged")
+                if error is not None:
+                    self._error(db, url, "limit_exceeded", error)
+                elif material is None:
+                    self.stats["not_modified"] += 1
+                if material is None:
+                    self._persist(db)
+                    return False
+                self.state.append_material(db, self.collection_id, material["observation_id"], material)
+                self.stats["emitted"] += 1
+                self.state.put_url_state(
+                    db,
+                    self.state_key,
+                    url,
+                    status=None,
+                    etag=None,
+                    last_modified=None,
+                    content_sha256=content_sha,
+                    links=None,
+                )
+                self._persist(db)
+        return True
 
     # ------------------------------------------------------------------ run
     def _build_strategies(self) -> None:
@@ -950,3 +1121,16 @@ class CrawlRun:
 
 def resource_sha(body: bytes) -> str:
     return hashlib.sha256(body).hexdigest()
+
+
+def _changed_after(lastmod: str | None, fetched_at: float) -> bool:
+    """The candidate's ``lastmod`` (ISO 8601; naive = UTC) is later than the previous fetch (epoch seconds)."""
+    if not lastmod:
+        return False
+    try:
+        when = datetime.fromisoformat(lastmod)
+    except ValueError:
+        return False
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=UTC)
+    return when.timestamp() > fetched_at

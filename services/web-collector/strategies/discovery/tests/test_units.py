@@ -329,13 +329,17 @@ def test_api_pagination_rules(discovery: ModuleType) -> None:
     assert items({"other": 1}) == []
 
 
-def test_api_feed_configs_the_core_cannot_execute(discovery: ModuleType) -> None:
+def test_api_feed_configs(discovery: ModuleType) -> None:
+    """POST with a body and JSON items as materials are executed since WP-16 (R22, ``DiscoveryContext`` 1.1);
+    a method the schema does not know and an incomplete pagination are still configuration errors."""
     unsupported = discovery.api_feed.UnsupportedConfig
     base = {"url": "https://x.test/api", "items_path": "$.items", "url_path": "$.url"}
-    with pytest.raises(unsupported, match="POST"):
-        discovery.api_feed.ApiFeedStrategy({**base, "method": "POST", "body": {"q": 1}}, "api")
-    with pytest.raises(unsupported, match="emit_items_as_materials"):
-        discovery.api_feed.ApiFeedStrategy({**base, "emit_items_as_materials": True}, "api")
+    post = discovery.api_feed.ApiFeedStrategy({**base, "method": "POST", "body": {"q": 1}}, "api")
+    assert (post.method, post.body, post.emit_items) == ("POST", {"q": 1}, False)
+    items = discovery.api_feed.ApiFeedStrategy({**base, "emit_items_as_materials": True}, "api")
+    assert (items.method, items.body, items.emit_items) == ("GET", None, True)
+    with pytest.raises(unsupported, match="PUT"):
+        discovery.api_feed.ApiFeedStrategy({**base, "method": "PUT"}, "api")
     with pytest.raises(ValueError, match="cursor_param"):
         discovery.api_feed.ApiFeedStrategy(
             {**base, "pagination": {"type": "cursor", "cursor_path": "$.c"}}, "api"

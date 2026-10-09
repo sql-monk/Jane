@@ -17,12 +17,12 @@ Checkout координатора для злиттів — `.claude/worktrees/i
 | Завдання | Гілка / worktree | Стан |
 |---|---|---|
 | C-1: CI й документація | `wp/23a-developer-docs`, `wp23a` | прийнято й запушено, merge `a5b1563` |
-| C-2: contracts/python у workspace | `wp/23b-contracts-workspace`, `wp23b` | прийнято й запушено, merge `fdad210`; фінальний CI очікується |
+| C-2: contracts/python у workspace | `wp/23b-contracts-workspace`, `wp23b` | прийнято й запушено, merge `fdad210`; фінальний CI success |
 | C-3: формат Python-контрактів | `wp/23c-contracts-format`, `wp23c` | прийнято й запушено, merge `0dc2ded` |
-| C-4: прибирання | `.jane/cleanup-post-m3.ps1` | останнім: після WP-19, завершення B і фінального CI C |
+| C-4: прибирання | `wp/23d-cleanup-safety`, `wp23d` | active: окремий виконавець готує ignored копію; review / Apply ще не було |
 
-Поточний фінальний CI C: **dispatch count 1**, run **37942655574**, SHA `133bb5a`; результат очікується.
-C-4 ще не починався. Нижчі записи count 0 — історичні знімки до цього dispatch.
+Поточний фінальний CI C: **dispatch count 1**, run **37942655574**, SHA `133bb5a`; **success, 14/14 jobs**.
+C-4 виконується. Нижчі записи count 0 / C-4 not_started — історичні знімки до поточного стану.
 
 ## C-1: факти й перевірки
 
@@ -316,3 +316,53 @@ actual SHA рівний expected SHA. ID/URL, dispatch exit/time та метад
 **Це один фінальний dispatch C, verdict ще не отримано.** Продовжувати саме цей run;
 невідомий результат спершу шукати в gh, жодного дублюючого dispatch.
 Локальні full check/e2e не запускались. C-4 і застосування cleanup — лише після actual success цього run.
+
+## Фінальний CI C — success; C-4 відкрито
+
+2026-10-09 17:52 (Київ): actual `gh run view`
+[37942655574](https://github.com/sql-monk/Jane/actions/runs/37942655574) для точного SHA
+`133bb5a0604ccbc3ce41a820216d4751f301a47b`: **completed / success**, завершено
+`2026-10-09T14:48:22Z`. Усі 14 jobs success, жодного повторного dispatch/rerun.
+Повний JSON зі steps — `.jane/stream-c-full-ci-37942655574.json`; actual log —
+`.jane/stream-c-final-ci-log.txt` у `integ-c`.
+
+| Job | Фактичний підсумок | Job ID |
+|---|---|---|
+| lint | success; Ruff pass, 484 formatted, 22 mypy sessions включно з Protocol 3 files | 113860750407 |
+| contracts-compat | success; oasdiff 0 breaking, 0 warnings | 113860750736 |
+| unit | success; 1137 passed / 5 skipped, offline examples/profiles 93 passed | 113861103865 |
+| web | success; lint/typecheck/build, 11 test files / 58 tests passed | 113861103879 |
+| web-mock-e2e | success; 38 passed / 19 skipped | 113861103864 |
+| contract | success; 109 passed / 3 skipped | 113863733795 |
+| isolation | success; 7 passed | 113863733908 |
+| stack | success; integration 300 passed | 113864180048 |
+| limits | success; ci profile verdict pass | 113864180160 |
+| adapters (mongodb) | success; 22 passed | 113864180116 |
+| adapters (s3) | success; 27 passed / 10 skipped | 113864180246 |
+| adapters (minio) | success; 17 passed | 113864180360 |
+| adapters (sqlserver) | success; 17 passed | 113864180378 |
+| e2e | success; 79 passed, без skips, 1550.96s | 113864180122 |
+
+Межі: unit skips — git/gitleaks відсутні в runner; contract skips — PostgreSQL LLM dev-stack
+та template contract. S3 job пропустив 10 parametrized MinIO recovery cases через відсутній
+MinIO у його dev-stack; окремий MinIO job пройшов 17 тестів. Admin job виконує mock-регресію,
+19 real/hybrid тестів пропущено; повний browser real22 не оголошено перевіреним.
+Зовнішні LLM/IdP/AWS/Telegram — не перевірено на реальному сервісі;
+dev-laptop/single-node виключені з обсягу. Наявні FastAPI warnings і runner Node20 deprecation
+не приховано. Локальні повні набори не повторювались.
+
+C-2/C-3 мають незалежне приймання та повний exact-SHA CI; зовнішні запити storage/Telegram
+закриті їхніми власниками. Origin B `cbe8653` підтверджує закриття B-1…B-5 та final B 14/14;
+WP-19 marker `ee78fc5` і WP-19b `88ec168` є в integration. Гейт C-4 відкрито.
+
+Окремий автор `c4_cleanup`: checkout `C:/repos/Jane/.claude/worktrees/wp23d`, branch
+`wp/23d-cleanup-safety`, база `40272ca38941e45a7284fb7635748fba48301358`, `.jane-wp = 23`.
+Власність — власна ignored `.jane/cleanup-post-m3.ps1`, власні перевірки/logs `.jane/`, tracked
+звіт `docs/delivery/WP-23/c4-cleanup.md`; журнал веде лише координатор.
+До worktree скопійовано людський оригінал SHA256
+`5D54EC5CAFA78D6BE0D9BC357601190CA7D05BBD3ADEF7F18FA4E014DCE6B78F`.
+Людський скрипт ще не змінено, реального dry-run/-Apply ще не було.
+Автор готує захист active/checked-out refs, immutable local+origin archive tags, Git exit checks,
+bounds/reparse/orphan safeguards і збереження .jane; до застосування — незалежний reviewer ≤2 раунди.
+Force-with-lease також не використовується: для remote race потрібен no-force CAS guard або
+refs залишаються з явною причиною. Код кандидата й fixture checks ще не прийняті.

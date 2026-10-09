@@ -128,6 +128,29 @@ def test_older_storage_json_raw_gives_the_original_not_the_wrapper(
     _original(_read(w, "obj_old"))
 
 
+def test_large_html_in_storage_without_blob_uri_comes_as_a_transit_reference(
+    w: World, mat: dict[str, Any]
+) -> None:
+    """WP-19 (R18, WP-15 review): storage now keeps ``material`` for a RAW over its inline limit in an adapter without
+    a blob URI (PostgreSQL) and gives the content as its transit blob; the assistant takes the original bytes from
+    ``getObjectContent`` - no ``not_implemented`` any more."""
+    data = HTML.encode()
+    transit = {
+        "kind": "blob",
+        "uri": "file:///var/lib/jane/storage/transit/storage/2026/10/09/obj_pg-0123.html",
+        "media_type": "text/html",
+        "size_bytes": len(data),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "store": "transit",
+        "expires_at": "2026-10-16T12:00:00Z",
+    }
+    w.storage.put_object("obj_pg", _meta(mat, transit), data, "text/html")
+    got = _read(w, "obj_pg")
+    _original(got)
+    assert got["material_id"] == mat["material_id"]
+    assert len(w.storage.app.called("getObjectContent")) == 1
+
+
 def test_object_without_material_and_not_a_material_document_is_a_clear_error(w: World) -> None:
     w.storage.put_object("obj_plain", None, HTML.encode(), "text/html")
     with pytest.raises(JaneError) as exc:

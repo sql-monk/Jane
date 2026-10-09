@@ -265,8 +265,9 @@ class StorageClient(_Base):
     async def material(self, connection_id: str, object_id: str) -> dict[str, Any]:
         """Material of a stored RAW object with its **original** content inline (UTF-8 text or base64).
 
-        ``getObject`` gives the Material with its content either inline or by reference, or (for content over
-        storage's inline limit) no ``material`` at all. A RAW stored with ``format.raw = json`` is the Material
+        ``getObject`` gives the Material with its content either inline or by reference (a persistent URI of the
+        adapter or, for content over storage's inline limit without one, storage's transit blob - R18), or, when
+        storage has no transit store, no ``material`` at all. A RAW stored with ``format.raw = json`` is the Material
         document itself (original content inside it), so its object bytes are not the original content:
 
         * ``material.content`` inline and not such a document -> taken as is (the original content);

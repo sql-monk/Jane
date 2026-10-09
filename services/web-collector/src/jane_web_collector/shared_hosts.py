@@ -10,9 +10,10 @@ schedule of every host into the shared state store, so the host sees one polite 
   instance;
 * **parallelism** (``host_slots``): at most the smallest registered ``max_parallel_fetches_per_host`` requests
   of all instances are in flight;
-* **fairness** (``host_waiters``): requests that wait for a slot queue in arrival order across the instances; a
-  waiting request re-checks every ``collector.shared_host_poll_ms`` and takes a slot only when no older waiter is
-  ahead of it for the free slots, so a busy instance cannot starve another one;
+* **fairness** (``host_waiters``): requests that wait queue in arrival order across the instances and start strictly
+  in that order - a waiting request re-checks every ``collector.shared_host_poll_ms`` (the first one sleeps until
+  the schedule allows its start) and takes a slot only when it is first in line, so a busy instance cannot starve
+  another one, not even by arriving exactly when the first waiter's interval ends;
 * **request starts** (``host_schedule``): a request takes its slot only when it may start at once - the largest
   registered interval after the previous start of any instance has passed, and so has ``Retry-After``; the first
   request in line sleeps until then **without** a slot. A slot is held only while the request is in flight;

@@ -695,9 +695,9 @@ class StateStore:
         """One attempt of request ``token`` to start on ``host`` for the whole platform (R15), in one transaction.
 
         Registers (renews) the limits of ``instance_id`` on the host and queues the request in arrival order
-        (``host_waiters``). The request takes a slot only when it may start **now**: fewer requests than the
-        smallest registered parallelism are in flight, no older waiter is ahead of it for the free slots, and the
-        schedule allows a start - the largest registered interval after the previous start of any instance has
+        (``host_waiters``). The request takes a slot only when it may start **now**: it is first in line (starts go
+        strictly in arrival order: a younger request never takes the start the first one waits for), fewer requests
+        than the smallest registered parallelism are in flight, and the schedule allows a start - the largest registered interval after the previous start of any instance has
         passed, and so has a ``Retry-After``. A slot is thus never held while waiting (review 1 of WP-16).
 
         Returns ``(True, 0.0)`` when the slot is taken (the start is recorded as now), ``(False, seconds)`` when the
@@ -735,7 +735,9 @@ class StateStore:
                 db.execute("SELECT MIN(parallel) FROM host_users WHERE host = ?", (host,)).fetchone()[0]
             )
             busy = int(db.execute("SELECT COUNT(*) FROM host_slots WHERE host = ?", (host,)).fetchone()[0])
-            if busy + ahead >= allowed:
+            if (
+                ahead or busy >= allowed
+            ):  # strictly first come, first served: no younger request takes a start
                 return False, 0.0
             interval_s = float(
                 db.execute("SELECT MAX(interval_s) FROM host_users WHERE host = ?", (host,)).fetchone()[0]

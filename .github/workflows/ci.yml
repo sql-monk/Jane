@@ -72,7 +72,8 @@ jobs:
       - run: just contract
 
   # Backward compatibility of contracts/ (R27): compat.py self-test, then compat.py + oasdiff (Docker image
-  # tufin/oasdiff) against the revision the change starts from - the PR base branch, the previous tip of main
+  # pinned by tag and digest in contracts/tools/compat.py; JANE_OASDIFF_IMAGE overrides the Docker image)
+  # against the revision the change starts from - the PR base branch, the previous tip of main
   # for a push to main, otherwise the merge-base with main. Needs no workspace sync (uv scripts).
   contracts-compat:
     runs-on: ubuntu-24.04

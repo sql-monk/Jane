@@ -22,7 +22,7 @@ checkout потоку A. `main` і force push не використовують�
 |---|---|---|
 | B-1: матриця й сценарії | `wp/22a-acceptance-matrix`, `wp22a` | accepted; `a967228` (документи) |
 | B-2: решта real-адмінки | `wp/22b-admin-real-coverage` | виконання; база `2366213` |
-| B-3: дві репліки й L2 | `wp/22c-shared-host-replicas`, `wp22c` | виконання |
+| B-3: дві репліки й L2 | `wp/22c-shared-host-replicas`, `wp22c` | accepted; `753f3e9`, review 1 |
 | B-4: приклад info з limits | `wp/22d-assistant-info-example`, `wp22d` | виконання |
 | B-5: S-M3-02 після WP-19 | `wp/22e-storage-contract-cleanup` | очікує маркера `merge: accept WP-19` в origin |
 
@@ -119,3 +119,73 @@ To https://github.com/sql-monk/Jane.git
 branch 'wp/22a-acceptance-matrix' set up to track 'origin/wp/22a-acceptance-matrix'.
 exit=0
 ```
+
+
+## B-3: accepted
+
+Злиття: `306af36a0300b03dd42aab67703386f10439d981`. Незалежний wp-reviewer: **accepted**, раунд 1 (2026-10-09).
+
+Рецензент сам виконав: check-diff — 4 changed / 0 outside; diff --check — exit 0; Ruff — All checks passed, 2 files already formatted; Docker — 0 контейнерів / 0 томів. Перевірено окремі PID і mounts, aggregate concurrency/rate, живе поновлення понад TTL, SIGKILL і обмежене TTL очікування. 50 мс допускається для окремого інтервалу, повний span перевіряється без накопичення допуску. Успішний e2e не повторювали.
+
+
+Гілка: `wp/22c-shared-host-replicas`. База: `03a172d` (`origin/codex/jane-integration`). SHA: `753f3e9e4b9e48bf4b9beee57c7c1f1b7a4e8270`. Стан: **review** — незалежного wp-reviewer призначає координатор.
+
+### Результат
+
+Додано два e2e у `tests/e2e/test_shared_host_replicas.py`, тестову compose-накладку та обгортку справжнього testsite HTTP handler. Репліки працюють в окремих Docker-контейнерах, з різними PID та одним проєктним томом `STATE_DIR`. Продуктові сторінки й robots.txt віддає справжній TestSiteHandler; обгортка лише записує час старту/завершення та контрольовано затримує відповіді. Колектор не змінено, запити/відповіді колектора перевіряються контрактним collector.v1 клієнтом.
+
+Перша фаза навантажує спільний слот (1) тривалими відповідями; друга вимірює спільний інтервал 250 мс на миттєвих відповідях. Обидві репліки реально виконують по 8 товарних запитів, часові діапазони їхньої роботи перекриваються. Перевіряється кожна пауза і тривалість всіх 18 стартів, включно з robots.txt. Допуск 50 мс враховує доставку дозволеного запиту до потоку testsite; для повної тривалості він застосовується лише один раз.
+
+TTL-сценарій спершу тримає живий запит понад TTL (10.687 с при TTL 8 с), доводячи поновлення його слота та блокування другої репліки. Після SIGKILL перший HTTP handler testsite відпускається, але мертвий процес не може звільнити слот. Жива репліка стартувала через 6.454 с після kill, що менше 8 + 0.05 (shared host poll) + 0.5 (доставка/планування) = 8.55 с. Початки HTTP-запитів і маркери kill вимірюються одним монотонним годинником testsite.
+
+README.shared-hosts.md описує конфігурацію, типові значення й запуск. Production-ліміти не змінено; `collector.shared_host_*` задаються через конфігурацію тестового стека.
+
+### Локальні перевірки та справжній вивід
+
+`JANE_E2E_PROJECT=jane-wp22c-local JANE_E2E_REQUIRED=1 uv run --all-packages pytest tests/e2e/test_shared_host_replicas.py -m e2e -v -s`
+
+Перший запуск через Node child environment упав до контейнерів: compose plugin не знайдено (`unknown shorthand flag: 'f' in -f`), 3 setup/teardown errors in 3.43s. Весь вивід: `.jane/wp22c-e2e-setup-failure.txt`. Повтор після цього падіння через штатний authenticated exec environment:
+
+```text
+L2 Docker topology: {"project": "jane-wp22c-local-shared-hosts-1b0769", "containers": ["310f0ff96f81", "26818414f2f4"], "pids": [78575, 79292], "state_volumes": ["jane-wp22c-local-shared-hosts-1b0769_web-collector-data", "jane-wp22c-local-shared-hosts-1b0769_web-collector-data"], "shared_host_ttl_seconds": 8, "shared_host_poll_ms": 50}
+L2 parallel: {"requests":18,"product_requests_per_replica":[8,8],"max_in_flight":1,"min_start_gap_s":0.005914442001085263,"start_span_s":6.592995988998155} (requests_by_replica див. повний лог)
+L2 interval: {"requests":18,"product_requests_per_replica":[8,8],"max_in_flight":1,"min_start_gap_s":0.23368372999539133,"start_span_s":4.279775071001495} (requests_by_replica див. повний лог)
+L2 dead-owner TTL: {"live_slot_held_s": 10.687000000034459, "shared_host_ttl_seconds": 8, "shared_host_poll_s": 0.05, "kill_duration_s": 3.4693035270029213, "successor_start_after_kill_s": 6.454179512998962, "allowed_after_kill_s": 8.55}
+======================== 2 passed in 157.69s (0:02:37) ========================
+exit_code=0
+```
+
+Повний вивід: `.jane/wp22c-e2e.txt` (перелічені replica markers скорочено вище). Окремі e2e після успіху не повторювались. Повний just check / just e2e локально не запускались.
+
+```text
+$ .venv/Scripts/ruff.exe format tests/e2e/jane_e2e/host_probe.py tests/e2e/test_shared_host_replicas.py
+1 file reformatted, 1 file left unchanged
+$ .venv/Scripts/ruff.exe check tests/e2e/jane_e2e/host_probe.py tests/e2e/test_shared_host_replicas.py
+All checks passed!
+
+$ .venv/Scripts/python.exe .claude/hooks/jane_wp.py check-diff 03a172d
+WP-22: 4 changed file(s), 0 outside ownership
+
+exit_code=0
+
+```
+
+Власний проект `jane-wp22c-local-shared-hosts-1b0769` виконав `down --remove-orphans -v --rmi local` у fixture finalizer; стандартна session fixture також прибрала свій порожній `jane-wp22c-local`. Контейнери `puluj-g-*` і стек B-2 не змінювались. Перевірка залишків (`.jane/wp22c-cleanup.txt`):
+
+```text
+$ docker ps -a --filter label=com.docker.compose.project=jane-wp22c-local-shared-hosts-1b0769 --format {{.Names}}
+$ docker volume ls --filter label=com.docker.compose.project=jane-wp22c-local-shared-hosts-1b0769 --format {{.Name}}
+containers_remaining=0
+volumes_remaining=0
+
+```
+
+### CI та рев'ю
+
+Push власної гілки успішний, `.jane/wp22c-push.txt`. CI: [37913459478](https://github.com/sql-monk/Jane/actions/runs/37913459478), SHA `753f3e9e4b9e48bf4b9beee57c7c1f1b7a4e8270`, на момент передачі queued. Повний CI після злиттів потоку запускає координатор. Контракти не змінювались, окремий contract-guardian не потрібний.
+
+Незалежний wp-reviewer: очікує призначення координатором (≤2 раунди). Merge, main і force push виконавець не робив.
+
+### Запити до інших власників
+
+Немає. Зміни лише у tests/e2e/**; docs/acceptance, infra та код сервісів не змінено.

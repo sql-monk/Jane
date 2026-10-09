@@ -58,7 +58,7 @@ instructions, output_schema, model}` (`model` — псевдонім `default|ch
 `expected` тестів), має бути в пакеті.
 
 ## 3. Код екстрактора
-Контракт коду, стани результату, контекст і тестові утиліти — [README SDK](../../../../libs/extractor-sdk/README.md)
+Контракт коду, стани результату, контекст і тестові утиліти — [README SDK](../../../libs/extractor-sdk/README.md)
 (`libs/extractor-sdk`, WP-06; runtime і CLI — `services/handler-runtime/README.md`). Коротко: `extract(material,
 params, ctx)` повертає `success(...)`, `empty()` або `unrecognized(...)`; `failed` — виняток або рішення runtime;
 без мережі, `subprocess`, запису поза `/tmp`, детерміновано; лише бібліотеки профілю runtime; пропущене поле ≠
@@ -98,8 +98,8 @@ params, ctx)` повертає `success(...)`, `empty()` або `unrecognized(..
 `jane-package.json` = `json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"` (UTF-8, порядок ключів як у
 запиті). Локально той самий дайджест: `jane-registry archive <тека> --out pkg.zip`.
 Digest у контрактних JSON/OpenAPI прикладах ілюстративний; перевіряйте фактичний ZIP, а не копіюйте
-дайджест із прикладу. Деталі — [опис пакетів](../../../../contracts/docs/handler-packages.md#структура-архіву),
-[registry](../../../../services/registry/README.md), [runtime/CLI](../../../../services/handler-runtime/README.md).
+дайджест із прикладу. Деталі — [опис пакетів](../../../contracts/docs/handler-packages.md#структура-архіву),
+[registry](../../../services/registry/README.md), [runtime/CLI](../../../services/handler-runtime/README.md).
 
 ## 8. Версії, походження, статуси
 - SemVer: несумісна зміна полів/схеми виходу — major; нові поля/селектори — minor; виправлення — patch.

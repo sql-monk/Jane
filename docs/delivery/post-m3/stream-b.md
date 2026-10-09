@@ -616,3 +616,202 @@ exit=0
 2026-10-09: fresh fetch підтвердив `ee78fc5 merge: accept WP-19 shared stores and files ContentRef transit`. Gate відкрито. Створено окремий worktree `wp22e`, гілку `wp/22e-storage-contract-cleanup` від `b336922149c3b379f6946c82f6ee924b1720c56a`, `.jane-wp = 22`; виконавець — окремий субагент `b5_storage_cleanup`. Власність: `tests/e2e/**`, `docs/acceptance/**`; журнал веде root. Код поки не прийнято, reviewer буде окремим.
 
 Storage transit allowlist уже інтегровано потоком A в `2d4a101`; повторна fixture-правка не потрібна. Виконавець прибирає лише обходи adapter lifetime і пряме text/plain читання поза ContractClient, зберігає assertions bytes/size/sha256 та історичну фінальну ревізію M3. Локально — лише S-M3-01/02, один успішний прогін; фінальний повний workflow dispatch count досі 0. Фоновий monitor залишається активним до accepted B-5 + CI success, дублікати роботи заборонені.
+
+
+## B-5: accepted і злито
+
+Авторський SHA: `b76d7789ca3380a7d171d401e6c00e2b3a6ce50a`; незалежний `b5_review` / wp-reviewer: **accepted**, раунд 1. Злиття: `f0fde812e60ca1cfa5bab8ecf973f307fd3fef61`, pushed у `codex/jane-integration`. Усі B-1…B-5 та документальне оновлення після B-2 прийняті й інтегровані. Contracts у B-5 не змінено, нового guardian pass не потрібно.
+
+Рецензент сам перевірив ownership 4/0, diff check exit 0, Ruff `All checks passed!`, format `2 files already formatted`; Content-Type/bytes/size/sha256 assertions збережено, клієнт контрактний, функціональна синхронізація R-03 лишилася. Історичні M3-блоки побайтово однакові (2344 / 425 bytes). Raw evidence: обидва PASSED, `2 passed in 200.78s`, EXIT_CODE=0, down -v; незалежні Docker listings own project порожні. Успішні e2e рецензент і координатор не повторювали.
+
+Справжній вивід координатора:
+
+```text
+$ git fetch origin
+(виводу немає)
+EXIT_CODE=0
+$ git pull --ff-only origin codex/jane-integration
+From https://github.com/sql-monk/Jane
+ * branch            codex/jane-integration -> FETCH_HEAD
+Already up to date.
+EXIT_CODE=0
+$ git merge --no-ff b76d7789ca3380a7d171d401e6c00e2b3a6ce50a -m "merge: accept WP-22e storage contract cleanup" -m "Co-authored-by: Codex <noreply@openai.com>"
+Merge made by the ort strategy.
+ docs/acceptance/matrix.md             | 17 ++++++++++++++---
+ docs/acceptance/scenarios.md          | 29 ++++++++++++++++++-----------
+ tests/e2e/jane_e2e/orchestration.py   |  6 +++---
+ tests/e2e/test_reprocessing_stored.py | 14 ++------------
+ 4 files changed, 37 insertions(+), 29 deletions(-)
+EXIT_CODE=0
+$ git push origin HEAD:codex/jane-integration
+To https://github.com/sql-monk/Jane.git
+   8633bce..f0fde81  HEAD -> codex/jane-integration
+EXIT_CODE=0
+```
+
+Нижче — авторський звіт перед рев’ю; його state review історичний, поточне приймання наведено вище.
+
+# B-5 / WP-22e. Прибирання storage-обходів після WP-19
+
+Дата: 2026-10-09. Стан: **review**, незалежне рев’ю й інтеграційний CI веде координатор.
+
+- Гілка: `wp/22e-storage-contract-cleanup` (опублікована).
+- База: `b336922149c3b379f6946c82f6ee924b1720c56a`, свіжий `origin/codex/jane-integration` на старті.
+- Коміт: `b76d7789ca3380a7d171d401e6c00e2b3a6ce50a`.
+- Worktree: `C:/repos/Jane/.claude/worktrees/wp22e`; `.jane-wp = 22`.
+- Gate: `ee78fc5043382239d06bb73cbf4f1f64d038978d`, `merge: accept WP-19 shared stores and files ContentRef transit`.
+- Ownership цього інкременту: лише `tests/e2e/**` і `docs/acceptance/**`; журнал потоку не редагувався.
+
+## Результат
+
+1. `tests/e2e/test_reprocessing_stored.py`: S-M3-02 більше не імпортує й не очікує `connections_synced`
+   перед прямим записом у storage. `put_connections` і всі поведінкові assertions збережено.
+2. `stored_text` читає RAW через `storage.api("storage").get(...)`, тобто ContractClient і storage.v1
+   `getObjectContent`, замість `storage.http.get(...)`. Перевірки HTTP 200, точного Content-Type, байтів,
+   `size_bytes` і `sha256` лишилися. Прийнятий контракт уже описує `text/plain` та `*/*`, jane-kit обирає
+   exact → type/* → */*; вигаданих полів чи змін контракту немає.
+3. `tests/e2e/jane_e2e/orchestration.py`: helper `connections_synced` збережено для R-03, де він має
+   функціональну причину: перед partition доставка підключення не повинна займати worker, який потрібний
+   для вимірювання backoff. Оновлено лише застарілий docstring про `adapter is not open`.
+4. У `scenarios.md` прибрано storage-виняток із принципу 1, у scenarios/matrix актуальні обходи позначено
+   історичними, додано новий адресний після-M3 доказ і межі замінників. Інший виняток LLM sync replay
+   не належить B-5 і лишився. Історичні блоки «Фінальна ревізія» M3 побайтово незмінні у Git.
+
+Transit root `/var/lib/jane/storage/transit/storage` уже є в `tests/e2e/compose.e2e.yaml`, доданий потоком A
+комітом `2d4a101`. Файл звірено лише readonly; цей інкремент його не змінює й рядок не дублює.
+
+## Команди й справжній вивід
+
+Один локальний адресний прогін; повторів немає. Env налаштовано в PowerShell нормального userenv:
+
+```powershell
+$env:JANE_E2E_PROJECT = "jane-wp22e-storage-20261009"
+$env:JANE_E2E_REQUIRED = "1"
+$env:JANE_E2E_KEEP = "0"
+$env:PYTHONUTF8 = "1"
+uv run --all-packages pytest tests/e2e/test_reprocessing_stored.py -v -s
+```
+
+Повний вивід: `.jane/wp22e-e2e.txt`; setup скорочено нижче, результати не скорочено:
+
+```text
+collecting ... collected 2 items
+tests/e2e/test_reprocessing_stored.py::test_s_m3_01_reprocessing_takes_exactly_the_given_stored_objects
+S-M3-01: runs=['run_01M4GCYT0PR8901CCN0ZK5KA5M', 'run_01M4GCYYP0W1H63YYNQZBBACG4'] reprocessing=run_01M4GCZ4WJJXS1PQ80VPREK0RN chosen=['obs_01a120cf6b850000fcc4cb8a', 'obs_01a120cf80640000fde0ec48'] others=['obs_01a120cf6b510000aa6559f5', 'obs_01a120cf809b0000b4ee6b1e']
+S-M3-01: extracted=[('obs_01a120cf6b850000fcc4cb8a', 'completed', 'success'), ('obs_01a120cf80640000fde0ec48', 'completed', 'success')]
+PASSED
+tests/e2e/test_reprocessing_stored.py::test_s_m3_02_telegram_json_raw_is_restored_and_reprocessed_with_its_sha256
+S-M3-02: documents=[('obj_b6d1adb24f33d7790278fadaee505ad5', 'd023d67021da'), ('obj_83ab2c99150aaf118cf1faf20e71bb33', '50265559e3e4')]
+S-M3-02: reprocessing=run_01M4GD0JD53PXZ7YZ6T0K7YSCR succeeded items=[('obs_01a120d04575000185fa5e8c', 'completed'), ('obs_01a120d04575000096f8681f', 'completed')]
+S-M3-02: copies=[('text/plain', '4ddae9e89e66', 28), ('text/plain', '385263a067b4', 44)]
+S-M3-02: collector sha256=['385263a067b4', '4ddae9e89e66']
+PASSED
+======================== 2 passed in 200.78s (0:03:20) ========================
+EXIT_CODE=0
+```
+
+```text
+$ uv run ruff check tests/e2e/jane_e2e/orchestration.py tests/e2e/test_reprocessing_stored.py
+All checks passed!
+EXIT_CODE=0
+$ uv run ruff format --check tests/e2e/jane_e2e/orchestration.py tests/e2e/test_reprocessing_stored.py
+2 files already formatted
+EXIT_CODE=0
+$ python -X utf8 .claude/hooks/jane_wp.py check-diff b336922149c3b379f6946c82f6ee924b1720c56a
+WP-22: 4 changed file(s), 0 outside ownership
+EXIT_CODE=0
+$ git diff --check b336922149c3b379f6946c82f6ee924b1720c56a HEAD
+(виводу немає)
+EXIT_CODE=0
+```
+
+Коміт (4 файли, `37 insertions(+), 29 deletions(-)`) із трейлером
+`Co-authored-by: Codex <noreply@openai.com>`; commit hook:
+
+```text
+4:20PM INF 0 commits scanned.
+4:20PM INF scanned ~4935 bytes (4.93 KB) in 406ms
+4:20PM INF no leaks found
+[wp/22e-storage-contract-cleanup b76d778] test: remove post-WP19 storage workarounds
+ 4 files changed, 37 insertions(+), 29 deletions(-)
+EXIT_CODE=0
+$ git push -u origin wp/22e-storage-contract-cleanup
+To https://github.com/sql-monk/Jane.git
+ * [new branch]      wp/22e-storage-contract-cleanup -> wp/22e-storage-contract-cleanup
+branch 'wp/22e-storage-contract-cleanup' set up to track 'origin/wp/22e-storage-contract-cleanup'.
+EXIT_CODE=0
+```
+
+## Cleanup
+
+Fixture завершив `E2EStack.down(volumes=True)`:
+
+```text
+$ docker compose -f C:\repos\Jane\.claude\worktrees\wp22e\infra\compose.yaml -f C:\repos\Jane\.claude\worktrees\wp22e\tests\e2e\compose.e2e.yaml -p jane-wp22e-storage-20261009 down --remove-orphans -v --rmi local
+$ docker ps -a -q --filter label=io.jane.e2e-project=jane-wp22e-storage-20261009
+$ docker image rm -f jane-wp22e-storage-20261009-python-extractor:1
+```
+
+Після завершення pytest session (exit 0) незалежні readonly listings із фільтром
+`label=com.docker.compose.project=jane-wp22e-storage-20261009` для контейнерів, томів і мереж,
+а sandbox — `label=io.jane.e2e-project=jane-wp22e-storage-20261009`, дали:
+
+```text
+PROJECT=jane-wp22e-storage-20261009
+CONTAINERS=0
+SANDBOXES=0
+VOLUMES=0
+NETWORKS=0
+EXIT_CODE=0
+```
+
+Це єдиний project, який запускався й прибирався. `puluj-g-*` та інші стеки не зачіпались.
+
+## Історичні блоки
+
+Python порівняв bytes `git show <base>:<path>` і `git show <head>:<path>` між заголовками
+`## Фінальна ревізія` та `## Після M3`, без нормалізації:
+
+```json
+{
+  "base": "b336922149c3b379f6946c82f6ee924b1720c56a",
+  "head": "b76d7789ca3380a7d171d401e6c00e2b3a6ce50a",
+  "historicalBlocks": [
+    {
+      "path": "docs/acceptance/matrix.md",
+      "bytes": 2344,
+      "sha256": "2073649bf2a3da46fc9ddc9421c48d6f87f97f909937c1c2efbeaf4e20b488b2",
+      "identical": true
+    },
+    {
+      "path": "docs/acceptance/scenarios.md",
+      "bytes": 425,
+      "sha256": "ae54ad7dffd2fd0ed04a36705c1aa7003d8e9d6b53f16a1c2f749d6d0e75fa25",
+      "identical": true
+    }
+  ]
+}
+```
+
+## Межі й запити до інших власників
+
+Реальні orchestrator, storage, web-collector, handler-runtime, registry, telegram-collector, testsite
+та PostgreSQL. Записаний Telegram backend — зовнішній замінник **З**. Зовнішній fake LLM suite лишається
+замінником; у цьому адресному прогоні LLM не запускався. Реальні LLM/IdP/AWS/Telegram — не перевірено на
+реальному сервісі. Компоненти Jane не мокались, жоден тест не послаблено.
+
+Змін у `contracts/` немає, окремий guardian/compatibility pass для цього інкременту не потрібний.
+Повні локальні `just check`/`just e2e` і завершені B-1…B-4 не запускались. Нових backend/contract запитів немає.
+Незалежний wp-reviewer, злиття й один фінальний CI dispatch — координатор; успішний адресний e2e більше
+не повторювати. Жодного merge/main/force або workflow dispatch виконавець не робив.
+
+Артефакти: `.jane/wp22e-e2e.txt`, `wp22e-ruff-check.txt`, `wp22e-ruff-format.txt`, `wp22e-check-diff.txt`,
+`wp22e-diff-check.txt`, `wp22e-history-check.txt`, `wp22e-gate.txt`, `wp22e-cleanup.txt`, `wp22e-commit.txt`,
+`wp22e-push.txt`.
+
+
+## Фінальний CI потоку B: intent
+
+Усі злиття B завершені. Перед dispatch `gh run list --branch codex/jane-integration --event workflow_dispatch --limit 3` повернув лише старі M3 runs 37884090704 / 37876793244 / 37863992541; dispatch count потоку B = 0. Тепер зарезервовано **один** `gh workflow run ci --ref codex/jane-integration`; після виконання відразу записати run ID / точний head SHA, не створювати дубліката. Якщо цей запис читається після перезапуску, спочатку перевірити gh run list і свіжі workflow_dispatch runs.
+
+C серіалізує власний фінальний dispatch після завершення B, щоб concurrency cancel-in-progress не скасував наш run. Підсумковий A чекає B/C. Локальні full check/e2e не виконуються. Фінальний workflow включає API e2e, stack/adapters, isolation, ci limits і admin mock regression; full real22 браузерний набір цей workflow не запускає, зеленість усіх 22 real тут не заявляється.

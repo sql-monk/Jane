@@ -47,9 +47,39 @@ uv-скрипти зі своїми залежностями (`uv run --script c
 | Команда | Що робить |
 |---|---|
 | `just contracts-check [--redocly]` | лише лінтер контрактів (те саме, що в `just lint` / `just contract`); `--redocly` — ще й Redocly через npx (потрібен Node) |
-| `just contracts-compat [ref] [--oasdiff]` | `compat.py --self-test`, потім зворотна сумісність `contracts/` відносно git-ref (типово `main`; у worktree краще `origin/main` або merge-base). `--oasdiff` — ще `oasdiff breaking --fail-on ERR` (бінарник у PATH або Docker-образ `tufin/oasdiff`); BREAKING або непройдений oasdiff → код 1 |
+| `just contracts-compat [ref] [--oasdiff]` | `compat.py --self-test`, потім зворотна сумісність `contracts/` відносно git-ref (типово `main`; у worktree краще `origin/main` або merge-base). `--oasdiff` — ще `oasdiff breaking --fail-on ERR` (бінарник у PATH або закріплений Docker-образ, див. нижче); BREAKING або непройдений oasdiff → код 1 |
 | `just contracts-mock <api> [--port 4010] [--host 127.0.0.1]` | мок API з прикладів контракту (`contracts/tools/mock.py`, без Node) |
 | `just contracts-gen <api> <тека>` | асинхронний Python-клієнт одного контракту `contracts/openapi/<api>.v1.yaml` (`jane-codegen client --no-models`), напр. у `services/<я>/src/<пакет>/_generated/<api>`. Без моделей Pydantic: datamodel-code-generator не приймає багатофайлові контракти Jane і їхній Redocly-бандл («Modular references require an output directory»); моделі з однофайлової специфікації — `just gen-client` |
+
+`contracts-compat` без бінарника `oasdiff` у PATH використовує образ
+`tufin/oasdiff:v1.33.0@sha256:6263a96dd2ef0726c54e21fea9b8e1607eac4841add0079324b424c1f52b819c`
+(WP-21). Змінна `JANE_OASDIFF_IMAGE` перекриває цей образ; порожнє значення залишає типовий.
+Бінарник у PATH має пріоритет над Docker і використовується у встановленій версії. Порядок оновлення
+тегу й дайджесту та перевірки сумісності описано в [compat.py](contracts/tools/compat.py).
+
+### API й ліміти після M3
+
+[Асистент](services/assistant/README.md) віддає курсорні списки `GET /v1/onboarding-sessions` і
+`GET /v1/improvement-runs`: адмінка відновлює сесії підключення джерел і запуски вдосконалення після
+перезавантаження. Перший список підтримує фільтр `status`, другий — `status`, `package_id`, `source_id`
+і `problem_group_id`; `next_cursor: null` позначає останню сторінку.
+
+[Web Collector](services/web-collector/README.md) узгоджує частоту, паралельність і `Retry-After` на хост
+між екземплярами, які використовують спільний каталог `STATE_DIR` і `state.db`. Екземпляри з окремими
+каталогами стану мають окремі лімітери; спільне сховище між вузлами у v1 відсутнє.
+
+| Сервіс / параметр | Типово | Призначення |
+|---|---|---|
+| Web Collector: `collector.shared_host_limits` | `true` | увімкнути узгодження лімітів хоста між екземплярами |
+| Web Collector: `collector.shared_host_poll_ms` | `100` | інтервал повторної перевірки зайнятого слота хоста |
+| Web Collector: `collector.shared_host_ttl_seconds` | `120` | строк життя реєстрацій, слотів і черги вбитого екземпляра; живий поновлює їх кожні TTL/3 |
+| [Storage](services/storage/README.md): `conflict_retries` | `max_attempts=4`, `initial_backoff_ms=200`, `max_backoff_ms=10000`, `backoff_multiplier=2.0`, `jitter=true` | повтори ядра при `CONFLICT`; контрактний `retries` профілю чи запиту їх не змінює |
+| [LLM-шлюз](services/llm/README.md): `provider.request_timeout_ms` | `120000` | тайм-аут одного виклику моделі; профільний `timeouts.request_timeout_ms` його не змінює |
+| Асистент: `llm_call.request_timeout_ms` | `900000` | тайм-аут синхронного виклику LLM-шлюзу з урахуванням повторів; окремий від службового `clients.request_timeout_ms` |
+
+Це власні ліміти сервісів: повні змінні середовища, обмеження й правила старту наведено у відповідних
+README. Зокрема для Web Collector має виконуватись `TTL × 2/3 > STATE_BUSY_TIMEOUT_MS`. Для довгого
+виклику LLM асистент також підтримує `JANE_ASSISTANT_LLM_COMPLETION_MODE=async` з опитуванням job шлюзу.
 
 ## Монорепозиторій
 

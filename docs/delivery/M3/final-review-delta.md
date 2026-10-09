@@ -149,3 +149,102 @@ Summary й повні логи збережено в ignored `.jane/m3c-c2-evide
 **Нових блокерів у виконаних сценаріях не знайдено.** C-2 — функціональне відтворення документації
 після B2; воно не замінює вимірювання лімітів dev-laptop або фінальний CI/real UI gate потоку A.
 Повний локальний `just check`/`just e2e`, новий CI і повторний backup/restore не запускались.
+
+## Дельта 2
+
+Дата: 2026-10-09. Доручення: [HANDOFF-2026-10-09-stream-c-3.md](../HANDOFF-2026-10-09-stream-c-3.md), C-4.
+Один статичний прохід по результатах злиттів; без pytest, lint/typecheck, Docker, CI dispatch або нового
+раунду рев'ю безпеки B2. Рецензент C не був автором B2 чи WP-06d.
+Переглянута вершина origin: **`3a4e29c59d620c4e12b692b9968db6266a8405e6`**.
+Після повторного fetch злиттів B-11 у цій інтеграції немає; цей розділ є проміжним до їх появи.
+
+### Злиття → вердикт → знахідки
+
+| Злиття | Вердикт | Знахідки / фактичний статичний доказ |
+|---|---|---|
+| B2 — `5fd7acd` (батьки `4f0b2a9`, `5c36792`) | Злиття зберегло перевірений B2 і попередні інкременти; нових блокерів немає | База B2 — `3ec9358`; набори шляхів у `3ec9358..7b41bf4` і `5fd7acd^1..5fd7acd` однакові: 61/61, без пропущених або додаткових файлів. 58 із 61 кінцевого файла збігаються байт у байт із `7b41bf4`, зокрема весь код, тести, конфігурація та lockfile. Три відмінності — лише документи, пояснені нижче. Scope-таблиці й wiring усіх восьми сервісів, сервісні токени та генерація ключів збережені. |
+| WP-06d — `3e13f68` (`065a15a`…`7fe87b9`) | Тест не послаблено й не проходить порожньо; нових блокерів немає | Єдина зміна коду злиття — `services/handler-runtime/tests/test_app.py:129`: параметризація sync/async, перевірка HTTP 200/202, очікування кінцевого job result за 202. Усі попередні кінцеві assertions збережено. Probe виконує справжній `socket.create_connection`; незмінний Docker isolation-тест відокремлює перевірку мережевого ізолювання від API-класифікації (C-N5). |
+| B-11 — B-7 / B-8 / B-9 | **Очікує злиття, не переглянуто** | У `origin/codex/jane-integration` `3a4e29c` після другого fetch немає цих злиттів. Журнал B має лише підготовлені гілки та вказівки продовження. Наявність гілок не є прийманням злитого результату; C-N4 поки відкрито. |
+
+### Збереження B2 і попередніх змін
+
+- `services/handler-runtime/src/jane_handler_runtime/executor.py`, `sandbox.py`, `docker_sandbox.py`
+  збігаються байт у байт із першим батьком B2. Класифікація WP-06c, ознака власного kill і розрізнення
+  OOM/SIGKILL не переписані. Незмінний B2 `test_classification.py` також не входить у дельту злиття.
+  Відмінність runtime README від гілки B2 — саме збережений опис WP-06c у `services/handler-runtime/README.md:40`;
+  розділ B2 «Автентифікація» (`:209`) присутній разом із ним.
+- `libs/jane-kit/src/jane_kit/content.py` і `.github/workflows/ci.yml` збігаються байт у байт із першим
+  батьком B2. ContentReader/B1, `web-mock-e2e` і обов'язковий e2e gate не загублені.
+  B2-доповнення `infra/compose.yaml` — auth-конфігурація; дозволені RAW-корені та read-only монтування
+  runtime/LLM (`:190`, `:299`) збережено. Відоме C-N1 не переоцінювалося, repro не запускався.
+- Should-fix лишилися на місці: LLM settings додає SecretStr registry token без вилучення secret-policy/
+  api_base/лімітів; settings Web/Telegram Collector B2 не змінює. Orchestrator додає token_ref і SecretStr,
+  зберігаючи scheduler/run_workers, клієнтські ліміти й retry policy. README цих сервісів доповнено auth,
+  попередні налаштування та обмеження не вилучено. Результати цих файлів збігаються з перевіреним B2.
+- Три відмінні від `7b41bf4` документи: `docs/delivery/M3/01g-auth.md` містить передачу `5c36792` замість
+  CI-placeholder; `docs/operations/backup-restore.md` зберіг виправлення C-W1 разом з auth-доповненнями;
+  runtime README зберіг WP-06c. Втрати змін під час об'єднання не знайдено.
+
+### Scope, токени й ключі
+
+- Усі вісім продукційних app передають таблиці у `create_app`: collectors — COLLECTOR, runtime — HANDLER,
+  storage — merge(HANDLER, STORAGE), LLM — merge(HANDLER, LLM), assistant — ASSISTANT, registry — REGISTRY,
+  orchestrator — ORCHESTRATOR. Джерела: `services/*/src/*/app.py`, зокрема runtime `:161`, registry `:262`,
+  orchestrator `:82`. Додаткового продукційного FastAPI/mount, що обходив би цю фабрику, не знайдено.
+- `libs/jane-kit/src/jane_kit/service.py:101` встановлює загальний `Depends(authorize)`, а `:82` викликає
+  перевірку таблиць на старті. `auth.py:712` використовує метод і шаблон **підібраного маршруту**;
+  відсутній запис дає Forbidden (`:725`), потрібний scope перевіряється через principal (`:731`). HEAD
+  успадковує GET, а метод без власного запису не отримує дозволу. `auth.py:763` відхиляє неповну таблицю
+  на старті. Бізнесоперації, що після злиття лишилися без перевірки scope, не знайдені.
+- `/v1/info` та приватні `/metrics`/службові сторінки навмисно допускають будь-який **дійсний** токен
+  (`auth.py:90`); це визначена поведінка B2, а не випадіння бізнес-scope. Публічні шляхи — точний health
+  і metrics за відповідним налаштуванням; режим none на нелокальному host відхиляється без явного
+  test-винятку (`auth.py:750`). Scope-таблиці `auth_scopes.py` і їхній контрактний equality-тест збережені;
+  тут тест не запускався.
+- Вихідні токени лишилися токенами власного сервісу: orchestrator resolves token_ref і передає
+  `cfg.token.get_secret_value()` (`services/orchestrator/src/jane_orchestrator/executors.py:119`);
+  assistant бере власні refs/default і bearer_header (`services/assistant/src/jane_assistant/clients.py:296`);
+  runtime/LLM розкривають SecretStr лише для запиту до registry (`packages.py:190` / `app.py:168`);
+  registry додає власний token для runtime info (`services/registry/src/jane_registry/profiles.py:127`).
+  Incoming principal/header не підміняє ці токени. Compose налаштовує хеші й scopes відповідних identities.
+- `new_api_keys` у jane-kit/dev.py/profile stack і e2e credentials залишають генерацію окремих ключів
+  із SHA-256, збереження наявних ключів та доповнення старого stack-файла. Джерела:
+  `libs/jane-kit/src/jane_kit/devstack.py:53`, `scripts/dev.py:312`, `deploy/profiles/stack.py:252`,
+  `tests/e2e/jane_e2e/stack.py:224`. `scripts/dev.py:485` при up друкує спосіб отримання ключа, його значення
+  не друкує; stack-файли залишаються під ignored `.jane/` (`.gitignore:30`). Auth-клієнти examples/e2e
+  й key tables compose збігаються з перевіреною гілкою. Вхід адмінки та шаблон scopes належать майбутньому B-11.
+
+### Знахідки й межі
+
+| ID / рівень | Файл:рядок, доказ | Власник / рішення |
+|---|---|---|
+| C-N5 — **примітка, межа доказу WP-06d** | `services/handler-runtime/tests/test_app.py:129` перевіряє API-класифікацію мережевої спроби через subprocess fixture (`tests/conftest.py:85`). У `test_app.py:143`–`:146` лишилися failed/sandbox_violation/непорожні socket events; за 202 результат читається з кінцевого job. `tests/packages/probe/src/probe/main.py:29` справді відкриває socket. Ізоляцію ядром доводить окремий незмінний `tests/test_isolation.py:106`: контрольний bridge-контейнер досягає сервера, sandbox повертає OSError unreachable і sandbox.network_blocked. | WP-06. WP-06d не підміняє Docker isolation-тест і не заявляється його новим запуском. Незавершений job або відсутній result не можуть задовольнити кінцеві assertions. Нового блокера немає. |
+| C-N4 — **примітка, ще відкрита** | «Відтворення після B2» вище; B-11 у переглянутому origin відсутній, зведеного real-admin receipt із входом за ключем тут ще немає. | WP-12 / потік B, потім A. Закриття — після перевірки злитого B-11 і його фактичного N passed на зведеній ревізії. |
+
+**Підсумок незалежного статичного рев'ю `d37c522..3a4e29c`: нових блокерів M3 не знайдено.**
+C-1 разом із цією дельтою покриває інтегровані інкременти цього зрізу; C-W1/C-W3 виправлені, C-W2 лишається
+після M3, відомі примітки C-N1–C-N3 збережені. Це не фінальне приймання M3: B-11 і C-N4 ще очікують,
+фінальний CI, матриця та status.md — потоку A. Після злиття B-11 потрібне лише доповнення цього розділу
+за п. 3 handoff, без повторного проходу B2/WP-06d.
+
+Фактичний вивід статичного порівняння (`.jane/m3c-delta2-audit.txt`, ignored):
+
+```text
+B2 base: 3ec9358768dc3e5ada05d5ac13b148d28d934727
+B2 branch files: 61; merge files: 61
+Branch-only paths: []
+Merge-only paths: []
+Merged blobs differing from tested B2 code:
+  docs/delivery/M3/01g-auth.md
+  docs/operations/backup-restore.md
+  services/handler-runtime/README.md
+Pre-merge preserved executor.py: True
+Pre-merge preserved sandbox.py: True
+Pre-merge preserved docker_sandbox.py: True
+Pre-merge preserved content.py: True
+Pre-merge preserved ci.yml: True
+```
+
+Команди цього проходу: `git fetch origin` (на старті й перед підсумком), адресні `git diff`/`git show`,
+`rg`, читання вихідних файлів і порівняння Git blobs. Тимчасові worktree/clone, Docker-ресурси та CI
+не створювалися. Власні зміни C — лише цей документ і `M3/stream-c.md`.

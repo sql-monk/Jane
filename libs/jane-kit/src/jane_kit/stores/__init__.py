@@ -24,20 +24,25 @@ from pydantic import Field
 
 from jane_kit.config import Limits
 
-__all__ = ["LeaseLimits", "heartbeat_loop"]
+__all__ = ["ClaimLimits", "LeaseLimits", "heartbeat_loop"]
 
 log = logging.getLogger(__name__)
 
 
-class LeaseLimits(Limits):
-    """Leases of the shared stores (one group per service, e.g. ``limits.state``)."""
+class ClaimLimits(Limits):
+    """Leases of ``Idempotency-Key`` claims (a service without shared jobs, e.g. the orchestrator)."""
 
     in_progress_lease_ms: int = Field(default=900_000, ge=1_000)
     """An ``Idempotency-Key`` claim not renewed for this long (its instance stopped) can be claimed again."""
+    heartbeat_interval_ms: int = Field(default=15_000, ge=100)
+    """How often an instance renews its leases (keep well below them)."""
+
+
+class LeaseLimits(ClaimLimits):
+    """Leases of the shared stores (one group per service, e.g. ``limits.state``): claims and jobs."""
+
     job_lease_ms: int = Field(default=60_000, ge=1_000)
     """A job whose instance did not renew its lease for this long ends ``failed`` (retryable)."""
-    heartbeat_interval_ms: int = Field(default=15_000, ge=100)
-    """How often an instance renews its leases (keep well below both leases)."""
 
 
 async def heartbeat_loop(

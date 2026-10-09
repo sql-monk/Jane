@@ -1,62 +1,22 @@
-"""``Idempotency-Key`` storage in the orchestrator DB (jane-kit ``IdempotencyStore`` protocol), so several
-API instances share it."""
+"""``Idempotency-Key`` storage in the orchestrator DB, so several API instances share it.
+
+jane-kit's shared :class:`jane_kit.stores.postgres.PgIdempotencyStore` (R17) on the table ``idempotency_keys``
+(migration 7 added the claim ``owner``/``token``/``lease_until``): a claim of a stopped instance is taken over after
+``limits.claims.in_progress_lease_ms``; a live instance renews its claims (``heartbeat_interval_ms``); a request
+whose claim was taken over cannot overwrite the new one.
+"""
 
 from __future__ import annotations
 
-from datetime import timedelta
+from jane_kit.stores import ClaimLimits
+from jane_kit.stores.postgres import PgIdempotencyStore
+from jane_orchestrator.db import Database
 
-from starlette.concurrency import run_in_threadpool
-
-from jane_kit.idempotency import IdempotencyRecord, StoredResponse
-from jane_orchestrator.db import Database, Jsonb
-
-__all__ = ["PgIdempotencyStore"]
+__all__ = ["idempotency_store"]
 
 
-class PgIdempotencyStore:
-    def __init__(self, db: Database) -> None:
-        self.db = db
-
-    def _begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
-        with self.db.tx() as conn:
-            conn.execute("DELETE FROM idempotency_keys WHERE key = %s AND expires_at <= now()", (key,))
-            row = conn.execute(
-                "INSERT INTO idempotency_keys (key, fingerprint, state, expires_at)"
-                " VALUES (%s, %s, 'in_progress', now() + %s) ON CONFLICT (key) DO NOTHING RETURNING key",
-                (key, fingerprint, timedelta(seconds=ttl_s)),
-            ).fetchone()
-            if row is not None:
-                return None
-            existing = conn.execute("SELECT * FROM idempotency_keys WHERE key = %s", (key,)).fetchone()
-        if existing is None:  # expired and removed concurrently: treat as in progress, the client retries
-            return IdempotencyRecord(key, fingerprint, "in_progress", 0.0)
-        response = None
-        if existing["state"] == "completed":
-            response = StoredResponse(
-                int(existing["status_code"]), existing["body"], dict(existing["headers"] or {})
-            )
-        return IdempotencyRecord(
-            key, existing["fingerprint"], existing["state"], existing["expires_at"].timestamp(), response
-        )
-
-    def _complete(self, key: str, response: StoredResponse) -> None:
-        with self.db.tx() as conn:
-            conn.execute(
-                "UPDATE idempotency_keys SET state = 'completed', status_code = %s, body = %s, headers = %s"
-                " WHERE key = %s",
-                (response.status_code, Jsonb(response.body), Jsonb(dict(response.headers)), key),
-            )
-
-    def _release(self, key: str) -> None:
-        with self.db.tx() as conn:
-            conn.execute("DELETE FROM idempotency_keys WHERE key = %s AND state = 'in_progress'", (key,))
-
-    async def begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
-        result: IdempotencyRecord | None = await run_in_threadpool(self._begin, key, fingerprint, ttl_s)
-        return result
-
-    async def complete(self, key: str, response: StoredResponse) -> None:
-        await run_in_threadpool(self._complete, key, response)
-
-    async def release(self, key: str) -> None:
-        await run_in_threadpool(self._release, key)
+def idempotency_store(db: Database, owner: str, claims: ClaimLimits) -> PgIdempotencyStore:
+    # the table and its columns come from the orchestrator's own migrations (db.MIGRATIONS), not from ddl()
+    return PgIdempotencyStore(
+        db.tx, owner=owner, in_progress_lease_s=claims.in_progress_lease_ms / 1000, table="idempotency_keys"
+    )

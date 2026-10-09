@@ -8,6 +8,7 @@ unless ``JANE_ORCHESTRATOR_RUN_WORKERS=false`` (then run ``python -m jane_orches
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator, Callable
@@ -24,13 +25,14 @@ from jane_kit.errors import BadRequest, NotFound
 from jane_kit.idempotency import IDEMPOTENCY_HEADER, StoredResponse, idempotent
 from jane_kit.pagination import clamp_limit
 from jane_kit.service import create_app
+from jane_kit.stores import heartbeat_loop
 
 from . import __version__
 from .auth import Principal, caller
 from .common import etag
 from .core import Core
 from .engine import Engine, Worker
-from .idempotency import PgIdempotencyStore
+from .idempotency import idempotency_store
 from .service import Admin
 from .settings import Settings, resolve_service_limits
 
@@ -58,13 +60,22 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                 w = Worker(engine, f"{settings.instance_id}-w{i}", scheduler=settings.scheduler_enabled)
                 w.start()
                 workers.append(w)
-        holder.update(core=core, admin=Admin(core), engine=engine, idem=PgIdempotencyStore(core.db))
+        idem = idempotency_store(core.db, settings.instance_id, limits.claims)
+        holder.update(core=core, admin=Admin(core), engine=engine, idem=idem)
         app.state.core = core
         app.state.engine = engine
         log.info("orchestrator started", extra={"limits": resolved.effective(), "workers": len(workers)})
+        claims = asyncio.create_task(
+            heartbeat_loop(
+                [idem.heartbeat, idem.gc], limits.claims.heartbeat_interval_ms / 1000, name="claims"
+            ),
+            name="orchestrator-idempotency-claims",
+        )
         try:
             yield
         finally:
+            claims.cancel()
+            await asyncio.gather(claims, return_exceptions=True)
             for w in workers:
                 w.stop()
             await run_in_threadpool(core.close)

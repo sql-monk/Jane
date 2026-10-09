@@ -150,6 +150,12 @@ platform → source → task → stage → request (`RunRequest.limits`), `hard_
 
 Ліміти сторінок: `…_LIMITS__PAGES__DEFAULT_PAGE_SIZE` = 50, `MAX_PAGE_SIZE` = 500.
 
+«Захоплення» `Idempotency-Key` API (`…_LIMITS__CLAIMS__<ПОЛЕ>`, спільне сховище `jane_kit.stores.postgres`, R17,
+таблиця `idempotency_keys`, міграція 7): `in_progress_lease_ms` = 900000 — після цього claim зупиненого екземпляра
+можна захопити знову (раніше — лише після `transfer.idempotency_ttl_seconds`); `heartbeat_interval_ms` = 15000 — як
+часто живий екземпляр поновлює свої claim і прибирає прострочені ключі. Відповідь запиту, чий claim уже перехопили,
+не перезаписує новий запис.
+
 ## Тести
 
 ```

@@ -149,7 +149,7 @@ def build_components(settings: Settings, limits: ServiceLimits) -> Components:
     idem: IdempotencyStore
     jobs: JobStore
     if settings.db == "postgres":
-        from .postgres import PostgresIdempotencyStore, PostgresJobStore, PostgresStore
+        from .postgres import PostgresStore, postgres_idempotency_store, postgres_job_store
 
         if settings.db_url is None:
             raise ValueError(
@@ -158,10 +158,10 @@ def build_components(settings: Settings, limits: ServiceLimits) -> Components:
         pg = PostgresStore(settings.db_url.get_secret_value(), settings.db_schema, limits.db)
         rec = limits.recovery
         store = pg
-        idem = PostgresIdempotencyStore(pg, rec.in_progress_lease_ms / 1000)
         # the owner is unique per start: a restarted instance must not renew the jobs of its previous life
         owner = f"{settings.instance_id}-{uuid.uuid4().hex[:8]}"
-        jobs = PostgresJobStore(pg, limits.jobs, owner, rec.job_lease_ms / 1000)
+        idem = postgres_idempotency_store(pg, rec.in_progress_lease_ms / 1000, owner)
+        jobs = postgres_job_store(pg, limits.jobs, owner, rec.job_lease_ms / 1000)
     else:
         store, idem, jobs = (
             MemoryStore(),
@@ -237,13 +237,23 @@ def build_app(settings: Settings | None = None, components: Components | None = 
             await comp.store.close()
 
     async def _heartbeat() -> None:
-        beat = getattr(comp.jobs, "heartbeat", None)
-        while beat is not None:
+        """Renew this instance's job leases and idempotency claims (shared stores, R17); drop expired keys."""
+        beats = [
+            beat
+            for store, name in (
+                (comp.jobs, "heartbeat"),
+                (comp.idempotency, "heartbeat"),
+                (comp.idempotency, "gc"),
+            )
+            if (beat := getattr(store, name, None)) is not None
+        ]
+        while beats:
             await asyncio.sleep(limits.recovery.job_heartbeat_ms / 1000)
-            try:
-                await beat()
-            except Exception:
-                log.exception("job lease renewal failed")
+            for beat in beats:
+                try:
+                    await beat()
+                except Exception:
+                    log.exception("lease renewal failed")
 
     app = create_app(
         settings,

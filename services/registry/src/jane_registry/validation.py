@@ -14,8 +14,9 @@ from typing import Any
 
 from jsonschema import Draft202012Validator, SchemaError
 from jsonschema.exceptions import best_match
-from referencing import Registry, Resource
-from referencing.jsonschema import DRAFT202012
+
+from jane_kit.schemas import ContractSchemas as KitSchemas
+from jane_kit.schemas import json_pointer
 
 from .archive import MANIFEST_NAME
 
@@ -48,47 +49,22 @@ def _escape(token: str) -> str:
     return token.replace("~", "~0").replace("/", "~1")
 
 
-def _pointer(prefix: str, path: Any) -> str:
-    return prefix + "".join(f"/{_escape(str(p))}" for p in path)
-
-
-class ContractSchemas:
-    """JSON Schema 2020-12 validators for contract schemas with cross-file ``$ref``."""
+class ContractSchemas(KitSchemas):
+    """jane-kit's shared contract validators (R17; ``format`` is checked, as before) with the registry's issues."""
 
     def __init__(self, contracts: Path) -> None:
-        self.root = (contracts / "schemas").resolve()
-        self._registry: Registry[Any] = Registry(retrieve=self._retrieve)  # type: ignore[call-arg]
-
-    @staticmethod
-    def _retrieve(uri: str) -> Resource[Any]:
-        from urllib.parse import unquote, urlsplit
-
-        parts = urlsplit(uri)
-        raw = unquote(parts.path)
-        if len(raw) > 2 and raw[0] == "/" and raw[2] == ":":  # file:///C:/... on Windows
-            raw = raw[1:]
-        doc = json.loads(Path(raw).read_text(encoding="utf-8"))
-        return DRAFT202012.create_resource(doc)
-
-    def validator(self, relative: str, fragment: str = "") -> Draft202012Validator:
-        uri = (self.root / relative).as_uri() + (f"#{fragment}" if fragment else "")
-        return Draft202012Validator(
-            {"$ref": uri}, registry=self._registry, format_checker=Draft202012Validator.FORMAT_CHECKER
-        )
+        super().__init__(contracts, format_check=True)
 
     def issues(self, relative: str, instance: Any, prefix: str, fragment: str = "") -> list[Issue]:
-        errors = sorted(
-            self.validator(relative, fragment).iter_errors(instance), key=lambda e: list(e.absolute_path)
-        )
         out: list[Issue] = []
-        for e in errors[:MAX_REPORTED]:
+        for e in self.iter_errors(relative + (f"#{fragment}" if fragment else ""), instance)[:MAX_REPORTED]:
             # a failed oneOf/anyOf carries the useful message in its best sub-error
             message = e.message
             if e.context:
                 sub = best_match(e.context)
                 if sub is not None:
-                    message = f"{sub.message} (at {_pointer(prefix, sub.absolute_path)})"
-            out.append(Issue(_pointer(prefix, e.absolute_path), message, "schema"))
+                    message = f"{sub.message} (at {json_pointer(sub.absolute_path, prefix)})"
+            out.append(Issue(json_pointer(e.absolute_path, prefix), message, "schema"))
         return out
 
 

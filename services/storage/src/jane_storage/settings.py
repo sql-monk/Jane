@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import dataclasses
+import logging
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
@@ -17,6 +21,12 @@ from .packages import ArchiveLimits
 from .policy import AddressError, ConnectionPolicy, service_url
 
 ENV_PREFIX = "JANE_STORAGE_"
+LEGACY_RETRIES = "retries"
+"""Before WP-17 the core's CONFLICT retries were ``limits.retries``; in the service's own (non-shared) layers the
+old group is a deprecated alias of ``conflict_retries`` (``JANE_STORAGE_LIMITS__RETRIES__*``)."""
+
+log = logging.getLogger(__name__)
+_LEGACY_WARNED: set[str] = set()
 
 
 class Settings(JaneSettings):
@@ -177,10 +187,41 @@ class ServiceLimits(Limits):
     packages: PackageLimits = PackageLimits()
 
 
+def _legacy_retries(layer: LimitLayer) -> LimitLayer:
+    """``retries`` of an environment layer as the deprecated alias of ``conflict_retries`` (values and hard caps).
+
+    A shared platform file keeps ``retries`` as the contract path of the caller's policy (ignored here); when both
+    groups set the same field, ``conflict_retries`` wins. Warned once per process and layer."""
+    if layer.shared:
+        return layer
+    docs: dict[str, dict[str, Any]] = {"values": dict(layer.values), "hard_caps": dict(layer.hard_caps)}
+    moved = []
+    for part, doc in docs.items():
+        old = doc.get(LEGACY_RETRIES)
+        if not isinstance(old, Mapping) or not old:
+            continue
+        del doc[LEGACY_RETRIES]
+        doc["conflict_retries"] = {**old, **dict(doc.get("conflict_retries") or {})}
+        moved.append(part)
+    if not moved:
+        return layer
+    if layer.label not in _LEGACY_WARNED:
+        _LEGACY_WARNED.add(layer.label)
+        log.warning(
+            "deprecated limits group 'retries' taken as 'conflict_retries': rename "
+            f"{ENV_PREFIX}LIMITS__RETRIES__* to {ENV_PREFIX}LIMITS__CONFLICT_RETRIES__*",
+            extra={"layer": layer.label, "parts": moved},
+        )
+    return dataclasses.replace(layer, values=docs["values"], hard_caps=docs["hard_caps"])
+
+
 def resolve_service_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLimits[ServiceLimits]:
     """Defaults <- platform file (``..._LIMITS_FILE``) <- ``JANE_STORAGE_LIMITS__*`` <- ``extra``
     (request layer from ``HandlerInvocation.limits``).
 
     The platform file may be a whole platform profile (``deploy/profiles/<profile>.json``): contract limits
-    storage does not have are ignored (``ResolvedLimits.ignored``, start-up log); typos fail."""
-    return resolve_limits(ServiceLimits, *settings.platform_layers(f"{ENV_PREFIX}LIMITS__"), *extra)
+    storage does not have are ignored (``ResolvedLimits.ignored``, start-up log); typos fail. The old
+    ``JANE_STORAGE_LIMITS__RETRIES__*`` (and ``HARD_CAPS__RETRIES__*``) still configure the CONFLICT retries, with a
+    deprecation warning (:func:`_legacy_retries`)."""
+    layers = [_legacy_retries(layer) for layer in settings.platform_layers(f"{ENV_PREFIX}LIMITS__")]
+    return resolve_limits(ServiceLimits, *layers, *extra)

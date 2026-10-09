@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from collections.abc import Mapping
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,8 +18,10 @@ from fastapi.testclient import TestClient
 
 from jane_contracts.storage_adapter import CommitOutcome, CommitResult
 from jane_kit.clients import RetryPolicy
+from jane_kit.config import LimitError
 from jane_kit.contracts import OpenAPISpec
 from jane_storage import connections as connections_module
+from jane_storage import settings as settings_module
 from jane_storage.app import build_app
 from jane_storage.connections import AdapterPool, ConnectionRegistry
 from jane_storage.engine import ConflictRetriesExhausted, StorageEngine
@@ -226,6 +229,43 @@ def test_conflict_retries_come_only_from_the_service_configuration(monkeypatch: 
     # the stage's retries in HandlerInvocation.limits never reach the core
     with TestClient(build_app(settings)) as c:
         assert c.app.state.limits.limits.conflict_retries == lim  # type: ignore[attr-defined]
+
+
+def test_old_retries_variables_are_a_deprecated_alias_of_conflict_retries(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Before WP-17 ``JANE_STORAGE_LIMITS__RETRIES__*`` configured the CONFLICT retries: a deployment that still sets
+    them must keep starting (review of WP-17), with a warning; the new name wins when both set a field."""
+    settings_module._LEGACY_WARNED.clear()
+    monkeypatch.setenv("JANE_STORAGE_LIMITS__RETRIES__MAX_ATTEMPTS", "6")
+    monkeypatch.setenv("JANE_STORAGE_LIMITS__RETRIES__INITIAL_BACKOFF_MS", "15")
+    monkeypatch.setenv("JANE_STORAGE_LIMITS__HARD_CAPS__RETRIES__MAX_ATTEMPTS", "8")
+    with caplog.at_level(logging.WARNING, logger="jane_storage.settings"):
+        resolved = resolve_service_limits(Settings(log_format="console"))
+    lim = resolved.limits.conflict_retries
+    assert (lim.max_attempts, lim.initial_backoff_ms) == (6, 15)
+    assert resolved.hard_caps["conflict_retries.max_attempts"] == 8
+    assert any("JANE_STORAGE_LIMITS__CONFLICT_RETRIES__" in r.getMessage() for r in caplog.records)
+    # the new name wins field by field; the old one still fills the rest
+    monkeypatch.setenv("JANE_STORAGE_LIMITS__CONFLICT_RETRIES__MAX_ATTEMPTS", "3")
+    both = resolve_service_limits(Settings(log_format="console")).limits.conflict_retries
+    assert (both.max_attempts, both.initial_backoff_ms) == (3, 15)
+    # the service starts with the old variables (it failed with "unknown limit(s) ['retries.max_attempts']")
+    with TestClient(build_app(Settings(log_format="console"))) as c:
+        assert c.get("/v1/health").status_code == 200
+    # a typo under the old name is still an error, not silently ignored
+    monkeypatch.setenv("JANE_STORAGE_LIMITS__RETRIES__MAX_ATTEMPT", "2")
+    with pytest.raises(LimitError, match="max_attempt"):
+        resolve_service_limits(Settings(log_format="console"))
+
+
+def test_profile_retries_are_not_taken_as_the_old_alias(tmp_path: Path) -> None:
+    """In a platform file ``retries`` is the contract policy of the caller: still ignored, not an alias."""
+    profile = tmp_path / "profile.json"
+    profile.write_text(json.dumps({"defaults": {"retries": {"max_attempts": 9}}}), encoding="utf-8")
+    resolved = resolve_service_limits(Settings(log_format="console", limits_file=profile))
+    assert resolved.limits.conflict_retries == ConflictRetries()
+    assert "retries.max_attempts" in resolved.ignored
 
 
 class _AlwaysConflict:

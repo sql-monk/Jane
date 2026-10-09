@@ -4,7 +4,7 @@ Algorithm for one ``EntityRecord`` (delivery key ``<invocation delivery_key>#<n>
 
 1. ``get_delivery`` — already recorded → the stored ack with ``status: duplicate``;
 2. ``read_entity`` → :func:`jane_storage.merge.merge` (pure) → ``commit_entity`` with the read version;
-3. ``CONFLICT`` → re-read and retry (bounded by ``limits.retries``); ``DUPLICATE`` → as in step 1;
+3. ``CONFLICT`` → re-read and retry (bounded by ``limits.conflict_retries``); ``DUPLICATE`` → as in step 1;
    ``COMMITTED`` → ``WriteAck`` ``written | partially_stale | stale``.
 
 Objects: ``get_delivery`` → ``put_object`` (idempotent by key) → ``record_delivery`` (insert-if-absent).
@@ -39,7 +39,7 @@ __all__ = ["ConflictRetriesExhausted", "StorageEngine", "backoff_ms", "stored_ob
 
 
 class ConflictRetriesExhausted(AdapterError):
-    """Concurrent writers kept winning for longer than ``limits.retries.max_attempts``."""
+    """Concurrent writers kept winning for longer than ``limits.conflict_retries.max_attempts``."""
 
     def __init__(self, message: str) -> None:
         super().__init__(message, retryable=True)

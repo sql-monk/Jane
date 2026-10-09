@@ -407,8 +407,9 @@ export interface components {
      */
     "limits.schema": {
       concurrency?: {
-        /** @description Одночасні завантаження одного колектора (на екземпляр). */
+        /** @description Одночасні завантаження одного збору колектора (на екземпляр). */
         max_parallel_fetches?: number;
+        /** @description Одночасні запити до одного хоста джерела (host[:port]) від усієї платформи: усіх зборів і одноразових запитів колектора разом, також усіх його екземплярів, що ділять сховище стану (один вузол, спільний каталог стану). Якщо активні на хості збори мають різні значення, діє найменше. Екземпляри з окремими сховищами стану — окремі колектори й між собою цей ліміт не узгоджують. */
         max_parallel_fetches_per_host?: number;
         /** @description Одночасні виклики обробника (на екземпляр сервісу-виконавця або на етап). */
         max_parallel_invocations?: number;
@@ -418,7 +419,9 @@ export interface components {
         max_parallel_stage_items?: number;
       };
       rate?: {
+        /** @description Частота стартів запитів до одного хоста джерела; область дії — як у concurrency.max_parallel_fetches_per_host (уся платформа: усі збори, одноразові запити й екземпляри зі спільним сховищем стану). Інтервал між стартами = max(1 / requests_per_second_per_host, min_delay_ms_per_host, Crawl-delay за respect_crawl_delay); між активними на хості зборами діє найбільший інтервал. */
         requests_per_second_per_host?: number;
+        /** @description Мінімальний інтервал між стартами запитів до одного хоста джерела; область дії — як у requests_per_second_per_host. */
         min_delay_ms_per_host?: number;
         burst_per_host?: number;
         /** @description Враховувати Crawl-delay з robots.txt (може лише збільшити затримку). */
@@ -512,7 +515,7 @@ export interface components {
       /** @enum {string} */
       period: "run" | "day" | "week" | "month" | "total";
     };
-    /** @description Ліміти рівня платформи: типові значення й жорсткі стелі. */
+    /** @description Ліміти рівня platform — найширшого рівня успадкування: типові значення й жорсткі стелі одного розгортання (профілю, docs/adr/0007-target-environments.md), однакові для всіх сервісів і всіх їхніх екземплярів. Нижчі рівні (source, task, stage, request) лише перекривають типові значення, hard_caps їх обмежують. Область дії ліміту задає його опис: «на екземпляр» (concurrency.max_parallel_fetches, max_parallel_invocations) — кожен екземпляр окремо; «на хост» (concurrency.max_parallel_fetches_per_host, rate.*_per_host) — хост джерела для всієї платформи, разом для всіх екземплярів колектора зі спільним сховищем стану. */
     PlatformLimits: {
       /** @description Ім'я профілю середовища, з якого взято значення (див. docs/adr/0007-target-environments.md). */
       profile?: string;
@@ -783,7 +786,10 @@ export interface components {
       use_robots_txt?: boolean;
       /** @description Пропускати записи з lastmod раніше за цю дату. */
       lastmod_since?: components["schemas"]["Timestamp"];
-      /** @default true */
+      /**
+       * @description Передавати lastmod записів ядру: у зборі mode=incremental запис, чий lastmod пізніший за попереднє завантаження URL, завантажується знову навіть за revisit.mode=never чи до спливання інтервалу (див. WebRules.revisit). false — lastmod sitemap на повторні відвідування не впливає.
+       * @default true
+       */
       use_lastmod_for_revisit?: boolean;
     } & (components["schemas"]["StrategyCommon"] & {
       /** @constant */
@@ -813,7 +819,7 @@ export interface components {
       /** @default href */
       attribute?: string;
     };
-    /** @description Сторінки категорій, пагінації або пошуку: із кожної сторінки списку беруться посилання на матеріали та посилання на наступну сторінку. */
+    /** @description Сторінки категорій, пагінації або пошуку: із кожної сторінки списку беруться посилання на матеріали та посилання на наступну сторінку. Сторінки списку, відомі стратегії, читаються повністю в кожному зборі (і в mode=incremental: їх не пропускає revisit і не запитують умовно), щоб знаходити нові елементи; самі елементи підлягають revisit. */
     ListingStrategy: {
       /** @constant */
       type: "listing";
@@ -866,19 +872,19 @@ export interface components {
       /** @constant */
       type: "url_template";
     });
-    /** @description Перелік матеріалів із документованого API або JSON-каналу сайту. Web Collector v1 виконує GET, якщо стратегія api_feed зареєстрована. POST і emit_items_as_materials: true зарезервовані: правила з ними валідні за схемою, але /v1/rules/validations повертає valid: true, supported: false, а запуск збору відхиляється HTTP 422 validation_failed. */
+    /** @description Перелік матеріалів із документованого API або JSON-каналу сайту. Сторінки API — навігаційні документи (через ту саму політику scope/robots/лімітів/бюджету ядра, що й решта запитів). Без emit_items_as_materials URL з url_path кожного елемента пропонуються ядру як кандидати в матеріали; з emit_items_as_materials: true кожен елемент сам видається як Material. Виконується Web Collector з версії контракту стратегій 1.1 (WP-16); раніше POST і emit_items_as_materials давали supported: false. */
     ApiFeedStrategy: {
       /** @constant */
       type: "api_feed";
       /** Format: uri */
       url: string;
       /**
-       * @description GET — типовий виконуваний метод. POST зарезервований у Web Collector v1: schema-valid, але supported: false; збір відхиляється validation_failed.
+       * @description Метод запиту сторінок API. POST надсилає body як JSON (Content-Type: application/json) на кожну сторінку; параметри пагінації (cursor_param, page_param) лишаються параметрами запиту URL, next_url_path дає URL наступної сторінки. POST має бути запитом лише на читання: ядро повторює його за тією самою політикою retries, що й GET; переадресація 307/308 повторює POST з тілом, 301/302/303 — продовжує GET без тіла.
        * @default GET
        * @enum {string}
        */
       method?: "GET" | "POST";
-      /** @description JSON-тіло для POST; опція зарезервована разом із POST і не виконується Web Collector v1. */
+      /** @description JSON-тіло для method: POST (будь-яке JSON-значення), однакове для всіх сторінок; для GET не використовується. */
       body?: unknown;
       /** @description JSONPath до масиву елементів, наприклад '$.items'. */
       items_path: string;
@@ -886,7 +892,7 @@ export interface components {
       url_path: string;
       lastmod_path?: string;
       /**
-       * @description true — зарезервована опція видачі кожного елемента JSON як окремого матеріалу (application/json). Web Collector v1 її не виконує: schema-valid, але supported: false; збір відхиляється validation_failed.
+       * @description true — кожен елемент items_path видається як окремий Material: media_type application/json (елемент, серіалізований як JSON), content_kind json, material_id — від канонічного URL з url_path (той самий об'єкт, що й сторінка за цим URL), edited_at — з lastmod_path, discovery.parent_url — сторінка API, без http і locator.final_url. URL елементів не завантажуються; ядро закріплює їх у зборі, тож інша стратегія не завантажує той самий URL у цьому зборі (один матеріал на канонічний URL). У mode=incremental елементи підлягають revisit і dedup так само, як сторінки (if_changed — за зміною вмісту елемента).
        * @default false
        */
       emit_items_as_materials?: boolean;
@@ -1003,7 +1009,7 @@ export interface components {
       };
       revisit?: {
         /**
-         * @description if_changed — умовні запити (ETag/If-Modified-Since); інтервал — limits.crawl.revisit_interval_seconds.
+         * @description Повторне відвідування URL, відомих з історії state_key, у зборі mode=incremental (у full завантажується все). never — відомі успішні URL не завантажуються (їхні збережені посилання продовжують рекурсію); interval — лише старші за limits.crawl.revisit_interval_seconds; if_changed — умовні запити (ETag/If-Modified-Since), 304 не видається. Для всіх режимів: lastmod кандидата (sitemap з use_lastmod_for_revisit, feed, api_feed з lastmod_path), пізніший за попереднє завантаження URL, змушує завантажити його знову; старіший чи відсутній lastmod не забороняє того, що дозволяє режим. Навігаційні документи (sitemap, стрічки, сторінки API) і сторінки списків listing читаються повністю в кожному зборі; URL, що минулого разу впали (4xx/5xx), пробуються знову.
          * @default never
          * @enum {string}
          */
@@ -1147,9 +1153,9 @@ export interface components {
       /** @description Версія вмісту. Однаковий content_sha256 у двох спостереженнях означає незмінений вміст. */
       revision: {
         content_sha256: components["schemas"]["Sha256Hex"];
-        /** @description Версія, яку надає джерело: ETag, Last-Modified, Telegram edit_date. */
+        /** @description Версія, яку надає джерело: ETag, Last-Modified, Telegram edit_date (або date неред. повідомлення) в epoch seconds. */
         source_revision?: string;
-        /** @description Монотонний номер ревізії для порядку спостережень, якщо його надає джерело (Telegram: edit_date як epoch seconds; web: відсутній). */
+        /** @description Строго монотонний номер ревізії того самого material_id для порядку спостережень, якщо джерело дає основу для нього; кожна нова ревізія має більший sequence. Telegram: edit_date (або date неред. повідомлення) в epoch seconds × 1000 + порядковий номер ревізії з іншим текстом, яку колектор побачив у межах тієї самої секунди (0 — перша), тож кілька редагувань за секунду мають різні зростаючі значення (до 1.1 — просто epoch seconds; значення нового формату завжди більші за старі). Одноразовий POST /v1/fetches дає номер першої ревізії секунди. Web: відсутній. */
         sequence?: number;
         /** @description Джерело позначило матеріал як відредагований (Telegram edit). */
         is_edit?: boolean;
@@ -1208,7 +1214,7 @@ export interface components {
         collection_id?: components["schemas"]["Id"];
       };
       diagnostics?: components["schemas"]["DiagnosticMessage"][];
-      /** @description Додаткові метадані джерела (наприклад title, автор повідомлення, кількість переглядів). Відкритий об'єкт. */
+      /** @description Додаткові метадані джерела (наприклад title, автор повідомлення, кількість переглядів). Відкритий об'єкт. Telegram: service_action — дія службового повідомлення каналу (channel_create, pin_message, chat_edit_title…); таке повідомлення зазвичай має порожній текст, тож завдання може відфільтрувати його умовою material.metadata.service_action not_exists. */
       metadata?: Record<string, unknown>;
     };
     /** @description Ідентичність об'єкта. natural — значення ключових полів схеми (наприклад {"sku": "A-1"}); scope — простір імен (зазвичай source_id), щоб однакові SKU різних джерел не злилися. Сховище будує канонічний рядок ключа: scope + '|' + пари natural, відсортовані за іменем, серіалізовані як JSON без пробілів. */

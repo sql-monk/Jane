@@ -49,7 +49,9 @@ hostname і PID збігаються. Явний `<ПРЕФІКС>INSTANCE_ID` �
 
 Один модуль для всіх сервісів: `create_app` вмикає перевірку сам, сервіс лише передає таблицю scopes своїх
 операцій (`auth_scopes=merge(HANDLER, STORAGE)` тощо з `jane_kit.auth_scopes`; таблиці дорівнюють контрактам —
-`tests/test_auth_scopes.py`). Без таблиці (`auth_scopes=None`) лишається лише автентифікація, а scopes
+і переліком операцій, і scope кожної з них (`x-jane-scope`: рядок — один scope, масив — будь-який один, порядок
+не важить; спільні path items `common.yaml` розв'язуються, Health/Info — `[]`) — `tests/test_auth_scopes.py`).
+Без таблиці (`auth_scopes=None`) лишається лише автентифікація, а scopes
 перевіряють обробники (`Depends(require("x:y"))`, `principal_of(request)`).
 
 | Налаштування (env `<PREFIX><НАЗВА>`) | Типово | Значення |

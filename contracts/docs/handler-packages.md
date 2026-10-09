@@ -28,6 +28,22 @@ README.md                    # необов'язково
 Архів — zip, шляхи з `/`, без `..`, без симлінків, без секретів. Дайджест: `sha256` від
 канонічного архіву (файли відсортовані за шляхом, фіксовані час і права) — обчислює registry.
 
+Канонічний ZIP містить лише звичайні файли у порядку ASCII-шляхів: `ZIP_STORED` (без стиснення),
+час `1980-01-01 00:00:00`, Unix `create_system = 3`, права `0o100644 << 16`, без extra/comment.
+Вхідний ZIP registry розпаковує й перепаковує; digest — SHA-256 цих канонічних байтів, а не вхідного ZIP.
+`jane-package.json` із JSON-запиту серіалізується в UTF-8, з відступом 2, збереженим порядком ключів,
+без ASCII escaping і з кінцевим newline. Точна реалізація —
+[`archive.py`](../../services/registry/src/jane_registry/archive.py).
+
+Digest у JSON/OpenAPI прикладах **ілюстративні**: вони показують формат і зв'язки посилань,
+а не підтверджують байти архіву, який не постачається з прикладом. Для виконання/імпорту беріть digest
+із відповіді registry або обчислюйте з фактичного канонічного ZIP; його перевіряють також storage/runtime.
+Невідомий `dependencies.runtime_profile` registry відхиляє як `dependency_not_allowed`; якщо профілі
+не вдалося завантажити із зовнішнього джерела, повертає `upstream_unavailable`. Runtime також відхиляє
+відсутній профіль/образ як `dependency_not_allowed`. У diff `jane-package.json`
+представлено тільки в `manifest_changes`, решта файлів — у `files`
+([`diffing.py`](../../services/registry/src/jane_registry/diffing.py)).
+
 ## Обов'язкові властивості
 
 - **Точна версія** (SemVer); етап завдання посилається на `package_id@version` (+ `digest`).

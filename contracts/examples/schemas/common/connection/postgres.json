@@ -10,7 +10,7 @@
     "sslmode": "prefer"
   },
   "secret_refs": {
-    "username": "env:RESULTS_PG_USER",
-    "password": "env:RESULTS_PG_PASSWORD"
+    "username": "env:JANE_SECRET_RESULTS_PG_USER",
+    "password": "env:JANE_SECRET_RESULTS_PG_PASSWORD"
   }
 }

@@ -570,8 +570,8 @@ components:
                             port: 5432
                             database: jane_results
                           secret_refs:
-                            username: env:RESULTS_PG_USER
-                            password: env:RESULTS_PG_PASSWORD
+                            username: env:JANE_SECRET_RESULTS_PG_USER
+                            password: env:JANE_SECRET_RESULTS_PG_PASSWORD
                       next_cursor: null
           '401':
             $ref: '#/components/responses/Unauthenticated'

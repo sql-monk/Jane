@@ -301,6 +301,11 @@ paths:
           $ref: 'common.yaml#/components/responses/NotFound'
         '413':
           $ref: 'common.yaml#/components/responses/PayloadTooLarge'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+          description: |
+            Запит із тим самим Idempotency-Key і тілом ще виконується: `idempotency_in_progress`,
+            retryable=true. Повтор після завершення поверне збережену відповідь із Idempotency-Replayed.
         '422':
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
         '429':

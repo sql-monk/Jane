@@ -21,6 +21,9 @@ Checkout координатора для злиттів — `.claude/worktrees/i
 | C-3: формат Python-контрактів | `wp/23c-contracts-format`, `wp23c` | прийнято й запушено, merge `0dc2ded` |
 | C-4: прибирання | `.jane/cleanup-post-m3.ps1` | останнім: після WP-19, завершення B і фінального CI C |
 
+Поточний фінальний CI C: **dispatch count 1**, run **37942655574**, SHA `133bb5a`; результат очікується.
+C-4 ще не починався. Нижчі записи count 0 — історичні знімки до цього dispatch.
+
 ## C-1: факти й перевірки
 
 `DEVELOPMENT.md` і кореневий `README.md` описують aliases WP-18, закріплений образ oasdiff WP-21,
@@ -274,3 +277,42 @@ Origin `50f5e23` містить запит перевірити виправле
 **Фінальний C dispatch count 0, intent/run ID ще не створено.** Перед майбутнім dispatch
 перевірити свіжі journal/state/gh runs, зафіксувати expected SHA й intent, потім виконати лише один run.
 C-4 чекає цього CI success; людський cleanup script лишається незміненим, -Apply не виконувався.
+
+## WP-19b прийнято; єдиний фінальний CI C запущено
+
+2026-10-09 17:12–17:14 (Київ): fresh origin містить
+`88ec1682ec4f7b2a0e6c13745707ddc73ad16122 merge: accept WP-19b Telegram short-page test consumer`.
+Origin status `133bb5a` підтверджує незалежне accepted R1 нового інкремента та old-fail/new-pass
+відтворення, threshold=12, timeout=20, queue=10, exactly-once=80 збережено.
+Actual [branch CI 37940359810](https://github.com/sql-monk/Jane/actions/runs/37940359810)
+на `b29a0406645c6b846211cade14a2a5d9ae697e76` — completed/success, 7 jobs success,
+4 skipped за правилами push. Telegram owner request C-2 закрито цим прийнятим інкрементом.
+B за origin `cbe8653` фактично завершений; final CI 14/14, API e2e 79 passed.
+Чужі успішні тести/review не повторювались.
+
+Перед dispatch перевірено origin-журнал C та ignored `.jane/stream-c-state.json`: count 0,
+`.jane/stream-c-full-ci.json` відсутній. Actual gh list показав лише B final run 37937013460
+і старі M3 runs. Після `pull --ff-only` HEAD та origin integration —
+`133bb5a0604ccbc3ce41a820216d4751f301a47b`, detached HEAD без `.jane-wp`;
+ancestry C-2 `fdad210`, C-3 `0dc2ded`, WP-19b `88ec168` перевірено.
+
+Intent **2026-10-09T14:13:49.1497106Z**, expected SHA
+`133bb5a0604ccbc3ce41a820216d4751f301a47b`, dispatch count 1 та attempts 0 збережено
+в `.jane/stream-c-full-ci.json` **до** виклику; attempts 1 записано перед мережею.
+
+```text
+$ gh workflow run ci --ref codex/jane-integration --repo sql-monk/Jane
+https://github.com/sql-monk/Jane/actions/runs/37942655574
+exit=0
+$ gh run view 37942655574 --repo sql-monk/Jane --json status,conclusion,headSha,event,url,createdAt,jobs
+status=in_progress; conclusion=""; event=workflow_dispatch
+headSha=133bb5a0604ccbc3ce41a820216d4751f301a47b
+createdAt=2026-10-09T14:14:08Z
+```
+
+Фінальний run — [37942655574](https://github.com/sql-monk/Jane/actions/runs/37942655574);
+actual SHA рівний expected SHA. ID/URL, dispatch exit/time та метадані записано у власний ignored стан;
+сирий вивід — `.jane/stream-c-full-ci-dispatch.txt`, JSON — `.jane/stream-c-full-ci-37942655574.json`.
+**Це один фінальний dispatch C, verdict ще не отримано.** Продовжувати саме цей run;
+невідомий результат спершу шукати в gh, жодного дублюючого dispatch.
+Локальні full check/e2e не запускались. C-4 і застосування cleanup — лише після actual success цього run.

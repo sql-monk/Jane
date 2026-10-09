@@ -57,7 +57,9 @@ def test_flag_on_suggests_expanding_expected_types(w: World) -> None:
         "purpose": "unknown_material",
         "source_id": "shop-example",
         "task_id": "shop-catalog",
+        "run_id": r.json()["job_id"],  # the run of a period=run budget is this job (R13)
     }
+    assert req["limits"]["budget"] == {"amount": 2.0, "currency": "USD", "period": "run"}
     assert "Ignore previous" not in req["instructions"]
 
 

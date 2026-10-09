@@ -1,15 +1,22 @@
 """LLM gateway core: model resolution, prompt assembly, budgets and rates, provider call, schema validation.
 
-Budget semantics (``llm.v1``: platform -> source -> task):
+Budget semantics (``llm.v1``: platform -> source -> task; ``limits.schema.json`` ``Budget``):
 
 * the platform budget is the stored ``BudgetDefinition`` ``platform/platform`` or, if none, the configured
   ``limits.llm.budget``; source and task budgets exist only when defined (``PUT /v1/budgets``);
-  ``limits.llm.budget`` of a request narrows the most specific scope of the request (``min`` with a stored one);
+* ``limits.llm.budget`` of a request is one more budget of the **most specific scope of the request**
+  (``task`` if ``scope.task_id``, else ``source`` if ``scope.source_id``, else ``platform``). It only narrows:
+  it never replaces a stored or platform budget. With the same currency and period as the stored budget of that
+  scope both use one counter and the smaller amount applies; otherwise both are checked;
+* a counter is ``(scope, currency, window)``; the window of ``day``/``week``/``month`` is the UTC calendar
+  period, ``total`` has one window, ``run`` counts per ``scope.run_id`` and, without a ``run_id``, per this
+  completion (all its schema retries) - a budget is never skipped;
 * every applicable budget is checked before **each** provider call with a worst-case reservation
   (estimated input tokens + ``max_output_tokens`` at the model's price): the call happens only if
-  ``spent + reserved + estimate <= limit`` for every budget, atomically in the shared store; after the
-  call the reservation is replaced by the actual cost. So concurrent requests on any number of instances
-  never overspend a budget, and an exhausted budget stops calls (429 ``budget_exhausted``, no provider call);
+  ``spent < limit`` and ``spent + reserved + estimate <= limit`` for every budget, atomically in the shared
+  store; after the call the reservation is replaced by the actual cost. So ``amount: 0`` allows no call at all
+  (not even a zero-priced model), ``exhausted`` (``spent >= limit``) means no further call in the window, and
+  a refused call never reaches the provider (429 ``budget_exhausted``);
 * ``max_requests_per_minute`` is enforced per scope (platform, source, task and provider) the same way.
 """
 
@@ -210,45 +217,57 @@ class Gateway:
         request_limits: LlmLimitsIn | None,
         provider: Provider,
         now: datetime,
+        *,
+        run_key: str | None = None,
     ) -> tuple[list[BudgetCheck], list[RateCheck]]:
-        budgets: dict[tuple[str, str], Budget] = {}
+        """Budget and rate checks of one provider call.
+
+        ``run_key`` is the window of ``period: run`` budgets: ``scope.run_id`` or, for a completion without a
+        run, the completion itself. Without one (only the read-only status of ``GET /v1/budgets``) ``run``
+        budgets have no current window and are left out.
+        """
+        budgets: list[tuple[str, str, Budget]] = []
         rates: dict[tuple[str, str], int] = {}
         for st, sid, d in defs:
             if d and d.budget:
-                budgets[(st, sid)] = d.budget
+                budgets.append((st, sid, d.budget))
             if d and d.max_requests_per_minute:
                 rates[(st, sid)] = d.max_requests_per_minute
         platform = self.limits.llm
-        budgets.setdefault(
-            ("platform", "platform"),
-            Budget(
-                amount=platform.budget.amount,
-                currency=platform.budget.currency,
-                period=platform.budget.period,
-            ),
-        )
+        if not any(st == "platform" for st, _, _ in budgets):
+            budgets.append(
+                (
+                    "platform",
+                    "platform",
+                    Budget(
+                        amount=platform.budget.amount,
+                        currency=platform.budget.currency,
+                        period=platform.budget.period,
+                    ),
+                )
+            )
         rates.setdefault(("platform", "platform"), platform.max_requests_per_minute)
         st, sid = scope.levels()[-1]
         if request_limits and request_limits.budget:
-            rb, current = request_limits.budget, budgets.get((st, sid))
-            same = current and current.currency == rb.currency and current.period == rb.period
-            budgets[(st, sid)] = rb if not current or not same or rb.amount < current.amount else current
+            # One more budget of the most specific scope: it narrows, never replaces (see the module docstring).
+            budgets.append((st, sid, request_limits.budget))
         if request_limits and request_limits.max_requests_per_minute:
             rates[(st, sid)] = min(rates.get((st, sid), 10**9), request_limits.max_requests_per_minute)
         if provider.limits and provider.limits.max_requests_per_minute:
             rates[("provider", provider.provider_id)] = provider.limits.max_requests_per_minute
 
-        checks = []
-        for (bst, bsid), b in budgets.items():
-            w = window(b.period, now, scope.run_id)
+        by_counter: dict[CounterKey, BudgetCheck] = {}
+        for bst, bsid, b in budgets:
+            w = window(b.period, now, run_key if run_key is not None else scope.run_id)
             if w is None:
-                log.warning("budget with period=run skipped: request has no run_id", extra={"scope": bst})
-                continue
-            checks.append(
-                BudgetCheck(
-                    CounterKey(bst, bsid, f"{b.currency}:{w[0]}"), b.amount, b.currency, b.period, w[1]
-                )
+                continue  # period=run without a current run: only possible for the status view
+            check = BudgetCheck(
+                CounterKey(bst, bsid, f"{b.currency}:{w[0]}"), b.amount, b.currency, b.period, w[1]
             )
+            current = by_counter.get(check.key)
+            if current is None or check.limit < current.limit:
+                by_counter[check.key] = check  # the same counter: the smaller amount applies
+        checks = list(by_counter.values())
         minute = f"rpm:{now:%Y%m%d%H%M}"
         rate_checks = [
             RateCheck(CounterKey(rst, rsid, minute), limit, max(1, 60 - now.second))
@@ -257,6 +276,9 @@ class Gateway:
         return checks, rate_checks
 
     async def budget_status(self, checks: list[BudgetCheck]) -> list[dict[str, Any]]:
+        """``BudgetStatus`` per check: ``spent`` is the settled cost in the counter's window (reservations of
+        calls in flight are not included); ``exhausted`` = ``spent >= limit`` - no further call in this window
+        until it resets or the budget is raised (a call is refused earlier when its estimate does not fit)."""
         out = []
         for c in checks:
             if c.key.scope_type not in {"platform", "source", "task"}:
@@ -351,7 +373,9 @@ class Gateway:
             estimate = (est_in * pricing.input_per_mtok + max_out * pricing.output_per_mtok) / 1_000_000
             now = self.clock()
             defs = await self.budget_definitions(scope)
-            checks, rate_checks = self._plan(scope, defs, req.limits, rm.provider, now)
+            checks, rate_checks = self._plan(
+                scope, defs, req.limits, rm.provider, now, run_key=scope.run_id or completion_id
+            )
             mismatched = [c for c in checks if c.currency != pricing.currency]
             if mismatched:
                 raise ValidationFailed(

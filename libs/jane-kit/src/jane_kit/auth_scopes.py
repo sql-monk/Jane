@@ -102,10 +102,12 @@ LLM: dict[str, Scopes] = {
 }
 
 ASSISTANT: dict[str, Scopes] = {
+    "GET /v1/onboarding-sessions": "assistant:use",
     "POST /v1/onboarding-sessions": "assistant:use",
     "GET /v1/onboarding-sessions/{session_id}": "assistant:use",
     "POST /v1/onboarding-sessions/{session_id}/candidate-selection": "assistant:use",
     "POST /v1/onboarding-sessions/{session_id}/proposals/{proposal_id}/acceptance": "assistant:use",
+    "GET /v1/improvement-runs": "assistant:use",
     "POST /v1/improvement-runs": "assistant:use",
     "POST /v1/unknown-materials": "assistant:use",
     **_jobs("assistant:use", "assistant:use"),

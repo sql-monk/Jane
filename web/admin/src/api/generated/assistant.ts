@@ -42,9 +42,24 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    /**
+     * Сесії підключення, новіші першими (відновлення стану адмінки після перезавантаження)
+     * @description Курсорна пагінація (`limit`, `cursor` → `next_cursor`, `null` — сторінок більше немає; чужий курсор — 422).
+     *     Порядок — `created_at` спадно, за рівності — `session_id` спадно; нові сесії новіші за курсор, тож не
+     *     з'являються на наступних сторінках і не зсувають їх. Фільтр `status` бачить той самий стан, що й `GET` сесії.
+     *     Елементи — короткий стан сесії; повний (кандидати, вибірка, аналіз, варіанти) —
+     *     `GET /v1/onboarding-sessions/{session_id}`. Сесії без змін довше за налаштований строк зберігання
+     *     асистента (`state.session_retention_seconds`) видаляються.
+     */
+    get: operations["listOnboardingSessions"];
     put?: never;
-    /** Почати підключення джерела (назва сайту/каналу або точне посилання) */
+    /**
+     * Почати підключення джерела (назва сайту/каналу або точне посилання)
+     * @description 202 + Job (`kind: onboarding`). Ідентифікатор створеної сесії — `Job.labels.session_id`, її адреса —
+     *     `Job.links.session` (`/v1/onboarding-sessions/{session_id}`); ті самі поля мають усі job сесії
+     *     (продовження після `selectCandidate`, `acceptProposal`). `Job.result` завершеного job — `OnboardingSession`
+     *     на момент завершення (зокрема `needs_disambiguation`, `proposals_ready`, `insufficient_sample`).
+     */
     post: operations["startOnboarding"];
     delete?: never;
     options?: never;
@@ -122,7 +137,15 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    /**
+     * Запуски вдосконалення (job `kind = improvement`), новіші першими
+     * @description Job, створені `startImprovement`, з `result` = `ImprovementResult` для завершених — щоб адмінка відновила
+     *     список після перезавантаження. Курсорна пагінація (`limit`, `cursor` → `next_cursor`); порядок —
+     *     `created_at` спадно, за рівності — `job_id` спадно. Фільтри — за мітками job (`labels.package_id`,
+     *     `labels.source_id`, `labels.problem_group_id`) і станом. Завершені job зберігаються
+     *     `limits.transfer.job_retention_seconds` асистента.
+     */
+    get: operations["listImprovementRuns"];
     put?: never;
     /**
      * Вдосконалити екстрактор на проблемних прикладах (нова версія або форк)
@@ -165,7 +188,12 @@ export interface paths {
       };
       cookie?: never;
     };
-    /** Стан, прогрес і результат тривалої операції */
+    /**
+     * Стан, прогрес і результат тривалої операції
+     * @description `Job.result` завершеного (`succeeded`) job за `kind`: `onboarding` — `OnboardingSession`;
+     *     `onboarding_acceptance` — `AcceptanceResult`; `improvement` — `ImprovementResult`;
+     *     `unknown_material` — `UnknownMaterialResult`. Job сесії підключення мають `labels.session_id` і `links.session`.
+     */
     get: operations["getJob"];
     put?: never;
     post?: never;
@@ -273,20 +301,39 @@ export interface components {
       };
       risks?: string[];
     };
+    /** @enum {string} */
+    OnboardingStatus:
+      | "resolving"
+      | "needs_disambiguation"
+      | "sampling"
+      | "analyzing"
+      | "proposals_ready"
+      | "insufficient_sample"
+      | "applying"
+      | "completed"
+      | "failed"
+      | "cancelled";
+    /** @description Короткий стан сесії для списку; повний — `OnboardingSession`. */
+    OnboardingSessionSummary: {
+      session_id: components["schemas"]["Id"];
+      status: components["schemas"]["OnboardingStatus"];
+      query: string;
+      selected_candidate_id?: string;
+      /** @description Скільки варіантів збору запропоновано. */
+      proposal_count?: number;
+      costs?: components["schemas"]["Money"];
+      /** @description Останній job сесії (`GET /v1/jobs/{job_id}`). */
+      job_id?: string;
+      created_at: components["schemas"]["Timestamp"];
+      error?: components["schemas"]["problem.schema"];
+    };
+    OnboardingSessionList: {
+      items: components["schemas"]["OnboardingSessionSummary"][];
+      next_cursor: components["schemas"]["NextCursor"];
+    };
     OnboardingSession: {
       session_id: components["schemas"]["Id"];
-      /** @enum {string} */
-      status:
-        | "resolving"
-        | "needs_disambiguation"
-        | "sampling"
-        | "analyzing"
-        | "proposals_ready"
-        | "insufficient_sample"
-        | "applying"
-        | "completed"
-        | "failed"
-        | "cancelled";
+      status: components["schemas"]["OnboardingStatus"];
       query: string;
       candidates?: components["schemas"]["SourceCandidate"][];
       selected_candidate_id?: string;
@@ -368,6 +415,41 @@ export interface components {
       /** @description Пропозиція розширити очікувані типи даних джерела (приймає користувач). */
       suggested_entity_types?: string[];
       costs?: components["schemas"]["Money"];
+      /** @description Є лише за `outcome = proposal_only` — сама пропозиція (версію не опубліковано). */
+      proposal?: components["schemas"]["ImprovementProposal"];
+    };
+    /**
+     * @description Зміна пакета, якому заборонено автоматичні зміни (`auto_changes_allowed = false`): кандидат пройшов
+     *     тести, але асистент його не публікує. Користувач переглядає `diff` і, якщо погоджується, сам публікує
+     *     версію (`registry.v1` `publishPackageVersion` з `manifest` і файлами `based_on` + `files`).
+     */
+    ImprovementProposal: {
+      /** @description Версія, яку вдосконалено. */
+      based_on: components["schemas"]["package-ref.schema"];
+      /** @description Запропонований номер версії (SemVer за характером зміни схеми); не опублікована. */
+      version: string;
+      /** @enum {string} */
+      schema_change?: "none" | "additive" | "breaking";
+      change_summary?: string;
+      /** @description Маніфест запропонованої версії (з новими тестами з проблемних прикладів і походженням `llm`). */
+      manifest: components["schemas"]["package-manifest.schema"];
+      /**
+       * @description Змінені й додані файли відносно `based_on` у формі `PublishRequest.files` registry. Уся пропозиція
+       *     (компактний JSON, байти UTF-8) не перевищує `improvement.max_proposal_bytes` асистента, якщо вміщається
+       *     її обов'язкова частина; у цій межі по черзі: код і схеми (`src/`, `schemas/`), `diff`, тестові матеріали
+       *     та інші файли. Те, що не вмістилося, — в `omitted_files`. Незмінені файли беруться з `based_on`.
+       */
+      files: {
+        [key: string]: {
+          /** @enum {string} */
+          encoding: "utf-8" | "base64";
+          data: string;
+        };
+      };
+      /** @description Змінені файли, що не вмістились у `files` (зазвичай великі тестові матеріали). */
+      omitted_files?: string[];
+      /** @description Unified diff змінених текстових файлів `src/` і `schemas/` для перегляду; якщо не вміщається в залишок межі — обрізаний із позначкою `[... diff cut at improvement.max_proposal_bytes]`. */
+      diff?: string;
     };
     UnknownMaterialRequest: {
       source_id: string;
@@ -475,6 +557,8 @@ export interface components {
         max_improvement_attempts?: number;
         /** @description Верхня межа вибірки під час дослідження джерела (фактична кількість адаптивна). */
         max_onboarding_samples?: number;
+        /** @description Поріг достатньої впевненості вибірки під час дослідження джерела (ТЗ §8): асистент вибирає матеріали, доки оцінка впевненості не досягне порога; не досягнуто в межах бюджету й max_onboarding_samples — сесія insufficient_sample. Вищий поріг — більша вибірка й витрати, тому hard_caps обмежують його зверху. Типово 0.8. */
+        min_onboarding_confidence?: number;
       };
       transfer?: {
         /** @description Вміст до цього розміру можна передавати inline; більший — лише blob. */
@@ -505,7 +589,7 @@ export interface components {
       backoff_multiplier?: number;
       jitter?: boolean;
     };
-    /** @description Бюджет витрат LLM на рівні (platform/source/task). Перевищення зупиняє нові виклики з кодом budget_exhausted. */
+    /** @description Бюджет витрат LLM на рівні (platform/source/task). Перевищення зупиняє нові виклики з кодом budget_exhausted. Семантика однакова для LLM-шлюзу й асистента: (1) виклик дозволено, лише якщо для кожного застосовного бюджету витрачено < amount і витрачено + зарезервовано + найгірша оцінка вартості виклику ≤ amount; тому amount: 0 означає «LLM вимкнено» для рівня — відхиляється навіть модель із нульовою ціною; (2) витрати рахуються у вікні period: day/week/month — календарний період UTC, total — без скидання, run — окремо для кожного scope.run_id запиту LLM-шлюзу (асистент передає ідентифікатор свого запуску: сесії підключення чи job), а без run_id вікном є сам запит з усіма його повторами; бюджет ніколи не пропускається; (3) бюджет у limits запиту стосується найконкретнішого рівня запиту (task, якщо є task_id, інакше source, інакше platform) і лише звужує: збережені бюджети рівнів діють і далі; з тим самим period і currency лічильник спільний і діє менша сума, інакше перевіряються обидва. */
     Budget: {
       amount: number;
       currency: string;
@@ -575,6 +659,18 @@ export interface components {
       /** @description Додаткові структуровані дані, специфічні для коду (наприклад 'limit', 'actual' для limit_exceeded). */
       details?: Record<string, unknown>;
     };
+    /** @description Непрозорий ідентифікатор, згенерований сервісом-власником (наприклад 'mat_01J9Z...'). Клієнти не розбирають його структуру. */
+    Id: string;
+    Money: {
+      amount: number;
+      currency: string;
+    };
+    /**
+     * Format: date-time
+     * @description Момент часу RFC 3339 з часовою зоною; сервіси повертають UTC із суфіксом 'Z'.
+     */
+    Timestamp: string;
+    NextCursor: string | null;
     /**
      * @description Тип джерела. Розширюється додаванням нових значень (клієнти мають терпіти невідомі значення).
      * @example web
@@ -590,12 +686,9 @@ export interface components {
       max_improvement_attempts?: number;
       /** @description Верхня межа вибірки під час дослідження джерела (фактична кількість адаптивна). */
       max_onboarding_samples?: number;
+      /** @description Поріг достатньої впевненості вибірки під час дослідження джерела (ТЗ §8): асистент вибирає матеріали, доки оцінка впевненості не досягне порога; не досягнуто в межах бюджету й max_onboarding_samples — сесія insufficient_sample. Вищий поріг — більша вибірка й витрати, тому hard_caps обмежують його зверху. Типово 0.8. */
+      min_onboarding_confidence?: number;
     };
-    /**
-     * Format: date-time
-     * @description Момент часу RFC 3339 з часовою зоною; сервіси повертають UTC із суфіксом 'Z'.
-     */
-    Timestamp: string;
     /**
      * Job
      * @description Стан тривалої операції. Будь-який API, що повертає 202 Accepted, повертає Job і заголовок Location: /v1/jobs/{job_id}. Стан читається GET /v1/jobs/{job_id}, скасування — POST /v1/jobs/{job_id}/cancel. Переходи: queued → running → (succeeded | failed); queued|running → cancelling → cancelled (або succeeded/failed, якщо операція завершилась раніше, ніж скасування набрало сили). Термінальні стани: succeeded, failed, cancelled — більше не змінюються. Job живе в сервісі, який його створив; зберігається щонайменше limits.transfer.job_retention_seconds після завершення.
@@ -623,9 +716,6 @@ export interface components {
       };
       labels?: components["schemas"]["Labels"];
     };
-    NextCursor: string | null;
-    /** @description Непрозорий ідентифікатор, згенерований сервісом-власником (наприклад 'mat_01J9Z...'). Клієнти не розбирають його структуру. */
-    Id: string;
     /** @enum {string} */
     JobStatus: "queued" | "running" | "cancelling" | "succeeded" | "failed" | "cancelled";
     JobProgress: {
@@ -1068,9 +1158,9 @@ export interface components {
       version: components["schemas"]["SemVer"];
       digest?: components["schemas"]["Digest"];
     };
-    Money: {
-      amount: number;
-      currency: string;
+    JobList: {
+      items: components["schemas"]["job.schema"][];
+      next_cursor: components["schemas"]["NextCursor"];
     };
     DiagnosticMessage: {
       /** @enum {string} */
@@ -1621,6 +1711,226 @@ export interface components {
       forward_unknown_to_llm?: boolean;
       labels?: components["schemas"]["Labels"];
     };
+    /** @description Відносний шлях усередині пакета, роздільник '/', без '..' і абсолютних шляхів. */
+    PackagePath: string;
+    /** @description Python-код, що виконує handler-runtime у пісочниці. callable приймає (material, params, ctx) і повертає результат SDK екстракторів (WP-06). */
+    PythonEntry: {
+      /** @constant */
+      runtime: "python";
+      /** @description Імпортований модуль відносно каталогу src/ пакета. */
+      module: string;
+      callable: string;
+    };
+    /** @description Пакет збереження — маніфест і конфігурація для сервісу storage; коду немає. */
+    StorageEntry: {
+      /** @constant */
+      executor: "storage";
+      /**
+       * @description Тип адаптера; конкретне підключення задає етап через connections.
+       * @example filesystem
+       * @example postgresql
+       * @example sqlserver
+       * @example mongodb
+       * @example minio
+       * @example s3
+       */
+      adapter: string;
+      /** @enum {string} */
+      writes: "raw" | "entities" | "raw_and_entities" | "data";
+      /** @description Формат збереження, якщо адаптер його підтримує. Перевизначається params.format етапу (якщо params_schema пакета це дозволяє). Деталі — contracts/docs/storage-adapter.md, «Формати RAW». */
+      format?: {
+        /**
+         * @description Відсутнє значення — типова поведінка ТЗ §5 / §13.1 п.4: вебсторінка (text/html, application/xhtml+xml) зберігається як html, будь-який інший RAW — як json (документ Material із вбудованим вмістом). original — байти як отримано; html — лише для HTML-матеріалу (інакше HandlerResult.failed, invalid_params); json — документ Material.
+         * @enum {string}
+         */
+        raw?: "original" | "html" | "json";
+        /**
+         * @default json
+         * @enum {string}
+         */
+        entities?: "json" | "jsonl";
+      };
+      /**
+       * @description Зберігати історію оновлень сутностей.
+       * @default true
+       */
+      history?: boolean;
+    };
+    /** @description Пакет LLM — промпти, схема виходу й параметри моделі для сервісу llm; коду немає. Вихід моделі стає HandlerResult.output.data, а для output.entities[] маніфесту — EntityRecord за правилом contracts/docs/handler-packages.md («Пакет llm: вихід моделі → результат обробника»): поле виходу '<entity_type>s' (або '<entity_type>'), ключові поля message/material/material_id — з material_id матеріалу, observation — з матеріалу. */
+    LlmEntry: {
+      /** @constant */
+      executor: "llm";
+      /** @description Файл довірених інструкцій (системний промпт). */
+      instructions: components["schemas"]["PackagePath"];
+      /** @description Шаблон, що описує, які частини вхідних даних передати моделі як недовірені дані. */
+      input_template?: components["schemas"]["PackagePath"];
+      output_schema: components["schemas"]["PackagePath"];
+      /** @description Псевдонім моделі з конфігурації LLM-сервісу (наприклад 'default', 'cheap', 'strong'), не конкретний провайдер. */
+      model?: string;
+      temperature?: number;
+      max_output_tokens?: number;
+    };
+    CollectorRulesEntry: {
+      /**
+       * @example web
+       * @example telegram
+       */
+      collector: string;
+      /** @description Файл правил за collector-rules.schema.json. */
+      rules: components["schemas"]["PackagePath"];
+    };
+    ExecutorEntry: {
+      /** @description Ім'я сервісу-виконавця, що реалізує handler.v1 (наприклад 'storage', 'llm'). */
+      executor: string;
+      operation?: string;
+    };
+    InputContract: {
+      accepts?: ("material" | "entities" | "data")[];
+      /** @description Підтримувані медіатипи матеріалу (можна з '*': 'text/*'). */
+      media_types?: string[];
+      content_kinds?: string[];
+      /** @description Для accepts=entities: які типи сутностей приймає. */
+      entity_types?: string[];
+      data_schema?: components["schemas"]["PackagePath"];
+    };
+    OutputContract: {
+      entities?: {
+        entity_type: string;
+        /** @description JSON Schema 2020-12 полів сутності (EntityRecord.fields). */
+        schema: components["schemas"]["PackagePath"];
+        key_fields: string[];
+        description?: string;
+      }[];
+      /** @description Схема довільного виходу (llm, transform). */
+      data_schema?: components["schemas"]["PackagePath"];
+    };
+    Dependencies: {
+      /** @description Профіль образу виконання handler-runtime, наприклад 'python-extractor@1'. Профіль визначає версію Python і набір дозволених бібліотек (docs/adr/0003-python-sandbox.md). */
+      runtime_profile?: string;
+      /** @description Вимоги PEP 508 з точною або обмеженою версією; мають бути задоволені профілем (інакше dependency_not_allowed). Встановлення з мережі під час виконання немає. */
+      python?: string[];
+      /** @description Інші пакети репозиторію, від яких залежить цей (зафіксовані версії). */
+      packages?: components["schemas"]["package-ref.schema"][];
+    };
+    /**
+     * @example postgresql
+     * @example sqlserver
+     * @example mongodb
+     * @example s3
+     * @example minio
+     * @example filesystem
+     * @example llm_provider
+     * @example telegram_account
+     * @example search_provider
+     * @example http
+     */
+    ConnectionKind: string;
+    /** @description Вимога пакета до підключення (у маніфесті). Секретів не містить. */
+    ConnectionRequirement: {
+      /** @description Логічне ім'я, яке етап завдання зв'язує з connection_id. */
+      name: string;
+      kind: components["schemas"]["ConnectionKind"];
+      purpose?: string;
+      /** @default false */
+      optional?: boolean;
+    };
+    TestCase: {
+      name: string;
+      /** @description Вхід тесту: material — JSON Material (вміст inline або файл через content_file); file — сирий файл + мінімальні метадані; entities/data — JSON-файл. */
+      input: {
+        material?: components["schemas"]["PackagePath"];
+        file?: components["schemas"]["PackagePath"];
+        media_type?: string;
+        /** Format: uri */
+        url?: string;
+        entities?: components["schemas"]["PackagePath"];
+        data?: components["schemas"]["PackagePath"];
+      };
+      params?: Record<string, unknown>;
+      expected_status: components["schemas"]["HandlerStatus"];
+      /** @description JSON з очікуваним output (наприклад {"entities": [...]}); порівняння ігнорує provenance й observation. */
+      expected?: components["schemas"]["PackagePath"];
+      /**
+       * @description subset — кожне очікуване поле має збігтися, зайві поля допустимі.
+       * @default exact
+       * @enum {string}
+       */
+      compare?: "exact" | "subset";
+      /**
+       * @description Звідки тест: написаний людиною, згенерований LLM або доданий із проблемного прикладу.
+       * @enum {string}
+       */
+      origin?: "human" | "llm" | "problem_sample";
+    };
+    /** @description Походження версії (ТЗ §7): хто і як її створив. */
+    "$defs-Provenance": {
+      /** @enum {string} */
+      created_by: "human" | "llm" | "import";
+      authors?: string[];
+      created_at?: components["schemas"]["Timestamp"];
+      /** @description Попередня версія, з якої зроблено цю. */
+      based_on?: components["schemas"]["package-ref.schema"];
+      change_summary?: string;
+      llm?: {
+        provider?: string;
+        model?: string;
+        assistant_job_id?: components["schemas"]["Id"];
+        /** @enum {string} */
+        reason?: "onboarding" | "improvement" | "unknown_material" | "upstream_port";
+      };
+      /** @description Для версії форку, створеної явним перенесенням змін батька. */
+      upstream_port?: {
+        parent_version: components["schemas"]["SemVer"];
+        requested_by?: string;
+      };
+    };
+    /**
+     * PackageManifest
+     * @description Маніфест пакета обробника або правил колектора (ТЗ §7) — файл 'jane-package.json' у корені архіву пакета. Пакет незмінний після публікації; дайджест архіву обчислює репозиторій. Що є пакетом для кожного типу — contracts/docs/handler-packages.md. Секрети в пакеті заборонені (репозиторій відхиляє з secret_detected).
+     */
+    "package-manifest.schema": {
+      /** @constant */
+      schema_version: "1";
+      package_id: components["schemas"]["Slug"];
+      version: components["schemas"]["SemVer"];
+      kind: components["schemas"]["HandlerKind"];
+      title: string;
+      description?: string;
+      tags?: string[];
+      /** @description Спосіб виконання; форма залежить від kind: extractor — PythonEntry; transform — PythonEntry або ExecutorEntry; storage — StorageEntry; llm — LlmEntry; collector-rules — CollectorRulesEntry. Відповідність kind ↔ entry додатково перевіряє репозиторій (validation_failed). */
+      entry:
+        | components["schemas"]["PythonEntry"]
+        | components["schemas"]["StorageEntry"]
+        | components["schemas"]["LlmEntry"]
+        | components["schemas"]["CollectorRulesEntry"]
+        | components["schemas"]["ExecutorEntry"];
+      input?: components["schemas"]["InputContract"];
+      /** @description Шлях у пакеті до JSON Schema параметрів етапу. */
+      params_schema?: components["schemas"]["PackagePath"];
+      output?: components["schemas"]["OutputContract"];
+      dependencies?: components["schemas"]["Dependencies"];
+      required_connections?: components["schemas"]["ConnectionRequirement"][];
+      /** @description Потрібні доступи під час виконання. За замовчуванням мережі немає. */
+      access?: {
+        /**
+         * @default none
+         * @enum {string}
+         */
+        network?: "none" | "allowlist";
+        /** @description Для network=allowlist: дозволені хости (runtime може відмовити, якщо політика платформи забороняє). */
+        hosts?: string[];
+      };
+      tests?: components["schemas"]["TestCase"][];
+      provenance: components["schemas"]["$defs-Provenance"];
+      /** @description Батьківський пакет і вихідна версія форку (ТЗ §7). Встановлює репозиторій під час форку; далі переноситься в кожну версію форку без змін. */
+      fork_of?: components["schemas"]["package-ref.schema"];
+      /** @description Підказка, до яких матеріалів пакет доречно застосовувати. Не є прив'язкою: реальні прив'язки задаються в TaskConfig. */
+      bindings_hint?: {
+        source_kinds?: components["schemas"]["SourceKind"][];
+        domains?: string[];
+        url_patterns?: string[];
+      };
+    } & unknown;
   };
   responses: {
     /** @description Немає або недійсний токен (`unauthenticated`). */
@@ -1630,17 +1940,6 @@ export interface components {
       };
       content: {
         "application/problem+json": components["schemas"]["problem.schema"];
-      };
-    };
-    /** @description Операцію прийнято до асинхронного виконання. */
-    JobAccepted: {
-      headers: {
-        Location: components["headers"]["Location"];
-        "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
-        [name: string]: unknown;
-      };
-      content: {
-        "application/json": components["schemas"]["job.schema"];
       };
     };
     /** @description Семантична помилка (`validation_failed`, `idempotency_key_reused`, `limit_exceeded`, `secret_detected`, `schema_mismatch` тощо). */
@@ -1680,9 +1979,24 @@ export interface components {
         "application/problem+json": components["schemas"]["problem.schema"];
       };
     };
+    /** @description Операцію прийнято до асинхронного виконання. */
+    JobAccepted: {
+      headers: {
+        Location: components["headers"]["Location"];
+        "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+        [name: string]: unknown;
+      };
+      content: {
+        "application/json": components["schemas"]["job.schema"];
+      };
+    };
   };
   parameters: {
     SessionId: components["schemas"]["Id"];
+    /** @description Непрозорий курсор з `next_cursor` попередньої сторінки. */
+    Cursor: string;
+    /** @description Розмір сторінки. Значення понад максимум сервісу обрізається до максимуму. */
+    Limit: number;
     /**
      * @description Ключ ідемпотентності (1–255 друкованих ASCII-символів; рекомендовано UUID або детермінований
      *     ключ доставки). Повтор із тим самим ключем і тим самим тілом повертає збережену відповідь
@@ -1757,6 +2071,35 @@ export interface operations {
       401: components["responses"]["Unauthenticated"];
     };
   };
+  listOnboardingSessions: {
+    parameters: {
+      query?: {
+        /** @description Непрозорий курсор з `next_cursor` попередньої сторінки. */
+        cursor?: components["parameters"]["Cursor"];
+        /** @description Розмір сторінки. Значення понад максимум сервісу обрізається до максимуму. */
+        limit?: components["parameters"]["Limit"];
+        /** @description Лише сесії в цих станах (параметр можна повторити, наприклад `?status=sampling&status=analyzing`). */
+        status?: components["schemas"]["OnboardingStatus"][];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Сторінка сесій. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OnboardingSessionList"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      422: components["responses"]["UnprocessableEntity"];
+    };
+  };
   startOnboarding: {
     parameters: {
       query?: never;
@@ -1780,7 +2123,17 @@ export interface operations {
       };
     };
     responses: {
-      202: components["responses"]["JobAccepted"];
+      /** @description Підключення почато; `labels.session_id` і `links.session` — сесія. */
+      202: {
+        headers: {
+          Location: components["headers"]["Location"];
+          "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["job.schema"];
+        };
+      };
       401: components["responses"]["Unauthenticated"];
       422: components["responses"]["UnprocessableEntity"];
       429: components["responses"]["TooManyRequests"];
@@ -1875,6 +2228,38 @@ export interface operations {
       401: components["responses"]["Unauthenticated"];
       404: components["responses"]["NotFound"];
       409: components["responses"]["Conflict"];
+    };
+  };
+  listImprovementRuns: {
+    parameters: {
+      query?: {
+        /** @description Непрозорий курсор з `next_cursor` попередньої сторінки. */
+        cursor?: components["parameters"]["Cursor"];
+        /** @description Розмір сторінки. Значення понад максимум сервісу обрізається до максимуму. */
+        limit?: components["parameters"]["Limit"];
+        package_id?: string;
+        source_id?: string;
+        problem_group_id?: string;
+        /** @description Лише job у цих станах (параметр можна повторити). */
+        status?: components["schemas"]["JobStatus"][];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Сторінка job вдосконалення. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["JobList"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      422: components["responses"]["UnprocessableEntity"];
     };
   };
   startImprovement: {

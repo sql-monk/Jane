@@ -1,0 +1,29 @@
+diff --git a/libs/jane-kit/src/jane_kit/auth_scopes.py b/libs/jane-kit/src/jane_kit/auth_scopes.py
+index a4c9daf..4876eca 100644
+--- a/libs/jane-kit/src/jane_kit/auth_scopes.py
++++ b/libs/jane-kit/src/jane_kit/auth_scopes.py
+@@ -101,10 +101,12 @@ LLM: dict[str, Scopes] = {
+ }
+ 
+ ASSISTANT: dict[str, Scopes] = {
++    "GET /v1/onboarding-sessions": "assistant:use",
+     "POST /v1/onboarding-sessions": "assistant:use",
+     "GET /v1/onboarding-sessions/{session_id}": "assistant:use",
+     "POST /v1/onboarding-sessions/{session_id}/candidate-selection": "assistant:use",
+     "POST /v1/onboarding-sessions/{session_id}/proposals/{proposal_id}/acceptance": "assistant:use",
++    "GET /v1/improvement-runs": "assistant:use",
+     "POST /v1/improvement-runs": "assistant:use",
+     "POST /v1/unknown-materials": "assistant:use",
+     **_jobs("assistant:use", "assistant:use"),
+diff --git a/libs/jane-kit/src/jane_kit/config.py b/libs/jane-kit/src/jane_kit/config.py
+index 7319ea2..9842487 100644
+--- a/libs/jane-kit/src/jane_kit/config.py
++++ b/libs/jane-kit/src/jane_kit/config.py
+@@ -102,6 +102,7 @@ _CONTRACT_LIMITS: dict[str, tuple[str, ...]] = {
+         "budget.period",
+         "max_improvement_attempts",
+         "max_onboarding_samples",
++        "min_onboarding_confidence",
+     ),
+     "transfer": (
+         "inline_max_bytes",

@@ -82,20 +82,40 @@ class FakeLlm:
     def steps(self) -> list[str]:
         return [str(r["output_schema"]["title"]).split(".")[2] for r in self.requests]
 
+    @staticmethod
+    def _budget_counter(body: dict[str, Any], budget: dict[str, Any]) -> tuple[str, str, str, str]:
+        """Counter of the request budget as the gateway keeps it (``Budget`` in ``limits.schema.json``): the most
+        specific scope of the request, the currency and the window (``run`` -> ``scope.run_id`` or the request)."""
+        scope = body.get("scope") or {}
+        if scope.get("task_id"):
+            level = ("task", str(scope["task_id"]))
+        elif scope.get("source_id"):
+            level = ("source", str(scope["source_id"]))
+        else:
+            level = ("platform", "platform")
+        period = str(budget["period"])
+        window = f"run:{scope.get('run_id') or id(body)}" if period == "run" else period
+        return (*level, str(budget["currency"]), window)
+
     async def complete(self, req: FakeRequest) -> Reply:
         body = req.json
         self.requests.append(body)
         if self.knobs.delay_s:
             await asyncio.sleep(self.knobs.delay_s)
-        budget = ((body.get("limits") or {}).get("budget") or {}).get("amount")
-        if budget is not None and float(budget) < self.knobs.cost:
-            return problem(
-                429,
-                "budget_exhausted",
-                "LLM budget exhausted",
-                retryable=False,
-                details={"scope_type": "task"},
-            )
+        budget = (body.get("limits") or {}).get("budget")
+        if budget is not None:
+            # The gateway's rule: spent < amount and spent + (worst-case) cost <= amount, per counter.
+            counter = self._budget_counter(body, budget)
+            spent, amount = self.spent_by_scope.get(str(counter), 0.0), float(budget["amount"])
+            if spent >= amount or spent + self.knobs.cost > amount:
+                return problem(
+                    429,
+                    "budget_exhausted",
+                    "LLM budget exhausted",
+                    retryable=False,
+                    details={"scope_type": counter[0], "scope_id": counter[1], "period": budget["period"]},
+                )
+            self.spent_by_scope[str(counter)] = spent + self.knobs.cost
         step = str(body["output_schema"]["title"]).split(".")[2]
         data = {p["name"]: p.get("text", "") for p in body.get("data") or []}
         output = getattr(self, f"_{step}")(data)

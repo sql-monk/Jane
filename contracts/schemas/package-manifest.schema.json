@@ -114,7 +114,7 @@
       }
     },
     "LlmEntry": {
-      "description": "Пакет LLM — промпти, схема виходу й параметри моделі для сервісу llm; коду немає.",
+      "description": "Пакет LLM — промпти, схема виходу й параметри моделі для сервісу llm; коду немає. Вихід моделі стає HandlerResult.output.data, а для output.entities[] маніфесту — EntityRecord за правилом contracts/docs/handler-packages.md («Пакет llm: вихід моделі → результат обробника»): поле виходу '<entity_type>s' (або '<entity_type>'), ключові поля message/material/material_id — з material_id матеріалу, observation — з матеріалу.",
       "type": "object",
       "additionalProperties": false,
       "required": ["executor", "instructions", "output_schema"],

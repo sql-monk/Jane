@@ -995,6 +995,13 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
             minimum: 1,
             description: "Верхня межа вибірки під час дослідження джерела (фактична кількість адаптивна).",
           },
+          min_onboarding_confidence: {
+            type: "number",
+            exclusiveMinimum: 0,
+            maximum: 1,
+            description:
+              "Поріг достатньої впевненості вибірки під час дослідження джерела (ТЗ §8): асистент вибирає матеріали, доки оцінка впевненості не досягне порога; не досягнуто в межах бюджету й max_onboarding_samples — сесія insufficient_sample. Вищий поріг — більша вибірка й витрати, тому hard_caps обмежують його зверху. Типово 0.8.",
+          },
         },
       },
       transfer: {
@@ -1056,7 +1063,7 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
       },
       Budget: {
         description:
-          "Бюджет витрат LLM на рівні (platform/source/task). Перевищення зупиняє нові виклики з кодом budget_exhausted.",
+          "Бюджет витрат LLM на рівні (platform/source/task). Перевищення зупиняє нові виклики з кодом budget_exhausted. Семантика однакова для LLM-шлюзу й асистента: (1) виклик дозволено, лише якщо для кожного застосовного бюджету витрачено < amount і витрачено + зарезервовано + найгірша оцінка вартості виклику ≤ amount; тому amount: 0 означає «LLM вимкнено» для рівня — відхиляється навіть модель із нульовою ціною; (2) витрати рахуються у вікні period: day/week/month — календарний період UTC, total — без скидання, run — окремо для кожного scope.run_id запиту LLM-шлюзу (асистент передає ідентифікатор свого запуску: сесії підключення чи job), а без run_id вікном є сам запит з усіма його повторами; бюджет ніколи не пропускається; (3) бюджет у limits запиту стосується найконкретнішого рівня запиту (task, якщо є task_id, інакше source, інакше platform) і лише звужує: збережені бюджети рівнів діють і далі; з тим самим period і currency лічильник спільний і діє менша сума, інакше перевіряються обидва.",
         type: "object",
         additionalProperties: false,
         required: ["amount", "currency", "period"],
@@ -2093,7 +2100,8 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
         },
       },
       LlmEntry: {
-        description: "Пакет LLM — промпти, схема виходу й параметри моделі для сервісу llm; коду немає.",
+        description:
+          "Пакет LLM — промпти, схема виходу й параметри моделі для сервісу llm; коду немає. Вихід моделі стає HandlerResult.output.data, а для output.entities[] маніфесту — EntityRecord за правилом contracts/docs/handler-packages.md («Пакет llm: вихід моделі → результат обробника»): поле виходу '<entity_type>s' (або '<entity_type>'), ключові поля message/material/material_id — з material_id матеріалу, observation — з матеріалу.",
         type: "object",
         additionalProperties: false,
         required: ["executor", "instructions", "output_schema"],

@@ -58,7 +58,7 @@ just down -v --project jane-wp10
 
 | Файл | Що перевіряє |
 |---|---|
-| `tests/test_budget.py` | **Перевищення бюджету зупиняє виклики**: 429 `budget_exhausted` без звернення до провайдера; бюджет платформи з конфігурації; бюджет запиту лише звужує; повтор з тим самим `Idempotency-Key` не витрачає бюджет удруге; LLM-обробник повертає `failed/budget_exhausted` і не кешує його під ключем доставки |
+| `tests/test_budget.py` | **Перевищення бюджету зупиняє виклики**: 429 `budget_exhausted` без звернення до провайдера; бюджет платформи з конфігурації; бюджет запиту лише звужує (і з іншим періодом не підміняє збережений бюджет завдання чи платформи); `run` — окреме вікно на `run_id`, без `run_id` — на запит; `amount: 0` не пропускає жодного виклику (навіть безкоштовної моделі); повтор з тим самим `Idempotency-Key` не витрачає бюджет удруге; LLM-обробник повертає `failed/budget_exhausted` і не кешує його під ключем доставки |
 | `tests/test_injection.py` | **Ін'єкція у вмісті не змінює поведінку** (див. нижче) |
 | `tests/test_multi_instance.py` | два процеси сервісу з одним PostgreSQL: спільний бюджет під конкурентним навантаженням, спільний облік і ідемпотентність |
 | `tests/test_contract.py` | усі операції `llm.v1` і `handler.v1` через `ContractClient` (запити й відповіді за схемами) |
@@ -125,7 +125,7 @@ just down -v --project jane-wp10
 | `JANE_LLM_REGISTRY_URL` / `JANE_LLM_REGISTRY_TOKEN` | — | репозиторій обробників для пакетів за `handler` (архів `…/archive`); токен — власний ключ шлюзу (`registry:read`), лише з середовища, не журналюється |
 | `JANE_LLM_LOG_LEVEL` / `JANE_LLM_LOG_FORMAT` | `INFO` / `json` | журнали |
 | `JANE_LLM_AUTH_MODE` | `none` | `none` / `api_key` / `jwt` — див. «Автентифікація (ADR-0005)» |
-| `JANE_LLM_LIMITS_FILE` | — | файл `PlatformLimits` (`defaults`, `hard_caps`), зокрема цілий профіль `deploy/profiles/<профіль>.json`: ліміти контракту, яких сервіс не має, ігноруються (перелік — у журналі старту), опечатка чи некоректне значення — помилка старту. Увага: `timeouts.connect_timeout_ms`, `timeouts.request_timeout_ms` і `retries` профілю діють і на виклики провайдерів (`provider.*` оголошені як ці поля контракту), тобто замінюють типові 120 с тайм-ауту запиту |
+| `JANE_LLM_LIMITS_FILE` | — | файл `PlatformLimits` (`defaults`, `hard_caps`), зокрема цілий профіль `deploy/profiles/<профіль>.json`: ліміти контракту, яких сервіс не має, ігноруються (перелік — у журналі старту), опечатка чи некоректне значення — помилка старту. `timeouts.connect_timeout_ms` і `retries` профілю діють і на виклики провайдерів (`provider.connect_timeout_ms`, `provider.retries` оголошені як ці поля контракту); тайм-аут самого виклику моделі `provider.request_timeout_ms` — власний ліміт сервісу, профіль його не змінює (WP-15, R12) |
 | `JANE_LLM_LIMITS__<ГРУПА>__<ПАРАМЕТР>` | — | перевизначення, напр. `JANE_LLM_LIMITS__LLM__BUDGET__AMOUNT=5` |
 | `JANE_LLM_LIMITS__HARD_CAPS__…` | — | жорсткі стелі платформи |
 
@@ -204,6 +204,7 @@ JANE_LLM_API_KEYS=[{"name": "assistant", "sha256": "<sha256 hex ключа>", "s
 | `llm.max_requests_per_minute` | 60 | викликів провайдерів на хвилину для всієї платформи (усі екземпляри) |
 | `llm.max_input_tokens_per_request` | 100000 | оцінка вхідних токенів понад це — 422 `limit_exceeded` |
 | `llm.max_output_tokens_per_request` | 4096 | верхня межа `max_output_tokens` |
+| `llm.max_improvement_attempts`, `llm.max_onboarding_samples`, `llm.min_onboarding_confidence` | — | ліміти асистента: у `limits.llm` запиту чи профілі приймаються, шлюз їх не застосовує |
 | `gateway.default_max_output_tokens` | 1024 | якщо ні запит, ні пакет не задали |
 | `gateway.max_schema_retries` | 1 | типове й максимальне число повторів при виході не за схемою |
 | `gateway.chars_per_token_estimate` | 2.0 | оцінка вхідних токенів (символи / значення) для резерву бюджету |
@@ -214,27 +215,42 @@ JANE_LLM_API_KEYS=[{"name": "assistant", "sha256": "<sha256 hex ключа>", "s
 | `gateway.max_package_files` | 1000 | файлів в архіві пакета |
 | `fake.max_delay_ms` | 30000 | верхня межа затримки провайдера `fake` (`params.delay_ms`, `responses[].delay_ms`); довша скорочується до неї, `0` вимикає затримки (`JANE_LLM_LIMITS__FAKE__MAX_DELAY_MS`) |
 | пул PostgreSQL (`JANE_LLM_DB_POOL_MIN_SIZE` / `JANE_LLM_DB_POOL_MAX_SIZE`) | 1 / 10 | з'єднань на екземпляр (налаштування процесу, не `limits`) |
-| `provider.connect_timeout_ms` / `provider.request_timeout_ms` | 5000 / 120000 | тайм-аути викликів провайдера (контракт `timeouts.*`) |
-| `provider.retries.max_attempts` | 2 | спроби виклику провайдера (контракт `retries`) |
+| `provider.connect_timeout_ms` | 5000 | встановлення з'єднання з провайдером (контракт `timeouts.connect_timeout_ms`: профіль платформи задає й це значення) |
+| `provider.request_timeout_ms` | 120000 | один виклик моделі — очікування всієї генерації (власний ліміт, **не** контрактний `timeouts.request_timeout_ms`, розрахований на веб; змінюється лише `JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS` чи власним файлом лімітів). Найгірший час одного `createCompletion` ≈ (повтори за схемою + 1) × `provider.retries.max_attempts` × це значення + backoff — викликач (асистент: `llm_call.request_timeout_ms`) має чекати щонайменше стільки або брати `mode: async` |
+| `provider.retries.max_attempts` | 2 | спроби виклику провайдера (контракт `retries`: профіль платформи задає й їх) |
 | `registry.connect_timeout_ms` / `request_timeout_ms` / `max_attempts` | 5000 / 30000 / 3 | виклики репозиторію обробників |
 | `jobs.max_concurrent_jobs` / `max_queued_jobs` / `job_timeout_ms` | 4 / 1000 / 3600000 | асинхронні job (jane-kit) |
 | `idempotency.idempotency_ttl_seconds` | 86400 | скільки пам'ятається `Idempotency-Key` (контракт `transfer.idempotency_ttl_seconds`) |
 
-**Бюджети.** Бюджет платформи — збережене визначення або `llm.budget`; бюджети джерела й завдання — лише
-визначені через `PUT /v1/budgets/{scope_type}/{scope_id}` (оркестратор синхронізує сюди `llm.budget` джерел і
-завдань); `limits.llm.budget` запиту звужує найконкретніший рівень запиту (`min` зі збереженим). Scope
-запиту — `scope.source_id/task_id/run_id` (для обробника — з `context.trace`). Перед **кожним** викликом
-провайдера резервується найгірша оцінка вартості (оцінка вхідних токенів + `max_output_tokens` за ціною моделі);
-виклик відбувається лише якщо `витрачено + зарезервовано + оцінка ≤ ліміт` для кожного застосовного бюджету,
-інакше 429 `budget_exhausted` (з `details` і `Retry-After` до скидання періоду) і провайдер не викликається.
+**Бюджети** (семантика зафіксована в контракті: `limits.schema.json` → `Budget`, `llm.v1` →
+`CompletionRequest.limits`, `BudgetStatus`). Бюджет платформи — збережене визначення або `llm.budget`; бюджети
+джерела й завдання — лише визначені через `PUT /v1/budgets/{scope_type}/{scope_id}` (оркестратор синхронізує сюди
+`llm.budget` джерел і завдань). Scope запиту — `scope.source_id/task_id/run_id` (для обробника — з `context.trace`).
+
+- **Бюджет запиту** (`limits.llm.budget`) — ще один бюджет **найконкретнішого рівня запиту**: `task`, якщо є
+  `scope.task_id`, інакше `source`, інакше `platform`. Він лише звужує: збережені бюджети platform → source →
+  task діють і далі. Та сама валюта й період, що й у збереженого бюджету цього рівня → спільний лічильник, діє
+  менша сума; інший період → перевіряються обидва (до WP-15 бюджет запиту з іншим періодом підміняв збережений).
+- **Лічильник** — `(рівень, валюта, вікно)`: `day`/`week`/`month` — календарний період UTC, `total` — одне вікно,
+  `run` — окреме вікно на кожен `scope.run_id`; **без `run_id` вікном є сам запит** (усі його повтори за схемою),
+  бюджет ніколи не пропускається (до WP-15 `run` без `run_id` пропускався).
+- **Перевірка.** Перед **кожним** викликом провайдера резервується найгірша оцінка вартості (оцінка вхідних
+  токенів + `max_output_tokens` за ціною моделі); виклик відбувається лише якщо для кожного застосовного бюджету
+  `витрачено < ліміт` і `витрачено + зарезервовано + оцінка ≤ ліміт`, інакше 429 `budget_exhausted` (`details`:
+  рівень, період, `spent`, `limit`, оцінка; `Retry-After` — до скидання календарного періоду, для `run`/`total`
+  його немає) і провайдер не викликається. Тому **`amount: 0` — «LLM вимкнено»** для рівня: відхиляється навіть
+  модель із нульовою ціною (так само перевіряє й асистент).
+- **`exhausted`** (`BudgetStatus`) = `витрачено ≥ ліміт`: у цьому вікні не пройде жоден виклик, доки період не
+  скинеться чи бюджет не збільшать. За `exhausted = false` виклик теж буде відхилено, якщо його оцінка не вміщується.
+  `spent` — фактично списані витрати вікна (без резервів викликів, що ще йдуть); лічильник рахує виклики, на які
+  цей бюджет діяв (визначення, створене посеред доби, не бачить раніших викликів цієї доби).
+
 Після виклику резерв замінюється фактичною вартістю. Оцінка вхідних токенів — `символи / gateway.chars_per_token_estimate` (типово 2.0, з запасом до типових токенізаторів, зокрема для кирилиці), але
 це не гарантія: фактична вартість може перевищити резерв, і тоді `витрачено` може стати більшим за ліміт на
 цю різницю (для викликів, що йшли одночасно) — усі наступні виклики зупиняються. Для жорсткішої межі
-зменшіть `chars_per_token_estimate`. Періоди: `day`/`week`/`month` (UTC), `total`, `run` (за
-`run_id`). `status.exhausted` у `/v1/budgets` означає «витрачено ≥ ліміту»; виклики зупиняються раніше, якщо
-наступна оцінка не вміщується. Витрати `test_mode` рахуються в тому самому бюджеті й позначаються в обліку.
+зменшіть `chars_per_token_estimate`. Витрати `test_mode` рахуються в тому самому бюджеті й позначаються в обліку.
 `max_requests_per_minute` застосовується до платформи, джерела, завдання (з визначень) і провайдера
-(`Provider.limits`).
+(`Provider.limits`); `limits.llm.max_requests_per_minute` запиту звужує найконкретніший рівень.
 
 ## LLM-обробник
 
@@ -249,7 +265,9 @@ JANE_LLM_API_KEYS=[{"name": "assistant", "sha256": "<sha256 hex ключа>", "s
 структурований запит: інструкції пакета → системний канал, вхід (метадані й вміст матеріалу або заповнений
 `input_template`) → дані. Вихід — `output.data`; для кожного `output.entities[]` маніфесту з типом `T` елементи
 масиву `T + "s"` (або `T`) стають сутностями; ключові поля `message`/`material`/`material_id` беруться з
-`material_id`; `observation` — з матеріалу; поля валідуються за схемою сутності. Стани: `success`, `empty`,
+`material_id`; `observation` — з матеріалу; поля валідуються за схемою сутності. Повне правило відображення —
+у контракті: [`contracts/docs/handler-packages.md`](../../contracts/docs/handler-packages.md) («Пакет `llm`: вихід
+моделі → результат обробника»). Стани: `success`, `empty`,
 `failed` (`schema_mismatch`, `budget_exhausted`, `invalid_params`). Повтор доставки — збережений результат із
 `duplicate: true`; `failed/budget_exhausted` під ключем не зберігається (повторна доставка після збільшення
 бюджету виконається). `POST /v1/test-runs` — тести маніфесту й `extra_cases` у `test_mode` (job → `TestReport`).

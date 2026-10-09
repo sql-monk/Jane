@@ -38,7 +38,7 @@
    невибраним. Після першої порції асистент продовжує читати обмежений
    `fetch_ratio × max_onboarding_samples` потік, класифікує нові форми URL, а після завершення
    бере також матеріали з кінця вже відомих форм, щоб не покладатися лише на ранній порядок
-   обходу. Додаткові порції вибираються лише до порога `min_confidence`; для 100 матеріалів не
+   обходу. Додаткові порції вибираються лише до порога `llm.min_onboarding_confidence`; для 100 матеріалів не
    потрібно класифікувати всі 100. Достатність вимагає завершеного потоку й представлених у
    вибірці форм URL. Якщо потік не завершився до межі очікування, вичерпались вибірка чи бюджет —
    `insufficient_sample` з поясненням. Збір колектора після цього скасовується.
@@ -60,11 +60,23 @@
 тести з проблемних прикладів (`origin: problem_sample`), регресії на успішних прикладах і тести з
 параметрами кожної прив'язки (`listTasks?package_id=` + `getTask`). Ламає прив'язки інших джерел або
 несумісно змінює схему спільного пакета → форк для цього джерела (`policy.allow_fork`), інакше
-`unresolved`. `auto_changes_allowed = false` → `proposal_only`, нічого не публікується.
+`unresolved`. `auto_changes_allowed = false` → `proposal_only`, нічого не публікується, а сама пропозиція —
+у `ImprovementResult.proposal` (`based_on`, запропонована `version`, `manifest`, змінені `files` у формі
+`PublishRequest.files` registry, `diff` коду й схем): користувач переглядає й за бажання публікує її сам.
 `policy.approval = auto_after_checks` → погодження й `auto_activate` на всіх цільових прив'язках; якщо
 оркестратор відмовив на одній — уже активовані відкочуються (`kind: rollback`). Стан групи проблем
 (`in_progress` → `resolved` / `unresolved` з поясненням) оновлюється в оркестраторі — так невирішене видно
 в адмінці. Нові типи сутностей лише пропонуються (`suggested_entity_types`).
+
+**Списки для відновлення адмінки** (WP-15, R24): `GET /v1/onboarding-sessions` — короткий стан сесій
+(`OnboardingSessionSummary`: стан, запит, обраний кандидат, кількість варіантів, витрати, останній `job_id`,
+помилка), новіші першими; `?status=` (можна повторити). `GET /v1/improvement-runs` — job вдосконалення (з
+`result` для завершених), новіші першими; фільтри `package_id`, `source_id`, `problem_group_id` (мітки job) і
+`status`. Обидва — курсорна пагінація (`limit` понад `pages.max_page_size` обрізається, `next_cursor: null` —
+остання сторінка, чужий курсор — 422: курсор — позиція `[час UTC з мікросекундами, id]`). Перед вибіркою
+запущені сесії звіряються з їхнім job так само, як у `GET` сесії, тож фільтр `status` бачить той самий стан
+(сесія загиблого job — під `failed`, не під `sampling`); job загиблого екземпляра список показує `failed` (як
+`GET /v1/jobs/{id}`). `created_at` сесії — з мікросекундами: нові елементи не потрапляють на наступні сторінки.
 
 **Невідомі матеріали** (`POST /v1/unknown-materials`): `forward_unknown_to_llm = false` → 403
 `access_denied_by_policy` без жодного виклику LLM; інакше класифікація й пропозиція
@@ -100,9 +112,9 @@ docker run --rm -p 8000:8000 -e JANE_ASSISTANT_LLM_URL=http://llm:8000 jane-assi
 ### Кілька екземплярів
 
 Задайте `JANE_ASSISTANT_STATE_DSN` (PostgreSQL, власна схема `JANE_ASSISTANT_STATE_SCHEMA`, типово
-`jane_assistant`; таблиці створюються самі) і унікальний `JANE_ASSISTANT_INSTANCE_ID` кожному екземпляру
-(типово — `hostname-pid`). Тоді сесії підключення, job і ключі ідемпотентності спільні
-(`state.py`: `PostgresState`):
+`jane_assistant`; таблиці створюються самі). `JANE_ASSISTANT_INSTANCE_ID` можна не задавати: типовий ідентифікатор
+`<hostname>-<pid>-<uuid4 hex>` створюється заново для кожного запуску процесу (явний — див. нижче). Тоді сесії
+підключення, job і ключі ідемпотентності спільні (`state.py`: `PostgresState`):
 
 - будь-який екземпляр читає й продовжує сесію чи job іншого (`selectCandidate`, `acceptProposal`, `GET /v1/jobs`);
   повтор `Idempotency-Key` на іншому екземплярі повертає збережену відповідь;
@@ -111,8 +123,9 @@ docker run --rm -p 8000:8000 -e JANE_ASSISTANT_LLM_URL=http://llm:8000 jane-assi
 - job належить екземпляру, що його виконує, і тримає оренду (`limits.state.job_lease_ms`), яку той поновлює
   кожні `heartbeat_interval_ms`. Екземпляр убито → після закінчення оренди будь-який інший позначає job
   `failed` (`service_unavailable`, «instance … stopped …»), сесію — теж; завершений job більше не змінюється.
-  Типовий `instance_id` створюється заново для кожного запуску процесу, навіть якщо hostname і PID повторилися;
-  явно заданий `JANE_ASSISTANT_INSTANCE_ID` має бути унікальним для кожного одночасного екземпляра.
+  Типовий `instance_id` (`<hostname>-<pid>-<uuid4 hex>`, jane-kit `JaneSettings`) створюється заново для кожного
+  запуску процесу, навіть якщо hostname і PID повторилися (контейнер після рестарту знову має PID 1); явно заданий
+  `JANE_ASSISTANT_INSTANCE_ID` має бути унікальним для кожного одночасного екземпляра й відрізнятися після рестарту.
   Штатна зупинка → job `cancelled` з `cancellation.reason` «instance … shut down», сесія — `cancelled` з причиною;
 - `/v1/health` перевіряє `state`, `/v1/info` → `capabilities.state` = `postgresql`.
 
@@ -138,6 +151,11 @@ just down -v --project jane-wp11
 валять тест. Фейкова LLM детермінована (диспетчеризація за `output_schema.title`), може «піддатись
 ін'єкції», щоб перевірити захист. Тести пакетів справді виконуються (мінімальний замінник runtime).
 
+`tests/test_llm_budget.py` — бюджет і довгі виклики LLM проти **справжнього** шлюзу `jane_llm` (fake-провайдер,
+пам'ять): бюджет `run` рахується за `scope.run_id` через кілька сесій одного запуску, `amount: 0` зупиняє і асистента,
+і шлюз, режим `async` чекає job шлюзу; виклик, довший за `clients.request_timeout_ms`, завершується в межах
+`llm_call.request_timeout_ms` (контрактний фейк шлюзу на uvicorn, справжній HTTP).
+
 Скільки тести чекають, задається змінними середовища (це лише верхня межа очікування, не умова проходження;
 на завантаженій машині її можна збільшити): `JANE_ASSISTANT_TEST_START_S` (типово 120 с) — старт процесу
 асистента й фейкових серверів у `tests/test_process_e2e.py`, `JANE_ASSISTANT_TEST_WAIT_S` (типово 120 с) —
@@ -151,7 +169,11 @@ just down -v --project jane-wp11
 із `JANE_ASSISTANT_DOWNLOAD_HOST_ALLOWLIST`, без редиректів, без проксі й `.netrc` із середовища, лише незакодоване
 тіло, обрізання на `content.max_material_bytes`, усе завантаження — у межах `content.fetch_timeout_ms`; `file://` —
 лише строго всередині `JANE_ASSISTANT_BLOB_ROOTS` (шлях спершу розв'язується з `..` і symlink, читається саме
-розв'язаний звичайний файл); `s3://` без `download_url` — 422. Перевіряються `size_bytes` blob і `sha256`. Відмова
+розв'язаний звичайний файл); `s3://` без `download_url` — 422. `material_ref` зі storage (`StorageClient.material`) завжди дає **початковий** вміст: inline
+`material.content` береться як є; інакше читаються байти об'єкта, а RAW, збережений як JSON-документ Material
+(`format.raw = json`), розгортається в цей Material з його внутрішнім вмістом (і коли storage не повертає `material`
+для великого вмісту); об'єкт без `material`, що не є таким документом, — 501 `not_implemented` (передайте приклад
+inline). Тести: `tests/test_storage_material.py`. Перевіряються `size_bytes` blob і `sha256`. Відмова
 завершує job помилкою (`validation_failed` / `limit_exceeded` — 422, `not_found` — 404, `upstream_unavailable` — 502)
 без шляхів і вмісту в `detail`, до LLM нічого не йде. Застосунок ставить свій читач для кожного запиту
 (`content.MaterialContentScope`), тож його успадковують і job, які запит запускає; поза застосунком
@@ -177,14 +199,15 @@ just down -v --project jane-wp11
 | `BLOB_ROOTS` | `[]` (вимкнено) | каталоги, з яких можна читати `file://` вміст матеріалів (JSON-список); порожньо — `file://` відхиляється (422) |
 | `DOWNLOAD_HOST_ALLOWLIST` | `[]` (вимкнено) | `hostname` (будь-який порт) або `hostname:port`, куди може вести `download_url` вмісту матеріалу (JSON-список; IDN — у punycode `xn--…`); порожньо — завантаження відхиляються (422) |
 | `LLM_MODEL_CHEAP` / `LLM_MODEL_STRONG` | `cheap` / `strong` | псевдоніми моделей шлюзу |
+| `LLM_COMPLETION_MODE` | `sync` | як чекати виклик моделі: `sync` — один HTTP-запит із власним тайм-аутом `llm_call.request_timeout_ms`; `async` — 202 + job шлюзу, опитування кожні `clients.job_poll_interval_ms` у межах `clients.job_wait_timeout_ms` (без довгого з'єднання) |
 | `CONTRACTS_DIR` | пошук угору / `/app/contracts` | де `contracts/schemas` для локальної валідації |
 | `GENERATED_CODE_ALLOWED_MODULES` | `re, html, json, math, datetime, decimal, string, unicodedata, itertools, functools, collections, typing, dataclasses` | політика імпортів згенерованого коду (JSON-список) |
 | `ONBOARDING_ALLOW_ACTIVATION` | `true` | чи може прийняття з `activate: true` створювати джерело й завдання |
 | `DEFAULT_STORAGE_PACKAGE` / `DEFAULT_STORAGE_CONNECTION` | — | `package_id@version` і `connection_id` етапу збереження в чернетці завдання |
 | `STATE_DSN` | — | PostgreSQL для спільного стану кількох екземплярів (секрет; без нього — пам'ять, один екземпляр) |
 | `STATE_SCHEMA` | `jane_assistant` | схема таблиць стану |
-| `INSTANCE_ID` | `hostname-pid` | власник job і оренд (унікальний для кожного екземпляра) |
-| `LIMITS_FILE` | — | файл `PlatformLimits` (TOML/JSON/YAML), зокрема цілий профіль `deploy/profiles/<профіль>.json`: ліміти контракту, яких асистент не має, ігноруються (перелік — у журналі старту), опечатка чи некоректне значення — помилка старту; `timeouts.connect_timeout_ms` / `request_timeout_ms` і `retries` профілю діють на виклики сусідів (`clients.*`) |
+| `INSTANCE_ID` | `<hostname>-<pid>-<uuid4 hex>`, новий для кожного запуску | власник job і оренд. Явне значення має бути унікальним для кожного одночасного екземпляра **й іншим після рестарту**: з тим самим ID новий процес поновлював би оренди job загиблого (R-07) і ті назавжди лишалися б `running` |
+| `LIMITS_FILE` | — | файл `PlatformLimits` (TOML/JSON/YAML), зокрема цілий профіль `deploy/profiles/<профіль>.json`: ліміти контракту, яких асистент не має, ігноруються (перелік — у журналі старту), опечатка чи некоректне значення — помилка старту; `timeouts.connect_timeout_ms` / `request_timeout_ms` і `retries` профілю діють на виклики сусідів (`clients.*`), окрім тайм-ауту виклику моделі (`llm_call.request_timeout_ms`, власний ліміт асистента) |
 | `LIMITS__<ГРУПА>__<ПАРАМЕТР>` / `LIMITS__HARD_CAPS__…` | — | перевизначення й жорсткі стелі |
 
 ## Автентифікація (ADR-0005)
@@ -194,6 +217,8 @@ just down -v --project jane-wp11
 Scopes операцій (таблиця `ASSISTANT` з `jane_kit.auth_scopes`):
 
 - `assistant:use` — усі операції (`/v1/onboarding-sessions…`, `/v1/improvement-runs`, `/v1/unknown-materials`, `/v1/jobs/*`).
+  Два списки WP-15 (`GET /v1/onboarding-sessions`, `GET /v1/improvement-runs`) додає до таблиці сам сервіс
+  (`app.LIST_SCOPES`, `merge` з `ASSISTANT`), доки їх не внесено в `jane_kit.auth_scopes.ASSISTANT`.
 
 Сусідів асистент викликає власним токеном (`SERVICE_TOKEN_REF` або окремі `*_TOKEN_REF`), а не токеном користувача. Потрібні scopes ключа асистента: llm — `llm:invoke`; registry — `registry:read`, `registry:write`, `registry:approve` і `actor: llm`; колектори — `collector:read`, `collector:run`; handler-runtime — `handler:test`; storage — `storage:read`; orchestrator — `orchestrator:read`, `orchestrator:write`.
 
@@ -209,16 +234,16 @@ JANE_ASSISTANT_API_KEYS=[{"name": "admin", "sha256": "<sha256 hex ключа>", 
 
 Рівні: типові значення → платформа (файл, потім змінні середовища) → запит (`limits` у тілі —
 контрактний `limits.llm`); `hard_caps` обмежують результат. `GET /v1/info` → `limits` показує контрактні
-поля (`llm.*`, `transfer.*`, `timeouts.*`, `retries`); решта — внутрішні.
+поля (`llm.*`, зокрема `llm.min_onboarding_confidence`, `transfer.*`, `timeouts.*`, `retries`); решта — внутрішні.
 
 | Параметр | Типово | Опис |
 |---|---|---|
-| `llm.budget` | 2 USD / `run` | витрати одного job; асистент зупиняється сам, шлюз — теж (`budget_exhausted`) |
+| `llm.budget` | 2 USD / `run` | семантика контракту (`Budget`, однакова з LLM-шлюзом): `run` — один запуск асистента (сесія підключення — від пошуку до прийняття, хоч би скільки job і екземплярів її продовжували; job вдосконалення; job невідомого матеріалу). Кожен виклик несе весь бюджет і `scope.run_id` запуску — шлюз сам рахує витрати запуску атомарно для всіх екземплярів; інші періоди звужують спільний лічильник найконкретнішого рівня запиту (`source` для вдосконалення з `source_id`, інакше `platform`). Асистент зупиняється сам, щойно витрати запуску ≥ `amount`; **`amount: 0` — жодного виклику LLM** (так само відмовляє шлюз, навіть для безкоштовної моделі) |
 | `llm.max_onboarding_samples` | 60 | верхня межа класифікованих матеріалів (фактично — адаптивно менше) |
 | `llm.max_improvement_attempts` | 3 | спроби моделі на один запуск вдосконалення (0 → одразу `unresolved`) |
 | `llm.max_input_tokens_per_request` / `max_output_tokens_per_request` | 16000 / 4000 | дані обрізаються (~4 символи на токен) |
 | `llm.max_requests_per_minute` | 30 | передається шлюзу |
-| `onboarding.min_confidence` | 0.8 | поріг достатньої впевненості вибірки |
+| `llm.min_onboarding_confidence` | 0.8 | поріг достатньої впевненості вибірки — контрактний ліміт (WP-15, R08; до того — внутрішній `onboarding.min_confidence`, змінна `…__ONBOARDING__MIN_CONFIDENCE` більше не діє й зупиняє старт як невідомий ліміт): видно в `/v1/info`, задається профілем, `JANE_ASSISTANT_LIMITS__LLM__MIN_ONBOARDING_CONFIDENCE` чи `limits` запиту, `hard_caps` обмежують зверху |
 | `onboarding.min_distinct_types` | 2 | нижче цієї кількості спостережених типів оцінка ризику невідомого типу суворіша; однотипне джерело може стати достатнім за більшої вибірки |
 | `onboarding.sample_batch_size` | 10 | матеріалів на один запит класифікації |
 | `onboarding.fetch_ratio` | 3 | збір вибірки може отримати до `max_onboarding_samples × fetch_ratio` матеріалів |
@@ -237,12 +262,15 @@ JANE_ASSISTANT_API_KEYS=[{"name": "admin", "sha256": "<sha256 hex ключа>", 
 | `state.pool_max_size` / `connect_timeout_ms` | 10 / 10000 | з'єднання з PostgreSQL |
 | `onboarding.requests_overhead_ratio` | 0.05 | запас запитів понад оцінку матеріалів |
 | `improvement.max_problem_samples`, `max_successful_examples`, `max_sample_chars`, `max_file_chars` | 10, 5, 6000, 20000 | обсяг даних для моделі |
+| `improvement.max_proposal_bytes` | 1048576 | `proposal_only`: розмір усієї `ImprovementResult.proposal` (компактний JSON, байти UTF-8; якщо вміщається обов'язкова частина з маніфестом): по черзі код і схеми, `diff` (обрізається з позначкою), тестові матеріали; що не вмістилося — в `omitted_files` |
 | `unknown.min_confidence`, `max_sample_chars` | 0.6, 6000 | нижче — пропозиція `none` |
 | `transfer.inline_max_bytes` | 262144 | чернетка пакета до runtime inline; більша — `payload_too_large` |
 | `content.max_material_bytes` | 16777216 | найбільший вміст одного матеріалу (inline, `file://`, `download_url`); більший — `limit_exceeded` |
 | `content.fetch_timeout_ms` / `connect_timeout_ms` | 30000 / 5000 | усе завантаження за `download_url` / встановлення з'єднання |
 | `search.request_timeout_ms` / `connect_timeout_ms` | 10000 / 5000 | виклики пошукового провайдера `http_json` |
-| `clients.*` (тайм-аути, повтори, опитування job) | див. jane-kit | виклики сусідів |
+| `clients.*` (тайм-аути, повтори, опитування job) | див. jane-kit (30000 мс запит, 4 спроби) | виклики сусідів; це контрактні `timeouts.*` / `retries`, тож профіль платформи задає їх для коротких службових викликів |
+| `llm_call.request_timeout_ms` | 900000 | тайм-аут одного синхронного виклику LLM-шлюзу (власний ліміт: виклик моделі довший за службові). Має покривати найгірший випадок шлюзу: (повтори за схемою + 1) × спроби провайдера × тайм-аут провайдера — з типовими значеннями llm 2 × 2 × 120 с = 8 хв, зі спробами профілю 3 — 12 хв; 15 хв — і `gateway.reservation_ttl_seconds` шлюзу. З'єднання й повтори — з `clients.*` |
+| `pages.default_page_size` / `max_page_size` | 50 / 500 | сторінки `listOnboardingSessions` / `listImprovementRuns` (`limit` понад максимум обрізається) |
 | `jobs.*`, `idempotency.*` | див. jane-kit | job і ключі ідемпотентності |
 
 ## Приклад виклику зі стороннього застосунку

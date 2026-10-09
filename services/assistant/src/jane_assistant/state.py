@@ -22,6 +22,7 @@ with the Windows Proactor event loop, and the service runs on Windows and Linux.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -34,6 +35,7 @@ from jane_kit.errors import JaneError
 from jane_kit.idempotency import IdempotencyRecord, IdempotencyStore, InMemoryIdempotencyStore, StoredResponse
 from jane_kit.jobs import InMemoryJobStore, Job, JobCancellation, JobStatus, JobStore
 
+from .listing import Position
 from .onboarding import InMemorySessionStore, Session, SessionStore
 from .settings import ServiceLimits
 
@@ -42,10 +44,30 @@ __all__ = ["InMemoryState", "PostgresState", "ServiceState"]
 TERMINAL = ("succeeded", "failed", "cancelled")
 
 
+class JobLister(Protocol):
+    async def page(
+        self,
+        kind: str,
+        *,
+        labels: Mapping[str, str],
+        statuses: frozenset[str] | None,
+        after: Position | None,
+        limit: int,
+    ) -> list[Job]:
+        """Jobs of ``kind`` carrying all ``labels``, newest first (``created_at``, then ``job_id``), strictly
+        after the ``after`` position; a job whose owner stopped is reported ``failed`` (as by ``get``)."""
+        ...
+
+
+def job_position(job: Job) -> Position:
+    return (job.created_at, job.job_id)
+
+
 class ServiceState(Protocol):
     name: str
     idempotency: IdempotencyStore
     jobs: JobStore
+    job_list: JobLister
     sessions: SessionStore
 
     async def open(self) -> None: ...
@@ -55,12 +77,40 @@ class ServiceState(Protocol):
     async def release_owned(self, reason: str) -> None: ...
 
 
+class _ListedMemoryJobs(InMemoryJobStore):
+    """jane-kit's in-memory job store that can list its jobs. It lists the store's own dictionary, so it holds
+    nothing beyond the store: finished jobs leave with the store's retention (``jobs.job_retention_seconds``)."""
+
+    async def page(
+        self,
+        kind: str,
+        *,
+        labels: Mapping[str, str],
+        statuses: frozenset[str] | None,
+        after: Position | None,
+        limit: int,
+    ) -> list[Job]:
+        self._gc()  # the store's retention, as on create
+        wanted = [
+            job.model_copy(deep=True)
+            for job in self._jobs.values()
+            if job.kind == kind
+            and all((job.labels or {}).get(k) == v for k, v in labels.items())
+            and (not statuses or str(job.status) in statuses)
+            and (after is None or job_position(job) < after)
+        ]
+        wanted.sort(key=job_position, reverse=True)
+        return wanted[:limit]
+
+
 class InMemoryState:
     name = "memory"
 
     def __init__(self, limits: ServiceLimits) -> None:
         self.idempotency: IdempotencyStore = InMemoryIdempotencyStore(limits.idempotency)
-        self.jobs: JobStore = InMemoryJobStore(limits.jobs)
+        jobs = _ListedMemoryJobs(limits.jobs)
+        self.jobs: JobStore = jobs
+        self.job_list: JobLister = jobs
         self.sessions: SessionStore = InMemorySessionStore()
 
     async def open(self) -> None:
@@ -128,7 +178,9 @@ class PostgresState:
             kwargs={"autocommit": True, "connect_timeout": max(1, st.connect_timeout_ms // 1000)},
         )
         self.idempotency: IdempotencyStore = _PgIdempotency(self)
-        self.jobs: JobStore = _PgJobs(self)
+        jobs = _PgJobs(self)
+        self.jobs: JobStore = jobs
+        self.job_list: JobLister = jobs
         self.sessions: SessionStore = _PgSessions(self)
 
     def q(self, text: str) -> sql.Composed:
@@ -327,6 +379,42 @@ class _PgJobs:
             ),
         )
 
+    async def page(
+        self,
+        kind: str,
+        *,
+        labels: Mapping[str, str],
+        statuses: frozenset[str] | None,
+        after: Position | None,
+        limit: int,
+    ) -> list[Job]:
+        # Jobs of stopped instances first become `failed` (as `get` reports them), so a status filter sees them.
+        stale = await asyncio.to_thread(
+            self.db.run,
+            "SELECT job_id FROM {schema}.jobs WHERE finished_at IS NULL AND lease_until < now() "
+            "AND doc->>'kind' = %s",
+            (kind,),
+            True,
+        )
+        for row in stale:
+            await self.get(str(row["job_id"]))
+        where = ["doc->>'kind' = %s", "COALESCE(doc->'labels', '{{}}'::jsonb) @> %s"]
+        params: list[Any] = [kind, Jsonb(dict(labels))]
+        if statuses:
+            where.append("doc->>'status' = ANY(%s)")
+            params.append(sorted(statuses))
+        if after is not None:
+            where.append("((doc->>'created_at')::timestamptz, job_id COLLATE \"C\") < (%s, %s)")
+            params += [after[0], after[1]]
+        rows = await asyncio.to_thread(
+            self.db.run,
+            f"SELECT doc FROM {{schema}}.jobs WHERE {' AND '.join(where)} "  # noqa: S608 - fixed clauses only
+            "ORDER BY (doc->>'created_at')::timestamptz DESC, job_id COLLATE \"C\" DESC LIMIT %s",
+            (*params, limit),
+            True,
+        )
+        return [Job.model_validate(r["doc"]) for r in rows]
+
 
 class _PgSessions:
     def __init__(self, db: PostgresState) -> None:
@@ -351,6 +439,28 @@ class _PgSessions:
             True,
         )
         session.version = int(rows[0]["version"])
+
+    async def page(
+        self, *, statuses: frozenset[str] | None, after: Position | None, limit: int
+    ) -> list[Session]:
+        where = ["TRUE"]
+        params: list[Any] = []
+        if statuses:
+            where.append("doc->>'status' = ANY(%s)")
+            params.append(sorted(statuses))
+        if after is not None:
+            where.append(
+                "((doc->>'created_at')::timestamptz, session_id COLLATE \"C\") < (%s::timestamptz, %s)"
+            )
+            params += [after[0], after[1]]
+        rows = await asyncio.to_thread(
+            self.db.run,
+            f"SELECT doc, version FROM {{schema}}.sessions WHERE {' AND '.join(where)} "  # noqa: S608 - fixed clauses
+            "ORDER BY (doc->>'created_at')::timestamptz DESC, session_id COLLATE \"C\" DESC LIMIT %s",
+            (*params, limit),
+            True,
+        )
+        return [Session.from_doc(dict(r["doc"]), int(r["version"])) for r in rows]
 
     async def save_if(self, session: Session, expected: int) -> bool:
         if expected == 0:

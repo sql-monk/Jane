@@ -1,0 +1,68 @@
+diff --git a/deploy/profiles/ci.json b/deploy/profiles/ci.json
+index ad11a94..0e0c5ef 100644
+--- a/deploy/profiles/ci.json
++++ b/deploy/profiles/ci.json
+@@ -63,7 +63,8 @@
+         "period": "day"
+       },
+       "max_improvement_attempts": 3,
+-      "max_onboarding_samples": 60
++      "max_onboarding_samples": 60,
++      "min_onboarding_confidence": 0.8
+     },
+     "transfer": {
+       "inline_max_bytes": 262144,
+diff --git a/deploy/profiles/dev-laptop.json b/deploy/profiles/dev-laptop.json
+index d8e843d..fd01dc6 100644
+--- a/deploy/profiles/dev-laptop.json
++++ b/deploy/profiles/dev-laptop.json
+@@ -63,7 +63,8 @@
+         "period": "day"
+       },
+       "max_improvement_attempts": 3,
+-      "max_onboarding_samples": 60
++      "max_onboarding_samples": 60,
++      "min_onboarding_confidence": 0.8
+     },
+     "transfer": {
+       "inline_max_bytes": 262144,
+diff --git a/deploy/profiles/single-node.json b/deploy/profiles/single-node.json
+index 28f263d..1b50eac 100644
+--- a/deploy/profiles/single-node.json
++++ b/deploy/profiles/single-node.json
+@@ -63,7 +63,8 @@
+         "period": "day"
+       },
+       "max_improvement_attempts": 3,
+-      "max_onboarding_samples": 60
++      "max_onboarding_samples": 60,
++      "min_onboarding_confidence": 0.8
+     },
+     "transfer": {
+       "inline_max_bytes": 262144,
+diff --git a/deploy/profiles/tests/test_profiles_harness.py b/deploy/profiles/tests/test_profiles_harness.py
+index 4e3e5ed..414af1c 100644
+--- a/deploy/profiles/tests/test_profiles_harness.py
++++ b/deploy/profiles/tests/test_profiles_harness.py
+@@ -303,9 +303,9 @@ def test_stack_overlay_applies_the_profile_to_every_service() -> None:
+ def test_stack_llm_keeps_its_provider_timeout_and_the_profile_keeps_its_web_timeout(
+     profile: str, monkeypatch: pytest.MonkeyPatch
+ ) -> None:
+-    """The profile's ``timeouts.request_timeout_ms`` is sized for web fetches; llm declares its provider timeout
+-    as that contract field, so the stack overrides only ``provider.request_timeout_ms`` (to the service's own
+-    default) and every other service keeps the profile's value (request to WP-10 in docs/delivery/WP-14.md)."""
++    """The profile's ``timeouts.request_timeout_ms`` is sized for web fetches; llm's model call timeout
++    ``provider.request_timeout_ms`` is the service's own limit since WP-15 (R12), so the profile does not reach it
++    (the stack's override only repeats the default) and every other service keeps the profile's value."""
+     llm = jane_module("llm.settings")
+     key = "JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS"
+     override = int(compose_default(overlay_services()["llm"]["environment"][key]))
+@@ -315,7 +315,7 @@ def test_stack_llm_keeps_its_provider_timeout_and_the_profile_keeps_its_web_time
+     assert web_timeout < override
+     path = jane_stack.profile_path(profile)
+     llm_settings = llm.Settings.model_construct().model_copy(update={"limits_file": path})
+-    assert llm.resolve_service_limits(llm_settings).limits.provider.request_timeout_ms == web_timeout
++    assert llm.resolve_service_limits(llm_settings).limits.provider.request_timeout_ms == override
+     monkeypatch.setenv(key, str(override))
+     resolved = llm.resolve_service_limits(llm_settings)
+     assert resolved.limits.provider.request_timeout_ms == override

@@ -7,16 +7,17 @@ from __future__ import annotations
 
 import copy
 import time
+from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
-from assistant_fakes import WAIT_S, World
-from assistant_fakes.runtime import PRODUCT_CODE_V1, PRODUCT_CODE_V2_BREAKING
+from assistant_fakes import WAIT_S, World, world
+from assistant_fakes.runtime import PRODUCT_CODE_V1, PRODUCT_CODE_V2, PRODUCT_CODE_V2_BREAKING
 from assistant_fakes.site import SITES, material, product
 from fastapi.testclient import TestClient
 
-from jane_assistant.packages import extractor_draft
+from jane_assistant.packages import extractor_draft, proposal_bytes
 from jane_assistant.settings import Settings
 from jane_kit.contracts import ContractClient
 
@@ -274,6 +275,39 @@ def test_package_with_forbidden_auto_changes_gets_a_proposal_only(w: World) -> N
     assert list(w.registry.versions[PKG]) == ["1.2.0"]  # nothing published
     assert not w.registry.app.called("publishPackageVersion")
     assert w.orchestrator.groups["pg_1"]["status"] == "unresolved"
+    # R08: the proposal itself reaches the user (schema-checked as ImprovementResult by run())
+    proposal = result["proposal"]
+    assert proposal["based_on"]["package_id"] == PKG and proposal["based_on"]["version"] == "1.2.0"
+    assert proposal["version"] == "1.2.1" == proposal["manifest"]["version"]
+    assert proposal["manifest"]["provenance"]["created_by"] == "llm"
+    code = "src/product_extractor/main.py"
+    assert proposal["files"][code] == {"encoding": "utf-8", "data": PRODUCT_CODE_V2}
+    assert next(iter(proposal["files"])).startswith("src/")  # code first, then test fixtures
+    problem_tests = [t["name"] for t in proposal["manifest"]["tests"] if t["origin"] == "problem_sample"]
+    assert problem_tests and all(f"tests/{n}/material.json" in proposal["files"] for n in problem_tests)
+    assert (
+        f"--- a/{code}" in proposal["diff"]
+        and "+++ b/" in proposal["diff"]
+        and "(?:-new)?" in proposal["diff"]  # the new selector
+    )
+    assert "omitted_files" not in proposal
+
+
+def test_proposal_files_are_bounded_by_the_configured_size(
+    contracts: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``improvement.max_proposal_bytes`` bounds the whole proposal (UTF-8 JSON): code and schemas first, then the
+    diff; test fixtures that do not fit are named in ``omitted_files``. Here: ~1.8 KB required part + ~1.4 KB code
+    + diff fit 4 KB, the ~2.8 KB of fixtures do not."""
+    monkeypatch.setenv("JANE_ASSISTANT_LIMITS__IMPROVEMENT__MAX_PROPOSAL_BYTES", "4096")
+    with world(contracts, Settings(log_format="console", contracts_dir=contracts)) as wd:
+        seed(wd, auto_changes_allowed=False)
+        proposal = run(wd, request())["proposal"]
+        assert wd.violations() == []
+    assert "src/product_extractor/main.py" in proposal["files"]
+    assert proposal["omitted_files"] and all(p.startswith("tests/") for p in proposal["omitted_files"])
+    assert proposal_bytes(proposal) <= 4096
+    assert "+++ b/src/product_extractor/main.py" in proposal["diff"]
 
 
 def test_attempts_are_limited_and_unresolved_is_reported(w: World) -> None:

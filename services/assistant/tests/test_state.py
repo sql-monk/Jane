@@ -215,3 +215,221 @@ def test_state_survives_restart_for_finished_sessions(w: World, pg: tuple[str, s
         assert a2.get(f"/v1/onboarding-sessions/{sid}").json()["status"] == "insufficient_sample"
         job = a2.get(f"/v1/jobs/{job_id}").json()
         assert job["status"] == "succeeded" and job["result"]["session_id"] == sid
+
+
+def _drop(dsn: str, schema: str) -> None:
+    with psycopg.connect(dsn, autocommit=True) as conn:
+        conn.execute(sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(schema)))
+
+
+def _all_pages(client: TestClient, path: str, **params: Any) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    cursor: str | None = None
+    while True:
+        body = client.get(path, params={**params, **({"cursor": cursor} if cursor else {})}).json()
+        items += body["items"]
+        cursor = body["next_cursor"]
+        if cursor is None:
+            return items
+
+
+def test_lists_on_b_show_sessions_and_runs_of_a(w: World, pg: tuple[str, str]) -> None:
+    """R24 (WP-15) on PostgreSQL: B lists what A created - newest first, cursor pages, filters."""
+    own = (pg[0], f"wp15_lists_{uuid.uuid4().hex[:8]}")  # an empty schema: only this test's rows
+    try:
+        with w.instance(settings(w, own, "a")) as a, w.instance(settings(w, own, "b")) as b:
+            sids = []
+            for i in range(3):
+                r = start(a, "Shop Example kettles", f"lists-{i}")
+                wait(a, r.json()["job_id"])
+                sids.append(r.json()["labels"]["session_id"])
+            sessions = _all_pages(b, "/v1/onboarding-sessions", limit=2)
+            assert sorted(s["session_id"] for s in sessions) == sorted(sids)
+            positions = [(s["created_at"], s["session_id"]) for s in sessions]
+            assert positions == sorted(positions, reverse=True)
+            for s in sessions:
+                w.spec.validate_component("OnboardingSessionSummary", s)
+            assert (
+                len(
+                    b.get("/v1/onboarding-sessions", params={"status": "needs_disambiguation"}).json()[
+                        "items"
+                    ]
+                )
+                == 3
+            )
+            assert (
+                b.get("/v1/onboarding-sessions", params={"status": "proposals_ready"}).json()["items"] == []
+            )
+
+            runs = []
+            for i, extra in enumerate([{"source_id": "shop-example", "problem_group_id": "pg_1"}, {}]):
+                body = {
+                    "package": {"package_id": f"pkg-{i}.extractor", "version": "1.0.0"},
+                    "problem_samples": [{"material_ref": {"storage_connection_id": "raw", "object_id": "o"}}],
+                    **extra,
+                }
+                r = a.post("/v1/improvement-runs", json=body, headers={"Idempotency-Key": f"lists-imp-{i}"})
+                assert r.status_code == 202
+                wait(a, r.json()["job_id"])
+                runs.append(r.json()["job_id"])
+            listed = _all_pages(b, "/v1/improvement-runs", limit=1)
+            assert [j["job_id"] for j in listed] == sorted(
+                runs, key=lambda j: next(x["created_at"] for x in listed if x["job_id"] == j), reverse=True
+            )
+            assert sorted(j["job_id"] for j in listed) == sorted(runs)
+            assert [
+                j["job_id"]
+                for j in b.get("/v1/improvement-runs", params={"problem_group_id": "pg_1"}).json()["items"]
+            ] == [runs[0]]
+            assert {
+                j["job_id"]
+                for j in b.get("/v1/improvement-runs", params={"status": "failed"}).json()["items"]
+            } == set(runs)
+    finally:
+        _drop(*own)
+
+
+def test_job_list_reports_a_job_of_a_stopped_instance_as_failed(pg: tuple[str, str]) -> None:
+    """The PostgreSQL list normalizes jobs whose owner stopped renewing the lease, as ``get`` does."""
+    import asyncio
+
+    from jane_assistant.settings import ServiceLimits, StateLimits
+    from jane_assistant.state import PostgresState
+    from jane_kit.jobs import Job
+
+    schema = f"wp15_stale_{uuid.uuid4().hex[:8]}"
+    short = ServiceLimits(state=StateLimits(job_lease_ms=1))
+
+    async def scenario() -> None:
+        dead, alive = (
+            PostgresState(pg[0], schema, short, "dead"),
+            PostgresState(pg[0], schema, ServiceLimits(), "alive"),
+        )
+        await dead.open()
+        await alive.open()
+        try:
+            await dead.jobs.create(
+                Job(job_id="job_stale1", kind="improvement", status="running", labels={"package_id": "p"})
+            )
+            await alive.jobs.create(
+                Job(job_id="job_other1", kind="unknown_material", labels={"package_id": "p"})
+            )
+            await asyncio.sleep(0.05)
+            failed = await alive.job_list.page(
+                "improvement",
+                labels={"package_id": "p"},
+                statuses=frozenset({"failed"}),
+                after=None,
+                limit=10,
+            )
+            assert [(j.job_id, str(j.status)) for j in failed] == [("job_stale1", "failed")]
+            assert failed[0].error is not None and "dead" in str(failed[0].error.detail)
+            assert (
+                await alive.job_list.page(
+                    "improvement", labels={"package_id": "q"}, statuses=None, after=None, limit=10
+                )
+                == []
+            )
+        finally:
+            await dead.close()
+            await alive.close()
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        _drop(pg[0], schema)
+
+
+# ------------------------------------------------------------------ review 1 (WP-15): PostgreSQL lists
+def _improve(client: TestClient, package_id: str, key: str) -> str:
+    body = {
+        "package": {"package_id": package_id, "version": "1.0.0"},
+        "problem_samples": [{"material_ref": {"storage_connection_id": "raw", "object_id": "o"}}],
+    }
+    r = client.post("/v1/improvement-runs", json=body, headers={"Idempotency-Key": key})
+    assert r.status_code == 202
+    wait(client, r.json()["job_id"])
+    return str(r.json()["job_id"])
+
+
+def test_pg_lists_refuse_foreign_cursors_and_stay_stable(w: World, pg: tuple[str, str]) -> None:
+    from jane_kit.pagination import encode_cursor
+
+    own = (pg[0], f"wp15_r1_{uuid.uuid4().hex[:8]}")
+    try:
+        with w.instance(settings(w, own, "a")) as a, w.instance(settings(w, own, "b")) as b:
+            sids = []
+            for i in range(3):
+                r = start(a, "Shop Example kettles", f"r1-{i}")
+                wait(a, r.json()["job_id"])
+                sids.append(r.json()["labels"]["session_id"])
+            runs = [_improve(a, "shop.extractor", f"r1-run-{i}") for i in range(3)]
+            for path in ("/v1/onboarding-sessions", "/v1/improvement-runs"):
+                for cursor in (
+                    ["garbage", "x"],
+                    ["2026-01-01T00:00:00", "x"],
+                    ["2026-01-01T00:00:00Z", "a b"],
+                ):
+                    bad = b.get(path, params={"cursor": encode_cursor(cursor)})
+                    assert bad.status_code == 422 and bad.json()["code"] == "validation_failed", (
+                        path,
+                        cursor,
+                    )
+
+            page1 = b.get("/v1/onboarding-sessions", params={"limit": 2}).json()
+            r = start(a, "Shop Example kettles", "r1-new")  # created between the pages, on the other instance
+            wait(a, r.json()["job_id"])
+            page2 = b.get(
+                "/v1/onboarding-sessions", params={"limit": 2, "cursor": page1["next_cursor"]}
+            ).json()
+            seen = [s["session_id"] for s in page1["items"] + page2["items"]]
+            assert sorted(seen) == sorted(sids) and page2["next_cursor"] is None
+
+            p1 = b.get("/v1/improvement-runs", params={"limit": 2}).json()
+            late = _improve(a, "shop.extractor", "r1-run-new")
+            p2 = b.get("/v1/improvement-runs", params={"limit": 2, "cursor": p1["next_cursor"]}).json()
+            listed = [j["job_id"] for j in p1["items"] + p2["items"]]
+            assert sorted(listed) == sorted(runs) and late not in listed and p2["next_cursor"] is None
+    finally:
+        _drop(*own)
+
+
+def test_pg_status_filter_lists_a_session_of_a_dead_job_as_failed(w: World, pg: tuple[str, str]) -> None:
+    """Stored ``sampling``, its job's instance stopped renewing the lease: ``?status=failed`` lists it,
+    ``?status=sampling`` does not (the list settles running sessions first, as ``GET`` does)."""
+    import asyncio
+
+    from jane_assistant.onboarding import Session
+    from jane_assistant.settings import ServiceLimits, StateLimits
+    from jane_assistant.state import PostgresState
+    from jane_kit.jobs import Job, JobStatus
+
+    own = (pg[0], f"wp15_dead_{uuid.uuid4().hex[:8]}")
+
+    async def plant() -> None:
+        dead = PostgresState(own[0], own[1], ServiceLimits(state=StateLimits(job_lease_ms=1)), "dead")
+        await dead.open()
+        try:
+            await dead.jobs.create(Job(job_id="job_dead2", kind="onboarding", status=JobStatus.RUNNING))
+            session = Session(
+                session_id="onb_dead2", query="https://shop.example.test/", request={}, status="sampling"
+            )
+            session.job_id = "job_dead2"
+            await dead.sessions.save(session)
+        finally:
+            await dead.close()
+
+    try:
+        asyncio.run(plant())
+        time.sleep(0.05)
+        with w.instance(settings(w, own, "alive")) as b:
+
+            def ids(status: str) -> list[str]:
+                body = b.get("/v1/onboarding-sessions", params={"status": status}).json()
+                return [s["session_id"] for s in body["items"]]
+
+            assert ids("failed") == ["onb_dead2"]
+            assert ids("sampling") == []
+            assert b.get("/v1/onboarding-sessions/onb_dead2").json()["status"] == "failed"
+    finally:
+        _drop(*own)

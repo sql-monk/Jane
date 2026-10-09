@@ -10,8 +10,8 @@
 #     registry, llm and assistant take the limits they model from it as their own (standalone) limits and
 #     ignore the rest (WP-01b; the ignored paths are logged at start, `/v1/info` -> `limits.profile`);
 #   * JANE_LLM_PROVIDER_REQUEST_TIMEOUT_MS - timeout of one LLM provider call (default 120000, the llm
-#     service's own default): the profile's timeouts.request_timeout_ms is sized for web fetches and would
-#     otherwise become the provider timeout too (see deploy/profiles/README.md);
+#     service's own default; the profile's web timeouts.request_timeout_ms does not reach it), an optional
+#     knob for slow models (see deploy/profiles/README.md);
 #   * registry -> handler-runtime profile check, handler-runtime and the collectors read packages/rules from the
 #     registry; JANE_EXECUTORS_FILE - the orchestrator's executors (only the services of this stack);
 #   * JANE_TELEGRAM_RECORDINGS_DIR - a writable copy of examples/telegram/recordings (recorded backend);
@@ -115,9 +115,9 @@ services:
   llm:
     environment:
       JANE_LLM_LIMITS_FILE: /cfg/limits/platform.json
-      # provider.* of llm are declared as the contract's timeouts.* / retries, so the profile's web request
-      # timeout (30 s) would bound every model call. Until WP-10 settles that, the stack keeps the service's
-      # own provider timeout; the other provider limits (connect timeout, retries) come from the profile.
+      # The model call timeout is llm's own provider.request_timeout_ms (default 120000), not the profile's
+      # web timeouts.request_timeout_ms (WP-15, R12). The variable is an optional stack knob for slow models;
+      # the provider connect timeout and retries come from the profile.
       JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS: ${JANE_LLM_PROVIDER_REQUEST_TIMEOUT_MS:-120000}
     volumes: [*limits]
 

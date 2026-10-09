@@ -14,7 +14,7 @@ import pytest
 from jane_assistant.clients import LlmClient
 from jane_assistant.guards import SchemaValidator, check_code, sanitize_web_rules
 from jane_assistant.llm import BudgetExhausted, InvalidModelOutput, LlmSession
-from jane_assistant.packages import PackageDraft, bump, slug
+from jane_assistant.packages import DIFF_CUT, PackageDraft, bump, proposal_bytes, slug
 from jane_assistant.sampling import Sample, coverage, pick_diverse
 from jane_assistant.search import HttpJsonSearchProvider, StaticSearchProvider, direct_candidate
 from jane_assistant.settings import LlmLimits, Settings, request_layer, resolve_service_limits
@@ -184,18 +184,23 @@ def test_search_providers(tmp_path: Path) -> None:
 
 def test_limits_resolution_and_hard_caps(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("JANE_ASSISTANT_LIMITS__HARD_CAPS__LLM__MAX_IMPROVEMENT_ATTEMPTS", "2")
-    monkeypatch.setenv("JANE_ASSISTANT_LIMITS__ONBOARDING__MIN_CONFIDENCE", "0.7")
+    monkeypatch.setenv("JANE_ASSISTANT_LIMITS__LLM__MIN_ONBOARDING_CONFIDENCE", "0.7")
     resolved = resolve_service_limits(
         Settings(), *request_layer({"max_improvement_attempts": 5, "max_onboarding_samples": 10})
     )
     assert resolved.limits.llm.max_improvement_attempts == 2  # clamped by the platform hard cap
     assert resolved.limits.llm.max_onboarding_samples == 10
-    assert resolved.limits.onboarding.min_confidence == 0.7
+    assert (
+        resolved.limits.llm.min_onboarding_confidence == 0.7
+    )  # contract llm.min_onboarding_confidence (R08)
+    asked = resolve_service_limits(Settings(), *request_layer({"min_onboarding_confidence": 0.95}))
+    assert asked.limits.llm.min_onboarding_confidence == 0.95  # a request may ask for a stricter sample
     assert resolved.provenance()["llm.max_improvement_attempts"] == "hard_cap"
     with pytest.raises(LimitError):
         resolve_service_limits(Settings(), *request_layer({"unknown": 1}))
     info = resolve_service_limits(Settings()).platform_limits()
     assert info["defaults"]["llm"]["budget"] == {"amount": 2.0, "currency": "USD", "period": "run"}
+    assert info["defaults"]["llm"]["min_onboarding_confidence"] == 0.7  # visible in /v1/info
 
 
 def _llm_session(responder: Any, **limits: Any) -> LlmSession:
@@ -231,10 +236,14 @@ def test_llm_session_budget_truncation_and_validation() -> None:
     data = [{"name": "a", "text": "y" * 100}, {"name": "b", "text": "z"}]
     assert asyncio.run(llm.ask("s", "do it", data, schema, model="cheap")) == {"x": 1}
     assert len(seen[0]["data"]) == 1 and seen[0]["data"][0]["text"].startswith("y" * 40)
-    assert seen[0]["limits"]["budget"]["amount"] == 1
+    # R13: the whole run budget and the run id - the gateway counts the run itself (not "what is left")
+    assert seen[0]["limits"]["budget"] == {"amount": 1, "currency": "USD", "period": "run"}
+    assert seen[0]["scope"] == {"purpose": "onboarding", "run_id": "job_1"}
+    assert "mode" not in seen[0]  # sync by default
     asyncio.run(llm.ask("s", "do it", [], schema, model="cheap"))
     asyncio.run(llm.ask("s", "do it", [], schema, model="cheap"))
-    assert seen[-1]["limits"]["budget"]["amount"] == pytest.approx(0.2)
+    assert seen[-1]["limits"]["budget"]["amount"] == 1
+    assert llm.spent == pytest.approx(1.2) and llm.exhausted
     with pytest.raises(BudgetExhausted):
         asyncio.run(llm.ask("s", "do it", [], schema, model="cheap"))
     assert len(seen) == 3
@@ -306,3 +315,35 @@ def test_session_document_roundtrip_and_optimistic_version() -> None:
     assert not asyncio.run(store.save_if(stale, stale.version))  # lost the race: nothing written
     current = asyncio.run(store.get("onb_1"))
     assert current is not None and current.status == "sampling"
+
+
+def test_proposal_bound_counts_utf8_bytes_of_the_whole_proposal() -> None:
+    """``improvement.max_proposal_bytes`` (review 1): the whole proposal as compact UTF-8 JSON - not characters,
+    not per part. Code and schemas first, then the diff, then test fixtures; what does not fit is named."""
+    base = PackageDraft({"package_id": "shop.extractor", "version": "1.0.0"}, {"src/m/main.py": b"x = 1\n"})
+    draft = base.copy()
+    draft.manifest["version"] = "1.0.1"
+    code = "# " + "ї" * 600 + "\nx = 2\n"  # ~610 characters, ~1210 UTF-8 bytes
+    draft.files["src/m/main.py"] = code.encode()
+    draft.files["tests/case/material.json"] = json.dumps({"text": "ж" * 400}, ensure_ascii=False).encode()
+    based_on = {"package_id": "shop.extractor", "version": "1.0.0"}
+
+    def make(max_bytes: int) -> dict[str, Any]:
+        return draft.proposal(
+            base, based_on, schema_change="none", change_summary="зміна", max_bytes=max_bytes
+        )
+
+    whole = make(1_048_576)
+    assert (
+        set(whole["files"]) == {"src/m/main.py", "tests/case/material.json"} and "omitted_files" not in whole
+    )
+    assert "+x = 2" in whole["diff"] and not whole["diff"].endswith(DIFF_CUT)
+    required = proposal_bytes(make(1))  # what always stays: based_on, version, manifest...
+    limit = required + 900  # the code file's ~610 characters would fit, its ~1210 bytes do not
+    small = make(limit)
+    assert proposal_bytes(small) <= limit
+    assert "src/m/main.py" not in small["files"]
+    assert set(small["omitted_files"]) == {"src/m/main.py", "tests/case/material.json"}
+    assert small["diff"].endswith(DIFF_CUT)  # the diff got the room that was left, cut with a marker
+    for limit in range(required, required + 4000, 97):  # never over the bound, whatever the bound
+        assert proposal_bytes(make(limit)) <= limit

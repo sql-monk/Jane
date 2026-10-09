@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import base64
 import copy
+import difflib
 import hashlib
 import io
 import json
 import re
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -77,6 +79,38 @@ def strip_material(material: dict[str, Any]) -> dict[str, Any]:
     return {k: copy.deepcopy(material[k]) for k in keep if k in material}
 
 
+def file_entry(data: bytes) -> dict[str, str]:
+    """A package file as in ``registry.v1`` ``PublishRequest.files``: UTF-8 text, else base64."""
+    try:
+        return {"encoding": "utf-8", "data": data.decode("utf-8")}
+    except UnicodeDecodeError:
+        return {"encoding": "base64", "data": base64.b64encode(data).decode()}
+
+
+def proposal_bytes(doc: Any) -> int:
+    """Size of an ``ImprovementProposal`` as counted by ``improvement.max_proposal_bytes``: compact UTF-8 JSON."""
+    return len(json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+
+
+DIFF_CUT = "\n[... diff cut at improvement.max_proposal_bytes]\n"
+
+
+def _fit_text(text: str, fits: Callable[[str], bool]) -> str:
+    """``text``, or its longest prefix + :data:`DIFF_CUT` that ``fits``, or ``""``."""
+    if fits(text):
+        return text
+    if not fits(DIFF_CUT):
+        return ""
+    low, high = 0, len(text)  # fits(text[:low] + cut) holds, text[:high] + cut does not (or high = len)
+    while high - low > 1:
+        mid = (low + high) // 2
+        if fits(text[:mid] + DIFF_CUT):
+            low = mid
+        else:
+            high = mid
+    return text[:low] + DIFF_CUT
+
+
 def expected_output(entities: list[dict[str, Any]]) -> dict[str, Any]:
     """``expected.json`` of a test: entities without observation/provenance."""
     return {
@@ -129,15 +163,72 @@ class PackageDraft:
 
     def publish_body(self) -> dict[str, Any]:
         """``registry.v1`` ``PublishRequest``: manifest + files (jane-package.json comes from manifest)."""
-        files = {}
-        for path, data in sorted(self.files.items()):
-            if path == MANIFEST:
-                continue
-            try:
-                files[path] = {"encoding": "utf-8", "data": data.decode("utf-8")}
-            except UnicodeDecodeError:
-                files[path] = {"encoding": "base64", "data": base64.b64encode(data).decode()}
+        files = {path: file_entry(data) for path, data in sorted(self.files.items()) if path != MANIFEST}
         return {"manifest": self.manifest, "files": files}
+
+    def proposal(
+        self,
+        base: PackageDraft,
+        based_on: dict[str, str],
+        *,
+        schema_change: str,
+        change_summary: str,
+        max_bytes: int,
+    ) -> dict[str, Any]:
+        """``assistant.v1`` ``ImprovementProposal``: this unpublished version as changes against ``base``.
+
+        The whole proposal - as compact UTF-8 JSON - stays within ``max_bytes`` whenever its required part
+        (``based_on``, ``version``, ``manifest``...) fits. In that budget come, in this order: changed code and schema
+        files (``src/``, ``schemas/``, in the form of ``PublishRequest.files``), the unified ``diff`` of the changed
+        text files under ``src/`` and ``schemas/`` (cut with a marker if needed), then test fixtures and other files.
+        A file that does not fit is named in ``omitted_files`` (room for these names is reserved)."""
+        changed = sorted(p for p, data in self.files.items() if p != MANIFEST and base.files.get(p) != data)
+        code = [p for p in changed if p.startswith(("src/", "schemas/"))]
+        rest = [p for p in changed if p not in code]
+        head: dict[str, Any] = {
+            "based_on": based_on,
+            "version": self.manifest["version"],
+            "schema_change": schema_change,
+            "change_summary": change_summary,
+            "manifest": self.manifest,
+        }
+
+        def doc(files: dict[str, dict[str, str]], diff: str, omitted: list[str]) -> dict[str, Any]:
+            out = {**head, "files": files, "diff": diff}
+            if omitted:
+                out["omitted_files"] = omitted
+            return out
+
+        def fits(files: dict[str, dict[str, str]], diff: str, omitted: list[str]) -> bool:
+            return proposal_bytes(doc(files, diff, omitted)) <= max_bytes
+
+        files: dict[str, dict[str, str]] = {}
+        omitted: list[str] = []
+        for i, path in enumerate(code):  # room for naming every file still undecided as omitted
+            trial = {**files, path: file_entry(self.files[path])}
+            if fits(trial, "", [*omitted, *code[i:], *rest]):
+                files = trial
+            else:
+                omitted.append(path)
+        full_diff = "".join(
+            "".join(
+                difflib.unified_diff(
+                    base.text(path).splitlines(keepends=True),
+                    self.text(path).splitlines(keepends=True),
+                    fromfile=f"a/{path}" if path in base.files else "/dev/null",
+                    tofile=f"b/{path}",
+                )
+            )
+            for path in code
+        )
+        diff = _fit_text(full_diff, lambda d: fits(files, d, [*omitted, *rest]))
+        for i, path in enumerate(rest):
+            trial = {**files, path: file_entry(self.files[path])}
+            if fits(trial, diff, [*omitted, *rest[i:]]):
+                files = trial
+            else:
+                omitted.append(path)
+        return doc(files, diff, omitted)
 
     def archive(self) -> bytes:
         """Deterministic zip (sorted paths, fixed timestamps) with ``jane-package.json``."""

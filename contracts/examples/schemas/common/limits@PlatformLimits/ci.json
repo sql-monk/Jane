@@ -58,12 +58,13 @@
       "max_input_tokens_per_request": 32000,
       "max_output_tokens_per_request": 4096,
       "budget": {
-        "amount": 0,
+        "amount": 0.01,
         "currency": "USD",
-        "period": "run"
+        "period": "day"
       },
       "max_improvement_attempts": 3,
-      "max_onboarding_samples": 60
+      "max_onboarding_samples": 60,
+      "min_onboarding_confidence": 0.8
     },
     "transfer": {
       "inline_max_bytes": 262144,

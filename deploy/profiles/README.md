@@ -69,15 +69,14 @@ uv run --all-packages python deploy/profiles/harness/limits_harness.py run --pro
 з ключем оператора `JANE_API_KEY_ADMIN`.
 Нові ліміти діють для **нових** запусків. Обмеження сайту, провайдера й `hard_caps` можуть лише звузити профіль.
 
-**Тайм-аут виклику LLM.** llm оголошує `provider.connect_timeout_ms`, `provider.request_timeout_ms` і
-`provider.retries` як контрактні `timeouts.*` / `retries`, тож профіль (тайм-аут запиту 30 с — для
-веб-завантажень) інакше обмежив би кожен виклик моделі 30 с замість типових 120 с сервісу. Стек перекриває лише
-`JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS` значенням `JANE_LLM_PROVIDER_REQUEST_TIMEOUT_MS` (типово
-120 000 — власне типове значення llm). `timeouts.request_timeout_ms` профілів **не** піднято: це послабило б
-веб-завантаження колекторів. Підключення (`provider.connect_timeout_ms` 10 с) і повтори (3 спроби) llm бере з
-профілю. Остаточну семантику `provider.*` вирішує WP-10 (запит у звіті WP-14). Асистент викликає llm синхронно
-з власним `clients.request_timeout_ms` (30 с і в профілі, і типово) — довший виклик моделі він обірве раніше
-(запит до WP-11).
+**Тайм-аут виклику LLM.** Тайм-аут одного виклику моделі — власний ліміт llm `provider.request_timeout_ms`
+(типово 120 000), а не контрактний `timeouts.request_timeout_ms` профілю (30 с — для веб-завантажень і службових
+викликів); профіль його не змінює (WP-15, R12). З профілю llm бере лише підключення
+(`provider.connect_timeout_ms`, 10 с) і повтори (3 спроби). Стек передає
+`JANE_LLM_LIMITS__PROVIDER__REQUEST_TIMEOUT_MS` = `JANE_LLM_PROVIDER_REQUEST_TIMEOUT_MS` (типово те саме 120 000) —
+необов'язковий перемикач для повільних моделей. Асистент чекає синхронний виклик llm за власним
+`llm_call.request_timeout_ms` (типово 900 000, не `clients.request_timeout_ms`) або бере режим `async`
+(`JANE_ASSISTANT_LLM_COMPLETION_MODE=async`), див. README асистента.
 
 | Змінна стеку | Типово | Що |
 |---|---|---|

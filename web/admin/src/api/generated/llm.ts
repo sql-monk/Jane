@@ -278,13 +278,29 @@ export interface components {
       temperature?: number;
       /** @description Скільки разів перепитати модель при невалідному виході (у межах бюджету). */
       max_schema_retries?: number;
+      /**
+       * @description Рівні бюджетів і обліку. Найконкретніший рівень запиту — `task` (є `task_id`), інакше `source`
+       *     (є `source_id`), інакше `platform`.
+       */
       scope: {
         source_id?: string;
         task_id?: string;
+        /**
+         * @description Запуск, до якого належить виклик: вікно бюджетів `period: run` (запуск завдання оркестратора;
+         *     для асистента — сесія підключення чи job вдосконалення / невідомого матеріалу). Без `run_id`
+         *     вікном `run` є сам цей запит (усі повтори за схемою).
+         */
         run_id?: string;
         /** @enum {string} */
         purpose: "handler" | "onboarding" | "improvement" | "unknown_material" | "other";
       };
+      /**
+       * @description Ліміти викликача. `budget` — ще один бюджет найконкретнішого рівня запиту (див. `scope`): лише
+       *     звужує, збережені бюджети platform → source → task діють і далі; з тим самим `period` і `currency`,
+       *     що в збереженого бюджету цього рівня, лічильник спільний і діє менша сума, інакше перевіряються
+       *     обидва. `max_requests_per_minute` так само звужує найконкретніший рівень;
+       *     `max_input_tokens_per_request` / `max_output_tokens_per_request` — у межах hard_caps сервісу.
+       */
       limits?: components["schemas"]["llm"];
       test_mode?: boolean;
       /**
@@ -293,12 +309,23 @@ export interface components {
        */
       mode?: "sync" | "async";
     };
+    /**
+     * @description Стан одного бюджету в поточному вікні. У `CompletionResult.budget` — кожен бюджет, що діяв на виклик
+     *     (зокрема бюджет запиту; один рівень може мати кілька записів із різними `limit.period`).
+     */
     BudgetStatus: {
       scope_type: components["schemas"]["ScopeType"];
       scope_id: string;
+      /** @description Фактично списані витрати вікна (без резервів викликів, що ще виконуються). */
       spent: components["schemas"]["Money"];
       limit?: components["schemas"]["Budget"];
+      /** @description Скидання календарного вікна (`day`/`week`/`month`); для `run` і `total` відсутнє. */
       resets_at?: components["schemas"]["Timestamp"];
+      /**
+       * @description `spent ≥ limit.amount`: у цьому вікні не пройде жоден виклик (навіть безкоштовної моделі), доки
+       *     вікно не скинеться чи бюджет не збільшать. За `false` виклик теж відхиляється (429
+       *     `budget_exhausted`), якщо `spent + зарезервовано + його найгірша оцінка` не вміщується в ліміт.
+       */
       exhausted: boolean;
     };
     CompletionResult: {
@@ -436,6 +463,8 @@ export interface components {
         max_improvement_attempts?: number;
         /** @description Верхня межа вибірки під час дослідження джерела (фактична кількість адаптивна). */
         max_onboarding_samples?: number;
+        /** @description Поріг достатньої впевненості вибірки під час дослідження джерела (ТЗ §8): асистент вибирає матеріали, доки оцінка впевненості не досягне порога; не досягнуто в межах бюджету й max_onboarding_samples — сесія insufficient_sample. Вищий поріг — більша вибірка й витрати, тому hard_caps обмежують його зверху. Типово 0.8. */
+        min_onboarding_confidence?: number;
       };
       transfer?: {
         /** @description Вміст до цього розміру можна передавати inline; більший — лише blob. */
@@ -466,7 +495,7 @@ export interface components {
       backoff_multiplier?: number;
       jitter?: boolean;
     };
-    /** @description Бюджет витрат LLM на рівні (platform/source/task). Перевищення зупиняє нові виклики з кодом budget_exhausted. */
+    /** @description Бюджет витрат LLM на рівні (platform/source/task). Перевищення зупиняє нові виклики з кодом budget_exhausted. Семантика однакова для LLM-шлюзу й асистента: (1) виклик дозволено, лише якщо для кожного застосовного бюджету витрачено < amount і витрачено + зарезервовано + найгірша оцінка вартості виклику ≤ amount; тому amount: 0 означає «LLM вимкнено» для рівня — відхиляється навіть модель із нульовою ціною; (2) витрати рахуються у вікні period: day/week/month — календарний період UTC, total — без скидання, run — окремо для кожного scope.run_id запиту LLM-шлюзу (асистент передає ідентифікатор свого запуску: сесії підключення чи job), а без run_id вікном є сам запит з усіма його повторами; бюджет ніколи не пропускається; (3) бюджет у limits запиту стосується найконкретнішого рівня запиту (task, якщо є task_id, інакше source, інакше platform) і лише звужує: збережені бюджети рівнів діють і далі; з тим самим period і currency лічильник спільний і діє менша сума, інакше перевіряються обидва. */
     Budget: {
       amount: number;
       currency: string;
@@ -547,6 +576,8 @@ export interface components {
       max_improvement_attempts?: number;
       /** @description Верхня межа вибірки під час дослідження джерела (фактична кількість адаптивна). */
       max_onboarding_samples?: number;
+      /** @description Поріг достатньої впевненості вибірки під час дослідження джерела (ТЗ §8): асистент вибирає матеріали, доки оцінка впевненості не досягне порога; не досягнуто в межах бюджету й max_onboarding_samples — сесія insufficient_sample. Вищий поріг — більша вибірка й витрати, тому hard_caps обмежують його зверху. Типово 0.8. */
+      min_onboarding_confidence?: number;
     };
     /** @description Медіатип RFC 6838, наприклад 'text/html' або 'application/json'. Параметри (charset) передаються окремо. */
     MediaType: string;

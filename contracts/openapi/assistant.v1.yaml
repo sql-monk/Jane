@@ -32,10 +32,75 @@ paths:
   /v1/info:
     $ref: 'common.yaml#/components/pathItems/Info'
   /v1/onboarding-sessions:
+    get:
+      x-jane-scope: assistant:use
+      operationId: listOnboardingSessions
+      summary: Сесії підключення, новіші першими (відновлення стану адмінки після перезавантаження)
+      description: |
+        Курсорна пагінація (`limit`, `cursor` → `next_cursor`, `null` — сторінок більше немає; чужий курсор — 422).
+        Порядок — `created_at` спадно, за рівності — `session_id` спадно; нові сесії новіші за курсор, тож не
+        з'являються на наступних сторінках і не зсувають їх. Фільтр `status` бачить той самий стан, що й `GET` сесії.
+        Елементи — короткий стан сесії; повний (кандидати, вибірка, аналіз, варіанти) —
+        `GET /v1/onboarding-sessions/{session_id}`. Сесії без змін довше за налаштований строк зберігання
+        асистента (`state.session_retention_seconds`) видаляються.
+      tags: [onboarding]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+        - name: status
+          in: query
+          required: false
+          description: Лише сесії в цих станах (параметр можна повторити, наприклад `?status=sampling&status=analyzing`).
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/OnboardingStatus'
+      responses:
+        '200':
+          description: Сторінка сесій.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingSessionList'
+              examples:
+                page:
+                  value:
+                    items:
+                      - session_id: onb_01J9ZY0000000000000000002
+                        status: insufficient_sample
+                        query: https://tiny.example.test/
+                        proposal_count: 0
+                        costs:
+                          amount: 0.05
+                          currency: USD
+                        job_id: job_01J9ZY0000000000000000JO2
+                        created_at: '2026-09-27T10:00:00Z'
+                      - session_id: onb_01J9ZY0000000000000000001
+                        status: proposals_ready
+                        query: Shop Example kettles
+                        selected_candidate_id: cand_1
+                        proposal_count: 2
+                        costs:
+                          amount: 0.31
+                          currency: USD
+                        job_id: job_01J9ZY0000000000000000JOB
+                        created_at: '2026-09-27T09:00:00Z'
+                    next_cursor: WyIyMDI2LTA5LTI3VDA5OjAwOjAwWiIsIm9uYl8wMUo5WlkwMDAwMDAwMDAwMDAwMDAwMDAxIl0
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
     post:
       x-jane-scope: assistant:use
       operationId: startOnboarding
       summary: Почати підключення джерела (назва сайту/каналу або точне посилання)
+      description: |
+        202 + Job (`kind: onboarding`). Ідентифікатор створеної сесії — `Job.labels.session_id`, її адреса —
+        `Job.links.session` (`/v1/onboarding-sessions/{session_id}`); ті самі поля мають усі job сесії
+        (продовження після `selectCandidate`, `acceptProposal`). `Job.result` завершеного job — `OnboardingSession`
+        на момент завершення (зокрема `needs_disambiguation`, `proposals_ready`, `insufficient_sample`).
       tags: [onboarding]
       parameters:
         - $ref: 'common.yaml#/components/parameters/IdempotencyKey'
@@ -67,7 +132,21 @@ paths:
                       allowed_domains: [news.example.test]
       responses:
         '202':
-          $ref: 'common.yaml#/components/responses/JobAccepted'
+          description: Підключення почато; `labels.session_id` і `links.session` — сесія.
+          headers:
+            Location:
+              $ref: 'common.yaml#/components/headers/Location'
+            Idempotency-Replayed:
+              $ref: 'common.yaml#/components/headers/IdempotencyReplayed'
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Job'
+              examples:
+                queued:
+                  $ref: 'common.yaml#/components/examples/JobQueued'
+                onboarding:
+                  $ref: '#/components/examples/JobOnboardingQueued'
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '422':
@@ -193,6 +272,80 @@ paths:
         '409':
           $ref: 'common.yaml#/components/responses/Conflict'
   /v1/improvement-runs:
+    get:
+      x-jane-scope: assistant:use
+      operationId: listImprovementRuns
+      summary: Запуски вдосконалення (job `kind = improvement`), новіші першими
+      description: |
+        Job, створені `startImprovement`, з `result` = `ImprovementResult` для завершених — щоб адмінка відновила
+        список після перезавантаження. Курсорна пагінація (`limit`, `cursor` → `next_cursor`); порядок —
+        `created_at` спадно, за рівності — `job_id` спадно. Фільтри — за мітками job (`labels.package_id`,
+        `labels.source_id`, `labels.problem_group_id`) і станом. Завершені job зберігаються
+        `limits.transfer.job_retention_seconds` асистента.
+      tags: [improvement]
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+        - name: package_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: source_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: problem_group_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          description: Лише job у цих станах (параметр можна повторити).
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '../schemas/common/job.schema.json#/$defs/JobStatus'
+      responses:
+        '200':
+          description: Сторінка job вдосконалення.
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/JobList'
+              examples:
+                page:
+                  value:
+                    items:
+                      - job_id: job_01J9ZW00000000000000IMPROV
+                        kind: improvement
+                        status: succeeded
+                        created_at: '2026-09-27T10:00:00Z'
+                        finished_at: '2026-09-27T10:01:30Z'
+                        labels:
+                          package_id: shop-example.product-extractor
+                          source_id: shop-example
+                          problem_group_id: pg_01J9ZW0000000000000000001
+                        links:
+                          self: /v1/jobs/job_01J9ZW00000000000000IMPROV
+                          cancel: /v1/jobs/job_01J9ZW00000000000000IMPROV/cancel
+                        result:
+                          outcome: new_version
+                          version:
+                            package_id: shop-example.product-extractor
+                            version: 1.2.1
+                          attempts: 1
+                          activated: false
+                    next_cursor: null
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
     post:
       x-jane-scope: assistant:use
       operationId: startImprovement
@@ -327,6 +480,10 @@ paths:
       x-jane-scope: assistant:use
       operationId: getJob
       summary: Стан, прогрес і результат тривалої операції
+      description: |
+        `Job.result` завершеного (`succeeded`) job за `kind`: `onboarding` — `OnboardingSession`;
+        `onboarding_acceptance` — `AcceptanceResult`; `improvement` — `ImprovementResult`;
+        `unknown_material` — `UnknownMaterialResult`. Job сесії підключення мають `labels.session_id` і `links.session`.
       tags: [jobs]
       responses:
         '200':
@@ -340,6 +497,16 @@ paths:
                   $ref: 'common.yaml#/components/examples/JobRunning'
                 failed:
                   $ref: 'common.yaml#/components/examples/JobFailed'
+                onboardingSucceeded:
+                  $ref: '#/components/examples/JobOnboardingSucceeded'
+                acceptanceSucceeded:
+                  $ref: '#/components/examples/JobAcceptanceSucceeded'
+                improvementSucceeded:
+                  $ref: '#/components/examples/JobImprovementSucceeded'
+                improvementProposalOnly:
+                  $ref: '#/components/examples/JobImprovementProposalOnly'
+                unknownSucceeded:
+                  $ref: '#/components/examples/JobUnknownSucceeded'
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '404':
@@ -561,6 +728,45 @@ components:
           type: array
           items:
             type: string
+    OnboardingStatus:
+      type: string
+      enum: [resolving, needs_disambiguation, sampling, analyzing, proposals_ready, insufficient_sample, applying, completed, failed, cancelled]
+    OnboardingSessionSummary:
+      type: object
+      description: Короткий стан сесії для списку; повний — `OnboardingSession`.
+      required: [session_id, status, query, created_at]
+      properties:
+        session_id:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Id'
+        status:
+          $ref: '#/components/schemas/OnboardingStatus'
+        query:
+          type: string
+        selected_candidate_id:
+          type: string
+        proposal_count:
+          type: integer
+          minimum: 0
+          description: Скільки варіантів збору запропоновано.
+        costs:
+          $ref: '../schemas/handler-result.schema.json#/$defs/Money'
+        job_id:
+          type: string
+          description: Останній job сесії (`GET /v1/jobs/{job_id}`).
+        created_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        error:
+          $ref: '../schemas/common/problem.schema.json'
+    OnboardingSessionList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnboardingSessionSummary'
+        next_cursor:
+          $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
     OnboardingSession:
       type: object
       required: [session_id, status, query, created_at]
@@ -568,8 +774,7 @@ components:
         session_id:
           $ref: '../schemas/common/defs.schema.json#/$defs/Id'
         status:
-          type: string
-          enum: [resolving, needs_disambiguation, sampling, analyzing, proposals_ready, insufficient_sample, applying, completed, failed, cancelled]
+          $ref: '#/components/schemas/OnboardingStatus'
         query:
           type: string
         candidates:
@@ -737,6 +942,58 @@ components:
           description: Пропозиція розширити очікувані типи даних джерела (приймає користувач).
         costs:
           $ref: '../schemas/handler-result.schema.json#/$defs/Money'
+        proposal:
+          description: Є лише за `outcome = proposal_only` — сама пропозиція (версію не опубліковано).
+          $ref: '#/components/schemas/ImprovementProposal'
+    ImprovementProposal:
+      type: object
+      description: |
+        Зміна пакета, якому заборонено автоматичні зміни (`auto_changes_allowed = false`): кандидат пройшов
+        тести, але асистент його не публікує. Користувач переглядає `diff` і, якщо погоджується, сам публікує
+        версію (`registry.v1` `publishPackageVersion` з `manifest` і файлами `based_on` + `files`).
+      required: [based_on, version, manifest, files]
+      properties:
+        based_on:
+          description: Версія, яку вдосконалено.
+          $ref: '../schemas/common/package-ref.schema.json'
+        version:
+          type: string
+          description: Запропонований номер версії (SemVer за характером зміни схеми); не опублікована.
+        schema_change:
+          type: string
+          enum: [none, additive, breaking]
+        change_summary:
+          type: string
+        manifest:
+          description: Маніфест запропонованої версії (з новими тестами з проблемних прикладів і походженням `llm`).
+          $ref: '../schemas/package-manifest.schema.json'
+        files:
+          type: object
+          description: |
+            Змінені й додані файли відносно `based_on` у формі `PublishRequest.files` registry. Уся пропозиція
+            (компактний JSON, байти UTF-8) не перевищує `improvement.max_proposal_bytes` асистента, якщо вміщається
+            її обов'язкова частина; у цій межі по черзі: код і схеми (`src/`, `schemas/`), `diff`, тестові матеріали
+            та інші файли. Те, що не вмістилося, — в `omitted_files`. Незмінені файли беруться з `based_on`.
+          propertyNames:
+            $ref: '../schemas/package-manifest.schema.json#/$defs/PackagePath'
+          additionalProperties:
+            type: object
+            additionalProperties: false
+            required: [encoding, data]
+            properties:
+              encoding:
+                type: string
+                enum: [utf-8, base64]
+              data:
+                type: string
+        omitted_files:
+          type: array
+          items:
+            type: string
+          description: Змінені файли, що не вмістились у `files` (зазвичай великі тестові матеріали).
+        diff:
+          type: string
+          description: Unified diff змінених текстових файлів `src/` і `schemas/` для перегляду; якщо не вміщається в залишок межі — обрізаний із позначкою `[... diff cut at improvement.max_proposal_bytes]`.
     UnknownMaterialRequest:
       type: object
       additionalProperties: false
@@ -879,3 +1136,261 @@ components:
           currency: USD
         job_id: job_01J9ZY0000000000000000JOB
         created_at: '2026-09-27T09:00:00Z'
+    JobOnboardingQueued:
+      summary: Підключення почато — сесія в labels.session_id і links.session
+      value:
+        job_id: job_01J9ZY0000000000000000JOB
+        kind: onboarding
+        status: queued
+        created_at: '2026-09-27T09:00:00Z'
+        idempotency_key: onboard-shop-1
+        labels:
+          session_id: onb_01J9ZY0000000000000000001
+        links:
+          self: /v1/jobs/job_01J9ZY0000000000000000JOB
+          cancel: /v1/jobs/job_01J9ZY0000000000000000JOB/cancel
+          session: /v1/onboarding-sessions/onb_01J9ZY0000000000000000001
+    JobOnboardingSucceeded:
+      summary: Завершений job підключення — result = OnboardingSession (тут потрібне уточнення)
+      value:
+        job_id: job_01J9ZY0000000000000000JOB
+        kind: onboarding
+        status: succeeded
+        created_at: '2026-09-27T09:00:00Z'
+        started_at: '2026-09-27T09:00:00Z'
+        finished_at: '2026-09-27T09:00:02Z'
+        labels:
+          session_id: onb_01J9ZY0000000000000000001
+        links:
+          self: /v1/jobs/job_01J9ZY0000000000000000JOB
+          cancel: /v1/jobs/job_01J9ZY0000000000000000JOB/cancel
+          session: /v1/onboarding-sessions/onb_01J9ZY0000000000000000001
+        result:
+          session_id: onb_01J9ZY0000000000000000001
+          status: needs_disambiguation
+          query: Shop Example kettles
+          candidates:
+            - candidate_id: cand_1
+              title: Shop Example
+              url: https://shop.example.test/
+              confidence: 0.62
+            - candidate_id: cand_2
+              title: Shop Example Outlet
+              url: https://outlet.shop.example.test/
+              confidence: 0.35
+          job_id: job_01J9ZY0000000000000000JOB
+          created_at: '2026-09-27T09:00:00Z'
+    JobAcceptanceSucceeded:
+      summary: Варіант прийнято — result = AcceptanceResult (опубліковані draft-версії, звіти тестів, чернетка джерела)
+      value:
+        job_id: job_01J9ZY00000000000000ACCEPT
+        kind: onboarding_acceptance
+        status: succeeded
+        created_at: '2026-09-27T09:20:00Z'
+        started_at: '2026-09-27T09:20:00Z'
+        finished_at: '2026-09-27T09:20:09Z'
+        idempotency_key: accept-shop-1
+        labels:
+          session_id: onb_01J9ZY0000000000000000001
+        links:
+          self: /v1/jobs/job_01J9ZY00000000000000ACCEPT
+          cancel: /v1/jobs/job_01J9ZY00000000000000ACCEPT/cancel
+          session: /v1/onboarding-sessions/onb_01J9ZY0000000000000000001
+        result:
+          collector_rules:
+            package_id: shop-example.rules
+            version: 1.0.0
+            digest: sha256:2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881
+          extractors:
+            - action: bind_existing
+              package:
+                package_id: shop-example.product-extractor
+                version: 1.2.0
+              test_report:
+                package:
+                  package_id: shop-example.product-extractor
+                  version: 1.2.0
+                passed: 2
+                failed: 0
+                cases:
+                  - name: product-a100
+                    passed: true
+                    expected_status: success
+                    actual_status: success
+                  - name: category-page-empty
+                    passed: true
+                    expected_status: empty
+                    actual_status: empty
+          source_draft:
+            source_id: shop-example
+            kind: web
+            title: Shop Example
+            locator:
+              url: https://shop.example.test/
+            expected_entity_types: [product]
+          activated: false
+    JobImprovementSucceeded:
+      summary: Вдосконалення — нова версія пройшла старі й нові тести на всіх прив'язках (result = ImprovementResult)
+      value:
+        job_id: job_01J9ZW00000000000000IMPROV
+        kind: improvement
+        status: succeeded
+        created_at: '2026-09-27T10:00:00Z'
+        started_at: '2026-09-27T10:00:00Z'
+        finished_at: '2026-09-27T10:01:30Z'
+        idempotency_key: improve-pg-1
+        progress:
+          completed: 4
+          total: 4
+          unit: steps
+          message: published shop-example.product-extractor@1.2.1
+        labels:
+          package_id: shop-example.product-extractor
+          source_id: shop-example
+          problem_group_id: pg_01J9ZW0000000000000000001
+        links:
+          self: /v1/jobs/job_01J9ZW00000000000000IMPROV
+          cancel: /v1/jobs/job_01J9ZW00000000000000IMPROV/cancel
+        result:
+          outcome: new_version
+          version:
+            package_id: shop-example.product-extractor
+            version: 1.2.1
+            digest: sha256:4f6440c6a17b54edef02166e12a3bffd2364cbf790484d1f076b5d2e5ef78a35
+          attempts: 1
+          test_reports:
+            - context: tests
+              report:
+                package:
+                  package_id: shop-example.product-extractor
+                  version: 1.2.1
+                passed: 3
+                failed: 0
+                cases:
+                  - name: product-a100
+                    passed: true
+                    expected_status: success
+                    actual_status: success
+                  - name: category-page-empty
+                    passed: true
+                    expected_status: empty
+                    actual_status: empty
+                  - name: problem-p1
+                    passed: true
+                    expected_status: success
+                    actual_status: success
+          activated: false
+          costs:
+            amount: 0.12
+            currency: USD
+    JobImprovementProposalOnly:
+      summary: Пакет заборонено змінювати автоматично — result = ImprovementResult з proposal (нічого не опубліковано)
+      value:
+        job_id: job_01J9ZW0000000000000PROPOS
+        kind: improvement
+        status: succeeded
+        created_at: '2026-09-27T10:00:00Z'
+        started_at: '2026-09-27T10:00:00Z'
+        finished_at: '2026-09-27T10:01:10Z'
+        labels:
+          package_id: shop-example.product-extractor
+        links:
+          self: /v1/jobs/job_01J9ZW0000000000000PROPOS
+          cancel: /v1/jobs/job_01J9ZW0000000000000PROPOS/cancel
+        result:
+          outcome: proposal_only
+          version:
+            package_id: shop-example.product-extractor
+            version: 1.2.1
+          attempts: 1
+          activated: false
+          costs:
+            amount: 0.08
+            currency: USD
+          proposal:
+            based_on:
+              package_id: shop-example.product-extractor
+              version: 1.2.0
+            version: 1.2.1
+            schema_change: none
+            change_summary: Support the .price-new selector.
+            manifest:
+              schema_version: '1'
+              package_id: shop-example.product-extractor
+              version: 1.2.1
+              kind: extractor
+              title: Shop Example product cards
+              entry:
+                runtime: python
+                module: product_extractor.main
+                callable: extract
+              input:
+                accepts: [material]
+                media_types: [text/html]
+              output:
+                entities:
+                  - entity_type: product
+                    schema: schemas/product.schema.json
+                    key_fields: [sku]
+              dependencies:
+                runtime_profile: python-extractor@1
+                python: []
+              access:
+                network: none
+              tests:
+                - name: problem-p1
+                  input:
+                    material: tests/problem-p1/material.json
+                  expected_status: success
+                  expected: tests/problem-p1/expected.json
+                  compare: subset
+                  origin: problem_sample
+              provenance:
+                created_by: llm
+                based_on:
+                  package_id: shop-example.product-extractor
+                  version: 1.2.0
+                change_summary: Support the .price-new selector.
+                llm:
+                  reason: improvement
+                  assistant_job_id: job_01J9ZW0000000000000PROPOS
+            files:
+              src/product_extractor/main.py:
+                encoding: utf-8
+                data: |
+                  import re
+
+                  _PRICE = re.compile(r'class="price(?:-new)?"[^>]*>([0-9.]+)')
+              tests/problem-p1/expected.json:
+                encoding: utf-8
+                data: '{"entities": [{"entity_type": "product", "fields": {"sku": "C-300"}}]}'
+            omitted_files: [tests/problem-p1/material.json]
+            diff: |
+              --- a/src/product_extractor/main.py
+              +++ b/src/product_extractor/main.py
+              @@ -1,3 +1,3 @@
+               import re
+
+              -_PRICE = re.compile(r'class="price"[^>]*>([0-9.]+)')
+              +_PRICE = re.compile(r'class="price(?:-new)?"[^>]*>([0-9.]+)')
+    JobUnknownSucceeded:
+      summary: Невідомий матеріал проаналізовано (result = UnknownMaterialResult)
+      value:
+        job_id: job_01J9ZQ5A00000000000UNKNOWN
+        kind: unknown_material
+        status: succeeded
+        created_at: '2026-09-27T10:05:01Z'
+        started_at: '2026-09-27T10:05:01Z'
+        finished_at: '2026-09-27T10:05:03Z'
+        labels:
+          source_id: shop-example
+        links:
+          self: /v1/jobs/job_01J9ZQ5A00000000000UNKNOWN
+          cancel: /v1/jobs/job_01J9ZQ5A00000000000UNKNOWN/cancel
+        result:
+          classification:
+            material_type: gift_card_listing
+            confidence: 0.82
+          suggestion:
+            action: new_extractor
+            details: no extractor handles gift_card_listing materials carrying product

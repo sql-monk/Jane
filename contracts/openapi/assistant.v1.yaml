@@ -30,30 +30,7 @@ paths:
   /v1/health:
     $ref: 'common.yaml#/components/pathItems/Health'
   /v1/info:
-    get:
-      x-jane-scope: []
-      operationId: getServiceInfo
-      summary: Версія, підтримувані версії API й можливості сервісу
-      tags: [system]
-      responses:
-        '200':
-          description: Опис сервісу.
-          content:
-            application/json:
-              schema:
-                $ref: 'common.yaml#/components/schemas/ServiceInfo'
-              examples:
-                info:
-                  value:
-                    service: example-service
-                    version: 0.1.0
-                    api_versions: [v1]
-                    capabilities: {}
-                    auth_mode: jwt
-                assistantCi:
-                  $ref: '../examples/openapi/assistant-info-ci.json'
-        '401':
-          $ref: 'common.yaml#/components/responses/Unauthenticated'
+    $ref: 'common.yaml#/components/pathItems/Info'
   /v1/onboarding-sessions:
     get:
       x-jane-scope: assistant:use

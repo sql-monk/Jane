@@ -95,3 +95,19 @@ testsite *args:
 # Generate a client package from an OpenAPI contract
 gen-client spec out:
     @gen-client
+
+# Contracts linter alone (`--redocly` also requires the Redocly lint via npx)
+contracts-check *args:
+    @contracts-check
+
+# compat.py self-test + backward compatibility vs a git ref: `just contracts-compat [origin/main] [--oasdiff]`
+contracts-compat *args:
+    @contracts-compat
+
+# Example-driven mock of one API from contracts/: `just contracts-mock handler --port 4010`
+contracts-mock api *args:
+    @contracts-mock
+
+# Python client of one contract: `just contracts-gen storage services/x/src/jane_x/_generated/storage`
+contracts-gen api out *args:
+    @contracts-gen

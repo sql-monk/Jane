@@ -229,6 +229,72 @@ def test_pytest_arguments_pass_through(
         assert seen["ns"].target == "jane-kit"  # type: ignore[attr-defined]
 
 
+def _record_runs(monkeypatch: pytest.MonkeyPatch, codes: dict[str, int] | None = None) -> list[list[str]]:
+    """Replace dev.run; a command whose text contains a key of ``codes`` returns that exit code."""
+    calls: list[list[str]] = []
+
+    def fake_run(cmd: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        calls.append(list(cmd))
+        text = " ".join(cmd)
+        return subprocess.CompletedProcess(cmd, next((c for k, c in (codes or {}).items() if k in text), 0))
+
+    monkeypatch.setattr(dev, "run", fake_run)
+    return calls
+
+
+def test_types_checks_examples_and_profiles_one_run_each(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(dev, "members", list)
+    calls = _record_runs(monkeypatch, {"mypy deploy/profiles": 1})
+    assert dev.main(["types"]) == 1
+    mypy = [cmd[cmd.index("mypy") + 1 :] for cmd in calls]
+    assert mypy == [["scripts", "infra/tests"], ["examples"], ["deploy/profiles"]]
+
+
+def test_contract_runs_the_compat_self_test(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _record_runs(monkeypatch)
+    assert dev.main(["contract"]) == 0
+    assert dev.contract_tool("compat.py", "--self-test") in calls
+    calls = _record_runs(monkeypatch, {"--self-test": 1})
+    assert dev.main(["contract"]) == 1
+    assert any(cmd[-2:] == ["-m", "contract"] for cmd in calls)  # contract tests still run
+
+
+def test_contracts_compat_self_test_then_base(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _record_runs(monkeypatch)
+    assert dev.main(["contracts-compat", "origin/main", "--oasdiff"]) == 0
+    assert calls == [
+        ["uv", "run", "--script", "contracts/tools/compat.py", "--self-test"],
+        ["uv", "run", "--script", "contracts/tools/compat.py", "--base", "origin/main", "--oasdiff"],
+    ]
+    calls = _record_runs(monkeypatch)
+    assert dev.main(dev.from_just(["--just", "contracts-compat", "contracts-compat"])) == 0
+    assert calls[-1][-2:] == ["--base", "main"]
+    calls = _record_runs(monkeypatch, {"--self-test": 1})
+    assert dev.main(["contracts-compat"]) == 1
+    assert len(calls) == 1  # a broken comparator never reports "0 breaking"
+
+
+def test_contracts_check_mock_and_gen(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _record_runs(monkeypatch)
+    assert dev.main(["contracts-check"]) == 0
+    assert calls[-1][-2:] == ["python", "scripts/contracts_lint.py"]
+    assert dev.main(["contracts-mock", "handler", "--port", "4011"]) == 0
+    assert calls[-1] == dev.contract_tool("mock.py", "handler", "--port", "4011", "--host", "127.0.0.1")
+    assert dev.main(["contracts-gen", "storage", "out/storage"]) == 0
+    assert calls[-1][3:] == [
+        "jane-codegen",
+        "client",
+        "contracts/openapi/storage.v1.yaml",
+        "--out",
+        "out/storage",
+        "--no-models",
+    ]
+    assert dev.main(["contracts-gen", "storage", "out/storage", "--models"]) == 0
+    assert "--no-models" not in calls[-1]
+    with pytest.raises(SystemExit, match="unknown contract 'nope'"):
+        dev.main(["contracts-gen", "nope", "out"])
+
+
 def test_unknown_arguments_rejected_for_non_pytest_commands() -> None:
     with pytest.raises(SystemExit):
         dev.main(["lint", "-v"])

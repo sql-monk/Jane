@@ -16,6 +16,8 @@ codex/jane-integration`, `merge --no-ff` із маркером `merge: accept`,
 `push origin HEAD:codex/jane-integration`. Окремий checkout ізолює потік B від
 checkout потоку A. `main` і force push не використовуються.
 
+Поточний стан: **потік B завершено**; усі інкременти accepted/merged/pushed. Фінальний [CI 37937013460](https://github.com/sql-monk/Jane/actions/runs/37937013460) — success на `bb1982b`, 14/14 jobs, API e2e 79 passed. Heartbeat B — PAUSED. Нижче збережено історію роботи та точні докази.
+
 ## Стан інкрементів
 
 | Завдання | Гілка / worktree | Стан |
@@ -24,7 +26,7 @@ checkout потоку A. `main` і force push не використовують�
 | B-2: решта real-адмінки | `wp/22b-admin-real-coverage`, `wp22b` | accepted; `ffc6914`, review 1 |
 | B-3: дві репліки й L2 | `wp/22c-shared-host-replicas`, `wp22c` | accepted; `753f3e9`, review 1 |
 | B-4: приклад info з limits | `wp/22d-assistant-info-example`, `wp22d` | accepted; `256334c`, review 1, compatible |
-| B-5: S-M3-02 після WP-19 | `wp/22e-storage-contract-cleanup`, `wp22e` | виконання; база `b336922`, WP-19 прийнято `ee78fc5` |
+| B-5: S-M3-02 після WP-19 | `wp/22e-storage-contract-cleanup`, `wp22e` | accepted; `b76d778`, merge `f0fde81`, review 1 |
 
 ## Початкові перевірки
 
@@ -47,7 +49,7 @@ LLM/IdP/AWS/Telegram без доступу — не перевірено на р
 
 ## Запити до інших власників
 
-Поки немає. B-5 має явну залежність від приймання WP-19 потоком A.
+Відкритих запитів потоку B немає. Залежність WP-19 прийнята в ee78fc5; transit allowlist інтегровано потоком A в 2d4a101, B-5 accepted і завершено.
 
 
 ## B-1: accepted
@@ -889,3 +891,62 @@ Git-команди рецензента через Node execFile argv завер
 ```
 
 E2e не запускався повторно: рецензент читав авторський raw log із двома PASSED і cleanup; listings перевіряв сам. Публікація початкового запису run ID отримала non-fast-forward через паралельне C-2 злиття `fdad210`; detached journal commit збережено на backup ref `codex/stream-b-ci-run-record-20261009`, перенесено cherry-pick після fresh checkout + pull --ff-only, без force. Опублікований запис run ID — `33dce02`; перевірюваний SHA CI незмінний `bb1982b`, він передує C-2, який має власний наступний фінальний CI.
+
+
+## Потік B завершено: фінальний CI success
+
+Усі B-1…B-5 і документальне оновлення після B-2 accepted, merged та pushed у `codex/jane-integration`. Останній кодовий інкремент B-5: `b76d7789ca3380a7d171d401e6c00e2b3a6ce50a`, merge `f0fde812e60ca1cfa5bab8ecf973f307fd3fef61`, незалежне review accepted / round 1.
+
+Єдиний фінальний dispatch B — [37937013460](https://github.com/sql-monk/Jane/actions/runs/37937013460): **completed / success**, перевірений head SHA `bb1982b9f6b1e2593fb2f1ab60a436e6945f15b1`, завершено `2026-10-09T14:02:03Z`. Усі **14/14 jobs success**, повний API e2e **79 passed, без skips**. Додаткових dispatch/rerun і локальних повторів успішних e2e не було.
+
+Це результат потоку B на точному SHA перед паралельним C-2 та його follow-up; нові зміни C/A має підтверджувати їхній власний/підсумковий CI. Цей workflow запускав admin mock suite, не повний browser real22: структурні 22 та локально перевірені нові 4 real наведені в B-2, зеленість усіх 22 одним цим CI не заявляється. Реальні зовнішні LLM/IdP/AWS/Telegram і виключені dev-laptop/single-node не додавались до обсягу.
+
+### Фактичний результат GitHub
+
+```text
+$ gh run view 37937013460 --repo sql-monk/Jane --json status,conclusion,headSha,headBranch,url,createdAt,updatedAt
+{"conclusion":"success","createdAt":"2026-10-09T13:27:50Z","headBranch":"codex/jane-integration","headSha":"bb1982b9f6b1e2593fb2f1ab60a436e6945f15b1","status":"completed","updatedAt":"2026-10-09T14:02:03Z","url":"https://github.com/sql-monk/Jane/actions/runs/37937013460"}
+EXIT_CODE=0
+```
+
+Із фактичного `gh run view 37937013460 --repo sql-monk/Jane --json status,conclusion,headSha,headBranch,url,jobs,createdAt,updatedAt` (exit 0); повний JSON збережено в `.jane/stream-b-final-ci-status.json`, нижче всі jobs:
+
+| Job | Фактичний стан | Job ID |
+|---|---|---|
+| contracts-compat | completed / success | 113841503280 |
+| lint | completed / success | 113841503569 |
+| unit | completed / success | 113841851558 |
+| web-mock-e2e | completed / success | 113841851641 |
+| web | completed / success | 113841851854 |
+| contract | completed / success | 113844358454 |
+| isolation | completed / success | 113844358603 |
+| limits | completed / success | 113844771651 |
+| stack | completed / success | 113844771687 |
+| adapters (mongodb) | completed / success | 113844771814 |
+| adapters (s3) | completed / success | 113844771817 |
+| adapters (sqlserver) | completed / success | 113844771856 |
+| adapters (minio) | completed / success | 113844771873 |
+| e2e | completed / success | 113844771924 |
+
+### Фактичний e2e log
+
+`gh run watch 37937013460 --repo sql-monk/Jane --interval 60 --exit-status` завершився EXIT_CODE=0. `gh run view 37937013460 --repo sql-monk/Jane --job 113844771924 --log` завершився EXIT_CODE=0; повний log у `.jane/stream-b-final-e2e-log.txt`, нижче адресні докази B-3/B-5 та підсумок без скорочення:
+
+```text
+e2e	Run just e2e -v	2026-10-09T13:36:09.9333906Z   JANE_E2E_REQUIRED: 1
+e2e	Run just e2e -v	2026-10-09T14:00:30.5002476Z tests/e2e/test_reprocessing_stored.py::test_s_m3_01_reprocessing_takes_exactly_the_given_stored_objects PASSED [ 96%]
+e2e	Run just e2e -v	2026-10-09T14:00:32.0280541Z tests/e2e/test_reprocessing_stored.py::test_s_m3_02_telegram_json_raw_is_restored_and_reprocessed_with_its_sha256 PASSED [ 97%]
+e2e	Run just e2e -v	2026-10-09T14:01:19.3667674Z tests/e2e/test_shared_host_replicas.py::test_l2_two_docker_replicas_share_host_parallelism_and_interval PASSED [ 98%]
+e2e	Run just e2e -v	2026-10-09T14:01:59.5135961Z tests/e2e/test_shared_host_replicas.py::test_l2_killed_replica_releases_shared_host_within_ttl PASSED [100%]
+e2e	Run just e2e -v	2026-10-09T14:01:59.5137661Z ======================= 79 passed in 1547.83s (0:25:47) ========================
+```
+
+### Heartbeat
+
+Після confirmed success вимкнено лише `jane-b-5-wp-19` / **Jane B-5 після WP-19**, зі збереженням назви, prompt, cadence і target thread. Фактичний automation_update:
+
+```json
+{"automationId":"jane-b-5-wp-19","mode":"update","status":"PAUSED"}
+```
+
+Readonly `automation.toml` підтвердив `status = "PAUSED"`. Чужі автоматизації та стеки не змінювались. Відкритих запитів потоку B немає; main і force push не використовувались.

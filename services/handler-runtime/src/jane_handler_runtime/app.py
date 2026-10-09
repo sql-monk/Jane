@@ -53,7 +53,7 @@ class _Contracts:
 
     @cached_property
     def handler_spec(self) -> OpenAPISpec:
-        return OpenAPISpec.load(self.runtime.schemas.root.parent / "openapi" / "handler.v1.yaml")
+        return OpenAPISpec.load(self.runtime.schemas.root / "openapi" / "handler.v1.yaml")
 
 
 async def _json_body(request: Request) -> dict[str, Any]:

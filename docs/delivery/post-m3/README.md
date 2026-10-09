@@ -6,7 +6,7 @@ M3 прийнято й злито в `main`. Беклог [M3/open-requests.md](
 
 | Потік | Хто веде | Що | Доручення | Журнал |
 |---|---|---|---|---|
-| **A** | Claude (сесія координатора) | WP-19: R17 (спільні сховища job/idempotency у jane-kit), R18 (запис ContentRef), дефекти storage; підсумковий CI; `status.md` і `open-requests.md` | — (веде сам) | [status.md](../status.md) |
+| **A** | Codex (передано від Claude 2026-10-09) | WP-19: R17 (спільні сховища job/idempotency у jane-kit), R18 (запис ContentRef), дефекти storage; підсумковий CI; `status.md` і `open-requests.md` | [stream-a-handoff.md](stream-a-handoff.md) | [status.md](../status.md) |
 | **B** | Codex | Приймання й адмінка: матриця, real-покриття решти адмінки, L2 з двома репліками, приклад `/v1/info`, прибрати обхід S-M3-02 після WP-19 | [stream-b-handoff.md](stream-b-handoff.md) | `stream-b.md` |
 | **C** | Codex | Гігієна репозиторію й документація: CI/DEVELOPMENT, README, `contracts/python` у workspace, прибирання worktree/гілок | [stream-c-handoff.md](stream-c-handoff.md) | `stream-c.md` |
 

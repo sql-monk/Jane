@@ -499,9 +499,11 @@ class PgJobStore:
             )
             if saved is None:
                 return
+            # the lease is checked again at the write: it may have run out since the row was read (fencing)
             cur.execute(
                 sql.SQL(
-                    "UPDATE {} SET {} = %s, finished_at = %s, updated_at = clock_timestamp() WHERE job_id = %s"
+                    "UPDATE {} SET {} = %s, finished_at = %s, updated_at = clock_timestamp() "
+                    "WHERE job_id = %s AND finished_at IS NULL AND lease_until > clock_timestamp()"
                 ).format(self._t, self._doc),
                 (
                     self._dump(saved),

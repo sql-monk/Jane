@@ -358,11 +358,13 @@ class SqliteJobStore(_SqliteJobs):
             if saved is None:
                 return
             db.execute(
-                f"UPDATE {self.table} SET {self.doc} = ?, finished_at = ? WHERE job_id = ?",  # noqa: S608
+                f"UPDATE {self.table} SET {self.doc} = ?, finished_at = ? "  # noqa: S608
+                "WHERE job_id = ? AND finished_at IS NULL AND lease_until > ?",
                 (
                     saved.model_dump_json(),
                     _epoch(saved.finished_at) if saved.status in TERMINAL_STATUSES else None,
                     saved.job_id,
+                    time.time(),  # the lease is checked again at the write (fencing)
                 ),
             )
 

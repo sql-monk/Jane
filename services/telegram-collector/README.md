@@ -94,8 +94,14 @@ JANE_TELEGRAM_COLLECTOR_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 he
 Рівні: типові значення сервісу → platform (`LIMITS_FILE`, потім `JANE_TELEGRAM_COLLECTOR_LIMITS__<ГРУПА>__<ПОЛЕ>`,
 жорсткі стелі — `..._LIMITS__HARD_CAPS__...`) → source (`rules.limits`) → request (`limits` у запиті).
 Після злиття значення обмежуються `hard_caps` (`min`). Ефективні ліміти збору — у `GET /v1/collections/{id}`
-→ `effective_limits`; типові значення й стелі — у `GET /v1/info` → `limits`. Групи контракту, яких колектор
-не використовує (`crawl`, `sandbox`, `llm`…), ігноруються.
+→ `effective_limits`; типові значення й стелі — у `GET /v1/info` → `limits`.
+
+Шари — спільні шари jane-kit з тією самою перевіркою помилок, що й в інших сервісах (R20): `LIMITS_FILE` може
+бути цілим профілем `deploy/profiles/<профіль>.json` — ліміти контракту, яких колектор не має (`crawl`, `sandbox`,
+`llm`…), ігноруються й перелічуються в стартовому журналі (`platform limits profile applied partially`), а
+опечатка (шлях, невідомий і контракту, і моделі) — помилка старту. Змінні `..._LIMITS__*` задаються шляхами моделі
+(`..._LIMITS__JOBS__JOB_RETENTION_SECONDS`, `..._LIMITS__COLLECTOR__HISTORY_PAGE_SIZE`); невідомий шлях — помилка
+старту. `rules.limits` і `limits` запиту — документи контракту `Limits`: поля, яких колектор не має, ігноруються.
 
 | Ліміт | Типово | Що обмежує |
 |---|---|---|
@@ -120,7 +126,8 @@ JANE_TELEGRAM_COLLECTOR_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 he
 | `collector.backpressure_poll_ms` | 1000 | як часто призупинений збір перевіряє буфер |
 | `collector.gc_interval_seconds` | 3600 | прибирання прострочених зборів і транзитних файлів |
 
-Групи `jobs`, `idempotency`, `page`, `collector` — внутрішні (їх немає в контракті; у `limits` запиту чи правил ігноруються).
+Групи `jobs`, `idempotency`, `page`, `collector` — внутрішні (їх немає в контракті): задаються лише на рівні
+platform; у `limits` запиту чи правил їх відхиляє схема контракту (422 `validation_failed`).
 
 ## Поведінка
 

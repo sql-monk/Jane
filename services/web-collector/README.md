@@ -88,8 +88,8 @@ just test web-collector -m contract     # лише контрактні
 | `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | журнали |
 | `METRICS_ENABLED` | `true` | `/metrics` |
 | `AUTH_MODE` | `none` | `none` / `api_key` / `jwt` — див. «Автентифікація (ADR-0005)» |
-| `LIMITS_FILE` | — | `PlatformLimits` (`profile`, `defaults`, `hard_caps`; TOML/JSON/YAML); групи, яких колектор не використовує (`sandbox`, `llm`, `telegram`…), ігноруються |
-| `LIMITS__<ГРУПА>__<ПАРАМЕТР>` / `LIMITS__HARD_CAPS__…` | — | перевизначення, напр. `JANE_WEB_COLLECTOR_LIMITS__CRAWL__MAX_DEPTH=3` |
+| `LIMITS_FILE` | — | `PlatformLimits` (`profile`, `defaults`, `hard_caps`; TOML/JSON/YAML), напр. цілий `deploy/profiles/<профіль>.json`. Спільний шар jane-kit (R20): ліміти контракту, яких колектор не має (`sandbox`, `llm`, `telegram`…), ігноруються й перелічуються в стартовому журналі (`platform limits profile applied partially`); шлях, невідомий і контракту, і моделі (опечатка), — помилка старту |
+| `LIMITS__<ГРУПА>__<ПАРАМЕТР>` / `LIMITS__HARD_CAPS__…` | — | перевизначення шляхами моделі (як у всіх сервісах), напр. `JANE_WEB_COLLECTOR_LIMITS__CRAWL__MAX_DEPTH=3`, `..._LIMITS__JOBS__JOB_RETENTION_SECONDS=600`; невідомий шлях — помилка старту |
 
 ## Автентифікація (ADR-0005)
 

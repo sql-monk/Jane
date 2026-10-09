@@ -27,7 +27,7 @@ from .collector import LeaseLost, RunDeps, TelegramRun, new_stats
 from .connections import resolve_account
 from .materials import ContentTooLarge, Delivery, TransitStore, build_material, new_observation_id, rfc3339
 from .rules import ContractSchemas, RulesLoader, validate_rules
-from .settings import ServiceLimits, Settings, platform_layers, to_contract, translate_layer
+from .settings import ServiceLimits, Settings, contract_layer, platform_layers, to_contract
 from .state import StateStore
 
 __all__ = ["Engine"]
@@ -91,9 +91,7 @@ class Engine:
         if request:
             layers.append(LimitLayer("request", request, name="request"))
         try:
-            return resolve_limits(
-                ServiceLimits, *self.platform, *(translate_layer(la, contract_only=True) for la in layers)
-            )
+            return resolve_limits(ServiceLimits, *self.platform, *(contract_layer(la) for la in layers))
         except LimitError as exc:
             raise ValidationFailed(f"invalid limits: {exc}") from exc
 

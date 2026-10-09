@@ -8,8 +8,8 @@ restricts both ends:
 * ``env:VAR`` — only variables starting with ``JANE_STORAGE_SECRET_ENV_PREFIX`` (default ``JANE_SECRET_``),
   so not ``PGPASSWORD`` or another service's configuration;
 * ``file:<path>`` — only inside ``JANE_STORAGE_SECRET_FILES_DIR`` (default ``/run/secrets``); the path is
-  resolved first (``..`` and symlinks do not escape) and the resolved file is the one read; ``vault:`` is
-  disabled;
+  resolved first (``..`` and symlinks do not escape) and the resolved file is read through pinned path
+  components; ``vault:`` is disabled (both: jane-kit's shared :class:`jane_kit.secrets.SecretPolicy`, R17);
 * every network address the adapter of the connection contacts — only hosts from
   ``JANE_STORAGE_CONNECTION_HOST_ALLOWLIST`` (``hostname`` = any port, ``hostname:port`` = that port; default
   empty, so every connection with a network address is rejected). :data:`KIND_ADDRESSES` knows the address
@@ -24,14 +24,13 @@ percent-encoding in the host, trailing dots, IPv6 literals, Unix socket paths) a
 
 from __future__ import annotations
 
-import os
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 from jane_kit.errors import FieldError
+from jane_kit.secrets import SECRET_REF_NOT_ALLOWED, HostAllowlist, SecretPolicy, parse_host_port
 
 __all__ = [
     "GENERIC_ADDRESS_KEYS",
@@ -48,11 +47,8 @@ __all__ = [
     "service_url",
 ]
 
-SECRET_REF_NOT_ALLOWED = "secret_ref_not_allowed"  # noqa: S105 - an error code, not a secret
 HOST_NOT_ALLOWED = "host_not_allowed"
 
-_LABEL = r"(?!-)[A-Za-z0-9_-]{1,63}(?<!-)"
-_HOST_PORT = re.compile(rf"(?P<host>{_LABEL}(?:\.{_LABEL})*)(?::(?P<port>[0-9]{{1,5}}))?", re.ASCII)
 _URL = re.compile(
     r"(?P<scheme>[A-Za-z][A-Za-z0-9+.-]{0,31})://(?P<authority>[^/?#]*)(?P<rest>[/?#].*)?",
     re.ASCII | re.DOTALL,
@@ -82,21 +78,6 @@ class Address:
 
     def __str__(self) -> str:
         return self.host if self.port is None else f"{self.host}:{self.port}"
-
-
-def parse_host_port(value: object) -> tuple[str, int | None] | None:
-    """Strict ``hostname[:port]`` → ``(lower-case host, port)``; anything else → ``None``."""
-    if not isinstance(value, str) or len(value) > 300:
-        return None
-    m = _HOST_PORT.fullmatch(value)
-    if m is None or len(m.group("host")) > 253:
-        return None
-    if m.group("port") is None:
-        return m.group("host").lower(), None
-    port = int(m.group("port"))
-    if not 0 < port < 65536:
-        return None
-    return m.group("host").lower(), port
 
 
 def _host(value: object, pointer: str, default_port: int | None) -> Address:
@@ -322,72 +303,20 @@ def network_addresses(kind: str, params: Mapping[str, Any]) -> tuple[list[Addres
     return found, problems
 
 
-def _allow_entry(entry: str) -> tuple[str, int | None]:
-    parsed = parse_host_port(entry.strip()) if isinstance(entry, str) else None
-    if parsed is None:
-        raise ValueError(f"host allowlist entry {entry!r} must be hostname or hostname:port")
-    return parsed
-
-
 @dataclass(frozen=True)
-class ConnectionPolicy:
-    env_prefix: str = "JANE_SECRET_"
-    files_dir: Path | None = Path("/run/secrets")
+class ConnectionPolicy(SecretPolicy):
+    """jane-kit's shared secret policy (R17: ``env:`` prefix, ``file:`` directory with pinned reading, ``vault:``
+    refused) plus the network addresses a connection's adapter may contact."""
+
     host_allowlist: Sequence[str] = ()
-    _allowed: frozenset[tuple[str, int | None]] = field(init=False, repr=False, default=frozenset())
+    _allowed: HostAllowlist = field(init=False, repr=False, default=HostAllowlist())
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "_allowed", frozenset(_allow_entry(e) for e in self.host_allowlist))
-
-    # ------------------------------------------------------------------------------ secret_refs
-    def secret_file(self, ref: str) -> Path | None:
-        """Resolved path of an allowed ``file:`` reference (``None`` if not allowed)."""
-        if self.files_dir is None or not ref.startswith("file:") or not ref[5:]:
-            return None
-        try:
-            path = Path(ref[5:]).resolve()
-            base = self.files_dir.resolve()
-        except (OSError, RuntimeError, ValueError):
-            return None
-        return path if path.is_relative_to(base) and path != base else None
-
-    def ref_error(self, ref: str) -> str | None:
-        """Why a secret reference is not allowed (``None`` if allowed)."""
-        if ref.startswith("env:"):
-            name = ref[4:]
-            if not self.env_prefix or not name.startswith(self.env_prefix) or name == self.env_prefix:
-                return f"env: references must name variables starting with {self.env_prefix!r}"
-            return None
-        if ref.startswith("file:"):
-            if self.files_dir is None:
-                return "file: references are disabled"
-            if self.secret_file(ref) is None:
-                return f"file: references must point to a file inside {self.files_dir}"
-            return None
-        if ref.startswith("vault:"):
-            return "vault: references are not configured in this service"
-        return "unknown secret reference scheme"
-
-    def resolve(self, ref: str, environ: Mapping[str, str] | None = None) -> str | None:
-        """Value of an allowed ``env:VAR`` / ``file:<path>``; ``None`` if missing, empty or not allowed."""
-        if self.ref_error(ref) is not None:
-            return None
-        if ref.startswith("env:"):
-            env = os.environ if environ is None else environ
-            return env.get(ref[4:]) or None
-        path = self.secret_file(ref)
-        if path is None:
-            return None
-        try:
-            return path.read_text(encoding="utf-8").strip() or None
-        except (OSError, UnicodeDecodeError):
-            return None
+        object.__setattr__(self, "_allowed", HostAllowlist(tuple(self.host_allowlist)))
 
     # ------------------------------------------------------------------------------ hosts
     def host_allowed(self, address: Address) -> bool:
-        return (address.host, None) in self._allowed or (
-            address.port is not None and (address.host, address.port) in self._allowed
-        )
+        return self._allowed.allows(address.host, address.port)
 
     def host_violations(self, kind: str, params: Mapping[str, Any]) -> list[FieldError]:
         found, problems = network_addresses(kind, params)
@@ -403,20 +332,10 @@ class ConnectionPolicy:
                 )
         return errors
 
-    def violations(self, doc: Mapping[str, Any]) -> list[FieldError]:
+    def violations(self, doc: Any, pointer: str = "/secret_refs") -> list[FieldError]:
         """Policy violations of a Connection document (empty: allowed)."""
-        errors = []
-        refs = doc.get("secret_refs") or {}
-        if not isinstance(refs, Mapping):
-            errors.append(
-                FieldError(pointer="/secret_refs", code=SECRET_REF_NOT_ALLOWED, message="must be an object")
-            )
-            refs = {}
-        for name, ref in refs.items():
-            if msg := self.ref_error(str(ref)):
-                errors.append(
-                    FieldError(pointer=f"/secret_refs/{name}", code=SECRET_REF_NOT_ALLOWED, message=msg)
-                )
+        doc = doc if isinstance(doc, Mapping) else {}
+        errors = super().violations(doc.get("secret_refs") or {}, pointer)
         params = doc.get("params") or {}
         if not isinstance(params, Mapping):
             params = {}

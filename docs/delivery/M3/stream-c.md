@@ -3,15 +3,15 @@
 Доручення: [HANDOFF-2026-10-09-stream-c.md](../HANDOFF-2026-10-09-stream-c.md).
 Власний checkout: `C:\repos\Jane\.claude\worktrees\integ-c`, detached HEAD, без `.jane-wp`.
 
-## Поточний стан — C-6/C-4 завершено; C-5 очікує e2e
+## Поточний стан — C-6/C-4 завершено; C-5 завершено
 
 - C-6: [cleanup-plan.md](cleanup-plan.md) — лише план, жодних видалень. Зріз `19d58a1`: 29 remote refs,
   70 worktree, чужий wp13f має 3 незакомічені документи. Кандидати після M3: 23 remote / 61 clean checkout /
   95 local refs; сумнівні refs, dirty wp13f, main та координатори збережені.
 - C-4 завершено для B-11 `97ea4c4`; підсумковий статичний зріз `d37c522..19d58a1` — без нових
   блокерів M3. C-N4 закрито real-receipt 16+1; sessionStorage дозволений ADR, C-N6 уточнює storage-критерій.
-- C-5: [CI 37863992541](https://github.com/sql-monk/Jane/actions/runs/37863992541) на `8d7683b`: **in_progress / очікує**;
-  limits **pass**, stack та решта завершених job success. Підсумок e2e ще не отримано.
+- C-5: [CI 37863992541](https://github.com/sql-monk/Jane/actions/runs/37863992541) на `8d7683b`: **completed / success**;
+  limits **pass**, stack та решта завершених job success. Детальний кінцевий підсумок нижче.
 - Нового CI, тестів, Docker або видалень C не виконував. Змінюються лише три власні документи;
   status.md/матриця — потоку A, main потік C не змінює.
 
@@ -170,7 +170,7 @@ Warning auth-набору — Duplicate Operation ID у локальному GET
 
 ### C-5: CI 37863992541
 
-Точний SHA: **`8d7683bb6c9b2a8b7e19d660e6df8495e3b81b31`**; workflow — **in_progress / очікує**.
+Точний SHA: **`8d7683bb6c9b2a8b7e19d660e6df8495e3b81b31`**; workflow — **completed / success**.
 Спостерігається вже запущений прогін; workflow_dispatch/rerun потік C не виконував.
 
 | Job | Висновок | Доказ |
@@ -181,7 +181,7 @@ Warning auth-набору — Duplicate Operation ID у локальному GET
 | web-mock-e2e | **success** | [job 113606448663](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113606448663) |
 | isolation | **success** | [job 113607947534](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113607947534) |
 | contract | **success** | [job 113607947561](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113607947561) |
-| e2e | **in_progress** | [job 113608168969](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113608168969) |
+| e2e | **success** | [job 113608168969](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113608168969) |
 | limits | **success** | [job 113608168989](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113608168989) |
 | stack | **success** | [job 113608169010](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113608169010) |
 | adapters (minio) | **success** | [job 113608169024](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113608169024) |
@@ -189,14 +189,24 @@ Warning auth-набору — Duplicate Operation ID у локальному GET
 | adapters (mongodb) | **success** | [job 113608169098](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113608169098) |
 | adapters (sqlserver) | **success** | [job 113608169125](https://github.com/sql-monk/Jane/actions/runs/37863992541/job/113608169125) |
 
-**e2e ще виконується; N passed / 0 skipped/xfailed до завершення не заявляються.**
+Фактичний підсумок e2e:
+
+```text
+75 passed in 1503.66s (0:25:03)
+bad outcome lines (SKIPPED/XFAIL/XPASS/FAILED): 0
+JANE_E2E_REQUIRED=1 log lines: 5
+```
+
+e2e без skipped/xfailed; обов’язковий JANE_E2E_REQUIRED=1 підтверджено журналом job.
 
 Limits: **pass**, артефакт [limits-ci-37863992541-1](https://github.com/sql-monk/Jane/actions/runs/37863992541/artifacts/11588260101), `ci-20261009T002423Z/summary.md`.
 Усі перевірки L1–L8 мають ok, warn/блокерів немає. L1/L2 — 200 сторінок і rate ≈46/45.65 rps при
 цілі ≥25 та cap ≤51; L6 — cold start 5/5 без timeout, p95 0.353 s, timeout та OOM→resource_exceeded;
 L7 — memory peak 600.2 MiB, 0 OOM-killed containers/restarts; L8 — examples verified=true.
 
-Перемотування main за цим CI поки не підтверджується: чекаємо e2e.
+**Висновок C-5: 13/13 job success. Перевірений `8d7683b` можна перемотати в main людині/потоку A.**
+Цей CI не включає пізніший B-11 (`97ea4c4`); його real-receipt і статичне рев’ю наведено окремо.
+C не виконує merge/push main; фінальний зведений gate/матрицю/status визначає A.
 
 Безсекретні raw докази у власному ignored `.jane/`: `m3c-c5-run.json`, `m3c-c5-limits-summary.md`,
 `m3c-c5-artifacts/`; після завершення — `m3c-c5-e2e.txt` і `m3c-c5-e2e-evidence.json`.

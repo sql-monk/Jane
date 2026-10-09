@@ -221,7 +221,7 @@ Summary й повні логи збережено в ignored `.jane/m3c-c2-evide
 | ID / рівень | Файл:рядок, доказ | Власник / рішення |
 |---|---|---|
 | C-N5 — **примітка, межа доказу WP-06d** | `services/handler-runtime/tests/test_app.py:129` перевіряє API-класифікацію мережевої спроби через subprocess fixture (`tests/conftest.py:85`). У `test_app.py:143`–`:146` лишилися failed/sandbox_violation/непорожні socket events; за 202 результат читається з кінцевого job. `tests/packages/probe/src/probe/main.py:29` справді відкриває socket. Ізоляцію ядром доводить окремий незмінний `tests/test_isolation.py:106`: контрольний bridge-контейнер досягає сервера, sandbox повертає OSError unreachable і sandbox.network_blocked. | WP-06. WP-06d не підміняє Docker isolation-тест і не заявляється його новим запуском. Незавершений job або відсутній result не можуть задовольнити кінцеві assertions. Нового блокера немає. |
-| C-N4 — **примітка, закрито B-11** | `web/admin/e2e/fixtures.ts:36` виконує login за ключем, `:60` використовує його в admin fixture. Сирі `b11-real.log` / `b11-registry.log` підтвердили 16+1 сценаріїв, auth.spec.ts присутній у повному прогоні; fingerprint бекенду та admin_key_consistent — true. | WP-12 / потік B. Вхід за ключем підтверджено на зведеній ревізії B-11; C лише звірив готові докази, UI не запускав. |
+| C-N4 — **примітка, закрито B-11** | `web/admin/e2e/fixtures.ts:36` виконує login за ключем, `:64` використовує його в admin fixture. Сирі `b11-real.log` / `b11-registry.log` підтвердили 16+1 сценаріїв, auth.spec.ts присутній у повному прогоні; fingerprint бекенду та admin_key_consistent — true. | WP-12 / потік B. Вхід за ключем підтверджено на зведеній ревізії B-11; C лише звірив готові докази, UI не запускав. |
 | C-N6 — **примітка, уточнення storage-критерію** | `docs/adr/0005-authentication.md:30` явно дозволяє dev-ключ лише у sessionStorage; `web/admin/src/auth/session.ts:16` так його зберігає. `e2e/fixtures.ts:44` перевіряє HTML, URL і localStorage. Формулювання «сховище браузера» у попередньому handoff ширше за чинний ADR. | WP-00 / WP-12. Критерій цього приймання: не відображати ключ, не класти в URL/localStorage; sessionStorage дозволений ADR. B-11 не змінює цю поведінку; новим блокером вона не є. |
 
 **Підсумок незалежного статичного рев'ю `d37c522..19d58a1`: нових блокерів M3 не знайдено.**
@@ -258,7 +258,7 @@ Pre-merge preserved ci.yml: True
   відсутній/неоднозначний stack чи ключ зупиняє запуск. JSON/ключ не додаються до помилки читання.
   `JANE_ADMIN_E2E_API_KEY` у дочірньому env завжди перезаписується ключем вибраного stack, незалежний
   env key не є fallback. Ключ не додається в URL або публічний config. `fixtures.ts:36` входить за ключем,
-  `:68` звіряє Bearer усіх UI API-запитів і після сценарію перевіряє відсутність ключа в HTML/URL/localStorage.
+  `:71` звіряє Bearer усіх UI API-запитів і після сценарію перевіряє відсутність ключа в HTML/URL/localStorage.
   sessionStorage — явний виняток чинного ADR (C-N6), не оголошується порожнім.
 - `templates/service/src/jane_template_service/app.py:29` задає POST example, GET job і POST cancel
   scope handler:invoke; `:67` передає таблицю у create_app. Новий тест `tests/test_app.py:115` перевіряє

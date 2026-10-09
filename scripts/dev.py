@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import time
+import tomllib
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -67,16 +68,14 @@ def uv_run(*args: str) -> list[str]:
 
 def members() -> list[Path]:
     """Workspace members (directories with pyproject.toml) matching the root globs."""
-    out: list[Path] = []
-    for pattern in (
-        "libs/*",
-        "services/*",
-        "services/storage/adapters/*",
-        "templates/service",
-        "tests/fixtures/testsite",
-    ):
-        out += [p for p in sorted(ROOT.glob(pattern)) if (p / "pyproject.toml").is_file()]
-    return out
+    config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    paths = {
+        p
+        for pattern in config["tool"]["uv"]["workspace"]["members"]
+        for p in ROOT.glob(pattern)
+        if (p / "pyproject.toml").is_file()
+    }
+    return sorted(paths)
 
 
 def member_name(path: Path) -> str:

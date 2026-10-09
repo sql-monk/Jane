@@ -4,6 +4,7 @@
 
 [tool.uv.workspace]
 members = [
+    "contracts/python",
     "libs/*",
     "services/*",
     "services/storage/adapters/*",
@@ -34,6 +35,9 @@ integration = [
 
 [tool.uv]
 default-groups = ["dev", "integration"]
+
+[tool.uv.sources]
+jane-contracts = { workspace = true }
 
 # ---------------------------------------------------------------- ruff
 [tool.ruff]
@@ -79,7 +83,7 @@ python_version = "3.12"
 strict = true
 warn_unreachable = true
 plugins = ["pydantic.mypy"]
-exclude = ["/_generated/", "^contracts/"]  # contracts/ is linted by WP-00 tooling
+exclude = ["/_generated/", "^contracts/(?!python/)"]  # Protocols are typed; other contracts use WP-00 tools.
 
 [[tool.mypy.overrides]]
 module = ["prometheus_client.*", "openapi_spec_validator.*"]

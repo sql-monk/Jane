@@ -23,7 +23,6 @@ jane-storage-packages = "jane_storage.packages:main"
 
 [tool.uv.sources]
 jane-kit = { workspace = true }
-jane-contracts = { path = "../../contracts/python", editable = true }
 
 [build-system]
 requires = ["hatchling>=1.25"]

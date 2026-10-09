@@ -24,7 +24,6 @@ dev = [
 [tool.uv.sources]
 jane-kit = { workspace = true }
 jane-testsite = { workspace = true }
-jane-contracts = { path = "../../contracts/python", editable = true }
 
 [build-system]
 requires = ["hatchling>=1.25"]

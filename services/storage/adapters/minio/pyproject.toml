@@ -22,7 +22,6 @@ minio = "jane_storage_minio:MinioAdapter"
 # member when building it, see services/storage/README.md.
 jane-storage = { path = "../..", editable = true }
 jane-storage-s3 = { path = "../s3", editable = true }
-jane-contracts = { path = "../../../../contracts/python", editable = true }
 
 [build-system]
 requires = ["hatchling>=1.25"]

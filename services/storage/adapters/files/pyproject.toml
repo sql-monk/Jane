@@ -18,7 +18,6 @@ filesystem = "jane_storage_files:FilesystemAdapter"
 
 [tool.uv.sources]
 jane-storage = { path = "../..", editable = true }
-jane-contracts = { path = "../../../../contracts/python", editable = true }
 
 [build-system]
 requires = ["hatchling>=1.25"]

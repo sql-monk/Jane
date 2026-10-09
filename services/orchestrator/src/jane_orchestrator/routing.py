@@ -136,13 +136,9 @@ def result_context(result: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _problem_data(stage_id: str, result: Mapping[str, Any]) -> dict[str, Any]:
-    problem: dict[str, Any] = {
-        "stage_id": stage_id,
-        "status": result.get("status"),
-        "invocation_id": result.get("invocation_id"),
-        "handler": result.get("handler"),
-    }
-    for key in ("unrecognized", "failure", "diagnostics"):
+    """``ProblemData`` of handler-invocation.schema.json (``select: problems``); absent fields are omitted."""
+    problem: dict[str, Any] = {"stage_id": stage_id, "status": result.get("status")}
+    for key in ("invocation_id", "handler", "unrecognized", "failure", "diagnostics"):
         if result.get(key) is not None:
             problem[key] = result[key]
     return {"problem": problem}

@@ -260,6 +260,11 @@ MIGRATIONS: list[str] = [
     CREATE INDEX items_stored_raw_ambiguous ON items (source_id, observation_id)
         WHERE stored_object_ambiguous;
     """,
+    # 6 — diagnostics of claims and retries per item (R25); note of a problem group (R05)
+    """
+    ALTER TABLE items ADD COLUMN attempt_history jsonb NOT NULL DEFAULT '[]'::jsonb;
+    ALTER TABLE problem_groups ADD COLUMN note text;
+    """,
 ]
 
 

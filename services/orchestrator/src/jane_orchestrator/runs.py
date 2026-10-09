@@ -94,6 +94,13 @@ class Runs:
         urls = override.get("urls", task_input.get("urls"))
         stored = override.get("stored_materials", task_input.get("stored_materials"))
         if stored:
+            cap = self.core.engine.stored_selection_max_ids
+            for name in ("object_ids", "observation_ids"):
+                if len(stored.get(name) or ()) > cap:
+                    raise LimitExceeded(
+                        f"{len(stored[name])} stored_materials.{name} exceed engine.stored_selection_max_ids={cap}",
+                        details={"limit": "engine.stored_selection_max_ids", "value": cap},
+                    )
             run_input["stored_materials"] = stored
         elif urls:
             collect_eff = self.core.effective(
@@ -300,6 +307,7 @@ class Runs:
         for key in ("started_at", "finished_at"):
             if r.get(key) is not None:
                 out[key] = rfc3339(r[key])
+        out.update(attempt_diagnostics(r))
         return out
 
     def list_items(
@@ -361,13 +369,19 @@ class Runs:
                 if r["content_sha256"]:
                     obs["content_sha256"] = r["content_sha256"]
                 continue
-            stage: dict[str, Any] = {"stage_id": r["stage_id"]}
+            stage: dict[str, Any] = {
+                "stage_id": r["stage_id"],
+                "item_id": r["item_id"],
+                "status": r["status"],
+                "attempts": r["attempts"],
+            }
             if r["handler"]:
                 stage["handler"] = r["handler"]
             if r["invocation_id"]:
                 stage["invocation_id"] = r["invocation_id"]
             if r["result_status"]:
                 stage["result_status"] = r["result_status"]
+            stage.update(attempt_diagnostics(r))
             if r["outputs"]:
                 stage["outputs"] = r["outputs"]
             obs["stages"].append(stage)
@@ -460,6 +474,16 @@ class Runs:
         self.core.metrics.inc("runs", status=status)
         log.info("run finished", extra={"run_id": run_id, "status": status})
         return status
+
+
+def attempt_diagnostics(r: Mapping[str, Any]) -> dict[str, Any]:
+    """R25: ``available_at`` of a waiting item and the claim/retry history (``AttemptHistory``) of an item row."""
+    out: dict[str, Any] = {}
+    if r.get("status") in {"queued", "retrying"} and r.get("available_at") is not None:
+        out["available_at"] = rfc3339(r["available_at"])
+    if r.get("attempt_history"):
+        out["attempt_history"] = list(r["attempt_history"])
+    return out
 
 
 def problem(code: str, detail: str, status: int = 500, retryable: bool = False) -> dict[str, Any]:

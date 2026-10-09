@@ -174,6 +174,14 @@ class Collector(Limits):
     """How often expired collections and transit files are cleaned up."""
     host_state_prune_interval_seconds: int = Field(default=60, ge=1)
     """How often the shared per-host limiter drops the state of hosts nobody uses any more."""
+    shared_host_limits: bool = True
+    """Coordinate the per-host limits with the other instances that share the state store (R15)."""
+    shared_host_poll_ms: int = Field(default=100, ge=10)
+    """A request waiting for a host slot that other instances hold re-checks this often."""
+    shared_host_ttl_seconds: int = Field(default=120, ge=1)
+    """A registration of an instance on a host, or a slot it holds, expires after this long without a renewal or
+    a release (an instance that was killed stops limiting the others); keep it above
+    ``timeouts.request_timeout_ms``."""
 
 
 class ServiceLimits(Limits):

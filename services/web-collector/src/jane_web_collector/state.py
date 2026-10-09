@@ -3,7 +3,8 @@
 Holds collections (runs) with their lease, the frontier (queue + per-run dedup: primary key
 ``(collection_id, url)``), strategy snapshots, the buffer of emitted-but-unacknowledged materials, URL
 errors, the per-``state_key`` URL history used for revisits (ETag, Last-Modified, content hash, outgoing
-links), managed connections, jobs and idempotency keys.
+links), managed connections, jobs, idempotency keys and the per-host schedule shared by the instances
+(``host_users``, ``host_schedule``, ``host_slots``: :mod:`.shared_hosts`, R15).
 
 Every processed page is committed in one transaction (new URLs + page status + material + URL history +
 strategy snapshots + stats), so a killed process resumes from a consistent point. Several processes may
@@ -116,6 +117,33 @@ CREATE TABLE IF NOT EXISTS idempotency (
 CREATE TABLE IF NOT EXISTS counters (
     name TEXT PRIMARY KEY,
     value INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS host_users (
+    host TEXT NOT NULL,
+    instance_id TEXT NOT NULL,
+    interval_s REAL NOT NULL,
+    parallel INTEGER NOT NULL,
+    expires_at REAL NOT NULL,
+    PRIMARY KEY (host, instance_id)
+);
+CREATE TABLE IF NOT EXISTS host_schedule (
+    host TEXT PRIMARY KEY,
+    last_start REAL NOT NULL DEFAULT 0,
+    not_before REAL NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS host_slots (
+    host TEXT NOT NULL,
+    token TEXT NOT NULL,
+    instance_id TEXT NOT NULL,
+    expires_at REAL NOT NULL,
+    PRIMARY KEY (host, token)
+);
+CREATE TABLE IF NOT EXISTS host_waiters (
+    host TEXT NOT NULL,
+    token TEXT NOT NULL,
+    since REAL NOT NULL,
+    expires_at REAL NOT NULL,
+    PRIMARY KEY (host, token)
 );
 """
 
@@ -659,3 +687,106 @@ class StateStore:
     def idem_release(self, key: str) -> None:
         with self.tx() as db:
             db.execute("DELETE FROM idempotency WHERE key = ? AND state = 'in_progress'", (key,))
+
+    # ------------------------------------------------------------------ per-host schedule of all instances (R15)
+    def host_take_slot(
+        self, host: str, instance_id: str, token: str, *, interval: float, parallel: int, ttl: float
+    ) -> float | None:
+        """One attempt of request ``token`` to start on ``host`` for the whole platform (R15), in one transaction:
+
+        register (renew) the limits of ``instance_id`` on the host; queue the request in arrival order
+        (``host_waiters``); if fewer requests than the smallest registered parallelism are in flight and no older
+        waiter is ahead for the free slots, take a slot and reserve the next start - at least the largest
+        registered interval after the previous start of any instance, not before a ``Retry-After``. Returns the
+        start (epoch seconds) or ``None`` (try again later). Expired registrations, slots and waiters (instances
+        that died) are dropped first."""
+        now = time.time()
+        with self.tx() as db:
+            db.execute("DELETE FROM host_slots WHERE host = ? AND expires_at <= ?", (host, now))
+            db.execute("DELETE FROM host_users WHERE host = ? AND expires_at <= ?", (host, now))
+            db.execute("DELETE FROM host_waiters WHERE host = ? AND expires_at <= ?", (host, now))
+            db.execute(
+                "INSERT INTO host_users(host, instance_id, interval_s, parallel, expires_at) VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(host, instance_id) DO UPDATE SET interval_s = excluded.interval_s, "
+                "parallel = excluded.parallel, expires_at = excluded.expires_at",
+                (host, instance_id, interval, parallel, now + ttl),
+            )
+            db.execute(
+                "INSERT INTO host_waiters(host, token, since, expires_at) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(host, token) DO UPDATE SET expires_at = excluded.expires_at",
+                (host, token, now, now + ttl),
+            )
+            since = float(
+                db.execute(
+                    "SELECT since FROM host_waiters WHERE host = ? AND token = ?", (host, token)
+                ).fetchone()[0]
+            )
+            ahead = int(
+                db.execute(
+                    "SELECT COUNT(*) FROM host_waiters WHERE host = ? AND (since < ? OR (since = ? AND token < ?))",
+                    (host, since, since, token),
+                ).fetchone()[0]
+            )
+            allowed = int(
+                db.execute("SELECT MIN(parallel) FROM host_users WHERE host = ?", (host,)).fetchone()[0]
+            )
+            busy = int(db.execute("SELECT COUNT(*) FROM host_slots WHERE host = ?", (host,)).fetchone()[0])
+            if busy + ahead >= allowed:
+                return None
+            db.execute("DELETE FROM host_waiters WHERE host = ? AND token = ?", (host, token))
+            db.execute(
+                "INSERT INTO host_slots(host, token, instance_id, expires_at) VALUES (?, ?, ?, ?)",
+                (host, token, instance_id, now + ttl),
+            )
+            interval_s = float(
+                db.execute("SELECT MAX(interval_s) FROM host_users WHERE host = ?", (host,)).fetchone()[0]
+            )
+            row = db.execute(
+                "SELECT last_start, not_before FROM host_schedule WHERE host = ?", (host,)
+            ).fetchone()
+            last, not_before = (float(row[0]), float(row[1])) if row else (0.0, 0.0)
+            start = max(now, last + interval_s, not_before)
+            db.execute(
+                "INSERT INTO host_schedule(host, last_start, not_before) VALUES (?, ?, ?) "
+                "ON CONFLICT(host) DO UPDATE SET last_start = excluded.last_start",
+                (host, start, not_before),
+            )
+            return start
+
+    def host_release_slot(self, host: str, token: str) -> None:
+        """Give back the slot of ``token`` (or its place in line, if it never got one)."""
+        with self.tx() as db:
+            db.execute("DELETE FROM host_slots WHERE host = ? AND token = ?", (host, token))
+            db.execute("DELETE FROM host_waiters WHERE host = ? AND token = ?", (host, token))
+
+    def host_push_back(self, host: str, until: float) -> None:
+        with self.tx() as db:
+            db.execute(
+                "INSERT INTO host_schedule(host, last_start, not_before) VALUES (?, 0, ?) "
+                "ON CONFLICT(host) DO UPDATE SET not_before = MAX(host_schedule.not_before, excluded.not_before)",
+                (host, until),
+            )
+
+    def host_leave(self, host: str, instance_id: str) -> None:
+        with self.tx() as db:
+            db.execute("DELETE FROM host_users WHERE host = ? AND instance_id = ?", (host, instance_id))
+
+    def host_rows(self, host: str) -> dict[str, Any]:
+        """Shared state of one host (diagnostics, tests)."""
+        users = self._all("SELECT instance_id, interval_s, parallel FROM host_users WHERE host = ?", (host,))
+        slots = self._one("SELECT COUNT(*) FROM host_slots WHERE host = ?", (host,))
+        return {"users": [dict(r) for r in users], "slots": int(slots[0]) if slots else 0}
+
+    def host_prune(self) -> int:
+        """Drop expired registrations, slots and schedules of hosts nobody uses (housekeeping)."""
+        now = time.time()
+        with self.tx() as db:
+            removed = db.execute("DELETE FROM host_slots WHERE expires_at <= ?", (now,)).rowcount
+            removed += db.execute("DELETE FROM host_users WHERE expires_at <= ?", (now,)).rowcount
+            removed += db.execute("DELETE FROM host_waiters WHERE expires_at <= ?", (now,)).rowcount
+            removed += db.execute(
+                "DELETE FROM host_schedule WHERE last_start < ? AND not_before < ? "
+                "AND host NOT IN (SELECT host FROM host_users) AND host NOT IN (SELECT host FROM host_slots)",
+                (now, now),
+            ).rowcount
+            return removed

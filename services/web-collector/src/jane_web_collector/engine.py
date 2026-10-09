@@ -25,6 +25,7 @@ from .materials import Delivery, MaterialTooLarge, TransitStore, build_material,
 from .robots import RobotsCache
 from .rules import ContractSchemas, RulesLoader, validate_rules
 from .settings import ServiceLimits, Settings, contract_layer, platform_layers, to_contract
+from .shared_hosts import SharedHosts
 from .state import StateStore
 from .urls import Normalizer, Scope
 
@@ -71,8 +72,20 @@ class Engine:
             extra={"deny_link_local": egress.deny_link_local, "deny_private": egress.deny_private},
         )
         self.client = build_client(self.limits, egress)
-        # one per-host schedule for every collection and one-shot fetch of this process (WP-02c)
-        self.host_limiter = HostLimiter(self.limits)
+        # one per-host schedule for every collection and one-shot fetch of this process (WP-02c), shared with the
+        # other instances of the same state store (R15)
+        collector = self.limits.collector
+        shared = (
+            SharedHosts(
+                state,
+                settings.instance_id,
+                poll_s=collector.shared_host_poll_ms / 1000,
+                ttl_s=float(collector.shared_host_ttl_seconds),
+            )
+            if collector.shared_host_limits
+            else None
+        )
+        self.host_limiter = HostLimiter(self.limits, shared)
         self.deps = RunDeps(
             state=state,
             registry=registry,
@@ -172,6 +185,8 @@ class Engine:
         if self.transit is not None:
             self.transit.cleanup(self.limits.transfer.transit_ttl_seconds)
         self.host_limiter.prune()
+        if self.host_limiter.shared is not None:
+            self.state.host_prune()
 
     # ------------------------------------------------------------------ validation
     def _schema_errors(self, component: str, payload: Any) -> None:

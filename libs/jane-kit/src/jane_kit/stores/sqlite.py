@@ -36,6 +36,7 @@ from typing import Protocol
 from jane_kit.errors import Conflict
 from jane_kit.idempotency import IdempotencyRecord, StoredResponse
 from jane_kit.jobs import TERMINAL_STATUSES, Job, JobStatus, decide_save, orphaned, resumed
+from jane_kit.stores._claims import ClaimTokens
 
 __all__ = [
     "SqliteDatabase",
@@ -121,7 +122,11 @@ def _add_columns(db: sqlite3.Connection, table: str, columns: dict[str, str]) ->
 # ---------------------------------------------------------------------------------------------- idempotency
 class SqliteIdempotencyStore:
     """jane-kit ``IdempotencyStore`` on table ``table`` (``key``, ``fingerprint``, ``state``, ``expires_at``,
-    ``response`` JSON text, ``lease_until``, ``owner``, ``token``)."""
+    ``response`` JSON text, ``lease_until``, ``owner``, ``token``).
+
+    ``begin`` and its matching ``complete``/``release`` run in the same caller context (as in
+    ``run_idempotent``); concurrent requests on this store keep separate tokens. Heartbeat is process-wide.
+    """
 
     def __init__(
         self, db: SqliteTx, *, owner: str, in_progress_lease_s: float, table: str = "idempotency"
@@ -132,8 +137,7 @@ class SqliteIdempotencyStore:
         self.owner = owner
         self.lease_s = float(in_progress_lease_s)
         self.table = _ident(table)
-        self._claims: dict[str, str] = {}
-        self._lock = threading.Lock()
+        self._claims = ClaimTokens()
 
     def migrate(self) -> None:
         with self.db.tx() as db:
@@ -145,14 +149,23 @@ class SqliteIdempotencyStore:
             _add_columns(db, self.table, {"lease_until": "REAL", "owner": "TEXT", "token": "TEXT"})
 
     def begin_sync(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
+        record, token = self._begin_claim_sync(key, fingerprint, ttl_s)
+        if token is not None:
+            self._claims.bind(key, token)
+        return record
+
+    def _begin_claim_sync(
+        self, key: str, fingerprint: str, ttl_s: float
+    ) -> tuple[IdempotencyRecord | None, str | None]:
         now = time.time()
         token = uuid.uuid4().hex
         t = self.table
+        claimed = False
         with self.db.tx() as db:
+            # The fingerprint belongs to the key TTL, not to the shorter execution lease.
             db.execute(
-                f"DELETE FROM {t} WHERE expires_at <= ? OR "  # noqa: S608 - validated identifier
-                "(state = 'in_progress' AND lease_until IS NOT NULL AND lease_until <= ?)",
-                (now, now),
+                f"DELETE FROM {t} WHERE expires_at <= ?",  # noqa: S608 - validated identifier
+                (now,),
             )
             row = db.execute(f"SELECT * FROM {t} WHERE key = ?", (key,)).fetchone()  # noqa: S608
             if row is None:
@@ -161,10 +174,21 @@ class SqliteIdempotencyStore:
                     "VALUES (?, ?, 'in_progress', ?, ?, ?, ?)",
                     (key, fingerprint, now + float(ttl_s), now + self.lease_s, self.owner, token),
                 )
-        if row is None:
-            with self._lock:
-                self._claims[key] = token
-            return None
+                claimed = True
+            elif (
+                row["fingerprint"] == fingerprint
+                and row["state"] == "in_progress"
+                and row["lease_until"] is not None
+                and row["lease_until"] <= now
+            ):
+                db.execute(
+                    f"UPDATE {t} SET lease_until = ?, owner = ?, token = ? WHERE key = ?",  # noqa: S608
+                    (now + self.lease_s, self.owner, token, key),
+                )
+                claimed = True
+        if claimed:
+            return None, token
+        assert row is not None
         response = None
         if row["state"] == "completed" and row["response"]:
             data = json.loads(row["response"])
@@ -177,11 +201,12 @@ class SqliteIdempotencyStore:
             "completed" if row["state"] == "completed" else "in_progress",
             float(row["expires_at"]),
             response,
-        )
+        ), None
 
     def complete_sync(self, key: str, response: StoredResponse) -> None:
-        with self._lock:
-            token = self._claims.pop(key, None)
+        self._complete_claim_sync(key, response, self._claims.take(key))
+
+    def _complete_claim_sync(self, key: str, response: StoredResponse, token: str | None) -> None:
         if token is None:
             log.warning("idempotency key completed without a claim of this instance", extra={"key": key})
             return
@@ -199,8 +224,9 @@ class SqliteIdempotencyStore:
             log.warning("idempotency claim was taken over before completion", extra={"key": key})
 
     def release_sync(self, key: str) -> None:
-        with self._lock:
-            token = self._claims.pop(key, None)
+        self._release_claim_sync(key, self._claims.take(key))
+
+    def _release_claim_sync(self, key: str, token: str | None) -> None:
         if token is None:
             return
         with self.db.tx() as db:
@@ -210,8 +236,7 @@ class SqliteIdempotencyStore:
             )
 
     def heartbeat_sync(self) -> int:
-        with self._lock:
-            tokens = list(self._claims.values())
+        tokens = self._claims.active()
         if not tokens:
             return 0
         now = time.time()
@@ -226,13 +251,19 @@ class SqliteIdempotencyStore:
             )
 
     async def begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
-        return await asyncio.to_thread(self.begin_sync, key, fingerprint, ttl_s)
+        record, token = await asyncio.to_thread(self._begin_claim_sync, key, fingerprint, ttl_s)
+        # ContextVar writes in to_thread do not propagate back to this request's context.
+        if token is not None:
+            self._claims.bind(key, token)
+        return record
 
     async def complete(self, key: str, response: StoredResponse) -> None:
-        await asyncio.to_thread(self.complete_sync, key, response)
+        token = self._claims.take(key)
+        await asyncio.to_thread(self._complete_claim_sync, key, response, token)
 
     async def release(self, key: str) -> None:
-        await asyncio.to_thread(self.release_sync, key)
+        token = self._claims.take(key)
+        await asyncio.to_thread(self._release_claim_sync, key, token)
 
     async def heartbeat(self) -> int:
         return await asyncio.to_thread(self.heartbeat_sync)

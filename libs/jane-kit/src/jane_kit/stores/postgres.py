@@ -51,6 +51,7 @@ from jane_kit.jobs import (
     decide_save,
     orphaned,
 )
+from jane_kit.stores._claims import ClaimTokens
 
 __all__ = [
     "JobPosition",
@@ -147,6 +148,9 @@ class PgIdempotencyStore:
     ``layout``: ``"split"`` - response in ``status_code``/``body``/``headers`` columns; ``"json"`` - one
     ``response`` jsonb column (``{"status_code", "body", "headers"}``). ``in_progress_lease_s``: how long a claim
     survives without :meth:`heartbeat` (a stopped instance releases its keys after this).
+
+    ``begin`` and its matching ``complete``/``release`` run in the same caller context (as in
+    ``run_idempotent``); concurrent requests on this store keep separate tokens. Heartbeat is process-wide.
     """
 
     def __init__(
@@ -169,8 +173,7 @@ class PgIdempotencyStore:
         self.gc_batch = gc_batch
         self._t = _table(schema, table)
         self._table, self._schema = table, schema
-        self._claims: dict[str, str] = {}
-        self._lock = threading.Lock()
+        self._claims = ClaimTokens()
 
     def ddl(self) -> list[sql.Composed]:
         t = self._t
@@ -209,15 +212,20 @@ class PgIdempotencyStore:
         return StoredResponse(int(doc["status_code"]), doc.get("body"), dict(doc.get("headers") or {}))
 
     def begin_sync(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
+        record, token = self._begin_claim_sync(key, fingerprint, ttl_s)
+        if token is not None:
+            self._claims.bind(key, token)
+        return record
+
+    def _begin_claim_sync(
+        self, key: str, fingerprint: str, ttl_s: float
+    ) -> tuple[IdempotencyRecord | None, str | None]:
         token = uuid.uuid4().hex
         t = self._t
         with self._tx() as conn, conn.cursor(row_factory=dict_row) as cur:
-            # an expired key and the claim of a stopped instance (lease over) can be claimed again
+            # Only key TTL expiration forgets the fingerprint. Lease takeover preserves it.
             cur.execute(
-                sql.SQL(
-                    "DELETE FROM {} WHERE key = %s AND (expires_at <= clock_timestamp() OR "
-                    "(state = 'in_progress' AND lease_until IS NOT NULL AND lease_until <= clock_timestamp()))"
-                ).format(t),
+                sql.SQL("DELETE FROM {} WHERE key = %s AND expires_at <= clock_timestamp()").format(t),
                 (key,),
             )
             cur.execute(
@@ -230,24 +238,34 @@ class PgIdempotencyStore:
                 (key, fingerprint, float(ttl_s), self.lease_s, self.owner, token),
             )
             if cur.fetchone() is not None:
-                with self._lock:
-                    self._claims[key] = token
-                return None
+                return None, token
+            # UPDATE locks and rechecks the row: only one same-body contender can take over.
+            cur.execute(
+                sql.SQL(
+                    "UPDATE {} SET lease_until = clock_timestamp() + make_interval(secs => %s), "
+                    "owner = %s, token = %s WHERE key = %s AND fingerprint = %s AND state = 'in_progress' "
+                    "AND expires_at > clock_timestamp() AND lease_until <= clock_timestamp() RETURNING key"
+                ).format(t),
+                (self.lease_s, self.owner, token, key, fingerprint),
+            )
+            if cur.fetchone() is not None:
+                return None, token
             cur.execute(sql.SQL("SELECT * FROM {} WHERE key = %s").format(t), (key,))
             row = cur.fetchone()
         if row is None:  # removed between the statements: report it as running, the client retries
-            return IdempotencyRecord(key, fingerprint, "in_progress", 0.0)
+            return IdempotencyRecord(key, fingerprint, "in_progress", 0.0), None
         return IdempotencyRecord(
             str(row["key"]),
             str(row["fingerprint"]),
             "completed" if row["state"] == "completed" else "in_progress",
             row["expires_at"].timestamp(),
             self._response(row) if row["state"] == "completed" else None,
-        )
+        ), None
 
     def complete_sync(self, key: str, response: StoredResponse) -> None:
-        with self._lock:
-            token = self._claims.pop(key, None)
+        self._complete_claim_sync(key, response, self._claims.take(key))
+
+    def _complete_claim_sync(self, key: str, response: StoredResponse, token: str | None) -> None:
         if token is None:
             log.warning("idempotency key completed without a claim of this instance", extra={"key": key})
             return
@@ -270,8 +288,9 @@ class PgIdempotencyStore:
             log.warning("idempotency claim was taken over before completion", extra={"key": key})
 
     def release_sync(self, key: str) -> None:
-        with self._lock:
-            token = self._claims.pop(key, None)
+        self._release_claim_sync(key, self._claims.take(key))
+
+    def _release_claim_sync(self, key: str, token: str | None) -> None:
         if token is None:
             return
         with self._tx() as conn:
@@ -284,8 +303,7 @@ class PgIdempotencyStore:
 
     def heartbeat_sync(self) -> int:
         """Renew the leases of the claims this process still holds (not those of a previous start)."""
-        with self._lock:
-            tokens = list(self._claims.values())
+        tokens = self._claims.active()
         if not tokens:
             return 0
         with self._tx() as conn:
@@ -316,13 +334,19 @@ class PgIdempotencyStore:
 
     # -------------------------------------------------------------------------------- jane-kit protocol
     async def begin(self, key: str, fingerprint: str, ttl_s: float) -> IdempotencyRecord | None:
-        return await asyncio.to_thread(self.begin_sync, key, fingerprint, ttl_s)
+        record, token = await asyncio.to_thread(self._begin_claim_sync, key, fingerprint, ttl_s)
+        # Register in the caller, not the worker's copied context.
+        if token is not None:
+            self._claims.bind(key, token)
+        return record
 
     async def complete(self, key: str, response: StoredResponse) -> None:
-        await asyncio.to_thread(self.complete_sync, key, response)
+        token = self._claims.take(key)
+        await asyncio.to_thread(self._complete_claim_sync, key, response, token)
 
     async def release(self, key: str) -> None:
-        await asyncio.to_thread(self.release_sync, key)
+        token = self._claims.take(key)
+        await asyncio.to_thread(self._release_claim_sync, key, token)
 
     async def heartbeat(self) -> int:
         return await asyncio.to_thread(self.heartbeat_sync)

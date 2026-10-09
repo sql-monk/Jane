@@ -203,6 +203,34 @@
         "contracts/docs/**",
         "contracts/tools/**"
       ]
+    },
+    "22": {
+      "name": "post-m3-stream-b-acceptance-admin",
+      "allow": [
+        "tests/e2e/**",
+        "docs/acceptance/**",
+        "web/admin/**",
+        "contracts/**",
+        "docs/delivery/post-m3/stream-b.md"
+      ]
+    },
+    "23": {
+      "name": "post-m3-stream-c-hygiene-docs",
+      "allow": [
+        ".github/**",
+        "DEVELOPMENT.md",
+        "README.md",
+        "docs/operations/**",
+        "contracts/python/**",
+        "contracts/tools/**",
+        "pyproject.toml",
+        "services/*/pyproject.toml",
+        "libs/*/pyproject.toml",
+        "templates/service/pyproject.toml",
+        "justfile",
+        "scripts/**",
+        "docs/delivery/post-m3/stream-c.md"
+      ]
     }
   }
 }

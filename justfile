@@ -28,7 +28,7 @@ lint:
 fmt:
     @fmt
 
-# mypy for every workspace member
+# mypy for every workspace member, scripts/, infra/tests/, examples/, deploy/profiles/
 types:
     @types
 

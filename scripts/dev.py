@@ -745,7 +745,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     add("sync", cmd_sync, "uv sync --all-packages")
     add("lint", cmd_lint, "ruff check + format check + contracts lint")
     add("fmt", cmd_fmt, "ruff fix + format")
-    add("types", cmd_types, "mypy for every workspace member")
+    add("types", cmd_types, "mypy for workspace members, scripts, infra/tests, examples, deploy/profiles")
     add("unit", cmd_unit, "unit tests", True)
     add("contract", cmd_contract, "contracts lint + contract tests", True)
     p = add("integration", cmd_integration, "integration tests (need `just up`)", True)

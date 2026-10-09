@@ -891,3 +891,21 @@ r1 → виправлення на `origin/wp/01g2-service-auth`, CI 37857870977
 - [Фінальний CI B 37937013460](https://github.com/sql-monk/Jane/actions/runs/37937013460) на `bb1982b` —
   **14/14 jobs success**, e2e **79 passed**; B-1…B-5 accepted/merged. Цей SHA передує C-2.
   A чекає окремого фінального CI C та C-4, після них — один підсумковий dispatch на актуальній integration.
+
+### Після M3 — три потоки завершено (2026-10-09)
+
+- B-1…B-5 accepted/merged, full B CI success. [Потік C](post-m3/stream-c.md) закрив C-1…C-4:
+  full [CI 37942655574](https://github.com/sql-monk/Jane/actions/runs/37942655574) success 14/14,
+  C-4 accepted R2, merge `81f8443`, coordinator Apply exit 0 і verification PASS;
+  завершення опубліковано `9d9fb4c`. WP-19/19a/19b accepted, повторних review/tests не було.
+- Єдиний підсумковий [CI A 37953732904](https://github.com/sql-monk/Jane/actions/runs/37953732904) на
+  **`9d9fb4c07624710158c75ea18f38cc201779453f`** — **completed/success, 14/14 jobs**,
+  завершено `2026-10-09T16:17:02Z`. Mandatory API e2e **79 passed / 0 skipped**, stack **300 passed / 0 skipped**,
+  gitleaks **no leaks found**, limits profile `ci` **pass**, усі L1–L8 ok.
+  [Exact-SHA receipt, raw докази та межі](post-m3/final-ci.md).
+- Intent/run ID збережено до/після одного dispatch; локальні full check/e2e та успішні перевірки не повторювалися.
+  Після перевіреного SHA A додає лише підсумковий звіт і цей status; код тотожний перевіреному.
+  `origin/main` `37a30e2` — предок прийнятого стану. Точний SHA для людського fast-forward — у checkpoint/чаті;
+  main і push main виконує людина. Завершення вимикає лише heartbeat A `jane-a-ci-b-c`.
+  Попередні pending записи — історичні зрізи; зовнішні сервіси та browser real22 не оголошено перевіреними,
+  dev-laptop/single-node виключені з обсягу.

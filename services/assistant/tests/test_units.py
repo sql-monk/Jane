@@ -14,7 +14,7 @@ import pytest
 from jane_assistant.clients import LlmClient
 from jane_assistant.guards import SchemaValidator, check_code, sanitize_web_rules
 from jane_assistant.llm import BudgetExhausted, InvalidModelOutput, LlmSession
-from jane_assistant.packages import PackageDraft, bump, slug
+from jane_assistant.packages import DIFF_CUT, PackageDraft, bump, proposal_bytes, slug
 from jane_assistant.sampling import Sample, coverage, pick_diverse
 from jane_assistant.search import HttpJsonSearchProvider, StaticSearchProvider, direct_candidate
 from jane_assistant.settings import LlmLimits, Settings, request_layer, resolve_service_limits
@@ -315,3 +315,35 @@ def test_session_document_roundtrip_and_optimistic_version() -> None:
     assert not asyncio.run(store.save_if(stale, stale.version))  # lost the race: nothing written
     current = asyncio.run(store.get("onb_1"))
     assert current is not None and current.status == "sampling"
+
+
+def test_proposal_bound_counts_utf8_bytes_of_the_whole_proposal() -> None:
+    """``improvement.max_proposal_bytes`` (review 1): the whole proposal as compact UTF-8 JSON - not characters,
+    not per part. Code and schemas first, then the diff, then test fixtures; what does not fit is named."""
+    base = PackageDraft({"package_id": "shop.extractor", "version": "1.0.0"}, {"src/m/main.py": b"x = 1\n"})
+    draft = base.copy()
+    draft.manifest["version"] = "1.0.1"
+    code = "# " + "ї" * 600 + "\nx = 2\n"  # ~610 characters, ~1210 UTF-8 bytes
+    draft.files["src/m/main.py"] = code.encode()
+    draft.files["tests/case/material.json"] = json.dumps({"text": "ж" * 400}, ensure_ascii=False).encode()
+    based_on = {"package_id": "shop.extractor", "version": "1.0.0"}
+
+    def make(max_bytes: int) -> dict[str, Any]:
+        return draft.proposal(
+            base, based_on, schema_change="none", change_summary="зміна", max_bytes=max_bytes
+        )
+
+    whole = make(1_048_576)
+    assert (
+        set(whole["files"]) == {"src/m/main.py", "tests/case/material.json"} and "omitted_files" not in whole
+    )
+    assert "+x = 2" in whole["diff"] and not whole["diff"].endswith(DIFF_CUT)
+    required = proposal_bytes(make(1))  # what always stays: based_on, version, manifest...
+    limit = required + 900  # the code file's ~610 characters would fit, its ~1210 bytes do not
+    small = make(limit)
+    assert proposal_bytes(small) <= limit
+    assert "src/m/main.py" not in small["files"]
+    assert set(small["omitted_files"]) == {"src/m/main.py", "tests/case/material.json"}
+    assert small["diff"].endswith(DIFF_CUT)  # the diff got the room that was left, cut with a marker
+    for limit in range(required, required + 4000, 97):  # never over the bound, whatever the bound
+        assert proposal_bytes(make(limit)) <= limit

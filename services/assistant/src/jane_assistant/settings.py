@@ -211,8 +211,9 @@ class ImprovementLimits(Limits):
     max_file_chars: int = Field(default=20_000, ge=200)
     """Package source file passed to the model (longer files are cut)."""
     max_proposal_bytes: int = Field(default=1_048_576, ge=1_024)
-    """``proposal_only``: the changed files carried in ``ImprovementResult.proposal.files`` (code and schemas
-    first, then test fixtures; the rest is listed in ``omitted_files``) and the size of its ``diff``."""
+    """``proposal_only``: size of the whole ``ImprovementResult.proposal`` as compact UTF-8 JSON (whenever its
+    required part fits): code and schema files, then the diff (cut with a marker), then test fixtures; files that do
+    not fit are named in ``omitted_files``."""
 
 
 class UnknownLimits(Limits):

@@ -24,7 +24,7 @@ import re
 from collections import OrderedDict
 from collections.abc import AsyncIterator, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +36,7 @@ from jsonschema import Draft202012Validator
 from jane_contracts.storage_adapter import AdapterError, EntitySnapshot, HistoryEvent, ObjectRecord
 from jane_kit.auth_scopes import HANDLER, STORAGE, merge
 from jane_kit.config import LimitError, LimitLayer
+from jane_kit.content import ContentWriter, FileTransitStore, inline_ref
 from jane_kit.contracts import ContractViolation, OpenAPISpec, contracts_dir
 from jane_kit.errors import FieldError, JaneError, NotFound, ValidationFailed
 from jane_kit.idempotency import (
@@ -107,12 +108,16 @@ def _many_cursor(cursor: str, count: int) -> tuple[int, str | None]:
     return index, inner
 
 
-def _inline(data: bytes) -> dict[str, str]:
-    """``encoding`` + ``data`` of an inline ContentRef (utf-8 when the bytes are valid UTF-8)."""
-    try:
-        return {"encoding": "utf-8", "data": data.decode("utf-8")}
-    except UnicodeDecodeError:
-        return {"encoding": "base64", "data": base64.b64encode(data).decode("ascii")}
+async def _clean_transit(transit: FileTransitStore, transfer: Any) -> None:
+    """The producer's cleaner of its transit blobs (ADR-0004 §2, files): every ``transit_cleanup_interval_seconds``."""
+    while True:
+        await asyncio.sleep(transfer.transit_cleanup_interval_seconds)
+        try:
+            removed = await asyncio.to_thread(transit.cleanup, transfer.transit_ttl_seconds)
+            if removed:
+                log.info("transit blobs removed", extra={"count": removed})
+        except Exception:
+            log.warning("transit cleanup failed", exc_info=True)
 
 
 def _embedded_content(document: bytes) -> tuple[bytes, str | None] | None:
@@ -221,6 +226,8 @@ def build_app(
     runner = JobRunner(limits=limits.jobs)
     keys = InMemoryIdempotencyStore(limits.idempotency)
     root = contracts_dir(Path(__file__).parent) if settings.validate_requests else None
+    # transit blobs of large RAW without a persistent URI (R18, ADR-0004 §2: written and removed here)
+    transit_blobs = FileTransitStore(settings.transit_dir, "storage") if settings.transit_dir else None
     registry = ConnectionRegistry(validator=_connection_validator(root), policy=settings.connection_policy())
     if settings.connections_file is not None:
         registry.load_file(settings.connections_file)
@@ -251,6 +258,7 @@ def build_app(
             request_timeout_ms=lim.timeouts.request_timeout_ms,
             transit=transit,
             files_dir=settings.content_files_dir,
+            extra_files_dirs=[transit_blobs.base] if transit_blobs is not None else [],
             download_host_allowlist=settings.download_host_allowlist,
         )
         return StorageHandler(
@@ -279,9 +287,21 @@ def build_app(
                 "connections": [c.connection_id for c in registry.list()],
             },
         )
-        yield
-        await runner.shutdown()
-        await pool.close()
+        cleaner = (
+            asyncio.create_task(
+                _clean_transit(transit_blobs, limits.transfer), name="storage-transit-cleanup"
+            )
+            if transit_blobs is not None
+            else None
+        )
+        try:
+            yield
+        finally:
+            if cleaner is not None:
+                cleaner.cancel()
+                await asyncio.gather(cleaner, return_exceptions=True)
+            await runner.shutdown()
+            await pool.close()
 
     def capabilities() -> dict[str, Any]:
         return {
@@ -712,6 +732,20 @@ def build_app(
             ]
             return JSONResponse({"items": items, "next_cursor": next_cursor})
 
+    def by_value(data: bytes, media_type: str, name: str) -> dict[str, Any] | None:
+        """ContentRef of content without a persistent URI: inline up to ``transfer.inline_max_bytes``, else a
+        transit blob of this service (R18); ``None`` without ``transit_dir`` - the Material is then omitted."""
+        if len(data) <= limits.transfer.inline_max_bytes:
+            return inline_ref(data, media_type, text=True)
+        if transit_blobs is None:
+            return None
+        writer = ContentWriter(
+            "blob", limits.transfer.inline_max_bytes, limits.transfer.transit_ttl_seconds, transit_blobs
+        )
+        # content-addressed name: repeated reads of one object reuse one file and restart its TTL
+        name = f"{name}-{hashlib.sha256(data).hexdigest()[:32]}"
+        return writer.ref(data, media_type, name, datetime.now(UTC), reuse=True)
+
     async def get_record(adapter: Any, object_id: str) -> ObjectRecord:
         rec: ObjectRecord | None = await call(adapter.get_object(object_id))
         if rec is None:
@@ -743,19 +777,15 @@ def build_app(
                     # RAW that is not a web page): its bytes are not the material's content. Restore the original
                     # content embedded in the document; there is no persistent URI of those bytes.
                     original = _embedded_content(await call(adapter.read_object_content(object_id)))
-                    if original is not None and len(original[0]) <= limits.transfer.inline_max_bytes:
+                    restored = None
+                    if original is not None:
                         data, media_type = original
-                        material["content"] = {
-                            "kind": "inline",
-                            "media_type": media_type
-                            or material["format"].get("media_type")
-                            or rec.media_type,
-                            **_inline(data),
-                            "size_bytes": len(data),
-                            "sha256": hashlib.sha256(data).hexdigest(),
-                        }
-                    else:
+                        media_type = media_type or material["format"].get("media_type") or rec.media_type
+                        restored = by_value(data, media_type, f"{object_id}-orig")
+                    if restored is None:
                         material = {}
+                    else:
+                        material["content"] = restored
                 elif uri is not None:
                     material["content"] = {
                         "kind": "blob",
@@ -766,15 +796,14 @@ def build_app(
                         "store": "persistent",
                         "expires_at": None,
                     }
-                elif rec.size_bytes <= limits.transfer.inline_max_bytes:
+                elif rec.size_bytes <= limits.transfer.inline_max_bytes or transit_blobs is not None:
+                    # no persistent URI: inline, or a transit blob of this service (R18) instead of no material
                     data = await call(adapter.read_object_content(object_id))
-                    material["content"] = {
-                        "kind": "inline",
-                        "media_type": rec.media_type,
-                        **_inline(data),
-                        "size_bytes": rec.size_bytes,
-                        "sha256": rec.sha256,
-                    }
+                    restored = by_value(data, rec.media_type, object_id)
+                    if restored is None:
+                        material = {}
+                    else:
+                        material["content"] = restored
                 else:
                     material = {}
                 if material:

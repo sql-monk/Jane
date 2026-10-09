@@ -103,8 +103,11 @@ export interface paths {
      *     (`format.raw` пакета, `contracts/docs/storage-adapter.md`, «Формати RAW»): `html` / `original` —
      *     постійне посилання адаптера на ті самі байти (`file://` чи `s3://`, `store: persistent`) або inline
      *     до `limits.transfer.inline_max_bytes`; `json` (документ Material із вбудованим вмістом) — початковий
-     *     вміст, вийнятий із документа, inline до `limits.transfer.inline_max_bytes`. Якщо вміст не можна
-     *     віддати (більший за ліміт без постійного посилання), `material` відсутній.
+     *     вміст, вийнятий із документа, inline до `limits.transfer.inline_max_bytes`. Більший за ліміт вміст без
+     *     постійного посилання (`json`, а також адаптери без blob-URI: PostgreSQL, MongoDB, SQL Server) віддається
+     *     транзитним blob самого storage (`store: transit`, `expires_at` = зараз + `limits.transfer.transit_ttl_seconds`,
+     *     ADR-0004 §2), якщо в розгортанні налаштовано його транзитне сховище; без нього `material` відсутній
+     *     (байти — `getObjectContent`).
      */
     get: operations["getObject"];
     put?: never;
@@ -176,7 +179,7 @@ export interface components {
      */
     "limits.schema": {
       concurrency?: {
-        /** @description Одночасні завантаження одного збору колектора (на екземпляр). */
+        /** @description Одночасні завантаження одного збору колектора (на збір: кожен збір окремо, на будь-якому екземплярі; спільний для всіх зборів ліміт хоста — max_parallel_fetches_per_host). */
         max_parallel_fetches?: number;
         /** @description Одночасні запити до одного хоста джерела (host[:port]) від усієї платформи: усіх зборів і одноразових запитів колектора разом, також усіх його екземплярів, що ділять сховище стану (один вузол, спільний каталог стану). Якщо активні на хості збори мають різні значення, діє найменше. Екземпляри з окремими сховищами стану — окремі колектори й між собою цей ліміт не узгоджують. */
         max_parallel_fetches_per_host?: number;
@@ -286,7 +289,7 @@ export interface components {
       /** @enum {string} */
       period: "run" | "day" | "week" | "month" | "total";
     };
-    /** @description Ліміти рівня platform — найширшого рівня успадкування: типові значення й жорсткі стелі одного розгортання (профілю, docs/adr/0007-target-environments.md), однакові для всіх сервісів і всіх їхніх екземплярів. Нижчі рівні (source, task, stage, request) лише перекривають типові значення, hard_caps їх обмежують. Область дії ліміту задає його опис: «на екземпляр» (concurrency.max_parallel_fetches, max_parallel_invocations) — кожен екземпляр окремо; «на хост» (concurrency.max_parallel_fetches_per_host, rate.*_per_host) у Web Collector — хост джерела для всієї платформи, разом для всіх екземплярів колектора зі спільним сховищем стану (Telegram Collector застосовує rate.min_delay_ms_per_host до викликів API одного збору). */
+    /** @description Ліміти рівня platform — найширшого рівня успадкування: типові значення й жорсткі стелі одного розгортання (профілю, docs/adr/0007-target-environments.md), однакові для всіх сервісів і всіх їхніх екземплярів. Нижчі рівні (source, task, stage, request) лише перекривають типові значення, hard_caps їх обмежують. Область дії ліміту задає його опис: «на збір» (concurrency.max_parallel_fetches) — кожен збір колектора окремо; «на екземпляр» (concurrency.max_parallel_invocations) — кожен екземпляр окремо; «на хост» (concurrency.max_parallel_fetches_per_host, rate.*_per_host) у Web Collector — хост джерела для всієї платформи, разом для всіх екземплярів колектора зі спільним сховищем стану (Telegram Collector застосовує rate.min_delay_ms_per_host до викликів API одного збору). */
     PlatformLimits: {
       /** @description Ім'я профілю середовища, з якого взято значення (див. docs/adr/0007-target-environments.md). */
       profile?: string;
@@ -901,7 +904,7 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description Вміст; Content-Type — медіатип об'єкта; підтримується Range. */
+      /** @description Вміст; Content-Type — медіатип об'єкта (будь-який: `text/html`, `text/plain`, `application/json`, `application/pdf`, `image/*`…; перелічені нижче — приклади, решта — `*\/*`); підтримується Range. */
       200: {
         headers: {
           [name: string]: unknown;
@@ -910,8 +913,12 @@ export interface operations {
           "application/octet-stream": string;
           /** @example <html><head><title>Kettle A-100</title></head></html> */
           "text/html": string;
+          /** @example Event 1: concert at 19:00 */
+          "text/plain": string;
           /** @example {} */
           "application/json": unknown;
+          /** @example Kettle A-100 1299 UAH */
+          "*/*": string;
         };
       };
       401: components["responses"]["Unauthenticated"];

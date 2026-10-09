@@ -477,8 +477,10 @@ class ContentWriter:
         *,
         text: bool = False,
         charset: str | None = None,
+        reuse: bool = False,
     ) -> dict[str, Any]:
-        """ContentRef of ``body``; ``name`` names the transit blob if one is written (unique per content)."""
+        """ContentRef of ``body``; ``name`` names the transit blob if one is written (unique per content;
+        ``reuse`` - the name is content-addressed, an existing blob is kept, see :meth:`FileTransitStore.put`)."""
         now = now or datetime.now(UTC)
         too_big = len(body) > self.inline_max_bytes
         if self.mode == "inline" and too_big:
@@ -495,16 +497,23 @@ class ContentWriter:
                     else "content_delivery=blob but no blob store configured",
                     details={"path": "transfer.inline_max_bytes", "limit": self.inline_max_bytes},
                 )
-            return self.blob(body, media_type, name, now, charset=charset)
+            return self.blob(body, media_type, name, now, charset=charset, reuse=reuse)
         return inline_ref(body, media_type, text=text, charset=charset)
 
     def blob(
-        self, body: bytes, media_type: str, name: str, now: datetime, *, charset: str | None = None
+        self,
+        body: bytes,
+        media_type: str,
+        name: str,
+        now: datetime,
+        *,
+        charset: str | None = None,
+        reuse: bool = False,
     ) -> dict[str, Any]:
         """A transit blob of ``body`` (the store must be configured)."""
         if self.store is None:
             raise ContentTooLarge("no blob store configured")
-        path = self.store.put(name, body, media_type, now)
+        path = self.store.put(name, body, media_type, now, reuse=reuse)
         ref: dict[str, Any] = {
             "kind": "blob",
             "uri": path.as_uri(),

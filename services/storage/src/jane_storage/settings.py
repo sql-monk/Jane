@@ -51,6 +51,11 @@ class Settings(JaneSettings):
     a network address are rejected."""
     content_files_dir: Path | None = None
     """Only ``file:///`` ContentRef blobs below this directory may be read; None disables local blobs."""
+    transit_dir: Path | None = None
+    """Transit blob store of this service (ADR-0004, R18): a RAW larger than ``transfer.inline_max_bytes`` whose
+    adapter has no persistent URI is returned by ``GET /v1/objects/{id}`` as a transit ``file://`` blob written under
+    ``<transit_dir>/storage/`` (kept ``transfer.transit_ttl_seconds``, removed by this service). The consumers read it
+    within their ``BLOB_ROOTS``; this service also reads its own transit blobs. None: such a RAW has no ``material``."""
     download_host_allowlist: list[str] = Field(default_factory=list)
     """``hostname`` or ``hostname:port`` allowed for ContentRef download_url; empty disables downloads."""
     registry_url: str | None = None
@@ -61,7 +66,7 @@ class Settings(JaneSettings):
     """Bearer token for the registry (environment only; never logged, sent only to ``registry_url``). Not an
     ``env:JANE_SECRET_*`` variable, so a connection's ``secret_refs`` cannot reference it."""
 
-    @field_validator("secret_files_dir", "content_files_dir", mode="before")
+    @field_validator("secret_files_dir", "content_files_dir", "transit_dir", mode="before")
     @classmethod
     def _empty_files_dir_disables(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
@@ -104,6 +109,10 @@ class Transfer(Limits):
     inline_max_bytes: int = contract_field("transfer.inline_max_bytes", 1024 * 1024, ge=0)
     """Contract ``limits.transfer.inline_max_bytes``: stored content up to this size is returned inline
     in ``GET /v1/objects/{id}`` when the adapter has no persistent URI for it."""
+    transit_ttl_seconds: int = contract_field("transfer.transit_ttl_seconds", 604_800, ge=60)
+    """Contract ``limits.transfer.transit_ttl_seconds``: how long a transit blob of this service is kept."""
+    transit_cleanup_interval_seconds: int = Field(default=600, ge=1)
+    """How often this service removes its expired transit blobs (``transit_dir``)."""
 
 
 class Objects(Limits):

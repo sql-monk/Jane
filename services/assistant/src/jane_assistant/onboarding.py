@@ -30,7 +30,6 @@ import math
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from jane_kit.errors import Conflict, JaneError, NotFound
@@ -40,6 +39,7 @@ from .clients import Neighbours, RemoteError, idem_key
 from .content import host_of, material_label
 from .guards import SchemaValidator, check_code, sanitize_web_rules
 from .improvement import ProblemCase, improve_draft
+from .listing import Position, now_text, parse_time
 from .llm import BudgetExhausted, InvalidModelOutput, LlmSession, as_json, part
 from .packages import PackageDraft, bump, collector_rules_draft, extractor_draft, model_ref, slug
 from .prompts import ANALYZE, ANALYZE_SCHEMA, GENERATE, GENERATE_SCHEMA, PROPOSE, PROPOSE_SCHEMA
@@ -57,7 +57,7 @@ DISCOVERY_METHODS = {"seed_list", "sitemap", "feed", "listing", "url_template", 
 
 
 def _now() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return now_text()  # microseconds: list positions of sessions created in one second stay ordered
 
 
 @dataclass
@@ -204,9 +204,9 @@ class Session:
         return out
 
     @property
-    def position(self) -> tuple[str, str]:
-        """Sort key of the list (newest first): ``created_at`` (fixed ``%Y-%m-%dT%H:%M:%SZ``), ``session_id``."""
-        return (self.created_at, self.session_id)
+    def position(self) -> Position:
+        """Sort key of the list (newest first): ``created_at`` as UTC time, then ``session_id``."""
+        return (parse_time(self.created_at), self.session_id)
 
 
 def _plan_doc(p: ExtractorPlan) -> dict[str, Any]:
@@ -252,9 +252,10 @@ class SessionStore(Protocol):
     async def save(self, session: Session) -> None: ...
     async def save_if(self, session: Session, expected: int) -> bool: ...
     async def page(
-        self, *, statuses: frozenset[str] | None, after: tuple[str, str] | None, limit: int
+        self, *, statuses: frozenset[str] | None, after: Position | None, limit: int
     ) -> list[Session]:
-        """Newest first by :attr:`Session.position`, strictly after the ``after`` position (the cursor)."""
+        """Newest first by :attr:`Session.position`, strictly after the ``after`` position (the cursor),
+        filtered by the **stored** status."""
         ...
 
 
@@ -282,9 +283,12 @@ class InMemorySessionStore:
         return True
 
     async def page(
-        self, *, statuses: frozenset[str] | None, after: tuple[str, str] | None, limit: int
+        self, *, statuses: frozenset[str] | None, after: Position | None, limit: int
     ) -> list[Session]:
-        rows = sorted(((doc["created_at"], sid), version, doc) for sid, (version, doc) in self._items.items())
+        rows = sorted(
+            ((parse_time(doc["created_at"]), sid), version, doc)
+            for sid, (version, doc) in self._items.items()
+        )
         out: list[Session] = []
         for position, version, doc in reversed(rows):
             if after is not None and position >= after:
@@ -337,17 +341,28 @@ class OnboardingService:
         return await self._refresh(session)
 
     async def page(
-        self, statuses: frozenset[str] | None, after: tuple[str, str] | None, limit: int
-    ) -> tuple[list[Session], tuple[str, str] | None]:
+        self, statuses: frozenset[str] | None, after: Position | None, limit: int
+    ) -> tuple[list[Session], Position | None]:
         """One page of ``listOnboardingSessions`` (newest first) and the position after it (``None`` = last page).
 
-        Running sessions are refreshed like ``GET`` (a job that ended without its handler updating the session),
-        so the list never shows a session as running whose job already failed or was cancelled."""
+        Running sessions are settled first, as ``GET`` does for one session (a job that ended without its handler
+        updating the session: cancelled before it started, failed because its instance stopped), so the stored
+        status the page is filtered by is the status ``GET`` reports - a session of a dead job is listed under
+        ``failed``, not ``sampling``."""
+        await self._settle_running()
         found = await self.store.page(statuses=statuses, after=after, limit=limit + 1)
-        sessions = [await self._refresh(s) if s.status in RUNNING else s for s in found[:limit]]
-        if statuses:
-            sessions = [s for s in sessions if s.status in statuses]
-        return sessions, (found[limit - 1].position if len(found) > limit else None)
+        return found[:limit], (found[limit - 1].position if len(found) > limit else None)
+
+    async def _settle_running(self) -> None:
+        batch = self._limits({}).pages.max_page_size
+        after: Position | None = None
+        while True:
+            running = await self.store.page(statuses=frozenset(RUNNING), after=after, limit=batch)
+            for session in running:
+                await self._refresh(session)
+            if len(running) < batch:
+                return
+            after = running[-1].position
 
     async def select(self, session_id: str, candidate_id: str) -> Session:
         session = await self.get(session_id)

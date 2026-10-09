@@ -33,8 +33,9 @@ from psycopg_pool import ConnectionPool
 
 from jane_kit.errors import JaneError
 from jane_kit.idempotency import IdempotencyRecord, IdempotencyStore, InMemoryIdempotencyStore, StoredResponse
-from jane_kit.jobs import InMemoryJobStore, Job, JobCancellation, JobLimits, JobStatus, JobStore
+from jane_kit.jobs import InMemoryJobStore, Job, JobCancellation, JobStatus, JobStore
 
+from .listing import Position
 from .onboarding import InMemorySessionStore, Session, SessionStore
 from .settings import ServiceLimits
 
@@ -50,7 +51,7 @@ class JobLister(Protocol):
         *,
         labels: Mapping[str, str],
         statuses: frozenset[str] | None,
-        after: tuple[datetime, str] | None,
+        after: Position | None,
         limit: int,
     ) -> list[Job]:
         """Jobs of ``kind`` carrying all ``labels``, newest first (``created_at``, then ``job_id``), strictly
@@ -58,7 +59,7 @@ class JobLister(Protocol):
         ...
 
 
-def job_position(job: Job) -> tuple[datetime, str]:
+def job_position(job: Job) -> Position:
     return (job.created_at, job.job_id)
 
 
@@ -77,15 +78,8 @@ class ServiceState(Protocol):
 
 
 class _ListedMemoryJobs(InMemoryJobStore):
-    """jane-kit's in-memory job store plus the ids it created, to list them (only its public methods are used)."""
-
-    def __init__(self, limits: JobLimits) -> None:
-        super().__init__(limits)
-        self._ids: list[str] = []
-
-    async def create(self, job: Job) -> None:
-        await super().create(job)
-        self._ids.append(job.job_id)
+    """jane-kit's in-memory job store that can list its jobs. It lists the store's own dictionary, so it holds
+    nothing beyond the store: finished jobs leave with the store's retention (``jobs.job_retention_seconds``)."""
 
     async def page(
         self,
@@ -93,14 +87,13 @@ class _ListedMemoryJobs(InMemoryJobStore):
         *,
         labels: Mapping[str, str],
         statuses: frozenset[str] | None,
-        after: tuple[datetime, str] | None,
+        after: Position | None,
         limit: int,
     ) -> list[Job]:
-        found = [job for job in [await self.get(i) for i in self._ids] if job is not None]
-        self._ids = [job.job_id for job in found]  # the store dropped finished jobs past their retention
+        self._gc()  # the store's retention, as on create
         wanted = [
-            job
-            for job in found
+            job.model_copy(deep=True)
+            for job in self._jobs.values()
             if job.kind == kind
             and all((job.labels or {}).get(k) == v for k, v in labels.items())
             and (not statuses or str(job.status) in statuses)
@@ -392,7 +385,7 @@ class _PgJobs:
         *,
         labels: Mapping[str, str],
         statuses: frozenset[str] | None,
-        after: tuple[datetime, str] | None,
+        after: Position | None,
         limit: int,
     ) -> list[Job]:
         # Jobs of stopped instances first become `failed` (as `get` reports them), so a status filter sees them.
@@ -448,7 +441,7 @@ class _PgSessions:
         session.version = int(rows[0]["version"])
 
     async def page(
-        self, *, statuses: frozenset[str] | None, after: tuple[str, str] | None, limit: int
+        self, *, statuses: frozenset[str] | None, after: Position | None, limit: int
     ) -> list[Session]:
         where = ["TRUE"]
         params: list[Any] = []

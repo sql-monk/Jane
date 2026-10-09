@@ -15,7 +15,11 @@
    публічні API за контрактами. Кожен запит і кожна відповідь перевіряються схемою з `contracts/openapi`
    (`jane_kit.contracts.ContractClient`), тож розбіжність із контрактом валить сценарій. Явний виняток:
    sync replay `POST /v1/completions` під час роботи повертає 409 за загальною конвенцією; поки цей статус
-   не додано до OpenAPI endpoint, тіло Problem перевіряється напряму (запит WP-00 у WP-13s).
+   не додано до OpenAPI endpoint, тіло Problem перевіряється напряму (запит WP-00 у WP-13s). Так само
+   (WP-21) `GET /v1/objects/{id}/content` для RAW, збереженого в початковому `text/plain` (S-M3-02): storage.v1
+   описує Content-Type як медіатип об'єкта, але перелічує лише `application/octet-stream`, `text/html` і
+   `application/json`, тож статус, Content-Type і байти цього виклику перевіряються напряму (запит власнику
+   контракту — у [звіті WP-21](../delivery/WP-21.md)).
 2. **Замінники зовнішніх систем позначаються явно:** фейковий провайдер LLM (WP-10), записаний або фейковий
    клієнт Telegram (WP-04), статичний пошуковий провайдер (WP-11), SeaweedFS замість AWS S3 (WP-01).
    У матриці вони мають позначку **З**.
@@ -97,6 +101,8 @@ Docker-сокет із групою, визначеною автоматично
 | R-06 | Дві репліки, спільні job/idempotency/стан | 8 | усі 8 сервісів | PASSED, Р; зовнішні Telegram/LLM — З |
 | R-07 | Вдосконалення під навантаженням і з рестартами | 6, 8 | orchestrator, assistant, llm, registry, runtime, storage | 5 PASSED, Р; LLM — З; активна пісочниця кандидата в мить kill не підтверджена |
 | R-08 | Backpressure стримує збір і не перевищує max_unacked | 8, 13 | orchestrator, web-collector | 2 PASSED, Р |
+| S-M3-01 | Повторна обробка точно вибраних збережених RAW (`object_ids`, R06) | 6 | orchestrator, storage, handler-runtime, registry, web-collector | після M3: PASSED локально (WP-21), у CI ще не прогнано; Р |
+| S-M3-02 | Telegram JSON-RAW: відновлення вмісту й повторна обробка з тим самим `sha256` (R01) | 1, 12 | telegram-collector, storage, orchestrator | після M3: PASSED локально (WP-21), у CI ще не прогнано; Р; Telegram backend — З |
 
 Не перевірені живі зовнішні системи та ручна перевірка Telegram —
 [матриця, «Не перевірено на реальних сервісах»](matrix.md#не-перевірено-на-реальних-сервісах).
@@ -436,6 +442,39 @@ LLM у scope джерела й `Run.costs.llm` > 0.
 LLM — **З**. Архіви пакетів-фікстур `e2e.instock-product-extractor` і `e2e.llm-page-triage` — з реального
 registry (WP-13t: опубліковано й погоджено, етапи зафіксовано дайджестами registry).
 
+## Після M3 — повторна обробка збережених RAW
+
+Беклог WP-17 (R06, R01), сценарії WP-21: `tests/e2e/test_reprocessing_stored.py` (маркер `milestone("M3")`).
+Підсумок CI 37853683903 вище їх не містить: на 2026-10-09 вони пройшли лише локально, на власному стеку
+WP-21 (по одному прогону); повний e2e запускає CI.
+
+### S-M3-01. Повторна обробка точно вибраних RAW
+`test_s_m3_01_reprocessing_takes_exactly_the_given_stored_objects`. Два прогони M1-завдання на двох сторінках
+товарів дають по два збережені RAW-спостереження кожного матеріалу. `POST /v1/reprocessing` з
+`stored_materials.object_ids` = [RAW товару B з прогону 1, RAW товару A з прогону 2] і `from_stage:
+extract-products`: екстраговано рівно ці два спостереження в заданому порядку (`material_ids` взяв би всі
+чотири), `store-products` — ті самі два, RAW повторно не записано. Кожен товар має три події історії, і подія
+від прогону повторної обробки (`provenance.run_id`) зроблена саме з вибраного спостереження
+(`observation.observation_id`). Відсутній `object_id` у списку — прогін `failed` з `error.code: not_found`.
+
+### S-M3-02. Telegram JSON-RAW: відновлення й той самий sha256
+`test_s_m3_02_telegram_json_raw_is_restored_and_reprocessed_with_its_sha256`. Реальний Telegram Collector
+(записаний бекенд — **З**) збирає два повідомлення (одне не-ASCII). Storage зберігає їх як JSON-документи
+Material (типовий формат RAW, що не є вебсторінкою, ТЗ §5): `sha256` об'єкта — це `sha256` документа, а не
+повідомлення. `GET /v1/objects/{id}` повертає `material.content` inline з **початковим** вмістом:
+текст, `text/plain`, `size_bytes` і `sha256` матеріалу колектора (= `revision.content_sha256`). Далі завдання
+джерела `telegram` з етапом `store-original` (`jane.storage-files`, `params.format.raw: original`) і
+`POST /v1/reprocessing` з `object_ids` цих JSON-RAW і `from_stage: store-original`: обидва елементи `success`
+у заданому порядку, нові об'єкти — `text/plain` з `sha256` і розміром матеріалу колектора, байти збігаються з
+текстом повідомлення. До WP-17 відновлений матеріал ніс JSON-документ із медіатипом `text/plain` і чужим
+`sha256`.
+
+Під час налагодження S-M3-02 знайдено дефект storage: кожен `PUT /v1/connections/{id}` (також з незмінним
+документом, а оркестратор надсилає його після кожного `PUT` у свій реєстр) закриває відкритий адаптер
+підключення, і запис, що йде в цю мить, завершується `failed` / `execution_error` «adapter is not open»
+з `retryable: false`. Сценарій чекає синхронізації підключень перед прямим записом; дефект описано в
+[звіті WP-21](../delivery/WP-21.md) («Запити до інших власників»).
+
 ## Надійність
 
 | ID | Як відтворюємо | Що очікуємо |
@@ -504,8 +543,15 @@ orchestrator, web-collector, handler-runtime, storage, registry; архіви п
 єдиний незавершений, тож інші item не займають воркер чи слот етапу. Опитування API кожні ~0,1 с дає нижню й верхню
 межі кожного очікування: після спроби 1 (3000 мс) і спроби 2 (6000 мс) item не взято раніше за
 затримку (допуск 250 мс на транзакцію повтору) й утримано не менше половини затримки, поки жоден
-item прогону не виконувався. API не відкриває `available_at` та історію claim, тому причинність
-backoff доведена лише в цих межах. R-08:
+item прогону не виконувався. Причинність backoff доводить історія спроб item (WP-17, R25: `attempt_history`
+і `available_at` у `/v1/runs/{id}/items` та trace матеріалу; годинник бази даних, WP-21): історія повна
+(менша за `engine.attempt_history_max`), `claimed` 1 → `retry_scheduled` 1 (`delay_ms` = 3000, код
+`upstream_unavailable`, `available_at − at` = затримка) → `claimed` 2 → `retry_scheduled` 2 (6000) →
+`claimed` 3 … `completed`, без `lease_reclaimed`. Кожне взяття — не раніше за `available_at` попередньої
+затримки (запит claim вимагає `available_at <= now()`) і не пізніше за половину затримки після неї; записане
+очікування `claimed.at − retry_scheduled.at` лежить у межах опитування (± 250 мс на commit). `available_at`,
+який опитування бачило на item у стані `retrying`, — той самий, що в історії, а trace матеріалу віддає той
+самий `item_id`, `attempts` і `attempt_history`. R-08:
 `queue.max_unacked_materials = 2` рівня завдання — колектор призупиняється, не перевищує межу
 (і напряму, без оркестратора) й завершує збір з `unacked = 0`, `acknowledged = 8`.
 

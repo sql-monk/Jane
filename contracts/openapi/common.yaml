@@ -474,6 +474,8 @@ components:
                       api_versions: [v1]
                       capabilities: {}
                       auth_mode: jwt
+                  assistantCi:
+                    $ref: '../examples/openapi/assistant-info-ci.json'
           '401':
             $ref: '#/components/responses/Unauthenticated'
     Job:

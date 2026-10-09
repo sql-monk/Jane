@@ -3,7 +3,7 @@
 Tables: collections (runs) with their lease, per-run channel progress, persistent channel cursors per
 ``state_key`` (last message id, edit watermark, ``pts``), seen revisions per ``state_key`` (to tell an edit
 from a repeated delivery of the same revision), the buffer of emitted-but-unacknowledged materials, errors,
-managed connections, jobs, idempotency keys and counters.
+managed connections, jobs and idempotency keys (tables of jane-kit's shared SQLite stores, R17) and counters.
 
 Every emitted message is committed in one transaction (material + run progress + cursor + seen revision +
 stats), fenced by the run's lease: a killed process resumes from a consistent point and a run that lost its
@@ -16,7 +16,7 @@ import json
 import sqlite3
 import threading
 import time
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -525,57 +525,33 @@ class StateStore:
         )
         return [json.loads(r[0]) for r in rows]
 
-    # ------------------------------------------------------------------ jobs / idempotency (jane-kit protocols)
+    # ------------------------------------------------------------------ jobs (jane-kit shared stores, R17)
+    @contextmanager
+    def read(self) -> Iterator[sqlite3.Connection]:
+        """The connection for single-statement reads (no write lock; ``jane_kit.stores.sqlite``)."""
+        with self._lock:
+            yield self._db
+
     def get_job(self, job_id: str) -> str | None:
         row = self._one("SELECT body FROM jobs WHERE job_id = ?", (job_id,))
         return str(row[0]) if row else None
 
-    def put_job(self, job_id: str, body: str) -> None:
-        with self.tx() as db:
-            db.execute(
-                "INSERT INTO jobs(job_id, body) VALUES (?, ?) ON CONFLICT(job_id) DO UPDATE SET body = excluded.body",
-                (job_id, body),
-            )
+    def work_row(self, db: sqlite3.Connection, job_id: str) -> tuple[str | None, str] | None:
+        """``(owner, status)`` of the collection of a job (``jane_kit.stores.sqlite.WorkRows``)."""
+        row = db.execute(
+            "SELECT owner, status FROM collections WHERE collection_id = ?", (job_id,)
+        ).fetchone()
+        return (row[0], str(row[1])) if row else None
 
-    def update_job(
-        self, job_id: str, decide: Callable[[str | None, str | None, str | None], str | None]
-    ) -> None:
-        """Read the collection's ``(owner, status)`` and the stored job and write ``decide(...)`` (``None`` =
-        keep) in one ``BEGIN IMMEDIATE`` transaction: no other instance can claim the lease in between."""
-        with self.tx() as db:
-            row = db.execute(
-                "SELECT owner, status FROM collections WHERE collection_id = ?", (job_id,)
+    def cancel_unstarted(self, db: sqlite3.Connection, job_id: str, owner: str) -> bool:
+        """A collection cancelled before its run started ends ``cancelled`` (only its lease holder)."""
+        if (
+            db.execute(
+                "SELECT 1 FROM collections WHERE collection_id = ? AND status = 'queued' AND owner = ?",
+                (job_id, owner),
             ).fetchone()
-            current = db.execute("SELECT body FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
-            body = decide(
-                row[0] if row else None, str(row[1]) if row else None, str(current[0]) if current else None
-            )
-            if body is not None:
-                db.execute(
-                    "INSERT INTO jobs(job_id, body) VALUES (?, ?) "
-                    "ON CONFLICT(job_id) DO UPDATE SET body = excluded.body",
-                    (job_id, body),
-                )
-
-    def idem_begin(self, key: str, fingerprint: str, ttl_s: float) -> sqlite3.Row | None:
-        now = time.time()
-        with self.tx() as db:
-            db.execute("DELETE FROM idempotency WHERE expires_at <= ?", (now,))
-            row: sqlite3.Row | None = db.execute("SELECT * FROM idempotency WHERE key = ?", (key,)).fetchone()
-            if row is not None:
-                return row
-            db.execute(
-                "INSERT INTO idempotency(key, fingerprint, state, expires_at) VALUES (?, ?, 'in_progress', ?)",
-                (key, fingerprint, now + ttl_s),
-            )
-            return None
-
-    def idem_complete(self, key: str, response: str) -> None:
-        with self.tx() as db:
-            db.execute(
-                "UPDATE idempotency SET state = 'completed', response = ? WHERE key = ?", (response, key)
-            )
-
-    def idem_release(self, key: str) -> None:
-        with self.tx() as db:
-            db.execute("DELETE FROM idempotency WHERE key = ? AND state = 'in_progress'", (key,))
+            is None
+        ):
+            return False
+        self.finish(db, job_id, "cancelled", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+        return True

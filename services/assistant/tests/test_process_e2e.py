@@ -16,7 +16,6 @@ import os
 import socket
 import subprocess
 import sys
-import threading
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -24,10 +23,10 @@ from typing import Any
 
 import httpx
 import pytest
-import uvicorn
 from assistant_fakes import START_S, WAIT_S
 from assistant_fakes.llm import FakeLlm
 from assistant_fakes.registry import FakeRegistry
+from assistant_fakes.server import Server
 from assistant_fakes.services import FakeCollector, FakeHandler, FakeOrchestrator, FakeStorage
 from assistant_fakes.site import material, product
 
@@ -36,35 +35,6 @@ def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return int(s.getsockname()[1])
-
-
-class _Server:
-    def __init__(self, app: Any) -> None:
-        # the socket is bound here and handed to uvicorn: no other process can take the port in between
-        # (a free port picked and released first was taken by a parallel test run: WinError 10048)
-        self.sock = socket.socket()
-        self.sock.bind(("127.0.0.1", 0))
-        self.port = int(self.sock.getsockname()[1])
-        self.server = uvicorn.Server(uvicorn.Config(app, log_level="warning", lifespan="off"))
-        self.thread = threading.Thread(target=self.server.run, kwargs={"sockets": [self.sock]}, daemon=True)
-
-    @property
-    def url(self) -> str:
-        return f"http://127.0.0.1:{self.port}"
-
-    def __enter__(self) -> _Server:
-        self.thread.start()
-        deadline = time.monotonic() + START_S
-        while not self.server.started:
-            if time.monotonic() > deadline:
-                raise RuntimeError("fake server did not start")
-            time.sleep(0.02)
-        return self
-
-    def __exit__(self, *exc: object) -> None:
-        self.server.should_exit = True
-        self.thread.join(timeout=5)
-        self.sock.close()
 
 
 @pytest.fixture
@@ -85,7 +55,7 @@ def stack(contracts: Path, tmp_path: Path) -> Iterator[dict[str, Any]]:
         ),
         encoding="utf-8",
     )
-    servers = {name: _Server(f.app) for name, f in fakes.items()}
+    servers = {name: Server(f.app) for name, f in fakes.items()}
     for s in servers.values():
         s.__enter__()
     port = _free_port()

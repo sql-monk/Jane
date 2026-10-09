@@ -423,7 +423,15 @@ async def run_improvement(
     package_id, version = ref["package_id"], ref["version"]
     policy = {"approval": "manual", "allow_fork": True, **(req.get("policy") or {})}
     group_id = req.get("problem_group_id")
-    llm = LlmSession(nb.llm, limits.llm, "improvement", job_id, source_id=req.get("source_id"))
+    llm = LlmSession(
+        nb.llm,
+        limits.llm,
+        "improvement",
+        job_id,
+        source_id=req.get("source_id"),
+        run_id=job_id,
+        mode=settings.llm_completion_mode,
+    )
     await _patch_group(nb, group_id, {"status": "in_progress", "assistant_job_id": job_id})
 
     def result(outcome: str, **extra: Any) -> dict[str, Any]:

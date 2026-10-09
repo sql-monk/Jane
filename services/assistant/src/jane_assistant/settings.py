@@ -101,6 +101,10 @@ class Settings(JaneSettings):
     """Model alias of the LLM gateway for classification (sampling, unknown materials)."""
     llm_model_strong: str = "strong"
     """Model alias for analysis, proposals and code generation."""
+    llm_completion_mode: Literal["sync", "async"] = "sync"
+    """How the assistant waits for a model call (``llm.v1`` ``CompletionRequest.mode``): ``sync`` - one HTTP
+    request with its own timeout ``limits.llm_call.request_timeout_ms``; ``async`` - 202 + job of the gateway,
+    polled every ``clients.job_poll_interval_ms`` within ``clients.job_wait_timeout_ms`` (no long connection)."""
     generated_code_allowed_modules: list[str] = Field(
         default_factory=lambda: [
             "re",
@@ -140,8 +144,10 @@ class Budget(Limits):
 
 
 class LlmLimits(Limits):
-    """Contract ``limits.llm``. The gateway enforces its own budgets too; the assistant also stops
-    by itself when the spend of one job reaches ``budget.amount``."""
+    """Contract ``limits.llm``. ``budget`` follows the contract's ``Budget`` semantics: with ``period: run`` it is
+    the limit of one assistant run (onboarding session, improvement or unknown-material job) - every call sends
+    it with ``scope.run_id`` and the gateway counts the run; ``amount: 0`` allows no LLM call. The assistant
+    also stops by itself once its run spent ``budget.amount``."""
 
     max_requests_per_minute: int = Field(default=30, ge=1)
     max_input_tokens_per_request: int = Field(default=16_000, ge=1)
@@ -232,6 +238,20 @@ class SearchLimits(Limits):
     connect_timeout_ms: int = Field(default=5_000, ge=1)
 
 
+class LlmCallLimits(Limits):
+    """Calls of the LLM gateway (internal). Other neighbours use ``clients.*`` - the platform's general
+    ``timeouts.*`` / ``retries``, sized for short service calls; one model call can take minutes."""
+
+    request_timeout_ms: int = Field(default=900_000, ge=1)
+    """Timeout of one synchronous ``createCompletion``. It must cover the gateway's worst case: (schema retries
+    + 1) x provider attempts x provider timeout + backoff - with the llm defaults 2 x 2 x 120 s = 8 min, with a
+    platform profile's 3 attempts 12 min; 15 min is also the gateway's ``reservation_ttl_seconds`` (a call
+    older than that is treated as crashed). Connection and retries come from ``clients.*``."""
+
+    def client_limits(self, clients: ClientLimits) -> ClientLimits:
+        return clients.model_copy(update={"request_timeout_ms": self.request_timeout_ms})
+
+
 class StateLimits(Limits):
     """Shared PostgreSQL state (``state_dsn``)."""
 
@@ -257,6 +277,9 @@ class ServiceLimits(Limits):
     content: ContentLimits = ContentLimits()
     search: SearchLimits = SearchLimits()
     clients: ClientLimits = ClientLimits()
+    """Calls of the neighbours: contract ``timeouts.connect_timeout_ms`` / ``request_timeout_ms`` and ``retries``
+    (a platform profile sets them); the LLM gateway's request timeout is ``llm_call`` instead."""
+    llm_call: LlmCallLimits = LlmCallLimits()
     jobs: JobLimits = JobLimits()
     idempotency: IdempotencyLimits = IdempotencyLimits()
 

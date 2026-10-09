@@ -21,7 +21,7 @@ import httpx
 
 from jane_kit.auth import bearer_header, resolve_secret_ref
 from jane_kit.clients import ClientLimits, RemoteError, ServiceClient
-from jane_kit.errors import JaneError, UpstreamUnavailable
+from jane_kit.errors import JaneError, Problem, UpstreamUnavailable
 
 from .settings import Settings
 
@@ -81,8 +81,26 @@ class LlmClient(_Base):
     name = "llm"
 
     async def complete(self, request: Mapping[str, Any], key: str) -> dict[str, Any]:
+        """``createCompletion``: ``200`` result, or a ``202`` job (``mode: async``) awaited to its result. A failed
+        job is raised as :class:`RemoteError` with the job's Problem, like the synchronous error (e.g. 429
+        ``budget_exhausted``)."""
         r = await self.c.request("POST", "/v1/completions", json=dict(request), idempotency_key=key)
-        return await self._job_result(r)
+        body: dict[str, Any] = r.json()
+        if r.status_code != 202:
+            return body
+        location = r.headers.get("location") or (body.get("links") or {}).get("self")
+        job = await self.c.wait_for_job(location or f"/v1/jobs/{body['job_id']}")
+        if job.get("status") == "succeeded":
+            return dict(job.get("result") or {})
+        error = job.get("error") or {
+            "type": "urn:jane:problem:upstream_unavailable",
+            "title": f"LLM job {job.get('status')}",
+            "status": 502,
+            "code": "upstream_unavailable",
+            "retryable": True,
+        }
+        problem = Problem.model_validate(error)
+        raise RemoteError(problem.status, problem, str(error.get("detail") or ""))
 
 
 class RegistryClient(_Base):
@@ -289,9 +307,12 @@ class Neighbours:
         settings: Settings,
         limits: ClientLimits,
         transports: Mapping[str, httpx.AsyncBaseTransport] | None = None,
+        *,
+        llm_limits: ClientLimits | None = None,
     ) -> Neighbours:
         """Clients for configured URLs. ``transports`` (tests) maps a neighbour name to an ASGI
-        transport; the URL then only provides the base."""
+        transport; the URL then only provides the base. ``llm_limits`` - the LLM gateway client's own limits
+        (a model call is far longer than a call of another neighbour, ``limits.llm_call``); default ``limits``."""
         transports = transports or {}
         default = resolve_secret_ref(settings.service_token_ref) if settings.service_token_ref else None
         if default is None and settings.service_token_env:
@@ -307,18 +328,18 @@ class Neighbours:
         }
         tokens = {name: resolve_secret_ref(ref) if ref else default for name, ref in refs.items()}
 
-        def make(name: str, url: str | None) -> ServiceClient | None:
+        def make(name: str, url: str | None, own: ClientLimits | None = None) -> ServiceClient | None:
             if url is None and name not in transports:
                 return None
             return ServiceClient(
                 url or f"http://{name}.test",
-                limits,
+                own or limits,
                 headers=bearer_header(tokens[name]),
                 transport=transports.get(name),
             )
 
         return cls(
-            llm=LlmClient(make("llm", settings.llm_url)),
+            llm=LlmClient(make("llm", settings.llm_url, llm_limits)),
             registry=RegistryClient(make("registry", settings.registry_url)),
             collectors={
                 "web": CollectorClient(make("collector_web", settings.collector_web_url)),

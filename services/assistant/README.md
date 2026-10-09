@@ -138,6 +138,11 @@ just down -v --project jane-wp11
 валять тест. Фейкова LLM детермінована (диспетчеризація за `output_schema.title`), може «піддатись
 ін'єкції», щоб перевірити захист. Тести пакетів справді виконуються (мінімальний замінник runtime).
 
+`tests/test_llm_budget.py` — бюджет і довгі виклики LLM проти **справжнього** шлюзу `jane_llm` (fake-провайдер,
+пам'ять): бюджет `run` рахується за `scope.run_id` через кілька сесій одного запуску, `amount: 0` зупиняє і асистента,
+і шлюз, режим `async` чекає job шлюзу; виклик, довший за `clients.request_timeout_ms`, завершується в межах
+`llm_call.request_timeout_ms` (контрактний фейк шлюзу на uvicorn, справжній HTTP).
+
 Скільки тести чекають, задається змінними середовища (це лише верхня межа очікування, не умова проходження;
 на завантаженій машині її можна збільшити): `JANE_ASSISTANT_TEST_START_S` (типово 120 с) — старт процесу
 асистента й фейкових серверів у `tests/test_process_e2e.py`, `JANE_ASSISTANT_TEST_WAIT_S` (типово 120 с) —
@@ -177,6 +182,7 @@ just down -v --project jane-wp11
 | `BLOB_ROOTS` | `[]` (вимкнено) | каталоги, з яких можна читати `file://` вміст матеріалів (JSON-список); порожньо — `file://` відхиляється (422) |
 | `DOWNLOAD_HOST_ALLOWLIST` | `[]` (вимкнено) | `hostname` (будь-який порт) або `hostname:port`, куди може вести `download_url` вмісту матеріалу (JSON-список; IDN — у punycode `xn--…`); порожньо — завантаження відхиляються (422) |
 | `LLM_MODEL_CHEAP` / `LLM_MODEL_STRONG` | `cheap` / `strong` | псевдоніми моделей шлюзу |
+| `LLM_COMPLETION_MODE` | `sync` | як чекати виклик моделі: `sync` — один HTTP-запит із власним тайм-аутом `llm_call.request_timeout_ms`; `async` — 202 + job шлюзу, опитування кожні `clients.job_poll_interval_ms` у межах `clients.job_wait_timeout_ms` (без довгого з'єднання) |
 | `CONTRACTS_DIR` | пошук угору / `/app/contracts` | де `contracts/schemas` для локальної валідації |
 | `GENERATED_CODE_ALLOWED_MODULES` | `re, html, json, math, datetime, decimal, string, unicodedata, itertools, functools, collections, typing, dataclasses` | політика імпортів згенерованого коду (JSON-список) |
 | `ONBOARDING_ALLOW_ACTIVATION` | `true` | чи може прийняття з `activate: true` створювати джерело й завдання |
@@ -184,7 +190,7 @@ just down -v --project jane-wp11
 | `STATE_DSN` | — | PostgreSQL для спільного стану кількох екземплярів (секрет; без нього — пам'ять, один екземпляр) |
 | `STATE_SCHEMA` | `jane_assistant` | схема таблиць стану |
 | `INSTANCE_ID` | `hostname-pid` | власник job і оренд (унікальний для кожного екземпляра) |
-| `LIMITS_FILE` | — | файл `PlatformLimits` (TOML/JSON/YAML), зокрема цілий профіль `deploy/profiles/<профіль>.json`: ліміти контракту, яких асистент не має, ігноруються (перелік — у журналі старту), опечатка чи некоректне значення — помилка старту; `timeouts.connect_timeout_ms` / `request_timeout_ms` і `retries` профілю діють на виклики сусідів (`clients.*`) |
+| `LIMITS_FILE` | — | файл `PlatformLimits` (TOML/JSON/YAML), зокрема цілий профіль `deploy/profiles/<профіль>.json`: ліміти контракту, яких асистент не має, ігноруються (перелік — у журналі старту), опечатка чи некоректне значення — помилка старту; `timeouts.connect_timeout_ms` / `request_timeout_ms` і `retries` профілю діють на виклики сусідів (`clients.*`), окрім тайм-ауту виклику моделі (`llm_call.request_timeout_ms`, власний ліміт асистента) |
 | `LIMITS__<ГРУПА>__<ПАРАМЕТР>` / `LIMITS__HARD_CAPS__…` | — | перевизначення й жорсткі стелі |
 
 ## Автентифікація (ADR-0005)
@@ -213,7 +219,7 @@ JANE_ASSISTANT_API_KEYS=[{"name": "admin", "sha256": "<sha256 hex ключа>", 
 
 | Параметр | Типово | Опис |
 |---|---|---|
-| `llm.budget` | 2 USD / `run` | витрати одного job; асистент зупиняється сам, шлюз — теж (`budget_exhausted`) |
+| `llm.budget` | 2 USD / `run` | семантика контракту (`Budget`, однакова з LLM-шлюзом): `run` — один запуск асистента (сесія підключення — від пошуку до прийняття, хоч би скільки job і екземплярів її продовжували; job вдосконалення; job невідомого матеріалу). Кожен виклик несе весь бюджет і `scope.run_id` запуску — шлюз сам рахує витрати запуску атомарно для всіх екземплярів; інші періоди звужують спільний лічильник найконкретнішого рівня запиту (`source` для вдосконалення з `source_id`, інакше `platform`). Асистент зупиняється сам, щойно витрати запуску ≥ `amount`; **`amount: 0` — жодного виклику LLM** (так само відмовляє шлюз, навіть для безкоштовної моделі) |
 | `llm.max_onboarding_samples` | 60 | верхня межа класифікованих матеріалів (фактично — адаптивно менше) |
 | `llm.max_improvement_attempts` | 3 | спроби моделі на один запуск вдосконалення (0 → одразу `unresolved`) |
 | `llm.max_input_tokens_per_request` / `max_output_tokens_per_request` | 16000 / 4000 | дані обрізаються (~4 символи на токен) |
@@ -242,7 +248,8 @@ JANE_ASSISTANT_API_KEYS=[{"name": "admin", "sha256": "<sha256 hex ключа>", 
 | `content.max_material_bytes` | 16777216 | найбільший вміст одного матеріалу (inline, `file://`, `download_url`); більший — `limit_exceeded` |
 | `content.fetch_timeout_ms` / `connect_timeout_ms` | 30000 / 5000 | усе завантаження за `download_url` / встановлення з'єднання |
 | `search.request_timeout_ms` / `connect_timeout_ms` | 10000 / 5000 | виклики пошукового провайдера `http_json` |
-| `clients.*` (тайм-аути, повтори, опитування job) | див. jane-kit | виклики сусідів |
+| `clients.*` (тайм-аути, повтори, опитування job) | див. jane-kit (30000 мс запит, 4 спроби) | виклики сусідів; це контрактні `timeouts.*` / `retries`, тож профіль платформи задає їх для коротких службових викликів |
+| `llm_call.request_timeout_ms` | 900000 | тайм-аут одного синхронного виклику LLM-шлюзу (власний ліміт: виклик моделі довший за службові). Має покривати найгірший випадок шлюзу: (повтори за схемою + 1) × спроби провайдера × тайм-аут провайдера — з типовими значеннями llm 2 × 2 × 120 с = 8 хв, зі спробами профілю 3 — 12 хв; 15 хв — і `gateway.reservation_ttl_seconds` шлюзу. З'єднання й повтори — з `clients.*` |
 | `jobs.*`, `idempotency.*` | див. jane-kit | job і ключі ідемпотентності |
 
 ## Приклад виклику зі стороннього застосунку

@@ -475,7 +475,13 @@ class OnboardingService:
         )
         source_id = slug(host or cand.telegram_username or session.query)
         llm = LlmSession(
-            self.nb.llm, limits.llm, "onboarding", session.session_id + (session.job_id or ""), source_id=None
+            self.nb.llm,
+            limits.llm,
+            "onboarding",
+            session.session_id + (session.job_id or ""),
+            source_id=None,
+            run_id=session.session_id,  # one onboarding run = the session, whichever job continues it
+            mode=self.settings.llm_completion_mode,
         )
 
         async def progress(done: int, message: str) -> None:

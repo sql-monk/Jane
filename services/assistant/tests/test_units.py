@@ -231,10 +231,14 @@ def test_llm_session_budget_truncation_and_validation() -> None:
     data = [{"name": "a", "text": "y" * 100}, {"name": "b", "text": "z"}]
     assert asyncio.run(llm.ask("s", "do it", data, schema, model="cheap")) == {"x": 1}
     assert len(seen[0]["data"]) == 1 and seen[0]["data"][0]["text"].startswith("y" * 40)
-    assert seen[0]["limits"]["budget"]["amount"] == 1
+    # R13: the whole run budget and the run id - the gateway counts the run itself (not "what is left")
+    assert seen[0]["limits"]["budget"] == {"amount": 1, "currency": "USD", "period": "run"}
+    assert seen[0]["scope"] == {"purpose": "onboarding", "run_id": "job_1"}
+    assert "mode" not in seen[0]  # sync by default
     asyncio.run(llm.ask("s", "do it", [], schema, model="cheap"))
     asyncio.run(llm.ask("s", "do it", [], schema, model="cheap"))
-    assert seen[-1]["limits"]["budget"]["amount"] == pytest.approx(0.2)
+    assert seen[-1]["limits"]["budget"]["amount"] == 1
+    assert llm.spent == pytest.approx(1.2) and llm.exhausted
     with pytest.raises(BudgetExhausted):
         asyncio.run(llm.ask("s", "do it", [], schema, model="cheap"))
     assert len(seen) == 3

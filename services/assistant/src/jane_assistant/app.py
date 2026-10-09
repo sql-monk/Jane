@@ -173,7 +173,9 @@ def build_app(settings: Settings | None = None, deps: Dependencies | None = None
     state = deps.state or build_state(settings, limits)
     runner = JobRunner(store=state.jobs, limits=limits.jobs)
     idem_store = state.idempotency
-    neighbours = Neighbours.from_settings(settings, limits.clients, deps.transports)
+    neighbours = Neighbours.from_settings(
+        settings, limits.clients, deps.transports, llm_limits=limits.llm_call.client_limits(limits.clients)
+    )
     validator = SchemaValidator.locate(settings.contracts_dir)
     search = deps.search or build_search(settings, limits)
     onboarding = OnboardingService(

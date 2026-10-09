@@ -33,6 +33,7 @@ paths:
     $ref: 'common.yaml#/components/pathItems/Info'
   /v1/onboarding-sessions:
     post:
+      x-jane-scope: assistant:use
       operationId: startOnboarding
       summary: Почати підключення джерела (назва сайту/каналу або точне посилання)
       tags: [onboarding]
@@ -77,6 +78,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/SessionId'
     get:
+      x-jane-scope: assistant:use
       operationId: getOnboardingSession
       summary: Стан підключення — кандидати, вибірка, аналіз, варіанти
       tags: [onboarding]
@@ -102,6 +104,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/SessionId'
     post:
+      x-jane-scope: assistant:use
       operationId: selectCandidate
       summary: Уточнити неоднозначність — обрати джерело з кандидатів
       tags: [onboarding]
@@ -152,6 +155,7 @@ paths:
         schema:
           type: string
     post:
+      x-jane-scope: assistant:use
       operationId: acceptProposal
       summary: Прийняти варіант — опублікувати правила й пакети, прогнати тести, підготувати джерело й завдання
       description: |
@@ -190,6 +194,7 @@ paths:
           $ref: 'common.yaml#/components/responses/Conflict'
   /v1/improvement-runs:
     post:
+      x-jane-scope: assistant:use
       operationId: startImprovement
       summary: Вдосконалити екстрактор на проблемних прикладах (нова версія або форк)
       description: |
@@ -254,6 +259,7 @@ paths:
           $ref: 'common.yaml#/components/responses/TooManyRequests'
   /v1/unknown-materials:
     post:
+      x-jane-scope: assistant:use
       operationId: analyzeUnknownMaterial
       summary: Проаналізувати невідомий матеріал (викликає оркестратор лише за увімкненим прапорцем)
       tags: [unknown]
@@ -315,9 +321,75 @@ paths:
         '429':
           $ref: 'common.yaml#/components/responses/TooManyRequests'
   /v1/jobs/{job_id}:
-    $ref: 'common.yaml#/components/pathItems/Job'
+    parameters:
+      - $ref: 'common.yaml#/components/parameters/JobId'
+    get:
+      x-jane-scope: assistant:use
+      operationId: getJob
+      summary: Стан, прогрес і результат тривалої операції
+      tags: [jobs]
+      responses:
+        '200':
+          description: Поточний стан job.
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Job'
+              examples:
+                running:
+                  $ref: 'common.yaml#/components/examples/JobRunning'
+                failed:
+                  $ref: 'common.yaml#/components/examples/JobFailed'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
   /v1/jobs/{job_id}/cancel:
-    $ref: 'common.yaml#/components/pathItems/JobCancel'
+    parameters:
+      - $ref: 'common.yaml#/components/parameters/JobId'
+    post:
+      x-jane-scope: assistant:use
+      operationId: cancelJob
+      summary: Запит на скасування job (ідемпотентний)
+      x-jane-no-idempotency-key: cancellation is idempotent by nature
+      description: |
+        202 — скасування прийнято, job переходить у `cancelling`, далі в `cancelled`.
+        200 — job уже в термінальному стані; повертається як є, без змін.
+        Повторний виклик безпечний, тому Idempotency-Key не потрібен.
+      tags: [jobs]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: 'common.yaml#/components/schemas/JobCancelRequest'
+            examples:
+              reason:
+                value:
+                  reason: wrong scope
+      responses:
+        '200':
+          description: Job уже завершено; стан не змінено.
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Job'
+              examples:
+                failed:
+                  $ref: 'common.yaml#/components/examples/JobFailed'
+        '202':
+          description: Скасування прийнято.
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Job'
+              examples:
+                cancelling:
+                  $ref: 'common.yaml#/components/examples/JobCancelling'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
 components:
   securitySchemes:
     bearerAuth:

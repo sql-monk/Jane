@@ -39,6 +39,7 @@ paths:
     $ref: 'common.yaml#/components/pathItems/Info'
   /v1/sources:
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: listSources
       summary: Джерела
       tags: [sources]
@@ -79,6 +80,7 @@ paths:
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
     post:
+      x-jane-scope: [orchestrator:write, orchestrator:admin]
       operationId: createSource
       summary: Створити джерело
       tags: [sources]
@@ -120,6 +122,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/SourceId'
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: getSource
       summary: Джерело
       tags: [sources]
@@ -141,6 +144,7 @@ paths:
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
     put:
+      x-jane-scope: [orchestrator:write, orchestrator:admin]
       operationId: replaceSource
       summary: Замінити джерело (включно з прапорцем «Передавати в LLM невідомі сторінки»)
       tags: [sources]
@@ -177,6 +181,7 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
     delete:
+      x-jane-scope: [orchestrator:write, orchestrator:admin]
       operationId: deleteSource
       summary: Видалити джерело (заборонено, якщо є завдання)
       tags: [sources]
@@ -191,6 +196,7 @@ paths:
           $ref: 'common.yaml#/components/responses/Conflict'
   /v1/tasks:
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: listTasks
       summary: Завдання (з фільтром за джерелом або пакетом, що використовується в етапах)
       description: |
@@ -275,6 +281,7 @@ paths:
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
     post:
+      x-jane-scope: [orchestrator:write, orchestrator:admin]
       operationId: createTask
       summary: Створити завдання
       tags: [tasks]
@@ -318,6 +325,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/TaskId'
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: getTask
       summary: Конфігурація завдання
       tags: [tasks]
@@ -339,6 +347,7 @@ paths:
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
     put:
+      x-jane-scope: [orchestrator:write, orchestrator:admin]
       operationId: replaceTask
       summary: Замінити конфігурацію завдання (ліміти, розклад, етапи) без зміни коду
       tags: [tasks]
@@ -375,6 +384,7 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
     delete:
+      x-jane-scope: [orchestrator:write, orchestrator:admin]
       operationId: deleteTask
       summary: Видалити завдання (історія запусків зберігається)
       tags: [tasks]
@@ -389,6 +399,7 @@ paths:
           $ref: 'common.yaml#/components/responses/Conflict'
   /v1/task-validations:
     post:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: validateTask
       summary: Перевірити конфігурацію завдання без збереження (DAG, версії, прив'язки, ліміти)
       tags: [tasks]
@@ -425,6 +436,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/TaskId'
     post:
+      x-jane-scope: [orchestrator:write, orchestrator:admin]
       operationId: startRun
       summary: Запустити завдання зараз
       tags: [runs]
@@ -478,6 +490,7 @@ paths:
         schema:
           $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: listStageActivations
       summary: Історія версій пакета в етапі (активації й відкати)
       tags: [tasks, audit]
@@ -522,6 +535,7 @@ paths:
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
     post:
+      x-jane-scope: [orchestrator:write, orchestrator:admin]
       operationId: activateStageVersion
       summary: Активувати версію пакета в етапі (або відкотити до попередньої)
       description: |
@@ -612,6 +626,7 @@ paths:
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
   /v1/runs:
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: listRuns
       summary: Запуски
       tags: [runs]
@@ -665,6 +680,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RunId'
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: getRun
       summary: Стан запуску, прогрес етапів, витрати
       tags: [runs]
@@ -686,6 +702,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RunId'
     post:
+      x-jane-scope: [orchestrator:write, orchestrator:admin]
       operationId: cancelRun
       summary: Скасувати запуск (те саме, що /v1/jobs/{run_id}/cancel)
       tags: [runs]
@@ -744,6 +761,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RunId'
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: listRunItems
       summary: Елементи запуску — матеріал на етапі, спроби, результат, помилка
       tags: [runs, traces]
@@ -806,6 +824,7 @@ paths:
         schema:
           $ref: '../schemas/common/defs.schema.json#/$defs/Id'
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: getMaterialTrace
       summary: Простежуваність матеріалу — спостереження → етапи → результати → версії пакетів
       tags: [traces]
@@ -866,6 +885,7 @@ paths:
           $ref: 'common.yaml#/components/responses/NotFound'
   /v1/unknown-materials:
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: listUnknownMaterials
       summary: Матеріали без відповідного обробника (і чи були передані в LLM)
       tags: [problems]
@@ -914,6 +934,7 @@ paths:
           $ref: 'common.yaml#/components/responses/Unauthenticated'
   /v1/problem-groups:
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: listProblemGroups
       summary: Проблемні матеріали, згруповані за джерелом і характером проблеми
       tags: [problems]
@@ -975,6 +996,7 @@ paths:
         schema:
           $ref: '../schemas/common/defs.schema.json#/$defs/Id'
     patch:
+      x-jane-scope: [orchestrator:write, orchestrator:admin]
       operationId: updateProblemGroup
       summary: Змінити статус групи (ignored, resolved) або прив'язати job вдосконалення
       tags: [problems]
@@ -1026,6 +1048,7 @@ paths:
           $ref: 'common.yaml#/components/responses/NotFound'
   /v1/reprocessing:
     post:
+      x-jane-scope: [orchestrator:write, orchestrator:admin]
       operationId: startReprocessing
       summary: Повторно обробити збережені RAW етапами завдання
       tags: [runs]
@@ -1057,6 +1080,7 @@ paths:
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
   /v1/connections:
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: listPlatformConnections
       summary: Реєстр підключень платформи (без значень секретів)
       tags: [connections]
@@ -1112,6 +1136,7 @@ paths:
         schema:
           $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: getPlatformConnection
       summary: Підключення і стан синхронізації з виконавцями
       tags: [connections]
@@ -1141,6 +1166,7 @@ paths:
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
     put:
+      x-jane-scope: orchestrator:admin
       operationId: putPlatformConnection
       summary: Створити або замінити підключення й синхронізувати з виконавцями
       tags: [connections]
@@ -1183,6 +1209,7 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
     delete:
+      x-jane-scope: orchestrator:admin
       operationId: deletePlatformConnection
       summary: Видалити підключення (заборонено, якщо на нього посилаються етапи)
       tags: [connections]
@@ -1195,6 +1222,7 @@ paths:
           $ref: 'common.yaml#/components/responses/Conflict'
   /v1/limits/platform:
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: getPlatformLimits
       summary: Ліміти рівня платформи (типові значення й жорсткі стелі)
       tags: [limits]
@@ -1214,6 +1242,7 @@ paths:
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
     put:
+      x-jane-scope: orchestrator:admin
       operationId: putPlatformLimits
       summary: Змінити ліміти платформи без зміни коду
       tags: [limits]
@@ -1251,6 +1280,7 @@ paths:
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
   /v1/limits/effective:
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: getEffectiveLimits
       summary: Ефективні ліміти для контексту з походженням кожного значення
       tags: [limits]
@@ -1286,6 +1316,7 @@ paths:
           $ref: 'common.yaml#/components/responses/NotFound'
   /v1/executors:
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: listExecutors
       summary: Сервіси-виконавці, відомі оркестратору (з конфігурації), і їхній стан
       tags: [system]
@@ -1326,6 +1357,7 @@ paths:
           $ref: 'common.yaml#/components/responses/Unauthenticated'
   /v1/audit-events:
     get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
       operationId: listAuditEvents
       summary: Журнал аудиту (активації, відкати, зміни конфігурацій, підключень і лімітів)
       tags: [audit]
@@ -1375,9 +1407,75 @@ paths:
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
   /v1/jobs/{job_id}:
-    $ref: 'common.yaml#/components/pathItems/Job'
+    parameters:
+      - $ref: 'common.yaml#/components/parameters/JobId'
+    get:
+      x-jane-scope: [orchestrator:read, orchestrator:admin]
+      operationId: getJob
+      summary: Стан, прогрес і результат тривалої операції
+      tags: [jobs]
+      responses:
+        '200':
+          description: Поточний стан job.
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Job'
+              examples:
+                running:
+                  $ref: 'common.yaml#/components/examples/JobRunning'
+                failed:
+                  $ref: 'common.yaml#/components/examples/JobFailed'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
   /v1/jobs/{job_id}/cancel:
-    $ref: 'common.yaml#/components/pathItems/JobCancel'
+    parameters:
+      - $ref: 'common.yaml#/components/parameters/JobId'
+    post:
+      x-jane-scope: [orchestrator:write, orchestrator:admin]
+      operationId: cancelJob
+      summary: Запит на скасування job (ідемпотентний)
+      x-jane-no-idempotency-key: cancellation is idempotent by nature
+      description: |
+        202 — скасування прийнято, job переходить у `cancelling`, далі в `cancelled`.
+        200 — job уже в термінальному стані; повертається як є, без змін.
+        Повторний виклик безпечний, тому Idempotency-Key не потрібен.
+      tags: [jobs]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: 'common.yaml#/components/schemas/JobCancelRequest'
+            examples:
+              reason:
+                value:
+                  reason: wrong scope
+      responses:
+        '200':
+          description: Job уже завершено; стан не змінено.
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Job'
+              examples:
+                failed:
+                  $ref: 'common.yaml#/components/examples/JobFailed'
+        '202':
+          description: Скасування прийнято.
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Job'
+              examples:
+                cancelling:
+                  $ref: 'common.yaml#/components/examples/JobCancelling'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
 components:
   securitySchemes:
     bearerAuth:

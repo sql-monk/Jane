@@ -34,6 +34,7 @@ paths:
     $ref: 'common.yaml#/components/pathItems/Info'
   /v1/packages:
     get:
+      x-jane-scope: registry:read
       operationId: listPackages
       summary: Пошук пакетів
       tags: [packages]
@@ -102,6 +103,7 @@ paths:
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
     post:
+      x-jane-scope: registry:write
       operationId: createPackage
       summary: Створити пакет (без версій)
       tags: [packages]
@@ -147,6 +149,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/PackageId'
     get:
+      x-jane-scope: registry:read
       operationId: getPackage
       summary: Пакет і його налаштування
       tags: [packages]
@@ -168,6 +171,7 @@ paths:
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
     patch:
+      x-jane-scope: registry:write
       operationId: updatePackage
       summary: Змінити налаштування пакета (назва, опис, заборона автозмін, застарілість)
       tags: [packages]
@@ -208,6 +212,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/PackageId'
     get:
+      x-jane-scope: registry:read
       operationId: listPackageVersions
       summary: Версії пакета
       tags: [versions]
@@ -243,6 +248,7 @@ paths:
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
     post:
+      x-jane-scope: registry:write
       operationId: publishPackageVersion
       summary: Опублікувати нову незмінну версію
       description: |
@@ -391,6 +397,7 @@ paths:
       - $ref: '#/components/parameters/PackageId'
       - $ref: '#/components/parameters/Version'
     get:
+      x-jane-scope: registry:read
       operationId: getPackageVersion
       summary: Версія пакета — маніфест, дайджест, файли, статус
       tags: [versions]
@@ -413,6 +420,7 @@ paths:
       - $ref: '#/components/parameters/PackageId'
       - $ref: '#/components/parameters/Version'
     get:
+      x-jane-scope: registry:read
       operationId: downloadPackageArchive
       summary: Архів версії для автономного використання (ETag = дайджест)
       tags: [versions]
@@ -436,6 +444,7 @@ paths:
       - $ref: '#/components/parameters/PackageId'
       - $ref: '#/components/parameters/Version'
     get:
+      x-jane-scope: registry:read
       operationId: getPackageFile
       summary: Один файл версії (для редактора й diff в адмінці)
       tags: [versions]
@@ -466,6 +475,7 @@ paths:
       - $ref: '#/components/parameters/PackageId'
       - $ref: '#/components/parameters/Version'
     post:
+      x-jane-scope: registry:approve
       operationId: setPackageVersionStatus
       summary: Змінити статус версії (погодити, відхилити, позначити застарілою) з аудитом
       tags: [versions]
@@ -503,6 +513,7 @@ paths:
       - $ref: '#/components/parameters/PackageId'
       - $ref: '#/components/parameters/Version'
     post:
+      x-jane-scope: registry:write
       operationId: recordTestResults
       summary: Записати звіт прогону тестів версії (від handler-runtime або асистента)
       tags: [versions]
@@ -550,6 +561,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/PackageId'
     post:
+      x-jane-scope: registry:write
       operationId: forkPackage
       summary: Створити незалежний форк від версії
       description: |
@@ -606,6 +618,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/PackageId'
     get:
+      x-jane-scope: registry:read
       operationId: diffPackage
       summary: Відмінності між версіями або від батька (для форку)
       tags: [versions, forks]
@@ -663,6 +676,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/PackageId'
     get:
+      x-jane-scope: registry:read
       operationId: getUpstreamStatus
       summary: Оновлення батьківського пакета для форку
       tags: [forks]
@@ -703,6 +717,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/PackageId'
     post:
+      x-jane-scope: registry:write
       operationId: portUpstreamChanges
       summary: Явно перенести зміни батька у форк новою версією (асинхронно)
       description: |
@@ -737,9 +752,75 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
   /v1/jobs/{job_id}:
-    $ref: 'common.yaml#/components/pathItems/Job'
+    parameters:
+      - $ref: 'common.yaml#/components/parameters/JobId'
+    get:
+      x-jane-scope: registry:read
+      operationId: getJob
+      summary: Стан, прогрес і результат тривалої операції
+      tags: [jobs]
+      responses:
+        '200':
+          description: Поточний стан job.
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Job'
+              examples:
+                running:
+                  $ref: 'common.yaml#/components/examples/JobRunning'
+                failed:
+                  $ref: 'common.yaml#/components/examples/JobFailed'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
   /v1/jobs/{job_id}/cancel:
-    $ref: 'common.yaml#/components/pathItems/JobCancel'
+    parameters:
+      - $ref: 'common.yaml#/components/parameters/JobId'
+    post:
+      x-jane-scope: registry:write
+      operationId: cancelJob
+      summary: Запит на скасування job (ідемпотентний)
+      x-jane-no-idempotency-key: cancellation is idempotent by nature
+      description: |
+        202 — скасування прийнято, job переходить у `cancelling`, далі в `cancelled`.
+        200 — job уже в термінальному стані; повертається як є, без змін.
+        Повторний виклик безпечний, тому Idempotency-Key не потрібен.
+      tags: [jobs]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: 'common.yaml#/components/schemas/JobCancelRequest'
+            examples:
+              reason:
+                value:
+                  reason: wrong scope
+      responses:
+        '200':
+          description: Job уже завершено; стан не змінено.
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Job'
+              examples:
+                failed:
+                  $ref: 'common.yaml#/components/examples/JobFailed'
+        '202':
+          description: Скасування прийнято.
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Job'
+              examples:
+                cancelling:
+                  $ref: 'common.yaml#/components/examples/JobCancelling'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
 components:
   securitySchemes:
     bearerAuth:

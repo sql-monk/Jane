@@ -27,6 +27,7 @@ paths:
     $ref: 'common.yaml#/components/pathItems/Info'
   /v1/entities:
     get:
+      x-jane-scope: storage:read
       operationId: listEntities
       summary: Актуальний стан сутностей
       tags: [entities]
@@ -98,6 +99,7 @@ paths:
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
   /v1/entity-history:
     get:
+      x-jane-scope: storage:read
       operationId: listEntityHistory
       summary: Історія оновлень однієї сутності (включно із запізнілими)
       tags: [entities]
@@ -158,6 +160,7 @@ paths:
           $ref: 'common.yaml#/components/responses/NotFound'
   /v1/objects:
     get:
+      x-jane-scope: storage:read
       operationId: listObjects
       summary: Збережені об'єкти (RAW, документи результатів) — для перегляду й повторної обробки
       tags: [objects]
@@ -233,6 +236,7 @@ paths:
           $ref: '../schemas/common/defs.schema.json#/$defs/Id'
       - $ref: '#/components/parameters/ConnectionIdQuery'
     get:
+      x-jane-scope: storage:read
       operationId: getObject
       summary: Метадані збереженого об'єкта і відновлений Material для повторної обробки
       tags: [objects]
@@ -290,6 +294,7 @@ paths:
           $ref: '../schemas/common/defs.schema.json#/$defs/Id'
       - $ref: '#/components/parameters/ConnectionIdQuery'
     get:
+      x-jane-scope: storage:read
       operationId: getObjectContent
       summary: Вміст збереженого об'єкта (байти в оригінальному медіатипі)
       tags: [objects]

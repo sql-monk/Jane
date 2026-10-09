@@ -1020,6 +1020,11 @@ export interface operations {
       400: components["responses"]["BadRequest"];
       401: components["responses"]["Unauthenticated"];
       404: components["responses"]["NotFound"];
+      /**
+       * @description Запит із тим самим Idempotency-Key і тілом ще виконується: `idempotency_in_progress`,
+       *     retryable=true. Повтор після завершення поверне збережену відповідь із Idempotency-Replayed.
+       */
+      409: components["responses"]["Conflict"];
       413: components["responses"]["PayloadTooLarge"];
       422: components["responses"]["UnprocessableEntity"];
       /** @description Вичерпано бюджет (`budget_exhausted`) або ліміт частоти (`rate_limited`). */

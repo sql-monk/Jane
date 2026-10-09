@@ -90,13 +90,16 @@ params, ctx)` повертає `success(...)`, `empty()` або `unrecognized(..
 - `dependencies.packages` — точні версії інших пакетів registry (з `digest` — має збігтися).
 
 ## 7. Канонічний архів і дайджест
-Дайджест версії — `sha256:` **канонічного zip** (registry і storage вже однакові; `build_archive` SDK має
-перейти на stored — запит WP-05 до WP-06; README registry):
+Дайджест версії — `sha256:` **канонічного zip**. Registry, storage й реалізований `build_archive` SDK
+використовують однаковий формат (R30 закрито):
 файли відсортовані за байтами шляху, без тек; метод **stored (без стиснення)**; час `1980-01-01 00:00:00`;
 права `0o100644`, `create_system = 3`; без extra-полів і коментарів. Registry перепаковує будь-який
 завантажений zip канонічно, тож дайджест залежить лише від шляхів і вмісту. Для JSON-публікації
 `jane-package.json` = `json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"` (UTF-8, порядок ключів як у
 запиті). Локально той самий дайджест: `jane-registry archive <тека> --out pkg.zip`.
+Digest у контрактних JSON/OpenAPI прикладах ілюстративний; перевіряйте фактичний ZIP, а не копіюйте
+дайджест із прикладу. Деталі — [опис пакетів](../../../contracts/docs/handler-packages.md#структура-архіву),
+[registry](../../../services/registry/README.md), [runtime/CLI](../../../services/handler-runtime/README.md).
 
 ## 8. Версії, походження, статуси
 - SemVer: несумісна зміна полів/схеми виходу — major; нові поля/селектори — minor; виправлення — patch.

@@ -419,6 +419,7 @@ components:
   pathItems:
     Health:
       get:
+        x-jane-scope: []
         operationId: getHealth
         summary: Стан сервісу (liveness/readiness)
         tags: [system]
@@ -454,6 +455,7 @@ components:
                           message: connection refused
     Info:
       get:
+        x-jane-scope: []
         operationId: getServiceInfo
         summary: Версія, підтримувані версії API й можливості сервісу
         tags: [system]
@@ -568,8 +570,8 @@ components:
                             port: 5432
                             database: jane_results
                           secret_refs:
-                            username: env:RESULTS_PG_USER
-                            password: env:RESULTS_PG_PASSWORD
+                            username: env:JANE_SECRET_RESULTS_PG_USER
+                            password: env:JANE_SECRET_RESULTS_PG_PASSWORD
                       next_cursor: null
           '401':
             $ref: '#/components/responses/Unauthenticated'

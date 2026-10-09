@@ -35,6 +35,7 @@ paths:
     $ref: 'common.yaml#/components/pathItems/Info'
   /v1/providers:
     get:
+      x-jane-scope: [llm:admin, llm:invoke]
       operationId: listProviders
       summary: Провайдери LLM і їхні моделі
       tags: [providers]
@@ -76,6 +77,7 @@ paths:
         schema:
           $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
     get:
+      x-jane-scope: [llm:admin, llm:invoke]
       operationId: getProvider
       summary: Провайдер
       tags: [providers]
@@ -94,6 +96,7 @@ paths:
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
     put:
+      x-jane-scope: llm:admin
       operationId: putProvider
       summary: Створити або замінити провайдера (облікові дані — через connection_id)
       tags: [providers]
@@ -125,6 +128,7 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
     delete:
+      x-jane-scope: llm:admin
       operationId: deleteProvider
       summary: Видалити провайдера
       tags: [providers]
@@ -137,6 +141,7 @@ paths:
           $ref: 'common.yaml#/components/responses/Conflict'
   /v1/model-aliases:
     get:
+      x-jane-scope: [llm:admin, llm:invoke]
       operationId: listModelAliases
       summary: Псевдоніми моделей, на які посилаються пакети (default, cheap, strong)
       tags: [providers]
@@ -171,6 +176,7 @@ paths:
           type: string
           pattern: '^[a-z][a-z0-9_-]{0,31}$'
     put:
+      x-jane-scope: llm:admin
       operationId: putModelAlias
       summary: Призначити псевдонім моделі
       tags: [providers]
@@ -205,6 +211,7 @@ paths:
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
   /v1/completions:
     post:
+      x-jane-scope: llm:invoke
       operationId: createCompletion
       summary: Структурований запит до LLM з валідацією виходу за схемою
       tags: [completions]
@@ -294,6 +301,11 @@ paths:
           $ref: 'common.yaml#/components/responses/NotFound'
         '413':
           $ref: 'common.yaml#/components/responses/PayloadTooLarge'
+        '409':
+          $ref: 'common.yaml#/components/responses/Conflict'
+          description: |
+            Запит із тим самим Idempotency-Key і тілом ще виконується: `idempotency_in_progress`,
+            retryable=true. Повтор після завершення поверне збережену відповідь із Idempotency-Replayed.
         '422':
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
         '429':
@@ -334,6 +346,7 @@ paths:
                     retryable: true
   /v1/budgets:
     get:
+      x-jane-scope: llm:admin
       operationId: listBudgets
       summary: Визначення бюджетів за рівнями й поточні витрати
       tags: [budgets]
@@ -382,6 +395,7 @@ paths:
         schema:
           type: string
     put:
+      x-jane-scope: llm:admin
       operationId: putBudget
       summary: Задати бюджет рівня (оркестратор синхронізує сюди ліміти llm.budget джерел і завдань)
       tags: [budgets]
@@ -421,6 +435,7 @@ paths:
         '422':
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
     delete:
+      x-jane-scope: llm:admin
       operationId: deleteBudget
       summary: Прибрати бюджет рівня (діє успадкований)
       tags: [budgets]
@@ -433,6 +448,7 @@ paths:
           $ref: 'common.yaml#/components/responses/NotFound'
   /v1/usage:
     get:
+      x-jane-scope: llm:admin
       operationId: getUsage
       summary: Облік витрат LLM
       tags: [usage]
@@ -495,9 +511,75 @@ paths:
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
   /v1/jobs/{job_id}:
-    $ref: 'common.yaml#/components/pathItems/Job'
+    parameters:
+      - $ref: 'common.yaml#/components/parameters/JobId'
+    get:
+      x-jane-scope: [llm:admin, llm:invoke]
+      operationId: getJob
+      summary: Стан, прогрес і результат тривалої операції
+      tags: [jobs]
+      responses:
+        '200':
+          description: Поточний стан job.
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Job'
+              examples:
+                running:
+                  $ref: 'common.yaml#/components/examples/JobRunning'
+                failed:
+                  $ref: 'common.yaml#/components/examples/JobFailed'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
   /v1/jobs/{job_id}/cancel:
-    $ref: 'common.yaml#/components/pathItems/JobCancel'
+    parameters:
+      - $ref: 'common.yaml#/components/parameters/JobId'
+    post:
+      x-jane-scope: [llm:admin, llm:invoke]
+      operationId: cancelJob
+      summary: Запит на скасування job (ідемпотентний)
+      x-jane-no-idempotency-key: cancellation is idempotent by nature
+      description: |
+        202 — скасування прийнято, job переходить у `cancelling`, далі в `cancelled`.
+        200 — job уже в термінальному стані; повертається як є, без змін.
+        Повторний виклик безпечний, тому Idempotency-Key не потрібен.
+      tags: [jobs]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: 'common.yaml#/components/schemas/JobCancelRequest'
+            examples:
+              reason:
+                value:
+                  reason: wrong scope
+      responses:
+        '200':
+          description: Job уже завершено; стан не змінено.
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Job'
+              examples:
+                failed:
+                  $ref: 'common.yaml#/components/examples/JobFailed'
+        '202':
+          description: Скасування прийнято.
+          content:
+            application/json:
+              schema:
+                $ref: 'common.yaml#/components/schemas/Job'
+              examples:
+                cancelling:
+                  $ref: 'common.yaml#/components/examples/JobCancelling'
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
 components:
   securitySchemes:
     bearerAuth:

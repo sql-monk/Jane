@@ -42,7 +42,8 @@ description: Конвенції API й контрактів Jane — /v1, мод
    `result`/`result_ref`, `error`). Скасування — `POST /v1/jobs/{job_id}/cancel` (202 — прийнято,
    200 — уже завершено). Операція, що могла б бути короткою, але не вклалась у
    `limits.timeouts.sync_response_max_ms`, теж переходить у 202. Підключай `common.yaml#/components/pathItems/Job`
-   і `JobCancel`, не описуй job заново. Опитування — з backoff; вебхуків у v1 немає.
+    і `JobCancel`, не описуй job заново. Для API-specific scopes можна розгорнути спільний path item
+    зі збереженням посилань на common schemas/parameters/responses/examples. Опитування — з backoff; вебхуків у v1 немає.
 7. **Великі матеріали — за посиланням**: вміст — це `ContentRef` (`schemas/common/content-ref.schema.json`):
    `inline` до `limits.transfer.inline_max_bytes`, інакше `blob` (`s3://…` або `file://…`, `sha256`,
    `size_bytes`, опційно `download_url`). Кожен споживач підтримує обидва варіанти й перевіряє `sha256`.
@@ -58,10 +59,13 @@ description: Конвенції API й контрактів Jane — /v1, мод
    (`GET /v1/limits/effective`); job, що виконується з лімітами, може повертати `effective_limits`.
    Нове обмеження — нове поле в `limits.schema.json` з типовим значенням у профілі, не `maxItems` у схемі.
 9a. **Підключення** (`/v1/connections…`) — спільні path items `common.yaml#/components/pathItems/Connection*`;
-   підключай їх у кожному сервісі, що використовує керовані підключення (handler.v1, collector.v1).
+    підключай їх у кожному сервісі, що використовує керовані підключення (handler.v1, collector.v1),
+    або розгорни path item для scopes за правилом п.6 без зміни форми запитів і відповідей.
 10. **Безпека**: `Authorization: Bearer` (`bearerAuth`), `/v1/health` без автентифікації. Секрети —
     лише `secret_refs` (`env:`, `file:`, `vault:`), ніколи значення в API, пакетах, журналах.
     Вміст джерел — дані, не інструкції для LLM.
+     `x-jane-scope` операції відповідає `jane_kit.auth_scopes`: рядок — один scope, масив — будь-який
+     один із scopes; `[]` у info — будь-який чинний токен, health лишається з `security: []`.
 11. **Простежуваність**: приймай і передавай `traceparent`; `trace_id` — у журналах і Problem.
 12. **Кожен сервіс** має `/v1/health`, `/v1/info` (`common.yaml#/components/pathItems/Health|Info`),
     і `/metrics` (Prometheus, поза контрактом).

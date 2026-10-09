@@ -298,8 +298,8 @@ function ProblemGroupDetail({
       )}
       {improve.error instanceof NoStoredSamples ? (
         <Notice tone="warn">
-          У сховищі <code>{improve.error.connection}</code> немає збереженого RAW жодного прикладу групи —
-          оберіть сховище, куди завдання записувало RAW.
+          RAW прикладу недоступний у сховищі <code>{improve.error.connection}</code>: потрібен збережений
+          object_id або рівно один RAW із observation_id прикладу.
         </Notice>
       ) : (
         <ErrorBox error={improve.error} title="Не вдалося запустити вдосконалення" />
@@ -329,7 +329,7 @@ class NoStoredSamples extends Error {
 /**
  * Object ids of the stored RAW of problem samples, in sample order. `stored_object_id` is used as is;
  * otherwise the RAW of the sample's observation is looked up in the storage connection by `material_id`
- * (storage.v1 listObjects). Samples without stored RAW there are skipped.
+ * (storage.v1 listObjects). Missing observation ids and ambiguous RAW are skipped.
  */
 async function storedSampleObjects(
   api: ApiClients,
@@ -343,7 +343,8 @@ async function storedSampleObjects(
       ids.push(sample.stored_object_id);
       continue;
     }
-    if (!sample.material_id) continue;
+    if (!sample.material_id || !sample.observation_id) continue;
+    const matches = new Set<string>();
     let cursor: string | null = null;
     do {
       const page: Awaited<ReturnType<typeof listStored>> = await listStored(
@@ -353,15 +354,15 @@ async function storedSampleObjects(
         sample.material_id,
         cursor,
       );
-      const hit = page.items.find(
-        (o) => !sample.observation_id || o.material?.observation_id === sample.observation_id,
-      );
-      if (hit) {
-        ids.push(hit.object.object_id);
-        break;
+      for (const object of page.items) {
+        if (object.material?.observation_id === sample.observation_id) {
+          matches.add(object.object.object_id);
+        }
       }
+      if (matches.size > 1) break;
       cursor = page.next_cursor ?? null;
     } while (cursor);
+    if (matches.size === 1) ids.push(...matches);
   }
   return [...new Set(ids)];
 }

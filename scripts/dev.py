@@ -111,7 +111,7 @@ def cmd_sync(_: argparse.Namespace) -> int:
 def cmd_lint(_: argparse.Namespace) -> int:
     codes = [
         run(uv_run("ruff", "check", ".")).returncode,
-        run(uv_run("ruff", "format", "--check", ".")).returncode,
+        run(uv_run("ruff", "format", "--check", ".", "contracts/python")).returncode,
         run(uv_run("python", "scripts/contracts_lint.py")).returncode,
     ]
     return max(codes)
@@ -119,7 +119,7 @@ def cmd_lint(_: argparse.Namespace) -> int:
 
 def cmd_fmt(_: argparse.Namespace) -> int:
     run(uv_run("ruff", "check", "--fix", "."))
-    return run(uv_run("ruff", "format", ".")).returncode
+    return run(uv_run("ruff", "format", ".", "contracts/python")).returncode
 
 
 def cmd_types(_: argparse.Namespace) -> int:

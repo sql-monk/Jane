@@ -187,7 +187,9 @@ class StorageAdapter(Protocol):
 
     async def read_entity(self, entity_type: str, canonical_key: str) -> EntitySnapshot | None: ...
 
-    async def commit_entity(self, *, new: EntitySnapshot, expected_version: int | None, event: HistoryEvent) -> CommitResult:
+    async def commit_entity(
+        self, *, new: EntitySnapshot, expected_version: int | None, event: HistoryEvent
+    ) -> CommitResult:
         """Atomically: if (event.delivery_key, entity) already recorded → DUPLICATE; else if the stored
         version != expected_version (None = must not exist) → CONFLICT; else write ``new`` (whose
         version = expected_version + 1, or 1) and append ``event`` → COMMITTED. A stale-only update

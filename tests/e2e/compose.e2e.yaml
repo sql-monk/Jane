@@ -46,7 +46,7 @@ services:
       # (reprocessing of stored RAW, S-M2-07).
       - storage-data:/var/lib/jane/storage:ro
     environment:
-      JANE_HANDLER_RUNTIME_BLOB_ROOTS: '["/var/lib/jane/storage/objects"]'  # RAW objects only (WP-01h)
+      JANE_HANDLER_RUNTIME_BLOB_ROOTS: '["/var/lib/jane/storage/objects", "/var/lib/jane/storage/transit/storage"]'  # stored RAW and storage transit (WP-19)
       JANE_HANDLER_RUNTIME_PROFILE_IMAGES: '{"python-extractor@1": "${JANE_E2E_SANDBOX_IMAGE:?set by tests/e2e}"}'
       JANE_HANDLER_RUNTIME_SANDBOX_LABELS: '{"io.jane.e2e-project": "${JANE_E2E_PROJECT:-jane-e2e}"}'
       # Archives of orchestrated stages (no package_archive) come from the real registry (WP-05).

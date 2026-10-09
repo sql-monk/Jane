@@ -843,5 +843,25 @@ r1 → виправлення на `origin/wp/01g2-service-auth`, CI 37857870977
 - Беклог [M3/open-requests.md](M3/open-requests.md) виконується пакетами WP-15…21 (власність — `.claude/wp-paths.json`), кожен з незалежним wp-reviewer і contract-guardian (≤2 раунди; раунд 2 — перевірка координатором).
 - Злито в `codex/jane-integration`: п'ята черга потоку B `040fe6e` (R09–R11, R16, R28, R32-опис, R33); WP-18 `4d87516` (R27, R32-тест); WP-17 `539152d` (R01, R02, R05, R06, R14-storage, R19, R21, R25, rate_limited, test_summary); WP-15 `eff48bb` (R07, R08, R12, R13, R14-асистент, R24-API, R29, INSTANCE_ID); WP-16 `37a30e2` (R03, R04, R15, R20, R22, R23, R30). Повний CI [37884090704](https://github.com/sql-monk/Jane/actions/runs/37884090704) на `37a30e2` — success.
 - Злито: WP-21 `c6cccef` (e2e R-03 через `attempt_history`, S-M3-01/02, профілі, `errors.md`, закріплений oasdiff; CI [37905643300](https://github.com/sql-monk/Jane/actions/runs/37905643300)); WP-20 `7a38c21` (адмінка: R24-UI, R26, поля WP-15/17).
-- **Три потоки** ([post-m3/README.md](post-m3/README.md)): A — [WP-19](post-m3/stream-a-handoff.md) (R17, R18, дефекти storage; код на `wp/19-post-m3-shared-stores-contentref` `261b4dd`, бракує перевірок, рев'ю й злиття; передано Codex); B — Codex, [приймання й адмінка](post-m3/stream-b-handoff.md); C — Codex, [гігієна й документація](post-m3/stream-c-handoff.md).
+- **Три потоки** ([post-m3/README.md](post-m3/README.md)): A — [WP-19](WP-19.md) **accepted**, merge `ee78fc5` (R17 і files-транзит R18, дефекти storage; код `7a6904c`, звіт/CI `ff12c6a`); B — Codex, [приймання й адмінка](post-m3/stream-b-handoff.md); C — Codex, [гігієна й документація](post-m3/stream-c-handoff.md).
 - Прибирання worktree/гілок: 61 worktree знято з реєстрації, докази — у `.jane/archive/worktrees/`; решта — скрипт людини `.jane/cleanup-post-m3.ps1` (dry-run за замовчуванням, незлиті гілки → теги `archive/*`).
+
+### WP-19 — прийнято потоком A (2026-10-09)
+
+- Злиття [ee78fc5](https://github.com/sql-monk/Jane/commit/ee78fc5043382239d06bb73cbf4f1f64d038978d)
+  має точний маркер `merge: accept WP-19`. Виконавець завершив перевірки й [звіт](WP-19.md);
+  [незалежне R1](WP-19/review-r1.md) знайшло два дефекти ідемпотентності (fingerprint до TTL і token generation
+  того самого процесу), виправлення `7a6904c`; [R2](WP-19/review-r2.md) — **accepted**, 67 адресних тестів.
+  Третього раунду не було. [Guardian](WP-19/contracts-r2.md) — **compatible-with-actions**, shape 0 breaking/0 warnings.
+- [Повний branch CI 37929680616](https://github.com/sql-monk/Jane/actions/runs/37929680616) на `ff12c6a` —
+  **14/14 jobs success**, e2e **75 passed**, 0 skipped/xfailed/failed (`JANE_E2E_REQUIRED=1`),
+  повний stack **300 passed / 0 skipped**, gitleaks **no leaks found**. [Деталі й межі](WP-19/ci.md).
+  Profile ci: warn лише L1 single-gap jitter `0.013018131256103516 s < 0.015 s`; решта L1–L8 ok.
+- [R17/R18](M3/open-requests.md) закрито: R18 — **в межах files-транзиту**;
+  S3/MinIO-транзит і producer `download_url` поза погодженим обсягом.
+  Координатор після локального merge додав storage transit root до e2e overlay;
+  перший push маркера містить також цей рядок, щоб B-5 не дублював погоджену зміну.
+- B/C продовжують після маркера. Після їхнього фактичного завершення — один фінальний workflow_dispatch
+  на `codex/jane-integration`, тоді SHA людині для main. Цей фінальний run ще не запускали.
+  `main` і force push координатор A не виконував; власні стеки worker/reviewer прибрані,
+  сирі докази збережені також у `.jane` захищеного checkout `integ-a`.

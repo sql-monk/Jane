@@ -881,7 +881,13 @@ r1 → виправлення на `origin/wp/01g2-service-auth`, CI 37857870977
   A взяв запит власнику Telegram у **новий WP-19b**, `wp/19b-telegram-pagination-test`, окремий checkout.
   Код заморожено на `2e68cf7`, HEAD/звіт `b29a040`: old-fail (1 failed) / new-pass (1 passed)
   відтворено на двох реальних OS processes із першою сторінкою limit=1; threshold=12, timeout=20,
-  queue=10 і exactly-once=80 збережено. Незалежне R1 цього інкремента триває;
-  [автоматичний branch CI 37940359810](https://github.com/sql-monk/Jane/actions/runs/37940359810) ще in_progress.
-  **WP-19b ще не accepted.** Запит до C: фінальний CI виконати на SHA з прийнятим WP-19b,
-  щоб перевірити усунення зафіксованої гонки споживача. Оригінальний WP-19 лишається accepted.
+  queue=10 і exactly-once=80 збережено. [Незалежне R1](WP-19/telegram-pagination-review.md) — **accepted**,
+  один раунд нового інкремента; [branch CI 37940359810](https://github.com/sql-monk/Jane/actions/runs/37940359810)
+  — **success**, 7 jobs success, 4 skipped за правилами push; unit 1137 passed / 5 skipped, offline 93 passed,
+  gitleaks `no leaks found`. **WP-19b accepted**, merge `88ec1682ec4f7b2a0e6c13745707ddc73ad16122`.
+  [Звіт](WP-19/telegram-pagination-followup.md); Telegram owner request C-2 закрито цим інкрементом.
+  C може виконати свій фінальний CI на SHA з прийнятим WP-19b. Оригінальний WP-19 лишається accepted.
+
+- [Фінальний CI B 37937013460](https://github.com/sql-monk/Jane/actions/runs/37937013460) на `bb1982b` —
+  **14/14 jobs success**, e2e **79 passed**; B-1…B-5 accepted/merged. Цей SHA передує C-2.
+  A чекає окремого фінального CI C та C-4, після них — один підсумковий dispatch на актуальній integration.

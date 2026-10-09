@@ -2,7 +2,7 @@
 
 **Гілка:** `wp/19b-telegram-pagination-test` · **Ревізія коду:**
 `2e68cf7339e0bac9b70d1464336109d10f7c42a5` · **База / merge-base:**
-`57e621786943583d64a2c5da348aa6b70afee04e` · **Стан:** review.
+`57e621786943583d64a2c5da348aa6b70afee04e` · **Стан:** accepted.
 
 Це окремий інкремент для нового запиту з
 [stream-c.md](../post-m3/stream-c.md#c-2-завершення-branch-ci--failure).
@@ -146,3 +146,13 @@ Docker не потрібен цьому fixture й не запускався; ч
 і merge координатором. Прийняте первісне WP-19 не є предметом цього review;
 фінальний повний CI A лишається один після завершення B/C. Запит власнику Telegram виконано кодом цього інкремента,
 статус журналів потоків веде координатор.
+
+## Приймання координатором A
+
+Злиття `88ec1682ec4f7b2a0e6c13745707ddc73ad16122`, маркер `merge: accept WP-19b`.
+[Незалежне R1](telegram-pagination-review.md) — **accepted**, один раунд нового інкремента.
+[Автоматичний branch CI 37940359810](https://github.com/sql-monk/Jane/actions/runs/37940359810)
+на frozen `b29a0406645c6b846211cade14a2a5d9ae697e76` — **success**, 7 jobs success;
+4 jobs skipped за правилами push. Unit: 1137 passed / 5 skipped, окрема offline session: 93 passed;
+lint secret scan — `no leaks found`. Production і contracts незмінні.
+Первісний WP-19 не переглядався; повний фінальний CI A ще чекає завершення C й C-4.

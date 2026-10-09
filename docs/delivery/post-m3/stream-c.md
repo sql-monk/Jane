@@ -17,7 +17,7 @@ Checkout координатора для злиттів — `.claude/worktrees/i
 | Завдання | Гілка / worktree | Стан |
 |---|---|---|
 | C-1: CI й документація | `wp/23a-developer-docs`, `wp23a` | прийнято й запушено, merge `a5b1563` |
-| C-2: contracts/python у workspace | `wp/23b-contracts-workspace`, `wp23b` | active після WP-19 `ee78fc5`; окремий виконавець |
+| C-2: contracts/python у workspace | `wp/23b-contracts-workspace`, `wp23b` | прийнято й запушено, merge `fdad210`; фінальний CI очікується |
 | C-3: формат Python-контрактів | `wp/23c-contracts-format`, `wp23c` | прийнято й запушено, merge `0dc2ded` |
 | C-4: прибирання | `.jane/cleanup-post-m3.ps1` | останнім: після WP-19, завершення B і фінального CI C |
 
@@ -148,3 +148,55 @@ ContentRef transit`, вершина integration — `2d4a101`. Гейт C-2 ві
 фінальний dispatch C чекатиме завершення фінального CI B; C не створює нового run, поки B працює.
 Він перевірить свіжий integration SHA з усіма змінами C-2/C-3. A за своїм handoff запускає підсумковий
 CI після завершення B/C. Це зберігає один повний dispatch C і не змінює workflow чи обсяг перевірок.
+
+## C-2: accepted і злито
+
+Автор `c2_workspace`: код `3a70b939f8ca34321e2a369f0b86a839ee1a820e`, остаточний звіт/HEAD
+`22f83662efaac0a64a91a2bc9078b0bcec04a793`, чистий checkout `wp23b`, гілка запушена.
+Незалежний `c3_review` / wp-reviewer: **accepted**, раунд 1, для точного остаточного SHA.
+Після fresh fetch та `pull --ff-only` прийняте злиття
+`fdad2106c0fb6531639d1071d720a990a646b0b7` запушено в `codex/jane-integration`.
+Звіт із командами й обмеженнями — [c2-workspace.md](../WP-23/c2-workspace.md).
+
+`contracts/python` — 19-й член uv workspace; кореневе джерело
+`jane-contracts = { workspace = true }` успадковують усі вісім споживачів.
+Їхні локальні path-overrides вилучено. `members()` читає root manifest, mypy реально включає
+три файли Protocol-пакета. Версії та sources 109 зовнішніх пакетів незмінні.
+Вкладені адаптери не підтримують локальне workspace-джерело в uv 0.12.13; перевірене root inheritance
+обходить цю особливість без повернення jane-contracts до path-залежності.
+
+Справжні підсумки автора:
+
+```text
+uv lock --check: Resolved 109 packages; exit=0
+uv sync --all-packages --locked: 19 local packages; exit=0
+just types: 22 mypy sessions, 370 files; Protocol: 3 source files; exit=0
+just lint: All checks passed; 484 files already formatted; exit=0
+JANE_CONTRACTS_REDOCLY=1 just contract: Redocly ok; 109 passed, 3 skipped, 1 warning; exit=0
+pytest scripts/tests/test_dev.py: 32 passed; exit=0
+check-diff: 14 changed file(s), 0 outside ownership; exit=0
+```
+
+Рецензент незалежно виконав lock/check, locked sync, 32 dev-тести, mypy трьох Protocol-файлів,
+lint та ownership; усе exit 0. Він звірив фактичні Linux Docker build/import журнали
+storage, web-collector та llm: три збірки й три перевірки exit 0; storage містить точні шість
+adapter entry points, Protocol імпортується із site-packages. Dockerfile не змінені.
+`contracts/` не змінено, окремий contract-guardian не потрібен. Локальні full check/e2e не запускались.
+Сирі докази — `.jane/wp23b-*.txt` у `wp23b`; тимчасові Docker tags автора прибрано.
+
+Три contract skips: два потребують PostgreSQL dev-stack LLM, третій — контракту template service;
+наявний FastAPI warning `Duplicate Operation ID cancelJob` не приховано. Docker перевірено на трьох
+класах контексту, повний integration gate лишається CI. Зовнішні LLM/IdP/AWS/Telegram —
+не перевірено на реальному сервісі; профілі dev-laptop/single-node виключені.
+
+Запит власнику storage / WP-19: `services/storage/README.md:253` у рецепті нового адаптера має
+застарілий `jane-contracts = { path = "../../../../contracts/python", editable = true }`.
+Прибрати лише цей override, послатися на root source inheritance у DEVELOPMENT; path-джерело
+jane-storage зберегти. Чужий README не редагувався. Рецензент визнав це зовнішньою документальною
+дією, яка не блокує C-2 з явним запитом; копіювання старого рядка поверне workspace/path conflict.
+
+Branch CI [37936808211](https://github.com/sql-monk/Jane/actions/runs/37936808211)
+на `22f83662efaac0a64a91a2bc9078b0bcec04a793` ще in_progress при прийманні;
+contracts-compat/lint/web — success, unit/web-mock-e2e тривають. Це push CI, не фінальний dispatch.
+Потік B уже злив B-5 як `f0fde81` і записав intent свого фінального CI; C чекає його actual success.
+**Повний dispatch C: count 0; C-4 не починався, людський cleanup script не змінено й не виконано.**

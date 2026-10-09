@@ -25,6 +25,7 @@ import logging
 import secrets
 import time
 from collections.abc import Callable, Collection, Mapping, Sequence
+from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol
@@ -84,6 +85,12 @@ class AdapterProvider(Protocol):
         self, connection_id: str, adapter_kind: str, options: Mapping[str, Any]
     ) -> StorageAdapter:
         """Opened adapter for the connection (raises NotFound / ValidationFailed / AdapterError)."""
+        ...
+
+    def lease(
+        self, connection_id: str, adapter_kind: str, options: Mapping[str, Any]
+    ) -> AbstractAsyncContextManager[StorageAdapter]:
+        """The opened adapter held for a block: a changed connection does not close it under the work in progress."""
         ...
 
 
@@ -346,83 +353,89 @@ class StorageHandler:
         writes: list[dict[str, Any]] = []
         engine: StorageEngine | None = None
         try:
-            if not prep.test_mode:
-                assert prep.connection_id is not None
-                adapter = await self.adapters.adapter_for(
-                    prep.connection_id, prep.package.adapter, prep.options
-                )
-                engine = StorageEngine(
-                    adapter, connection_id=prep.connection_id, retries=self.retries, clock=self._clock
-                )
-            n_entity = n_raw = n_data = 0
-            for item in inv["inputs"]:
-                kind = item["kind"]
-                if kind == "material":
-                    material = item["material"]
-                    content = await self.content.read(material["content"])
-                    obj = build_raw_object(material, content, prep.raw_format)
-                    dk = object_delivery_key(delivery_key, n_raw, "raw")
-                    n_raw += 1
-                    if engine is None:
-                        writes.append(
-                            self._simulated(
-                                prep,
-                                dk,
-                                object={
-                                    "object_id": "obj_simulated",
-                                    "adapter": prep.package.adapter,
-                                    "media_type": obj.media_type,
-                                    "size_bytes": len(obj.content),
-                                    "sha256": obj.sha256,
-                                    "locator": {"object_key": obj.object_key},
-                                },
-                            )
-                        )
-                    else:
-                        writes.append(await engine.store_object(obj, dk))
-                elif kind == "entities":
-                    for record in await self._entities_of(item):
-                        dk = entity_delivery_key(delivery_key, n_entity)
-                        n_entity += 1
+            async with AsyncExitStack() as stack:
+                if not prep.test_mode:
+                    assert prep.connection_id is not None
+                    # held for the whole invocation: a concurrent PUT of the connection retires the adapter only after
+                    # the writes in progress finish on it
+                    adapter = await stack.enter_async_context(
+                        self.adapters.lease(prep.connection_id, prep.package.adapter, prep.options)
+                    )
+                    engine = StorageEngine(
+                        adapter, connection_id=prep.connection_id, retries=self.retries, clock=self._clock
+                    )
+                n_entity = n_raw = n_data = 0
+                for item in inv["inputs"]:
+                    kind = item["kind"]
+                    if kind == "material":
+                        material = item["material"]
+                        content = await self.content.read(material["content"])
+                        obj = build_raw_object(material, content, prep.raw_format)
+                        dk = object_delivery_key(delivery_key, n_raw, "raw")
+                        n_raw += 1
                         if engine is None:
-                            fields = sorted([*record["fields"], *(record.get("cleared") or ())])
                             writes.append(
                                 self._simulated(
                                     prep,
                                     dk,
-                                    entity={
-                                        "entity_type": record["entity_type"],
-                                        "canonical_key": canonical_key(record["key"]),
+                                    object={
+                                        "object_id": "obj_simulated",
+                                        "adapter": prep.package.adapter,
+                                        "media_type": obj.media_type,
+                                        "size_bytes": len(obj.content),
+                                        "sha256": obj.sha256,
+                                        "locator": {"object_key": obj.object_key},
                                     },
-                                    applied_fields=fields,
-                                    stale_fields=[],
                                 )
                             )
                         else:
-                            writes.append(await engine.store_entity(record, dk))
-                else:  # data
-                    data = await self._data_of(item)
-                    obj = build_data_object(
-                        data, delivery_key_digest=key_digest(delivery_key), index=n_data, source_id=source_id
-                    )
-                    dk = object_delivery_key(delivery_key, n_data, "data")
-                    n_data += 1
-                    if engine is None:
-                        writes.append(
-                            self._simulated(
-                                prep,
-                                dk,
-                                object={
-                                    "object_id": "obj_simulated",
-                                    "adapter": prep.package.adapter,
-                                    "media_type": obj.media_type,
-                                    "size_bytes": len(obj.content),
-                                    "sha256": obj.sha256,
-                                },
-                            )
+                            writes.append(await engine.store_object(obj, dk))
+                    elif kind == "entities":
+                        for record in await self._entities_of(item):
+                            dk = entity_delivery_key(delivery_key, n_entity)
+                            n_entity += 1
+                            if engine is None:
+                                fields = sorted([*record["fields"], *(record.get("cleared") or ())])
+                                writes.append(
+                                    self._simulated(
+                                        prep,
+                                        dk,
+                                        entity={
+                                            "entity_type": record["entity_type"],
+                                            "canonical_key": canonical_key(record["key"]),
+                                        },
+                                        applied_fields=fields,
+                                        stale_fields=[],
+                                    )
+                                )
+                            else:
+                                writes.append(await engine.store_entity(record, dk))
+                    else:  # data
+                        data = await self._data_of(item)
+                        obj = build_data_object(
+                            data,
+                            delivery_key_digest=key_digest(delivery_key),
+                            index=n_data,
+                            source_id=source_id,
                         )
-                    else:
-                        writes.append(await engine.store_object(obj, dk))
+                        dk = object_delivery_key(delivery_key, n_data, "data")
+                        n_data += 1
+                        if engine is None:
+                            writes.append(
+                                self._simulated(
+                                    prep,
+                                    dk,
+                                    object={
+                                        "object_id": "obj_simulated",
+                                        "adapter": prep.package.adapter,
+                                        "media_type": obj.media_type,
+                                        "size_bytes": len(obj.content),
+                                        "sha256": obj.sha256,
+                                    },
+                                )
+                            )
+                        else:
+                            writes.append(await engine.store_object(obj, dk))
         except AdapterError as exc:
             kind = "connection_error" if exc.retryable else "execution_error"
             log.warning("storage adapter failed", extra={"error": str(exc), "retryable": exc.retryable})

@@ -23,7 +23,7 @@ import logging
 import re
 from collections import OrderedDict
 from collections.abc import AsyncIterator, Mapping
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -507,16 +507,17 @@ def build_app(
                 "connection_id in the body must match the path",
                 errors=[FieldError(pointer="/connection_id", message="must match the path")],
             )
+        try:
+            current: str | None = registry.get(connection_id).etag
+        except NotFound:
+            current = None
         if_match = request.headers.get("if-match")
-        if if_match is not None:
-            try:
-                current = registry.get(connection_id).etag
-            except NotFound:
-                current = None
-            if if_match != "*" and if_match != current:
-                raise JaneError("ETag does not match", code="precondition_failed")
+        if if_match is not None and if_match != "*" and if_match != current:
+            raise JaneError("ETag does not match", code="precondition_failed")
         stored, created = registry.put(body)
-        await pool.forget(connection_id)
+        if stored.etag != current:
+            # a changed definition: new work opens a new adapter, work in progress finishes on the old one
+            await pool.forget(connection_id)
         return JSONResponse(
             connection_body(stored.document),
             status_code=201 if created else 200,
@@ -551,21 +552,25 @@ def build_app(
             out["message"] = f"secret(s) not resolvable in this executor: {missing}"
             return JSONResponse(out)
         try:
-            adapter = await pool.adapter_for(connection_id, stored.kind, {})
-            out["ok"] = await adapter.health()
+            async with pool.lease(connection_id, stored.kind, {}) as adapter:
+                out["ok"] = await adapter.health()
         except (AdapterError, JaneError) as exc:
             out["message"] = str(exc)[:1000]
         out["latency_ms"] = int((asyncio.get_running_loop().time() - started) * 1000)
         return JSONResponse(out)
 
     # ------------------------------------------------------------------ storage.v1
-    async def reader(connection_id: str) -> Any:
+    @asynccontextmanager
+    async def reader(connection_id: str) -> AsyncIterator[Any]:
+        """The connection's adapter held for one request (a concurrent PUT does not close it under the read)."""
         stored = registry.get(connection_id)
         registry.ensure_allowed(connection_id, parameter="connection_id")
-        try:
-            return await pool.adapter_for(connection_id, stored.kind, {})
-        except AdapterError as exc:
-            raise JaneError(str(exc), code="upstream_unavailable", retryable=exc.retryable) from exc
+        async with AsyncExitStack() as stack:
+            try:
+                adapter = await stack.enter_async_context(pool.lease(connection_id, stored.kind, {}))
+            except AdapterError as exc:
+                raise JaneError(str(exc), code="upstream_unavailable", retryable=exc.retryable) from exc
+            yield adapter
 
     async def call(coro: Any) -> Any:
         try:
@@ -587,21 +592,23 @@ def build_app(
         cursor: str | None = None,
         limit: int | None = Query(default=None, ge=1),
     ) -> JSONResponse:
-        adapter = await reader(connection_id)
-        if key is not None:
-            snap = await call(adapter.read_entity(entity_type, key))
-            items = [snap] if snap is not None and (scope is None or snap.key.get("scope") == scope) else []
-            return JSONResponse({"items": [entity_state(s) for s in items], "next_cursor": None})
-        page, next_cursor = await call(
-            adapter.list_entities(
-                entity_type,
-                scope=scope,
-                updated_since=updated_since,
-                cursor=cursor,
-                limit=clamp_limit(limit, limits.pages),
+        async with reader(connection_id) as adapter:
+            if key is not None:
+                snap = await call(adapter.read_entity(entity_type, key))
+                items = (
+                    [snap] if snap is not None and (scope is None or snap.key.get("scope") == scope) else []
+                )
+                return JSONResponse({"items": [entity_state(s) for s in items], "next_cursor": None})
+            page, next_cursor = await call(
+                adapter.list_entities(
+                    entity_type,
+                    scope=scope,
+                    updated_since=updated_since,
+                    cursor=cursor,
+                    limit=clamp_limit(limit, limits.pages),
+                )
             )
-        )
-        return JSONResponse({"items": [entity_state(s) for s in page], "next_cursor": next_cursor})
+            return JSONResponse({"items": [entity_state(s) for s in page], "next_cursor": next_cursor})
 
     @app.get("/v1/entity-history", tags=["entities"])
     async def list_history(
@@ -611,13 +618,13 @@ def build_app(
         cursor: str | None = None,
         limit: int | None = Query(default=None, ge=1),
     ) -> JSONResponse:
-        adapter = await reader(connection_id)
-        if await call(adapter.read_entity(entity_type, key)) is None:
-            raise NotFound(f"entity {entity_type} {key!r} not found")
-        page, next_cursor = await call(
-            adapter.list_history(entity_type, key, cursor=cursor, limit=clamp_limit(limit, limits.pages))
-        )
-        return JSONResponse({"items": [history_entry(e) for e in page], "next_cursor": next_cursor})
+        async with reader(connection_id) as adapter:
+            if await call(adapter.read_entity(entity_type, key)) is None:
+                raise NotFound(f"entity {entity_type} {key!r} not found")
+            page, next_cursor = await call(
+                adapter.list_history(entity_type, key, cursor=cursor, limit=clamp_limit(limit, limits.pages))
+            )
+            return JSONResponse({"items": [history_entry(e) for e in page], "next_cursor": next_cursor})
 
     def object_ref(rec: ObjectRecord, adapter_kind: str, connection_id: str) -> dict[str, Any]:
         return {
@@ -684,26 +691,26 @@ def build_app(
                 code="limit_exceeded",
                 errors=[FieldError(parameter="material_ids", message=f"at most {cap} values")],
             )
-        adapter = await reader(connection_id)
-        size = clamp_limit(limit, limits.pages)
-        filters = {"source_id": source_id, "since": since, "until": until}
-        if len(wanted) <= 1:
-            page, next_cursor = await call(
-                adapter.list_objects(
-                    material_id=wanted[0] if wanted else None, cursor=cursor, limit=size, **filters
+        async with reader(connection_id) as adapter:
+            size = clamp_limit(limit, limits.pages)
+            filters = {"source_id": source_id, "since": since, "until": until}
+            if len(wanted) <= 1:
+                page, next_cursor = await call(
+                    adapter.list_objects(
+                        material_id=wanted[0] if wanted else None, cursor=cursor, limit=size, **filters
+                    )
                 )
-            )
-        else:
-            page, next_cursor = await list_many(adapter, wanted, filters, cursor, size)
-        items = [
-            {
-                "object": object_ref(rec, adapter.kind, connection_id),
-                "material": material_summary(rec.metadata),
-                "stored_at": format_ts(rec.stored_at),
-            }
-            for rec in page
-        ]
-        return JSONResponse({"items": items, "next_cursor": next_cursor})
+            else:
+                page, next_cursor = await list_many(adapter, wanted, filters, cursor, size)
+            items = [
+                {
+                    "object": object_ref(rec, adapter.kind, connection_id),
+                    "material": material_summary(rec.metadata),
+                    "stored_at": format_ts(rec.stored_at),
+                }
+                for rec in page
+            ]
+            return JSONResponse({"items": items, "next_cursor": next_cursor})
 
     async def get_record(adapter: Any, object_id: str) -> ObjectRecord:
         rec: ObjectRecord | None = await call(adapter.get_object(object_id))
@@ -713,85 +720,89 @@ def build_app(
 
     @app.get("/v1/objects/{object_id}", tags=["objects"])
     async def get_object(object_id: str, connection_id: str) -> JSONResponse:
-        adapter = await reader(connection_id)
-        rec = await get_record(adapter, object_id)
-        out: dict[str, Any] = {
-            "object": object_ref(rec, adapter.kind, connection_id),
-            "stored_at": format_ts(rec.stored_at),
-        }
-        meta = dict(rec.metadata)
-        if "material_id" in meta and "fetched_at" in meta and isinstance(meta.get("content"), Mapping):
-            material = {k: v for k, v in meta.items() if k not in {"source_id", "stored_format", "format"}}
-            material["format"] = (
-                meta.get("format")
-                if isinstance(meta.get("format"), Mapping)
-                else {"media_type": rec.media_type}
-            )
-            content_uri = getattr(adapter, "content_uri", None)
-            uri = content_uri(rec) if callable(content_uri) else None
-            if meta.get("stored_format") == "json":
-                # The object is the JSON document of the Material (format.raw json, or the TZ §5 default for a
-                # RAW that is not a web page): its bytes are not the material's content. Restore the original
-                # content embedded in the document; there is no persistent URI of those bytes.
-                original = _embedded_content(await call(adapter.read_object_content(object_id)))
-                if original is not None and len(original[0]) <= limits.transfer.inline_max_bytes:
-                    data, media_type = original
+        async with reader(connection_id) as adapter:
+            rec = await get_record(adapter, object_id)
+            out: dict[str, Any] = {
+                "object": object_ref(rec, adapter.kind, connection_id),
+                "stored_at": format_ts(rec.stored_at),
+            }
+            meta = dict(rec.metadata)
+            if "material_id" in meta and "fetched_at" in meta and isinstance(meta.get("content"), Mapping):
+                material = {
+                    k: v for k, v in meta.items() if k not in {"source_id", "stored_format", "format"}
+                }
+                material["format"] = (
+                    meta.get("format")
+                    if isinstance(meta.get("format"), Mapping)
+                    else {"media_type": rec.media_type}
+                )
+                content_uri = getattr(adapter, "content_uri", None)
+                uri = content_uri(rec) if callable(content_uri) else None
+                if meta.get("stored_format") == "json":
+                    # The object is the JSON document of the Material (format.raw json, or the TZ §5 default for a
+                    # RAW that is not a web page): its bytes are not the material's content. Restore the original
+                    # content embedded in the document; there is no persistent URI of those bytes.
+                    original = _embedded_content(await call(adapter.read_object_content(object_id)))
+                    if original is not None and len(original[0]) <= limits.transfer.inline_max_bytes:
+                        data, media_type = original
+                        material["content"] = {
+                            "kind": "inline",
+                            "media_type": media_type
+                            or material["format"].get("media_type")
+                            or rec.media_type,
+                            **_inline(data),
+                            "size_bytes": len(data),
+                            "sha256": hashlib.sha256(data).hexdigest(),
+                        }
+                    else:
+                        material = {}
+                elif uri is not None:
+                    material["content"] = {
+                        "kind": "blob",
+                        "uri": uri,
+                        "media_type": rec.media_type,
+                        "size_bytes": rec.size_bytes,
+                        "sha256": rec.sha256,
+                        "store": "persistent",
+                        "expires_at": None,
+                    }
+                elif rec.size_bytes <= limits.transfer.inline_max_bytes:
+                    data = await call(adapter.read_object_content(object_id))
                     material["content"] = {
                         "kind": "inline",
-                        "media_type": media_type or material["format"].get("media_type") or rec.media_type,
+                        "media_type": rec.media_type,
                         **_inline(data),
-                        "size_bytes": len(data),
-                        "sha256": hashlib.sha256(data).hexdigest(),
+                        "size_bytes": rec.size_bytes,
+                        "sha256": rec.sha256,
                     }
                 else:
                     material = {}
-            elif uri is not None:
-                material["content"] = {
-                    "kind": "blob",
-                    "uri": uri,
-                    "media_type": rec.media_type,
-                    "size_bytes": rec.size_bytes,
-                    "sha256": rec.sha256,
-                    "store": "persistent",
-                    "expires_at": None,
-                }
-            elif rec.size_bytes <= limits.transfer.inline_max_bytes:
-                data = await call(adapter.read_object_content(object_id))
-                material["content"] = {
-                    "kind": "inline",
-                    "media_type": rec.media_type,
-                    **_inline(data),
-                    "size_bytes": rec.size_bytes,
-                    "sha256": rec.sha256,
-                }
-            else:
-                material = {}
-            if material:
-                out["material"] = material
-        return JSONResponse(out)
+                if material:
+                    out["material"] = material
+            return JSONResponse(out)
 
     @app.get("/v1/objects/{object_id}/content", tags=["objects"])
     async def get_object_content(object_id: str, connection_id: str, request: Request) -> Response:
-        adapter = await reader(connection_id)
-        rec = await get_record(adapter, object_id)
-        data: bytes = await call(adapter.read_object_content(object_id))
-        rng = request.headers.get("range")
-        if rng and (m := re.fullmatch(r"bytes=(\d*)-(\d*)", rng.strip())):
-            start_s, end_s = m.groups()
-            if start_s:
-                start, end = int(start_s), int(end_s) if end_s else len(data) - 1
-            else:
-                start, end = max(0, len(data) - int(end_s or 0)), len(data) - 1
-            end = min(end, len(data) - 1)
-            if start > end:
-                return Response(status_code=416, headers={"Content-Range": f"bytes */{len(data)}"})
-            return Response(
-                data[start : end + 1],
-                status_code=206,
-                media_type=rec.media_type,
-                headers={"Content-Range": f"bytes {start}-{end}/{len(data)}", "Accept-Ranges": "bytes"},
-            )
-        return Response(data, media_type=rec.media_type, headers={"Accept-Ranges": "bytes"})
+        async with reader(connection_id) as adapter:
+            rec = await get_record(adapter, object_id)
+            data: bytes = await call(adapter.read_object_content(object_id))
+            rng = request.headers.get("range")
+            if rng and (m := re.fullmatch(r"bytes=(\d*)-(\d*)", rng.strip())):
+                start_s, end_s = m.groups()
+                if start_s:
+                    start, end = int(start_s), int(end_s) if end_s else len(data) - 1
+                else:
+                    start, end = max(0, len(data) - int(end_s or 0)), len(data) - 1
+                end = min(end, len(data) - 1)
+                if start > end:
+                    return Response(status_code=416, headers={"Content-Range": f"bytes */{len(data)}"})
+                return Response(
+                    data[start : end + 1],
+                    status_code=206,
+                    media_type=rec.media_type,
+                    headers={"Content-Range": f"bytes {start}-{end}/{len(data)}", "Accept-Ranges": "bytes"},
+                )
+            return Response(data, media_type=rec.media_type, headers={"Accept-Ranges": "bytes"})
 
     return app
 

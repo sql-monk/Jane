@@ -21,7 +21,9 @@ A request cancelled while it waits (for a slot or for its turn) leaves no trace 
 The state of a host is dropped once no session uses it, nothing is in flight or waiting and its last interval
 has passed: when a session closes and every ``collector.host_state_prune_interval_seconds``.
 
-The limits are per process: instances of the service do not coordinate them (README, "Ліміти").
+Instances that share the state store (one node, one ``STATE_DIR``) coordinate the same limits through it
+(:class:`~.shared_hosts.SharedHosts`, R15): a request holding a slot of the process also takes a slot of the
+platform and reserves its start in the shared schedule, so the host sees one polite client in total.
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .settings import ServiceLimits
+from .shared_hosts import SharedHosts
 
 __all__ = ["HostLimiter", "HostSession"]
 
@@ -95,10 +98,12 @@ class _Host:
 class HostLimiter:
     """Per-host limits of one service process (see the module docstring)."""
 
-    def __init__(self, limits: ServiceLimits) -> None:
+    def __init__(self, limits: ServiceLimits, shared: SharedHosts | None = None) -> None:
         """``limits`` are the service's own (platform) limits; only housekeeping is read from them, the
-        per-host limits come with every session."""
+        per-host limits come with every session. ``shared``: coordination with the other instances that share
+        the state store (``None``: this process only)."""
         self.prune_interval = float(limits.collector.host_state_prune_interval_seconds)
+        self.shared = shared
         self._hosts: dict[str, _Host] = {}
         self._pruned_at = time.monotonic()
 
@@ -147,6 +152,8 @@ class HostLimiter:
         """The source asked to slow down (``Retry-After``): no request to this host from anyone before that."""
         state = self._host(host)
         state.not_before = max(state.not_before, time.monotonic() + seconds)
+        if self.shared is not None:
+            self.shared.push_back(host, seconds)
 
     def _leave(self, session: HostSession, host: str) -> None:
         state = self._hosts.get(host)
@@ -154,6 +161,8 @@ class HostLimiter:
             return
         state.users.pop(session, None)
         state.wake()
+        if not state.users and self.shared is not None:
+            self.shared.leave(host)  # no session of this process uses the host: its limits stop counting
         if state.idle(time.monotonic()):
             del self._hosts[host]
 
@@ -198,15 +207,23 @@ class HostSession:
             finally:
                 state.waiters.remove(waiter)
         state.in_flight += 1
+        token: str | None = None
         try:
-            await self._wait_turn(state)
+            token = await self._wait_turn(state, host)
             yield
         finally:
+            if token is not None and self.limiter.shared is not None:
+                self.limiter.shared.release(host, token)
             state.in_flight -= 1
             state.wake()
 
-    async def _wait_turn(self, state: _Host) -> None:
-        # Nothing is reserved ahead: a request cancelled while it waits leaves no trace in the schedule.
+    async def _wait_turn(self, state: _Host, host: str) -> str | None:
+        """Wait for the start the process allows, then (with :class:`~.shared_hosts.SharedHosts`) for a slot and a
+        start of the platform; returns the platform slot token, if any.
+
+        Nothing is reserved ahead in the process: a request cancelled while it waits leaves no trace in its
+        schedule. The platform slot is taken only after the process' own interval has passed, so an instance does
+        not hold it while it waits - other instances get their turn (FIFO across instances)."""
         async with state.turn:
             planned = state.next_start()
             while (now := time.monotonic()) < planned:
@@ -215,8 +232,14 @@ class HostSession:
                 if required <= planned:
                     break
                 planned = required
+            token = None
+            if self.limiter.shared is not None:
+                token = await self.limiter.shared.start(
+                    host, interval=state.interval(), parallel=state.parallel()
+                )
             state.last_start = max(planned, time.monotonic())
             state.free_at = state.last_start + state.interval()
+            return token
 
     def push_back(self, host: str, seconds: float) -> None:
         self.limiter.push_back(host, seconds)

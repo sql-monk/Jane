@@ -61,7 +61,7 @@ def test_history_is_collected_as_valid_materials(
     assert first["revision"] == {
         "content_sha256": first["content"]["sha256"],
         "source_revision": str(int(T0.timestamp())),
-        "sequence": int(T0.timestamp()),
+        "sequence": int(T0.timestamp()) * 1000,  # epoch seconds x 1000 + revision within the second
         "is_edit": False,
     }
     assert first["discovery"] == {"strategy": "telegram_history"}
@@ -124,7 +124,8 @@ def test_edit_is_a_new_revision_and_repeated_delivery_is_not(client: TestClient,
     assert edited["material_id"] == original["material_id"]
     assert edited["observation_id"] != original["observation_id"]
     assert edited["revision"]["is_edit"] is True
-    assert edited["revision"]["sequence"] == int(edit_date.timestamp())
+    assert edited["revision"]["sequence"] == int(edit_date.timestamp()) * 1000
+    assert edited["revision"]["source_revision"] == str(int(edit_date.timestamp()))
     assert edited["revision"]["sequence"] > original["revision"]["sequence"]
     assert edited["revision"]["content_sha256"] != original["revision"]["content_sha256"]
     assert edited["edited_at"] == "2026-09-02T10:00:00Z"
@@ -141,10 +142,22 @@ def test_edit_is_a_new_revision_and_repeated_delivery_is_not(client: TestClient,
     view, items = collect(client, mode="incremental")
     assert items == [] and view["stats"]["duplicates"] == 1
 
-    # a second edit within the same second but with other text is still a new revision
+    # a second edit within the same second but with other text is still a new revision, and its sequence is
+    # strictly larger although Telegram's edit_date (seconds) is the same (R04)
     channel.edit(7, "Event 7: moved to 21:00", edit_date=edit_date)
     view, items = collect(client, mode="incremental")
     assert [m["content"]["data"] for m in items] == ["Event 7: moved to 21:00"]
+    second = items[0]["revision"]
+    assert second["source_revision"] == edited["revision"]["source_revision"]
+    assert second["sequence"] == edited["revision"]["sequence"] + 1
+
+    # a third one in the same second: +1 again; its repeated delivery is a duplicate with the same sequence
+    channel.edit(7, "Event 7: moved to 22:00", edit_date=edit_date)
+    _, items = collect(client, mode="incremental")
+    assert [m["revision"]["sequence"] for m in items] == [second["sequence"] + 1]
+    channel.redeliver(7)
+    view, items = collect(client, mode="incremental")
+    assert items == [] and view["stats"]["duplicates"] == 1
 
 
 def test_technical_redelivery_keeps_the_observation(client: TestClient, channel: Recording) -> None:
@@ -223,6 +236,7 @@ def test_budget_stops_the_run_and_the_next_run_continues(client: TestClient, cha
     assert len(items) == 10
     job = client.get(f"/v1/jobs/{cid}").json()
     assert job["result"]["stopped_by"] == "telegram.max_messages_per_run"
+    assert "pts" not in client.get("/v1/states/b").json()["cursors"][CHANNEL_ID]  # history not finished
     ids: list[int] = [m["locator"]["telegram"]["message_id"] for m in items]
     for _ in range(2):
         cid = start(
@@ -235,8 +249,13 @@ def test_budget_stops_the_run_and_the_next_run_continues(client: TestClient, cha
                 "limits": limits,
             },
         )
-        ids += [m["locator"]["telegram"]["message_id"] for m in drain(client, cid)]
+        more = drain(client, cid)
+        ids += [m["locator"]["telegram"]["message_id"] for m in more]
+        # the rest of the history is read from the history, and says so (R30)
+        assert {m["discovery"]["strategy"] for m in more} == {"telegram_history"}
+        assert wait_done(client, cid)["stats"]["by_strategy"] == {"telegram_history": len(more)}
     assert ids == list(range(1, 26))
+    assert client.get("/v1/states/b").json()["cursors"][CHANNEL_ID]["pts"] == 25
 
 
 def test_backpressure_limit_from_the_request(client: TestClient, channel: Recording) -> None:
@@ -317,6 +336,10 @@ def test_one_shot_fetch(
         "/v1/fetches",
         json={"source_kind": "telegram", "telegram": {"channel_username": USERNAME, "message_id": 999}},
     )
-    assert missing.status_code == 502 and missing.json()["details"]["reason"] == "message_not_found"
+    # the source says there is no such message: 404 not_found, not retryable (R04)
+    assert missing.status_code == 404, missing.text
+    assert missing.json()["code"] == "not_found" and missing.json()["retryable"] is False
+    assert missing.json()["details"]["reason"] == "message_not_found"
+    assert m["revision"]["sequence"] == int(m["revision"]["source_revision"]) * 1000
     web = client.post("/v1/fetches", json={"source_kind": "web", "url": "https://example.test/"})
     assert web.status_code == 422

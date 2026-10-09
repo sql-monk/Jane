@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 import pytest
@@ -14,6 +18,35 @@ from jane_web_collector.testing import FAST_LIMITS, REPO_ROOT, Site, wait_timeou
 pytestmark = pytest.mark.contract
 
 SPEC = OpenAPISpec.load(REPO_ROOT / "contracts" / "openapi" / "collector.v1.yaml")
+
+
+@contextmanager
+def _failing_site() -> Iterator[str]:
+    """A site whose robots.txt allows everything and whose every page answers 500 (a source error)."""
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+        def do_GET(self) -> None:
+            ok = self.path == "/robots.txt"
+            body = b"User-agent: *\nAllow: /\n" if ok else b"internal error"
+            self.send_response(200 if ok else 500)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.daemon_threads = True
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
 
 
 def _wait_paused(client: TestClient, cid: str) -> dict[str, Any]:
@@ -35,7 +68,7 @@ def test_every_operation_matches_the_contract(
     api.get("/v1/health")
     api.get("/v1/info")
 
-    # fetch: 200, 403 (robots), 422 (out of scope), 502 (source error), 400 (bad JSON)
+    # fetch: 200, 403 (robots), 422 (out of scope), 404 (the site has no such page), 400 (bad JSON)
     assert api.post("/v1/fetches", json={"source_kind": "web", "url": site.url("/about")}).status_code == 200
     assert (
         api.post("/v1/fetches", json={"source_kind": "web", "url": site.url("/private/x")}).status_code == 403
@@ -45,10 +78,15 @@ def test_every_operation_matches_the_contract(
         "/v1/fetches", json={"source_kind": "web", "url": "https://elsewhere.example.org/", "rules": rules}
     )
     assert out.status_code == 422 and out.json()["code"] == "out_of_scope"
-    assert (
-        api.post("/v1/fetches", json={"source_kind": "web", "url": site.url("/missing-page")}).status_code
-        == 502
-    )
+    missing = api.post("/v1/fetches", json={"source_kind": "web", "url": site.url("/missing-page")})
+    assert missing.status_code == 404 and missing.json()["details"] == {"http_status": 404}
+    # 502: the source still answers 5xx after the retries (review 1 of WP-16)
+    once = {"retries": {"max_attempts": 2, "initial_backoff_ms": 0, "max_backoff_ms": 0}}
+    with _failing_site() as failing:
+        boom = api.post("/v1/fetches", json={"source_kind": "web", "url": failing + "/boom", "limits": once})
+    assert boom.status_code == 502, boom.text
+    assert boom.json()["code"] == "source_unavailable" and boom.json()["retryable"] is True
+    assert boom.json()["details"] == {"http_status": 500, "attempts": 2}
     bad = api.request("POST", "/v1/fetches", content=b"{", headers={"content-type": "application/json"})
     assert bad.status_code == 400
 

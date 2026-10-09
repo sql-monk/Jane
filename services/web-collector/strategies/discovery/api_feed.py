@@ -15,9 +15,17 @@ non-2xx or non-JSON page, and at the pagination depth: page N counts as N-1 step
 items as N, so pages are followed while their items fit into ``crawl.max_depth`` of the strategy. API pages are
 navigation documents read in ``seeds()`` through ``ctx.fetch`` (re-read after a restart; the core dedups).
 
-Not supported by the collector core in v1 (the collection fails with a clear message instead of silently
-collecting something else): ``method: POST`` (``DiscoveryContext.fetch`` performs GET only) and
-``emit_items_as_materials: true`` (a strategy can only propose URLs, it cannot emit a Material itself).
+R22 (``DiscoveryContext`` 1.1):
+
+* ``method: POST`` - every API page is requested with POST and ``body`` as JSON (``Content-Type:
+  application/json``); pagination parameters (``cursor_param``, ``page_param``) stay query parameters of the
+  URL, ``next_url`` gives the next URL, and the same ``body`` is sent to every page. The query must be read-only:
+  the core retries it like a GET;
+* ``emit_items_as_materials: true`` - every item becomes a Material itself (``application/json``, the item
+  serialized as JSON) through ``ctx.emit_material``: ``material_id`` from the item's ``url_path`` URL (the same
+  object as the page at that URL), ``edited_at`` from ``lastmod_path``, ``discovery.parent_url`` - the API page.
+  The item URLs are not fetched; the core claims them in the collection, so no other strategy fetches the same
+  URL in that collection. Without the option the items' URLs are proposed to the core as before.
 """
 
 from __future__ import annotations
@@ -26,7 +34,7 @@ import json
 from collections.abc import AsyncIterator, Mapping
 from typing import Any, ClassVar
 
-from jane_contracts.discovery import DiscoveredUrl, DiscoveryContext, FetchedResource
+from jane_contracts.discovery import DiscoveredMaterial, DiscoveredUrl, DiscoveryContext, FetchedResource
 
 from ._common import (
     BudgetExhausted,
@@ -45,7 +53,7 @@ __all__ = ["ApiFeedStrategy", "UnsupportedConfig"]
 
 
 class UnsupportedConfig(ValueError):
-    """Valid by the schema, but not executable by this collector (see the module docstring)."""
+    """Valid by the schema, but not executable by this collector."""
 
 
 def _as_page_number(value: str | None, default: int = 1) -> int:
@@ -61,15 +69,11 @@ class ApiFeedStrategy:
     def __init__(self, config: Mapping[str, Any], strategy_id: str) -> None:
         self.config = config
         self.strategy_id = strategy_id
-        if str(config.get("method", "GET")).upper() != "GET":
-            raise UnsupportedConfig(
-                "api_feed: method POST is not supported by this collector (DiscoveryContext.fetch performs GET only)"
-            )
-        if config.get("emit_items_as_materials"):
-            raise UnsupportedConfig(
-                "api_feed: emit_items_as_materials is not supported by this collector "
-                "(a discovery strategy can propose URLs only, not emit Materials)"
-            )
+        self.method = str(config.get("method", "GET")).upper()
+        if self.method not in {"GET", "POST"}:
+            raise UnsupportedConfig(f"api_feed: method {self.method} is not supported (GET or POST)")
+        self.body: Any = config.get("body")
+        self.emit_items = bool(config.get("emit_items_as_materials", False))
         self.url: str = str(config["url"])
         self.items_path = JsonPath(str(config["items_path"]))
         self.url_path = JsonPath(str(config["url_path"]))
@@ -146,7 +150,7 @@ class ApiFeedStrategy:
             if normalized is None or normalized in pages_seen:
                 return
             pages_seen.add(normalized)
-            resource = await fetch_document(ctx, normalized)
+            resource = await fetch_document(ctx, normalized, method=self.method, body=self.body)
             if resource is None or not is_success(resource):
                 return
             document = self._json(ctx, resource, max_bytes)
@@ -173,6 +177,20 @@ class ApiFeedStrategy:
                 new += 1
                 bump(self.stats, "items")
                 lastmod = parse_datetime(self.lastmod_path.first(item)) if self.lastmod_path else None
+                if self.emit_items:
+                    emitted = await ctx.emit_material(
+                        DiscoveredMaterial(
+                            url=target,
+                            strategy_id=self.strategy_id,
+                            body=json.dumps(item, ensure_ascii=False, separators=(",", ":")).encode("utf-8"),
+                            fetched_at=resource.fetched_at,
+                            depth=step + 1,
+                            parent_url=resource.final_url,
+                            lastmod=lastmod,
+                        )
+                    )
+                    bump(self.stats, "items_emitted" if emitted else "items_not_emitted")
+                    continue
                 yield DiscoveredUrl(
                     url=target,
                     strategy_id=self.strategy_id,

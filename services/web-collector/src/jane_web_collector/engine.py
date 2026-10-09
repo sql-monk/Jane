@@ -16,7 +16,7 @@ from jane_kit.jobs import Job, JobCancelledError, JobContext, JobRunner, JobStat
 
 from . import __version__
 from .connections import auth_headers
-from .crawler import CrawlRun, LeaseLost, RunDeps, new_stats
+from .crawler import NOT_FOUND_STATUSES, CrawlRun, LeaseLost, RunDeps, new_stats
 from .discovery.links import html_meta, is_html, parse_html
 from .discovery.registry import RESERVED_TYPES, Registry
 from .fetcher import Fetcher, FetchError, build_client
@@ -24,7 +24,8 @@ from .host_limits import HostLimiter
 from .materials import Delivery, MaterialTooLarge, TransitStore, build_material, new_observation_id, rfc3339
 from .robots import RobotsCache
 from .rules import ContractSchemas, RulesLoader, validate_rules
-from .settings import ServiceLimits, Settings, platform_layers, to_contract, translate_layer
+from .settings import ServiceLimits, Settings, contract_layer, platform_layers, to_contract
+from .shared_hosts import SharedHosts, check_ttl
 from .state import StateStore
 from .urls import Normalizer, Scope
 
@@ -71,8 +72,20 @@ class Engine:
             extra={"deny_link_local": egress.deny_link_local, "deny_private": egress.deny_private},
         )
         self.client = build_client(self.limits, egress)
-        # one per-host schedule for every collection and one-shot fetch of this process (WP-02c)
-        self.host_limiter = HostLimiter(self.limits)
+        # one per-host schedule for every collection and one-shot fetch of this process (WP-02c), shared with the
+        # other instances of the same state store (R15)
+        collector = self.limits.collector
+        shared = None
+        if collector.shared_host_limits:
+            # a renewal that waited one full lock wait must come before the TTL runs out (fails the start)
+            check_ttl(float(collector.shared_host_ttl_seconds), settings.state_busy_timeout_ms)
+            shared = SharedHosts(
+                state,
+                settings.instance_id,
+                poll_s=collector.shared_host_poll_ms / 1000,
+                ttl_s=float(collector.shared_host_ttl_seconds),
+            )
+        self.host_limiter = HostLimiter(self.limits, shared)
         self.deps = RunDeps(
             state=state,
             registry=registry,
@@ -105,9 +118,7 @@ class Engine:
             layers.append(LimitLayer("request", request, name="request"))
         layers.extend(extra)
         try:
-            return resolve_limits(
-                ServiceLimits, *self.platform, *(translate_layer(la, contract_only=True) for la in layers)
-            )
+            return resolve_limits(ServiceLimits, *self.platform, *(contract_layer(la) for la in layers))
         except LimitError as exc:
             raise ValidationFailed(f"invalid limits: {exc}") from exc
 
@@ -124,6 +135,8 @@ class Engine:
         await self.runner.shutdown()
         for cid in list(self.local):
             self.state.release(cid, self.settings.instance_id)
+        if self.host_limiter.shared is not None:
+            await self.host_limiter.shared.aclose()
         await self.client.aclose()
 
     async def _resume_loop(self) -> None:
@@ -174,6 +187,8 @@ class Engine:
         if self.transit is not None:
             self.transit.cleanup(self.limits.transfer.transit_ttl_seconds)
         self.host_limiter.prune()
+        if self.host_limiter.shared is not None:
+            self.state.host_prune()
 
     # ------------------------------------------------------------------ validation
     def _schema_errors(self, component: str, payload: Any) -> None:
@@ -442,6 +457,13 @@ class Engine:
             ) from exc
         finally:
             host_session.close()
+        if result.status in NOT_FOUND_STATUSES:
+            # the site says the page does not exist: 404 not_found (collector.v1, R04), as in /errors of a collection
+            raise JaneError(
+                f"source returned HTTP {result.status}",
+                code="not_found",
+                details={"http_status": result.status},
+            )
         if result.status >= 400:
             raise JaneError(
                 f"source returned HTTP {result.status}",

@@ -80,16 +80,21 @@ def is_success(resource: FetchedResource) -> bool:
     return 200 <= resource.status < 300
 
 
-async def fetch_document(ctx: DiscoveryContext, url: str) -> FetchedResource | None:
+async def fetch_document(
+    ctx: DiscoveryContext, url: str, *, method: str = "GET", body: Any = None
+) -> FetchedResource | None:
     """Fetch a navigation document through the core, always with a body (``conditional=False``).
 
     Navigation documents (sitemaps, feeds, API pages) are re-read on every run: only the materials they
     list go through the revisit rules of the core. ``None``: already fetched in this process, or the fetch
-    failed (the core records the error). Policy refusals of one URL are skipped; an exhausted budget raises
-    :class:`BudgetExhausted` so the strategy stops.
+    failed (the core records the error). Policy refusals of one URL are skipped; an exhausted budget or a
+    source that asks to wait too long raises :class:`BudgetExhausted` so the strategy stops. ``method="POST"``
+    sends ``body`` as JSON (API queries, ``DiscoveryContext`` 1.1).
     """
     try:
-        return await ctx.fetch(url, kind="navigation", conditional=False)
+        if method == "GET":
+            return await ctx.fetch(url, kind="navigation", conditional=False)
+        return await ctx.fetch(url, kind="navigation", conditional=False, method="POST", body=body)
     except FetchRejected as exc:
         if exc.code in {"limit_exceeded", "rate_limited"}:
             raise BudgetExhausted(f"{exc.code}: {exc}") from exc

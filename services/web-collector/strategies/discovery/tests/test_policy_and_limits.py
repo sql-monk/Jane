@@ -169,26 +169,11 @@ def test_incremental_run_rereads_navigation_documents_only(
     ],
     ids=["post", "json-materials", "both"],
 )
-def test_schema_valid_api_feed_options_are_rejected_before_job(
+def test_schema_valid_api_feed_options_are_supported(
     client: TestClient, site: Site, options: dict[str, Any], pointers: list[str]
 ) -> None:
+    """Since WP-16 (R22) the core executes POST and JSON items (``test_post_m3.py``): no early 422 any more."""
     strategy = {**api(site), **options}
     rules = web_rules(site, strategies=[strategy])
     report = client.post("/v1/rules/validations", json=rules).json()
-    assert report["valid"] is True and report["supported"] is False, report
-    assert report["errors"] == []
-    assert [(w["pointer"], w["code"]) for w in report["warnings"]] == [
-        (pointer, "unsupported_strategy") for pointer in pointers
-    ]
-    response = client.post(
-        "/v1/collections",
-        json={"source_kind": "web", "rules": rules, "limits": FAST_LIMITS},
-        headers={"Idempotency-Key": "api-feed-unsupported"},
-    )
-    assert response.status_code == 422, response.text
-    problem = response.json()
-    assert problem["code"] == "validation_failed"
-    assert [(e["pointer"], e["code"]) for e in problem["errors"]] == [
-        ("/rules" + pointer, "unsupported_strategy") for pointer in pointers
-    ]
-    assert site.requests == {}
+    assert report == {"valid": True, "supported": True, "errors": [], "warnings": []}, (pointers, report)

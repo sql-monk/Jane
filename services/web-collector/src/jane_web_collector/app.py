@@ -10,7 +10,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import re
+import sqlite3
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -21,7 +23,7 @@ from fastapi import FastAPI, Header, Query, Request, Response
 from fastapi.responses import JSONResponse
 
 from jane_kit.auth_scopes import COLLECTOR
-from jane_kit.errors import FieldError, JaneError, NotFound, ValidationFailed
+from jane_kit.errors import FieldError, JaneError, NotFound, ValidationFailed, problem_response
 from jane_kit.idempotency import StoredResponse, idempotent
 from jane_kit.jobs import JobRunner, jobs_router
 from jane_kit.pagination import clamp_limit, decode_cursor, encode_cursor
@@ -56,6 +58,12 @@ def _parse_after(after: str | None) -> int | None:
             "invalid cursor", errors=[FieldError(parameter="after", message="invalid cursor")]
         )
     return int(m.group(1))
+
+
+def state_store_busy(exc: BaseException) -> bool:
+    """SQLite could not take its lock within ``STATE_BUSY_TIMEOUT_MS`` (another instance holds it)."""
+    text = str(exc).lower()
+    return isinstance(exc, sqlite3.OperationalError) and ("locked" in text or "busy" in text)
 
 
 def build_app(settings: Settings | None = None) -> FastAPI:
@@ -104,6 +112,23 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         return "ok", None
 
     app.state.health.add("state_store", state_check)
+
+    # Retry-After of a busy state store: one full lock wait (JANE_WEB_COLLECTOR_STATE_BUSY_TIMEOUT_MS)
+    busy_retry_after = max(1, math.ceil(settings.state_busy_timeout_ms / 1000))
+
+    async def state_busy(request: Request, exc: Exception) -> JSONResponse:
+        if not state_store_busy(exc):  # another SQLite failure is not "busy": 500 internal_error as usual
+            log.exception("state store error", extra={"path": request.url.path})
+            failure = JaneError("internal error")
+            return problem_response(failure.to_problem(instance=request.url.path), failure.headers)
+        # another instance held the SQLite lock longer than state_busy_timeout_ms: retryable 503 (collector.v1)
+        log.warning("state store busy", extra={"path": request.url.path, "error": str(exc)})
+        err = JaneError(
+            "state store is busy, retry", code="service_unavailable", retry_after_seconds=busy_retry_after
+        )
+        return problem_response(err.to_problem(instance=request.url.path), err.headers)
+
+    app.add_exception_handler(sqlite3.OperationalError, state_busy)
     app.include_router(jobs_router(runner))
 
     async def json_body(request: Request) -> Any:

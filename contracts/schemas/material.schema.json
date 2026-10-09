@@ -64,9 +64,9 @@
       "required": ["content_sha256"],
       "properties": {
         "content_sha256": { "$ref": "common/defs.schema.json#/$defs/Sha256Hex" },
-        "source_revision": { "type": "string", "description": "Версія, яку надає джерело: ETag, Last-Modified, Telegram edit_date." },
+        "source_revision": { "type": "string", "description": "Версія, яку надає джерело: ETag, Last-Modified, Telegram edit_date (або date неред. повідомлення) в epoch seconds." },
         "sequence": {
-          "description": "Монотонний номер ревізії для порядку спостережень, якщо його надає джерело (Telegram: edit_date як epoch seconds; web: відсутній).",
+          "description": "Строго монотонний номер ревізії того самого material_id для порядку спостережень, якщо джерело дає основу для нього; кожна нова ревізія має більший sequence. Telegram: edit_date (або date неред. повідомлення) в epoch seconds × 1000 + порядковий номер ревізії з іншим текстом, яку колектор побачив у межах тієї самої секунди (0 — перша), тож кілька редагувань за секунду мають різні зростаючі значення (до 1.1 — просто epoch seconds; значення нового формату завжди більші за старі). Одноразовий POST /v1/fetches бере номер із ревізій, які колектор уже видав (у будь-якому state_key), і нічого не записує; строгу монотонність гарантують збори одного state_key. Web: відсутній.",
           "type": "integer",
           "minimum": 0
         },
@@ -125,7 +125,7 @@
       "items": { "$ref": "handler-result.schema.json#/$defs/DiagnosticMessage" }
     },
     "metadata": {
-      "description": "Додаткові метадані джерела (наприклад title, автор повідомлення, кількість переглядів). Відкритий об'єкт.",
+      "description": "Додаткові метадані джерела (наприклад title, автор повідомлення, кількість переглядів). Відкритий об'єкт. Telegram: service_action — дія службового повідомлення каналу (channel_create, pin_message, chat_edit_title…); таке повідомлення зазвичай має порожній текст, тож завдання може відфільтрувати його умовою material.metadata.service_action not_exists.",
       "type": "object"
     }
   }

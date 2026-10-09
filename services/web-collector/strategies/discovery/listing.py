@@ -21,6 +21,10 @@ page repeats the items of the previous one (a site that ignores the page paramet
 
 State (``snapshot``): the listing pages known to the strategy, saved by the core in the same transaction as
 the candidates, so a killed collection resumes without losing a pagination chain.
+
+Re-reading (R23, ``RefreshingStrategy``): every listing page the strategy knows is fetched in full in every run
+- in an ``incremental`` collection it is not skipped by ``revisit`` and never answered 304 - so new items on
+known category, pagination and search pages are found; the items themselves follow ``revisit`` as usual.
 """
 
 from __future__ import annotations
@@ -93,6 +97,10 @@ class ListingStrategy:
                 continue
             self.pages.setdefault(normalized, {"n": self._page_number(normalized), "prev": None})
             yield DiscoveredUrl(url=normalized, strategy_id=self.strategy_id, kind="material", depth=0)
+
+    def refresh_on_revisit(self, url: str) -> bool:
+        """``RefreshingStrategy``: a listing page is read again in every run (new items appear on known pages)."""
+        return url in self.pages
 
     def _page_number(self, url: str) -> int:
         if not self.page_param:

@@ -3,14 +3,20 @@
 Limit levels (``contracts/schemas/common/limits.schema.json``): service defaults -> platform (limits file,
 then ``JANE_WEB_COLLECTOR_LIMITS__*``) -> source (``rules.limits``) -> request (``CollectionRequest.limits``)
 -> strategy (``strategies[].limits``, only for that strategy's URLs). ``hard_caps`` bound the result.
-Groups and fields that the collector does not use (``sandbox``, ``llm``, ``telegram``...) are valid in the
-contract and are ignored here.
+
+The layers are jane-kit's, with the same error checks as every other service (R20): the limits file is a
+shared ``PlatformLimits`` profile (contract paths map to the fields that declare them, contract groups the
+collector does not use - ``sandbox``, ``llm``, ``telegram``... - are ignored and listed in
+``ResolvedLimits.ignored``, a path unknown to the contract and to the model is an error); the environment layer
+takes model paths (``..._LIMITS__JOBS__JOB_RETENTION_SECONDS``); source, request and strategy layers are
+contract-shaped ``Limits`` documents (validated against the contract before they get here) and are applied the
+same way as the profile (:func:`contract_layer`).
 """
 
 from __future__ import annotations
 
+import dataclasses
 import logging
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -168,6 +174,14 @@ class Collector(Limits):
     """How often expired collections and transit files are cleaned up."""
     host_state_prune_interval_seconds: int = Field(default=60, ge=1)
     """How often the shared per-host limiter drops the state of hosts nobody uses any more."""
+    shared_host_limits: bool = True
+    """Coordinate the per-host limits with the other instances that share the state store (R15)."""
+    shared_host_poll_ms: int = Field(default=100, ge=10)
+    """A request waiting for a host slot that other instances hold re-checks this often."""
+    shared_host_ttl_seconds: int = Field(default=120, ge=1)
+    """How long the registration, slot or place in line of an instance that died keeps limiting the others. A live
+    instance renews them every TTL / 3 (also during long downloads, Retry-After and Crawl-delay waits), so the TTL
+    need not exceed them; start-up rule: TTL * 2/3 > ``STATE_BUSY_TIMEOUT_MS``."""
 
 
 class ServiceLimits(Limits):
@@ -192,92 +206,31 @@ class ServiceLimits(Limits):
         return self
 
 
-# ---------------------------------------------------------------- contract <-> model paths
+# ---------------------------------------------------------------- jane-kit layers (R20)
 
 
-def _flatten(data: Mapping[str, Any], prefix: str = "") -> dict[str, Any]:
-    out: dict[str, Any] = {}
-    for key, value in data.items():
-        path = f"{prefix}{key}"
-        if isinstance(value, Mapping):
-            out.update(_flatten(value, f"{path}."))
-        else:
-            out[path] = value
-    return out
-
-
-def _unflatten(flat: Mapping[str, Any]) -> dict[str, Any]:
-    out: dict[str, Any] = {}
-    for path, value in flat.items():
-        node = out
-        *parents, leaf = path.split(".")
-        for part in parents:
-            node = node.setdefault(part, {})
-        node[leaf] = value
-    return out
-
-
-def _model_paths() -> set[str]:
-    return set(_flatten(ServiceLimits().model_dump()))
-
-
-def contract_to_model() -> dict[str, str]:
-    """Contract leaf path -> model leaf path for every limit the collector uses."""
-    mapping: dict[str, str] = {}
-    for group_name, info in ServiceLimits.model_fields.items():
-        extra = info.json_schema_extra if isinstance(info.json_schema_extra, dict) else {}
-        group_model = info.annotation
-        if not (isinstance(group_model, type) and issubclass(group_model, Limits)):
-            raise TypeError(f"ServiceLimits.{group_name} must be a Limits group")
-        group_contract = extra.get("contract")
-        for name, sub in group_model.model_fields.items():
-            sub_extra = sub.json_schema_extra if isinstance(sub.json_schema_extra, dict) else {}
-            own = sub_extra.get("contract")
-            contract = str(own) if own else (f"{group_contract}.{name}" if group_contract else None)
-            if contract:
-                mapping[contract] = f"{group_name}.{name}"
-    return mapping
-
-
-MODEL_PATHS = _model_paths()
-CONTRACT_TO_MODEL = contract_to_model()
-MODEL_TO_CONTRACT = {v: k for k, v in CONTRACT_TO_MODEL.items()}
-
-
-def translate(values: Mapping[str, Any], *, contract_only: bool = False) -> tuple[dict[str, Any], list[str]]:
-    """Contract-shaped (or model-shaped) Limits -> model-shaped values; returns (values, ignored paths)."""
-    out: dict[str, Any] = {}
-    ignored: list[str] = []
-    for path, value in _flatten(values).items():
-        if path in CONTRACT_TO_MODEL:
-            out[CONTRACT_TO_MODEL[path]] = value
-        elif not contract_only and path in MODEL_PATHS:
-            out[path] = value
-        else:
-            ignored.append(path)
-    return _unflatten(out), ignored
-
-
-def translate_layer(layer: LimitLayer, *, contract_only: bool = False) -> LimitLayer:
-    values, ignored_v = translate(layer.values, contract_only=contract_only)
-    caps, ignored_c = translate(layer.hard_caps, contract_only=contract_only)
-    if ignored_v or ignored_c:
-        log.debug("limits not used by the web collector ignored", extra={"layer": layer.label})
-    return LimitLayer(layer.level, values, caps, name=layer.name, profile=layer.profile)
+def contract_layer(layer: LimitLayer) -> LimitLayer:
+    """A contract-shaped ``Limits`` document (``rules.limits``, request ``limits``, ``strategies[].limits``) as a
+    jane-kit layer: contract paths go to the fields that declare them (``transfer.job_retention_seconds`` ->
+    ``jobs.job_retention_seconds``), contract limits the collector does not have are ignored, anything else is a
+    :class:`~jane_kit.config.LimitError` - exactly as for the platform profile."""
+    return dataclasses.replace(layer, shared=True)
 
 
 def to_contract(limits: ServiceLimits) -> dict[str, Any]:
-    """Model -> contract ``Limits`` document (only fields that exist in the contract)."""
-    flat = _flatten(limits.model_dump(mode="json"))
-    return _unflatten({MODEL_TO_CONTRACT[p]: v for p, v in flat.items() if p in MODEL_TO_CONTRACT})
+    """Model -> contract ``Limits`` document (only fields that exist in the contract), by jane-kit's mapping."""
+    defaults: dict[str, Any] = ResolvedLimits(limits=limits, origin={}, clamped={}).platform_limits()[
+        "defaults"
+    ]
+    return defaults
 
 
 def platform_layers(settings: Settings) -> list[LimitLayer]:
-    return [translate_layer(layer) for layer in settings.platform_layers(LIMITS_ENV_PREFIX)]
+    """jane-kit's platform layers: the ``PlatformLimits`` file (shared profile) and the env overrides."""
+    return settings.platform_layers(LIMITS_ENV_PREFIX)
 
 
 def resolve_service_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLimits[ServiceLimits]:
     """Defaults <- platform file (``..._LIMITS_FILE``) <- ``JANE_WEB_COLLECTOR_LIMITS__*`` <- ``extra``
-    (source/request/strategy layers, contract-shaped)."""
-    layers = [translate_layer(layer, contract_only=True) for layer in extra]
-    return resolve_limits(ServiceLimits, *platform_layers(settings), *layers)
+    (source/request/strategy layers, contract-shaped). Invalid limits raise :class:`~jane_kit.config.LimitError`."""
+    return resolve_limits(ServiceLimits, *platform_layers(settings), *(contract_layer(x) for x in extra))

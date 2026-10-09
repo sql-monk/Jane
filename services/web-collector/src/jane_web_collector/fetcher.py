@@ -29,6 +29,8 @@ __all__ = ["FetchError", "Fetcher", "HttpResult", "build_client"]
 
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+METHOD_KEEPING_REDIRECTS = frozenset({307, 308})
+"""A POST redirected with these is repeated with its body; 301/302/303 continue with GET (RFC 9110 15.4)."""
 # Response headers copied into Material.http.headers (never Set-Cookie or auth headers).
 KEPT_HEADERS = (
     "content-type",
@@ -158,7 +160,13 @@ class Fetcher:
         return httpx.Timeout(t.request_timeout_ms / 1000, connect=t.connect_timeout_ms / 1000)
 
     async def _one_request(
-        self, url: str, headers: Mapping[str, str], max_bytes: int, timeouts: Timeouts | None = None
+        self,
+        url: str,
+        headers: Mapping[str, str],
+        max_bytes: int,
+        timeouts: Timeouts | None = None,
+        method: str = "GET",
+        content: bytes | None = None,
     ) -> tuple[int, dict[str, str], bytes, bool]:
         if any(not header_name_safe(name) or not header_value_safe(value) for name, value in headers.items()):
             raise FetchError("access_denied_by_policy", "HTTP request header rejected by policy")
@@ -174,7 +182,9 @@ class Fetcher:
             )
         async with (
             self.limiter.slot(host, delay),
-            self.client.stream("GET", url, headers=headers, timeout=self._timeout(timeouts)) as resp,
+            self.client.stream(
+                method, url, headers=headers, content=content, timeout=self._timeout(timeouts)
+            ) as resp,
         ):
             chunks: list[bytes] = []
             size = 0
@@ -198,16 +208,24 @@ class Fetcher:
         conditional: Mapping[str, str] | None = None,
         max_bytes: int | None = None,
         timeouts: Timeouts | None = None,
+        method: str = "GET",
+        json_body: bytes | None = None,
     ) -> HttpResult:
-        """GET with retries and redirects. Raises :class:`FetchError`; policy callbacks may raise their own."""
+        """GET (or a POST of ``json_body`` with ``Content-Type: application/json``) with retries and redirects.
+        A POST is never conditional; after a 307/308 redirect it is repeated with its body, after 301/302/303 the
+        chain continues with GET. Raises :class:`FetchError`; policy callbacks may raise their own."""
         max_bytes = max_bytes if max_bytes is not None else self.limits.crawl.max_material_bytes
         redirects: list[str] = []
         current = url
         total_attempts = 0
+        if method != "GET":
+            conditional = None
         while True:
             headers = {**self.headers, **self.auth_headers_for(current, url), **dict(conditional or {})}
+            if method == "POST":
+                headers["Content-Type"] = "application/json"
             status, hdrs, body, truncated, attempts = await self._with_retries(
-                current, headers, max_bytes, timeouts
+                current, headers, max_bytes, timeouts, method, json_body if method == "POST" else None
             )
             total_attempts += attempts
             if status in REDIRECT_STATUSES and "location" in hdrs:
@@ -224,6 +242,8 @@ class Fetcher:
                 redirects.append(target)
                 current = target
                 conditional = None
+                if status not in METHOD_KEEPING_REDIRECTS:
+                    method, json_body = "GET", None
                 continue
             return HttpResult(
                 url=url,
@@ -255,14 +275,22 @@ class Fetcher:
         return {}
 
     async def _with_retries(
-        self, url: str, headers: Mapping[str, str], max_bytes: int, timeouts: Timeouts | None = None
+        self,
+        url: str,
+        headers: Mapping[str, str],
+        max_bytes: int,
+        timeouts: Timeouts | None = None,
+        method: str = "GET",
+        content: bytes | None = None,
     ) -> tuple[int, dict[str, str], bytes, bool, int]:
         max_attempts = self.limits.retries.max_attempts
         last_error = ""
         last_status: int | None = None
         for attempt in range(1, max_attempts + 1):
             try:
-                status, hdrs, body, truncated = await self._one_request(url, headers, max_bytes, timeouts)
+                status, hdrs, body, truncated = await self._one_request(
+                    url, headers, max_bytes, timeouts, method, content
+                )
             except EgressDenied as exc:  # a policy decision: never retried
                 raise FetchError("access_denied_by_policy", str(exc), attempts=attempt) from None
             except httpx.TimeoutException:

@@ -7,4 +7,6 @@ Only typing Protocols and plain dataclasses; no runtime dependencies. Semantics 
 ``contracts/docs/discovery-strategy.md`` and ``contracts/docs/storage-adapter.md``.
 """
 
-CONTRACT_VERSION = "1.0.0"
+CONTRACT_VERSION = "1.1.0"
+"""1.1.0 (WP-16): additive changes of ``discovery`` (``fetch`` method/body, ``emit_material``,
+``DiscoveredMaterial``, ``RefreshingStrategy``); every 1.0 implementation of a strategy works unchanged."""

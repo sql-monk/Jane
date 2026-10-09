@@ -36,7 +36,10 @@ lease, навіть якщо один запис чекав на блокува�
 Кілька екземплярів: кожен процес має власний `JANE_WEB_COLLECTOR_PORT`. Екземпляри з **одним** каталогом стану на
 одному вузлі ділять SQLite-файл: збір виконує той, хто тримає lease (`JANE_WEB_COLLECTOR_LEASE_SECONDS`), решта
 віддає матеріали, стан і помилки з того самого сховища й підхоплює збір, якщо власник зник. Екземпляри з різними
-каталогами — незалежні колектори. Ліміти на хост кожен процес застосовує сам (див. «Ліміти»). Спільного сховища для кількох вузлів (PostgreSQL) у v1 немає — див. «Відомі
+каталогами — незалежні колектори. Якщо інший екземпляр тримає блокування `state.db` довше за
+`STATE_BUSY_TIMEOUT_MS`, операція відповідає `503 service_unavailable` з `Retry-After` (описано в `collector.v1`);
+повтор безпечний. Ліміти на хост екземпляри зі спільним каталогом узгоджують через те саме сховище (R15, див.
+«Ліміти»). Спільного сховища для кількох вузлів (PostgreSQL) у v1 немає — див. «Відомі
 обмеження» у звіті WP-02.
 
 ## Тести
@@ -88,8 +91,8 @@ just test web-collector -m contract     # лише контрактні
 | `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | журнали |
 | `METRICS_ENABLED` | `true` | `/metrics` |
 | `AUTH_MODE` | `none` | `none` / `api_key` / `jwt` — див. «Автентифікація (ADR-0005)» |
-| `LIMITS_FILE` | — | `PlatformLimits` (`profile`, `defaults`, `hard_caps`; TOML/JSON/YAML); групи, яких колектор не використовує (`sandbox`, `llm`, `telegram`…), ігноруються |
-| `LIMITS__<ГРУПА>__<ПАРАМЕТР>` / `LIMITS__HARD_CAPS__…` | — | перевизначення, напр. `JANE_WEB_COLLECTOR_LIMITS__CRAWL__MAX_DEPTH=3` |
+| `LIMITS_FILE` | — | `PlatformLimits` (`profile`, `defaults`, `hard_caps`; TOML/JSON/YAML), напр. цілий `deploy/profiles/<профіль>.json`. Спільний шар jane-kit (R20): ліміти контракту, яких колектор не має (`sandbox`, `llm`, `telegram`…), ігноруються й перелічуються в стартовому журналі (`platform limits profile applied partially`); шлях, невідомий і контракту, і моделі (опечатка), — помилка старту |
+| `LIMITS__<ГРУПА>__<ПАРАМЕТР>` / `LIMITS__HARD_CAPS__…` | — | перевизначення шляхами моделі (як у всіх сервісах), напр. `JANE_WEB_COLLECTOR_LIMITS__CRAWL__MAX_DEPTH=3`, `..._LIMITS__JOBS__JOB_RETENTION_SECONDS=600`; невідомий шлях — помилка старту |
 
 ## Автентифікація (ADR-0005)
 
@@ -117,10 +120,11 @@ JANE_WEB_COLLECTOR_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 hex к�
 звужують. Ефективні ліміти збору — у `GET /v1/collections/{id}` → `effective_limits`; налаштовані —
 у `GET /v1/info` → `limits`.
 
-**Ліміти на хост спільні для процесу.** `concurrency.max_parallel_fetches_per_host`, `rate.requests_per_second_per_host`,
+**Ліміти на хост спільні для платформи.** `concurrency.max_parallel_fetches_per_host`, `rate.requests_per_second_per_host`,
 `rate.min_delay_ms_per_host`, `Crawl-delay` і `Retry-After` діють на хост (`host[:port]` URL) для **всіх** зборів і
-одноразових `POST /v1/fetches` одного процесу разом: два збори одного сайту разом роблять не більше запитів, ніж
-дозволяє ліміт, а не вдвічі більше.
+одноразових `POST /v1/fetches` разом — у процесі (WP-02c) і між **екземплярами**, що ділять каталог стану (R15):
+два збори одного сайту, хоч в одному процесі, хоч у двох репліках, разом роблять не більше запитів, ніж дозволяє
+ліміт, а не вдвічі більше. Так `limits.schema.json` визначає область дії лімітів «на хост» (рівень platform).
 
 - Правило для різних значень: діє **найсуворіше** значення серед активних на хості користувачів — найбільший
   інтервал між стартами запитів і найменша паралельність. Збір активний на хості від свого першого запиту до нього
@@ -138,16 +142,23 @@ JANE_WEB_COLLECTOR_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 hex к�
 - Очікування слоту чи черги на хост не блокує скасування: запит, скасований під час очікування, нічого не
   резервує в розкладі хоста. Стан хоста, яким ніхто не користується, прибирається
   (`collector.host_state_prune_interval_seconds` і під час завершення збору).
-- **Межа:** ліміти на хост спільні в межах **одного процесу**. Кілька екземплярів (зокрема зі спільним каталогом
-  стану) не узгоджують їх між собою: N екземплярів, що одночасно збирають один хост, можуть разом дати до N×
-  ліміту. Для такого розгортання задайте на екземпляр частку ліміту (наприклад, `rate.requests_per_second_per_host`
-  / N у платформному профілі) або збирайте один хост одним екземпляром.
+- **Між екземплярами** (R15, [`shared_hosts.py`](src/jane_web_collector/shared_hosts.py)): у спільному `state.db`
+  кожен екземпляр реєструє на хості свої найсуворіші значення (`host_users`); запит, що пройшов інтервал свого
+  процесу, стає в чергу хоста (FIFO між екземплярами, `host_waiters`) і бере слот платформи (`host_slots`, не більше
+  найменшого зареєстрованого `max_parallel_fetches_per_host`) лише тоді, коли може стартувати одразу: минув
+  найбільший зареєстрований інтервал від попереднього старту будь-якого екземпляра і `Retry-After` (`host_schedule`).
+  Перший у черзі чекає старту **без** слота, тож слот тримається лише на час запиту. Живий екземпляр поновлює свої
+  реєстрації, слоти й місця в черзі кожні `shared_host_ttl_seconds / 3` — також під час довгого завантаження,
+  `Retry-After` до `collector.max_retry_after_seconds` чи `Crawl-delay`, довшого за TTL; лише вбитий екземпляр
+  перестає їх поновлювати, і вони спливають через `collector.shared_host_ttl_seconds` (рев'ю 1). Зайняте сховище
+  не валить запит — він чекає й пробує знову. Екземпляри з **різними** каталогами стану — окремі колектори, вони ліміти не узгоджують (спільного сховища
+  між вузлами у v1 немає, ADR-0007). Вимкнути узгодження — `collector.shared_host_limits=false`.
 
 | Параметр | Типово | Опис |
 |---|---|---|
 | `concurrency.max_parallel_fetches` | 4 | одночасні завантаження одного збору |
-| `concurrency.max_parallel_fetches_per_host` | 2 | одночасні запити до одного хоста (усі збори й fetch процесу разом) |
-| `rate.requests_per_second_per_host` | 1 | частота запитів до хоста (усі збори й fetch процесу разом) |
+| `concurrency.max_parallel_fetches_per_host` | 2 | одночасні запити до одного хоста (усі збори й fetch усіх екземплярів зі спільним сховищем разом) |
+| `rate.requests_per_second_per_host` | 1 | частота запитів до хоста (так само) |
 | `rate.min_delay_ms_per_host` | 500 | мінімальний інтервал між стартами запитів до хоста (так само) |
 | `rate.respect_crawl_delay` | true | враховувати `Crawl-delay` |
 | `crawl.max_depth` | 5 | глибина від seeds |
@@ -176,6 +187,9 @@ JANE_WEB_COLLECTOR_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 hex к�
 | `collector.long_poll_interval_ms` | 100 | як часто `/materials?wait_ms=` шукає нові матеріали |
 | `collector.gc_interval_seconds` | 3600 | прибирання прострочених зборів і транзитних файлів (не рідше `job_retention_seconds / 10`) |
 | `collector.host_state_prune_interval_seconds` | 60 | як часто спільний лімітер хостів прибирає стан хостів, якими ніхто не користується |
+| `collector.shared_host_limits` | true | узгоджувати ліміти на хост з іншими екземплярами через спільне сховище стану (R15) |
+| `collector.shared_host_poll_ms` | 100 | як часто запит, що чекає слоту хоста, зайнятого іншими екземплярами, перевіряє його знову |
+| `collector.shared_host_ttl_seconds` | 120 | скільки реєстрація, слот і місце в черзі вбитого екземпляра ще обмежують інших; живий екземпляр поновлює їх кожні TTL/3, тож TTL не мусить перевищувати запити чи очікування. Правило старту: `TTL × 2/3 > STATE_BUSY_TIMEOUT_MS`, інакше сервіс не стартує |
 
 ## Поведінка
 
@@ -194,6 +208,11 @@ JANE_WEB_COLLECTOR_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 hex к�
   спостереження); `mode=incremental` + `revisit.mode=never` — відомі успішні URL не завантажуються (їхні збережені
   посилання продовжують обхід), `interval` — лише старші за `revisit_interval_seconds`, `if_changed` — умовні
   запити (ETag / If-Modified-Since), 304 не видається. URL, що минулого разу впали (4xx/5xx), пробуються знову.
+  `lastmod` кандидата (sitemap з `use_lastmod_for_revisit`, стрічка, `api_feed` з `lastmod_path`), пізніший за
+  попереднє завантаження URL, змушує завантажити його попри `never`/`interval` (лічильник `revisited_by_lastmod`);
+  старіший чи відсутній `lastmod` нічого не забороняє (R23). Навігаційні документи стратегій і сторінки списків
+  `listing` (хук `RefreshingStrategy`) читаються повністю в кожному зборі — без пропуску й без умовного запиту
+  (лічильник `refreshed`), тож нові елементи відомих категорій знаходяться в `incremental`.
 - **Тайм-аути** `timeouts.connect_timeout_ms` / `request_timeout_ms` застосовуються до кожного запиту з ефективних
   лімітів збору (з урахуванням `rules.limits`, `limits` запиту і `limits` стратегії), а не з платформних типових.
 - **Видача**: `GET /v1/collections/{id}/materials?after=<cursor>` підтверджує все до курсора включно
@@ -259,13 +278,25 @@ IPv4, вкладена в IPv6 (`::ffff:a.b.c.d`, NAT64 `64:ff9b::/96`, 6to4 `20
 
 Що дає ядро стратегії (`StrategyContext`, реалізує `DiscoveryContext`):
 
-- `ctx.fetch(url, kind=..., conditional=True)` — через ті самі scope, robots, ліміти, переадресації й бюджет.
-  Повертає `FetchedResource` (зокрема з 4xx-статусом — корисно для `url_template`), `None` для 304, для URL, уже
-  отриманого в цьому процесі, або для вже виданого матеріалу; `FetchRejected` — `out_of_scope`,
-  `access_denied_by_policy`, `limit_exceeded`. Ресурс, отриманий через `ctx.fetch`, передається в `on_fetched`
-  усіх **інших** стратегій. Навігаційні документи після рестарту можна отримати знову (стан — у `snapshot()`).
-- `on_fetched` викликається для кожної HTTP-відповіді з черги (будь-який статус; `resource.strategy_id` — хто
-  запропонував URL). Кандидати з `on_fetched` отримують `depth = resource.depth + 1`.
+- `ctx.fetch(url, kind=..., conditional=True, method="GET", body=None)` — через ті самі scope, robots, політику
+  адрес, ліміти на хост (спільні з усіма зборами, fetch і екземплярами зі спільним сховищем), повтори,
+  переадресації, розмір і бюджет збору; тайм-аути — з `limits` стратегії (повна таблиця — в
+  [`discovery-strategy.md`](../../contracts/docs/discovery-strategy.md), R03). Повертає `FetchedResource` з будь-яким
+  кінцевим статусом, крім 304 (зокрема 4xx — корисно для `url_template`); `None` — 304, URL уже отримано в цьому
+  процесі для збору або вже виданий матеріал, переадресація на відомий URL, збій після повторів (помилка — в
+  `/errors`); `FetchRejected` — `out_of_scope`, `access_denied_by_policy` (robots, політика адрес),
+  `limit_exceeded` (бюджет), `rate_limited` (джерело просить чекати довше за `collector.max_retry_after_seconds`
+  або 429 після повторів). `method="POST"` з JSON `body` — лише для `kind="navigation"` (сторінки API, R22).
+  Ресурс, отриманий через `ctx.fetch`, передається в `on_fetched` усіх **інших** стратегій. Навігаційні документи
+  після рестарту можна отримати знову (стан — у `snapshot()`).
+- `await ctx.emit_material(DiscoveredMaterial(...))` — вміст, який стратегія вже має (елемент JSON API), стає
+  Material за правилами сторінки: scope, глибина, один матеріал на канонічний URL у зборі, `revisit`/`dedup`,
+  backpressure (R22).
+- `on_fetched` викликається для кожної HTTP-відповіді з тілом, хай який статус (2xx, 4xx, 5xx без повторів;
+  `resource.strategy_id` — хто запропонував URL), але не для 304, пропущених `revisit`, дублікатів і збоїв.
+  Кандидати з `on_fetched` отримують `depth = resource.depth + 1`.
+- Необов'язковий хук `refresh_on_revisit(url) -> bool` (`RefreshingStrategy`): сторінка, з якої стратегія бере нові
+  матеріали, читається повністю в кожному зборі (так робить `listing`, R23).
 - `ctx.extract_links(resource, LinkSelector(...))` — css / xpath / rel через lxml (залежності `lxml`, `cssselect`
   уже є); `ctx.normalize`, `ctx.in_scope`, `ctx.section_for`, `ctx.limits` (ефективні, з `limits` стратегії),
   `ctx.is_cancelled()`.
@@ -308,6 +339,8 @@ with httpx.Client(base_url="http://127.0.0.1:8101") as api:
 ```
 
 Одна сторінка синхронно: `POST /v1/fetches {"source_kind": "web", "url": "https://shop.example.test/about"}`.
+Сторінка, якої на сайті немає (HTTP 404 або 410), — `404 not_found` з `details.http_status` (`retryable: false`), як
+`not_found` у `/errors` збору; інші помилки сайту — `502 source_unavailable` з `details.http_status`.
 
 ## Спостережуваність
 

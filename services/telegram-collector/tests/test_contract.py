@@ -23,14 +23,17 @@ def test_every_operation_matches_the_contract(
     COMMON.validate_component("Health", api.get("/v1/health").json())
     COMMON.validate_component("ServiceInfo", api.get("/v1/info").json())
 
-    # fetch: 200, 429 (flood-wait), 502 (missing message), 422 (not telegram), 400 (bad JSON)
+    # fetch: 200, 429 (flood-wait), 404 (missing message), 502 (unknown channel), 422 (not telegram), 400
     one = {"source_kind": "telegram", "telegram": {"channel_username": USERNAME, "message_id": 1}}
     assert api.post("/v1/fetches", json=one).status_code == 200
     channel.set("faults", [{"method": "get_message", "flood_wait": 30, "count": 1}])
     assert api.post("/v1/fetches", json=one).status_code == 429
     channel.set("faults", [])
     missing = {"source_kind": "telegram", "telegram": {"channel_username": USERNAME, "message_id": 404}}
-    assert api.post("/v1/fetches", json=missing).status_code == 502
+    assert api.post("/v1/fetches", json=missing).status_code == 404
+    no_channel = {"source_kind": "telegram", "telegram": {"channel_username": "no_such", "message_id": 1}}
+    unavailable = api.post("/v1/fetches", json=no_channel)
+    assert unavailable.status_code == 502 and unavailable.json()["details"]["reason"] == "channel_unavailable"
     assert (
         api.post("/v1/fetches", json={"source_kind": "web", "url": "https://example.test/"}).status_code
         == 422

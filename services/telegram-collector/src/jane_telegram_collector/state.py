@@ -21,7 +21,22 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-__all__ = ["Fence", "LeaseLost", "StateStore"]
+from .materials import SEQUENCE_SCALE
+
+__all__ = ["SCHEMA_VERSION", "Fence", "LeaseLost", "StateFileTooNew", "StateStore"]
+
+SCHEMA_VERSION = 1
+"""``PRAGMA user_version`` of the state file - the format marker. 1 (WP-16, R04): ``tg_seen.sequence`` is in
+``revision.sequence`` units (epoch seconds x ``SEQUENCE_SCALE`` + the revision number within the second); a
+version 0 file (seconds, collectors before WP-16) is migrated when a process opens it. A file of a newer version
+than the code knows is refused (:class:`StateFileTooNew`). Collectors before WP-16 do not read the marker: run
+them on a migrated file and they take the stored sequences for seconds, so every known message looks newer than
+its edits and no edit is emitted - instances sharing one ``STATE_DIR`` are upgraded together (README)."""
+
+
+class StateFileTooNew(RuntimeError):
+    """The state file was written by a newer collector (``PRAGMA user_version`` > :data:`SCHEMA_VERSION`)."""
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS collections (
@@ -126,7 +141,29 @@ class StateStore:
         self._db.row_factory = sqlite3.Row
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute("PRAGMA synchronous=NORMAL")
+        version = int(self._db.execute("PRAGMA user_version").fetchone()[0])
+        if version > SCHEMA_VERSION:  # written by a newer collector: its format is unknown here
+            self._db.close()
+            raise StateFileTooNew(
+                f"{path}: state file version {version} is newer than this collector supports ({SCHEMA_VERSION})"
+            )
         self._db.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Bring a state file of an older version to :data:`SCHEMA_VERSION` (one transaction, once per file)."""
+        with self.tx() as db:
+            version = int(db.execute("PRAGMA user_version").fetchone()[0])
+            if version > SCHEMA_VERSION:  # another process upgraded the file meanwhile
+                raise StateFileTooNew(f"{self.path}: state file version {version} > {SCHEMA_VERSION}")
+            if version < 1:
+                db.execute("UPDATE tg_seen SET sequence = sequence * ?", (SEQUENCE_SCALE,))
+            if version < SCHEMA_VERSION:
+                db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
+    def schema_version(self) -> int:
+        row = self._one("PRAGMA user_version")
+        return int(row[0]) if row else 0
 
     def close(self) -> None:
         with self._lock:
@@ -357,6 +394,14 @@ class StateStore:
             "ON CONFLICT(state_key, channel_id) DO UPDATE SET cursor = excluded.cursor, updated_at = excluded.updated_at",
             (state_key, channel_id, _dumps(cursor), now),
         )
+
+    def latest_seen(self, material_id: str) -> tuple[int, str] | None:
+        """The newest revision of the message emitted under any ``state_key`` (``sequence``, text sha256)."""
+        row = self._one(
+            "SELECT sequence, content_sha256 FROM tg_seen WHERE material_id = ? ORDER BY sequence DESC LIMIT 1",
+            (material_id,),
+        )
+        return (int(row[0]), str(row[1])) if row else None
 
     def seen(self, state_key: str, material_id: str) -> tuple[int, str] | None:
         row = self._one(

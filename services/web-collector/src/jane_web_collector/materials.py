@@ -19,6 +19,7 @@ from .urls import material_id
 __all__ = [
     "MaterialTooLarge",
     "TransitStore",
+    "build_item_material",
     "build_material",
     "content_kind",
     "new_observation_id",
@@ -236,4 +237,50 @@ def build_material(
                 "message": "content cut at limits.crawl.max_material_bytes",
             }
         ]
+    return material
+
+
+def build_item_material(
+    body: bytes,
+    *,
+    media_type: str,
+    url: str,
+    canonical_url: str,
+    fetched_at: datetime,
+    observation_id: str,
+    source_id: str | None,
+    delivery: Delivery,
+    collector_version: str,
+    collection_id: str | None = None,
+    rules_ref: Mapping[str, Any] | None = None,
+    discovery: Mapping[str, Any] | None = None,
+    edited_at: datetime | None = None,
+) -> dict[str, Any]:
+    """Material of content a strategy already has (``api_feed`` JSON item, ``DiscoveryContext.emit_material``).
+
+    The same document as for a fetched page, except that nothing was fetched at ``url``: no ``http`` and no
+    ``locator.final_url``; ``fetched_at`` is when the API page with the item was fetched (its URL is
+    ``discovery.parent_url``); ``edited_at`` is the item's ``lastmod``, if the strategy has one."""
+    charset = "utf-8" if is_text(media_type) else None
+    material: dict[str, Any] = {
+        "material_id": material_id(canonical_url),
+        "observation_id": observation_id,
+        "source": {"kind": "web", **({"source_id": source_id} if source_id else {})},
+        "locator": {"url": url, "canonical_url": canonical_url},
+        "fetched_at": rfc3339(fetched_at),
+        "format": {"media_type": media_type, "content_kind": content_kind(media_type, canonical_url)},
+        "revision": {"content_sha256": hashlib.sha256(body).hexdigest()},
+        "content": _content_ref(body, media_type, charset, observation_id, fetched_at, delivery),
+        "collector": {"name": "web-collector", "version": collector_version},
+    }
+    if charset:
+        material["format"]["charset"] = charset
+    if edited_at is not None:
+        material["edited_at"] = rfc3339(edited_at)
+    if collection_id:
+        material["collector"]["collection_id"] = collection_id
+    if rules_ref:
+        material["collector"]["rules"] = dict(rules_ref)
+    if discovery:
+        material["discovery"] = {k: v for k, v in discovery.items() if v is not None}
     return material

@@ -9,8 +9,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "max_parallel_fetches": { "type": "integer", "minimum": 1, "description": "Одночасні завантаження одного колектора (на екземпляр)." },
-        "max_parallel_fetches_per_host": { "type": "integer", "minimum": 1 },
+        "max_parallel_fetches": { "type": "integer", "minimum": 1, "description": "Одночасні завантаження одного збору колектора (на екземпляр)." },
+        "max_parallel_fetches_per_host": { "type": "integer", "minimum": 1, "description": "Одночасні запити до одного хоста джерела (host[:port]) від усієї платформи: усіх зборів і одноразових запитів колектора разом, також усіх його екземплярів, що ділять сховище стану (один вузол, спільний каталог стану). Якщо активні на хості збори мають різні значення, діє найменше. Екземпляри з окремими сховищами стану — окремі колектори й між собою цей ліміт не узгоджують." },
         "max_parallel_invocations": { "type": "integer", "minimum": 1, "description": "Одночасні виклики обробника (на екземпляр сервісу-виконавця або на етап)." },
         "max_parallel_runs_per_task": { "type": "integer", "minimum": 1, "description": "Скільки запусків одного завдання можуть іти одночасно." },
         "max_parallel_stage_items": { "type": "integer", "minimum": 1, "description": "Скільки елементів один етап запуску обробляє одночасно." }
@@ -20,8 +20,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "requests_per_second_per_host": { "type": "number", "exclusiveMinimum": 0 },
-        "min_delay_ms_per_host": { "type": "integer", "minimum": 0 },
+        "requests_per_second_per_host": { "type": "number", "exclusiveMinimum": 0, "description": "Частота стартів запитів до одного хоста джерела; область дії — як у concurrency.max_parallel_fetches_per_host (уся платформа: усі збори, одноразові запити й екземпляри зі спільним сховищем стану). Інтервал між стартами = max(1 / requests_per_second_per_host, min_delay_ms_per_host, Crawl-delay за respect_crawl_delay); між активними на хості зборами діє найбільший інтервал." },
+        "min_delay_ms_per_host": { "type": "integer", "minimum": 0, "description": "Мінімальний інтервал між стартами запитів до одного хоста джерела; область дії у Web Collector — як у requests_per_second_per_host. Telegram Collector (єдиний «хост» — API Telegram) застосовує його до викликів API одного збору." },
         "burst_per_host": { "type": "integer", "minimum": 1 },
         "respect_crawl_delay": { "type": "boolean", "description": "Враховувати Crawl-delay з robots.txt (може лише збільшити затримку)." }
       }
@@ -139,7 +139,7 @@
       "enum": ["platform", "source", "task", "stage", "request", "hard_cap", "runtime"]
     },
     "PlatformLimits": {
-      "description": "Ліміти рівня платформи: типові значення й жорсткі стелі.",
+      "description": "Ліміти рівня platform — найширшого рівня успадкування: типові значення й жорсткі стелі одного розгортання (профілю, docs/adr/0007-target-environments.md), однакові для всіх сервісів і всіх їхніх екземплярів. Нижчі рівні (source, task, stage, request) лише перекривають типові значення, hard_caps їх обмежують. Область дії ліміту задає його опис: «на екземпляр» (concurrency.max_parallel_fetches, max_parallel_invocations) — кожен екземпляр окремо; «на хост» (concurrency.max_parallel_fetches_per_host, rate.*_per_host) у Web Collector — хост джерела для всієї платформи, разом для всіх екземплярів колектора зі спільним сховищем стану (Telegram Collector застосовує rate.min_delay_ms_per_host до викликів API одного збору).",
       "type": "object",
       "additionalProperties": false,
       "required": ["defaults"],

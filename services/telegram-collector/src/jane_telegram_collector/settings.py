@@ -2,14 +2,20 @@
 
 Limit levels (``contracts/schemas/common/limits.schema.json``): service defaults -> platform (limits file,
 then ``JANE_TELEGRAM_COLLECTOR_LIMITS__*``) -> source (``rules.limits``) -> request (``CollectionRequest.limits``
-or ``FetchRequest.limits``). ``hard_caps`` bound the result. Groups the collector does not use (``crawl``,
-``sandbox``, ``llm``...) are valid in the contract and are ignored here.
+or ``FetchRequest.limits``). ``hard_caps`` bound the result.
+
+The layers are jane-kit's, with the same error checks as every other service (R20): the limits file is a
+shared ``PlatformLimits`` profile (contract groups the collector does not use - ``crawl``, ``sandbox``, ``llm``...
+- are ignored and listed in ``ResolvedLimits.ignored``, a path unknown to the contract and to the model is an
+error); the environment layer takes model paths (``..._LIMITS__COLLECTOR__HISTORY_PAGE_SIZE``); source and
+request layers are contract-shaped ``Limits`` documents applied the same way as the profile
+(:func:`contract_layer`).
 """
 
 from __future__ import annotations
 
+import dataclasses
 import logging
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -168,91 +174,31 @@ class ServiceLimits(Limits):
         return self
 
 
-# ---------------------------------------------------------------- contract <-> model paths
+# ---------------------------------------------------------------- jane-kit layers (R20)
 
 
-def _flatten(data: Mapping[str, Any], prefix: str = "") -> dict[str, Any]:
-    out: dict[str, Any] = {}
-    for key, value in data.items():
-        path = f"{prefix}{key}"
-        if isinstance(value, Mapping):
-            out.update(_flatten(value, f"{path}."))
-        else:
-            out[path] = value
-    return out
-
-
-def _unflatten(flat: Mapping[str, Any]) -> dict[str, Any]:
-    out: dict[str, Any] = {}
-    for path, value in flat.items():
-        node = out
-        *parents, leaf = path.split(".")
-        for part in parents:
-            node = node.setdefault(part, {})
-        node[leaf] = value
-    return out
-
-
-def _contract_to_model() -> dict[str, str]:
-    """Contract leaf path -> model leaf path for every limit the collector uses."""
-    mapping: dict[str, str] = {}
-    for group_name, info in ServiceLimits.model_fields.items():
-        extra = info.json_schema_extra if isinstance(info.json_schema_extra, dict) else {}
-        group_model = info.annotation
-        if not (isinstance(group_model, type) and issubclass(group_model, Limits)):
-            raise TypeError(f"ServiceLimits.{group_name} must be a Limits group")
-        group_contract = extra.get("contract")
-        for name, sub in group_model.model_fields.items():
-            sub_extra = sub.json_schema_extra if isinstance(sub.json_schema_extra, dict) else {}
-            own = sub_extra.get("contract")
-            contract = str(own) if own else (f"{group_contract}.{name}" if group_contract else None)
-            if contract:
-                mapping[contract] = f"{group_name}.{name}"
-    return mapping
-
-
-MODEL_PATHS = set(_flatten(ServiceLimits().model_dump()))
-CONTRACT_TO_MODEL = _contract_to_model()
-MODEL_TO_CONTRACT = {v: k for k, v in CONTRACT_TO_MODEL.items()}
-
-
-def translate(values: Mapping[str, Any], *, contract_only: bool = False) -> tuple[dict[str, Any], list[str]]:
-    """Contract-shaped (or model-shaped) Limits -> model-shaped values; returns (values, ignored paths)."""
-    out: dict[str, Any] = {}
-    ignored: list[str] = []
-    for path, value in _flatten(values).items():
-        if path in CONTRACT_TO_MODEL:
-            out[CONTRACT_TO_MODEL[path]] = value
-        elif not contract_only and path in MODEL_PATHS:
-            out[path] = value
-        else:
-            ignored.append(path)
-    return _unflatten(out), ignored
-
-
-def translate_layer(layer: LimitLayer, *, contract_only: bool = False) -> LimitLayer:
-    values, ignored_v = translate(layer.values, contract_only=contract_only)
-    caps, ignored_c = translate(layer.hard_caps, contract_only=contract_only)
-    if ignored_v or ignored_c:
-        log.debug(
-            "limits not used by the telegram collector ignored",
-            extra={"layer": layer.label, "ignored": ignored_v + ignored_c},
-        )
-    return LimitLayer(layer.level, values, caps, name=layer.name, profile=layer.profile)
+def contract_layer(layer: LimitLayer) -> LimitLayer:
+    """A contract-shaped ``Limits`` document (``rules.limits``, request ``limits``) as a jane-kit layer: contract
+    paths go to the fields that declare them (``transfer.job_retention_seconds`` -> ``jobs.job_retention_seconds``),
+    contract limits the collector does not have are ignored, anything else is a
+    :class:`~jane_kit.config.LimitError` - exactly as for the platform profile."""
+    return dataclasses.replace(layer, shared=True)
 
 
 def to_contract(limits: ServiceLimits) -> dict[str, Any]:
-    """Model -> contract ``Limits`` document (only fields that exist in the contract)."""
-    flat = _flatten(limits.model_dump(mode="json"))
-    return _unflatten({MODEL_TO_CONTRACT[p]: v for p, v in flat.items() if p in MODEL_TO_CONTRACT})
+    """Model -> contract ``Limits`` document (only fields that exist in the contract), by jane-kit's mapping."""
+    defaults: dict[str, Any] = ResolvedLimits(limits=limits, origin={}, clamped={}).platform_limits()[
+        "defaults"
+    ]
+    return defaults
 
 
 def platform_layers(settings: Settings) -> list[LimitLayer]:
-    return [translate_layer(layer) for layer in settings.platform_layers(LIMITS_ENV_PREFIX)]
+    """jane-kit's platform layers: the ``PlatformLimits`` file (shared profile) and the env overrides."""
+    return settings.platform_layers(LIMITS_ENV_PREFIX)
 
 
 def resolve_service_limits(settings: Settings, *extra: LimitLayer) -> ResolvedLimits[ServiceLimits]:
     """Defaults <- platform file (``..._LIMITS_FILE``) <- ``JANE_TELEGRAM_COLLECTOR_LIMITS__*`` <- ``extra``
-    (source/request layers, contract-shaped)."""
-    layers = [translate_layer(layer, contract_only=True) for layer in extra]
-    return resolve_limits(ServiceLimits, *platform_layers(settings), *layers)
+    (source/request layers, contract-shaped). Invalid limits raise :class:`~jane_kit.config.LimitError`."""
+    return resolve_limits(ServiceLimits, *platform_layers(settings), *(contract_layer(x) for x in extra))

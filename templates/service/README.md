@@ -27,7 +27,10 @@ docker run --rm -p 8000:8000 --env-file .jane/template-auth.env jane-template-se
 
 Кілька екземплярів: запустіть кілька процесів або контейнерів з різними портами
 (`JANE_TEMPLATE_SERVICE_PORT`). Стан, який має бути спільним (job, ключі ідемпотентності), зберігайте у
-власній БД сервісу через протоколи `JobStore` / `IdempotencyStore` з jane-kit.
+власній БД сервісу спільними сховищами jane-kit (R17): `jane_kit.stores.postgres` (`PgIdempotencyStore`,
+`PgJobStore`, `PgDatabase`, `migrate`; залежність `jane-kit[postgres]`) або `jane_kit.stores.sqlite` для файла
+стану одного вузла; оренди — `jane_kit.stores.LeaseLimits` у лімітах сервісу, поновлення — `heartbeat_loop` у
+lifespan. Власні реалізації протоколів не пишіть: оренда, fencing, перехоплення й міграції вже там.
 
 ## Тести
 

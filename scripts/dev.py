@@ -198,11 +198,11 @@ def contract_spec(api: str) -> Path:
 
 
 def cmd_contracts_gen(ns: argparse.Namespace) -> int:
-    """Python client of one contract (`jane-codegen client`), e.g. into `<pkg>/_generated/<api>`.
+    """Python client of one contract (`jane-codegen client --no-models`), e.g. into `<pkg>/_generated/<api>`.
 
-    Client only by default: datamodel-code-generator does not take the multi-file Jane contracts
-    ("Modular references require an output directory"); `--models` is for single-file (bundled) specs."""
-    args = [contract_spec(ns.api).as_posix(), "--out", ns.out] + ([] if ns.models else ["--no-models"])
+    No Pydantic models: datamodel-code-generator does not take the multi-file Jane contracts (nor their
+    Redocly bundle): "Modular references require an output directory". `gen-client` stays for other specs."""
+    args = [contract_spec(ns.api).as_posix(), "--out", ns.out, "--no-models"]
     return run(uv_run("jane-codegen", "client", *args)).returncode
 
 
@@ -804,7 +804,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     p = add("contracts-gen", cmd_contracts_gen, "Python client of one contract (jane-codegen client)")
     p.add_argument("api", help="contract name: contracts/openapi/<api>.v1.yaml")
     p.add_argument("out", help="output package directory, e.g. services/<me>/src/<pkg>/_generated/<api>")
-    p.add_argument("--models", action="store_true", help="also Pydantic models (single-file specs only)")
 
     ns, extra = ap.parse_known_args(from_just(list(sys.argv[1:] if argv is None else argv)))
     extra = [a for a in extra if a != "--"]

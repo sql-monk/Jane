@@ -289,8 +289,6 @@ def test_contracts_check_mock_and_gen(monkeypatch: pytest.MonkeyPatch) -> None:
         "out/storage",
         "--no-models",
     ]
-    assert dev.main(["contracts-gen", "storage", "out/storage", "--models"]) == 0
-    assert "--no-models" not in calls[-1]
     with pytest.raises(SystemExit, match="unknown contract 'nope'"):
         dev.main(["contracts-gen", "nope", "out"])
 

@@ -49,7 +49,7 @@ uv-скрипти зі своїми залежностями (`uv run --script c
 | `just contracts-check [--redocly]` | лише лінтер контрактів (те саме, що в `just lint` / `just contract`); `--redocly` — ще й Redocly через npx (потрібен Node) |
 | `just contracts-compat [ref] [--oasdiff]` | `compat.py --self-test`, потім зворотна сумісність `contracts/` відносно git-ref (типово `main`; у worktree краще `origin/main` або merge-base). `--oasdiff` — ще `oasdiff breaking --fail-on ERR` (бінарник у PATH або Docker-образ `tufin/oasdiff`); BREAKING або непройдений oasdiff → код 1 |
 | `just contracts-mock <api> [--port 4010] [--host 127.0.0.1]` | мок API з прикладів контракту (`contracts/tools/mock.py`, без Node) |
-| `just contracts-gen <api> <тека> [--models]` | асинхронний Python-клієнт одного контракту `contracts/openapi/<api>.v1.yaml` (`jane-codegen client --no-models`), напр. у `services/<я>/src/<пакет>/_generated/<api>`. `--models` додає моделі Pydantic, але datamodel-code-generator не приймає багатофайлові контракти Jane («Modular references require an output directory»), тож лише для однофайлових специфікацій |
+| `just contracts-gen <api> <тека>` | асинхронний Python-клієнт одного контракту `contracts/openapi/<api>.v1.yaml` (`jane-codegen client --no-models`), напр. у `services/<я>/src/<пакет>/_generated/<api>`. Без моделей Pydantic: datamodel-code-generator не приймає багатофайлові контракти Jane і їхній Redocly-бандл («Modular references require an output directory»); моделі з однофайлової специфікації — `just gen-client` |
 
 ## Монорепозиторій
 

@@ -157,3 +157,71 @@ Corepack запустив pnpm 12.8.1 із попередженням про н�
    записати `N passed` і SHA в цей журнал. До цього не приймати B-7 як виконаний фінальний real gate.
 4. Злити B-7/B-8/B-9 через detached `integ-b`; push лише інтеграції або нових гілок, без force push і без main.
    Повний CI M3, фінальна ревізія матриці й статус — потік A; merge main — людина.
+
+## Четверта черга
+
+Доручення: [HANDOFF-2026-10-09-stream-b-4.md](../HANDOFF-2026-10-09-stream-b-4.md) і пряме уточнення людини:
+B-10 пропустити, C-W2 перенести після M3, виконати B-11 без повного CI.
+
+**Потік B завершено. B-7/B-8/B-9 злито через detached `integ-b`, merge `97ea4c41fb9b0afba27b552b6af42af715abdfa5`.**
+Власна дельта злиття — 12 файлів; `web/admin/src`, jane-kit, status і матриця незмінні.
+Після зведення A/C в origin додали лише документацію; при злитті її збережено.
+
+| Частина | Нова гілка від підготовленого SHA | Реалізація / результат |
+|---|---|---|
+| B-7, адмінка | `wp/12f-admin-auth-final` від `58c5eec`; rebase `4f0f791`, виправлення тесту `7d27b57`, лише формат `8145b34` | Ключ real-wrapper зі stack-файлу, README, вузький B1 root у prepare. Після B2 три прямі GET registry у real-тесті теж передають Bearer; старі asserts збережено, додано перевірку HTTP 200 перед JSON |
+| B-7, шаблон | `wp/01j-template-scopes-final` від `9fa705f`, rebase `e330062` | auth_scopes для прикладу й job; Python-код/тест після rebase тотожні перевіреним у третій черзі (`10 passed, 1 skipped`), повтору не було |
+| B-8/B-9 | `wp/00e-auth-decisions-final` від `c301bbe`, rebase `9f12af0`, беклог `32509ff` | ADR B2 й закриті auth-запити. Add/add open-requests: збережено актуальне зведення B-6, накладено лише B-9. C-W2 внесено як R33, **відкрито після M3**, ProblemsPage не змінено |
+
+### Real-прогін: один повний набір і один контроль виправленого тесту
+
+Зведена ревізія **`7eed2e18799ad8ae36c40ca48b8b004f9943fdb3`**, база origin `beb11f1`, включає прийняті B2
+`5fd7acd` і WP-06d та всі три інкременти потоку B. Власний проєкт `jane-b11-real-20261009`;
+Caddy `http://127.0.0.1:61036`, усі 8 API реальні. Ключ — `env.JANE_API_KEY_ADMIN` того самого стек-файлу;
+незалежну `JANE_ADMIN_E2E_API_KEY` перед запуском прибрано. LLM — зовнішній `fake`; сценарій маскування
+problem+json використовує явне перехоплення несправної відповіді, як і раніше.
+
+```text
+$ corepack pnpm --dir web/admin e2e:real http://127.0.0.1:61036 --project jane-b11-real-20261009 --config=../../.jane/b11-new-headless.config.mts --reporter=list --output=../../.jane/b11-real-results
+Running 17 tests using 1 worker
+1 failed
+16 passed (4.1m)
+EXIT_CODE=1
+```
+
+Єдина відмова — `hybrid-registry.spec.ts`: прямий GET списку версій форку без Authorization отримав 401,
+тому `forkVersions.items.map` упав. Trace підтвердив `authorization_present=false`, HTTP 401.
+UI-виклики й публікація з токеном до цього пройшли. Виправлено лише цей real-тест (`7d27b57`): Bearer
+додано до списку версій, poll нової версії й читання manifest; повний набір вдруге не запускався.
+
+**Зведена ревізія адресного контролю `48af2a1bdf075a27f1568fbc2d5ca088ec03d65d`:**
+
+```text
+$ corepack pnpm --dir web/admin e2e:real http://127.0.0.1:61036 --project jane-b11-real-20261009 --config=../../.jane/b11-new-headless.config.mts --reporter=list --output=../../.jane/b11-registry-results e2e/hybrid-registry.spec.ts
+Running 1 test using 1 worker
+ok 1 ... create and publish rules, approve, fork, then explicitly port a later parent version (11.7s)
+1 passed (26.9s)
+EXIT_CODE=0
+```
+
+Отже, **підтверджено всі 17 real-сценаріїв за мінімумом перевірок: 16 у єдиному повному прогоні + 1 після
+виправлення у єдиному адресному контролі**. Повний прогін на `7eed2e1` лишається 16/1, його статус не
+підмінюється зеленим. Між двома ревізіями змінено лише прямі авторизовані запити одного тесту; код UI й сервісів
+і решта 16 сценаріїв тотожні. Після контролю `8145b34` лише переносить рядок Prettier (без зміни виразів).
+
+Changed-file eslint / prettier і web typecheck — exit 0; первісну помилку Prettier перевірки виправлено
+форматуванням і контрольним `prettier --check`. Нових reviewers немає: код web/admin/src/сервісів не змінювався.
+Full CI / workflow dispatch — **0**. Локальні посилання змінених README/ADR/беклогу: 159, відсутніх файлів 0.
+У Chromium використано channel `chromium` зі штатними assertions/timeouts, один worker, retries 0;
+обидва runner завершилися штатно. Corepack використав pnpm 12.8.1 із попередженням про 11.27.1; lockfile незмінний.
+
+Перед прогоном хеші встановлених у контейнері модулів збіглися з Git-ревізією:
+engine `a61432844c5d2a36edbbd7c4bb28f27484d1d17f8b79ffd12c1849ea46185f61`,
+auth `391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c`.
+UI і sandbox зібрано зі зведеного checkout; working tree до прогону чистий.
+Докази лишаються в `.claude/worktrees/b11-real/.jane/`: `b11-real.log`, `b11-registry.log`,
+`b11-source.json`, `b11-backend.json`, `b11-code-preserved.json`, `b11-down.log`; значення ключів у stdout замасковані.
+`down --volumes --project jane-b11-real-20261009` — exit 0, власні контейнер/мережа/томи прибрані.
+
+Потоку A залишено фінальний CI, status і блок фінальної ревізії матриці. Потік B у main не зливав,
+force push не робив, worktree/гілки `wp01g`/`wp01h` і `puluj-g-*` не чіпав.

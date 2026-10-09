@@ -250,8 +250,10 @@ mongodb = "jane_storage_mongodb:MongoAdapter"            # ім'я == Adapter.ki
 
 [tool.uv.sources]
 jane-storage = { path = "../..", editable = true }        # саме path: uv не вважає вкладений проєкт членом workspace під час збирання
-jane-contracts = { path = "../../../../contracts/python", editable = true }
 ```
+
+`jane-contracts` успадковує кореневе workspace-джерело `jane-contracts = { workspace = true }`
+за прийнятим C-2; див. [DEVELOPMENT.md](../../DEVELOPMENT.md). Локальний override для нього не потрібний.
 
 - Клас реалізує `jane_contracts.storage_adapter.StorageAdapter`; `capabilities = {"objects", "entities", "history"}`
   (реєстр відхиляє інше). Спільні JSON-документи (`EntitySnapshot`, `HistoryEvent`, `DeliveryRecord`, `ObjectRecord`) і

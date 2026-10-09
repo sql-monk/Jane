@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -41,6 +42,16 @@ def _telethon() -> Any:
         raise ClientUnavailable(
             "telethon backend: install the 'telethon' extra of jane-telegram-collector"
         ) from exc
+
+
+def _snake(name: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
+
+
+def service_action(action: Any) -> str:
+    """``MessageActionChannelCreate`` -> ``channel_create`` (the action of a ``MessageService``)."""
+    name = type(action).__name__
+    return _snake(name.removeprefix("MessageAction") or name)
 
 
 def _utc(value: datetime | None) -> datetime | None:
@@ -116,16 +127,18 @@ class TelethonClient:
         date = _utc(msg.date)
         if date is None:
             raise ClientUnavailable(f"message {msg.id} without date")
+        action = getattr(msg, "action", None) if isinstance(msg, self.types.MessageService) else None
         return TgMessage(
             channel_id=channel_id,
             message_id=int(msg.id),
             date=date,
-            text=msg.message or "",
-            edit_date=_utc(msg.edit_date),
-            grouped_id=str(msg.grouped_id) if msg.grouped_id else None,
-            views=msg.views,
-            author=msg.post_author,
+            text=getattr(msg, "message", None) or "",
+            edit_date=_utc(getattr(msg, "edit_date", None)),
+            grouped_id=str(msg.grouped_id) if getattr(msg, "grouped_id", None) else None,
+            views=getattr(msg, "views", None),
+            author=getattr(msg, "post_author", None),
             media=tuple(media),
+            service_action=service_action(action) if action is not None else None,
         )
 
     async def resolve(self, *, username: str | None = None, channel_id: str | None = None) -> ChannelInfo:
@@ -184,7 +197,10 @@ class TelethonClient:
         if isinstance(diff, self.types.updates.ChannelDifferenceTooLong):
             full = await self._call(self.client(self.functions.channels.GetFullChannelRequest(entity)))
             return ChangeBatch(messages=[], pts=int(full.full_chat.pts), final=True, too_long=True)
-        messages = [m for m in diff.new_messages if isinstance(m, self.types.Message)]
+        # service messages (pinned, title changed...) are emitted too, marked in metadata (R30)
+        messages = [
+            m for m in diff.new_messages if isinstance(m, self.types.Message | self.types.MessageService)
+        ]
         for update in diff.other_updates:
             if isinstance(update, self.types.UpdateEditChannelMessage) and isinstance(
                 update.message, self.types.Message

@@ -18,6 +18,17 @@ info:
     Керовані підключення (обліковий запис Telegram, HTTP-автентифікація сайту) — ті самі операції
     `/v1/connections`, що й у спільному протоколі обробника (`common.yaml#/components/pathItems/Connection*`):
     оркестратор синхронізує визначення без секретів, колектор розв'язує `secret_refs` у своєму середовищі.
+    Конвенція `params` для `kind=http` (Web Collector): `auth_scheme` = `bearer` (`secret_refs.token` →
+    `Authorization: Bearer …`), `basic` (`secret_refs.username` і `secret_refs.password`) або `header`
+    (`params.header_name` — ім'я заголовка, крім `Host`, `Content-Length`, `Transfer-Encoding`;
+    `secret_refs.value` — значення). Облікові дані йдуть лише на origin зі списку, дозволеного оператором
+    колектора, і не переносяться переадресацією на інший origin чи з HTTPS на HTTP. Для `kind=telegram_account`:
+    `params.api_id`, `secret_refs.api_hash`, `secret_refs.session`.
+
+    Кілька екземплярів колектора можуть ділити одне сховище стану (той самий вузол, спільний каталог). Будь-яка
+    операція, що звертається до сховища, може отримати `503 service_unavailable` (`retryable: true`,
+    `Retry-After`), якщо інший екземпляр тримає блокування сховища довше за налаштований час очікування
+    колектора; запит можна повторити без змін.
   license:
     name: Proprietary
     identifier: LicenseRef-Jane
@@ -49,7 +60,9 @@ paths:
       description: |
         Коротка операція: один URL або одне повідомлення. Перевіряє scope й robots, якщо передано
         правила. Кожен виклик — нове спостереження (новий `observation_id`), тому ключ
-        ідемпотентності не потрібен.
+        ідемпотентності не потрібен. Якщо джерело підтвердило, що матеріалу немає (сайт відповів
+        HTTP 404 або 410; повідомлення Telegram не існує чи видалене), — `404 not_found`; інші
+        помилки джерела — `502 source_unavailable`.
       tags: [fetch]
       x-jane-no-idempotency-key: read-only for Jane state; every call is a new observation by design
       requestBody:
@@ -106,12 +119,46 @@ paths:
                     status: 403
                     code: access_denied_by_policy
                     detail: disallowed by robots.txt for user-agent JaneBot
+        '404':
+          description: |
+            Джерело підтвердило, що матеріалу немає (`not_found`, `retryable: false`): web — сайт відповів
+            HTTP 404 або 410 (`details.http_status`); Telegram — повідомлення не існує або видалене
+            (`details.reason: message_not_found`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                web:
+                  value:
+                    type: urn:jane:problem:not_found
+                    title: Not found
+                    status: 404
+                    code: not_found
+                    retryable: false
+                    detail: source returned HTTP 404
+                    details:
+                      http_status: 404
+                telegram:
+                  value:
+                    type: urn:jane:problem:not_found
+                    title: Not found
+                    status: 404
+                    code: not_found
+                    retryable: false
+                    detail: message 4521 not found in city_events_example
+                    details:
+                      reason: message_not_found
         '422':
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
         '429':
           $ref: 'common.yaml#/components/responses/TooManyRequests'
         '502':
-          description: Джерело недоступне або повернуло помилку (`source_unavailable`).
+          description: |
+            Джерело недоступне або повернуло помилку (`source_unavailable`). Web: `details.http_status` —
+            статус відповіді сайту (крім 404/410, див. 404) або останньої спроби після повторів. Telegram:
+            `details.reason` — `channel_unavailable` (канал не знайдено, приватний чи без доступу) або
+            `account_unauthorized` (сесію відхилено); для них `retryable: false`, бо повтор нічого не змінить.
           content:
             application/problem+json:
               schema:
@@ -126,6 +173,17 @@ paths:
                     retryable: true
                     details:
                       http_status: 503
+                channel:
+                  value:
+                    type: urn:jane:problem:source_unavailable
+                    title: Source unavailable
+                    status: 502
+                    code: source_unavailable
+                    retryable: false
+                    details:
+                      reason: channel_unavailable
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
   /v1/collections:
     post:
       x-jane-scope: collector:run
@@ -213,6 +271,8 @@ paths:
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
   /v1/collections/{collection_id}/materials:
     parameters:
       - $ref: '#/components/parameters/CollectionId'
@@ -268,6 +328,8 @@ paths:
                     title: Collection expired
                     status: 410
                     code: not_found
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
   /v1/collections/{collection_id}/errors:
     parameters:
       - $ref: '#/components/parameters/CollectionId'
@@ -305,6 +367,8 @@ paths:
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
   /v1/rules/validations:
     post:
       x-jane-scope: [collector:read, collector:run]
@@ -382,10 +446,14 @@ paths:
                       '-1001234567890':
                         last_message_id: 4530
                         last_edit_date: '2026-09-27T12:10:00Z'
+                        pts: 9112
+                        username: city_events_example
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
     delete:
       x-jane-scope: collector:run
       operationId: resetCollectorState
@@ -398,6 +466,8 @@ paths:
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '409':
           $ref: 'common.yaml#/components/responses/Conflict'
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
   /v1/connections:
     get:
       x-jane-scope: [connections:write, collector:read]
@@ -419,6 +489,8 @@ paths:
                   $ref: 'common.yaml#/components/pathItems/Connections/get/responses/200/content/application~1json/examples/list'
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
   /v1/connections/{connection_id}:
     parameters:
       - $ref: 'common.yaml#/components/parameters/ConnectionId'
@@ -444,6 +516,8 @@ paths:
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
     put:
       x-jane-scope: connections:write
       operationId: putConnection
@@ -509,6 +583,8 @@ paths:
                     title: Not implemented
                     status: 501
                     code: not_implemented
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
     delete:
       x-jane-scope: connections:write
       operationId: deleteConnection
@@ -521,6 +597,8 @@ paths:
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
   /v1/connections/{connection_id}/test:
     parameters:
       - $ref: 'common.yaml#/components/parameters/ConnectionId'
@@ -558,6 +636,8 @@ paths:
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
   /v1/jobs/{job_id}:
     parameters:
       - $ref: 'common.yaml#/components/parameters/JobId'
@@ -582,6 +662,8 @@ paths:
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
   /v1/jobs/{job_id}/cancel:
     parameters:
       - $ref: 'common.yaml#/components/parameters/JobId'
@@ -628,6 +710,8 @@ paths:
           $ref: 'common.yaml#/components/responses/Unauthenticated'
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
+        '503':
+          $ref: 'common.yaml#/components/responses/ServiceUnavailable'
 components:
   securitySchemes:
     bearerAuth:
@@ -868,7 +952,14 @@ components:
           minimum: 0
         cursors:
           type: object
-          description: Курсори за каналами (Telegram) або стратегіями (web, наприклад lastmod sitemap).
+          description: |
+            Курсори, збережені для `state_key` (читаються наступним `mode: incremental`).
+            Telegram — ключ `channel_id` (`-100…`), значення: `last_message_id` (найбільший виданий id),
+            `last_edit_date` (найпізніший виданий `edit_date`, RFC 3339), `pts` (стан оновлень каналу, з якого
+            наступний збір читає `getChannelDifference`; відсутній, поки збір каналу не дочитав історію до кінця —
+            тоді наступний збір дочитує історію після `last_message_id`), `username`.
+            Web — ключ `strategy_id`, значення: непорожній `snapshot()` стратегії (стан і діагностичні лічильники,
+            наприклад `stats`); стан черги й історії URL не показується, лише `known_urls` і `frontier_size`.
           additionalProperties:
             type: object
   examples:

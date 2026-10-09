@@ -80,6 +80,9 @@ class TgMessage:
     views: int | None = None
     author: str | None = None
     media: Sequence[TgMedia] = field(default_factory=tuple)
+    service_action: str | None = None
+    """A service message of the channel (``MessageService``: channel created, message pinned, title or photo
+    changed...): the action in snake case (``channel_create``, ``pin_message``); ``None`` for a post."""
 
 
 @dataclass(frozen=True)

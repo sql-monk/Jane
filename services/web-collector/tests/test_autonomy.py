@@ -100,7 +100,8 @@ def test_fetch_respects_robots_without_rules(service_factory: ServiceFactory, si
         assert r.status_code == 403
         assert r.json()["code"] == "access_denied_by_policy"
         r = api.post("/v1/fetches", json={"source_kind": "web", "url": site.url("/missing-page")})
-        assert r.status_code == 502
-        assert r.json()["code"] == "source_unavailable"
+        # the site says there is no such page: 404 not_found, not retryable (collector.v1, R04)
+        assert r.status_code == 404
+        assert r.json()["code"] == "not_found" and r.json()["retryable"] is False
         assert r.json()["details"]["http_status"] == 404
     assert site.requests["/private/admin"] == 0

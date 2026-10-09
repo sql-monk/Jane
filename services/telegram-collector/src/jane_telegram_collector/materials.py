@@ -2,8 +2,14 @@
 
 * ``material_id`` = ``tg:<channel_id>:<message_id>`` — the same for every observation of the message;
 * ``observation_id`` — new for every read from Telegram (history, update, edit, one-shot fetch);
-* ``revision.sequence`` = ``edit_date`` (or ``date`` for an unedited message) as epoch seconds,
-  ``revision.is_edit`` = Telegram marked the message as edited, ``revision.content_sha256`` = sha256 of the text;
+* ``revision.sequence`` = ``edit_date`` (or ``date`` for an unedited message) in epoch seconds
+  x :data:`SEQUENCE_SCALE` + the number of the revision the collector saw within that second (0 for the first):
+  strictly larger for every new revision, also for several edits within one second (R04,
+  ``material.schema.json``); ``revision.source_revision`` keeps ``edit_date`` in epoch seconds as Telegram gives
+  it; ``revision.is_edit`` = Telegram marked the message as edited, ``revision.content_sha256`` = sha256 of the
+  text;
+* a service message of the channel (channel created, message pinned...) is a material too, with its action in
+  ``metadata.service_action`` (R30);
 * content: the message text (``text/plain``, UTF-8) inline, or a transit blob (``file://``) if asked or larger
   than ``transfer.inline_max_bytes``; downloaded media go to ``attachments`` the same way.
 """
@@ -31,6 +37,7 @@ __all__ = [
     "message_sequence",
     "message_sha",
     "new_observation_id",
+    "revision_sequence",
     "rfc3339",
 ]
 
@@ -66,8 +73,37 @@ def material_id(channel_id: str, message_id: int) -> str:
     return f"tg:{channel_id}:{message_id}"
 
 
-def message_sequence(msg: TgMessage) -> int:
+SEQUENCE_SCALE = 1000
+"""``revision.sequence`` units per second of ``edit_date``: room for that many revisions within one second. A
+format constant of the contract (``material.schema.json``), not a limit."""
+
+
+def message_seconds(msg: TgMessage) -> int:
+    """``edit_date`` (or ``date`` of an unedited message) in epoch seconds: Telegram's own revision mark."""
     return int((msg.edit_date or msg.date).timestamp())
+
+
+def message_sequence(msg: TgMessage) -> int:
+    """``revision.sequence`` of the first revision with this ``edit_date`` second."""
+    return message_seconds(msg) * SEQUENCE_SCALE
+
+
+def revision_sequence(msg: TgMessage, sha: str, seen: tuple[int, str] | None) -> int:
+    """``revision.sequence`` of ``msg`` given the last revision seen for the message (``sequence``, text sha256).
+
+    Another text within the second of the seen revision gets the next number, so every new revision has a
+    strictly larger sequence (Telegram's ``edit_date`` has only second precision); the same text keeps the seen
+    sequence (a repeated delivery); an older ``edit_date`` gives a smaller sequence (the caller skips it).
+    """
+    base = message_sequence(msg)
+    if seen is None:
+        return base
+    seen_sequence, seen_sha = seen
+    if not base <= seen_sequence < base + SEQUENCE_SCALE:
+        return base  # another second: newer (larger) or older (smaller) than the seen revision
+    if seen_sha == sha:
+        return seen_sequence
+    return min(seen_sequence + 1, base + SEQUENCE_SCALE - 1)
 
 
 def message_sha(msg: TgMessage) -> str:
@@ -185,10 +221,14 @@ def build_material(
     attachments: Sequence[tuple[TgMedia, dict[str, Any]]] = (),
     diagnostics: Sequence[Mapping[str, Any]] = (),
     now: datetime | None = None,
+    sequence: int | None = None,
 ) -> dict[str, Any]:
+    """``sequence``: the revision number computed against the state (:func:`revision_sequence`); without it the
+    first number of the ``edit_date`` second (one-shot fetch, which keeps no state)."""
     fetched = now or datetime.now(UTC)
     body = msg.text.encode("utf-8")
-    sequence = message_sequence(msg)
+    if sequence is None:
+        sequence = message_sequence(msg)
     telegram: dict[str, Any] = {"channel_id": channel.channel_id, "message_id": msg.message_id}
     if channel.username:
         telegram["channel_username"] = channel.username
@@ -214,7 +254,7 @@ def build_material(
         "format": {"media_type": "text/plain", "charset": "utf-8", "content_kind": "message"},
         "revision": {
             "content_sha256": hashlib.sha256(body).hexdigest(),
-            "source_revision": str(sequence),
+            "source_revision": str(message_seconds(msg)),
             "sequence": sequence,
             "is_edit": msg.edit_date is not None,
         },
@@ -230,6 +270,8 @@ def build_material(
     if diagnostics:
         material["diagnostics"] = [dict(d) for d in diagnostics]
     metadata: dict[str, Any] = {}
+    if msg.service_action:
+        metadata["service_action"] = msg.service_action
     if msg.views is not None:
         metadata["views"] = msg.views
     if msg.author:

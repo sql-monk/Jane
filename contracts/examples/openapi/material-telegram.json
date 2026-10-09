@@ -27,7 +27,7 @@
     "revision": {
       "content_sha256": "39f16d19ae01f13cceb68b1822579074b18f9bb848a8c4bf5288c088daad8a5d",
       "source_revision": "1790503800",
-      "sequence": 1790503800,
+      "sequence": 1790503800000,
       "is_edit": true
     },
     "content": {

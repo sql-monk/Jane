@@ -10,9 +10,16 @@ Per channel the run keeps a *progress* record (``channel_progress``, per collect
   messages. If Telegram answers "difference too long", new messages are read from the history after
   ``last_message_id`` and an error entry says that edits in the gap are unavailable.
 
-An edit is emitted as a new observation of the same ``material_id`` with a larger ``revision.sequence``
-(``edit_date``) and ``is_edit: true``. A repeated delivery of a revision already emitted for the ``state_key``
-(same sequence and text; e.g. an update replayed after a restart) is not emitted again (``stats.duplicates``).
+An edit is emitted as a new observation of the same ``material_id`` with a strictly larger ``revision.sequence``
+(``edit_date`` x 1000 + the revision number within that second, also for several edits in one second) and
+``is_edit: true``. A repeated delivery of a revision already emitted for the ``state_key`` (same ``edit_date``
+and text; e.g. an update replayed after a restart) is not emitted again (``stats.duplicates``).
+
+``stats.by_strategy`` / ``discovery.strategy``: ``telegram_history`` for messages read from the channel history
+(full mode, the first incremental run without a cursor, and an incremental run that finishes a history read a
+previous collection stopped, e.g. at ``telegram.max_messages_per_run``, before the cursor got a ``pts``);
+``telegram_updates`` for new and edited messages from ``getChannelDifference`` and for new messages read after
+"difference too long" in place of the lost updates.
 
 Every emitted message is committed in one lease-fenced transaction with the run progress, the cursor, the
 seen revision and the stats, so a killed instance's successor continues exactly after the last emitted
@@ -53,9 +60,9 @@ from .materials import (
     TransitStore,
     build_material,
     material_id,
-    message_sequence,
     message_sha,
     new_observation_id,
+    revision_sequence,
     rfc3339,
 )
 from .settings import ServiceLimits
@@ -414,12 +421,14 @@ class TelegramRun:
             return {**base, "phase": "changes", "pts": int(cursor["pts"]), "known_max": known, "dedup": True}
         if not self.new_on:  # edits wanted but no pts yet: nothing to diff against, start from now
             return {**base, "phase": "finish", "known_max": known}
+        # a cursor without pts: a previous collection stopped while reading the history (budget, flood-wait,
+        # failure); this run reads the rest of the history after last_message_id (R30: by_strategy history)
         return {
             **base,
             "phase": "history",
             "after_id": known,
             "since": None,
-            "strategy": UPDATES,
+            "strategy": HISTORY,
             "dedup": True,
             "known_max": known,
         }
@@ -602,14 +611,13 @@ class TelegramRun:
         self.stats["fetched"] += 1
         self.stats["bytes_fetched"] += len(msg.text.encode("utf-8"))
         mid = material_id(channel.channel_id, msg.message_id)
-        sequence = message_sequence(msg)
         sha = message_sha(msg)
+        seen = self.state.seen(self.state_key, mid)
+        sequence = revision_sequence(msg, sha, seen)
         cursor = self._cursor(channel.channel_id)
-        if dedup:
-            seen = self.state.seen(self.state_key, mid)
-            if seen is not None and (seen[0] > sequence or (seen[0] == sequence and seen[1] == sha)):
-                self.stats["duplicates"] += 1
-                return
+        if dedup and seen is not None and (seen[0] > sequence or (seen[0] == sequence and seen[1] == sha)):
+            self.stats["duplicates"] += 1
+            return
         await self._wait_backpressure()
         observation_id = new_observation_id()
         attachments, diagnostics = await self._media(client, channel, msg, observation_id)
@@ -626,6 +634,7 @@ class TelegramRun:
                 collection_id=self.collection_id,
                 attachments=attachments,
                 diagnostics=diagnostics,
+                sequence=sequence,
             )
         except ContentTooLarge as exc:
             with self._tx() as db:

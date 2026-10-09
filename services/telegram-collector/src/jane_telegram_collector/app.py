@@ -64,6 +64,12 @@ def _now() -> str:
     return rfc3339(datetime.now(UTC))
 
 
+def state_store_busy(exc: BaseException) -> bool:
+    """SQLite could not take its lock within ``STATE_BUSY_TIMEOUT_MS`` (another instance holds it)."""
+    text = str(exc).lower()
+    return isinstance(exc, sqlite3.OperationalError) and ("locked" in text or "busy" in text)
+
+
 def build_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     resolved = resolve_service_limits(settings)
@@ -111,7 +117,11 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     busy_retry_after = max(1, math.ceil(settings.state_busy_timeout_ms / 1000))
 
     async def state_busy(request: Request, exc: Exception) -> JSONResponse:
-        # another instance held the SQLite lock longer than state_busy_timeout_ms: retryable, not a 500
+        if not state_store_busy(exc):  # another SQLite failure is not "busy": 500 internal_error as usual
+            log.exception("state store error", extra={"path": request.url.path})
+            failure = JaneError("internal error")
+            return problem_response(failure.to_problem(instance=request.url.path), failure.headers)
+        # another instance held the SQLite lock longer than state_busy_timeout_ms: retryable 503, not a 500
         log.warning("state store busy", extra={"path": request.url.path, "error": str(exc)})
         err = JaneError(
             "state store is busy, retry", code="service_unavailable", retry_after_seconds=busy_retry_after

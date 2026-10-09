@@ -44,7 +44,10 @@ from .settings import ServiceLimits, to_contract
 from .state import FrontierRow, LeaseLost, StateStore
 from .urls import Normalizer, Scope, UrlPattern, compile_patterns, patterns_match
 
-__all__ = ["CrawlRun", "LeaseLost", "RunDeps", "StrategyContext", "new_stats"]
+__all__ = ["NOT_FOUND_STATUSES", "CrawlRun", "LeaseLost", "RunDeps", "StrategyContext", "new_stats"]
+
+NOT_FOUND_STATUSES = frozenset({404, 410})
+"""Source answers that mean "no such material": ``not_found`` in collection errors and in ``POST /v1/fetches``."""
 
 log = logging.getLogger(__name__)
 
@@ -639,7 +642,7 @@ class CrawlRun:
         material: dict[str, Any] | None = None
         error: tuple[str, str] | None = None
         if result.status >= 400:
-            code = "not_found" if result.status in (404, 410) else "source_unavailable"
+            code = "not_found" if result.status in NOT_FOUND_STATUSES else "source_unavailable"
             error = (code, f"HTTP {result.status}")
         elif duplicate_of is None and row.kind == "material" and 200 <= result.status < 300:
             changed = prev is None or prev.get("content_sha256") != content_sha

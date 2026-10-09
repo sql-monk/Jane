@@ -35,7 +35,7 @@ def test_every_operation_matches_the_contract(
     api.get("/v1/health")
     api.get("/v1/info")
 
-    # fetch: 200, 403 (robots), 422 (out of scope), 502 (source error), 400 (bad JSON)
+    # fetch: 200, 403 (robots), 422 (out of scope), 404 (the site has no such page), 400 (bad JSON)
     assert api.post("/v1/fetches", json={"source_kind": "web", "url": site.url("/about")}).status_code == 200
     assert (
         api.post("/v1/fetches", json={"source_kind": "web", "url": site.url("/private/x")}).status_code == 403
@@ -45,10 +45,8 @@ def test_every_operation_matches_the_contract(
         "/v1/fetches", json={"source_kind": "web", "url": "https://elsewhere.example.org/", "rules": rules}
     )
     assert out.status_code == 422 and out.json()["code"] == "out_of_scope"
-    assert (
-        api.post("/v1/fetches", json={"source_kind": "web", "url": site.url("/missing-page")}).status_code
-        == 502
-    )
+    missing = api.post("/v1/fetches", json={"source_kind": "web", "url": site.url("/missing-page")})
+    assert missing.status_code == 404 and missing.json()["details"] == {"http_status": 404}
     bad = api.request("POST", "/v1/fetches", content=b"{", headers={"content-type": "application/json"})
     assert bad.status_code == 400
 

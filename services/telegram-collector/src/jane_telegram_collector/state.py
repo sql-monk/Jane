@@ -21,7 +21,14 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-__all__ = ["Fence", "LeaseLost", "StateStore"]
+from .materials import SEQUENCE_SCALE
+
+__all__ = ["SCHEMA_VERSION", "Fence", "LeaseLost", "StateStore"]
+
+SCHEMA_VERSION = 1
+"""``PRAGMA user_version`` of the state file. 1 (R04): ``tg_seen.sequence`` is in ``revision.sequence`` units
+(epoch seconds x ``SEQUENCE_SCALE`` + the revision number within the second); a version 0 file (seconds) is
+migrated when a process opens it. Instances sharing one ``STATE_DIR`` are upgraded together."""
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS collections (
@@ -127,6 +134,20 @@ class StateStore:
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute("PRAGMA synchronous=NORMAL")
         self._db.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Bring a state file of an older version to :data:`SCHEMA_VERSION` (one transaction, once per file)."""
+        with self.tx() as db:
+            version = int(db.execute("PRAGMA user_version").fetchone()[0])
+            if version < 1:
+                db.execute("UPDATE tg_seen SET sequence = sequence * ?", (SEQUENCE_SCALE,))
+            if version < SCHEMA_VERSION:
+                db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
+    def schema_version(self) -> int:
+        row = self._one("PRAGMA user_version")
+        return int(row[0]) if row else 0
 
     def close(self) -> None:
         with self._lock:

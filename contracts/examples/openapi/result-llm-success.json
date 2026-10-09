@@ -35,7 +35,7 @@
           "observation": {
             "observation_id": "obs_01J9ZT0C0000000000000004",
             "observed_at": "2026-09-27T12:30:00Z",
-            "sequence": 1790503800,
+            "sequence": 1790503800000,
             "material_id": "tg:-1001234567890:4521"
           }
         }

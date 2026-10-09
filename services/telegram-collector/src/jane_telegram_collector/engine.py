@@ -413,10 +413,10 @@ class Engine:
                 f"telegram unavailable: {exc!r}", code="source_unavailable", retryable=True
             ) from exc
         if msg is None:
+            # the source says the material does not exist: 404 not_found (collector.v1, R04), not a source error
             raise JaneError(
                 f"message {target['message_id']} not found in {channel.username or channel.channel_id}",
-                code="source_unavailable",
-                retryable=False,
+                code="not_found",
                 details={"reason": "message_not_found"},
             )
         delivery = Delivery(

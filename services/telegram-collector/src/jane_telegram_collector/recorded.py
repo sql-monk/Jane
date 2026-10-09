@@ -7,7 +7,8 @@ A recording ``<recordings_dir>/<username or channel_id>.json``::
       "required_secrets": ["session"],          # optional: the account must resolve these secret_refs
       "messages": [{"id": 1, "date": "2026-09-01T10:00:00Z", "text": "...", "edit_date": null,
                     "views": 10, "grouped_id": null, "author": null,
-                    "media": [{"kind": "photo", "name": "p.jpg", "media_type": "image/jpeg", "data_base64": "..."}]}],
+                    "media": [{"kind": "photo", "name": "p.jpg", "media_type": "image/jpeg", "data_base64": "..."}],
+                    "service": null}],          # a service message: its action, e.g. "channel_create"
       "events": [{"pts": 1, "message": {...message as it was after this update...}}],
       "min_pts": 0,                             # updates before this pts are gone -> difference too long
       "faults": [{"method": "history", "flood_wait": 3, "count": 1},
@@ -182,6 +183,7 @@ class RecordedClient:
             views=raw.get("views"),
             author=raw.get("author"),
             media=media,
+            service_action=str(raw["service"]) if raw.get("service") else None,
         )
 
     @staticmethod

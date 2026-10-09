@@ -16,7 +16,7 @@ from jane_kit.jobs import Job, JobCancelledError, JobContext, JobRunner, JobStat
 
 from . import __version__
 from .connections import auth_headers
-from .crawler import CrawlRun, LeaseLost, RunDeps, new_stats
+from .crawler import NOT_FOUND_STATUSES, CrawlRun, LeaseLost, RunDeps, new_stats
 from .discovery.links import html_meta, is_html, parse_html
 from .discovery.registry import RESERVED_TYPES, Registry
 from .fetcher import Fetcher, FetchError, build_client
@@ -440,6 +440,13 @@ class Engine:
             ) from exc
         finally:
             host_session.close()
+        if result.status in NOT_FOUND_STATUSES:
+            # the site says the page does not exist: 404 not_found (collector.v1, R04), as in /errors of a collection
+            raise JaneError(
+                f"source returned HTTP {result.status}",
+                code="not_found",
+                details={"http_status": result.status},
+            )
         if result.status >= 400:
             raise JaneError(
                 f"source returned HTTP {result.status}",

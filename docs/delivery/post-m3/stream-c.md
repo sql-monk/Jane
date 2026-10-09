@@ -200,3 +200,42 @@ Branch CI [37936808211](https://github.com/sql-monk/Jane/actions/runs/3793680821
 contracts-compat/lint/web — success, unit/web-mock-e2e тривають. Це push CI, не фінальний dispatch.
 Потік B уже злив B-5 як `f0fde81` і записав intent свого фінального CI; C чекає його actual success.
 **Повний dispatch C: count 0; C-4 не починався, людський cleanup script не змінено й не виконано.**
+
+### C-2: завершення branch CI — failure
+
+2026-10-09 16:37 (Київ): actual `gh run view` для
+[37936808211](https://github.com/sql-monk/Jane/actions/runs/37936808211), точний SHA
+`22f83662efaac0a64a91a2bc9078b0bcec04a793`: **completed / failure**.
+contracts-compat, lint, web, web-mock-e2e — success; unit — failure;
+isolation, stack, contract, limits, adapters, e2e — skipped після падіння unit.
+Журнал невдалого job збережено в ignored `.jane/wp23b-branch-ci-failed.txt` checkout `integ-c`.
+
+```text
+FAILED services/telegram-collector/tests/test_processes.py::test_two_instances_share_state_and_take_over_after_kill
+AssertionError: condition not reached
+status=running; paused_by_backpressure=True
+emitted=11; acknowledged=1; unacked=10; max_unacked_materials=10
+1 failed, 1136 passed, 5 skipped, 417 deselected, 33 warnings in 317.71s
+examples/deploy offline unit session: 93 passed, 3 warnings in 15.48s
+recipe unit: exit=1
+```
+
+Запит власнику Telegram Collector (WP-04 / власнику `services/telegram-collector/**`):
+усунути залежність тесту `test_processes.py:196` від розміру першої сторінки materials.
+Фактичний log містить наступний GET з `after=c_0000000000000001`: перша сторінка мала одну
+матеріальну одиницю. Тест після двох GET припиняє ACK і чекає `emitted >= 12`, хоча ACK=1 та
+queue=10 дозволяють рівно 11. Це пояснює зафіксований стан backpressure; робочий діагноз —
+гонка тестового споживача, а не доведений дефект packaging C-2. Власнику потрібна зміна споживання
+сторінок/ACK із збереженням перевірок shared state, kill/takeover та exactly-once; не послаблювати
+assertions і не збільшувати timeout як заміну виправленню.
+
+Readonly `git diff bb1982b 22f8366 -- services/telegram-collector libs/jane-kit contracts/python`
+порожній; Telegram Collector не залежить від jane-contracts. Фінальний CI B
+[37937013460](https://github.com/sql-monk/Jane/actions/runs/37937013460) на
+`bb1982b9f6b1e2593fb2f1ab60a436e6945f15b1` уже має unit/contract/isolation success,
+але stack/limits/e2e ще працюють. У C немає власності на цей тест: чужий код не редагувався,
+запит передано через цей журнал; інший чат не повідомлявся.
+
+Branch CI не названо зеленим. Прийняте незалежним review злиття C-2 збережено; фінальне закриття
+коду C-2/C-3 чекає окремого точного integration CI. Повний C dispatch досі 0, не дубльовано
+ні branch run, ні B final run; локальні повні набори та успішні targeted gates не повторювались.

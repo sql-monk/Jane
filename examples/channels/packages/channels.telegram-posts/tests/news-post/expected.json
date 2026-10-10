@@ -1,0 +1,29 @@
+{
+  "entities": [
+    {
+      "entity_type": "post",
+      "fields": {
+        "channel": "news_example",
+        "message_id": 42,
+        "title": "⚡️ У Києві відкрили новий міст через Дніпро",
+        "text": "⚡️ У Києві відкрили новий міст через Дніпро\n\nРух відкрито о 9:00. Деталі — на сайті.",
+        "url": "https://t.me/news_example/42",
+        "published_at": "2026-10-10T09:30:00Z"
+      },
+      "key": {
+        "scope": "tg-news",
+        "natural": {
+          "channel": "news_example",
+          "message_id": 42
+        }
+      },
+      "observation": {
+        "observation_id": "obs_channels_42",
+        "observed_at": "2026-10-10T10:00:00Z",
+        "sequence": 1,
+        "material_id": "tg:-1009000000002:42",
+        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  ]
+}

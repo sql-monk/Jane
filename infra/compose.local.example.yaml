@@ -19,6 +19,17 @@ services:
       # Real shop pages are often 0.5-2 MB; without a blob store larger pages fail with limit_exceeded
       # (default 256 KiB for inline delivery).
       JANE_WEB_COLLECTOR_LIMITS__TRANSFER__INLINE_MAX_BYTES: "8388608"
+  telegram-collector:
+    build:
+      # real Telegram: Telethon in the image; the account comes from the tg-main connection whose secrets are
+      # file:/run/secrets/tg_api_hash and tg_session (scripts/tg_session.py writes them to .jane/secrets)
+      args:
+        EXTRAS: --extra telethon
+    environment:
+      JANE_TELEGRAM_COLLECTOR_CLIENT_BACKEND: telethon
+      JANE_TELEGRAM_COLLECTOR_REGISTRY_URL: http://registry:8000
+    volumes:
+      - ../.jane/secrets:/run/secrets:ro
   orchestrator:
     environment:
       JANE_ORCHESTRATOR_EXECUTORS: >-
@@ -32,6 +43,8 @@ services:
           "sync_connections": false},
          {"executor": "registry", "role": "registry", "base_url": "http://registry:8000"},
          {"executor": "llm", "role": "llm", "base_url": "http://llm:8110", "capabilities": {"handler_kinds": ["llm"]}},
+         {"executor": "telegram-collector", "role": "collector", "base_url": "http://telegram-collector:8102",
+          "capabilities": {"collector": "telegram"}},
          {"executor": "assistant", "role": "assistant", "base_url": "http://assistant:8000"}]
   llm:
     environment:
@@ -41,3 +54,4 @@ services:
       JANE_ASSISTANT_REGISTRY_URL: http://registry:8000
       JANE_ASSISTANT_ORCHESTRATOR_URL: http://orchestrator:8000
       JANE_ASSISTANT_COLLECTOR_WEB_URL: http://web-collector:8101
+      JANE_ASSISTANT_COLLECTOR_TELEGRAM_URL: http://telegram-collector:8102

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "post (повідомлення Telegram-каналу)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["channel", "message_id", "title", "text"],
+  "properties": {
+    "channel": { "type": "string", "minLength": 1 },
+    "message_id": { "type": "integer", "minimum": 0 },
+    "url": { "type": "string", "minLength": 1 },
+    "published_at": { "type": "string" },
+    "title": { "type": "string" },
+    "text": { "type": "string", "minLength": 1 }
+  }
+}

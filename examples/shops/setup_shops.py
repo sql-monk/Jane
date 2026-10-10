@@ -37,10 +37,10 @@ SHOPS = {
 STORAGE = ("jane.storage-files", "jane.storage-postgresql")
 
 
-def package_dirs() -> dict[str, Path]:
+def package_dirs(packages: Path = PACKAGES) -> dict[str, Path]:
     from jane_storage.adapters import package_dirs as storage_dirs
 
-    dirs = {ex.read_json(p / "jane-package.json")["package_id"]: p for p in sorted(PACKAGES.iterdir())}
+    dirs = {ex.read_json(p / "jane-package.json")["package_id"]: p for p in sorted(packages.iterdir())}
     for root in storage_dirs().values():
         pid = ex.read_json(Path(root) / "jane-package.json")["package_id"]
         if pid in STORAGE:
@@ -48,11 +48,12 @@ def package_dirs() -> dict[str, Path]:
     return dirs
 
 
-def publish(svc: ex.Services) -> dict[str, dict[str, str]]:
+def publish(svc: ex.Services, packages: Path = PACKAGES) -> dict[str, dict[str, str]]:
+    """Publish, check and approve every package of ``packages`` and the storage packages; their references."""
     from jane_registry.archive import canonical_archive, digest_of, files_from_dir
 
     refs: dict[str, dict[str, str]] = {}
-    for pid, directory in package_dirs().items():
+    for pid, directory in package_dirs(packages).items():
         manifest = ex.read_json(directory / "jane-package.json")
         archive = bytes(canonical_archive(files_from_dir(directory)))
         digest = str(digest_of(archive))

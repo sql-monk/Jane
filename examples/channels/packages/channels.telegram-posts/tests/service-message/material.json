@@ -1,0 +1,38 @@
+{
+  "material_id": "tg:-1009000000002:43",
+  "observation_id": "obs_channels_43",
+  "source": {
+    "source_id": "tg-news",
+    "kind": "telegram",
+    "name": "News example"
+  },
+  "locator": {
+    "telegram": {
+      "channel_id": "-1009000000002",
+      "channel_username": "news_example",
+      "message_id": 43
+    }
+  },
+  "fetched_at": "2026-10-10T10:00:00Z",
+  "published_at": "2026-10-10T09:30:00Z",
+  "format": {
+    "media_type": "text/plain",
+    "charset": "utf-8",
+    "content_kind": "message"
+  },
+  "revision": {
+    "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "sequence": 1
+  },
+  "content_file": "tests/service-message/message.txt",
+  "content": {
+    "kind": "inline",
+    "media_type": "text/plain",
+    "encoding": "utf-8",
+    "data": ""
+  },
+  "collector": {
+    "name": "telegram-collector",
+    "version": "0.1.0"
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "schema_version": "1",
+  "package_id": "channels.telegram-posts",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "Telegram channels: posts",
+  "description": "Повідомлення публічних Telegram-каналів як сутності post: канал, id, посилання t.me, час, заголовок (перший рядок) і текст. Редагування оновлює той самий пост.",
+  "tags": [
+    "telegram",
+    "news",
+    "posts"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_channels_posts.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/plain"
+    ],
+    "content_kinds": [
+      "message"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "post",
+        "schema": "schemas/post.schema.json",
+        "key_fields": [
+          "channel",
+          "message_id"
+        ],
+        "description": "Повідомлення каналу"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "news-post",
+      "input": {
+        "material": "tests/news-post/material.json"
+      },
+      "expected_status": "success",
+      "expected": "tests/news-post/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "service-message-empty",
+      "input": {
+        "material": "tests/service-message/material.json"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (coordinator)"
+    ],
+    "created_at": "2026-10-10T00:00:00Z",
+    "change_summary": "Posts of public news channels."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "telegram"
+    ]
+  }
+}

@@ -78,6 +78,7 @@ HANDLER: dict[str, Scopes] = {
 }
 
 STORAGE: dict[str, Scopes] = {
+    "GET /v1/storage-status": "storage:read",
     "GET /v1/entities": "storage:read",
     "GET /v1/entity-history": "storage:read",
     "GET /v1/objects": "storage:read",

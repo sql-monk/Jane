@@ -909,3 +909,15 @@ r1 → виправлення на `origin/wp/01g2-service-auth`, CI 37857870977
   main і push main виконує людина. Завершення вимикає лише heartbeat A `jane-a-ci-b-c`.
   Попередні pending записи — історичні зрізи; зовнішні сервіси та browser real22 не оголошено перевіреними,
   dev-laptop/single-node виключені з обсягу.
+
+
+## Адмінка: матеріали, сховища та ланцюжки (2026-10-11)
+
+Погоджено користувачем; [план](admin-materials-chains-plan.md). Інтеграція в `codex/admin-materials-chains`, базова ревізія `1eb6dbd`.
+
+| WP | Назва | Статус | Гілка |
+|---|---|---|---|
+| 24 | Стан і статистика сховищ | active | wp/24-storage-observability |
+| 25 | Матеріали й браузер сховищ | active | wp/25-materials-storage-browser |
+| 26 | Візуальний редактор ланцюжків | active | wp/26-visual-chain-editor |
+| 27 | Інтеграція та приймання | active | codex/admin-materials-chains |

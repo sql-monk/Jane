@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { ApiError, errorMessage, safeProblemCode } from "../api/problem";
 import { redactSecrets } from "../lib/secrets";
+import { useLocation } from "react-router-dom";
+import { navigationFor } from "../lib/navigation";
 
 export function Page({
   title,
@@ -11,10 +13,15 @@ export function Page({
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  const location = useLocation();
+  const description = navigationFor(location.pathname)?.description;
   return (
     <section className="page">
       <header className="page-header">
-        <h1>{title}</h1>
+        <div>
+          <h1>{title}</h1>
+          {description ? <p className="page-description">{description}</p> : null}
+        </div>
         {actions ? <div className="page-actions">{actions}</div> : null}
       </header>
       {children}

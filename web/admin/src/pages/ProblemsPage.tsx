@@ -49,8 +49,18 @@ export function ProblemsPage() {
 
 function ProblemGroups() {
   const api = useApi();
-  const [status, setStatus] = useState<ProblemGroupStatus | "">("");
-  const [sourceId, setSourceId] = useState("");
+  const [params, setParams] = useSearchParams();
+  const rawStatus = params.get("status");
+  const status = GROUP_STATUSES.includes(rawStatus as ProblemGroupStatus)
+    ? (rawStatus as ProblemGroupStatus)
+    : "";
+  const sourceId = params.get("source_id") ?? "";
+  const updateFilter = (key: string, value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next);
+  };
   const [selected, setSelected] = useState<ProblemGroup | null>(null);
   const list = useCursorList(["problem-groups", status, sourceId], (cursor, limit) =>
     unwrap(
@@ -70,7 +80,7 @@ function ProblemGroups() {
     <>
       <div className="filters">
         <Field label="Стан групи">
-          <select value={status} onChange={(e) => setStatus(e.target.value as ProblemGroupStatus | "")}>
+          <select value={status} onChange={(e) => updateFilter("status", e.target.value)}>
             <option value="">усі</option>
             {GROUP_STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -80,7 +90,7 @@ function ProblemGroups() {
           </select>
         </Field>
         <Field label="Джерело">
-          <input value={sourceId} onChange={(e) => setSourceId(e.target.value)} />
+          <input value={sourceId} onChange={(e) => updateFilter("source_id", e.target.value)} />
         </Field>
       </div>
       {list.isLoading ? <Loading /> : null}

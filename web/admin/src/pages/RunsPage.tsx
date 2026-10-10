@@ -42,19 +42,22 @@ export function RunsPage() {
   const [params, setParams] = useSearchParams();
   const taskId = params.get("task_id") ?? "";
   const status = (params.get("status") ?? "") as JobStatus | "";
-  const list = useCursorList(["runs", taskId, status], (cursor, limit) =>
-    unwrap(
-      api.orchestrator.GET("/v1/runs", {
-        params: {
-          query: {
-            limit,
-            ...(cursor ? { cursor } : {}),
-            ...(taskId ? { task_id: taskId } : {}),
-            ...(status ? { status } : {}),
+  const list = useCursorList(
+    ["runs", taskId, status],
+    (cursor, limit) =>
+      unwrap(
+        api.orchestrator.GET("/v1/runs", {
+          params: {
+            query: {
+              limit,
+              ...(cursor ? { cursor } : {}),
+              ...(taskId ? { task_id: taskId } : {}),
+              ...(status ? { status } : {}),
+            },
           },
-        },
-      }),
-    ),
+        }),
+      ),
+    (items) => items.some((run) => !TERMINAL_JOB_STATUSES.has(run.status)),
   );
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -63,7 +66,14 @@ export function RunsPage() {
     setParams(next);
   };
   return (
-    <Page title="Запуски">
+    <Page
+      title="Запуски"
+      actions={
+        <button className="btn" type="button" onClick={list.refetch}>
+          Оновити список
+        </button>
+      }
+    >
       <div className="filters">
         <Field label="Завдання">
           <input value={taskId} onChange={(e) => update("task_id", e.target.value)} />
@@ -90,16 +100,61 @@ export function RunsPage() {
             header: "Запуск",
             cell: (r) => <Link to={`/runs/${encodeURIComponent(r.run_id)}`}>{r.run_id}</Link>,
           },
-          { header: "Завдання", cell: (r) => r.task_id },
+          {
+            header: "Завдання",
+            cell: (r) => <Link to={`/tasks/${encodeURIComponent(r.task_id)}`}>{r.task_id}</Link>,
+          },
           { header: "Стан", cell: (r) => <Status value={r.status} /> },
           { header: "Тригер", cell: (r) => r.trigger },
           { header: "Тест", cell: (r) => (r.test_mode ? "так" : "") },
           { header: "Створено", cell: (r) => formatDate(r.created_at) },
           { header: "Завершено", cell: (r) => formatDate(r.finished_at) },
+          { header: "Дії", cell: (run) => <RunListActions run={run} /> },
         ]}
       />
       <LoadMore hasMore={list.hasMore} loading={list.loadingMore} onClick={list.loadMore} />
     </Page>
+  );
+}
+
+function RunListActions({ run }: { run: Run }) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const cancel = useMutation({
+    mutationFn: (reason: string) =>
+      unwrap(
+        api.orchestrator.POST("/v1/runs/{run_id}/cancel", {
+          params: { path: { run_id: run.run_id } },
+          body: reason ? { reason } : {},
+        }),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["runs"] });
+      void queryClient.invalidateQueries({ queryKey: ["run", run.run_id] });
+    },
+  });
+  return (
+    <div>
+      <div className="button-row">
+        <Link className="btn btn-small" to={`/runs/${encodeURIComponent(run.run_id)}`}>
+          Деталі
+        </Link>
+        {!TERMINAL_JOB_STATUSES.has(run.status) && run.status !== "cancelling" ? (
+          <ReasonAction
+            label="Зупинити"
+            confirmLabel="Підтвердити зупинку"
+            danger
+            busy={cancel.isPending || cancel.isSuccess}
+            requireReason={false}
+            onConfirm={(reason) => cancel.mutate(reason)}
+          />
+        ) : null}
+      </div>
+      <ErrorBox error={cancel.error} title="Не вдалося зупинити" />
+      {cancel.isSuccess ? (
+        <Notice>Скасування прийнято. Уже збережені дані залишаються у сховищах.</Notice>
+      ) : null}
+    </div>
   );
 }
 

@@ -25,6 +25,8 @@ import { StrategiesSummary } from "./RulesEditorPage";
 
 export function SourcesPage() {
   const api = useApi();
+  const [search, setSearch] = useState("");
+  const [kind, setKind] = useState("");
   const list = useCursorList(["sources"], (cursor, limit) =>
     unwrap(
       api.orchestrator.GET("/v1/sources", { params: { query: { limit, ...(cursor ? { cursor } : {}) } } }),
@@ -44,11 +46,51 @@ export function SourcesPage() {
         </>
       }
     >
+      <div className="filters">
+        <Field label="Пошук у завантажених джерелах">
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Назва, адреса або ідентифікатор…"
+          />
+        </Field>
+        <Field label="Тип джерела">
+          <select value={kind} onChange={(event) => setKind(event.target.value)}>
+            <option value="">Усі джерела</option>
+            <option value="web">Вебсайти</option>
+            <option value="telegram">Telegram</option>
+          </select>
+        </Field>
+      </div>
       {list.isLoading ? <Loading /> : null}
       <ErrorBox error={list.error} />
+      <div className="list-summary">
+        <span>
+          Завантажено <strong>{list.isLoading || list.error ? "—" : list.items.length}</strong>
+          {list.hasMore ? "+" : ""}
+        </span>
+        <button className="btn btn-small" type="button" onClick={list.refetch}>
+          Оновити список
+        </button>
+      </div>
       <Table
         label="Джерела"
-        rows={list.items}
+        rows={list.items.filter(
+          (source) =>
+            (!kind || source.kind === kind) &&
+            `${source.source_id} ${source.title} ${source.locator.url ?? ""} ${source.locator.telegram_username ?? ""} ${source.locator.telegram_channel_id ?? ""}`
+              .toLocaleLowerCase("uk")
+              .includes(search.toLocaleLowerCase("uk")),
+        )}
+        empty={
+          list.error
+            ? "Дані джерел недоступні. Спробуйте оновити список."
+            : list.isLoading
+              ? "Завантаження джерел…"
+              : search || kind
+                ? "Збігів у завантажених джерелах немає. Змініть фільтри або завантажте наступну сторінку."
+                : "Джерел ще немає. Додайте сайт або канал самостійно чи через асистента."
+        }
         rowKey={(s) => s.source_id}
         columns={[
           {
@@ -66,6 +108,14 @@ export function SourcesPage() {
             header: "Невідомі сторінки → LLM",
             cell: (s) =>
               s.forward_unknown_to_llm ? <Status value="on" /> : <span className="muted">вимкнено</span>,
+          },
+          {
+            header: "Дії",
+            cell: (source) => (
+              <Link className="btn btn-small" to={`/tasks?source_id=${encodeURIComponent(source.source_id)}`}>
+                Завдання джерела
+              </Link>
+            ),
           },
         ]}
       />

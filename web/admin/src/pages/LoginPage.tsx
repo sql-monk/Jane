@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../app/context";
 import { ErrorBox } from "../components/ui";
+import { ThemeControl } from "../components/ThemeControl";
 
 export function LoginPage() {
   const auth = useAuth();
@@ -23,12 +24,14 @@ export function LoginPage() {
 
   return (
     <main className="login">
+      <div className="login-theme">
+        <ThemeControl />
+      </div>
       <h1>Jane — адмінка</h1>
       {auth.mode === "api_key" ? (
         <form onSubmit={submit} autoComplete="off" aria-label="Вхід за ключем API">
           <p className="muted">
-            Режим розробки (<code>auth.mode = api_key</code>): ключ адміністратора зберігається лише в
-            sessionStorage цієї вкладки й передається як <code>Authorization: Bearer</code>.
+            Введіть ключ адміністратора. Він зберігається лише протягом сесії цієї вкладки.
           </p>
           <label className="field">
             <span className="field-label">Ключ API</span>

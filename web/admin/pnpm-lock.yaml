@@ -14,12 +14,18 @@ importers:
       '@codemirror/lang-python':
         specifier: ^6.2.1
         version: 6.2.1
+      '@codemirror/language':
+        specifier: 6.12.4
+        version: 6.12.4
       '@codemirror/state':
         specifier: ^6.7.6
         version: 6.7.6
       '@codemirror/view':
         specifier: ^6.43.13
         version: 6.43.13
+      '@lezer/highlight':
+        specifier: 1.2.4
+        version: 1.2.4
       '@tanstack/react-query':
         specifier: ^5.104.0
         version: 5.104.0(react@19.3.0)

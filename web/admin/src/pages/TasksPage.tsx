@@ -11,6 +11,7 @@ import { EffectiveLimitsView } from "../components/EffectiveLimitsView";
 import { JsonEditor, checkJson, toJsonText } from "../components/JsonEditor";
 import { ScheduleEditor } from "../components/ScheduleEditor";
 import { StageVersions } from "../components/StageVersions";
+import { TaskQuickRun } from "../components/TaskQuickRun";
 import {
   ErrorBox,
   Field,
@@ -39,6 +40,8 @@ export function TasksPage() {
   const [params, setParams] = useSearchParams();
   const sourceId = params.get("source_id") ?? "";
   const packageId = params.get("package_id") ?? "";
+  const [search, setSearch] = useState("");
+  const [enabled, setEnabled] = useState("");
   const list = useCursorList(["tasks", sourceId, packageId], (cursor, limit) =>
     unwrap(
       api.orchestrator.GET("/v1/tasks", {
@@ -53,6 +56,13 @@ export function TasksPage() {
       }),
     ),
   );
+  const filtered = list.items.filter(
+    (task) =>
+      `${task.task_id} ${task.title} ${task.source_id}`
+        .toLocaleLowerCase("uk")
+        .includes(search.toLocaleLowerCase("uk")) &&
+      (!enabled || task.enabled === (enabled === "on")),
+  );
   return (
     <Page
       title="Завдання"
@@ -63,10 +73,29 @@ export function TasksPage() {
       }
     >
       <div className="filters">
+        <Field label="Пошук у завантажених завданнях">
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Назва або ідентифікатор…"
+          />
+        </Field>
+        <Field label="Активність">
+          <select value={enabled} onChange={(event) => setEnabled(event.target.value)}>
+            <option value="">Усі завдання</option>
+            <option value="on">Увімкнені</option>
+            <option value="off">Призупинені</option>
+          </select>
+        </Field>
         <Field label="Джерело">
           <input
             value={sourceId}
-            onChange={(e) => setParams(e.target.value ? { source_id: e.target.value } : {})}
+            onChange={(e) => {
+              const next = new URLSearchParams(params);
+              if (e.target.value) next.set("source_id", e.target.value);
+              else next.delete("source_id");
+              setParams(next);
+            }}
           />
         </Field>
         {packageId ? (
@@ -80,19 +109,51 @@ export function TasksPage() {
       </div>
       {list.isLoading ? <Loading /> : null}
       <ErrorBox error={list.error} />
+      <div className="list-summary">
+        <span>
+          Завантажено <strong>{list.isLoading || list.error ? "—" : list.items.length}</strong>
+          {list.hasMore ? "+" : ""}
+        </span>
+        <span>
+          Увімкнено{" "}
+          <strong>
+            {list.isLoading || list.error ? "—" : list.items.filter((task) => task.enabled).length}
+          </strong>
+        </span>
+        <button className="btn btn-small" type="button" onClick={list.refetch}>
+          Оновити список
+        </button>
+      </div>
       <Table
         label="Завдання"
-        rows={list.items}
+        rows={filtered}
+        empty={
+          list.error
+            ? "Дані завдань недоступні. Спробуйте оновити список."
+            : list.isLoading
+              ? "Завантаження завдань…"
+              : search || enabled
+                ? "Збігів у завантажених завданнях немає. Змініть фільтри або завантажте наступну сторінку."
+                : "Завдань ще немає. Створіть завдання, щоб налаштувати збір, обробку та розклад."
+        }
         rowKey={(t) => t.task_id}
         columns={[
           {
             header: "Завдання",
-            cell: (t) => <Link to={`/tasks/${encodeURIComponent(t.task_id)}`}>{t.task_id}</Link>,
+            cell: (t) => (
+              <Link title={t.task_id} to={`/tasks/${encodeURIComponent(t.task_id)}`}>
+                {t.task_id}
+              </Link>
+            ),
           },
           { header: "Назва", cell: (t) => t.title },
           {
             header: "Джерело",
-            cell: (t) => <Link to={`/sources/${encodeURIComponent(t.source_id)}`}>{t.source_id}</Link>,
+            cell: (t) => (
+              <Link title={t.source_id} to={`/sources/${encodeURIComponent(t.source_id)}`}>
+                {t.source_id}
+              </Link>
+            ),
           },
           { header: "Розклад", cell: (t) => scheduleLabel(t.schedule) },
           { header: "Наступний запуск", cell: (t) => formatDate(t.next_run_at) },
@@ -101,6 +162,17 @@ export function TasksPage() {
             cell: (t) => (t.last_run ? <Status value={t.last_run.status ?? null} /> : "—"),
           },
           { header: "Увімкнено", cell: (t) => (t.enabled ? "так" : "ні") },
+          {
+            header: "Дії",
+            cell: (task) => (
+              <div className="button-row row-actions">
+                <TaskQuickRun taskId={task.task_id} />
+                <Link className="btn btn-small" to={`/runs?task_id=${encodeURIComponent(task.task_id)}`}>
+                  Історія
+                </Link>
+              </div>
+            ),
+          },
           ...(packageId
             ? [
                 {

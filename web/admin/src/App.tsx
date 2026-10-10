@@ -1,4 +1,8 @@
+import { useState } from "react";
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import { Icon } from "./components/Icon";
+import { ThemeControl } from "./components/ThemeControl";
+import { NAV_GROUPS, navigationFor } from "./lib/navigation";
 import { useAuth } from "./app/context";
 import { LoginPage, OidcCallbackPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -18,43 +22,77 @@ import { LimitsPage } from "./pages/LimitsPage";
 import { AssistantPage } from "./pages/AssistantPage";
 import { AuditPage } from "./pages/AuditPage";
 
-const NAV: Array<[string, string]> = [
-  ["/", "Огляд"],
-  ["/sources", "Джерела"],
-  ["/tasks", "Завдання"],
-  ["/runs", "Запуски"],
-  ["/materials", "Матеріали"],
-  ["/storages", "Сховища"],
-  ["/results", "Результати"],
-  ["/problems", "Проблеми"],
-  ["/packages", "Пакети"],
-  ["/assistant", "Асистент"],
-  ["/connections", "Підключення"],
-  ["/llm", "LLM"],
-  ["/limits", "Ліміти"],
-  ["/audit", "Аудит"],
-];
-
 function Layout() {
   const auth = useAuth();
-  const { pathname } = useLocation();
-  const storageWorkspace = pathname.startsWith("/materials") || pathname === "/storages";
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const active = navigationFor(location.pathname);
   return (
-    <div className="layout">
-      <nav className="sidebar" aria-label="Розділи">
-        <div className="brand">Jane</div>
-        {NAV.map(([to, label]) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === "/"}
-            className={({ isActive }) => (isActive ? "nav nav-active" : "nav")}
-          >
-            {label}
-          </NavLink>
-        ))}
+    <div className={menuOpen ? "layout menu-open" : "layout"}>
+      <a className="skip-link" href="#main-content">
+        До вмісту
+      </a>
+      <nav id="main-navigation" className="sidebar" aria-label="Розділи">
+        <NavLink className="brand" to="/" onClick={() => setMenuOpen(false)}>
+          <span className="brand-mark">j</span>
+          <span>
+            Jane<small>Платформа збору даних</small>
+          </span>
+        </NavLink>
+        <label className="nav-search">
+          <Icon name="search" />
+          <input
+            aria-label="Знайти розділ"
+            placeholder="Знайти розділ…"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
+        <div className="nav-groups">
+          {NAV_GROUPS.map((group) => {
+            const items = group.items.filter((item) =>
+              `${item.label} ${item.description}`
+                .toLocaleLowerCase("uk")
+                .includes(search.toLocaleLowerCase("uk")),
+            );
+            return items.length ? (
+              <div className="nav-group" key={group.label}>
+                <div className="nav-group-label">{group.label}</div>
+                {items.map(({ to, label, icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end={to === "/"}
+                    className={({ isActive }) => (isActive ? "nav nav-active" : "nav")}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <Icon name={icon} />
+                    <span>{label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            ) : null;
+          })}
+          {search &&
+          !NAV_GROUPS.some((group) =>
+            group.items.some((item) =>
+              `${item.label} ${item.description}`
+                .toLocaleLowerCase("uk")
+                .includes(search.toLocaleLowerCase("uk")),
+            ),
+          ) ? (
+            <p className="muted">Розділ не знайдено</p>
+          ) : null}
+        </div>
         <div className="sidebar-foot">
-          <span className="muted">{auth.principal ?? ""}</span>
+          <div className="workspace-label">
+            <span className="workspace-avatar">J</span>
+            <span>
+              Робочий простір
+              <small>{auth.principal ?? (auth.mode === "none" ? "Локальний режим" : "Адміністратор")}</small>
+            </span>
+          </div>
           {auth.mode !== "none" ? (
             <button type="button" className="btn btn-small" onClick={auth.logout}>
               Вийти
@@ -62,14 +100,44 @@ function Layout() {
           ) : null}
         </div>
       </nav>
-      <main className={`content${storageWorkspace ? " storage-workspace" : ""}`}>
-        {auth.expired ? (
-          <div className="error-box" role="alert">
-            Сесія недійсна або прострочена (401). <NavLink to="/login">Увійти знову</NavLink>
+      <div className="workspace">
+        <header className="topbar">
+          <div className="topbar-path">
+            <button
+              type="button"
+              className="btn menu-toggle"
+              aria-label={menuOpen ? "Закрити меню" : "Відкрити меню"}
+              aria-expanded={menuOpen}
+              aria-controls="main-navigation"
+              onClick={() => setMenuOpen(!menuOpen)}
+            >
+              <Icon name={menuOpen ? "close" : "menu"} />
+            </button>
+            <span className="muted">Робочий простір</span>
+            <span className="muted">/</span>
+            <strong>{active?.label ?? "Jane"}</strong>
           </div>
-        ) : null}
-        <Outlet />
-      </main>
+          <div className="topbar-actions">
+            <NavLink className="assistant-shortcut" to="/assistant">
+              <Icon name="assistant" />
+              Асистент
+            </NavLink>
+            <ThemeControl />
+          </div>
+        </header>
+        <main
+          className={`content${location.pathname.startsWith("/materials") || location.pathname === "/storages" ? " storage-workspace" : ""}`}
+          id="main-content"
+          tabIndex={-1}
+        >
+          {auth.expired ? (
+            <div className="error-box" role="alert">
+              Сесія недійсна або прострочена (401). <NavLink to="/login">Увійти знову</NavLink>
+            </div>
+          ) : null}
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
@@ -96,8 +164,8 @@ export function App() {
         <Route path="/tasks/:taskId" element={<TaskPage />} />
         <Route path="/runs" element={<RunsPage />} />
         <Route path="/runs/:runId" element={<RunPage />} />
-        <Route path="/storages" element={<StoragesPage />} />
         <Route path="/materials" element={<MaterialsPage />} />
+        <Route path="/storages" element={<StoragesPage />} />
         <Route path="/materials/:materialId/trace" element={<MaterialTracePage />} />
         <Route path="/results" element={<ResultsPage />} />
         <Route path="/problems" element={<ProblemsPage />} />

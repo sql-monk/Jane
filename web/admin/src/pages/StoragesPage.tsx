@@ -1,7 +1,10 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../app/context";
 import { newIdempotencyKey, unwrap } from "../api/client";
+import { TERMINAL_JOB_STATUSES, useJob } from "../api/hooks";
+import { ApiError } from "../api/problem";
 import type { StorageConnection } from "../api/types";
 import { storageName, useStorageConnections } from "../components/StorageConnections";
 import { ErrorBox, KeyValue, Loading, LoadMore, Notice, Page, Section } from "../components/ui";
@@ -45,6 +48,15 @@ function StorageCard({ connection }: { connection: StorageConnection }) {
   const queryClient = useQueryClient();
   const id = connection.connection_id;
   const queryKey = ["storage-status", id];
+  const [jobId, setJobId] = useState<string | null>(null);
+  const job = useJob("storage", api.storage as never, jobId);
+  const terminal = Boolean(job.data && TERMINAL_JOB_STATUSES.has(job.data.status));
+  const busy = Boolean(jobId && !terminal);
+  useEffect(() => {
+    if (job.data && TERMINAL_JOB_STATUSES.has(job.data.status)) {
+      void queryClient.invalidateQueries({ queryKey: ["storage-status", id] });
+    }
+  }, [job.data, id, queryClient]);
   const status = useQuery({
     queryKey,
     queryFn: () =>
@@ -53,13 +65,14 @@ function StorageCard({ connection }: { connection: StorageConnection }) {
   const check = useMutation({
     mutationFn: () =>
       unwrap(
-        api.storage.POST("/v1/connections/{connection_id}/test", {
-          params: { path: { connection_id: id } },
-          headers: { "Idempotency-Key": newIdempotencyKey() },
+        api.storage.POST("/v1/storage-status/checks", {
+          body: { connection_id: id },
+          params: { header: { "Idempotency-Key": newIdempotencyKey() } },
         }),
       ),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey });
+    onSuccess: (data) => {
+      queryClient.setQueryData(["job", "storage", data.job_id], data);
+      setJobId(data.job_id);
     },
   });
   const data = status.data;
@@ -72,8 +85,13 @@ function StorageCard({ connection }: { connection: StorageConnection }) {
         <Link className="btn" to={`/results?connection_id=${encodeURIComponent(id)}`}>
           Результати
         </Link>
-        <button type="button" className="btn" disabled={check.isPending} onClick={() => check.mutate()}>
-          {check.isPending ? "Перевіряємо…" : "Перевірити зараз"}
+        <button
+          type="button"
+          className="btn"
+          disabled={check.isPending || busy}
+          onClick={() => check.mutate()}
+        >
+          {check.isPending || busy ? "Перевіряємо…" : "Перевірити зараз"}
         </button>
         <button
           type="button"
@@ -84,7 +102,26 @@ function StorageCard({ connection }: { connection: StorageConnection }) {
           Оновити стан
         </button>
       </div>
-      <ErrorBox error={status.error ?? check.error} />
+      <ErrorBox error={status.error ?? check.error ?? job.error} />
+      {jobId ? (
+        <div role="status" aria-label="Перевірка сховища">
+          <p>{jobStatusLabel(job.data?.status ?? "queued")}</p>
+          {job.data?.progress ? (
+            <p>
+              Прогрес: {job.data.progress.completed ?? 0}
+              {job.data.progress.total != null ? ` / ${job.data.progress.total}` : ""}
+            </p>
+          ) : null}
+          {job.data?.error ? (
+            <ErrorBox error={new ApiError(job.data.error.status, job.data.error)} title="Помилка перевірки" />
+          ) : null}
+          {job.error ? (
+            <button type="button" className="btn" onClick={() => void job.refetch()}>
+              Оновити перевірку
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {status.isLoading ? <Loading /> : null}
       <KeyValue
         rows={[
@@ -116,11 +153,35 @@ function StorageCard({ connection }: { connection: StorageConnection }) {
         ]}
       />
       {data?.statistics.unavailable_reason ? (
-        <p className="muted">Статистика недоступна: {data.statistics.unavailable_reason}</p>
+        <p className="muted">
+          Статистика недоступна: {statisticsReasonLabel(data.statistics.unavailable_reason)}
+        </p>
       ) : null}
       <p className="muted">
         Статистика охоплює збережені об'єкти цього підключення; не показує загальний розмір диска чи бази.
       </p>
     </Section>
   );
+}
+
+export function statisticsReasonLabel(reason: string): string {
+  const labels: Record<string, string> = {
+    not_checked: "Перевірку ще не виконано.",
+    adapter_statistics_not_supported: "Цей тип сховища не надає статистику.",
+    statistics_check_failed: "Не вдалося отримати статистику. Спробуйте перевірити ще раз.",
+    check_failed: "Не вдалося перевірити підключення.",
+  };
+  return labels[reason] ?? "Причину недоступності статистики не визначено.";
+}
+
+function jobStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    queued: "Перевірка очікує виконання.",
+    running: "Перевіряємо доступність і статистику…",
+    cancelling: "Перевірка скасовується…",
+    cancelled: "Перевірку скасовано.",
+    succeeded: "Перевірку завершено.",
+    failed: "Перевірка завершилася з помилкою.",
+  };
+  return labels[status] ?? "Стан перевірки невідомий.";
 }

@@ -26,11 +26,8 @@ import { formatBytes, formatDate, formatInstant, refLabel } from "../lib/format"
 import "../materials-storage.css";
 
 export function formatMaterialContent(text: string): string {
-  try {
-    return JSON.stringify(JSON.parse(text), null, 2);
-  } catch {
-    return text;
-  }
+  // Preserve source number lexemes, duplicate keys and whitespace without parsing JSON.
+  return text;
 }
 
 function dateInputValue(value: string) {

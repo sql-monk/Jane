@@ -80,20 +80,65 @@ test.describe("material/storage browser @mock", () => {
             total_size_bytes: null,
             checked_at: null,
             scope: "connection_objects",
-            unavailable_reason: "Adapter does not support statistics",
+            unavailable_reason: "adapter_statistics_not_supported",
           },
         },
       }),
     );
-    await admin.route("**/api/storage/v1/connections/*/test", (route) => {
+    await admin.route("**/api/storage/v1/storage-status/checks", async (route) => {
       expect(route.request().headers()["idempotency-key"]).toBeTruthy();
-      checked = true;
-      return route.fulfill({ json: { ok: true, checked_at: "2026-10-11T08:00:00Z" } });
+      expect(route.request().postDataJSON()).toEqual({ connection_id: "results-pg" });
+      return route.fulfill({
+        status: 202,
+        headers: { Location: "/v1/jobs/job_status_check" },
+        json: {
+          job_id: "job_status_check",
+          kind: "storage_status_check",
+          status: "queued",
+          created_at: "2026-10-11T08:00:00Z",
+        },
+      });
+    });
+    let finish = false;
+    await admin.route("**/api/storage/v1/jobs/job_status_check", (route) => {
+      checked = finish;
+      return route.fulfill({
+        json: {
+          job_id: "job_status_check",
+          kind: "storage_status_check",
+          status: finish ? "succeeded" : "running",
+          created_at: "2026-10-11T08:00:00Z",
+          progress: { completed: finish ? 1 : 0, total: 1, unit: "connections" },
+          ...(finish
+            ? {
+                finished_at: "2026-10-11T08:00:01Z",
+                result: {
+                  connection_id: pg.connection_id,
+                  kind: pg.kind,
+                  availability: "available",
+                  checked_at: "2026-10-11T08:00:00Z",
+                  message: null,
+                  statistics: {
+                    object_count: null,
+                    total_size_bytes: null,
+                    checked_at: null,
+                    scope: "connection_objects",
+                    unavailable_reason: "adapter_statistics_not_supported",
+                  },
+                },
+              }
+            : {}),
+        },
+      });
     });
     await admin.goto("/storages");
     await expect(admin.getByText("Невідомо", { exact: true })).toHaveCount(2);
     await admin.getByRole("button", { name: "Перевірити зараз" }).click();
+    await expect(admin.getByRole("button", { name: "Перевіряємо…" })).toBeDisabled();
+    await expect(admin.getByText("Перевіряємо доступність і статистику…")).toBeVisible();
+    finish = true;
     await expect(admin.getByText("Доступне", { exact: true })).toBeVisible();
+    await expect(admin.getByRole("button", { name: "Перевірити зараз" })).toBeEnabled();
     await admin.screenshot({ path: "../../.jane/wp25-storages-wide.png", fullPage: true });
     await admin.setViewportSize({ width: 390, height: 844 });
     await admin.screenshot({ path: "../../.jane/wp25-storages-narrow.png", fullPage: true });

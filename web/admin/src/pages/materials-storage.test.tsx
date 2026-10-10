@@ -7,7 +7,7 @@ import { AppProvider } from "../app/context";
 import { DEFAULT_CONFIG } from "../config";
 import type { Connection, StoredObject } from "../api/types";
 import { openapiExample } from "../test/contracts";
-import { MaterialsPage, formatMaterialContent } from "./MaterialsPage";
+import { MaterialsPage } from "./MaterialsPage";
 import { StoragesPage } from "./StoragesPage";
 
 const pg = openapiExample<Connection>("connection-pg");
@@ -26,13 +26,19 @@ afterEach(() => {
 function mount(page: React.ReactNode, url = "/materials") {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <AppProvider config={{ ...DEFAULT_CONFIG, auth: { mode: "none" } }}>
+      <AppProvider
+        config={{
+          ...DEFAULT_CONFIG,
+          auth: { mode: "none" },
+          polling: { initial_ms: 10, max_ms: 20, multiplier: 1 },
+        }}
+      >
         <MemoryRouter initialEntries={[url]}>{page}</MemoryRouter>
       </AppProvider>
     </QueryClientProvider>,
   );
 }
-function mockObjects() {
+function mockObjects(contentText = "<script>window.stolen=true</script>") {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (request: Request) => {
@@ -68,7 +74,7 @@ function mockObjects() {
         });
       }
       if (url.pathname.endsWith("/content"))
-        return new Response("<script>window.stolen=true</script>", {
+        return new Response(contentText, {
           headers: { "Content-Type": "text/html" },
         });
       return Response.json(raw);
@@ -100,19 +106,20 @@ describe("material and storage browser", () => {
       ),
     ).toBe(false);
   });
-  it("deep links preserve storage identity and render HTML as inert text", async () => {
-    mockObjects();
-    mount(<MaterialsPage />, `/materials?connection_id=raw-files&object_id=${raw.object.object_id}`);
-    expect(await screen.findByTestId("content-preview")).toHaveTextContent(
-      "<script>window.stolen=true</script>",
-    );
-    expect(document.querySelector("script")).toBeNull();
-    expect(
-      requests
-        .filter((u) => u.pathname.includes("/objects/"))
-        .every((u) => u.searchParams.get("connection_id") === "raw-files"),
-    ).toBe(true);
-  });
+  it.each(["<script>window.stolen=true</script>", '{ "large":9007199254740993, "exponent":1e400 }'])(
+    "deep links preserve storage identity and exact source content: %s",
+    async (contentText) => {
+      mockObjects(contentText);
+      mount(<MaterialsPage />, `/materials?connection_id=raw-files&object_id=${raw.object.object_id}`);
+      expect((await screen.findByTestId("content-preview")).textContent).toBe(contentText);
+      expect(document.querySelector("script")).toBeNull();
+      expect(
+        requests
+          .filter((u) => u.pathname.includes("/objects/"))
+          .every((u) => u.searchParams.get("connection_id") === "raw-files"),
+      ).toBe(true);
+    },
+  );
   it("forwards source and storage-date filters to the API, without claiming local type filtering covers unloaded pages", async () => {
     mockObjects();
     mount(
@@ -126,46 +133,122 @@ describe("material and storage browser", () => {
     expect(query.get("until")).toBe(new Date("2026-10-02T12:00").toISOString());
     expect(screen.getByLabelText("Медіатип у завантажених матеріалах")).toBeInTheDocument();
   });
-  it("shows unknown statistics, checks explicitly with idempotency, then refreshes snapshot", async () => {
-    let checked = false;
+  it("polls an async check without duplicate submission or premature snapshot refresh", async () => {
+    let completed = false;
+    let snapshots = 0;
     const keys: string[] = [];
+    const requestBodies: unknown[] = [];
+    const job = {
+      job_id: "job_status_check",
+      kind: "storage_status_check",
+      status: "queued",
+      created_at: "2026-10-11T08:00:00Z",
+    };
+    const snapshot = () => ({
+      connection_id: pg.connection_id,
+      kind: pg.kind,
+      availability: completed ? "available" : "unknown",
+      checked_at: completed ? "2026-10-11T08:00:00Z" : null,
+      message: null,
+      statistics: {
+        object_count: null,
+        total_size_bytes: null,
+        checked_at: null,
+        scope: "connection_objects",
+        unavailable_reason: "adapter_statistics_not_supported",
+      },
+    });
     vi.stubGlobal(
       "fetch",
       vi.fn(async (request: Request) => {
         const url = new URL(request.url);
         if (url.pathname.endsWith("/connections")) return Response.json({ items: [pg], next_cursor: null });
         if (request.method === "POST") {
-          checked = true;
+          expect(url.pathname.endsWith("/storage-status/checks")).toBe(true);
           keys.push(request.headers.get("Idempotency-Key") ?? "");
-          return Response.json({ ok: true, checked_at: "2026-10-11T08:00:00Z" });
+          requestBodies.push(await request.json());
+          return Response.json(job, { status: 202, headers: { Location: "/v1/jobs/job_status_check" } });
         }
+        if (url.pathname.includes("/jobs/"))
+          return Response.json({
+            ...job,
+            status: completed ? "succeeded" : "running",
+            progress: { completed: completed ? 1 : 0, total: 1, unit: "connections" },
+            ...(completed ? { result: snapshot(), finished_at: "2026-10-11T08:00:01Z" } : {}),
+          });
+        snapshots++;
+        return Response.json(snapshot());
+      }),
+    );
+    mount(<StoragesPage />, "/storages");
+    expect((await screen.findAllByText("Невідомо")).length).toBe(2);
+    await userEvent.click(screen.getByRole("button", { name: "Перевірити зараз" }));
+    expect(await screen.findByText("Перевіряємо доступність і статистику…")).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: "Перевіряємо…" });
+    expect(button).toBeDisabled();
+    await userEvent.click(button);
+    expect(keys).toHaveLength(1);
+    expect(snapshots).toBe(1);
+    expect(requestBodies).toEqual([{ connection_id: "results-pg" }]);
+    completed = true;
+    await waitFor(() => expect(screen.getByText("Доступне")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Перевірити зараз" })).toBeEnabled();
+    expect(keys[0]).toBeTruthy();
+    expect(snapshots).toBe(2);
+    expect(
+      screen.getByText("Статистика недоступна: Цей тип сховища не надає статистику."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Матеріали" })).toHaveAttribute(
+      "href",
+      "/materials?connection_id=results-pg",
+    );
+    expect(screen.queryByText("JANE_SECRET_RESULTS_PG_PASSWORD")).not.toBeInTheDocument();
+  });
+  it("shows a failed check and releases the button after its terminal outcome", async () => {
+    const job = {
+      job_id: "job_status_check",
+      kind: "storage_status_check",
+      status: "queued",
+      created_at: "2026-10-11T08:00:00Z",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        const url = new URL(request.url);
+        if (url.pathname.endsWith("/connections")) return Response.json({ items: [pg], next_cursor: null });
+        if (request.method === "POST") return Response.json(job, { status: 202 });
+        if (url.pathname.includes("/jobs/"))
+          return Response.json({
+            ...job,
+            status: "failed",
+            error: {
+              type: "urn:jane:problem:upstream_unavailable",
+              title: "Storage unavailable",
+              status: 503,
+              code: "upstream_unavailable",
+            },
+          });
         return Response.json({
           connection_id: pg.connection_id,
           kind: pg.kind,
-          availability: checked ? "available" : "unknown",
-          checked_at: checked ? "2026-10-11T08:00:00Z" : null,
+          availability: "unknown",
+          checked_at: null,
           message: null,
           statistics: {
             object_count: null,
             total_size_bytes: null,
             checked_at: null,
             scope: "connection_objects",
-            unavailable_reason: "not supported",
+            unavailable_reason: "not_checked",
           },
         });
       }),
     );
     mount(<StoragesPage />, "/storages");
-    expect((await screen.findAllByText("Невідомо")).length).toBe(2);
-    await userEvent.click(screen.getByRole("button", { name: "Перевірити зараз" }));
-    await waitFor(() => expect(screen.getByText("Доступне")).toBeInTheDocument());
-    expect(keys[0]).toBeTruthy();
-    expect(screen.getByText("Статистика недоступна: not supported")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Матеріали" })).toHaveAttribute(
-      "href",
-      "/materials?connection_id=results-pg",
-    );
-    expect(screen.queryByText("JANE_SECRET_RESULTS_PG_PASSWORD")).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Перевірити зараз" }));
+    expect(await screen.findByText("Перевірка завершилася з помилкою.")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("upstream_unavailable");
+    expect(screen.getByRole("button", { name: "Перевірити зараз" })).toBeEnabled();
   });
   it.each(["since=invalid-date", "since=2026-10-02T12%3A00&until=2026-10-01T12%3A00"])(
     "blocks invalid date filters before storage requests: %s",
@@ -176,9 +259,4 @@ describe("material and storage browser", () => {
       expect(requests.some((u) => u.pathname.endsWith("/objects"))).toBe(false);
     },
   );
-  it("formats nested JSON without changing types and preserves plain text", () => {
-    const text = '{"items":[1,false,null,{"x":"<b>safe</b>"}]}';
-    expect(JSON.parse(formatMaterialContent(text))).toEqual(JSON.parse(text));
-    expect(formatMaterialContent("not json")).toBe("not json");
-  });
 });

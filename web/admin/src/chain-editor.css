@@ -1,0 +1,55 @@
+.chain-editor .chain-layout {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+  gap: 1rem;
+}
+.chain-editor nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.chain-editor [aria-pressed="true"] {
+  outline: 2px solid var(--accent, #4b89e0);
+}
+.chain-editor .property-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin: 1rem 0;
+}
+.chain-editor .property-grid th,
+.chain-editor .property-grid td {
+  border: 1px solid var(--border, #aaa);
+  padding: 0.4rem;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.chain-editor .property-grid th:nth-child(1) {
+  width: 30%;
+}
+.chain-editor .property-grid th:nth-child(2) {
+  width: 18%;
+}
+.chain-editor .property-grid input:not([type="checkbox"]),
+.chain-editor .property-grid textarea,
+.chain-editor .property-grid select {
+  width: 100%;
+  min-width: 0;
+}
+.chain-editor .chain-link {
+  padding: 0.7rem;
+  border: 1px solid var(--border, #aaa);
+  margin-bottom: 0.6rem;
+}
+.dag [role="button"] {
+  cursor: pointer;
+}
+.dag [aria-pressed="true"] rect {
+  stroke: var(--accent, #4b89e0);
+  stroke-width: 3px;
+}
+@media (max-width: 760px) {
+  .chain-editor .chain-layout {
+    grid-template-columns: 1fr;
+  }
+}

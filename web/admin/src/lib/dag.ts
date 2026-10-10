@@ -30,7 +30,7 @@ export function stageLabel(stage: Stage): string {
   return handler ? `${handler.package_id}@${handler.version}` : "handler: ?";
 }
 
-export function buildDag(stages: readonly Stage[]): Dag {
+export function buildDag(stages: readonly Stage[], options: { requireCollect?: boolean } = {}): Dag {
   const issues: string[] = [];
   const byId = new Map<string, Stage>();
   for (const stage of stages) {
@@ -71,7 +71,9 @@ export function buildDag(stages: readonly Stage[]): Dag {
   const cyclic = [...byId.keys()].filter((id) => !layer.has(id));
   if (cyclic.length) issues.push(`цикл між етапами: ${cyclic.join(", ")}`);
   const collectStages = stages.filter((s) => s.kind === "collect");
-  if (collectStages.length === 0 && stages.length > 0) issues.push("немає етапу збору (kind=collect)");
+  if (options.requireCollect !== false && collectStages.length === 0 && stages.length > 0)
+    issues.push("немає етапу збору (kind=collect)");
+  if (collectStages.length > 1) issues.push("має бути рівно один етап збору (kind=collect)");
   for (const stage of stages) {
     if (stage.kind === "handler" && (stage.inputs ?? []).length === 0) {
       issues.push(`етап-обробник «${stage.stage_id}» не має входів`);

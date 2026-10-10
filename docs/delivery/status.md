@@ -917,7 +917,9 @@ r1 → виправлення на `origin/wp/01g2-service-auth`, CI 37857870977
 
 | WP | Назва | Статус | Гілка |
 |---|---|---|---|
-| 24 | Стан і статистика сховищ | active | wp/24-storage-observability |
-| 25 | Матеріали й браузер сховищ | active | wp/25-materials-storage-browser |
-| 26 | Візуальний редактор ланцюжків | active | wp/26-visual-chain-editor |
-| 27 | Інтеграція та приймання | active | codex/admin-materials-chains |
+| 24 | Стан і статистика сховищ | accepted (R2) | wp/24-storage-observability |
+| 25 | Матеріали й браузер сховищ | accepted (R2) | wp/25-materials-storage-browser |
+| 26 | Візуальний редактор ланцюжків | accepted (R2) | wp/26-visual-chain-editor |
+| 27 | Інтеграція та приймання | accepted locally | codex/admin-materials-chains |
+
+Інтеграція: 74 unit passed, typecheck/lint/build exit 0, реальний filesystem browser smoke 1 passed. Незалежні WP-reviewer прийняли всі три WP; контрактний guardian підтвердив сумісність. [Підсумковий звіт і межі перевірки](WP-27.md). Повний CI та розгортання в demo не виконувалися; main незмінний.

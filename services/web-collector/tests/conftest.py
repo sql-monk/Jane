@@ -6,6 +6,7 @@ requested (to prove "no cycles", "robots obeyed", "no requests outside the bound
 
 from __future__ import annotations
 
+import os
 import sys
 import threading
 from collections.abc import Iterator
@@ -61,6 +62,23 @@ def site() -> Iterator[Site]:
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+@pytest.fixture(scope="session")
+def chromium() -> None:
+    """Headless Chromium for ``fetch.render_js`` tests: skipped without it on a developer machine, a failure in CI
+    (``CI`` set, as in GitHub Actions) - browser tests are never silently skipped there."""
+    try:
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            pw.chromium.launch().close()
+    except Exception as exc:
+        reason = str(exc).strip().splitlines()[0] if str(exc).strip() else type(exc).__name__
+        message = f"headless Chromium is not available ({reason}); run: uv run playwright install chromium"
+        if os.environ.get("CI"):
+            pytest.fail(message)
+        pytest.skip(message)
 
 
 @pytest.fixture(scope="session")

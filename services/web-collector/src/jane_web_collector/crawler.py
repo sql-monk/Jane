@@ -50,6 +50,7 @@ from .materials import (
     new_observation_id,
     rfc3339,
 )
+from .render import Renderer, renderable
 from .robots import RobotsCache
 from .settings import ServiceLimits, to_contract
 from .state import FrontierRow, LeaseLost, StateStore
@@ -110,6 +111,8 @@ class RunDeps:
     """Per-host limits of the whole process, shared by every run and one-shot fetch."""
     connection_policy: ConnectionPolicy = field(default_factory=ConnectionPolicy)
     ack_events: dict[str, asyncio.Event] = field(default_factory=dict)
+    renderer: Renderer | None = None
+    """Headless browser for ``fetch.render_js`` (``None``: such URLs fail with ``not_implemented``)."""
 
 
 def _now_iso() -> str:
@@ -197,6 +200,8 @@ class CrawlRun:
         self.owner_policy = robots_cfg.get("mode") == "owner_policy"
         fetch_cfg = self.rules.get("fetch") or {}
         user_agent = fetch_cfg.get("user_agent") or deps.user_agent
+        self.user_agent: str = user_agent
+        self.render_js = bool(fetch_cfg.get("render_js"))
         token = robots_cfg.get("user_agent_token") or user_agent.split("/", 1)[0].split()[0]
         dedup = self.rules.get("dedup") or {}
         self.dedup_key = dedup.get("key", "canonical_url")
@@ -210,6 +215,9 @@ class CrawlRun:
         )
         self.accept = fetch_cfg.get("accept_media_types")
         headers = dict(fetch_cfg.get("headers") or {})
+        self.accept_language: str | None = next(
+            (v for k, v in headers.items() if k.lower() == "accept-language"), None
+        )
         if self.accept:
             headers.setdefault("Accept", ", ".join(self.accept))
         creds: dict[str, str] = {}
@@ -537,7 +545,14 @@ class CrawlRun:
                 self._persist(db)
             return None
         cond: dict[str, str] = {}
-        if prev and conditional and not refresh and (self.revisit_mode == "if_changed" or caller is not None):
+        # a rendered page can change while its HTML does not (prices loaded by scripts): never conditional
+        if (
+            prev
+            and conditional
+            and not refresh
+            and not self.render_js
+            and (self.revisit_mode == "if_changed" or caller is not None)
+        ):
             if prev.get("etag"):
                 cond["If-None-Match"] = prev["etag"]
             if prev.get("last_modified"):
@@ -572,6 +587,8 @@ class CrawlRun:
             result = await self.fetcher.get(
                 url, check_hop=hop, conditional=cond, timeouts=timeouts, method=method, json_body=json_body
             )
+            if self.render_js and method == "GET" and renderable(result):
+                result = await self._render(result)
         except RedirectDuplicate as dup:
             with self._tx() as db:
                 self.stats["fetched"] += 1
@@ -623,6 +640,14 @@ class CrawlRun:
             return None
         return await self._process_result(row, result, prev, caller, claimed)
 
+    async def _render(self, result: HttpResult) -> HttpResult:
+        """``fetch.render_js``: the fetched HTML as the browser's DOM (fails with ``FetchError``, never falls back)."""
+        if self.deps.renderer is None:
+            raise FetchError("not_implemented", "fetch.render_js: this collector has no headless browser")
+        return await self.deps.renderer.render(
+            result, user_agent=self.user_agent, limits=self.limits, accept_language=self.accept_language
+        )
+
     async def _process_result(
         self,
         row: FrontierRow,
@@ -633,7 +658,9 @@ class CrawlRun:
     ) -> FetchedResource | None:
         url = row.url
         self.stats["fetched"] += 1
-        self.stats["bytes_fetched"] += len(result.body)
+        self.stats["bytes_fetched"] += (
+            len(result.body) if result.network_bytes is None else result.network_bytes
+        )
         if result.status == 304:
             with self._tx() as db:
                 self.stats["not_modified"] += 1

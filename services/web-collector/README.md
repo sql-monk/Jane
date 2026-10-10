@@ -11,6 +11,8 @@
 політика власника (`owner_policy`), черга з дедуплікацією та пріоритетами, глибина, повторні відвідування
 (`revisit`, умовні запити), ліміти на хост, власне сховище стану й відновлення після kill, реєстр стратегій,
 стратегії `seed_list` (явний перелік / головна сторінка) і `recursive`. Решту стратегій додає WP-03.
+Сторінки, які будують вміст скриптами, рендеряться в headless Chromium за `fetch.render_js` — див.
+[«Рендеринг JavaScript»](#рендеринг-javascript-fetchrender_js).
 
 ## Незалежний запуск
 
@@ -28,6 +30,18 @@ curl http://127.0.0.1:8101/v1/health
 docker build -f services/web-collector/Dockerfile -t jane-web-collector .
 docker run --rm -p 8101:8101 -v jane-wc-state:/var/lib/jane-web-collector jane-web-collector
 ```
+
+З рендерингом JavaScript (`fetch.render_js`) — необов'язковий extra `render` (Playwright) і Chromium:
+
+```
+uv run --package jane-web-collector playwright install chromium        # локально, один раз
+docker build -f services/web-collector/Dockerfile --build-arg EXTRAS="--extra render" -t jane-web-collector .
+```
+
+В образі з extra `render` Chromium (headless shell) і його системні бібліотеки ставляться окремим шаром, що
+залежить лише від `uv.lock` (версія Playwright — заблокована), тож зміна коду не завантажує браузер знову; образ
+більший приблизно на 1 ГБ. Без extra образ не змінюється, а URL з `render_js` завершуються `not_implemented`.
+Локальний стек (`infra/compose.local.example.yaml`) збирає колектор з extra `render`.
 
 Правило конфігурації (перевіряється на старті, інакше сервіс не запускається):
 `HEARTBEAT_INTERVAL_MS + STATE_BUSY_TIMEOUT_MS < LEASE_SECONDS × 1000` — живий власник завжди встигає продовжити
@@ -70,6 +84,10 @@ just test web-collector -m contract     # лише контрактні
 Тести, яким потрібна незавершена колекція (409 на `DELETE /v1/states/…`, скасування, перехоплення після kill),
 утримують її через backpressure (`limits.queue.max_unacked_materials`), а не розраховують на повільний обхід.
 
+Тести рендерингу (`tests/test_render_js.py`, фікстура `chromium`) потребують headless Chromium:
+`uv run --package jane-web-collector playwright install chromium`. Без нього на машині розробника вони
+пропускаються з поясненням (`-ra`), а в CI (змінна `CI`) — падають; job `unit` у CI ставить Chromium сам.
+
 ## Конфігурація
 
 Змінні середовища з префіксом `JANE_WEB_COLLECTOR_`:
@@ -90,6 +108,10 @@ just test web-collector -m contract     # лише контрактні
 | `CONTRACTS_DIR` | `JANE_CONTRACTS_DIR` або `contracts/` checkout | JSON Schema контрактів для валідації запитів і правил |
 | `DISCOVERY_PATH` | `services/web-collector/strategies/discovery` | пакет стратегій WP-03 |
 | `USER_AGENT` | `JaneBot/0.1 (+https://github.com/jane)` | типовий User-Agent; перше слово — токен для `robots.txt` |
+| `RENDER_ENABLED` | `true` | виконувати `fetch.render_js` (потрібні extra `render` і Chromium); `false` — такі URL завершуються `not_implemented` |
+| `RENDER_WAIT_UNTIL` | `networkidle` | на що чекає сторінка перед знімком DOM: `domcontentloaded` / `load` / `networkidle` (0,5 с без мережевих запитів) |
+| `RENDER_BLOCK_RESOURCE_TYPES` | `["image", "media", "font"]` | JSON-масив типів ресурсів Playwright, яких браузер не запитує зовсім (економія трафіку) |
+| `RENDER_BROWSER_EXECUTABLE` | — | свій виконуваний файл Chromium; типово — встановлений `playwright install chromium` |
 | `LEASE_SECONDS` | `30` | lease збору; після нього інший екземпляр підхоплює збір |
 | `HEARTBEAT_INTERVAL_MS` | `5000` | як часто власник продовжує lease (окрема задача, працює й під час seeds і повільних запитів) і перевіряє скасування |
 | `STATE_BUSY_TIMEOUT_MS` | `10000` | скільки запис чекає на блокування SQLite іншим процесом |
@@ -195,6 +217,10 @@ JANE_WEB_COLLECTOR_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 hex к�
 | `collector.host_state_prune_interval_seconds` | 60 | як часто спільний лімітер хостів прибирає стан хостів, якими ніхто не користується |
 | `collector.shared_host_limits` | true | узгоджувати ліміти на хост з іншими екземплярами через спільне сховище стану (R15) |
 | `collector.shared_host_poll_ms` | 100 | як часто запит, що чекає слоту хоста, зайнятого іншими екземплярами, перевіряє його знову |
+| `collector.render_timeout_ms` | 30000 | `fetch.render_js`: скільки сторінка вантажиться в браузері (навігація й `RENDER_WAIT_UNTIL`); далі DOM береться як є (діагностика `render_incomplete`). Знімок DOM має ту саму межу (інакше `timeout`) |
+| `collector.render_extra_wait_ms` | 0 | додаткова пауза після умови очікування для скриптів, що заповнюють сторінку пізно (у межах `render_timeout_ms`) |
+| `collector.render_max_pages` | 2 | сторінок браузера одночасно на процес (усі збори й fetch разом); решта чекає |
+| `collector.render_max_transfer_bytes` | 52428800 | байтів, які браузер може завантажити для однієї сторінки (скрипти, XHR, стилі); далі з'єднання обриваються, DOM береться як є (діагностика `render_budget_exceeded`) |
 | `collector.shared_host_ttl_seconds` | 120 | скільки реєстрація, слот і місце в черзі вбитого екземпляра ще обмежують інших; живий екземпляр поновлює їх кожні TTL/3, тож TTL не мусить перевищувати запити чи очікування. Правило старту: `TTL × 2/3 > STATE_BUSY_TIMEOUT_MS`, інакше сервіс не стартує |
 
 ## Поведінка
@@ -244,6 +270,46 @@ JANE_WEB_COLLECTOR_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 hex к�
   поза видимим ASCII відхиляється до HTTP-запиту; повідомлення про транспортні помилки не містять значень
   заголовків.
 
+## Рендеринг JavaScript (`fetch.render_js`)
+
+Деякі сайти будують вміст скриптами (ціни, JSON-LD, списки товарів): HTML від сервера його не містить.
+`rules.fetch.render_js: true` (типово `false`) — HTML-сторінки (відповідь 2xx, `text/html` або
+`application/xhtml+xml`) рендеряться в headless Chromium через Playwright
+([`render.py`](src/jane_web_collector/render.py)), і матеріалом стає DOM після виконання скриптів. Діє для збору
+(зокрема навігаційних HTML-сторінок стратегій — посилання беруться з відрендереного DOM) і для `POST /v1/fetches`;
+JSON, XML, sitemap, `robots.txt` і `POST` стратегій не рендеряться.
+
+- **Ті самі гарантії, що й без рендерингу.** Сторінку спершу завантажує звичайний fetcher: `scope`, `robots.txt`,
+  перевірка кожного кроку переадресації, політика вихідних адрес, ліміти на хост (запит сторінки рахується як
+  завжди), повтори, `crawl.max_material_bytes`, User-Agent і облікові дані підключення. Браузер сторінку **не
+  запитує вдруге**: її першу навігацію обслуговує вже отримане тіло (`route.fulfill`). Будь-яка наступна навігація
+  верхнього фрейму (скриптовий редирект, reload, popup) переривається (діагностика `render_navigation_blocked`),
+  тож DOM — завжди DOM URL, що пройшов перевірки.
+- **Запити браузера** (скрипти, XHR/fetch, стилі, фрейми, WebSocket) йдуть лише через проксі сторінки на
+  127.0.0.1 (`EgressProxy`, один на сторінку) з тією самою [політикою вихідних адрес](#політика-вихідних-адрес):
+  ім'я розв'язується один раз, перевіряється кожна адреса, з'єднання — з перевіреною адресою (DNS rebinding не
+  обходить). Маршрутизатор Playwright додатково перевіряє URL кожного запиту до з'єднання й перериває заборонений
+  (`accessdenied`). Loopback теж іде через проксі (Playwright `<-loopback>`), service workers заблоковано, WebRTC —
+  лише через проксі. Заборонені запити видно в діагностиці матеріалу `render_egress_denied` (URL і адреса); сам
+  матеріал видається. Типи з `RENDER_BLOCK_RESOURCE_TYPES` не запитуються; на сторінку — не більше
+  `collector.render_max_transfer_bytes`. Запити браузера не рахуються в ліміти на хост (рахується лише запит самої
+  сторінки) і не перевіряються `robots.txt` (як у звичайного браузера). Браузер надсилає User-Agent правил/сервісу і
+  `Accept-Language` з `fetch.headers`, але **не** облікові дані підключення й не cookies відповіді сторінки.
+- **Матеріал** — `<!DOCTYPE …>` + `document.documentElement.outerHTML` після `RENDER_WAIT_UNTIL` (+
+  `collector.render_extra_wait_ms`) або після `collector.render_timeout_ms` (тоді `render_incomplete`), у UTF-8:
+  `format.charset: utf-8`, `<meta charset>` у DOM переписується на `utf-8`. Обрізається за
+  `crawl.max_material_bytes` (`truncated`). `http.status` — статус сторінки; `ETag` і `Content-Length` не
+  передаються (описують байти сервера, а не DOM). Діагностика `rendered` (рівень `info`) — тривалість, з'єднання й
+  байти браузера. `stats.bytes_fetched` рахує тіло сторінки й усе, що завантажив браузер.
+- **Повторні відвідування:** для `render_js` умовні запити (`If-None-Match` / `If-Modified-Since`) не
+  надсилаються — ціни, що вантажаться скриптами, змінюються без зміни HTML; зміни вмісту видно за
+  `dedup.key=canonical_url_and_content`.
+- **Без браузера** (`RENDER_ENABLED=false`, немає Playwright, Chromium не встановлено чи не стартує) URL
+  завершується помилкою `not_implemented` з поясненням (`fetch.render_js: …`) у `/errors` збору — ніколи не тихим
+  звичайним завантаженням; збір триває з рештою URL. `POST /v1/fetches` → `501 not_implemented`. Тайм-аут знімка
+  DOM — `timeout`, збій браузера — `internal_error`. Браузер стартує при першій потребі, один на процес; після
+  падіння запускається знову. `GET /v1/info` → `capabilities.render_js` (і `render_js_unavailable` з причиною).
+
 ## Політика вихідних адрес
 
 Захист від SSRF: `POST /v1/fetches` чи збір не можуть стати проксі до сервісу метаданих хмари або внутрішніх
@@ -255,7 +321,8 @@ JANE_WEB_COLLECTOR_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 hex к�
    змінилась між перевіркою і з'єднанням (DNS rebinding), політику не обходить.
 
 Перевірка стоїть на рівні з'єднання, тому діє для першого запиту, **кожного кроку переадресації** (крок спершу
-проходить `scope` і `robots.txt`, потім — політику адрес), `robots.txt`, sitemap і запитів стратегій.
+проходить `scope` і `robots.txt`, потім — політику адрес), `robots.txt`, sitemap і запитів стратегій, а також для
+**кожного запиту браузера** під час рендерингу (`fetch.render_js`: проксі сторінки перевіряє з'єднання так само).
 
 | Налаштування | Типово | Що забороняє |
 |---|---|---|
@@ -350,7 +417,7 @@ with httpx.Client(base_url="http://127.0.0.1:8101") as api:
 
 ## Спостережуваність
 
-- `GET /v1/health` (перевірка `state_store`), `GET /v1/info` (стратегії, джерела правил, ліміти).
+- `GET /v1/health` (перевірка `state_store`), `GET /v1/info` (стратегії, джерела правил, ліміти, `render_js`).
 - `GET /metrics` — Prometheus (`jane_http_requests_total`, `jane_http_request_duration_seconds`).
 - Журнали — JSON у stdout із `trace_id`, `job_id`; прогрес збору — `GET /v1/jobs/{id}` → `progress.counters`
   (зокрема `skipped_depth`, `dropped_frontier_full`, `dropped_by_budget`).

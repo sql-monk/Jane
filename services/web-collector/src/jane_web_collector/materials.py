@@ -165,14 +165,17 @@ def build_material(
                 meta.pop(prop, None)
     if meta.get("title"):
         material["metadata"] = {"title": meta["title"]}
+    diagnostics = [dict(d) for d in result.diagnostics]
     if result.truncated:
-        material["diagnostics"] = [
+        diagnostics.append(
             {
                 "level": "warning",
                 "code": "truncated",
                 "message": "content cut at limits.crawl.max_material_bytes",
             }
-        ]
+        )
+    if diagnostics:
+        material["diagnostics"] = diagnostics
     return material
 
 

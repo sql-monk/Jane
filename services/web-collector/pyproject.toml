@@ -15,9 +15,15 @@ dependencies = [
 [project.scripts]
 jane-web-collector = "jane_web_collector.__main__:main"
 
+[project.optional-dependencies]
+render = [
+    "playwright>=1.49",
+]
+
 [dependency-groups]
 dev = [
     "jane-testsite",
+    "playwright>=1.49",
     "psutil>=6.0",
 ]
 

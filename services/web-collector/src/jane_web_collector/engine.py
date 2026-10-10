@@ -22,6 +22,7 @@ from .discovery.registry import RESERVED_TYPES, Registry
 from .fetcher import Fetcher, FetchError, build_client
 from .host_limits import HostLimiter
 from .materials import Delivery, MaterialTooLarge, TransitStore, build_material, new_observation_id, rfc3339
+from .render import Renderer, RenderOptions, renderable
 from .robots import RobotsCache
 from .rules import ContractSchemas, RulesLoader, validate_rules
 from .settings import ServiceLimits, Settings, contract_layer, platform_layers, to_contract
@@ -76,6 +77,19 @@ class Engine:
             extra={"deny_link_local": egress.deny_link_local, "deny_private": egress.deny_private},
         )
         self.client = build_client(self.limits, egress)
+        # fetch.render_js: one headless browser for the process, started on first use; its requests go through
+        # the same outbound address policy (render.py)
+        self.renderer = Renderer(
+            RenderOptions(
+                enabled=settings.render_enabled,
+                wait_until=settings.render_wait_until,
+                block_resource_types=tuple(settings.render_block_resource_types),
+                executable=settings.render_browser_executable,
+            ),
+            egress,
+            max_pages=self.limits.collector.render_max_pages,
+        )
+        log.info("javascript rendering", extra=self.renderer.capabilities())
         # one per-host schedule for every collection and one-shot fetch of this process (WP-02c), shared with the
         # other instances of the same state store (R15)
         collector = self.limits.collector
@@ -103,6 +117,7 @@ class Engine:
             version=__version__,
             host_limiter=self.host_limiter,
             connection_policy=self.connection_policy,
+            renderer=self.renderer,
         )
         self.local: set[str] = set()
         self.shutting_down = False
@@ -141,6 +156,7 @@ class Engine:
             self.state.release(cid, self.settings.instance_id)
         if self.host_limiter.shared is not None:
             await self.host_limiter.shared.aclose()
+        await self.renderer.aclose()
         await self.client.aclose()
 
     async def _resume_loop(self) -> None:
@@ -463,6 +479,18 @@ class Engine:
             ) from exc
         finally:
             host_session.close()
+        if fetch_cfg.get("render_js") and renderable(result):
+            try:
+                result = await self.renderer.render(
+                    result,
+                    user_agent=user_agent,
+                    limits=limits,
+                    accept_language=next(
+                        (v for k, v in headers.items() if k.lower() == "accept-language"), None
+                    ),
+                )
+            except FetchError as exc:  # not_implemented (no browser) 501, timeout 504, internal_error 500
+                raise JaneError(exc.message, code=exc.code) from exc
         if result.status in NOT_FOUND_STATUSES:
             # the site says the page does not exist: 404 not_found (collector.v1, R04), as in /errors of a collection
             raise JaneError(
@@ -506,6 +534,7 @@ class Engine:
             "rules_sources": self.rules_loader.sources(),
             "connection_kinds": ["http"],
             "robots_policies": ["respect", "owner_policy"],
+            **self.renderer.capabilities(),
             **(
                 {"strategy_load_errors": list(self.registry.load_errors)} if self.registry.load_errors else {}
             ),

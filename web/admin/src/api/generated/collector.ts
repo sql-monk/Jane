@@ -908,7 +908,7 @@ export interface components {
         connection_id?: components["schemas"]["Slug"];
         accept_media_types?: string[];
         /**
-         * @description Зарезервовано; v1 не рендерить JavaScript.
+         * @description true — HTML-сторінки (2xx) рендеряться в headless-браузері: матеріал — DOM після виконання скриптів сторінки (doctype + document.documentElement.outerHTML, UTF-8), а не HTML, отриманий від сервера. Саму сторінку колектор завантажує як завжди (scope, robots.txt, переадресації, політика вихідних адрес, ліміти на хост, max_material_bytes, User-Agent) і віддає браузеру без повторного запиту; кожен запит браузера (скрипти, XHR) проходить ту саму політику вихідних адрес, облікові дані підключення браузеру не передаються. Умовні запити (ETag) для таких сторінок не надсилаються. Якщо в колекторі немає браузера, URL завершується помилкою not_implemented (без тихого звичайного завантаження), збір триває з рештою URL. Деталі й налаштування — README Web Collector.
          * @default false
          */
         render_js?: boolean;

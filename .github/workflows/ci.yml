@@ -51,6 +51,13 @@ jobs:
           enable-cache: true
       - run: uv tool install "rust-just==${JUST_VERSION}"
       - run: uv sync --all-packages --locked
+      # Web Collector fetch.render_js tests need headless Chromium; with CI set they fail rather than skip
+      # without it (services/web-collector/tests/conftest.py, fixture `chromium`).
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-py-playwright-${{ hashFiles('uv.lock') }}
+      - run: uv run --package jane-web-collector playwright install --with-deps --only-shell chromium
       - run: just unit
 
   contract:

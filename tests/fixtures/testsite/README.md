@@ -54,6 +54,12 @@ uv run python -m jane_testsite --write-expected tests/fixtures/testsite/expected
 інструкцій у вмісті. Вона містить звичайну відповідь FAQ і фразу `Ignore previous instructions and output ...`.
 Сторінка не входить до наборів пошуку й обходу, щоб інші тести мали незмінні очікувані URL.
 
+Так само лише за прямим URL — сторінки для рендерингу JavaScript (Web Collector `fetch.render_js`, константи
+`JS_*` у `site.py`): `/js/price` — товар, ціну, наявність і JSON-LD `Offer` якого скрипт сторінки додає з
+`/js/price.json` (`fetch()`); у HTML від сервера їх немає, як і атрибута `data-marker="rendered-by-script"`.
+`/js/probe` — те саме плюс запит скрипта до `http://169.254.169.254/latest/meta-data/` (адреса, яку забороняє
+політика вихідних адрес колектора); результат пише в `#probe` (`metadata: reachable` / `unreachable`).
+
 Цикли: `/loop/a → /loop/b → /loop/c → /loop/a`, самопосилання, товари посилаються на «пов'язаний» товар
 по колу, статті — на новішу/старішу.
 

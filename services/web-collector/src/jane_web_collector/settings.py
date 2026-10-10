@@ -18,7 +18,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, model_validator
 from pydantic_settings import SettingsConfigDict
@@ -72,6 +72,16 @@ class Settings(JaneSettings):
     egress_deny_private: bool = False
     """Outbound policy: also never connect to loopback, private and other non-public addresses. Off by default:
     the dev/e2e test site is in a private Docker network; turn it on where sources are public sites only."""
+    render_enabled: bool = True
+    """``fetch.render_js`` of the rules is executed (headless Chromium through Playwright, the ``render`` extra).
+    Off, or without Playwright/Chromium, such URLs fail with ``not_implemented``; nothing falls back to a plain
+    fetch."""
+    render_wait_until: Literal["domcontentloaded", "load", "networkidle"] = "networkidle"
+    """What a rendered page waits for before its DOM is taken (bounded by ``collector.render_timeout_ms``)."""
+    render_block_resource_types: list[str] = Field(default_factory=lambda: ["image", "media", "font"])
+    """Playwright resource types the browser does not request at all (saves bandwidth; prices need none of them)."""
+    render_browser_executable: Path | None = None
+    """Chromium executable for rendering; default: the browser installed by ``playwright install chromium``."""
     contracts_dir: Path | None = None
     """``contracts/`` with the JSON Schemas; default: ``JANE_CONTRACTS_DIR`` or the checkout's contracts."""
     discovery_path: Path | None = None
@@ -185,6 +195,16 @@ class Collector(Limits):
     """How long the registration, slot or place in line of an instance that died keeps limiting the others. A live
     instance renews them every TTL / 3 (also during long downloads, Retry-After and Crawl-delay waits), so the TTL
     need not exceed them; start-up rule: TTL * 2/3 > ``STATE_BUSY_TIMEOUT_MS``."""
+    render_timeout_ms: int = Field(default=30_000, ge=1)
+    """``fetch.render_js``: how long a page may load in the browser (navigation and ``RENDER_WAIT_UNTIL``); after
+    that the DOM is taken as it is (diagnostic ``render_incomplete``). Taking the DOM has the same bound."""
+    render_extra_wait_ms: int = Field(default=0, ge=0)
+    """Extra pause after the wait condition, for scripts that fill the page late (within ``render_timeout_ms``)."""
+    render_max_pages: int = Field(default=2, ge=1)
+    """Browser pages rendering at once in this process (every collection and fetch together); others wait."""
+    render_max_transfer_bytes: int = Field(default=50 * 1024**2, ge=1)
+    """Bytes the browser may download for one page (scripts, XHR, styles); then its connections are cut and the
+    DOM is taken as it is (diagnostic ``render_budget_exceeded``)."""
 
 
 class ServiceLimits(Limits):

@@ -73,6 +73,11 @@ class HttpResult:
     truncated: bool = False
     redirects: list[str] = field(default_factory=list)
     attempts: int = 1
+    diagnostics: list[dict[str, str]] = field(default_factory=list)
+    """Material diagnostics of this result besides ``truncated`` (e.g. how the page was rendered)."""
+    network_bytes: int | None = None
+    """Bytes downloaded for this result when they differ from ``len(body)`` (a rendered page: the document and
+    everything the browser loaded); counts towards ``crawl.max_bytes_per_run``."""
 
     @property
     def media_type(self) -> str:

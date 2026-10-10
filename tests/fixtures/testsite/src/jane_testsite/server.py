@@ -144,6 +144,9 @@ class TestSiteHandler(BaseHTTPRequestHandler):
             "/news/": lambda: self.news_list(1),
             "/api/v1/products": lambda: self.api_list(page_no),
             "/search": lambda: self.search(query.get("q", [""])[0], page_no),
+            site.JS_PRICE_PAGE: lambda: self.scripted_offer(probe=False),
+            site.JS_PROBE_PAGE: lambda: self.scripted_offer(probe=True),
+            site.JS_PRICE_DATA: self.scripted_offer_data,
         }
         if path in routes:
             routes[path]()
@@ -383,6 +386,47 @@ class TestSiteHandler(BaseHTTPRequestHandler):
         if results:
             body += self.pager(page_no, total, lambda n: site.search_page_path(term, n))
         self.page(f"Search: {term}", "search", body)
+
+    def scripted_offer(self, *, probe: bool) -> None:
+        """A product page whose price, stock and JSON-LD Offer exist only after its script ran (fetch() of
+        ``JS_PRICE_DATA``); the probe variant also asks ``METADATA_PROBE_URL`` and writes whether it answered."""
+        probe_js = ""
+        if probe:
+            probe_js = (
+                f"fetch({json.dumps(site.METADATA_PROBE_URL)}, {{mode: 'no-cors'}}).then("
+                "function () { probe.textContent = 'metadata: reachable'; },"
+                "function () { probe.textContent = 'metadata: unreachable'; });"
+            )
+        script = (
+            "(function () {"
+            "var offer = document.getElementById('offer'); var probe = document.getElementById('probe');"
+            "offer.setAttribute('data-marker', ['rendered', 'by', 'script'].join('-'));"
+            f"{probe_js}"
+            f"fetch({json.dumps(self.link(site.JS_PRICE_DATA))}).then(function (r) {{ return r.json(); }})"
+            ".then(function (d) {"
+            "document.getElementById('price').textContent = d.price + ' ' + d.currency;"
+            "document.getElementById('stock').textContent = d.availability;"
+            "var ld = document.createElement('script'); ld.type = 'application/ld+json';"
+            "ld.text = JSON.stringify({'@context': 'https://schema.org', '@type': 'Product', name: d.name,"
+            "offers: {'@type': 'Offer', price: d.price, priceCurrency: d.currency,"
+            "availability: 'https://schema.org/' + d.availability}});"
+            "document.head.appendChild(ld); offer.setAttribute('data-state', 'ready');"
+            "}).catch(function () { offer.setAttribute('data-state', 'failed'); });"
+            "})();"
+        )
+        body = (
+            f'<div id="offer" data-state="loading"><span class="name">{_esc(site.JS_OFFER.name)}</span> '
+            '<span class="price" id="price">price loads with JavaScript</span> '
+            '<span class="availability" id="stock"></span></div><p id="probe"></p>'
+            "<noscript>Prices need JavaScript.</noscript>"
+            f"<script>{script}</script>"
+        )
+        self.page(site.JS_OFFER.name, "product", body)
+
+    def scripted_offer_data(self) -> None:
+        o = site.JS_OFFER
+        data = {"name": o.name, "price": o.price, "currency": o.currency, "availability": o.availability}
+        self.send(200, json.dumps(data).encode(), "application/json")
 
     # ------------------------------------------------------------------ machine formats
     def _urlset(self, entries: list[tuple[str, str | None]]) -> bytes:

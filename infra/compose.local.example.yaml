@@ -10,6 +10,10 @@ services:
     environment:
       JANE_HANDLER_RUNTIME_REGISTRY_URL: http://registry:8000
   web-collector:
+    build:
+      # fetch.render_js: Playwright and headless Chromium in the image (pages whose prices are built by scripts)
+      args:
+        EXTRAS: --extra render
     environment:
       JANE_WEB_COLLECTOR_REGISTRY_URL: http://registry:8000
       # Real shop pages are often 0.5-2 MB; without a blob store larger pages fail with limit_exceeded

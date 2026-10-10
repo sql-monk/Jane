@@ -44,6 +44,27 @@ def test_patterns_and_scope() -> None:
     assert not glob.matches("https://shop.test/product/a/b")
     assert UrlPattern.from_rule({"value": "shop.test/**"}).matches("https://shop.test/a/b?c=1")
     assert UrlPattern.from_rule({"type": "regex", "value": r"/news/\d+"}).matches("https://shop.test/news/12")
+    # '?' is one character of a path segment, '=' is a literal: the include of a real Rozetka collection matched
+    # its pages 2-4 (they were fetched; dedup.use_link_rel_canonical dropped them as copies of page 1)
+    paged = Scope.from_rules(
+        {
+            "scope": {
+                "allowed_domains": ["rozetka.com.ua"],
+                "include": [
+                    {"value": "rozetka.com.ua/ua/notebooks/c80004/"},
+                    {"value": "rozetka.com.ua/ua/notebooks/c80004/page=?/"},
+                ],
+            }
+        }
+    )
+    assert paged is not None
+    norm = Normalizer()
+    for n in ("", "page=2/", "page=9/"):
+        url = norm.normalize(f"https://rozetka.com.ua/ua/notebooks/c80004/{n}")
+        assert url is not None and paged.check(url) is None, url
+    for n in ("page=10/", "page=2", "page=2/x/", "page=/"):
+        url = norm.normalize(f"https://rozetka.com.ua/ua/notebooks/c80004/{n}")
+        assert url is not None and paged.check(url) == "does not match scope.include", url
     scope = Scope.from_rules(
         {
             "scope": {

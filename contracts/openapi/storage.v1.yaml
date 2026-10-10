@@ -210,13 +210,141 @@ paths:
           $ref: common.yaml#/components/responses/Unauthenticated
         '404':
           $ref: common.yaml#/components/responses/NotFound
+  /v1/storage-status/checks:
+    post:
+      x-jane-scope: connections:write
+      operationId: checkStorageStatus
+      summary: Фонова перевірка доступності та інвентаризація сховища
+      tags:
+      - objects
+      parameters:
+      - $ref: common.yaml#/components/parameters/IdempotencyKey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - connection_id
+              properties:
+                connection_id:
+                  $ref: ../schemas/common/defs.schema.json#/$defs/Slug
+            example:
+              connection_id: raw-files
+      responses:
+        '202':
+          description: Job; при succeeded result містить StorageStatus. Помилка статистики
+            не означає недоступність підключення.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common/job.schema.json
+              example:
+                job_id: job_status_check
+                kind: storage_status_check
+                status: queued
+                created_at: '2026-10-11T08:00:00Z'
+        '401':
+          $ref: common.yaml#/components/responses/Unauthenticated
+        '404':
+          $ref: common.yaml#/components/responses/NotFound
+        '422':
+          $ref: common.yaml#/components/responses/UnprocessableEntity
+  /v1/jobs/{job_id}:
+    parameters:
+    - $ref: common.yaml#/components/parameters/JobId
+    get:
+      x-jane-scope:
+      - handler:invoke
+      - handler:test
+      - connections:write
+      operationId: getJob
+      summary: Стан, прогрес і результат тривалої операції
+      tags:
+      - jobs
+      responses:
+        '200':
+          description: Поточний стан job.
+          content:
+            application/json:
+              schema:
+                $ref: common.yaml#/components/schemas/Job
+              examples:
+                running:
+                  $ref: common.yaml#/components/examples/JobRunning
+                failed:
+                  $ref: common.yaml#/components/examples/JobFailed
+        '401':
+          $ref: common.yaml#/components/responses/Unauthenticated
+        '404':
+          $ref: common.yaml#/components/responses/NotFound
+  /v1/jobs/{job_id}/cancel:
+    parameters:
+    - $ref: common.yaml#/components/parameters/JobId
+    post:
+      x-jane-scope:
+      - handler:invoke
+      - handler:test
+      - connections:write
+      operationId: cancelJob
+      summary: Запит на скасування job (ідемпотентний)
+      x-jane-no-idempotency-key: cancellation is idempotent by nature
+      description: '202 — скасування прийнято, job переходить у `cancelling`, далі в
+        `cancelled`.
+  
+        200 — job уже в термінальному стані; повертається як є, без змін.
+  
+        Повторний виклик безпечний, тому Idempotency-Key не потрібен.
+  
+        '
+      tags:
+      - jobs
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/components/schemas/JobCancelRequest
+            examples:
+              reason:
+                value:
+                  reason: wrong scope
+      responses:
+        '200':
+          description: Job уже завершено; стан не змінено.
+          content:
+            application/json:
+              schema:
+                $ref: common.yaml#/components/schemas/Job
+              examples:
+                failed:
+                  $ref: common.yaml#/components/examples/JobFailed
+        '202':
+          description: Скасування прийнято.
+          content:
+            application/json:
+              schema:
+                $ref: common.yaml#/components/schemas/Job
+              examples:
+                cancelling:
+                  $ref: common.yaml#/components/examples/JobCancelling
+        '401':
+          $ref: common.yaml#/components/responses/Unauthenticated
+        '404':
+          $ref: common.yaml#/components/responses/NotFound
   /v1/storage-status:
     get:
       x-jane-scope: storage:read
       operationId: getStorageStatus
       summary: Остання явна перевірка сховища та статистика об’єктів
-      description: 'GET не відкриває адаптер і не обходить сховище. POST /v1/connections/{connection_id}/test
-        оновлює process-local snapshot. Зміна визначення та рестарт скидають snapshot.
+      description: 'GET не відкриває адаптер і не обходить сховище. POST /v1/storage-status/checks запускає Job для health та статистики,
+        оновлює process-local snapshot. Connection test перевіряє лише health. Зміна визначення та рестарт скидають snapshot.
         Статистика охоплює лише об’єкти namespace підключення: payload bytes, не зайнятий
         диск або сутності. Непідтримувані агрегати мають null і причину. Час фіксує
         свіжість, запис нових об’єктів не оновлює snapshot.'

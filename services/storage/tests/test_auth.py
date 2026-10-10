@@ -59,3 +59,23 @@ def test_storage_needs_a_token_and_the_operation_scope(settings: Settings, h: Si
         assert c.get("/v1/storage-status", params=params, headers=auth("k-storage-nobody")).status_code == 403
         assert c.get("/v1/storage-status", params=params, headers=auth("k-storage-reader")).status_code == 200
         assert c.post("/v1/connections/raw-files/test", headers=auth("k-storage-reader")).status_code == 403
+
+        status_body = {"connection_id": "raw-files"}
+        assert (
+            c.post(
+                "/v1/storage-status/checks",
+                json=status_body,
+                headers=auth("k-storage-reader", **{"Idempotency-Key": "auth-check"}),
+            ).status_code
+            == 403
+        )
+        accepted_check = c.post(
+            "/v1/storage-status/checks",
+            json=status_body,
+            headers=auth("k-storage-orchestrator", **{"Idempotency-Key": "auth-check"}),
+        )
+        assert accepted_check.status_code == 202
+        assert (
+            c.get(accepted_check.headers["Location"], headers=auth("k-storage-orchestrator")).status_code
+            == 200
+        )

@@ -1,11 +1,30 @@
 """Status snapshots over the real filesystem adapter."""
 
+import time
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
 from jane_kit.contracts import OpenAPISpec
+
+
+def inventory(client: TestClient, connection_id: str = "raw-files") -> dict:
+    response = client.post(
+        "/v1/storage-status/checks",
+        json={"connection_id": connection_id},
+        headers={"Idempotency-Key": str(uuid4())},
+    )
+    assert response.status_code == 202, response.text
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        job = client.get(response.headers["Location"]).json()
+        if job["status"] in {"succeeded", "failed", "cancelled"}:
+            assert job["status"] == "succeeded", job
+            return job["result"]
+        time.sleep(0.01)
+    raise AssertionError("status job did not complete")
 
 
 def test_status_unknown_then_inventory(client: TestClient, h: SimpleNamespace) -> None:
@@ -13,7 +32,7 @@ def test_status_unknown_then_inventory(client: TestClient, h: SimpleNamespace) -
     before = client.get(url).json()
     assert before["availability"] == "unknown"
     assert before["statistics"]["object_count"] is None
-    assert client.post("/v1/connections/raw-files/test").json()["ok"] is True
+    assert inventory(client)["availability"] == "available"
     empty = client.get(url).json()
     assert empty["statistics"]["object_count"] == 0
     assert empty["statistics"]["total_size_bytes"] == 0
@@ -21,7 +40,7 @@ def test_status_unknown_then_inventory(client: TestClient, h: SimpleNamespace) -
     assert result.json()["status"] == "success"
     # A render does not rescan the backend: only an explicit test refreshes metadata counts.
     assert client.get(url).json() == empty
-    assert client.post("/v1/connections/raw-files/test").json()["ok"] is True
+    assert inventory(client)["availability"] == "available"
     snapshot = client.get(url).json()
     assert snapshot["availability"] == "available"
     assert snapshot["checked_at"] is not None
@@ -49,12 +68,12 @@ def test_snapshot_invalidates_on_put_and_delete(client: TestClient) -> None:
 def test_failure_is_visible_and_does_not_hide_other_connections(client: TestClient) -> None:
     doc = {"connection_id": "bad-files", "kind": "filesystem", "params": {}}
     assert client.put("/v1/connections/bad-files", json=doc).status_code == 201
-    assert client.post("/v1/connections/bad-files/test").json()["ok"] is False
+    assert inventory(client, "bad-files")["availability"] == "unavailable"
     snapshot = client.get("/v1/storage-status?connection_id=bad-files").json()
     assert snapshot["availability"] == "unavailable"
     assert snapshot["statistics"]["object_count"] is None
     assert snapshot["statistics"]["unavailable_reason"] == "check_failed"
-    assert client.post("/v1/connections/raw-files/test").json()["ok"] is True
+    assert inventory(client)["availability"] == "available"
     assert client.get("/v1/storage-status?connection_id=raw-files").json()["availability"] == "available"
 
 
@@ -63,11 +82,65 @@ def test_failed_fresh_inventory_replaces_success(
 ) -> None:
     result = h.post(client, h.invocation([{"kind": "material", "material": h.material()}], "status-broken"))
     assert result.json()["status"] == "success"
-    assert client.post("/v1/connections/raw-files/test").json()["ok"] is True
+    assert inventory(client)["availability"] == "available"
     # Broken stored metadata must not become an invented zero count.
     payload = storage_dir / result.json()["output"]["writes"][0]["object"]["locator"]["path"]
     payload.with_name(payload.name + ".meta.json").unlink()
-    assert client.post("/v1/connections/raw-files/test").json()["ok"] is False
+    assert inventory(client)["availability"] == "available"
     state = client.get("/v1/storage-status?connection_id=raw-files").json()
-    assert state["availability"] == "unavailable"
+    assert state["availability"] == "available"
     assert state["statistics"]["object_count"] is None
+
+    assert state["statistics"]["unavailable_reason"] == "statistics_check_failed"
+    # The original endpoint remains a health check even with damaged inventory.
+    assert client.post("/v1/connections/raw-files/test").json()["ok"] is True
+
+
+def test_idempotent_status_jobs_and_unknown_connection(client: TestClient) -> None:
+    body = {"connection_id": "raw-files"}
+    headers = {"Idempotency-Key": "status-replay"}
+    first = client.post("/v1/storage-status/checks", json=body, headers=headers)
+    assert first.status_code == 202
+    again = client.post("/v1/storage-status/checks", json=body, headers=headers)
+    assert again.status_code == 202
+    assert again.json()["job_id"] == first.json()["job_id"]
+    assert again.headers["Idempotency-Replayed"] == "true"
+    changed = client.post(
+        "/v1/storage-status/checks", json={"connection_id": "broken-files"}, headers=headers
+    )
+    assert changed.status_code == 422
+    assert changed.json()["code"] == "idempotency_key_reused"
+    assert (
+        client.post(
+            "/v1/storage-status/checks", json={"connection_id": "unknown"}, headers=headers
+        ).status_code
+        == 404
+    )
+    assert client.post("/v1/storage-status/checks", json=body).status_code == 422
+
+
+def test_slow_inventory_is_background(settings, monkeypatch) -> None:
+    import asyncio
+
+    from jane_storage.app import build_app
+    from jane_storage_files import FilesystemAdapter
+
+    original = FilesystemAdapter.object_statistics
+
+    async def delayed_real_inventory(self):
+        # Delay injection only; execute the real inventory rather than returning a mocked result.
+        await asyncio.sleep(0.2)
+        return await original(self)
+
+    monkeypatch.setattr(FilesystemAdapter, "object_statistics", delayed_real_inventory)
+    settings = settings.with_overrides(limits={"timeouts": {"sync_response_max_ms": 1}})
+    with TestClient(build_app(settings)) as client:
+        response = client.post(
+            "/v1/storage-status/checks",
+            json={"connection_id": "raw-files"},
+            headers={"Idempotency-Key": "slow-status"},
+        )
+        assert response.status_code == 202
+        assert response.json()["status"] == "queued"
+        assert client.post("/v1/connections/raw-files/test").json()["ok"] is True
+        assert inventory(client)["statistics"]["object_count"] == 0

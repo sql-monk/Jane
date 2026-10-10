@@ -110,7 +110,7 @@ def _many_cursor(cursor: str, count: int) -> tuple[int, str | None]:
 
 
 async def _clean_transit(transit: FileTransitStore, transfer: Any) -> None:
-    """The producer's cleaner of its transit blobs (ADR-0004 Р В РІР‚в„ўР вЂ™Р’В§2, files): every ``transit_cleanup_interval_seconds``."""
+    """The producer's cleaner of its transit blobs (ADR-0004 §2, files): every ``transit_cleanup_interval_seconds``."""
     while True:
         await asyncio.sleep(transfer.transit_cleanup_interval_seconds)
         try:
@@ -227,7 +227,7 @@ def build_app(
     runner = JobRunner(limits=limits.jobs)
     keys = InMemoryIdempotencyStore(limits.idempotency)
     root = contracts_dir(Path(__file__).parent) if settings.validate_requests else None
-    # transit blobs of large RAW without a persistent URI (R18, ADR-0004 Р В РІР‚в„ўР вЂ™Р’В§2: written and removed here)
+    # transit blobs of large RAW without a persistent URI (R18, ADR-0004 §2: written and removed here)
     transit_blobs = FileTransitStore(settings.transit_dir, "storage") if settings.transit_dir else None
     registry = ConnectionRegistry(validator=_connection_validator(root), policy=settings.connection_policy())
     if settings.connections_file is not None:
@@ -524,6 +524,85 @@ def build_app(
             }
         )
 
+    @app.post("/v1/storage-status/checks", status_code=202, tags=["objects"])
+    async def check_storage_status(request: Request) -> Response:
+        body = await read_body(request)
+        if (
+            not isinstance(body, dict)
+            or set(body) != {"connection_id"}
+            or not isinstance(body["connection_id"], str)
+        ):
+            raise ValidationFailed("connection_id is required and no other fields are accepted")
+        connection_id = body["connection_id"]
+        stored = registry.get(connection_id)  # Unknown connection fails before creating a job.
+        key = request.headers.get(IDEMPOTENCY_HEADER)
+        if not key:
+            raise ValidationFailed("Idempotency-Key is required")
+        fingerprint = _fingerprint({"operation": "storage_status_check", "body": body})
+        existing = await keys.begin(key, fingerprint, float(limits.idempotency.idempotency_ttl_seconds))
+        if existing is not None:
+            if existing.fingerprint != fingerprint:
+                raise IdempotencyKeyReused("the key was used with a different request")
+            if existing.response is None:
+                raise IdempotencyInProgress("a request with this key is still running")
+            return JSONResponse(
+                existing.response.body,
+                status_code=202,
+                headers={**existing.response.headers, REPLAY_HEADER: "true"},
+            )
+
+        async def work(ctx: JobContext) -> dict[str, Any]:
+            await ctx.check_cancelled()
+            out: dict[str, Any] = {
+                "connection_id": connection_id,
+                "kind": stored.kind,
+                "availability": "unavailable",
+                "checked_at": format_ts(datetime.now(UTC)),
+                "message": None,
+                "statistics": empty_statistics("connection_unavailable"),
+            }
+            try:
+                async with asyncio.timeout(limits.timeouts.request_timeout_ms / 1000):
+                    async with pool.lease(connection_id, stored.kind, {}) as adapter:
+                        healthy = await adapter.health()
+                        out["availability"] = "available" if healthy else "unavailable"
+                        if healthy:
+                            aggregate = getattr(adapter, "object_statistics", None)
+                            out["statistics"] = empty_statistics("adapter_statistics_not_supported")
+                            if aggregate is not None:
+                                try:
+                                    counts = await aggregate()
+                                    out["statistics"] = {
+                                        **counts,
+                                        "scope": "connection_objects",
+                                        "checked_at": format_ts(datetime.now(UTC)),
+                                        "unavailable_reason": None,
+                                    }
+                                except (AdapterError, ValueError, KeyError):
+                                    out["statistics"] = empty_statistics("statistics_check_failed")
+            except (AdapterError, JaneError, TimeoutError) as exc:
+                out["message"] = redact(str(exc), registry.secret_values(connection_id))[:1000]
+                reason = "statistics_check_failed" if out["availability"] == "available" else "check_failed"
+                out["statistics"] = empty_statistics(reason)
+            # Definition changes during a probe must not publish a stale result for a new connection.
+            try:
+                if registry.get(connection_id).etag == stored.etag:
+                    storage_checks[connection_id] = (stored.etag, out)
+            except NotFound:
+                pass
+            return out
+
+        try:
+            job = await runner.submit("storage_status_check", work, idempotency_key=key)
+            response = accepted(job, runner.location(job.job_id))
+            await keys.complete(
+                key, StoredResponse(202, job.wire(), {"Location": runner.location(job.job_id)})
+            )
+            return response
+        except BaseException:
+            await keys.release(key)
+            raise
+
     # ------------------------------------------------------------------ connections
     def connection_body(doc: Mapping[str, Any]) -> dict[str, Any]:
         return {
@@ -592,11 +671,11 @@ def build_app(
             "checked_at": format_ts(datetime.now().astimezone()),
             "secrets_resolved": resolved_secrets,
         }
-        statistics = empty_statistics("adapter_statistics_not_supported")
+        statistics = empty_statistics("not_checked")
 
         def remember() -> JSONResponse:
             nonlocal statistics
-            if not out["ok"] and statistics["unavailable_reason"] == "adapter_statistics_not_supported":
+            if not out["ok"] and statistics["unavailable_reason"] == "not_checked":
                 statistics = empty_statistics("connection_unavailable")
             storage_checks[connection_id] = (
                 stored.etag,
@@ -626,18 +705,6 @@ def build_app(
             async with asyncio.timeout(limits.timeouts.request_timeout_ms / 1000):
                 async with pool.lease(connection_id, stored.kind, {}) as adapter:
                     out["ok"] = await adapter.health()
-                    # Optional aggregate capability: never enumerate remote backend objects in the core.
-                    aggregate = getattr(adapter, "object_statistics", None)
-                    if out["ok"] and aggregate is not None:
-                        counts = await aggregate()
-                        statistics = {
-                            **counts,
-                            "checked_at": format_ts(datetime.now().astimezone()),
-                            "scope": "connection_objects",
-                            "unavailable_reason": None,
-                        }
-                    elif not out["ok"]:
-                        statistics = empty_statistics("connection_unavailable")
         except (AdapterError, JaneError, TimeoutError) as exc:
             out["ok"] = False
             out["message"] = redact(str(exc), registry.secret_values(connection_id))[:1000]
@@ -839,7 +906,7 @@ def build_app(
                 content_uri = getattr(adapter, "content_uri", None)
                 uri = content_uri(rec) if callable(content_uri) else None
                 if meta.get("stored_format") == "json":
-                    # The object is the JSON document of the Material (format.raw json, or the TZ Р В РІР‚в„ўР вЂ™Р’В§5 default for a
+                    # The object is the JSON document of the Material (format.raw json, or the TZ §5 default for a
                     # RAW that is not a web page): its bytes are not the material's content. Restore the original
                     # content embedded in the document; there is no persistent URI of those bytes.
                     original = _embedded_content(await call(adapter.read_object_content(object_id)))

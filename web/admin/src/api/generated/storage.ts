@@ -101,6 +101,66 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/storage-status/checks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Фонова перевірка доступності та інвентаризація сховища */
+    post: operations["checkStorageStatus"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/jobs/{job_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: components["parameters"]["JobId"];
+      };
+      cookie?: never;
+    };
+    /** Стан, прогрес і результат тривалої операції */
+    get: operations["getJob"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/jobs/{job_id}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: components["parameters"]["JobId"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Запит на скасування job (ідемпотентний)
+     * @description 202 — скасування прийнято, job переходить у `cancelling`, далі в `cancelled`.
+     *     200 — job уже в термінальному стані; повертається як є, без змін.
+     *     Повторний виклик безпечний, тому Idempotency-Key не потрібен.
+     */
+    post: operations["cancelJob"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/storage-status": {
     parameters: {
       query?: never;
@@ -110,7 +170,7 @@ export interface paths {
     };
     /**
      * Остання явна перевірка сховища та статистика об’єктів
-     * @description GET не відкриває адаптер і не обходить сховище. POST /v1/connections/{connection_id}/test оновлює process-local snapshot. Зміна визначення та рестарт скидають snapshot. Статистика охоплює лише об’єкти namespace підключення: payload bytes, не зайнятий диск або сутності. Непідтримувані агрегати мають null і причину. Час фіксує свіжість, запис нових об’єктів не оновлює snapshot.
+     * @description GET не відкриває адаптер і не обходить сховище. POST /v1/storage-status/checks запускає Job для health та статистики, оновлює process-local snapshot. Connection test перевіряє лише health. Зміна визначення та рестарт скидають snapshot. Статистика охоплює лише об’єкти namespace підключення: payload bytes, не зайнятий диск або сутності. Непідтримувані агрегати мають null і причину. Час фіксує свіжість, запис нових об’єктів не оновлює snapshot.
      */
     get: operations["getStorageStatus"];
     put?: never;
@@ -514,6 +574,115 @@ export interface components {
       };
       message?: string;
     };
+    /**
+     * Job
+     * @description Стан тривалої операції. Будь-який API, що повертає 202 Accepted, повертає Job і заголовок Location: /v1/jobs/{job_id}. Стан читається GET /v1/jobs/{job_id}, скасування — POST /v1/jobs/{job_id}/cancel. Переходи: queued → running → (succeeded | failed); queued|running → cancelling → cancelled (або succeeded/failed, якщо операція завершилась раніше, ніж скасування набрало сили). Термінальні стани: succeeded, failed, cancelled — більше не змінюються. Job живе в сервісі, який його створив; зберігається щонайменше limits.transfer.job_retention_seconds після завершення.
+     */
+    "job.schema": {
+      job_id: components["schemas"]["Id"];
+      /** @description Вид операції в межах сервісу, наприклад 'collection', 'invocation', 'test_run', 'run', 'onboarding', 'improvement', 'upstream_port'. */
+      kind: string;
+      status: components["schemas"]["JobStatus"];
+      created_at: components["schemas"]["Timestamp"];
+      updated_at?: components["schemas"]["Timestamp"];
+      started_at?: components["schemas"]["Timestamp"];
+      finished_at?: components["schemas"]["Timestamp"];
+      progress?: components["schemas"]["JobProgress"];
+      /** @description Результат, коли status = succeeded. Форма залежить від 'kind' і описана в API відповідної операції. Великий результат передається як result_ref. */
+      result?: Record<string, unknown>;
+      result_ref?: components["schemas"]["content-ref.schema"];
+      /** @description Причина, коли status = failed. Для cancelled причина — у cancellation. */
+      error?: components["schemas"]["problem.schema"];
+      cancellation?: components["schemas"]["JobCancellation"];
+      idempotency_key?: string;
+      /** @description Пов'язані ресурси: self, cancel, result, run, collection тощо. */
+      links?: {
+        [key: string]: string;
+      };
+      labels?: components["schemas"]["Labels"];
+    };
+    /** @description Непрозорий ідентифікатор, згенерований сервісом-власником (наприклад 'mat_01J9Z...'). Клієнти не розбирають його структуру. */
+    Id: string;
+    /** @enum {string} */
+    JobStatus: "queued" | "running" | "cancelling" | "succeeded" | "failed" | "cancelled";
+    JobProgress: {
+      completed?: number;
+      /** @description Відома загальна кількість одиниць; null — невідома (наприклад під час рекурсивного обходу). */
+      total?: number | null;
+      /**
+       * @example materials
+       * @example pages
+       * @example tests
+       * @example stages
+       */
+      unit?: string;
+      message?: string;
+      /** @description Довільні лічильники, наприклад {"fetched": 10, "skipped_robots": 2}. */
+      counters?: {
+        [key: string]: number;
+      };
+      updated_at?: components["schemas"]["Timestamp"];
+    };
+    /** @description Медіатип RFC 6838, наприклад 'text/html' або 'application/json'. Параметри (charset) передаються окремо. */
+    MediaType: string;
+    Sha256Hex: string;
+    InlineContent: {
+      /** @constant */
+      kind: "inline";
+      media_type: components["schemas"]["MediaType"];
+      /** @description Кодування тексту в першоджерелі (після декодування data завжди UTF-8 для encoding=utf-8). */
+      charset?: string;
+      /**
+       * @description utf-8 — текст як є; base64 — двійкові дані (RFC 4648).
+       * @enum {string}
+       */
+      encoding: "utf-8" | "base64";
+      data: string;
+      /** @description Розмір декодованих байтів. */
+      size_bytes?: number;
+      sha256?: components["schemas"]["Sha256Hex"];
+    };
+    BlobContent: {
+      /** @constant */
+      kind: "blob";
+      /** @description Канонічна адреса об'єкта: 's3://<bucket>/<key>' (MinIO/S3) або 'file:///<abs-path>' (лише для одновузлового розгортання зі спільним томом). */
+      uri: string;
+      /**
+       * Format: uri
+       * @description Необов'язкове попередньо підписане HTTP(S)-посилання для читання без облікових даних сховища. Діє до download_url_expires_at.
+       */
+      download_url?: string;
+      download_url_expires_at?: components["schemas"]["Timestamp"];
+      media_type: components["schemas"]["MediaType"];
+      charset?: string;
+      size_bytes: number;
+      sha256: components["schemas"]["Sha256Hex"];
+      /**
+       * @description transit — тимчасовий об'єкт для передавання між етапами (видаляється після expires_at); persistent — збережений обробником збереження.
+       * @enum {string}
+       */
+      store?: "transit" | "persistent";
+      /**
+       * Format: date-time
+       * @description Коли транзитний об'єкт може бути видалено. null для persistent.
+       */
+      expires_at?: string | null;
+    };
+    /**
+     * ContentRef
+     * @description Вміст матеріалу або великого результату: або вбудований (kind=inline, до limits.transfer.inline_max_bytes), або посилання на blob-сховище (kind=blob). Кожен споживач зобов'язаний підтримувати обидва варіанти. Див. docs/adr/0004-large-materials.md.
+     */
+    "content-ref.schema": {} & (
+      components["schemas"]["InlineContent"] | components["schemas"]["BlobContent"]
+    );
+    JobCancellation: {
+      requested_at: components["schemas"]["Timestamp"];
+      requested_by?: string;
+      reason?: string;
+    };
+    JobCancelRequest: {
+      reason?: string;
+    };
     /** @description Ідентичність об'єкта. natural — значення ключових полів схеми (наприклад {"sku": "A-1"}); scope — простір імен (зазвичай source_id), щоб однакові SKU різних джерел не злилися. Сховище будує канонічний рядок ключа: scope + '|' + пари natural, відсортовані за іменем, серіалізовані як JSON без пробілів. */
     EntityKey: {
       scope: string;
@@ -521,9 +690,6 @@ export interface components {
         [key: string]: string | number | boolean;
       };
     };
-    /** @description Непрозорий ідентифікатор, згенерований сервісом-власником (наприклад 'mat_01J9Z...'). Клієнти не розбирають його структуру. */
-    Id: string;
-    Sha256Hex: string;
     /** @description Порядок спостережень. Порівняння: спочатку observed_at (час отримання матеріалу колектором), потім sequence (ревізія джерела, якщо є), потім observation_id лексикографічно. Більше — новіше. Час обробки чи доставки в порівнянні не бере участі. */
     ObservationOrder: {
       observation_id: components["schemas"]["Id"];
@@ -600,57 +766,6 @@ export interface components {
       applied_fields: string[];
       stale_fields: string[];
     };
-    /** @description Медіатип RFC 6838, наприклад 'text/html' або 'application/json'. Параметри (charset) передаються окремо. */
-    MediaType: string;
-    InlineContent: {
-      /** @constant */
-      kind: "inline";
-      media_type: components["schemas"]["MediaType"];
-      /** @description Кодування тексту в першоджерелі (після декодування data завжди UTF-8 для encoding=utf-8). */
-      charset?: string;
-      /**
-       * @description utf-8 — текст як є; base64 — двійкові дані (RFC 4648).
-       * @enum {string}
-       */
-      encoding: "utf-8" | "base64";
-      data: string;
-      /** @description Розмір декодованих байтів. */
-      size_bytes?: number;
-      sha256?: components["schemas"]["Sha256Hex"];
-    };
-    BlobContent: {
-      /** @constant */
-      kind: "blob";
-      /** @description Канонічна адреса об'єкта: 's3://<bucket>/<key>' (MinIO/S3) або 'file:///<abs-path>' (лише для одновузлового розгортання зі спільним томом). */
-      uri: string;
-      /**
-       * Format: uri
-       * @description Необов'язкове попередньо підписане HTTP(S)-посилання для читання без облікових даних сховища. Діє до download_url_expires_at.
-       */
-      download_url?: string;
-      download_url_expires_at?: components["schemas"]["Timestamp"];
-      media_type: components["schemas"]["MediaType"];
-      charset?: string;
-      size_bytes: number;
-      sha256: components["schemas"]["Sha256Hex"];
-      /**
-       * @description transit — тимчасовий об'єкт для передавання між етапами (видаляється після expires_at); persistent — збережений обробником збереження.
-       * @enum {string}
-       */
-      store?: "transit" | "persistent";
-      /**
-       * Format: date-time
-       * @description Коли транзитний об'єкт може бути видалено. null для persistent.
-       */
-      expires_at?: string | null;
-    };
-    /**
-     * ContentRef
-     * @description Вміст матеріалу або великого результату: або вбудований (kind=inline, до limits.transfer.inline_max_bytes), або посилання на blob-сховище (kind=blob). Кожен споживач зобов'язаний підтримувати обидва варіанти. Див. docs/adr/0004-large-materials.md.
-     */
-    "content-ref.schema": {} & (
-      components["schemas"]["InlineContent"] | components["schemas"]["BlobContent"]
-    );
     /** @description Посилання на збережений об'єкт (RAW або документ результатів), за яким його можна прочитати через storage API або повторно обробити. */
     StoredObjectRef: {
       object_id: components["schemas"]["Id"];
@@ -862,6 +977,16 @@ export interface components {
      * @example "v7"
      */
     IfMatch: string;
+    /**
+     * @description Ключ ідемпотентності (1–255 друкованих ASCII-символів; рекомендовано UUID або детермінований
+     *     ключ доставки). Повтор із тим самим ключем і тим самим тілом повертає збережену відповідь
+     *     (заголовок `Idempotency-Replayed: true`) без повторного ефекту. Той самий ключ з іншим тілом —
+     *     422 `idempotency_key_reused`. Запит ще виконується — 409 `idempotency_in_progress`
+     *     (retryable). Сервіс пам'ятає ключ щонайменше `limits.transfer.idempotency_ttl_seconds`.
+     * @example 0b7d5c1e-3f7e-4a53-9d0e-5a0f5c0a9b11
+     */
+    IdempotencyKey: string;
+    JobId: components["schemas"]["Id"];
   };
   requestBodies: never;
   headers: {
@@ -1068,6 +1193,120 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ConnectionTestResult"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+    };
+  };
+  checkStorageStatus: {
+    parameters: {
+      query?: never;
+      header: {
+        /**
+         * @description Ключ ідемпотентності (1–255 друкованих ASCII-символів; рекомендовано UUID або детермінований
+         *     ключ доставки). Повтор із тим самим ключем і тим самим тілом повертає збережену відповідь
+         *     (заголовок `Idempotency-Replayed: true`) без повторного ефекту. Той самий ключ з іншим тілом —
+         *     422 `idempotency_key_reused`. Запит ще виконується — 409 `idempotency_in_progress`
+         *     (retryable). Сервіс пам'ятає ключ щонайменше `limits.transfer.idempotency_ttl_seconds`.
+         * @example 0b7d5c1e-3f7e-4a53-9d0e-5a0f5c0a9b11
+         */
+        "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "connection_id": "raw-files"
+         *     }
+         */
+        "application/json": {
+          connection_id: components["schemas"]["Slug"];
+        };
+      };
+    };
+    responses: {
+      /** @description Job; при succeeded result містить StorageStatus. Помилка статистики не означає недоступність підключення. */
+      202: {
+        headers: {
+          Location?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "job_id": "job_status_check",
+           *       "kind": "storage_status_check",
+           *       "status": "queued",
+           *       "created_at": "2026-10-11T08:00:00Z"
+           *     }
+           */
+          "application/json": components["schemas"]["job.schema"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+      422: components["responses"]["UnprocessableEntity"];
+    };
+  };
+  getJob: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: components["parameters"]["JobId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Поточний стан job. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["job.schema"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+    };
+  };
+  cancelJob: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: components["parameters"]["JobId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["JobCancelRequest"];
+      };
+    };
+    responses: {
+      /** @description Job уже завершено; стан не змінено. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["job.schema"];
+        };
+      };
+      /** @description Скасування прийнято. */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["job.schema"];
         };
       };
       401: components["responses"]["Unauthenticated"];

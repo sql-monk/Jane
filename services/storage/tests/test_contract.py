@@ -130,6 +130,13 @@ def test_storage_read_api_matches_contract(client: TestClient, h: SimpleNamespac
     doc["connection_id"] = "contract-status"
     assert api.put("/v1/connections/contract-status", json=doc).status_code == 201
     api.delete("/v1/connections/contract-status")
+    status_job = api.post(
+        "/v1/storage-status/checks",
+        json={"connection_id": "raw-files"},
+        headers={"Idempotency-Key": "contract-status-check"},
+    )
+    api.get(status_job.headers["Location"])
+    api.post(status_job.headers["Location"] + "/cancel")
     assert api.uncovered() == []
 
 

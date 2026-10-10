@@ -321,8 +321,10 @@ uv run --all-packages jane-storage-packages publish --registry http://localhost:
 ## Стан сховища (WP-24)
 
 `GET /v1/storage-status?connection_id=raw-files` потребує `storage:read` та повертає останню
-явну перевірку. `POST /v1/connections/raw-files/test` потребує `connections:write`, перевіряє
-health адаптера та оновлює snapshot. GET не відкриває адаптер, не читає payload та не обходить backend.
+явну перевірку. `POST /v1/storage-status/checks` з тілом `{"connection_id":"raw-files"}`
+і `Idempotency-Key` потребує `connections:write`, негайно повертає 202 Job + Location.
+Опитуйте GET Location до succeeded; result містить StorageStatus. Job перевіряє health і статистику.
+Звичайний `POST /v1/connections/raw-files/test` перевіряє лише health, без інвентаризації. GET не відкриває адаптер, не читає payload та не обходить backend.
 GET `/v1/connections` і `/v1/connections/{id}` доступні також читачу `storage:read`.
 
 До перевірки, після рестарту, DELETE чи зміни визначення: availability `unknown`, checked_at null,
@@ -344,3 +346,10 @@ storage не читає його таблиці. Зовнішні сховища
 Приклад для стороннього читача: `GET /v1/storage-status?connection_id=raw-files`
 з `Authorization: Bearer <ключ зі storage:read>`. Звичайна команда тестів:
 `uv run pytest services/storage/tests services/storage/adapters/files/tests -q`.
+
+
+Інвентаризація виконується в JobRunner з налаштованими `jobs.max_concurrent_jobs`, `jobs.max_queued_jobs`,
+`jobs.job_timeout_ms`; probe додатково обмежено `timeouts.request_timeout_ms` (типово 30000 ms).
+У filesystem cancel/timeout встановлює cooperative stop event; worker припиняє обходи між metadata records.
+Помилка статистики не скасовує успішний health: availability available, статистики null,
+причина statistics_check_failed. POST replay повертає той самий Job і Idempotency-Replayed=true.

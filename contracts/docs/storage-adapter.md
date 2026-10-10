@@ -171,7 +171,7 @@ S3-сумісному замінникові, про що пишеться у з
 ## Спостереження за станом (WP-24)
 
 Storage Read API містить discovery підключень та `GET /v1/storage-status?connection_id=…`.
-Це snapshot останнього `POST /v1/connections/{id}/test`, локальний процесу; restart і зміна визначення
+Це snapshot фонового `POST /v1/storage-status/checks` (202 Job, Idempotency-Key), локальний процесу; restart і зміна визначення
 роблять його unknown. GET ніколи не обходить backend. `checked_at` показує свіжість,
 `statistics.checked_at` — час останнього агрегату; null числові поля з `unavailable_reason` означають
 невідоме значення. `scope=connection_objects` означає лише збережені об’єкти namespace цього connection,
@@ -179,3 +179,9 @@ Storage Read API містить discovery підключень та `GET /v1/sto
 індексу metadata, зовнішні адаптери поки не підтримують aggregate. Інвентаризація не змінює StorageAdapter
 Protocol: необов’язкова локальна capability `object_statistics` не є вимогою до сторонніх адаптерів.
 API не приписує стан обробки матеріалу: це власність оркестратора.
+
+
+Звичайний ConnectionTest не виконує inventory; його ok залишається результатом health.
+Фонова statistics_check_failed зберігає успішну availability available та null counts.
+Job read/cancel доступні handler:invoke, handler:test або connections:write; створення status check —
+connections:write. JobRunner застосовує concurrency/queue/timeout/retention budgets.

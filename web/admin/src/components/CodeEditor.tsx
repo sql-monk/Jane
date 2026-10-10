@@ -1,8 +1,51 @@
 import { useEffect, useRef } from "react";
 import { EditorView, basicSetup } from "codemirror";
-import { EditorState, type Extension } from "@codemirror/state";
+import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { python } from "@codemirror/lang-python";
 import { json } from "@codemirror/lang-json";
+import { useTheme } from "../app/theme";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
+
+function editorTheme(dark: boolean): Extension {
+  return [
+    EditorView.theme(
+      {
+        "&": { color: "var(--text)", backgroundColor: "var(--panel)" },
+        ".cm-content": { caretColor: "var(--accent)" },
+        ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--accent)" },
+        ".cm-gutters": {
+          backgroundColor: "var(--surface)",
+          color: "var(--muted)",
+          borderColor: "var(--border)",
+        },
+        ".cm-activeLine, .cm-activeLineGutter": {
+          backgroundColor: "color-mix(in srgb, var(--accent) 8%, transparent)",
+        },
+        ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
+          backgroundColor: "color-mix(in srgb, var(--accent) 22%, var(--panel))",
+        },
+        ".cm-panels, .cm-tooltip": {
+          backgroundColor: "var(--surface)",
+          color: "var(--text)",
+          borderColor: "var(--border)",
+        },
+      },
+      { dark },
+    ),
+    syntaxHighlighting(
+      HighlightStyle.define([
+        { tag: tags.keyword, color: dark ? "#ff7b72" : "#cf222e" },
+        { tag: [tags.string, tags.special(tags.string)], color: dark ? "#a5d6ff" : "#0a3069" },
+        { tag: [tags.number, tags.bool, tags.null], color: dark ? "#79c0ff" : "#0550ae" },
+        { tag: tags.comment, color: "var(--muted)", fontStyle: "italic" },
+        { tag: [tags.function(tags.variableName), tags.propertyName], color: dark ? "#d2a8ff" : "#8250df" },
+        { tag: [tags.typeName, tags.className], color: dark ? "#ffa657" : "#953800" },
+        { tag: tags.invalid, color: "var(--bad)" },
+      ]),
+    ),
+  ];
+}
 
 export type EditorLanguage = "python" | "json" | "text";
 
@@ -39,6 +82,8 @@ export function CodeEditor({
 }) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
+  const themeCompartment = useRef(new Compartment());
+  const { theme } = useTheme();
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -50,6 +95,7 @@ export function CodeEditor({
         doc: value,
         extensions: [
           basicSetup,
+          themeCompartment.current.of(editorTheme(theme === "dark")),
           ...languageFor(language),
           EditorState.readOnly.of(readOnly),
           EditorView.editable.of(!readOnly),
@@ -69,6 +115,10 @@ export function CodeEditor({
     // Recreate only when the language / mode changes; content is synchronised below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language, readOnly, label, minHeight]);
+
+  useEffect(() => {
+    view.current?.dispatch({ effects: themeCompartment.current.reconfigure(editorTheme(theme === "dark")) });
+  }, [theme]);
 
   useEffect(() => {
     const current = view.current;

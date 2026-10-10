@@ -1,6 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { ApiError, errorMessage, safeProblemCode } from "../api/problem";
 import { redactSecrets } from "../lib/secrets";
+import { useLocation } from "react-router-dom";
+import { navigationFor } from "../lib/navigation";
 
 export function Page({
   title,
@@ -11,10 +14,15 @@ export function Page({
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  const location = useLocation();
+  const description = navigationFor(location.pathname)?.description;
   return (
     <section className="page">
       <header className="page-header">
-        <h1>{title}</h1>
+        <div>
+          <h1>{title}</h1>
+          {description ? <p className="page-description">{description}</p> : null}
+        </div>
         {actions ? <div className="page-actions">{actions}</div> : null}
       </header>
       {children}
@@ -149,6 +157,16 @@ export interface Column<T> {
   className?: string;
 }
 
+function TableValue({ value }: { value: ReactNode }) {
+  return typeof value === "string" || typeof value === "number" ? (
+    <span className="table-value" title={String(value)}>
+      {value}
+    </span>
+  ) : (
+    value
+  );
+}
+
 export function Table<T>({
   rows,
   columns,
@@ -180,7 +198,7 @@ export function Table<T>({
             <tr key={rowKey(row, i)}>
               {columns.map((c) => (
                 <td key={c.header} className={c.className}>
-                  {c.cell(row)}
+                  <TableValue value={c.cell(row)} />
                 </td>
               ))}
             </tr>
@@ -245,6 +263,44 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
   );
 }
 
+/** Native modal: focus stays inside it and table rows keep their compact layout. */
+export function ActionDialog({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const element = dialog.current;
+    const previouslyFocused = document.activeElement;
+    element?.showModal();
+    return () => {
+      if (element?.open) element.close();
+      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected)
+        previouslyFocused.focus();
+    };
+  }, []);
+  return createPortal(
+    <dialog
+      ref={dialog}
+      className="action-dialog"
+      aria-label={title}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      <h2>{title}</h2>
+      {children}
+    </dialog>,
+    document.body,
+  );
+}
+
 /** A button that asks for a reason (audit) before running a destructive or auditable action. */
 export function ReasonAction({
   label,
@@ -253,6 +309,7 @@ export function ReasonAction({
   busy,
   danger = false,
   requireReason = true,
+  modal = false,
 }: {
   label: string;
   confirmLabel?: string;
@@ -260,22 +317,22 @@ export function ReasonAction({
   busy?: boolean;
   danger?: boolean;
   requireReason?: boolean;
+  modal?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
-  if (!open) {
-    return (
-      <button
-        type="button"
-        className={danger ? "btn btn-danger" : "btn"}
-        onClick={() => setOpen(true)}
-        disabled={busy}
-      >
-        {label}
-      </button>
-    );
-  }
-  return (
+  const trigger = (
+    <button
+      type="button"
+      className={danger ? "btn btn-danger" : "btn"}
+      onClick={() => setOpen(true)}
+      disabled={busy}
+    >
+      {label}
+    </button>
+  );
+  if (!open) return trigger;
+  const confirmation = (
     <span className="reason-action">
       <input
         aria-label={`Причина: ${label}`}
@@ -300,6 +357,21 @@ export function ReasonAction({
         Назад
       </button>
     </span>
+  );
+  return modal ? (
+    <>
+      {trigger}
+      <ActionDialog
+        title={label}
+        onClose={() => {
+          if (!busy) setOpen(false);
+        }}
+      >
+        {confirmation}
+      </ActionDialog>
+    </>
+  ) : (
+    confirmation
   );
 }
 

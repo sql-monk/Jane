@@ -1,7 +1,7 @@
-"""Laptop prices of three real shops (Rozetka, Allo, Citrus) on a running Jane stack.
+"""Laptop prices of five real shops (Rozetka, Allo, Citrus, Foxtrot, Moyo) on a running Jane stack.
 
-Publishes and approves the packages of ``examples/shops/packages`` (one shared JSON-LD extractor, collector
-rules per shop) and the storage packages, puts the connections ``raw-files`` / ``results-pg`` (as
+Publishes and approves the packages of ``examples/shops/packages`` (a JSON-LD and a product-card extractor,
+collector rules per shop) and the storage packages, puts the connections ``raw-files`` / ``results-pg`` (as
 ``examples/documents/connections.json``), creates a source and a task per shop and starts every task once:
 category pages 1-5 -> RAW in files -> ``offer`` entities in PostgreSQL. The tasks then run on their schedule.
 
@@ -25,11 +25,14 @@ sys.path.insert(0, str(HERE.parent))
 import jane_examples as ex  # noqa: E402 - examples/jane_examples.py: contract-validated API clients
 
 PACKAGES = HERE / "packages"
-EXTRACTOR = "shops.jsonld-offers"
+JSONLD, CARDS = "shops.jsonld-offers", "shops.product-cards"
+# shop -> (category URL, title, extractor package)
 SHOPS = {
-    "rozetka": ("https://rozetka.com.ua/ua/notebooks/c80004/", "Rozetka — ноутбуки"),
-    "allo": ("https://allo.ua/ua/products/notebooks/", "Allo — ноутбуки"),
-    "citrus": ("https://citrus.ua/noutbuki-i-ultrabuki/", "Цитрус — ноутбуки"),
+    "rozetka": ("https://rozetka.com.ua/ua/notebooks/c80004/", "Rozetka — ноутбуки", JSONLD),
+    "allo": ("https://allo.ua/ua/products/notebooks/", "Allo — ноутбуки", JSONLD),
+    "citrus": ("https://citrus.ua/noutbuki-i-ultrabuki/", "Цитрус — ноутбуки", JSONLD),
+    "foxtrot": ("https://www.foxtrot.com.ua/uk/shop/noutbuki.html", "Фокстрот — ноутбуки", CARDS),
+    "moyo": ("https://www.moyo.ua/ua/comp-and-periphery/notebooks/", "MOYO — ноутбуки", CARDS),
 }
 STORAGE = ("jane.storage-files", "jane.storage-postgresql")
 
@@ -96,7 +99,7 @@ def source_doc(shop: str, url: str, title: str, refs: dict[str, dict[str, str]])
         "source_id": f"shop-{shop}",
         "kind": "web",
         "title": title,
-        "description": f"Ціни ноутбуків {url}: сторінки категорії 1-5, JSON-LD.",
+        "description": f"Ціни ноутбуків {url}: сторінки категорії 1-5.",
         "locator": {"url": url},
         "collector_rules": refs[f"shops.{shop}-notebooks-rules"],
         "limits": {"rate": {"requests_per_second_per_host": 1, "min_delay_ms_per_host": 1000}},
@@ -106,7 +109,7 @@ def source_doc(shop: str, url: str, title: str, refs: dict[str, dict[str, str]])
     }
 
 
-def task_doc(shop: str, title: str, refs: dict[str, dict[str, str]]) -> dict[str, Any]:
+def task_doc(shop: str, title: str, extractor: str, refs: dict[str, dict[str, str]]) -> dict[str, Any]:
     return {
         "task_id": f"notebooks-{shop}",
         "title": f"{title}: ціни",
@@ -124,7 +127,7 @@ def task_doc(shop: str, title: str, refs: dict[str, dict[str, str]]) -> dict[str
             {
                 "stage_id": "extract-offers",
                 "kind": "handler",
-                "handler": refs[EXTRACTOR],
+                "handler": refs[extractor],
                 "inputs": [
                     {
                         "from": "collect",
@@ -165,7 +168,7 @@ def main(argv: list[str] | None = None) -> int:
         orch = svc.orchestrator
         for conn in ex.read_json(HERE.parent / "documents" / "connections.json")["connections"]:
             orch.call("PUT", f"/v1/connections/{conn['connection_id']}", ok=(200, 201), json=conn)
-        for shop, (url, title) in SHOPS.items():
+        for shop, (url, title, extractor) in SHOPS.items():
             source = source_doc(shop, url, title, refs)
             r = orch.call(
                 "POST", "/v1/sources", ok=(201, 409), json=source, headers={"Idempotency-Key": ex.key()}
@@ -179,7 +182,7 @@ def main(argv: list[str] | None = None) -> int:
                     headers={"If-Match": current.headers["ETag"]},
                 )
             ex.log(f"orchestrator: source {source['source_id']} -> {r.status_code}")
-            ex.create_task(orch, task_doc(shop, title, refs))
+            ex.create_task(orch, task_doc(shop, title, extractor, refs))
         if ns.no_run:
             return 0
         runs = {shop: ex.start_run(orch, f"notebooks-{shop}", "examples/shops: first run") for shop in SHOPS}

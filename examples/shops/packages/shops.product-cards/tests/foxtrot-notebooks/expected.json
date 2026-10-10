@@ -1,0 +1,88 @@
+{
+  "entities": [
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "foxtrot.com.ua",
+        "product_id": "7230394",
+        "title": "Ноутбук ACER Aspire Lite AL16-54P-552L Light Silver (NX.DK6EU.003)",
+        "url": "https://www.foxtrot.com.ua/uk/shop/noutbuki-acer-aspire-lite-al16-54p-552l-nxdk6eu003.html",
+        "price": {
+          "amount": 36999.0,
+          "currency": "UAH"
+        },
+        "availability": "in_stock",
+        "brand": "ACER"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "foxtrot.com.ua",
+          "product_id": "7230394"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_e4e9d074103f884f4d6487b1",
+        "observed_at": "2026-10-10T20:09:46Z",
+        "material_id": "web:a91428296333c4953ed8d4879ed44f74",
+        "content_sha256": "e4e9d074103f884f4d6487b1631533a4aae276a3f678e237809a7684c57f6741"
+      }
+    },
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "foxtrot.com.ua",
+        "product_id": "7295202",
+        "title": "Ноутбук Lenovo IdeaPad Slim 3 15ABR8 Arctic Grey (82XM01AKRA)",
+        "url": "https://www.foxtrot.com.ua/uk/shop/noutbuki-lenovo-ideapad-slim-3-15abr8-82xm01akra.html",
+        "price": {
+          "amount": 39999.0,
+          "currency": "UAH"
+        },
+        "availability": "in_stock",
+        "brand": "LENOVO"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "foxtrot.com.ua",
+          "product_id": "7295202"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_e4e9d074103f884f4d6487b1",
+        "observed_at": "2026-10-10T20:09:46Z",
+        "material_id": "web:a91428296333c4953ed8d4879ed44f74",
+        "content_sha256": "e4e9d074103f884f4d6487b1631533a4aae276a3f678e237809a7684c57f6741"
+      }
+    },
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "foxtrot.com.ua",
+        "product_id": "7258696",
+        "title": "Ігровий ноутбук ASUS TUF Gaming A15 FA506NCG-HN343 Graphite Black (90NR0JF7-M00T90)",
+        "url": "https://www.foxtrot.com.ua/uk/shop/noutbuki-asus-fa506ncg-hn343.html",
+        "price": {
+          "amount": 49999.0,
+          "currency": "UAH"
+        },
+        "availability": "in_stock",
+        "brand": "ASUS"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "foxtrot.com.ua",
+          "product_id": "7258696"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_e4e9d074103f884f4d6487b1",
+        "observed_at": "2026-10-10T20:09:46Z",
+        "material_id": "web:a91428296333c4953ed8d4879ed44f74",
+        "content_sha256": "e4e9d074103f884f4d6487b1631533a4aae276a3f678e237809a7684c57f6741"
+      }
+    }
+  ]
+}

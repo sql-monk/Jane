@@ -1,0 +1,91 @@
+{
+  "entities": [
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "moyo.ua",
+        "product_id": "734732",
+        "title": "Ноутбук ASUS TUF Gaming A15 FA506NCQ-HN065 (90NR0QE7-M003K0)",
+        "url": "https://www.moyo.ua/ua/noutbuk_asus_tuf_gaming_a15_fa506ncq-hn065_90nr0qe7-m003k0/734732.html",
+        "price": {
+          "amount": 49999.0,
+          "currency": "UAH"
+        },
+        "availability": "in_stock",
+        "brand": "ASUS",
+        "image": "https://i.moyo.ua/img/products/7347/32_96.jpg?1776079741"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "moyo.ua",
+          "product_id": "734732"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_fab866569ed17aef024c27ea",
+        "observed_at": "2026-10-10T20:09:46Z",
+        "material_id": "web:a750593bf348c736be84959386b4c29a",
+        "content_sha256": "fab866569ed17aef024c27ea4678e6faecd9c756b61231991a389ab8a1ccc50d"
+      }
+    },
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "moyo.ua",
+        "product_id": "821007",
+        "title": "Ноутбук HP 15-fc0331ua (DM8F9EA)",
+        "url": "https://www.moyo.ua/ua/noutbuk_hp_15-fc0331ua_dm8f9ea/821007.html",
+        "price": {
+          "amount": 38999.0,
+          "currency": "UAH"
+        },
+        "availability": "in_stock",
+        "brand": "HP",
+        "image": "https://i.moyo.ua/img/products/8210/7_96.jpg?1785762901"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "moyo.ua",
+          "product_id": "821007"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_fab866569ed17aef024c27ea",
+        "observed_at": "2026-10-10T20:09:46Z",
+        "material_id": "web:a750593bf348c736be84959386b4c29a",
+        "content_sha256": "fab866569ed17aef024c27ea4678e6faecd9c756b61231991a389ab8a1ccc50d"
+      }
+    },
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "moyo.ua",
+        "product_id": "651571",
+        "title": "Ноутбук HP Victus 15-fb3049ua (BV8Y0EA)",
+        "url": "https://www.moyo.ua/ua/noutbuk_hp_victus_15-fb3049ua_bv8y0ea_/651571.html",
+        "price": {
+          "amount": 46999.0,
+          "currency": "UAH"
+        },
+        "availability": "in_stock",
+        "brand": "HP",
+        "image": "https://i.moyo.ua/img/products/6515/71_96.jpg?1748612961"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "moyo.ua",
+          "product_id": "651571"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_fab866569ed17aef024c27ea",
+        "observed_at": "2026-10-10T20:09:46Z",
+        "material_id": "web:a750593bf348c736be84959386b4c29a",
+        "content_sha256": "fab866569ed17aef024c27ea4678e6faecd9c756b61231991a389ab8a1ccc50d"
+      }
+    }
+  ]
+}

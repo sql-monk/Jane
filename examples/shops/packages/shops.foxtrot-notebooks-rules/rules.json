@@ -1,0 +1,43 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "www.foxtrot.com.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/uk/shop/noutbuki.html"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "seed_list",
+      "strategy_id": "category-pages",
+      "urls": [
+        "https://www.foxtrot.com.ua/uk/shop/noutbuki.html",
+        "https://www.foxtrot.com.ua/uk/shop/noutbuki.html?page=2",
+        "https://www.foxtrot.com.ua/uk/shop/noutbuki.html?page=3",
+        "https://www.foxtrot.com.ua/uk/shop/noutbuki.html?page=4",
+        "https://www.foxtrot.com.ua/uk/shop/noutbuki.html?page=5"
+      ]
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "dedup": {
+    "use_link_rel_canonical": false
+  },
+  "sections": [
+    {
+      "section_id": "notebooks",
+      "patterns": [
+        {
+          "value": "www.foxtrot.com.ua/uk/shop/noutbuki.html**"
+        }
+      ]
+    }
+  ]
+}

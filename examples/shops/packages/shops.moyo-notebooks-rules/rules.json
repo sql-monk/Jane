@@ -1,0 +1,43 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "www.moyo.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/ua/comp-and-periphery/notebooks/"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "seed_list",
+      "strategy_id": "category-pages",
+      "urls": [
+        "https://www.moyo.ua/ua/comp-and-periphery/notebooks/",
+        "https://www.moyo.ua/ua/comp-and-periphery/notebooks/?page=2",
+        "https://www.moyo.ua/ua/comp-and-periphery/notebooks/?page=3",
+        "https://www.moyo.ua/ua/comp-and-periphery/notebooks/?page=4",
+        "https://www.moyo.ua/ua/comp-and-periphery/notebooks/?page=5"
+      ]
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "dedup": {
+    "use_link_rel_canonical": false
+  },
+  "sections": [
+    {
+      "section_id": "notebooks",
+      "patterns": [
+        {
+          "value": "www.moyo.ua/ua/comp-and-periphery/notebooks/**"
+        }
+      ]
+    }
+  ]
+}

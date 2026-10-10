@@ -14,8 +14,9 @@ from jane_extractor_sdk.testing import assert_package_tests_pass
 SHOPS = Path(__file__).resolve().parents[1] / "shops" / "packages"
 
 
-def test_jsonld_offers_extractor_manifest_tests_pass() -> None:
-    assert_package_tests_pass(SHOPS / "shops.jsonld-offers")
+@pytest.mark.parametrize("package", ["shops.jsonld-offers", "shops.product-cards"])
+def test_offer_extractor_manifest_tests_pass(package: str) -> None:
+    assert_package_tests_pass(SHOPS / package)
 
 
 @pytest.mark.parametrize("package", sorted(p.name for p in SHOPS.glob("shops.*-notebooks-rules")))

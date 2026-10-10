@@ -1,0 +1,99 @@
+{
+  "schema_version": "1",
+  "package_id": "shops.product-cards",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "Shops: product offers from product-card data attributes",
+  "description": "Пропозиції товарів з карток div.product-card сторінок категорій (атрибути data-price, data-title/data-name, data-code/data-product_id, data-brand, наявність, посилання): Foxtrot, Moyo. Та сама сутність offer, що й у shops.jsonld-offers.",
+  "tags": [
+    "shops",
+    "prices",
+    "product-cards"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_shops_cards.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "offer",
+        "schema": "schemas/offer.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "foxtrot-category-cards",
+      "input": {
+        "file": "tests/foxtrot-notebooks/page.html",
+        "media_type": "text/html",
+        "url": "https://www.foxtrot.com.ua/uk/shop/noutbuki.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/foxtrot-notebooks/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "moyo-category-cards",
+      "input": {
+        "file": "tests/moyo-notebooks/page.html",
+        "media_type": "text/html",
+        "url": "https://www.moyo.ua/ua/comp-and-periphery/notebooks/"
+      },
+      "expected_status": "success",
+      "expected": "tests/moyo-notebooks/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "page-without-cards-empty",
+      "input": {
+        "file": "tests/no-cards/page.html",
+        "media_type": "text/html",
+        "url": "https://www.moyo.ua/ua/"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (coordinator)"
+    ],
+    "created_at": "2026-10-10T00:00:00Z",
+    "change_summary": "Laptop prices of Foxtrot and Moyo from product cards."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ]
+  }
+}

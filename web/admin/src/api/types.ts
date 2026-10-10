@@ -69,6 +69,8 @@ export type TestReport = TestResultsRecord["report"];
 export type TestSummary = NonNullable<PackageVersion["test_summary"]>;
 
 // storage.v1
+export type StorageConnection = ItemOf<Ok<Sto["/v1/connections"]["get"]>>;
+export type StorageStatus = Ok<Sto["/v1/storage-status"]["get"]>;
 export type StoredObject = ItemOf<Ok<Sto["/v1/objects"]["get"]>>;
 export type StoredObjectDetail = Ok<Sto["/v1/objects/{object_id}"]["get"]>;
 export type EntityState = ItemOf<Ok<Sto["/v1/entities"]["get"]>>;

@@ -6,6 +6,7 @@ import { SourcesPage, SourcePage } from "./pages/SourcesPage";
 import { TasksPage, TaskPage } from "./pages/TasksPage";
 import { RunsPage, RunPage } from "./pages/RunsPage";
 import { MaterialsPage, MaterialTracePage } from "./pages/MaterialsPage";
+import { StoragesPage } from "./pages/StoragesPage";
 import { ResultsPage } from "./pages/ResultsPage";
 import { ProblemsPage } from "./pages/ProblemsPage";
 import { PackagesPage, PackagePage } from "./pages/PackagesPage";
@@ -23,6 +24,7 @@ const NAV: Array<[string, string]> = [
   ["/tasks", "Завдання"],
   ["/runs", "Запуски"],
   ["/materials", "Матеріали"],
+  ["/storages", "Сховища"],
   ["/results", "Результати"],
   ["/problems", "Проблеми"],
   ["/packages", "Пакети"],
@@ -35,6 +37,8 @@ const NAV: Array<[string, string]> = [
 
 function Layout() {
   const auth = useAuth();
+  const { pathname } = useLocation();
+  const storageWorkspace = pathname.startsWith("/materials") || pathname === "/storages";
   return (
     <div className="layout">
       <nav className="sidebar" aria-label="Розділи">
@@ -58,7 +62,7 @@ function Layout() {
           ) : null}
         </div>
       </nav>
-      <main className="content">
+      <main className={`content${storageWorkspace ? " storage-workspace" : ""}`}>
         {auth.expired ? (
           <div className="error-box" role="alert">
             Сесія недійсна або прострочена (401). <NavLink to="/login">Увійти знову</NavLink>
@@ -92,6 +96,7 @@ export function App() {
         <Route path="/tasks/:taskId" element={<TaskPage />} />
         <Route path="/runs" element={<RunsPage />} />
         <Route path="/runs/:runId" element={<RunPage />} />
+        <Route path="/storages" element={<StoragesPage />} />
         <Route path="/materials" element={<MaterialsPage />} />
         <Route path="/materials/:materialId/trace" element={<MaterialTracePage />} />
         <Route path="/results" element={<ResultsPage />} />

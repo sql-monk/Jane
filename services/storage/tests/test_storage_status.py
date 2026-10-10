@@ -3,14 +3,17 @@
 import time
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from jane_kit.contracts import OpenAPISpec
+from jane_storage.settings import Settings
 
 
-def inventory(client: TestClient, connection_id: str = "raw-files") -> dict:
+def inventory(client: TestClient, connection_id: str = "raw-files") -> dict[str, Any]:
     response = client.post(
         "/v1/storage-status/checks",
         json={"connection_id": connection_id},
@@ -22,7 +25,7 @@ def inventory(client: TestClient, connection_id: str = "raw-files") -> dict:
         job = client.get(response.headers["Location"]).json()
         if job["status"] in {"succeeded", "failed", "cancelled"}:
             assert job["status"] == "succeeded", job
-            return job["result"]
+            return cast(dict[str, Any], job["result"])
         time.sleep(0.01)
     raise AssertionError("status job did not complete")
 
@@ -119,7 +122,9 @@ def test_idempotent_status_jobs_and_unknown_connection(client: TestClient) -> No
     assert client.post("/v1/storage-status/checks", json=body).status_code == 422
 
 
-def test_slow_inventory_is_background(settings, monkeypatch, tmp_path: Path) -> None:
+def test_slow_inventory_is_background(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     import asyncio
     import json
     import threading
@@ -131,7 +136,7 @@ def test_slow_inventory_is_background(settings, monkeypatch, tmp_path: Path) -> 
     entered = threading.Event()
     release = asyncio.Event()
 
-    async def delayed_real_inventory(self):
+    async def delayed_real_inventory(self: FilesystemAdapter) -> dict[str, int]:
         # Gate only execution time; after release run the actual filesystem inventory.
         entered.set()
         await release.wait()
@@ -167,6 +172,7 @@ def test_slow_inventory_is_background(settings, monkeypatch, tmp_path: Path) -> 
             # Existing synchronous connection health check is independent of the gated inventory.
             assert client.post("/v1/connections/raw-files/test").json()["ok"] is True
         finally:
+            assert client.portal is not None
             client.portal.call(release.set)
         deadline = time.monotonic() + actual["request_timeout_ms"] / 1000
         while time.monotonic() < deadline:

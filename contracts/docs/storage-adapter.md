@@ -185,3 +185,5 @@ API не приписує стан обробки матеріалу: це вл�
 Фонова statistics_check_failed зберігає успішну availability available та null counts.
 Job read/cancel доступні handler:invoke, handler:test або connections:write; створення status check —
 connections:write. JobRunner застосовує concurrency/queue/timeout/retention budgets.
+
+Звичайний `POST /v1/connections/{id}/test` також оновлює availability/checked_at у cached snapshot, але скидає statistics до `null` із причиною `not_checked`, оскільки не виконує inventory. Щоб знову отримати counts/bytes, запускайте `POST /v1/storage-status/checks`.

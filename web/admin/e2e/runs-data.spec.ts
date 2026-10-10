@@ -60,8 +60,26 @@ test.describe("runs, progress, costs, cancellation, reprocessing, materials, res
   test("materials: stored RAW shown as text (data, not markup), trace, reprocess one material", async ({
     admin,
   }) => {
+    // The default connection list example contains results-pg; include a schema-valid RAW connection.
+    await admin.route("**/api/storage/v1/connections?**", async (route) => {
+      const response = await route.fetch();
+      const listed = (await response.json()) as { items: unknown[]; next_cursor: string | null };
+      await route.fulfill({
+        json: {
+          ...listed,
+          items: [
+            ...listed.items,
+            {
+              connection_id: "raw-files",
+              kind: "filesystem",
+              params: { base_path: "/var/lib/jane/storage/raw" },
+            },
+          ],
+        },
+      });
+    });
     await admin.goto("/materials");
-    await admin.getByLabel("Сховище", { exact: true }).selectOption("raw-files");
+    await admin.getByRole("combobox", { name: "Сховище", exact: true }).selectOption("raw-files");
     const table = admin.getByRole("table", { name: "Матеріали raw-files", exact: true });
     await expect(table).toContainText("https://shop.example.test/product/a-100");
     await table.getByRole("button", { name: "Переглянути" }).click();

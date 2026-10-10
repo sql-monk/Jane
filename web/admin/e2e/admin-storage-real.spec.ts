@@ -12,7 +12,7 @@ test("materials and storage status from the real filesystem adapter @hybrid", as
   const service = storage as string;
   const prefix = uniqueId("browser-storage");
   const source = `${prefix}-source`;
-  const connections = [`${prefix}-a`, `${prefix}-b`];
+  const connections = [`${prefix}-a`, `${prefix}-b`] as const;
   for (const id of connections) {
     await jsonRequest(
       request,

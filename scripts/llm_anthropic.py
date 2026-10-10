@@ -167,8 +167,9 @@ def main(argv: list[str] | None = None) -> int:
             timeout=180,
         )
         usage = result.get("usage") or {}
+        model = result.get("model") or {}
         print(
-            f"check: {result.get('provider_id', '')}/{result.get('model_id', '')} "
+            f"check: {model.get('provider_id', '')}/{model.get('model_id', '')} "
             f"output={result.get('output_text')!r} usage={json.dumps(usage)}"
         )
     return 0

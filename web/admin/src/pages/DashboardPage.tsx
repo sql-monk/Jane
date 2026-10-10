@@ -141,7 +141,9 @@ export function DashboardPage() {
           <span className={`status-dot ${refreshedAt ? "dot-ok" : "dot-warn"}`} />
           {refreshedAt
             ? `Оновлено ${new Date(refreshedAt).toLocaleTimeString("uk-UA")}`
-            : "Очікуємо дані сервісів"}
+            : queries.some((query) => query.isError)
+              ? "Частина даних недоступна"
+              : "Очікуємо дані сервісів"}
         </div>
       </div>
       <div className="metrics-grid">
@@ -167,7 +169,7 @@ export function DashboardPage() {
           label="У роботі"
           value={runs.data && !runs.isError ? `${activeRuns.length}${runs.data.next_cursor ? "+" : ""}` : "—"}
           note="Серед останніх запусків"
-          to="/runs?status=running"
+          to="/runs"
           icon="runs"
           tone="info"
         />
@@ -290,9 +292,11 @@ export function DashboardPage() {
               rows={recent.slice(0, 8)}
               rowKey={(run) => run.run_id}
               empty={
-                runs.isError
-                  ? "Дані запусків недоступні"
-                  : "Запусків ще немає. Відкрийте завдання та запустіть перший збір."
+                runs.isLoading
+                  ? "Завантаження запусків…"
+                  : runs.isError
+                    ? "Дані запусків недоступні"
+                    : "Запусків ще немає. Відкрийте завдання та запустіть перший збір."
               }
               columns={[
                 {

@@ -33,6 +33,7 @@ from jane_llm.packages import (
     read_dir,
 )
 from jane_llm.providers import AnthropicProvider, ProviderError, ProviderRequest, ResolvedConnection
+from jane_llm.providers.anthropic import api_schema
 from jane_llm.settings import GatewayLimits, ServiceLimits
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1] / "packages" / "jane.llm-event-extractor"
@@ -658,6 +659,92 @@ def test_anthropic_adapter_request_shape(messages_server: tuple[str, list[dict[s
     assert exc.value.retryable is False
     with pytest.raises(ProviderError):
         asyncio.run(AnthropicProvider().complete(req, None, ServiceLimits()))
+
+
+def test_anthropic_grammar_drops_unsupported_keywords_and_closes_objects() -> None:
+    # Shape of the assistant's classification schema: the real API answers 400 to minimum/maximum, pattern,
+    # maxLength, minItems and to objects without additionalProperties: false.
+    schema = {
+        "title": "classify",
+        "type": "object",
+        "required": ["items"],
+        "properties": {
+            "items": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                    "type": "object",
+                    "required": ["name", "confidence"],
+                    "properties": {
+                        "name": {"type": "string", "pattern": "^[a-z]+$", "maxLength": 64},
+                        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                        "kind": {"type": "string", "enum": ["a", "b"], "format": "uri"},
+                    },
+                },
+            }
+        },
+    }
+    assert api_schema(schema) == {
+        "title": "classify",
+        "type": "object",
+        "required": ["items"],
+        "properties": {
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["name", "confidence"],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "confidence": {"type": "number"},
+                        "kind": {"type": "string", "enum": ["a", "b"], "format": "uri"},
+                    },
+                    "additionalProperties": False,
+                },
+            }
+        },
+        "additionalProperties": False,
+    }
+    # a property named like a keyword is a property, not a constraint
+    assert api_schema({"type": "object", "properties": {"minimum": {"type": "integer"}}}) == {
+        "type": "object",
+        "properties": {"minimum": {"type": "integer"}},
+        "additionalProperties": False,
+    }
+    for inexpressible in (
+        {"type": "object", "properties": {"code": {"type": "string"}, "schema": {"type": "object"}}},
+        {"type": "object", "properties": {}, "additionalProperties": {"type": "string"}},
+        {"type": "object", "properties": {"a": {"oneOf": [{"type": "string"}, {"type": "integer"}]}}},
+    ):
+        assert api_schema(inexpressible) is None
+
+
+def test_anthropic_adapter_sends_inexpressible_schema_as_instructions(
+    messages_server: tuple[str, list[dict[str, Any]]],
+) -> None:
+    url, received = messages_server
+    conn = ResolvedConnection(
+        "anthropic-main", "llm_provider", {"api_base": url}, {"api_key": "test-key-not-secret"}
+    )
+    free_form = {
+        "type": "object",
+        "required": ["module_code", "entity_schema"],
+        "properties": {
+            "module_code": {"type": "string", "minLength": 1},
+            "entity_schema": {"type": "object"},
+        },
+    }
+    closed = {"type": "object", "properties": {"page_type": {"type": "string"}}, "required": ["page_type"]}
+    for schema, structured in ((free_form, True), (closed, False)):
+        req = ProviderRequest(
+            "claude-opus-5-5", "SYSTEM", "USER DATA", 256, schema, 0.0, structured_output=structured
+        )
+        asyncio.run(AnthropicProvider().complete(req, conn, ServiceLimits()))
+        body = received[-1]["body"]
+        assert "output_config" not in body
+        assert body["system"].startswith("SYSTEM\n\n# Output JSON Schema\n")
+        assert json.dumps(schema) in body["system"]
+        assert "USER DATA" not in body["system"]
 
 
 def test_gateway_with_anthropic_provider(

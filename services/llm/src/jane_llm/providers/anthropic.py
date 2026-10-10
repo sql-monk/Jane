@@ -14,6 +14,8 @@ Timeouts and retries (429, 5xx, connection errors) come from ``limits.provider``
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 import random
 from typing import TYPE_CHECKING, Any
 
@@ -28,6 +30,87 @@ DEFAULT_API_BASE = "https://api.anthropic.com"
 DEFAULT_VERSION = "2023-06-01"
 _FINISH = {"end_turn": "stop", "stop_sequence": "stop", "max_tokens": "length", "refusal": "content_filter"}
 _RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504, 529}
+_log = logging.getLogger(__name__)
+
+# Structured outputs accept a subset of JSON Schema ("JSON Schema limitations" of the Messages API): every
+# object needs ``additionalProperties: false``; numeric, string-length and array-size constraints are not
+# supported. Such keywords are dropped from the grammar only - the gateway validates the reply against the
+# full schema. Keywords outside both sets make the schema inexpressible (sent as instructions instead).
+_DROPPED = frozenset(
+    {
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "multipleOf",
+        "minLength",
+        "maxLength",
+        "pattern",
+        "minItems",
+        "maxItems",
+        "uniqueItems",
+        "minProperties",
+        "maxProperties",
+        "$schema",
+        "$id",
+    }
+)
+_KEPT = frozenset(
+    {"type", "properties", "required", "items", "enum", "const", "anyOf", "allOf", "$ref", "$defs"}
+)
+_KEPT |= {"title", "description", "default", "examples", "format", "additionalProperties"}
+_FORMATS = frozenset(
+    {"date-time", "time", "date", "duration", "email", "hostname", "uri", "ipv4", "ipv6", "uuid"}
+)
+
+
+class _Inexpressible(Exception):
+    pass
+
+
+def api_schema(schema: dict[str, Any]) -> dict[str, Any] | None:
+    """``schema`` in the subset ``output_config.format`` accepts, or ``None`` when it cannot be expressed
+    there (a free-form object - no ``properties`` or ``additionalProperties`` other than ``false`` - or an
+    unsupported keyword such as ``oneOf`` or ``patternProperties``)."""
+    try:
+        out = _grammar(schema)
+    except _Inexpressible:
+        return None
+    return out if isinstance(out, dict) else None
+
+
+def _grammar(node: Any) -> Any:
+    if isinstance(node, list):
+        return [_grammar(x) for x in node]
+    if not isinstance(node, dict):
+        return node
+    out: dict[str, Any] = {}
+    for key, value in node.items():
+        if key in _DROPPED or (key == "format" and value not in _FORMATS):
+            continue
+        if key not in _KEPT:
+            raise _Inexpressible(key)
+        if key in ("properties", "$defs"):
+            out[key] = {name: _grammar(sub) for name, sub in value.items()}
+        elif key in ("items", "anyOf", "allOf"):
+            out[key] = _grammar(value)
+        else:
+            out[key] = value
+    kind = node.get("type")
+    if kind == "object" or (isinstance(kind, list) and "object" in kind):
+        if "properties" not in node or node.get("additionalProperties", False) is not False:
+            raise _Inexpressible("free-form object")
+        out["additionalProperties"] = False
+    return out
+
+
+def _error_summary(resp: httpx.Response) -> str:
+    """``<type>: <message>`` of an API error body (no request content), cut to 500 characters."""
+    try:
+        err = resp.json().get("error") or {}
+        return f"{err.get('type', '')}: {err.get('message', '')}"[:500]
+    except (ValueError, AttributeError):
+        return ""
 
 
 class AnthropicProvider:
@@ -50,14 +133,24 @@ class AnthropicProvider:
             "anthropic-version": str(connection.params.get("anthropic_version") or DEFAULT_VERSION),
             "content-type": "application/json",
         }
+        system = request.system
+        grammar = None
+        if request.output_schema is not None:
+            grammar = api_schema(request.output_schema) if request.structured_output else None
+            if grammar is None:
+                # Not expressible as output_config.format (or the model has no structured output): the model
+                # gets the schema as trusted instructions; the gateway validates the reply and retries.
+                system += (
+                    f"\n\n# Output JSON Schema\n{json.dumps(request.output_schema, ensure_ascii=False)}\n"
+                )
         body: dict[str, Any] = {
             "model": request.model_id,
             "max_tokens": request.max_output_tokens,
-            "system": request.system,
+            "system": system,
             "messages": [{"role": "user", "content": request.user}],
         }
-        if request.output_schema is not None and request.structured_output:
-            body["output_config"] = {"format": {"type": "json_schema", "schema": request.output_schema}}
+        if grammar is not None:
+            body["output_config"] = {"format": {"type": "json_schema", "schema": grammar}}
         timeout = httpx.Timeout(pl.request_timeout_ms / 1000, connect=pl.connect_timeout_ms / 1000)
         policy = pl.retries
         async with httpx.AsyncClient(timeout=timeout, transport=self.transport) as client:
@@ -74,6 +167,11 @@ class AnthropicProvider:
                 if resp.status_code < 400:
                     return self._parse(resp.json())
                 retryable = resp.status_code in _RETRY_STATUS
+                if not retryable:
+                    _log.warning(
+                        "anthropic rejected the request",
+                        extra={"status": resp.status_code, "error": _error_summary(resp)},
+                    )
                 if not retryable or attempt >= policy.max_attempts:
                     raise ProviderError(f"anthropic returned HTTP {resp.status_code}", retryable=retryable)
                 await asyncio.sleep(self._delay(attempt, resp, limits))

@@ -139,12 +139,20 @@ export function TasksPage() {
         columns={[
           {
             header: "Завдання",
-            cell: (t) => <Link to={`/tasks/${encodeURIComponent(t.task_id)}`}>{t.task_id}</Link>,
+            cell: (t) => (
+              <Link title={t.task_id} to={`/tasks/${encodeURIComponent(t.task_id)}`}>
+                {t.task_id}
+              </Link>
+            ),
           },
           { header: "Назва", cell: (t) => t.title },
           {
             header: "Джерело",
-            cell: (t) => <Link to={`/sources/${encodeURIComponent(t.source_id)}`}>{t.source_id}</Link>,
+            cell: (t) => (
+              <Link title={t.source_id} to={`/sources/${encodeURIComponent(t.source_id)}`}>
+                {t.source_id}
+              </Link>
+            ),
           },
           { header: "Розклад", cell: (t) => scheduleLabel(t.schedule) },
           { header: "Наступний запуск", cell: (t) => formatDate(t.next_run_at) },
@@ -156,7 +164,7 @@ export function TasksPage() {
           {
             header: "Дії",
             cell: (task) => (
-              <div className="button-row">
+              <div className="button-row row-actions">
                 <TaskQuickRun taskId={task.task_id} />
                 <Link className="btn btn-small" to={`/runs?task_id=${encodeURIComponent(task.task_id)}`}>
                   Історія

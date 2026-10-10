@@ -1,10 +1,89 @@
 import path from "node:path";
 import { captureRequest, expect, fulfillJson, login, mockUrl, openapiExample, test } from "./fixtures";
-import type { Run, Source } from "../src/api/types";
+import type { Run, Source, TaskSummary } from "../src/api/types";
 
 const evidence = path.resolve(import.meta.dirname, "../../../.jane");
 
 test.describe("admin workspace", () => {
+  test("list rows and action buttons stay compact while dialogs are open @mock", async ({ admin }) => {
+    await admin.setViewportSize({ width: 1600, height: 900 });
+    await admin.getByLabel("Тема оформлення").selectOption("dark");
+    const response = await admin.request.get(`${mockUrl("orchestrator")}/v1/tasks`);
+    const list = (await response.json()) as { items: TaskSummary[]; next_cursor: string | null };
+    const title = "Повний збір каталогу з довгою назвою джерела та детальним описом призначення завдання";
+    await fulfillJson(admin, "/api/orchestrator/v1/tasks", {
+      ...list,
+      items: list.items.map((task) => ({ ...task, title })),
+    });
+    await admin.goto("/tasks");
+    const row = admin.getByRole("table", { name: "Завдання" }).locator("tbody tr").first();
+    const actions = row.locator(".row-actions .btn");
+    await expect(actions).toHaveCount(2);
+    const sizes = await actions.evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const rect = button.getBoundingClientRect();
+        return { height: rect.height, width: rect.width, top: rect.top };
+      }),
+    );
+    expect(sizes[0]).toEqual(sizes[1]);
+    await expect(row.getByTitle(title)).toHaveText(title);
+    expect(
+      await row
+        .getByTitle(title)
+        .evaluate(
+          (cell) =>
+            cell.getBoundingClientRect().height <= Number.parseFloat(getComputedStyle(cell).lineHeight) + 1,
+        ),
+    ).toBe(true);
+    await row
+      .locator("xpath=ancestor::div[contains(@class, 'table-wrap')]")
+      .screenshot({ path: path.join(evidence, "wp12-admin-compact-tasks.png") });
+    const height = (await row.boundingBox())!.height;
+    const trigger = row.getByRole("button", { name: /^Запустити / });
+    await trigger.click();
+    await expect(admin.getByRole("dialog", { name: /^Запуск / })).toBeVisible();
+    expect((await row.boundingBox())!.height).toBe(height);
+    await admin.keyboard.press("Escape");
+    await expect(admin.getByRole("dialog")).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await admin.goto("/runs");
+    const runRow = admin.getByRole("table", { name: "Запуски" }).locator("tbody tr").first();
+    await runRow
+      .locator("xpath=ancestor::div[contains(@class, 'table-wrap')]")
+      .screenshot({ path: path.join(evidence, "wp12-admin-compact-runs.png") });
+    const runHeight = (await runRow.boundingBox())!.height;
+    await runRow.getByRole("button", { name: "Зупинити", exact: true }).click();
+    await expect(admin.getByRole("dialog", { name: "Зупинити", exact: true })).toBeVisible();
+    expect((await runRow.boundingBox())!.height).toBe(runHeight);
+    await admin.keyboard.press("Escape");
+    await expect(admin.getByRole("dialog")).toHaveCount(0);
+    const cancelUrl = /\/api\/orchestrator\/v1\/runs\/[^/]+\/cancel$/;
+    await admin.route(cancelUrl, (route) =>
+      route.fulfill({
+        status: 503,
+        json: {
+          type: "urn:jane:problem:unavailable",
+          title: "Unavailable",
+          status: 503,
+          code: "unavailable",
+        },
+      }),
+    );
+    await runRow.getByRole("button", { name: "Зупинити", exact: true }).click();
+    await admin.getByRole("button", { name: "Підтвердити зупинку" }).click();
+    await expect(admin.getByRole("alert")).toContainText("Не вдалося зупинити");
+    expect((await runRow.boundingBox())!.height).toBe(runHeight);
+    await expect(runRow.getByRole("alert")).toHaveCount(0);
+    await admin.unroute(cancelUrl);
+    await runRow.getByRole("button", { name: "Зупинити", exact: true }).click();
+    await admin.getByLabel("Причина: Зупинити").fill("Перевірка компактності після зупинки");
+    await admin.getByRole("button", { name: "Підтвердити зупинку" }).click();
+    await expect(
+      admin.getByText("Скасування прийнято. Уже збережені дані залишаються у сховищах."),
+    ).toBeVisible();
+    expect((await runRow.boundingBox())!.height).toBe(runHeight);
+    await expect(runRow).not.toContainText("Скасування прийнято");
+  });
   test("active metric keeps queued runs visible after following its link @mock", async ({ admin }) => {
     const response = await admin.request.get(`${mockUrl("orchestrator")}/v1/runs`);
     const list = (await response.json()) as { items: Run[]; next_cursor: string | null };

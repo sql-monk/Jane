@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useApi } from "../app/context";
 import { newIdempotencyKey, unwrap } from "../api/client";
-import { ErrorBox, Field } from "./ui";
+import { ActionDialog, ErrorBox, Field } from "./ui";
 import { Icon } from "./Icon";
 
 export function TaskQuickRun({ taskId }: { taskId: string }) {
@@ -26,67 +26,83 @@ export function TaskQuickRun({ taskId }: { taskId: string }) {
       navigate(`/runs/${encodeURIComponent(job.job_id)}`);
     },
   });
-  if (!open)
-    return (
-      <button
-        className="btn btn-small"
-        type="button"
-        aria-label={`Запустити ${taskId}`}
-        onClick={() => setOpen(true)}
-      >
-        <Icon name="runs" size={14} />
-        Запустити
-      </button>
-    );
-  return (
-    <form
-      className="quick-run"
-      aria-label={`Запуск ${taskId}`}
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (!start.isPending) start.mutate();
+  const trigger = (
+    <button
+      className="btn btn-small"
+      type="button"
+      aria-label={`Запустити ${taskId}`}
+      onClick={() => {
+        setTestMode(true);
+        setReason("");
+        setOpen(true);
       }}
     >
-      <strong>Запустити {taskId}</strong>
-      <Field label="Режим запуску">
-        <select
-          value={testMode ? "test" : "live"}
-          onChange={(event) => setTestMode(event.target.value === "test")}
-          disabled={start.isPending}
-        >
-          <option value="test">Тестовий — без запису в робочі дані</option>
-          <option value="live">Робочий — зі збереженням результатів</option>
-        </select>
-      </Field>
-      <Field label="Причина запуску">
-        <input
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          maxLength={1000}
-          disabled={start.isPending}
-          placeholder="Необов’язково"
-        />
-      </Field>
-      {!testMode ? (
-        <p className="warn-inline">Етапи збереження запишуть результати в робочі сховища.</p>
-      ) : null}
-      <div className="button-row">
-        <button className="btn btn-primary btn-small" type="submit" disabled={start.isPending}>
-          {start.isPending ? "Запускаємо…" : "Підтвердити запуск"}
-        </button>
-        <button
-          className="btn btn-small"
-          type="button"
-          disabled={start.isPending}
-          onClick={() => {
+      <Icon name="runs" size={14} />
+      Запустити
+    </button>
+  );
+  if (!open) return trigger;
+  return (
+    <>
+      {trigger}
+      <ActionDialog
+        title={`Запуск ${taskId}`}
+        onClose={() => {
+          if (!start.isPending) {
             setOpen(false);
             start.reset();
+          }
+        }}
+      >
+        <form
+          className="quick-run"
+          aria-label={`Запуск ${taskId}`}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!start.isPending) start.mutate();
           }}
         >
-          Скасувати
-        </button>
-      </div>
-      <ErrorBox error={start.error} title="Не вдалося запустити" />
-    </form>
+          <Field label="Режим запуску">
+            <select
+              value={testMode ? "test" : "live"}
+              onChange={(event) => setTestMode(event.target.value === "test")}
+              disabled={start.isPending}
+            >
+              <option value="test">Тестовий — без запису в робочі дані</option>
+              <option value="live">Робочий — зі збереженням результатів</option>
+            </select>
+          </Field>
+          <Field label="Причина запуску">
+            <input
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              maxLength={1000}
+              disabled={start.isPending}
+              placeholder="Необов’язково"
+            />
+          </Field>
+          {!testMode ? (
+            <p className="warn-inline">Етапи збереження запишуть результати в робочі сховища.</p>
+          ) : null}
+          <div className="button-row">
+            <button className="btn btn-primary btn-small" type="submit" disabled={start.isPending}>
+              {start.isPending ? "Запускаємо…" : "Підтвердити запуск"}
+            </button>
+            <button
+              className="btn btn-small"
+              type="button"
+              disabled={start.isPending}
+              onClick={() => {
+                setOpen(false);
+                start.reset();
+              }}
+            >
+              Скасувати
+            </button>
+          </div>
+          <ErrorBox error={start.error} title="Не вдалося запустити" />
+        </form>
+      </ActionDialog>
+    </>
   );
 }

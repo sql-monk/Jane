@@ -37,8 +37,11 @@ const ITEM_STATUSES: NonNullable<StageItem["status"]>[] = [
   "cancelled",
 ];
 
+type RunActionFeedback = { runId: string; error?: unknown };
+
 export function RunsPage() {
   const api = useApi();
+  const [feedback, setFeedback] = useState<RunActionFeedback | null>(null);
   const [params, setParams] = useSearchParams();
   const taskId = params.get("task_id") ?? "";
   const status = (params.get("status") ?? "") as JobStatus | "";
@@ -91,6 +94,21 @@ export function RunsPage() {
       </div>
       {list.isLoading ? <Loading /> : null}
       <ErrorBox error={list.error} />
+      {feedback ? (
+        <div>
+          <div className="button-row">
+            <span className="muted">Запуск {feedback.runId}</span>
+            <button className="btn btn-small" type="button" onClick={() => setFeedback(null)}>
+              Закрити повідомлення
+            </button>
+          </div>
+          {feedback.error ? (
+            <ErrorBox error={feedback.error} title="Не вдалося зупинити" />
+          ) : (
+            <Notice>Скасування прийнято. Уже збережені дані залишаються у сховищах.</Notice>
+          )}
+        </div>
+      ) : null}
       <Table
         label="Запуски"
         rows={list.items}
@@ -98,18 +116,26 @@ export function RunsPage() {
         columns={[
           {
             header: "Запуск",
-            cell: (r) => <Link to={`/runs/${encodeURIComponent(r.run_id)}`}>{r.run_id}</Link>,
+            cell: (r) => (
+              <Link title={r.run_id} to={`/runs/${encodeURIComponent(r.run_id)}`}>
+                {r.run_id}
+              </Link>
+            ),
           },
           {
             header: "Завдання",
-            cell: (r) => <Link to={`/tasks/${encodeURIComponent(r.task_id)}`}>{r.task_id}</Link>,
+            cell: (r) => (
+              <Link title={r.task_id} to={`/tasks/${encodeURIComponent(r.task_id)}`}>
+                {r.task_id}
+              </Link>
+            ),
           },
           { header: "Стан", cell: (r) => <Status value={r.status} /> },
           { header: "Тригер", cell: (r) => r.trigger },
           { header: "Тест", cell: (r) => (r.test_mode ? "так" : "") },
           { header: "Створено", cell: (r) => formatDate(r.created_at) },
           { header: "Завершено", cell: (r) => formatDate(r.finished_at) },
-          { header: "Дії", cell: (run) => <RunListActions run={run} /> },
+          { header: "Дії", cell: (run) => <RunListActions run={run} onFeedback={setFeedback} /> },
         ]}
       />
       <LoadMore hasMore={list.hasMore} loading={list.loadingMore} onClick={list.loadMore} />
@@ -117,7 +143,13 @@ export function RunsPage() {
   );
 }
 
-function RunListActions({ run }: { run: Run }) {
+function RunListActions({
+  run,
+  onFeedback,
+}: {
+  run: Run;
+  onFeedback: (feedback: RunActionFeedback) => void;
+}) {
   const api = useApi();
   const queryClient = useQueryClient();
   const cancel = useMutation({
@@ -129,13 +161,15 @@ function RunListActions({ run }: { run: Run }) {
         }),
       ),
     onSuccess: () => {
+      onFeedback({ runId: run.run_id });
       void queryClient.invalidateQueries({ queryKey: ["runs"] });
       void queryClient.invalidateQueries({ queryKey: ["run", run.run_id] });
     },
+    onError: (error) => onFeedback({ runId: run.run_id, error }),
   });
   return (
     <div>
-      <div className="button-row">
+      <div className="button-row row-actions">
         <Link className="btn btn-small" to={`/runs/${encodeURIComponent(run.run_id)}`}>
           Деталі
         </Link>
@@ -146,14 +180,11 @@ function RunListActions({ run }: { run: Run }) {
             danger
             busy={cancel.isPending || cancel.isSuccess}
             requireReason={false}
+            modal
             onConfirm={(reason) => cancel.mutate(reason)}
           />
         ) : null}
       </div>
-      <ErrorBox error={cancel.error} title="Не вдалося зупинити" />
-      {cancel.isSuccess ? (
-        <Notice>Скасування прийнято. Уже збережені дані залишаються у сховищах.</Notice>
-      ) : null}
     </div>
   );
 }

@@ -1326,6 +1326,15 @@ export interface components {
         "application/problem+json": components["schemas"]["problem.schema"];
       };
     };
+    /** @description Непередбачена помилка сервісу (`internal_error`, retryable). */
+    InternalError: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/problem+json": components["schemas"]["problem.schema"];
+      };
+    };
     /** @description Сервіс або його залежність тимчасово недоступні (`service_unavailable`, `upstream_unavailable`). */
     ServiceUnavailable: {
       headers: {
@@ -1512,6 +1521,20 @@ export interface operations {
       };
       422: components["responses"]["UnprocessableEntity"];
       429: components["responses"]["TooManyRequests"];
+      500: components["responses"]["InternalError"];
+      /**
+       * @description Правила просять `fetch.render_js`, але в цьому колекторі немає headless-браузера (рендеринг вимкнено,
+       *     Playwright чи Chromium не встановлено або браузер не стартує; `not_implemented`, `retryable: false`).
+       *     Причина — у `detail`; те саме видно в `GET /v1/info` → `capabilities.render_js`.
+       */
+      501: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["problem.schema"];
+        };
+      };
       /**
        * @description Джерело недоступне або повернуло помилку (`source_unavailable`). Web: `details.http_status` —
        *     статус відповіді сайту (крім 404/410, див. 404) або останньої спроби після повторів. Telegram:
@@ -1527,6 +1550,18 @@ export interface operations {
         };
       };
       503: components["responses"]["ServiceUnavailable"];
+      /**
+       * @description `fetch.render_js`: DOM сторінки не вдалося отримати з браузера за `collector.render_timeout_ms`
+       *     (`timeout`, `retryable: true`).
+       */
+      504: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["problem.schema"];
+        };
+      };
     };
   };
   startCollection: {

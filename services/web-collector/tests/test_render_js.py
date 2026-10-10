@@ -1,7 +1,8 @@
 """``fetch.render_js``: pages built by scripts are rendered in headless Chromium (``render.py``).
 
-The collector is the real app, or the real :class:`Renderer` / :class:`EgressProxy`, against the real testsite;
-only DNS answers are replaced (a resolver function) where a test needs a name that resolves to a chosen address.
+The collector is the real app, or the real :class:`Renderer` / :class:`EgressProxy`, against the real testsite or a
+small local site of pages the testsite does not have (:class:`Pages`); only DNS answers are replaced (a resolver
+function) where a test needs a name that resolves to a chosen address.
 Tests with the ``chromium`` fixture need the browser (``uv run playwright install chromium``): skipped without it
 on a developer machine, failing in CI.
 """
@@ -10,20 +11,24 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Awaitable, Callable
+import os
+import threading
+from collections.abc import Awaitable, Callable, Iterator
 from datetime import UTC, datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
+import psutil  # type: ignore[import-untyped]
 import pytest
 from fastapi.testclient import TestClient
 
 from jane_testsite import site as testsite  # type: ignore[import-untyped]
 from jane_web_collector.app import build_app
 from jane_web_collector.egress import EgressPolicy
-from jane_web_collector.fetcher import HttpResult
+from jane_web_collector.fetcher import FetchError, HttpResult
 from jane_web_collector.render import EgressProxy, Renderer, RenderOptions
 from jane_web_collector.settings import ServiceLimits, Settings
 from jane_web_collector.testing import FAST_LIMITS, Site, drain, errors, make_settings, start, wait_done
@@ -31,6 +36,9 @@ from jane_web_collector.testing import FAST_LIMITS, Site, drain, errors, make_se
 PRICE = f"{testsite.JS_OFFER.price} {testsite.JS_OFFER.currency}"  # written by the page's script only
 MARKER = f'data-marker="{testsite.JS_MARKER}"'
 RENDER_UA = "JaneRenderBot/2.0 (+https://example.test/bot)"
+SETTLE_ENV = "JANE_WEB_COLLECTOR_LIMITS__COLLECTOR__RENDER_EXTRA_WAIT_MS"
+SETTLE_MS = "1000"
+"""Extra wait for tests whose page opens a WebSocket (not part of networkidle)."""
 
 
 def rules(site: Site, *paths: str, render_js: bool = True, **fetch: Any) -> dict[str, Any]:
@@ -106,6 +114,8 @@ def test_render_settings_come_from_the_environment(monkeypatch: pytest.MonkeyPat
     limits = ServiceLimits().collector
     assert (limits.render_timeout_ms, limits.render_extra_wait_ms, limits.render_max_pages) == (30_000, 0, 2)
     assert limits.render_max_transfer_bytes == 50 * 1024**2
+    assert (limits.render_launch_timeout_ms, limits.render_close_timeout_ms) == (30_000, 30_000)
+    assert defaults.render_deny_private is True
     monkeypatch.setenv("JANE_WEB_COLLECTOR_RENDER_WAIT_UNTIL", "load")
     monkeypatch.setenv("JANE_WEB_COLLECTOR_RENDER_BLOCK_RESOURCE_TYPES", '["image", "stylesheet"]')
     monkeypatch.setenv("JANE_WEB_COLLECTOR_LIMITS__COLLECTOR__RENDER_TIMEOUT_MS", "5000")
@@ -204,9 +214,9 @@ def test_fetch_renders_as_well(client: TestClient, site: Site) -> None:
 
 
 @pytest.mark.usefixtures("chromium")
-async def test_loopback_subrequests_go_through_the_proxy(site: Site) -> None:
-    """With private addresses denied, the page's request to the site on 127.0.0.1 never reaches it: the browser
-    has no way out except the egress proxy (Playwright proxies loopback too)."""
+async def test_page_request_to_a_denied_address_is_refused_before_it_is_made(site: Site) -> None:
+    """With private addresses denied, the router refuses the page's fetch() of the site on 127.0.0.1 with its URL
+    before the browser connects; nothing reaches the site."""
     page = await fetched(site, site.url(testsite.JS_PRICE_PAGE))
     renderer = Renderer(RenderOptions(), EgressPolicy(deny_private=True), max_pages=1)
     try:
@@ -262,7 +272,273 @@ async def test_dns_rebinding_is_caught_by_the_proxy(site: Site) -> None:
     assert "shop.example.test resolves to 169.254.169.254" in denied
 
 
+@pytest.mark.usefixtures("chromium")
+def test_navigation_away_keeps_the_page(client: TestClient, pages: PagesFactory) -> None:
+    """A script redirect, a delayed location.replace() and a meta refresh are not followed, and the material is still
+    the page that was checked (not an empty error document)."""
+    site = pages(
+        {
+            "/script": "<p>orig content script</p><script>location.href = '/elsewhere?script';</script>",
+            "/delayed": "<p>orig content delayed</p>"
+            "<script>setTimeout(function () { location.replace('/elsewhere?delayed'); }, 200);</script>",
+            "/refresh": '<meta http-equiv="refresh" content="0;url=/elsewhere?refresh"><p>orig content refresh</p>',
+        }
+    )
+    materials, errs = collect(client, {"rules": site.rules("/script", "/delayed", "/refresh")})
+    assert errs == []
+    by_path = {urlsplit(m["locator"]["url"]).path: m for m in materials}
+    assert set(by_path) == {"/script", "/delayed", "/refresh"}
+    for path, m in by_path.items():
+        assert f"orig content {path[1:]}" in m["content"]["data"], m["content"]["data"]
+        assert f"/elsewhere?{path[1:]}" in diagnostics(m)["render_navigation_blocked"]
+    assert not [r for r in site.requests if "/elsewhere" in r]
+
+
+@pytest.mark.usefixtures("chromium")
+def test_page_scripts_cannot_reach_internal_hosts_outside_the_scope(
+    tmp_path: Path, pages: PagesFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """RENDER_DENY_PRIVATE: a script of a page on 127.0.0.1 may use its own host, but a POST and a WebSocket to
+    ``localhost`` (another name, a loopback address, not in scope.allowed_domains) are refused and the target gets
+    nothing. Allowing the host by scope, or turning the setting off, lets the same requests through."""
+    monkeypatch.setenv(
+        SETTLE_ENV, SETTLE_MS
+    )  # a loaded machine: the WebSocket handshake is in before the DOM
+    site = pages({})
+    site.pages["/p"] = (
+        "<p>orig content</p><script>fetch('/data.json');"
+        f"fetch('http://localhost:{site.port}/admin/delete', {{method: 'POST', mode: 'no-cors', body: 'x'}});"
+        f"new WebSocket('ws://localhost:{site.port}/ws');</script>"
+    )
+    with TestClient(build_app(make_settings(tmp_path / "default"))) as client:
+        [m], _ = collect(client, {"rules": site.rules("/p")})
+    assert "GET /data.json" in site.requests  # the page's own host
+    assert "POST /admin/delete" not in site.requests and "GET /ws" not in site.requests
+    denied = diagnostics(m)["render_egress_denied"]
+    assert f"http://localhost:{site.port}/admin/delete" in denied and "RENDER_DENY_PRIVATE" in denied
+    assert denied.count("RENDER_DENY_PRIVATE") >= 2  # the fetch by the router, the WebSocket by the proxy
+
+    site.requests.clear()
+    with TestClient(build_app(make_settings(tmp_path / "scope"))) as client:
+        collect(client, {"rules": site.rules("/p", hosts=["127.0.0.1", "localhost"])})
+    assert "POST /admin/delete" in site.requests and "GET /ws" in site.requests
+
+    site.requests.clear()
+    with TestClient(build_app(make_settings(tmp_path / "off", render_deny_private=False))) as client:
+        collect(client, {"rules": site.rules("/p")})
+    assert "POST /admin/delete" in site.requests and "GET /ws" in site.requests
+
+
+@pytest.mark.usefixtures("chromium")
+async def test_websocket_goes_through_the_proxy(pages: PagesFactory) -> None:
+    """WebSockets are not seen by Playwright routing: the egress proxy alone decides. With private addresses denied
+    the target on 127.0.0.1 gets no connection; with the default policy (the page's own host) it does."""
+    site = pages({})
+    html = f"<p>orig content</p><script>new WebSocket('ws://127.0.0.1:{site.port}/ws');</script>"
+    settle = {"collector": {"render_extra_wait_ms": int(SETTLE_MS)}}
+    out = await render(page_result(site.url("/p"), html), EgressPolicy(deny_private=True), settle)
+    assert site.requests == []
+    denied = {d["code"]: d["message"] for d in out.diagnostics}["render_egress_denied"]
+    assert "127.0.0.1 resolves to 127.0.0.1: private" in denied
+    out = await render(page_result(site.url("/p"), html), EgressPolicy(), settle)
+    assert site.requests == ["GET /ws"]
+
+
+@pytest.mark.usefixtures("chromium")
+async def test_page_that_never_settles_is_taken_as_it_is(pages: PagesFactory) -> None:
+    site = pages({})
+    html = "<p>orig content</p><script>setInterval(function () { fetch('/data.json'); }, 100);</script>"
+    out = await render(page_result(site.url("/p"), html), limits={"collector": {"render_timeout_ms": 1500}})
+    codes = {d["code"]: d["message"] for d in out.diagnostics}
+    assert "orig content" in out.body.decode("utf-8")
+    assert "'networkidle' not reached within collector.render_timeout_ms=1500" in codes["render_incomplete"]
+
+
+@pytest.mark.usefixtures("chromium")
+async def test_huge_dom_is_cut_in_the_page(pages: PagesFactory) -> None:
+    """Only max_material_bytes characters of the DOM leave the browser; the material is cut and says so."""
+    site = pages({})
+    html = "<body><script>document.body.textContent = 'x'.repeat(8 * 1024 * 1024);</script></body>"
+    out = await render(page_result(site.url("/p"), html), limits={"crawl": {"max_material_bytes": 1000}})
+    assert out.truncated and len(out.body) <= 1000 and out.body.endswith(b"xxx")
+
+
+@pytest.mark.usefixtures("chromium")
+async def test_busy_page_times_out_and_the_browser_goes_on(pages: PagesFactory) -> None:
+    site = pages({})
+    renderer = Renderer(RenderOptions(), EgressPolicy(), max_pages=1)
+    limits = ServiceLimits.model_validate({"collector": {"render_timeout_ms": 1500}})
+    try:
+        busy = page_result(site.url("/busy"), "<p>busy</p><script>while (true) {}</script>")
+        with pytest.raises(FetchError) as failed:
+            await renderer.render(busy, user_agent=RENDER_UA, limits=limits)
+        assert failed.value.code == "timeout" and "render_timeout_ms=1500" in failed.value.message
+        out = await renderer.render(
+            page_result(site.url("/p"), "<p>next page</p>"), user_agent=RENDER_UA, limits=limits
+        )
+        assert "next page" in out.body.decode("utf-8")
+    finally:
+        await renderer.aclose()
+
+
+@pytest.mark.usefixtures("chromium")
+async def test_browser_crash_fails_the_page_and_the_next_one_gets_a_new_browser(pages: PagesFactory) -> None:
+    site = pages({})
+    renderer = Renderer(RenderOptions(), EgressPolicy(), max_pages=1)
+    limits = ServiceLimits.model_validate({"collector": {"render_timeout_ms": 30_000}})
+    polling = "<p>polling</p><script>setInterval(function () { fetch('/data.json'); }, 100);</script>"
+    try:
+        task = asyncio.create_task(
+            renderer.render(page_result(site.url("/p"), polling), user_agent=RENDER_UA, limits=limits)
+        )
+        for _ in range(200):  # the page runs: its script asks for data
+            if "GET /data.json" in site.requests:
+                break
+            await asyncio.sleep(0.05)
+        assert "GET /data.json" in site.requests
+        assert kill_browsers() > 0
+        with pytest.raises(FetchError) as failed:
+            await task
+        assert failed.value.code == "internal_error", failed.value.message
+        out = await renderer.render(
+            page_result(site.url("/p"), "<p>after crash</p>"), user_agent=RENDER_UA, limits=limits
+        )
+        assert "after crash" in out.body.decode("utf-8") and renderer.last_error is None
+    finally:
+        await renderer.aclose()
+
+
+@pytest.mark.usefixtures("chromium")
+async def test_launch_is_bounded(pages: PagesFactory) -> None:
+    site = pages({})
+    renderer = Renderer(RenderOptions(), EgressPolicy(), max_pages=1, launch_timeout_ms=1)
+    try:
+        with pytest.raises(FetchError) as failed:
+            await renderer.render(
+                page_result(site.url("/p"), "<p>x</p>"), user_agent=RENDER_UA, limits=ServiceLimits()
+            )
+    finally:
+        await renderer.aclose()
+    assert failed.value.code == "not_implemented"
+    assert "collector.render_launch_timeout_ms=1" in failed.value.message
+    assert renderer.capabilities()["render_js"] is False
+
+
 # ---------------------------------------------------------------- helpers
+
+
+class Pages:
+    """A small site on 127.0.0.1 for pages the testsite does not have: ``pages`` maps a path to its HTML; robots.txt
+    allows everything, ``*.json`` answers ``{"ok": true}``, anything else 404. Every request is recorded as
+    ``"METHOD /path"`` (also the WebSocket handshake, a GET)."""
+
+    def __init__(self, pages: dict[str, str]) -> None:
+        self.pages = pages
+        self.requests: list[str] = []
+        owner = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                owner.requests.append(f"{self.command} {self.path}")
+                path = self.path.split("?", 1)[0]
+                if path == "/robots.txt":
+                    self._send(200, b"User-agent: *\nAllow: /\n", "text/plain")
+                elif path in owner.pages:
+                    self._send(200, owner.pages[path].encode("utf-8"), "text/html; charset=utf-8")
+                elif path.endswith(".json"):
+                    self._send(200, b'{"ok": true}', "application/json")
+                else:
+                    self._send(404, b"", "text/plain")
+
+            def do_POST(self) -> None:
+                self.rfile.read(int(self.headers.get("Content-Length") or 0))
+                self.do_GET()
+
+            def _send(self, status: int, body: bytes, ctype: str) -> None:
+                self.send_response(status)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, format: str, *args: Any) -> None:
+                return
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.server.daemon_threads = True
+        self.port = int(self.server.server_address[1])
+        self.thread = threading.Thread(target=self.server.serve_forever, args=(0.05,), daemon=True)
+        self.thread.start()
+
+    def url(self, path: str) -> str:
+        return f"http://127.0.0.1:{self.port}{path}"
+
+    def rules(self, *paths: str, hosts: list[str] | None = None) -> dict[str, Any]:
+        return {
+            "collector": "web",
+            "scope": {"allowed_domains": hosts or ["127.0.0.1"]},
+            "strategies": [{"type": "seed_list", "urls": [self.url(p) for p in paths]}],
+            "fetch": {"render_js": True},
+        }
+
+    def close(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+
+
+PagesFactory = Callable[[dict[str, str]], Pages]
+
+
+@pytest.fixture
+def pages() -> Iterator[PagesFactory]:
+    started: list[Pages] = []
+
+    def factory(content: dict[str, str]) -> Pages:
+        started.append(Pages(content))
+        return started[-1]
+
+    yield factory
+    for site in started:
+        site.close()
+
+
+def page_result(url: str, html: str) -> HttpResult:
+    """A fetched page as the fetcher hands it to the renderer (the browser never requests it)."""
+    return HttpResult(
+        url=url,
+        final_url=url,
+        status=200,
+        headers={"content-type": "text/html; charset=utf-8"},
+        body=html.encode("utf-8"),
+        fetched_at=datetime.now(UTC),
+    )
+
+
+async def render(
+    page: HttpResult, policy: EgressPolicy | None = None, limits: dict[str, Any] | None = None
+) -> HttpResult:
+    """One page through a fresh renderer (closed afterwards)."""
+    renderer = Renderer(RenderOptions(), policy or EgressPolicy(), max_pages=1)
+    try:
+        return await renderer.render(
+            page, user_agent=RENDER_UA, limits=ServiceLimits.model_validate(limits or {})
+        )
+    finally:
+        await renderer.aclose()
+
+
+def kill_browsers() -> int:
+    """Kill the Chromium processes started by this test process (a browser crash); returns how many."""
+    killed = 0
+    for proc in psutil.Process(os.getpid()).children(recursive=True):
+        try:
+            name = proc.name().lower()
+            if "chrome" in name or "headless" in name:
+                proc.kill()
+                killed += 1
+        except psutil.Error:
+            continue
+    return killed
 
 
 def fake_dns(answers: dict[str, list[str]]) -> Callable[[str, int], Awaitable[list[str]]]:

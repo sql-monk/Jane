@@ -4,13 +4,16 @@ The page itself is never requested by the browser. :class:`~.fetcher.Fetcher` fe
 of a plain fetch: scope and robots.txt before, each redirect hop re-checked, the outbound address policy, per-host
 limits, retries, ``crawl.max_material_bytes``, the User-Agent and the credentials of a managed connection. Only a
 2xx HTML answer is rendered: the first navigation of the browser page is answered with the fetched body
-(``route.fulfill``), any later navigation of a top-level frame (a script redirect, a reload, a popup) is aborted, so
-the DOM is the DOM of the URL that passed the checks.
+(``route.fulfill``), any later navigation of a top-level frame (a script redirect, a meta refresh, a reload, a popup)
+is answered ``204 No Content`` - the navigation does not happen and the document stays - so the DOM is the DOM of
+the URL that passed the checks.
 
 Everything else the browser loads (scripts, XHR/fetch, styles, frames, WebSockets) goes through
 :class:`EgressProxy` - an HTTP proxy on 127.0.0.1, one per page - which applies the fetch client's
 :class:`~.egress.EgressPolicy` to every connection the same way :class:`~.egress.GuardedBackend` does: the host is
-resolved once, every address is checked, the connection is opened to a checked address (no DNS rebinding). Playwright
+resolved once, every address is checked, the connection is opened to a checked address (no DNS rebinding). On top of
+that (``RENDER_DENY_PRIVATE``, default on) a non-public address is refused unless the host is the page's own or in the
+rules' ``scope.allowed_domains``: a page script cannot reach internal services the caller did not choose. Playwright
 sends loopback through the proxy as well (``<-loopback>``), service workers are blocked and WebRTC may use proxied
 traffic only. Requests of the resource types in ``RENDER_BLOCK_RESOURCE_TYPES`` are not made at all. One page may
 download ``collector.render_max_transfer_bytes``; the browser sends the collector's User-Agent and never the
@@ -18,8 +21,10 @@ connection credentials.
 
 The material is the serialized DOM (doctype + ``document.documentElement.outerHTML``) once the wait condition is
 reached or ``collector.render_timeout_ms`` has passed, encoded as UTF-8 (``<meta charset>`` says so), cut at
-``crawl.max_material_bytes``. If rendering is off, Playwright is not installed or Chromium cannot start, the URL fails
-with ``not_implemented`` and a message saying why - never a silent plain fetch.
+``crawl.max_material_bytes`` - already in the page, so a huge DOM never crosses to the collector whole. Starting
+Chromium and closing pages are bounded too (``collector.render_launch_timeout_ms`` / ``render_close_timeout_ms``). If
+rendering is off, Playwright is not installed or Chromium cannot start, the URL fails with ``not_implemented`` and a
+message saying why - never a silent plain fetch.
 """
 
 from __future__ import annotations
@@ -36,12 +41,12 @@ from urllib.parse import urlsplit
 
 from .egress import EgressDenied, EgressPolicy, Resolver, system_resolve
 from .fetcher import FetchError, HttpResult
-from .settings import ServiceLimits
+from .settings import Collector, ServiceLimits
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from playwright.async_api import Browser, Page, Playwright, Route
+    from playwright.async_api import Browser, BrowserContext, Page, Playwright, Route
 
 __all__ = ["EgressProxy", "RenderOptions", "Renderer", "renderable"]
 
@@ -65,8 +70,11 @@ DIAGNOSTIC_MAX_CHARS = 4000
 """``DiagnosticMessage.message`` maxLength of the contract."""
 HOP_BY_HOP = frozenset({"connection", "proxy-connection", "keep-alive", "proxy-authorization"})
 DEFAULT_PORTS = {"http": 80, "https": 443, "ws": 80, "wss": 443}
+NON_PUBLIC = EgressPolicy(deny_link_local=False, deny_private=True)
+"""Classifies non-public addresses for ``RENDER_DENY_PRIVATE``."""
+PRIVATE_REASON = "non-public address of a host that is neither the page's own nor in scope.allowed_domains (RENDER_DENY_PRIVATE)"
 
-SNAPSHOT_JS = """() => {
+SNAPSHOT_JS = """(max) => {
   for (const m of document.querySelectorAll('meta[charset]')) m.setAttribute('charset', 'utf-8');
   for (const m of document.querySelectorAll('meta[http-equiv]')) {
     if ((m.getAttribute('http-equiv') || '').toLowerCase() === 'content-type') {
@@ -75,8 +83,14 @@ SNAPSHOT_JS = """() => {
   }
   const dt = document.doctype;
   const doctype = dt ? new XMLSerializer().serializeToString(dt) + '\\n' : '';
-  return doctype + (document.documentElement ? document.documentElement.outerHTML : '');
+  const html = doctype + (document.documentElement ? document.documentElement.outerHTML : '');
+  if (html.length <= max) return [html, false];
+  let end = max;  // max_material_bytes characters are at least as many bytes: only that much leaves the page
+  const last = html.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) end -= 1;  // never half a surrogate pair
+  return [html.slice(0, end), true];
 }"""
+"""Serializes the DOM in the page and returns ``[html, cut]``: at most ``max`` characters cross to the collector."""
 
 
 def renderable(result: HttpResult) -> bool:
@@ -119,8 +133,12 @@ class EgressProxy:
         resolver: Resolver = system_resolve,
         connect_timeout_s: float,
         max_bytes: int,
+        private_allowed: Callable[[str], bool] | None = None,
     ) -> None:
+        """``private_allowed``: with it, a non-public address is refused unless this says yes for the host (the
+        page's own host and ``scope.allowed_domains``, ``RENDER_DENY_PRIVATE``); ``policy`` applies to every host."""
         self.policy = policy
+        self.private_allowed = private_allowed
         self.resolver = resolver
         self.connect_timeout_s = connect_timeout_s
         self.max_bytes = max_bytes
@@ -169,13 +187,24 @@ class EgressProxy:
             try:
                 async with asyncio.timeout(self.connect_timeout_s):
                     addresses = await self.resolver(*key)
-                self.policy.check(key[0], addresses)
+                self.check(key[0], addresses)
             except EgressDenied as exc:
                 verdict = str(exc)
             except (OSError, TimeoutError):
                 pass  # unresolvable: the proxy fails the connection
             self._verdicts[key] = verdict
         return self._verdicts[key]
+
+    def check(self, host: str, addresses: list[str]) -> None:
+        """The policy of the fetch client, then (``RENDER_DENY_PRIVATE``) no non-public address for a host that is
+        neither the page's own nor in ``scope.allowed_domains``: a page script must not reach internal services the
+        caller did not choose. Raises :class:`~.egress.EgressDenied`."""
+        self.policy.check(host, addresses)
+        if self.private_allowed is None or self.private_allowed(host):
+            return
+        for address in addresses:
+            if NON_PUBLIC.reason(address) is not None:
+                raise EgressDenied(host, address, PRIVATE_REASON)
 
     async def _serve(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         task = asyncio.current_task()
@@ -241,7 +270,7 @@ class EgressProxy:
             addresses = await self.resolver(host, port)
             if not addresses:
                 raise OSError(f"cannot resolve {host}: no addresses")
-            self.policy.check(host, addresses)
+            self.check(host, addresses)
             last: OSError | None = None
             for address in addresses:
                 try:
@@ -324,6 +353,9 @@ class RenderOptions:
     wait_until: WaitUntil = "networkidle"
     block_resource_types: tuple[str, ...] = ("image", "media", "font")
     executable: Path | None = None
+    deny_private: bool = True
+    """``RENDER_DENY_PRIVATE``: browser requests reach non-public addresses only for the page's own host and
+    ``scope.allowed_domains``."""
 
 
 @dataclass
@@ -346,14 +378,23 @@ class Renderer:
         *,
         max_pages: int,
         resolver: Resolver = system_resolve,
+        launch_timeout_ms: int | None = None,
+        close_timeout_ms: int | None = None,
     ) -> None:
+        """``launch_timeout_ms`` / ``close_timeout_ms``: ``collector.render_launch_timeout_ms`` /
+        ``collector.render_close_timeout_ms`` (their defaults when not given)."""
+        defaults = Collector()
         self.options = options
         self.policy = policy
         self.resolver = resolver
+        self.launch_timeout_ms = launch_timeout_ms or defaults.render_launch_timeout_ms
+        self.close_timeout_s = (close_timeout_ms or defaults.render_close_timeout_ms) / 1000
         self._pages = asyncio.Semaphore(max_pages)
         self._lock = asyncio.Lock()
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
+        self._broken = False
+        """A page of the browser did not close in time: the browser is started again before the next page."""
         self.last_error: str | None = None
         """Why the browser could not start the last time it was needed (cleared by a successful start)."""
 
@@ -375,37 +416,48 @@ class Renderer:
             await self._shutdown()
 
     async def _shutdown(self) -> None:
+        """Close the browser and the Playwright driver, each within ``collector.render_close_timeout_ms``."""
         browser, playwright = self._browser, self._playwright
         self._browser = self._playwright = None
+        self._broken = False
         if browser is not None:
             with contextlib.suppress(Exception):
-                await browser.close()
+                await asyncio.wait_for(browser.close(), self.close_timeout_s)
         if playwright is not None:
             with contextlib.suppress(Exception):
-                await playwright.stop()
+                await asyncio.wait_for(playwright.stop(), self.close_timeout_s)
 
     async def _get_browser(self) -> Browser:
         async with self._lock:
-            if self._browser is not None and self._browser.is_connected():
+            if self._browser is not None and self._browser.is_connected() and not self._broken:
                 return self._browser
-            await self._shutdown()  # a browser that crashed or disconnected is started again
+            await self._shutdown()  # a browser that crashed, disconnected or hangs is started again
             reason = self.unavailable_reason()
             if reason is not None:
                 raise FetchError("not_implemented", f"fetch.render_js: {reason}")
             from playwright.async_api import async_playwright
 
             try:
+                # the local driver fails by itself if it cannot run; Chromium is bounded by Playwright's own launch
+                # timeout (collector.render_launch_timeout_ms), which also stops a browser that did not come up.
+                # Cancelling the driver's start from outside would leave its pipe reader running for good.
                 self._playwright = await async_playwright().start()
                 self._browser = await self._playwright.chromium.launch(
                     headless=True,
                     executable_path=self.options.executable,
                     proxy={"server": PER_CONTEXT_PROXY},
                     args=list(CHROMIUM_ARGS),
+                    timeout=self.launch_timeout_ms,
                 )
-            # Playwright's Error, a missing driver or browser, an event loop without subprocess support
+            # Playwright's Error, a missing driver or browser, an event loop without subprocess support, a timeout
             except Exception as exc:
                 await self._shutdown()
-                self.last_error = f"headless Chromium could not start: {_first_line(exc)}; {INSTALL_HINT}"
+                why = (
+                    f"no start within collector.render_launch_timeout_ms={self.launch_timeout_ms}"
+                    if type(exc).__name__ == "TimeoutError"  # Playwright's launch timeout
+                    else _first_line(exc)
+                )
+                self.last_error = f"headless Chromium could not start: {why}; {INSTALL_HINT}"
                 log.warning("headless browser unavailable", extra={"error": self.last_error})
                 raise FetchError("not_implemented", f"fetch.render_js: {self.last_error}") from None
             self.last_error = None
@@ -419,11 +471,20 @@ class Renderer:
         user_agent: str,
         limits: ServiceLimits,
         accept_language: str | None = None,
+        allowed_hosts: Callable[[str], bool] | None = None,
     ) -> HttpResult:
         """The fetched HTML ``result`` rendered by the browser: the same result with the serialized DOM as body.
 
-        Raises :class:`~.fetcher.FetchError`: ``not_implemented`` (no browser), ``timeout`` (the DOM could not be
-        taken in time), ``internal_error`` (the browser failed)."""
+        ``allowed_hosts``: hosts of ``scope.allowed_domains`` - with the page's own host the only ones the browser
+        may reach at a non-public address (``RENDER_DENY_PRIVATE``). Raises :class:`~.fetcher.FetchError`:
+        ``not_implemented`` (no browser), ``timeout`` (the DOM could not be taken in time), ``internal_error`` (the
+        browser failed)."""
+        page_host = (urlsplit(result.final_url).hostname or "").lower().rstrip(".")
+
+        def private_allowed(host: str) -> bool:
+            host = host.lower().rstrip(".")
+            return host == page_host or (allowed_hosts is not None and allowed_hosts(host))
+
         async with self._pages:
             browser = await self._get_browser()
             proxy = EgressProxy(
@@ -431,6 +492,7 @@ class Renderer:
                 resolver=self.resolver,
                 connect_timeout_s=limits.timeouts.connect_timeout_ms / 1000,
                 max_bytes=limits.collector.render_max_transfer_bytes,
+                private_allowed=private_allowed if self.options.deny_private else None,
             )
             await proxy.start()
             try:
@@ -487,7 +549,9 @@ class Renderer:
             if extra_ms > 0 and not incomplete:
                 await asyncio.sleep(extra_ms / 1000)
             try:
-                html = await asyncio.wait_for(page.evaluate(SNAPSHOT_JS), timeout_ms / 1000)
+                snapshot = await asyncio.wait_for(
+                    page.evaluate(SNAPSHOT_JS, limits.crawl.max_material_bytes), timeout_ms / 1000
+                )
             except TimeoutError:
                 raise FetchError(
                     "timeout",
@@ -496,12 +560,23 @@ class Renderer:
         except PlaywrightError as exc:
             raise FetchError("internal_error", f"render failed: {_first_line(exc)}") from None
         finally:
-            with contextlib.suppress(Exception):
-                await context.close()
+            await self._close(context)
         elapsed_ms = int((time.monotonic() - started) * 1000)
-        if not isinstance(html, str):
+        if not (isinstance(snapshot, list) and len(snapshot) == 2 and isinstance(snapshot[0], str)):
             raise FetchError("internal_error", "render: the page returned no DOM")
-        return self._rendered(result, html, limits, proxy, page_log, incomplete, elapsed_ms)
+        html, cut = snapshot[0], bool(snapshot[1])
+        return self._rendered(result, html, cut, limits, proxy, page_log, incomplete, elapsed_ms)
+
+    async def _close(self, context: BrowserContext) -> None:
+        """Close the page's context within ``collector.render_close_timeout_ms``; a browser that cannot is started
+        again before the next page."""
+        try:
+            await asyncio.wait_for(context.close(), self.close_timeout_s)
+        except TimeoutError:
+            self._broken = True
+            log.warning("browser context did not close in time; the browser will be restarted")
+        except Exception:
+            log.debug("browser context close failed", exc_info=True)
 
     def _router(
         self, page: Page, result: HttpResult, page_log: _PageLog, proxy: EgressProxy
@@ -518,9 +593,11 @@ class Renderer:
                     if not page_log.served and request.frame == page.main_frame:
                         page_log.served = True  # the fetched document; the browser never requests it
                         await route.fulfill(status=result.status, headers=document_headers, body=result.body)
-                    else:  # a script redirect, reload or popup would replace the checked page
+                    else:  # a script redirect, meta refresh, reload or popup would replace the checked page
                         page_log.navigations.append(request.url)
-                        await route.abort("blockedbyclient")
+                        # 204 No Content: the navigation does not happen and the document stays (an aborted
+                        # navigation would replace it with an error page)
+                        await route.fulfill(status=204)
                     return
                 if request.resource_type in blocked:
                     page_log.blocked_types += 1
@@ -542,14 +619,15 @@ class Renderer:
         self,
         result: HttpResult,
         html: str,
+        cut: bool,
         limits: ServiceLimits,
         proxy: EgressProxy,
         page_log: _PageLog,
         incomplete: str | None,
         elapsed_ms: int,
     ) -> HttpResult:
-        body = html.encode("utf-8")
-        truncated = result.truncated
+        body = html.encode("utf-8", errors="replace")
+        truncated = result.truncated or cut
         max_bytes = limits.crawl.max_material_bytes
         if len(body) > max_bytes:
             body = body[:max_bytes].decode("utf-8", errors="ignore").encode("utf-8")

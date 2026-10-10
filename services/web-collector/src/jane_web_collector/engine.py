@@ -85,9 +85,12 @@ class Engine:
                 wait_until=settings.render_wait_until,
                 block_resource_types=tuple(settings.render_block_resource_types),
                 executable=settings.render_browser_executable,
+                deny_private=settings.render_deny_private,
             ),
             egress,
             max_pages=self.limits.collector.render_max_pages,
+            launch_timeout_ms=self.limits.collector.render_launch_timeout_ms,
+            close_timeout_ms=self.limits.collector.render_close_timeout_ms,
         )
         log.info("javascript rendering", extra=self.renderer.capabilities())
         # one per-host schedule for every collection and one-shot fetch of this process (WP-02c), shared with the
@@ -488,6 +491,7 @@ class Engine:
                     accept_language=next(
                         (v for k, v in headers.items() if k.lower() == "accept-language"), None
                     ),
+                    allowed_hosts=scope.domain_allowed if scope is not None else None,
                 )
             except FetchError as exc:  # not_implemented (no browser) 501, timeout 504, internal_error 500
                 raise JaneError(exc.message, code=exc.code) from exc

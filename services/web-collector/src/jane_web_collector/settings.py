@@ -82,6 +82,10 @@ class Settings(JaneSettings):
     """Playwright resource types the browser does not request at all (saves bandwidth; prices need none of them)."""
     render_browser_executable: Path | None = None
     """Chromium executable for rendering; default: the browser installed by ``playwright install chromium``."""
+    render_deny_private: bool = True
+    """Requests of the browser (page scripts) reach non-public addresses - loopback, RFC 1918, ``fc00::/7``... - only
+    for the page's own host and the rules' ``scope.allowed_domains``: a page must not make the collector a proxy to
+    internal services the caller did not choose. ``EGRESS_*`` applies on top for every host."""
     contracts_dir: Path | None = None
     """``contracts/`` with the JSON Schemas; default: ``JANE_CONTRACTS_DIR`` or the checkout's contracts."""
     discovery_path: Path | None = None
@@ -205,6 +209,12 @@ class Collector(Limits):
     render_max_transfer_bytes: int = Field(default=50 * 1024**2, ge=1)
     """Bytes the browser may download for one page (scripts, XHR, styles); then its connections are cut and the
     DOM is taken as it is (diagnostic ``render_budget_exceeded``)."""
+    render_launch_timeout_ms: int = Field(default=30_000, ge=1)
+    """How long starting headless Chromium may take; longer counts as "no browser" (``not_implemented``)."""
+    render_close_timeout_ms: int = Field(default=30_000, ge=1)
+    """How long closing a page's browser context, and the browser and its driver on restart or stop, may take; a
+    context that does not close in time makes the browser start again before the next page. Generous on purpose:
+    Chromium on Windows sometimes needs several seconds to exit, and a browser given up on may be left running."""
 
 
 class ServiceLimits(Limits):

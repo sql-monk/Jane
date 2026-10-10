@@ -645,7 +645,11 @@ class CrawlRun:
         if self.deps.renderer is None:
             raise FetchError("not_implemented", "fetch.render_js: this collector has no headless browser")
         return await self.deps.renderer.render(
-            result, user_agent=self.user_agent, limits=self.limits, accept_language=self.accept_language
+            result,
+            user_agent=self.user_agent,
+            limits=self.limits,
+            accept_language=self.accept_language,
+            allowed_hosts=self.scope.domain_allowed if self.scope is not None else None,
         )
 
     async def _process_result(

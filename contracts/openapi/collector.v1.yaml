@@ -182,8 +182,45 @@ paths:
                     retryable: false
                     details:
                       reason: channel_unavailable
+        '500':
+          $ref: 'common.yaml#/components/responses/InternalError'
+        '501':
+          description: |
+            Правила просять `fetch.render_js`, але в цьому колекторі немає headless-браузера (рендеринг вимкнено,
+            Playwright чи Chromium не встановлено або браузер не стартує; `not_implemented`, `retryable: false`).
+            Причина — у `detail`; те саме видно в `GET /v1/info` → `capabilities.render_js`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                noBrowser:
+                  value:
+                    type: urn:jane:problem:not_implemented
+                    title: Not implemented
+                    status: 501
+                    code: not_implemented
+                    retryable: false
+                    detail: 'fetch.render_js: rendering is disabled (JANE_WEB_COLLECTOR_RENDER_ENABLED=false)'
         '503':
           $ref: 'common.yaml#/components/responses/ServiceUnavailable'
+        '504':
+          description: |
+            `fetch.render_js`: DOM сторінки не вдалося отримати з браузера за `collector.render_timeout_ms`
+            (`timeout`, `retryable: true`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '../schemas/common/problem.schema.json'
+              examples:
+                renderTimeout:
+                  value:
+                    type: urn:jane:problem:timeout
+                    title: Timeout
+                    status: 504
+                    code: timeout
+                    retryable: true
+                    detail: 'render: the DOM was not taken within collector.render_timeout_ms=30000'
   /v1/collections:
     post:
       x-jane-scope: collector:run

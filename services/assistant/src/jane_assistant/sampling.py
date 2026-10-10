@@ -49,6 +49,7 @@ from .content import decode_text, material_bytes, material_label, url_shape
 from .llm import BudgetExhausted, LlmSession, part
 from .material import (
     declared_canonical,
+    inline_bytes,
     inline_text,
     is_html,
     link_pattern,
@@ -59,13 +60,11 @@ from .material import (
     same_url,
 )
 from .prompts import CLASSIFY, CLASSIFY_SCHEMA
-from .settings import ServiceLimits
+from .settings import OnboardingLimits, ServiceLimits
 
 __all__ = ["Evidence", "Sample", "SampleResult", "coverage", "sample_source", "sampling_rules"]
 
 Progress = Callable[[int, str], Awaitable[None]]
-MAX_EVIDENCE_EXAMPLES = 5
-"""Examples kept per kind of evidence (canonical declarations) - only for the model and the user to read."""
 
 
 @dataclass
@@ -75,6 +74,8 @@ class Sample:
     shape: str
     material_type: str = "other"
     confidence: float = 0.0
+    reduced_from_bytes: int | None = None
+    """Size of the page as served when ``material`` holds its reduced copy (``material.max_fixture_bytes``)."""
 
 
 @dataclass
@@ -113,7 +114,7 @@ class Evidence:
     """What sampled pages say about discovery: canonical declarations, link patterns, pagination."""
 
     hosts: list[str]
-    max_patterns: int
+    limits: OnboardingLimits
     shas: dict[str, str] = field(default_factory=dict)
     canonicals: list[tuple[str, str]] = field(default_factory=list)
     patterns: Counter[str] = field(default_factory=Counter)
@@ -135,7 +136,7 @@ class Evidence:
             pattern = link_pattern(link)
             self.patterns[pattern] += 1
             seen = self.examples.setdefault(pattern, [])
-            if len(seen) < 2 and link not in seen:
+            if len(seen) < self.limits.link_pattern_examples and link not in seen:
                 seen.append(link)
         for template, pages in pagination_templates(links).items():
             entry = self.pagination.setdefault(template, {"pages": set(), "found_on": url})
@@ -153,7 +154,7 @@ class Evidence:
             "declared_elsewhere": len(rows),
             "different_content": sum(1 for r in rows if r["content"] == "different"),
             "same_content": sum(1 for r in rows if r["content"] == "same"),
-            "examples": rows[:MAX_EVIDENCE_EXAMPLES],
+            "examples": rows[: self.limits.max_evidence_examples],
             "urls": [r["url"] for r in rows if r["content"] != "same"],
         }
 
@@ -162,17 +163,17 @@ class Evidence:
             "canonical": self.canonical_wire(),
             "link_patterns": [
                 {"pattern": p, "links": n, "examples": self.examples.get(p, [])}
-                for p, n in self.patterns.most_common(self.max_patterns)
+                for p, n in self.patterns.most_common(self.limits.max_link_patterns)
             ],
             "pagination": [
                 {
                     "template": t,
-                    "pages_seen": sorted(v["pages"])[:20],
+                    "pages_seen": sorted(v["pages"])[: self.limits.max_pages_listed],
                     "max_page_seen": max(v["pages"]),
                     "found_on": v["found_on"],
                 }
                 for t, v in sorted(self.pagination.items(), key=lambda kv: -len(kv[1]["pages"]))[
-                    : self.max_patterns
+                    : self.limits.max_link_patterns
                 ]
             ],
         }
@@ -229,7 +230,12 @@ def confidence_of(
     unclassified: int,
     min_confidence: float,
     min_distinct_types: int,
+    unsampled: int = 0,
 ) -> float:
+    """``unsampled``: materials among ``unclassified`` that could never be picked for classification (read after
+    the sample budget was spent). The with-replacement term of :func:`unseen_risk` assumes the classified materials
+    were picked from the whole stream; for these it does not hold, so their whole share counts as possibly of an
+    unknown type (finite population)."""
     if not samples:
         return 0.0
     counts = Counter(s.material_type for s in samples)
@@ -239,7 +245,8 @@ def confidence_of(
     # tighter miss-risk level. A genuinely homogeneous source can still become sufficient.
     risk_confidence = 1.0 - (1.0 - min_confidence) / max(1, min_distinct_types - len(counts) + 1)
     unseen_share = unseen_risk(len(samples), len(samples) + unclassified, risk_confidence)
-    return (1.0 - max(rare_share, unseen_share)) * mean
+    unsampled_share = unsampled / (len(samples) + unclassified)
+    return (1.0 - max(rare_share, unseen_share, unsampled_share)) * mean
 
 
 def sampling_rules(
@@ -348,9 +355,7 @@ async def sample_source(
         request["limits"] = {"crawl": {**crawl, "max_pages_per_run": fetch_bound}}
     job = await collector.start_collection(request, idem_key(job_key, "sample-collection"))
     collection_id = str(job["job_id"])
-    evidence = Evidence(
-        hosts=list((rules.get("scope") or {}).get("allowed_domains") or []), max_patterns=ob.max_link_patterns
-    )
+    evidence = Evidence(hosts=list((rules.get("scope") or {}).get("allowed_domains") or []), limits=ob)
 
     samples: list[Sample] = []
     reserve: list[Sample] = []
@@ -363,6 +368,7 @@ async def sample_source(
     empty_polls = 0
     confidence = 0.0
     message: str | None = None
+    unsampled = 0  # read after the sample budget was spent: never classified
 
     async def read_page() -> list[Sample]:
         """One poll of the collection: new materials (reduced, with their text) appended to ``reserve``."""
@@ -390,7 +396,8 @@ async def sample_source(
                 by_strategy[str(strategy)] += 1
             if ck := (m.get("format") or {}).get("content_kind"):
                 content_kinds[str(ck)] += 1
-            new.append(Sample(lean, text, shape))
+            reduced = len(raw) if inline_bytes(lean) != raw else None
+            new.append(Sample(lean, text, shape, reduced_from_bytes=reduced))
         reserve.extend(new)
         return new
 
@@ -403,14 +410,23 @@ async def sample_source(
         return None
 
     async def drain(reached: str) -> str | None:
-        """Read the rest of the stream without classifying; why the sample is insufficient, if it is."""
+        """Read the rest of the stream without classifying (the budget is spent): every material read now counts
+        as possibly of an unknown type, whatever its URL shape. Why the sample is insufficient, if it is - as
+        soon as it is."""
+        nonlocal unsampled
         while not ended:
             new = await read_page()
+            unsampled += len(new)
             novel = sorted({s.shape for s in new if s.shape not in shapes})
             if novel:
                 return (
                     f"{reached} with confidence {current():.2f}; URL shape(s) found later are not "
-                    f"represented: {', '.join(novel[:5])}"
+                    f"represented: {', '.join(novel[: ob.max_evidence_examples])}"
+                )
+            if (score := current()) < min_confidence:
+                return (
+                    f"{reached}; {unsampled} later material(s) could not be classified, "
+                    f"confidence {score:.2f}"
                 )
             if (why := stalled()) is not None:
                 return why
@@ -418,7 +434,12 @@ async def sample_source(
 
     def current() -> float:
         return confidence_of(
-            samples, ob.min_examples_per_type, len(reserve), min_confidence, ob.min_distinct_types
+            samples,
+            ob.min_examples_per_type,
+            len(reserve),
+            min_confidence,
+            ob.min_distinct_types,
+            unsampled,
         )
 
     try:
@@ -485,12 +506,10 @@ async def sample_source(
                 reached = f"reached limits.llm.max_onboarding_samples={max_samples}"
                 if confidence >= min_confidence and not unseen_shape and not ended:
                     # Confident within the budget, but the stream is still running: read the rest without
-                    # classifying. A new URL shape there (or no end) leaves the sample insufficient.
+                    # classifying. Its whole share is unknown-type risk; a new URL shape there, a tail too long
+                    # for the confidence threshold, or no end leaves the sample insufficient.
                     message = await drain(reached)
-                    if message is None:
-                        confidence = current()
-                        if confidence < min_confidence:
-                            message = f"{reached} with confidence {confidence:.2f} over the finished stream"
+                    confidence = current()
                     break
                 message = f"{reached} with confidence {confidence:.2f}"
                 break
@@ -527,7 +546,7 @@ async def sample_source(
         **({} if source_kind == "telegram" else evidence.wire()),
     }
     note: str | None = None
-    if ended and source_kind != "telegram" and fetched >= fetch_bound:
+    if ended and source_kind != "telegram" and fetched >= fetch_bound and discovered > fetched:
         hints["truncated"] = {"fetched": fetched, "discovered": discovered, "max_pages_per_run": fetch_bound}
         note = (
             f"the sampling collection stopped at limits.crawl.max_pages_per_run={fetch_bound} "

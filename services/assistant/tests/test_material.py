@@ -6,7 +6,9 @@ import hashlib
 import json
 from typing import Any
 
+import pytest
 from assistant_fakes.site import listing_page, material
+from pydantic import ValidationError
 
 from jane_assistant.content import url_shape
 from jane_assistant.material import (
@@ -16,6 +18,7 @@ from jane_assistant.material import (
     lean_html,
     link_pattern,
     material_text,
+    outside_blocks,
     page_links,
     pagination_templates,
     reduce_material,
@@ -23,9 +26,10 @@ from jane_assistant.material import (
 )
 from jane_assistant.onboarding import _canonical_dedup, _estimate
 from jane_assistant.sampling import sampling_rules
-from jane_assistant.settings import MaterialLimits
+from jane_assistant.settings import MaterialLimits, OnboardingLimits
 
 BASE = "https://shop.example.test/catalog/c80004/"
+URL = OnboardingLimits().max_risk_url_chars
 PRODUCTS = [(f"Laptop {k}", f"https://shop.example.test/laptop-{k}/p{1000 + k}/", 100 + k) for k in range(60)]
 
 
@@ -87,7 +91,9 @@ def test_digest_shows_structured_data_beyond_the_first_kilobytes() -> None:
 
     assert material_text("<p>small</p>", "text/html", 6_000, limits) == "<p>small</p>"
     plain = material_text("y" * 7_000, "text/plain", 6_000, limits)
-    assert plain.startswith("y" * 6_000) and "truncated 1000 characters" in plain
+    kept = len(plain) - len(plain.lstrip("y"))
+    assert len(plain) <= 6_000 and kept > 5_900
+    assert plain.endswith(f"[... truncated {7_000 - kept} characters]")
 
 
 def test_reduced_material_describes_its_own_content() -> None:
@@ -210,9 +216,9 @@ def test_canonical_dedup_follows_what_a_plan_targets() -> None:
     }
     off = {"use_link_rel_canonical": False}
     pages = _rules({"type": "seed_list", "urls": [BASE, f"{BASE}page=2/"]})
-    assert _canonical_dedup(pages, evidence, {})[0] == off
-    assert _canonical_dedup(pages, {}, {})[0] == off  # an explicit page list, evidence or not
-    assert _canonical_dedup(_rules({"type": "listing", "start_urls": [BASE]}), {}, {})[0] == off
+    assert _canonical_dedup(pages, evidence, {}, URL)[0] == off
+    assert _canonical_dedup(pages, {}, {}, URL)[0] == off  # an explicit page list, evidence or not
+    assert _canonical_dedup(_rules({"type": "listing", "start_urls": [BASE]}), {}, {}, URL)[0] == off
     follow = _rules(
         {
             "type": "recursive",
@@ -220,21 +226,29 @@ def test_canonical_dedup_follows_what_a_plan_targets() -> None:
             "follow": [{"type": "glob", "value": "shop.example.test/catalog/c80004/page=*"}],
         }
     )
-    dedup, risk = _canonical_dedup(follow, evidence, {})
+    dedup, risk = _canonical_dedup(follow, evidence, {}, URL)
     assert dedup == off and risk and "pagination pages" in risk
     sitemap = _rules({"type": "sitemap"})
-    dedup, risk = _canonical_dedup(sitemap, evidence, {})
+    dedup, risk = _canonical_dedup(sitemap, evidence, {}, URL)
     assert dedup is None and risk and f"{BASE}page=2/ -> {BASE}" in risk
-    assert _canonical_dedup(sitemap, {}, {}) == (None, None)
+    assert _canonical_dedup(sitemap, {}, {}, URL) == (None, None)
     template = _rules(
         {"type": "url_template", "template": f"{BASE}page={{n}}/", "variables": {"n": {"values": [2]}}}
     )
-    dedup, risk = _canonical_dedup(template, {}, {})
+    dedup, risk = _canonical_dedup(template, {}, {}, URL)
     assert dedup == off and risk and "generates its page URLs" in risk
     one_seed = _rules({"type": "seed_list", "urls": [BASE]})
-    assert _canonical_dedup(one_seed, {}, {}) == (None, None)
+    assert _canonical_dedup(one_seed, {}, {}, URL) == (None, None)
+    long = {
+        "canonical": {
+            "examples": [{"url": f"{BASE}page=2/?" + "q" * 5_000, "canonical": BASE + "c" * 5_000}],
+            "urls": [f"{BASE}page=2/?" + "q" * 5_000],
+        }
+    }
+    dedup, risk = _canonical_dedup(sitemap, long, {}, 120)
+    assert dedup is None and risk and len(risk) < 2 * 120 + 200  # page URLs in a risk are cut
     user = {"dedup": {"use_link_rel_canonical": True, "bogus": 1}}
-    assert _canonical_dedup(pages, evidence, user) == (
+    assert _canonical_dedup(pages, evidence, user, URL) == (
         {"use_link_rel_canonical": True},
         None,
     )  # the user decides
@@ -254,3 +268,42 @@ def test_estimates_count_listed_pages_and_respect_the_users_page_budget() -> Non
     estimated, notes = _estimate(crawl, 500, 0.5, 60)
     assert estimated == 60 and "max_pages_per_run=60" in notes
     assert _estimate(crawl, 500, 0.5, None)[0] == 250
+
+
+def test_script_text_never_starts_a_comment_style_or_another_block() -> None:
+    """Review repro: ``"<!--"`` / ``"<style"`` inside JavaScript used to eat the page up to the next ``-->``."""
+    rows = "<p>row</p>" * 20_000
+    page = (
+        '<html><body><script>var s="<!--"; var t="<style>"; var u="<svg>";</script><main>'
+        f'{rows}</main><script type="application/ld+json">{{"a":1}}</script><!-- c --><p>tail</p></body></html>'
+    )
+    lean = lean_html(page, 131_072)
+    assert lean.count("<p>row</p>") > 10_000 and '<script type="application/ld+json">{"a":1}</script>' in lean
+    assert "var s=" not in lean and "<!-- c -->" not in lean
+    full = lean_html(page, 1_000_000)  # fits: untouched
+    assert full == page
+    padded = page.replace("<main>", "<main>" + "<i>x</i>" * 3_000)  # over the limit, nothing to cut but code
+    assert lean_html(padded, len(padded.encode()) - 10).count("<p>row</p>") == 20_000
+    # a commented-out script is a comment, a script inside a comment is not a block of its own
+    assert outside_blocks('a<!-- <script>x</script> -->b<script>"-->"</script>c') == "a b c"
+    assert declared_canonical(
+        '<script>"<link rel=canonical href=/x>"</script><link rel="canonical" href="/y">', BASE
+    ) == ("https://shop.example.test/y")
+    assert page_links(
+        '<script>"<a href=/in-js>"</script><!-- <a href="/in-comment"> --><a href="/real">', BASE
+    ) == ["https://shop.example.test/real"]
+
+
+def test_digest_and_cut_texts_respect_their_size() -> None:
+    page = listing_page(BASE, PRODUCTS, [f"{BASE}page=2/"])
+    limits = MaterialLimits()
+    for size in (0, 1, 50, 181, 400, 2_000):
+        assert len(html_digest(page, size, limits)) <= size
+        assert len(material_text("y" * 7_000, "text/plain", size, limits)) <= size
+    assert html_digest(page, 0, limits) == ""
+
+
+def test_material_limits_shares_must_fit() -> None:
+    MaterialLimits(head_share=0.2, structured_share=0.6, text_share=0.2)  # exactly 1 is fine
+    with pytest.raises(ValidationError, match="must not exceed 1"):
+        MaterialLimits(head_share=0.5, structured_share=0.5, text_share=0.1)

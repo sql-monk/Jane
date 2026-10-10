@@ -212,6 +212,14 @@ class OnboardingLimits(Limits):
     max_link_patterns: int = Field(default=20, ge=0)
     """In-page link patterns (and pagination URL templates) of sampled pages kept as evidence for analysis
     and proposals, most frequent first."""
+    link_pattern_examples: int = Field(default=2, ge=0)
+    """Example links kept per link pattern."""
+    max_pages_listed: int = Field(default=20, ge=1)
+    """Page numbers listed per pagination template (the largest seen is always given)."""
+    max_evidence_examples: int = Field(default=5, ge=1)
+    """Examples kept of other evidence (pages declaring another canonical) and of URL shapes in messages."""
+    max_risk_url_chars: int = Field(default=200, ge=20)
+    """A page URL quoted in a proposal risk is cut to this many characters."""
 
 
 class MaterialLimits(Limits):
@@ -233,6 +241,14 @@ class MaterialLimits(Limits):
     """Items kept from every long list of structured data in a digest (the count of the rest is stated)."""
     max_string_chars: int = Field(default=1_000, ge=20)
     """Longer strings of structured data are shortened in a digest (marked with the number of cut characters)."""
+    short_string_chars: int = Field(default=200, ge=20)
+    """Strings of structured data when even its first list items do not fit the structured share: lists then
+    keep one item and strings this many characters."""
+    max_head_tags: int = Field(default=60, ge=0)
+    """Head tags (title, informative meta, canonical / next / prev links) in a digest."""
+    max_microdata_types: int = Field(default=20, ge=0)
+    max_microdata_props: int = Field(default=30, ge=0)
+    """Microdata item types and property names (most frequent first, with counts) in a digest."""
 
     @model_validator(mode="after")
     def _shares_fit(self) -> MaterialLimits:

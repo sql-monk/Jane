@@ -977,6 +977,16 @@ class OnboardingService:
             for p in session.plans.values()
             if not p.tests_passed
         ]
+        for plan in session.plans.values():
+            positives, negatives = self._cases(sample, plan.material_type, limits)
+            reduced = [s for s in (*positives, *negatives) if s.reduced_from_bytes]
+            if reduced and plan.outcome is not None:
+                largest = max(s.reduced_from_bytes or 0 for s in reduced)
+                risks_common.append(
+                    f"extractor for {plan.entity_type} was tested on reduced copies of {len(reduced)} large page(s) "
+                    f"(up to {largest} bytes as served; scripts, styles and the end of the body removed to "
+                    f"material.max_fixture_bytes={limits.material.max_fixture_bytes}), not on the full pages"
+                )
         proposals: list[dict[str, Any]] = []
         if kind == "telegram":
             cand = session.candidate()
@@ -1041,7 +1051,7 @@ class OnboardingService:
             if check.rules is None:
                 log.info("proposal rejected", extra={"title": raw.get("title"), "reasons": check.rejected})
                 continue
-            dedup, dedup_risk = _canonical_dedup(check.rules, sample.hints, user_hints)
+            dedup, dedup_risk = _canonical_dedup(check.rules, sample.hints, user_hints, ob.max_risk_url_chars)
             if dedup is not None:
                 check.rules["dedup"] = dedup
             errors = self.validator.errors("collector-rules.schema.json", check.rules)
@@ -1147,7 +1157,7 @@ class OnboardingService:
             }
             title = "Recursive crawl from the entry point"
         risks = ["fallback plan: model proposals were rejected by validation", *risks_common]
-        dedup, dedup_risk = _canonical_dedup(rules, session.sample.hints, user_hints)
+        dedup, dedup_risk = _canonical_dedup(rules, session.sample.hints, user_hints, ob.max_risk_url_chars)
         if dedup is not None:
             rules["dedup"] = dedup
         if dedup_risk:
@@ -1465,8 +1475,16 @@ def _glob_match(url: str, globs: list[str]) -> bool:
     return any(fnmatch.fnmatch(bare, g.replace("**", "*")) for g in globs)
 
 
+def _short(url: Any, max_chars: int) -> str:
+    text = str(url)
+    return text if len(text) <= max_chars else text[: max(0, max_chars - 3)] + "..."
+
+
 def _canonical_dedup(
-    rules: dict[str, Any], sample_hints: dict[str, Any], user_hints: dict[str, Any]
+    rules: dict[str, Any],
+    sample_hints: dict[str, Any],
+    user_hints: dict[str, Any],
+    max_url_chars: int,
 ) -> tuple[dict[str, Any] | None, str | None]:
     """``dedup`` of a web plan and the risk to state.
 
@@ -1512,8 +1530,9 @@ def _canonical_dedup(
     if elsewhere:
         example = (canonical.get("examples") or [{}])[0]
         return None, (
-            f"{len(elsewhere)} sampled page(s) declare another page canonical (e.g. {example.get('url')} -> "
-            f"{example.get('canonical')}); with canonical dedup they are skipped as duplicates"
+            f"{len(elsewhere)} sampled page(s) declare another page canonical (e.g. "
+            f"{_short(example.get('url'), max_url_chars)} -> {_short(example.get('canonical'), max_url_chars)}); "
+            "with canonical dedup they are skipped as duplicates"
         )
     return None, None
 

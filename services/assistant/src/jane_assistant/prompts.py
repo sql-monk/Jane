@@ -26,6 +26,14 @@ DIGEST = (
     "end with '...[+N chars]'), microdata types, the visible text and the start of the body markup. "
 )
 
+REDUCED = (
+    "Large example pages are reduced copies of the real pages: executable and data scripts other than "
+    "JSON-LD, styles, SVG, comments and the end of the body may be missing in them, but the real pages the "
+    "code runs on contain them. So never search the whole page text for a pattern that a script may also "
+    "contain (such as a price); read the elements that carry the data, such as the JSON-LD script elements "
+    "or marked-up elements. "
+)
+
 CLASSIFY = (
     "You classify materials (web pages or channel messages) of one source by type. For every data "
     "part named m<N> return its material type as a short lower_snake_case noun (for example product, "
@@ -88,7 +96,7 @@ GENERATE = (
     "two records only (tests compare entities as a subset); in every expected entity give its key fields "
     "and at most three other short fields (never long texts such as descriptions, never a value shown "
     "shortened). Keep the module compact, without comments or docstrings. A negative example may be an "
-    "empty page of the same site. " + DIGEST + UNTRUSTED
+    "empty page of the same site. " + REDUCED + DIGEST + UNTRUSTED
 )
 
 IMPROVE = (
@@ -101,7 +109,7 @@ IMPROVE = (
     "(none, additive or breaking) and, if the problems show records of an entity type the package "
     "does not produce, those entity types as suggestions. Keep the same code rules: standard "
     "library only, no network, files, subprocesses, environment, eval or exec, deterministic, no "
-    "null fields. " + DIGEST + UNTRUSTED
+    "null fields. " + REDUCED + DIGEST + UNTRUSTED
 )
 
 UNKNOWN = (

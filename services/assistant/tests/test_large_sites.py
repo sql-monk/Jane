@@ -187,6 +187,10 @@ def test_large_shop_category_is_sampled_analysed_and_proposed(w: World) -> None:
     assert p1["recommended"] and p1["collector_rules"]["dedup"] == {"use_link_rel_canonical": False}
     assert p1["coverage"]["estimated_materials"] == 3 and "exactly the 3 listed" in p1["coverage"]["notes"]
     assert any("rel=canonical is not used for dedup" in r for r in p1["risks"])
+    # the extractor was tested on reduced copies (the full pages do not fit an inline test run): stated, and the
+    # model was told the real pages also contain the removed scripts
+    assert any("tested on reduced copies of" in r and "not on the full pages" in r for r in p1["risks"])
+    assert "reduced copies of the real pages" in generate["instructions"]
     assert p2["collector_rules"]["dedup"] == {"use_link_rel_canonical": False}
     assert any("pagination pages" in r for r in p2["risks"])
     assert p2["coverage"]["estimated_materials"] == 60  # a run fetches at most the user's 60 pages
@@ -211,42 +215,50 @@ def test_large_shop_category_is_sampled_analysed_and_proposed(w: World) -> None:
     assert w.violations() == []
 
 
-@pytest.mark.parametrize("rest", ["known_shapes", "new_shape"])
-def test_sample_budget_reached_before_the_stream_ends_reads_the_rest(w: World, rest: str) -> None:
-    """Confident at the sample budget while the collection still runs: the rest is read, not classified."""
-    words = [
-        "alpha",
-        "bravo",
-        "charlie",
-        "delta",
-        "echo",
-        "foxtrot",
-        "golf",
-        "hotel",
-        "india",
-        "juliett",
-        "kilo",
-        "lima",
-        "mike",
-        "november",
-        "oscar",
-        "papa",
-        "quebec",
-        "romeo",
-        "sierra",
-        "tango",
-    ]
+WORDS = [
+    "alpha",
+    "bravo",
+    "charlie",
+    "delta",
+    "echo",
+    "foxtrot",
+    "golf",
+    "hotel",
+    "india",
+    "juliett",
+    "kilo",
+    "lima",
+    "mike",
+    "november",
+    "oscar",
+    "papa",
+    "quebec",
+    "romeo",
+    "sierra",
+    "tango",
+]
+
+
+@pytest.mark.parametrize("tail", ["one_known", "long_known", "new_shape", "late_type"])
+def test_sample_budget_reached_before_the_stream_ends_counts_the_tail_as_unknown(w: World, tail: str) -> None:
+    """Confident at the sample budget while the collection still runs: the rest is read, never classified, so
+    its whole share is unknown-type risk whatever its URL shapes. Only a short tail keeps the sample sufficient;
+    a late type under already represented shapes (``late_type``, the review's repro: 40 product pages after 20
+    category pages) is not hidden."""
     base = "https://drain.example.test"
+    later = {
+        "one_known": [("category", f"{base}/alpha/2")],
+        "long_known": [("category", f"{base}/{word}/2") for word in WORDS[:15]],
+        "new_shape": [("category", f"{base}/zulu/1")],
+        "late_type": [("product", f"{base}/{WORDS[i % 20]}/{100 + i}") for i in range(40)],
+    }[tail]
 
     def start(req: FakeRequest) -> Reply:
         reply = w.collector.start(req)
         collection = next(iter(w.collector.collections.values()))
-        later = [f"{base}/{word}/2" for word in words[:15]]
-        if rest == "new_shape":
-            later[-1] = f"{base}/zulu/1"
+        first = [("category", f"{base}/{word}/1") for word in WORDS]
         collection["items"] = [
-            material(url, page("category", f"Category {url}", "<p>Products</p>"))
-            for url in [*(f"{base}/{word}/1" for word in words), *later]
+            material(url, page(kind, f"Page {url}", "<p>Content</p>")) for kind, url in [*first, *later]
         ]
         return reply
 
@@ -256,23 +268,63 @@ def test_sample_budget_reached_before_the_stream_ends_reads_the_rest(w: World, r
 
     w.collector.app.on("startCollection")(start)
     w.collector.app.on("listCollectionMaterials")(one_per_poll)
-    job_id, _ = _start(w, {"query": f"{base}/", "limits": {"max_onboarding_samples": 20}}, f"drain-{rest}")
+    job_id, _ = _start(w, {"query": f"{base}/", "limits": {"max_onboarding_samples": 20}}, f"drain-{tail}")
     s = w.result(job_id, "OnboardingSession")
 
     assert s["sample"]["materials"] == 20
-    assert len(w.collector.app.called("listCollectionMaterials")) >= 35  # the whole stream was read
     assert len(_requests(w, "classify")) == 20  # one novel URL shape per poll, nothing after the budget
-    if rest == "known_shapes":
+    polls = len(w.collector.app.called("listCollectionMaterials"))
+    if tail == "one_known":
         assert s["status"] == "proposals_ready", s
         assert s["sample"]["sufficient"] is True
-        # over the finished stream of 35: 1 - unseen, unseen = min(15/35, 1 - 0.1^(1/20)) (one type: tighter level)
-        assert s["sample"]["confidence"] == pytest.approx(0.9 * 0.1 ** (1 / 20), abs=1e-4)
-    else:
+        # 1 unclassified of 21: unseen = max(min(1/21, 1 - 0.1^(1/20)), 1/21) - the tail counts in full
+        assert s["sample"]["confidence"] == pytest.approx(0.9 * (1 - 1 / 21), abs=1e-4)
+        assert polls >= 21
+    elif tail == "new_shape":
         assert s["status"] == "insufficient_sample", s
         assert (
             "not represented" in s["sample"]["message"]
             and "drain.example.test/zulu/*" in s["sample"]["message"]
         )
+    else:
+        assert s["status"] == "insufficient_sample", s
+        assert not s["sample"]["sufficient"] and "analysis" not in s
+        assert "later material(s) could not be classified" in s["sample"]["message"]
+        # it stops reading as soon as the tail alone makes the threshold unreachable: 0.9 * (1 - 3/23) < 0.8
+        assert "3 later material(s)" in s["sample"]["message"] and polls == 23
+    assert w.violations() == []
+
+
+@pytest.mark.parametrize("larger", [False, True])
+def test_truncation_is_reported_only_when_the_crawl_space_is_larger(w: World, larger: bool) -> None:
+    """A stream that ends exactly at the page budget is not truncated unless more URLs were discovered."""
+
+    def start(req: FakeRequest) -> Reply:
+        reply = w.collector.start(req)
+        collection = next(iter(w.collector.collections.values()))
+        if larger:
+            collection["discovered"] = len(collection["items"]) + 1
+        return reply
+
+    w.collector.app.on("startCollection")(start)
+    pages = 16  # the fake shop: exactly the page budget of the hint
+    job_id, _ = _start(
+        w,
+        {
+            "query": "https://shop.example.test/",
+            "crawl_hints": {"limits": {"crawl": {"max_pages_per_run": pages}}},
+        },
+        f"truncation-{larger}",
+    )
+    s = w.result(job_id, "OnboardingSession")
+    request = next(iter(w.collector.collections.values()))["request"]
+    assert request["limits"] == {"crawl": {"max_pages_per_run": pages}}
+    assert len(next(iter(w.collector.collections.values()))["items"]) == pages
+    assert s["sample"]["sufficient"] is True, s
+    if larger:
+        assert f"({pages} fetched of {pages + 1} discovered URL(s))" in s["sample"]["message"]
+    else:
+        assert "message" not in s["sample"]
     assert w.violations() == []
 
 

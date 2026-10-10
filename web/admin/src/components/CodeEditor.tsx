@@ -35,12 +35,12 @@ function editorTheme(dark: boolean): Extension {
     ),
     syntaxHighlighting(
       HighlightStyle.define([
-        { tag: tags.keyword, color: dark ? "#d7a9f5" : "#7940a0" },
-        { tag: [tags.string, tags.special(tags.string)], color: dark ? "#a4d996" : "#32752b" },
-        { tag: [tags.number, tags.bool, tags.null], color: dark ? "#f3bd7c" : "#945000" },
+        { tag: tags.keyword, color: dark ? "#ff7b72" : "#cf222e" },
+        { tag: [tags.string, tags.special(tags.string)], color: dark ? "#a5d6ff" : "#0a3069" },
+        { tag: [tags.number, tags.bool, tags.null], color: dark ? "#79c0ff" : "#0550ae" },
         { tag: tags.comment, color: "var(--muted)", fontStyle: "italic" },
-        { tag: [tags.function(tags.variableName), tags.propertyName], color: dark ? "#8fc7fa" : "#24649d" },
-        { tag: [tags.typeName, tags.className], color: dark ? "#80dccb" : "#087f68" },
+        { tag: [tags.function(tags.variableName), tags.propertyName], color: dark ? "#d2a8ff" : "#8250df" },
+        { tag: [tags.typeName, tags.className], color: dark ? "#ffa657" : "#953800" },
         { tag: tags.invalid, color: "var(--bad)" },
       ]),
     ),

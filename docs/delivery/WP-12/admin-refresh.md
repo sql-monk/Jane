@@ -1,6 +1,6 @@
 # WP-12 — оновлення робочого простору адмінки
 
-Дата: 2026-10-10. Стан: review. Гілка: `codex/admin-workspace`.
+Дата: 2026-10-10. Стан: review, незалежне рев'ю **accepted**, готово до інтеграції. Гілка: `codex/admin-workspace`.
 База: `6e348ce` (актуальний локальний main на момент створення ізольованого checkout).
 Власність: `web/admin/**`, цей звіт і докази в `.jane/`; маркер `WP-12`.
 Інкремент за прямим дорученням користувача: інформативна адмінка, доступні дії та обов'язкова темна тема.
@@ -106,4 +106,49 @@ INF no leaks found
 
 ## Незалежне рев'ю
 
-Очікується перевірка wp-reviewer на завершеному інкременті.
+wp-reviewer самостійно перевірив код, власність, контракти клієнтів, дані вибірки / помилок,
+теми, форми дій, URL-фільтри, секрети та скриншоти dark / mobile / editor.
+
+Виявлено й виправлено в `9ad4169`:
+
+- Картка «У роботі» рахує queued / running / cancelling, але перехід раніше звужував список до running.
+  Тепер веде на `/runs` без звуження. Новий браузерний тест перевіряє, що queued запуск залишається видимим.
+- Під час початкового loading огляд більше не стверджує, що запусків немає; підпис недоступних сервісів
+  відрізняється від очікування даних. Скриншоти чекають завершення завантаження всіх блоків і відсутності alert.
+
+Незалежні результати першого прогону:
+
+```text
+lint / typecheck / unit: exit 0
+gen-api: 10 generated files are up to date
+All matched files use Prettier code style!
+Test Files 12 passed (12)
+     Tests 62 passed (62)
+Duration 10.43s
+e2e: 12 passed (9.3m), exit 0
+ownership 6e348ce: 22 changed file(s), 0 outside ownership
+gitleaks (2 task commits): no leaks found
+git diff --check: exit 0
+```
+
+Межа незалежного e2e: після завершення всіх сценаріїв Windows Chromium worker завис у teardown.
+Рев'юер перевірив ancestry й порти власних процесів (4970 / 4981…4987), прибрав лише свої server / Chromium
+процеси та вже завершений worker; wrapper після цього віддав підсумок і exit 0. Preview 5070 / 5081…5087
+збережено. Це не зміна assertions і не повтор успішних тестів; ручне прибирання вказано явно.
+
+Фінальний адресний повтор на `9ad4169`:
+
+```text
+corepack pnpm build
+160 modules transformed
+built in 839ms
+exit 0
+corepack pnpm e2e --grep 'active metric|dark and light|mobile navigation|dashboard: executors'
+4 passed (57.5s)
+exit 0
+```
+
+Останній прогін також потребував прибирання підтвердженого власного browser tree після 4 ok;
+фінальна перевірка: 0 listeners на 4970 / 4981…4987, runner / CLI / worker завершені.
+**ВЕРДИКТ wp-reviewer: accepted.** Перевірено UI-інкремент, реальний backend і CI не заявлено.
+Код заморожено на `9ad4169`; наступний commit змінює лише цей підсумковий звіт.

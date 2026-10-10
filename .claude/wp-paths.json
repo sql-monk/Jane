@@ -264,7 +264,8 @@
         "web/admin/src/lib/property*.ts",
         "web/admin/src/pages/TasksPage.tsx",
         "web/admin/src/chain-editor.css",
-        "web/admin/e2e/chain-editor.spec.ts"
+        "web/admin/e2e/chain-editor.spec.ts",
+        "web/admin/src/lib/dag.ts"
       ]
     },
     "27": {

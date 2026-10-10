@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import importlib
 import sys
 from pathlib import Path
 
@@ -26,8 +27,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--phone", help="phone number of the account (asked if omitted)")
     ns = ap.parse_args(argv)
 
-    from telethon.sessions import StringSession  # type: ignore[import-untyped,unused-ignore]
-    from telethon.sync import TelegramClient  # type: ignore[import-untyped,unused-ignore]
+    # Telethon is an optional extra, loaded only for this interactive command.
+    sessions = importlib.import_module("telethon.sessions")
+    sync = importlib.import_module("telethon.sync")
 
     SECRETS.mkdir(parents=True, exist_ok=True)
     hash_file, session_file = SECRETS / "tg_api_hash", SECRETS / "tg_session"
@@ -37,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
     if not api_hash:
         print("no api_hash given", file=sys.stderr)
         return 1
-    client = TelegramClient(StringSession(), ns.api_id, api_hash, device_model="Jane collector")
+    client = sync.TelegramClient(sessions.StringSession(), ns.api_id, api_hash, device_model="Jane collector")
     client.start(phone=ns.phone or (lambda: input("Phone number: ").strip()))
     try:
         me = client.get_me()

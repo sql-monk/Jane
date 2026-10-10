@@ -37,6 +37,11 @@ FIELDS = {
         {"name": "starts_at", "type": "datetime", "coverage": 1.0},
     ],
 }
+LISTING_FIELDS = [
+    {"name": "title", "type": "string", "coverage": 1.0},
+    {"name": "url", "type": "url", "coverage": 1.0},
+    {"name": "price", "type": "money", "coverage": 1.0},
+]
 
 
 def _type_of(text: str) -> str:
@@ -68,6 +73,12 @@ class Knobs:
     improve_invalid: bool = False
     cost: float = 0.01
     delay_s: float = 0.0
+    generate_code: str = PRODUCT_CODE_V1
+    """Extractor code the "model" writes (expectations are computed by running it on the data parts)."""
+    proposals: list[dict[str, Any]] | None = None
+    """Collection plans to answer instead of the built-in good/evil pair."""
+    listing_entities: bool = False
+    """Records listed on ``category`` pages are entities of the first ``expected_entity_types`` of the context."""
 
 
 class FakeLlm:
@@ -154,6 +165,11 @@ class FakeLlm:
             for t in types
             if t in ENTITY_BY_TYPE
         ]
+        expected = context.get("expected_entity_types") or []
+        if self.knobs.listing_entities and expected and "category" in types:
+            entities.append(
+                {"entity_type": expected[0], "material_type": "category", "fields": LISTING_FIELDS}
+            )
         return {
             "source_kind": "web",
             "discovery_methods": ["sitemap", "recursive", "llm_explore"],
@@ -185,6 +201,8 @@ class FakeLlm:
             ],
             "risks": ["recursion finds pages missing from the sitemap"],
         }
+        if self.knobs.proposals is not None:
+            return {"proposals": self.knobs.proposals}
         if self.knobs.only_evil_proposals:
             return {
                 "proposals": [
@@ -216,21 +234,22 @@ class FakeLlm:
 
     def _generate_extractor(self, data: dict[str, str]) -> dict[str, Any]:
         self._generate_calls += 1
-        code = PRODUCT_CODE_V1
+        code = self.knobs.generate_code
         if self.knobs.bad_code_first and self._generate_calls == 1:
             code = "import socket\n" + code
+        key = "url" if self.knobs.listing_entities else "sku"
         return {
             "module_code": code,
             "entity_schema": {
                 "type": "object",
                 "properties": {
-                    "sku": {"type": "string"},
+                    key: {"type": "string"},
                     "title": {"type": "string"},
                     "price": {"type": "object"},
                 },
-                "required": ["sku"],
+                "required": [key],
             },
-            "key_fields": ["sku"],
+            "key_fields": [key],
             "expectations": self._expectations(code, data, ("sample_", "neg_")),
         }
 

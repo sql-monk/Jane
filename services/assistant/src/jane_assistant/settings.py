@@ -15,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from jane_kit.clients import ClientLimits
@@ -152,8 +152,11 @@ class LlmLimits(Limits):
 
     max_requests_per_minute: int = Field(default=30, ge=1)
     max_input_tokens_per_request: int = Field(default=16_000, ge=1)
-    """Data sent to the model is truncated to about 4 characters per token of this limit."""
-    max_output_tokens_per_request: int = Field(default=4_000, ge=1)
+    """Data sent to the model is fitted to this limit as the gateway counts it (``llm_call.chars_per_token``)."""
+    max_output_tokens_per_request: int = Field(default=8_000, ge=1)
+    """Room for the model's answer. Code generation answers with a module, a schema and expectations; 4000 cut
+    such answers on real pages (the gateway then reports invalid output). Keep the answer within the gateway's
+    provider timeout (about 130 tokens/s of a strong model: 8000 tokens ~ 1 min)."""
     budget: Budget = Budget()
     max_improvement_attempts: int = Field(default=3, ge=0)
     max_onboarding_samples: int = Field(default=60, ge=1)
@@ -169,7 +172,11 @@ class OnboardingLimits(Limits):
     sample_batch_size: int = Field(default=10, ge=1)
     """Materials classified per LLM request during adaptive sampling."""
     max_sample_chars: int = Field(default=6_000, ge=200)
-    """Text of one material passed to the model (the rest is cut)."""
+    """Text of one material passed to the classifying model. A larger HTML page is shown as a digest of that
+    size (see ``material``); a batch shrinks it further to fit ``llm.max_input_tokens_per_request``."""
+    max_example_chars: int = Field(default=12_000, ge=200)
+    """Text of one example material in analysis and extractor generation (a digest for larger HTML; shrunk to
+    fit ``llm.max_input_tokens_per_request`` with the other parts of the request)."""
     min_examples_per_type: int = Field(default=2, ge=1)
     """A material type counts as distinguished after this many examples."""
     max_examples_per_type: int = Field(default=3, ge=1)
@@ -202,6 +209,36 @@ class OnboardingLimits(Limits):
     """Consecutive empty polls of a running collection before sampling gives up."""
     requests_overhead_ratio: float = Field(default=0.05, ge=0)
     """Added to estimated materials for the ``requests_per_run_estimate`` of a proposal."""
+    max_link_patterns: int = Field(default=20, ge=0)
+    """In-page link patterns (and pagination URL templates) of sampled pages kept as evidence for analysis
+    and proposals, most frequent first."""
+
+
+class MaterialLimits(Limits):
+    """How a large HTML material is shown to the model and kept as a test fixture (``material.py``)."""
+
+    max_fixture_bytes: int = Field(default=131_072, ge=1_024)
+    """HTML content above this size is reduced once it is read (executable scripts, styles, SVG and comments
+    removed, then data scripts other than JSON-LD, then the end of the body): the reduced page is what the
+    model sees, what extractors are tested on and what a package keeps as its test fixture, so generated
+    packages stay within ``transfer.inline_max_bytes``. JSON-LD is kept whole while it fits."""
+    head_share: float = Field(default=0.1, ge=0, le=1)
+    """Share of a digest's characters for head tags (title, meta, canonical / next / prev links)."""
+    structured_share: float = Field(default=0.6, ge=0, le=1)
+    """Share of a digest's characters for structured data (JSON-LD, microdata)."""
+    text_share: float = Field(default=0.15, ge=0, le=1)
+    """Share of a digest's characters for the visible text; the start of the body markup gets the rest (and
+    whatever the other parts do not use)."""
+    max_list_items: int = Field(default=3, ge=1)
+    """Items kept from every long list of structured data in a digest (the count of the rest is stated)."""
+    max_string_chars: int = Field(default=1_000, ge=20)
+    """Longer strings of structured data are shortened in a digest (marked with the number of cut characters)."""
+
+    @model_validator(mode="after")
+    def _shares_fit(self) -> MaterialLimits:
+        if self.head_share + self.structured_share + self.text_share > 1:
+            raise ValueError("material.head_share + structured_share + text_share must not exceed 1")
+        return self
 
 
 class ImprovementLimits(Limits):
@@ -255,6 +292,15 @@ class LlmCallLimits(Limits):
     platform profile's 3 attempts 12 min; 15 min is also the gateway's ``reservation_ttl_seconds`` (a call
     older than that is treated as crashed). Connection and retries come from ``clients.*``."""
 
+    chars_per_token: float = Field(default=2.0, gt=0)
+    """Characters per token used to fit data into ``llm.max_input_tokens_per_request``. Keep it no larger than
+    the gateway's own estimate (``gateway.chars_per_token_estimate``, 2.0 by default), otherwise the gateway
+    refuses a full request with ``limit_exceeded``."""
+    prompt_overhead_chars: int = Field(default=2_000, ge=0)
+    """Characters reserved for the gateway's preamble around the instructions (the instructions are counted)."""
+    part_overhead_chars: int = Field(default=150, ge=0)
+    """Characters reserved for the delimiters of every data part (its name and media type are counted)."""
+
     def client_limits(self, clients: ClientLimits) -> ClientLimits:
         return clients.model_copy(update={"request_timeout_ms": self.request_timeout_ms})
 
@@ -279,6 +325,7 @@ class ServiceLimits(Limits):
     llm: LlmLimits = contract_field("llm", LlmLimits())
     transfer: TransferLimits = TransferLimits()
     onboarding: OnboardingLimits = OnboardingLimits()
+    material: MaterialLimits = MaterialLimits()
     improvement: ImprovementLimits = ImprovementLimits()
     unknown: UnknownLimits = UnknownLimits()
     content: ContentLimits = ContentLimits()

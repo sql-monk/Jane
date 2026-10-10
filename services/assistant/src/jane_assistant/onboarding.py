@@ -25,8 +25,10 @@ import asyncio
 import base64
 import copy
 import dataclasses
+import fnmatch
 import logging
 import math
+import re
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -41,9 +43,10 @@ from .guards import SchemaValidator, check_code, sanitize_web_rules
 from .improvement import ProblemCase, improve_draft
 from .listing import Position, now_text, parse_time
 from .llm import BudgetExhausted, InvalidModelOutput, LlmSession, as_json, part
+from .material import empty_shell, same_url
 from .packages import PackageDraft, bump, collector_rules_draft, extractor_draft, model_ref, slug
 from .prompts import ANALYZE, ANALYZE_SCHEMA, GENERATE, GENERATE_SCHEMA, PROPOSE, PROPOSE_SCHEMA
-from .sampling import Sample, SampleResult, sample_source, sampling_rules
+from .sampling import Sample, SampleResult, sample_source, sample_text, sampling_rules
 from .search import Candidate, SearchProvider, direct_candidate
 from .settings import ServiceLimits, Settings, request_layer, resolve_service_limits
 from .testing import TestOutcome, extra_case, run_tests
@@ -413,6 +416,36 @@ class OnboardingService:
     def _limits(self, request: dict[str, Any]) -> ServiceLimits:
         return resolve_service_limits(self.settings, *request_layer(request.get("limits"))).limits
 
+    def _hint_limits(self, hints: dict[str, Any]) -> dict[str, Any]:
+        """``crawl_hints.limits`` when it is a valid ``limits.schema.json`` object (else ignored, logged): it bounds
+        the sampling collection and goes into the task draft."""
+        limits = hints.get("limits")
+        if not isinstance(limits, dict) or not limits:
+            return {}
+        errors = self.validator.errors("common/limits.schema.json", limits)
+        if errors:
+            log.info("crawl_hints.limits ignored", extra={"errors": errors[:5]})
+            return {}
+        return dict(limits)
+
+    @staticmethod
+    def _material_parts(
+        llm: LlmSession,
+        instructions: str,
+        fixed: list[dict[str, Any]],
+        materials: list[tuple[str, Sample]],
+        limits: ServiceLimits,
+    ) -> list[dict[str, Any]]:
+        """Data parts of example materials sized to fit the request next to ``fixed``: each gets at most
+        ``onboarding.max_example_chars`` (a digest of a large page), less if many share the request."""
+        labels = [f"url: {material_label(s.material)}\n\n" for _, s in materials]
+        cap = limits.onboarding.max_example_chars + max(map(len, labels), default=0)
+        each = llm.room(instructions, fixed, len(materials), cap)
+        return [
+            part(name, label + sample_text(s, each - len(label), limits))
+            for (name, s), label in zip(materials, labels, strict=True)
+        ]
+
     async def _submit(
         self,
         session: Session,
@@ -545,6 +578,7 @@ class OnboardingService:
             source_id=None,
             run_id=session.session_id,  # one onboarding run = the session, whichever job continues it
             mode=self.settings.llm_completion_mode,
+            call=limits.llm_call,
         )
 
         async def progress(done: int, message: str) -> None:
@@ -553,9 +587,8 @@ class OnboardingService:
             await ctx.check_cancelled()  # a cancel request may come through another instance
             await self.store.save(session)
 
-        rules = sampling_rules(
-            kind, cand.url, cand.telegram_username, allowed, session.request.get("crawl_hints")
-        )
+        hints = session.request.get("crawl_hints") or {}
+        rules = sampling_rules(kind, cand.url, cand.telegram_username, allowed, hints)
         try:
             session.sample = await sample_source(
                 collector=self.nb.collector(kind),
@@ -567,9 +600,12 @@ class OnboardingService:
                 rules=rules,
                 model=self.settings.llm_model_cheap,
                 progress=progress,
+                crawl_limits=self._hint_limits(hints).get("crawl"),
             )
         finally:
             session.spent = llm.spent
+        if kind != "telegram" and hints.get("strategies"):
+            session.sample.hints["discovery_bounded_by_crawl_hints"] = True
         if not session.sample.sufficient:
             session.status = "insufficient_sample"
             await self.store.save(session)
@@ -610,17 +646,22 @@ class OnboardingService:
         sample = session.sample
         ob = limits.onboarding
         counts = sample.counts()
-        context = {
-            "material_types": dict(counts),
-            "hints": {k: v for k, v in sample.hints.items() if k != "shapes"},
-        }
+        context: dict[str, Any] = {"material_types": dict(counts), "hints": _evidence(sample.hints)}
+        if session.request.get("expected_entity_types"):
+            context["expected_entity_types"] = list(session.request["expected_entity_types"])
         data = [part("context", as_json(context), "application/json")]
-        for mtype in sorted(counts):
-            for i, s in enumerate(sample.of_type(mtype)[: ob.max_examples_per_type]):
-                data.append(part(f"ex_{mtype}_{i}", f"url: {material_label(s.material)}\n\n{s.text}"))
+        examples = [
+            (f"ex_{mtype}_{i}", s)
+            for mtype in sorted(counts)
+            for i, s in enumerate(sample.of_type(mtype)[: ob.max_examples_per_type])
+        ]
+        data += self._material_parts(llm, ANALYZE, data, examples, limits)
         out = await llm.ask("analyze", ANALYZE, data, ANALYZE_SCHEMA, model=self.settings.llm_model_strong)
+        types = sample.hints.get("strategy_types") or {}
         observed = {
-            str(k).removeprefix("sample-") for k, v in (sample.hints.get("by_strategy") or {}).items() if v
+            str(types.get(k) or str(k).removeprefix("sample-"))
+            for k, v in (sample.hints.get("by_strategy") or {}).items()
+            if v
         }
         methods = sorted((set(out.get("discovery_methods") or []) | observed) & DISCOVERY_METHODS)
         expected = set(session.request.get("expected_entity_types") or [])
@@ -667,6 +708,11 @@ class OnboardingService:
         negatives = [s for s in sample.samples if s.material_type != material_type][
             : ob.max_negative_examples
         ]
+        if not negatives and positives:
+            # One material type only (a source bounded to one listing): the empty shell of a sampled page
+            # (its title, an empty body) is the negative example - an extractor must find no records there.
+            shell = empty_shell(positives[0].material)
+            negatives = [Sample(shell, str(shell["content"]["data"]), positives[0].shape, "empty_page", 1.0)]
         return positives, negatives
 
     async def _plan_extractor(
@@ -809,16 +855,11 @@ class OnboardingService:
                     "application/json",
                 )
             ]
-            data += [
-                part(f"sample_{i}", f"url: {material_label(s.material)}\n\n{s.text}")
-                for i, s in enumerate(positives)
-            ]
-            data += [
-                part(f"neg_{i}", f"url: {material_label(s.material)}\n\n{s.text}")
-                for i, s in enumerate(negatives)
-            ]
             if feedback is not None:
                 data.append(part("previous_attempt", as_json(feedback), "application/json"))
+            materials = [(f"sample_{i}", s) for i, s in enumerate(positives)]
+            materials += [(f"neg_{i}", s) for i, s in enumerate(negatives)]
+            data += self._material_parts(llm, GENERATE, data, materials, limits)
             try:
                 out = await llm.ask(
                     "generate_extractor",
@@ -883,13 +924,22 @@ class OnboardingService:
             if problems:
                 feedback = {"rejected": problems}
                 continue
-            last = await run_tests(
-                self.nb.handler,
-                job_key=job_key,
-                context=f"generated:{etype}",
-                draft=draft,
-                inline_max_bytes=limits.transfer.inline_max_bytes,
-            )
+            try:
+                last = await run_tests(
+                    self.nb.handler,
+                    job_key=job_key,
+                    context=f"generated:{etype}",
+                    draft=draft,
+                    inline_max_bytes=limits.transfer.inline_max_bytes,
+                )
+            except JaneError as exc:
+                if exc.error_code != "payload_too_large":
+                    raise
+                # The model cannot make the fixtures smaller: the plan stays untested (a risk of every
+                # proposal) instead of failing the whole session.
+                log.warning("generated package not tested", extra={"entity_type": etype, "reason": str(exc)})
+                last = None
+                break
             if last.passed:
                 break
             feedback = {"failed_tests": last.failures()}
@@ -964,11 +1014,17 @@ class OnboardingService:
                     )
                 )
             return proposals
+        user_hints = session.request.get("crawl_hints") or {}
+        hint_limits = self._hint_limits(user_hints)
+        page_cap = (hint_limits.get("crawl") or {}).get("max_pages_per_run")
         hints = {
             "by_strategy": sample.hints.get("by_strategy"),
             "discovered": discovered,
             "shapes": sample.hints.get("shapes"),
+            **_evidence(sample.hints),
         }
+        if user_hints:
+            hints["user_hints"] = user_hints
         out = await llm.ask(
             "propose",
             PROPOSE,
@@ -981,10 +1037,13 @@ class OnboardingService:
         )
         setup_cost = {"amount": round(llm.spent, 6), "currency": llm.currency}
         for raw in (out.get("proposals") or [])[: ob.max_proposals]:
-            check = sanitize_web_rules(raw, allowed, session.request.get("crawl_hints"))
+            check = sanitize_web_rules(raw, allowed, user_hints)
             if check.rules is None:
                 log.info("proposal rejected", extra={"title": raw.get("title"), "reasons": check.rejected})
                 continue
+            dedup, dedup_risk = _canonical_dedup(check.rules, sample.hints, user_hints)
+            if dedup is not None:
+                check.rules["dedup"] = dedup
             errors = self.validator.errors("collector-rules.schema.json", check.rules)
             if not errors and self.nb.collector(kind).configured:
                 verdict = await self.nb.collector(kind).validate_rules(check.rules)
@@ -997,7 +1056,9 @@ class OnboardingService:
                 continue
             risks = [str(r) for r in raw.get("risks") or []] + risks_common
             risks += [f"ignored model suggestion: {r}" for r in check.rejected]
-            share = self._share(sample, check.rules)
+            if dedup_risk:
+                risks.append(dedup_risk)
+            estimated, notes = _estimate(check.rules, discovered, self._share(sample, check.rules), page_cap)
             proposals.append(
                 self._proposal(
                     f"p{len(proposals) + 1}",
@@ -1006,35 +1067,29 @@ class OnboardingService:
                     bool(raw.get("recommended")),
                     check.rules,
                     extractors,
-                    max(1, round(discovered * share)),
+                    estimated,
                     entity_types,
                     setup_cost,
                     per_run,
                     risks,
                     ob,
-                    notes=f"estimated from {discovered} URL(s) discovered while sampling; {round(share * 100)}% of sampled materials match the plan's sections",
+                    notes=notes,
                 )
             )
         if not proposals and host:
-            rules = {
-                "collector": "web",
-                "scope": {"allowed_domains": allowed},
-                "strategies": [{"type": "recursive", "seeds": [f"https://{host}/"]}],
-                "robots": {"mode": "respect"},
-            }
             proposals.append(
-                self._proposal(
-                    "p1",
-                    "Recursive crawl from the entry point",
-                    "Fallback plan: no model proposal passed validation.",
-                    True,
-                    rules,
+                self._fallback_proposal(
+                    session,
+                    host,
+                    allowed,
+                    user_hints,
                     extractors,
                     discovered,
+                    page_cap,
                     entity_types,
                     setup_cost,
                     per_run,
-                    ["fallback plan: model proposals were rejected by validation", *risks_common],
+                    risks_common,
                     ob,
                 )
             )
@@ -1052,12 +1107,67 @@ class OnboardingService:
         sections = rules.get("sections") or []
         if not sections:
             return 1.0
-        import fnmatch
 
         pats = [p["value"] for s in sections for p in s["patterns"]]
         urls = [material_label(s.material).split("://", 1)[-1] for s in sample.samples]
         hits = sum(1 for u in urls if any(fnmatch.fnmatch(u, p.replace("**", "*")) for p in pats))
         return hits / len(urls) if urls else 0.0
+
+    def _fallback_proposal(
+        self,
+        session: Session,
+        host: str,
+        allowed: list[str],
+        user_hints: dict[str, Any],
+        extractors: list[dict[str, Any]],
+        discovered: int,
+        page_cap: int | None,
+        entity_types: list[str],
+        setup_cost: dict[str, Any],
+        per_run: dict[str, Any],
+        risks_common: list[str],
+        ob: Any,
+    ) -> dict[str, Any]:
+        """No model plan passed validation: the user's own strategies (``crawl_hints``) when they pass the same
+        guard, else recursion from the entry point."""
+        assert session.sample is not None
+        cand = session.candidate()
+        entry = cand.url if cand and cand.url else f"https://{host}/"
+        rules: dict[str, Any] | None = None
+        title = "Recursive crawl from the entry point"
+        if user_hints.get("strategies"):
+            rules = sanitize_web_rules({"strategies": user_hints["strategies"]}, allowed, user_hints).rules
+            title = "Strategies from the crawl hints"
+        if rules is None:
+            rules = {
+                "collector": "web",
+                "scope": {"allowed_domains": allowed},
+                "strategies": [{"type": "recursive", "seeds": [entry]}],
+                "robots": {"mode": "respect"},
+            }
+            title = "Recursive crawl from the entry point"
+        risks = ["fallback plan: model proposals were rejected by validation", *risks_common]
+        dedup, dedup_risk = _canonical_dedup(rules, session.sample.hints, user_hints)
+        if dedup is not None:
+            rules["dedup"] = dedup
+        if dedup_risk:
+            risks.append(dedup_risk)
+        estimated, notes = _estimate(rules, discovered, 1.0, page_cap)
+        return self._proposal(
+            "p1",
+            title,
+            "Fallback plan: no model proposal passed validation.",
+            True,
+            rules,
+            extractors,
+            estimated,
+            entity_types,
+            setup_cost,
+            per_run,
+            risks,
+            ob,
+            notes=notes,
+        )
 
     @staticmethod
     def _proposal(
@@ -1326,7 +1436,7 @@ class OnboardingService:
                 if self.settings.default_storage_connection:
                     storage_stage["connections"] = {"target": self.settings.default_storage_connection}
                 stages.append(storage_stage)
-        return {
+        task: dict[str, Any] = {
             "task_id": slug(f"{source_id}-collect"),
             "title": f"{cand.title}: {proposal['title']}"[:200],
             "description": (proposal.get("summary") or "Created by the source assistant.")[:4000],
@@ -1335,3 +1445,106 @@ class OnboardingService:
             "stages": stages,
             "schedule": {"type": "manual"},
         }
+        hint_limits = self._hint_limits(session.request.get("crawl_hints") or {})
+        if hint_limits:  # the user's crawl limits (validated): task-level, as rules carry no limits
+            task["limits"] = hint_limits
+        return task
+
+
+def _evidence(hints: dict[str, Any]) -> dict[str, Any]:
+    """Discovery evidence of the sample for the model (no per-page URL lists, no shape examples)."""
+    out = {k: v for k, v in hints.items() if k not in {"shapes", "canonical"}}
+    canonical = hints.get("canonical") or {}
+    if canonical.get("declared_elsewhere"):
+        out["canonical"] = {k: v for k, v in canonical.items() if k != "urls"}
+    return out
+
+
+def _glob_match(url: str, globs: list[str]) -> bool:
+    bare = url.split("://", 1)[-1]
+    return any(fnmatch.fnmatch(bare, g.replace("**", "*")) for g in globs)
+
+
+def _canonical_dedup(
+    rules: dict[str, Any], sample_hints: dict[str, Any], user_hints: dict[str, Any]
+) -> tuple[dict[str, Any] | None, str | None]:
+    """``dedup`` of a web plan and the risk to state.
+
+    The user's ``crawl_hints.dedup`` wins. Otherwise ``rel=canonical`` stops being a duplicate signal when the
+    plan targets pages explicitly - a ``listing`` (its pagination chain stops at a page declared a duplicate), a
+    ``seed_list`` of several pages, a ``url_template``, or URLs / ``follow`` patterns of pagination templates or of sampled pages
+    that declare another page canonical: such pages (page 2..N of a category declaring page 1) would be dropped
+    together with their links. Repeated content is then deduplicated by entity keys. A plan that targets none of
+    them keeps canonical dedup; sampled pages declaring another canonical are named as its risk."""
+    user = user_hints.get("dedup")
+    if isinstance(user, dict):
+        return {k: v for k, v in user.items() if k in {"key", "use_link_rel_canonical"}}, None
+    strategies = [s for s in rules.get("strategies") or [] if isinstance(s, dict)]
+    explicit = [
+        str(u) for s in strategies for key in ("urls", "start_urls", "seeds") for u in s.get(key) or []
+    ]
+    follows = [str(f.get("value")) for s in strategies for f in s.get("follow") or [] if isinstance(f, dict)]
+    canonical = sample_hints.get("canonical") or {}
+    elsewhere = [str(u) for u in canonical.get("urls") or []]
+    templates = [str(p["template"]) for p in sample_hints.get("pagination") or [] if p.get("template")]
+    numbered = [re.compile(re.escape(t).replace(re.escape("{n}"), r"\d+") + "$") for t in templates]
+    reasons = []
+    if any(s.get("type") == "listing" for s in strategies):
+        reasons.append("a listing follows its pages")
+    if any(s.get("type") == "seed_list" and len(s.get("urls") or []) > 1 for s in strategies):
+        reasons.append("the plan lists its pages")
+    if any(s.get("type") == "url_template" for s in strategies):
+        reasons.append("the plan generates its page URLs")
+    if any(rx.match(u) for rx in numbered for u in explicit) or any(
+        _glob_match(t.replace("{n}", "2"), follows) for t in templates
+    ):
+        reasons.append("the plan targets pagination pages")
+    if any(same_url(u, e) for u in explicit for e in elsewhere) or (
+        follows and any(_glob_match(e, follows) for e in elsewhere)
+    ):
+        reasons.append("the plan targets sampled pages that declare another page canonical")
+    if reasons:
+        return {"use_link_rel_canonical": False}, (
+            f"rel=canonical is not used for dedup ({'; '.join(reasons)}): pages such as page 2..N of a "
+            "listing often declare page 1 canonical and would be dropped; repeated records are merged by "
+            "entity keys"
+        )
+    if elsewhere:
+        example = (canonical.get("examples") or [{}])[0]
+        return None, (
+            f"{len(elsewhere)} sampled page(s) declare another page canonical (e.g. {example.get('url')} -> "
+            f"{example.get('canonical')}); with canonical dedup they are skipped as duplicates"
+        )
+    return None, None
+
+
+def _template_urls(strategy: dict[str, Any]) -> int:
+    """How many URLs a ``url_template`` strategy generates (every combination of its variables)."""
+    count = 1
+    for spec in (strategy.get("variables") or {}).values():
+        if isinstance(spec, dict) and isinstance(spec.get("range"), dict):
+            r = spec["range"]
+            count *= max(0, (int(r["end"]) - int(r["start"])) // max(1, int(r.get("step") or 1)) + 1)
+        elif isinstance(spec, dict):
+            count *= len(spec.get("values") or [])
+    return count
+
+
+def _estimate(rules: dict[str, Any], discovered: int, share: float, page_cap: int | None) -> tuple[int, str]:
+    """``estimated_materials`` of a web plan and how it was estimated."""
+    strategies = [s for s in rules.get("strategies") or [] if isinstance(s, dict)]
+    if strategies and all(s.get("type") in {"seed_list", "url_template"} for s in strategies):
+        listed = len({str(u) for s in strategies for u in s.get("urls") or []})
+        generated = sum(_template_urls(s) for s in strategies if s.get("type") == "url_template")
+        estimated = max(1, listed + generated)
+        notes = f"exactly the {listed + generated} listed or generated URL(s) per run"
+    else:
+        estimated = max(1, round(discovered * share))
+        notes = (
+            f"estimated from {discovered} URL(s) discovered while sampling; "
+            f"{round(share * 100)}% of sampled materials match the plan's sections"
+        )
+    if page_cap is not None and estimated > page_cap:
+        estimated = int(page_cap)
+        notes += f"; a run fetches at most crawl_hints limits.crawl.max_pages_per_run={page_cap} pages"
+    return estimated, notes

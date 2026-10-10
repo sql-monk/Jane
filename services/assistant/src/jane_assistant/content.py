@@ -42,6 +42,9 @@ __all__ = [
 _NUMERIC = re.compile(r"^\d+$")
 _HEXISH = re.compile(r"^[0-9a-f]{8,}$", re.I)
 _SLUGGY = re.compile(r"^[a-z0-9]+(?:[-_][a-z0-9]+)+$", re.I)
+_IDISH = re.compile(r"^[a-z]{1,4}\d{3,}$", re.I)
+"""An id with a short letter prefix: ``p621368348`` (product), ``c80004`` (category)."""
+_EXTENSION = re.compile(r"^(.+)\.([a-z0-9]{1,5})$", re.I)
 
 
 @dataclass(frozen=True)
@@ -119,9 +122,22 @@ def host_of(url: str | None) -> str | None:
     return host.lower() if host else None
 
 
+def segment_shape(seg: str) -> str:
+    """``*`` for a variable path segment (number, hash, slug, prefixed id), else the segment in lower case;
+    a file extension is kept (``*.html``)."""
+    ext = ""
+    if m := _EXTENSION.match(seg):
+        seg, ext = m.group(1), "." + m.group(2).lower()
+    if _NUMERIC.match(seg) or _HEXISH.match(seg) or _SLUGGY.match(seg) or _IDISH.match(seg):
+        return "*" + ext
+    return seg.lower() + ext
+
+
 def url_shape(material: dict[str, Any]) -> str:
     """Structural signature of a material's URL (``host/product/*``) used to diversify samples:
-    variable path segments (numbers, hashes, slugs) collapse to ``*``."""
+    variable path segments (numbers, hashes, slugs, prefixed ids) collapse to ``*``, parameter-like
+    segments (``producer=asus``, ``page=2``, ``a=1;b=2`` - filters and pagination embedded in the path, as
+    query parameters are) to ``*=*``, and any query string to ``?q``."""
     locator = material.get("locator") or {}
     if "telegram" in locator:
         text_len = len(str((material.get("content") or {}).get("data", "")))
@@ -132,10 +148,7 @@ def url_shape(material: dict[str, Any]) -> str:
     for seg in parts.path.split("/"):
         if not seg:
             continue
-        if _NUMERIC.match(seg) or _HEXISH.match(seg) or _SLUGGY.match(seg):
-            segments.append("*")
-        else:
-            segments.append(seg.lower())
+        segments.append("*=*" if "=" in seg else segment_shape(seg))
     query = "?q" if parts.query else ""
     return f"{(parts.hostname or '').lower()}/{'/'.join(segments)}{query}"
 

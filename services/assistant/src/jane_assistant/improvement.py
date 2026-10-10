@@ -32,9 +32,10 @@ from .clients import Neighbours, RemoteError, idem_key
 from .content import decode_text, material_bytes, material_label, truncate
 from .guards import SchemaValidator, check_code
 from .llm import BudgetExhausted, InvalidModelOutput, LlmSession, as_json, part
+from .material import inline_text, material_text, reduce_material
 from .packages import PackageDraft, bump, case_name, slug
 from .prompts import IMPROVE, IMPROVE_SCHEMA
-from .settings import ServiceLimits, Settings
+from .settings import MaterialLimits, ServiceLimits, Settings
 from .testing import TestOutcome, extra_case, run_tests
 
 __all__ = [
@@ -90,14 +91,20 @@ def group_problems(cases: list[ProblemCase]) -> list[dict[str, Any]]:
     ]
 
 
-async def load_case(nb: Neighbours, sample: dict[str, Any], name: str, max_chars: int) -> ProblemCase:
+async def load_case(
+    nb: Neighbours, sample: dict[str, Any], name: str, max_chars: int, view: MaterialLimits
+) -> ProblemCase:
     if sample.get("material"):
         material = dict(sample["material"])
     else:
         ref = sample["material_ref"]
         material = await nb.storage.material(str(ref["storage_connection_id"]), str(ref["object_id"]))
     raw = await material_bytes(material)
-    text = truncate(decode_text(raw, (material.get("format") or {}).get("charset")), max_chars)
+    decoded = decode_text(raw, (material.get("format") or {}).get("charset"))
+    # A large HTML page is reduced (it becomes a package test fixture) and shown to the model as a digest.
+    material = reduce_material(material, raw, decoded, view, inline=False)
+    media = (material.get("format") or {}).get("media_type")
+    text = material_text(inline_text(material, decoded), media, max_chars, view)
     diagnostics = list(sample.get("diagnostics") or [])
     result = sample.get("result")
     return ProblemCase(
@@ -431,6 +438,7 @@ async def run_improvement(
         source_id=req.get("source_id"),
         run_id=job_id,
         mode=settings.llm_completion_mode,
+        call=limits.llm_call,
     )
     await _patch_group(nb, group_id, {"status": "in_progress", "assistant_job_id": job_id})
 
@@ -463,11 +471,11 @@ async def run_improvement(
         based_on["digest"] = digest
     await progress(1, "package loaded")
     problems = [
-        await load_case(nb, s, f"p{i + 1}", limits.improvement.max_sample_chars)
+        await load_case(nb, s, f"p{i + 1}", limits.improvement.max_sample_chars, limits.material)
         for i, s in enumerate(req["problem_samples"][: limits.improvement.max_problem_samples])
     ]
     successes = [
-        await load_case(nb, s, f"s{i + 1}", limits.improvement.max_sample_chars)
+        await load_case(nb, s, f"s{i + 1}", limits.improvement.max_sample_chars, limits.material)
         for i, s in enumerate(
             (req.get("successful_examples") or [])[: limits.improvement.max_successful_examples]
         )

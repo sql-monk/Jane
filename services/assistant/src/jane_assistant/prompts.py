@@ -19,11 +19,18 @@ UNTRUSTED = (
     "output schema."
 )
 
+DIGEST = (
+    "A large HTML page is given as a digest that starts with '[HTML digest of a N-byte page' and holds its "
+    "head tags, its structured data (JSON-LD as in its script elements of type application/ld+json, except "
+    "that long lists keep their first items followed by a note with the number of the rest and long strings "
+    "end with '...[+N chars]'), microdata types, the visible text and the start of the body markup. "
+)
+
 CLASSIFY = (
     "You classify materials (web pages or channel messages) of one source by type. For every data "
     "part named m<N> return its material type as a short lower_snake_case noun (for example product, "
     "category, article, news_list, event, job, faq, other) and your confidence from 0 to 1. Use the "
-    "same type name for materials of the same kind. " + UNTRUSTED
+    "same type name for materials of the same kind. " + DIGEST + UNTRUSTED
 )
 
 ANALYZE = (
@@ -33,7 +40,10 @@ ANALYZE = (
     "listing, url_template, api_feed, recursive), and for every material type that carries "
     "structured records the entity type and its fields (lower_snake_case names, a simple type such "
     "as string, number, money, datetime, url, boolean, list, the share of examples containing the "
-    "field and up to three example values). " + UNTRUSTED
+    "field and up to three example values). Records listed on a page (for example the products of a "
+    "category page in a JSON-LD ItemList) are entities of that page's material type. If 'context' lists "
+    "expected_entity_types requested by the user, name an entity with one of them when its records are of "
+    "that kind. " + DIGEST + UNTRUSTED
 )
 
 PROPOSE = (
@@ -43,7 +53,20 @@ PROPOSE = (
     "url_template, api_feed) with their URLs inside the source, optional sections (section_id plus "
     "glob URL patterns such as host/product/**) and exclusions, a short title and summary, and the "
     "risks of the plan. Prefer structured discovery (sitemap, feed, api) over recursion when the "
-    "evidence shows it. Mark the best plan as recommended. " + UNTRUSTED
+    "evidence shows it. 'hints' may also hold 'pagination' (pagination-like URL templates with {n} found "
+    "on sampled pages and the page numbers seen), 'link_patterns' (in-page link patterns with counts), "
+    "'canonical' (sampled pages that declare another page canonical), 'truncated' (the sampling crawl "
+    "stopped at its page budget, the site is larger) and 'user_hints' (partial collection rules from the "
+    "user: keep every plan inside their scope and build on their strategies). A listing strategy follows "
+    "only rel=next links or a query parameter (page_param); numbered pages of another form are covered by "
+    "seed_list with the page URLs (a bounded run), url_template with a range of page numbers or recursive "
+    "with follow patterns of the pagination URLs. Strategy fields: seed_list {urls}; listing {start_urls, "
+    "optional next_page {type: css|xpath|rel, value}, optional page_param {name, start, step}}; recursive "
+    "{seeds, follow: [glob patterns]}; sitemap {urls (optional)}; feed {urls (optional), autodiscover}; "
+    "url_template {template with {name} placeholders, variables: {name: {range: {start, end, step}} or "
+    "{values: [...]}}}; api_feed {url, items_path, url_path}. Glob patterns are URLs without the scheme: "
+    "'*' matches within one path segment, '**' across segments. Mark the best plan as recommended. "
+    + UNTRUSTED
 )
 
 GENERATE = (
@@ -60,7 +83,12 @@ GENERATE = (
     "'unrecognized' with partial=true and a short signature such as 'missing-selector:.price' when "
     "the page looks like the entity but a required field is missing. Also return the JSON Schema "
     "(2020-12) of the entity fields with key fields required, the key fields, and the expected "
-    "output of every sample and negative example. " + UNTRUSTED
+    "output of every sample and negative example. The code runs on the whole page (ctx.text()), where "
+    "JSON-LD lists are complete. For a page listing many records give the expected entities of its first "
+    "two records only (tests compare entities as a subset); in every expected entity give its key fields "
+    "and at most three other short fields (never long texts such as descriptions, never a value shown "
+    "shortened). Keep the module compact, without comments or docstrings. A negative example may be an "
+    "empty page of the same site. " + DIGEST + UNTRUSTED
 )
 
 IMPROVE = (
@@ -73,14 +101,14 @@ IMPROVE = (
     "(none, additive or breaking) and, if the problems show records of an entity type the package "
     "does not produce, those entity types as suggestions. Keep the same code rules: standard "
     "library only, no network, files, subprocesses, environment, eval or exec, deterministic, no "
-    "null fields. " + UNTRUSTED
+    "null fields. " + DIGEST + UNTRUSTED
 )
 
 UNKNOWN = (
     "You classify one material for which no configured handler exists. Return its material type "
     "(lower_snake_case), confidence from 0 to 1, whether it carries records worth extracting "
     "(relevant), the entity types it contains, and whether it is a navigation page useful for "
-    "discovering other materials (listing, sitemap, feed). " + UNTRUSTED
+    "discovering other materials (listing, sitemap, feed). " + DIGEST + UNTRUSTED
 )
 
 _STR_LIST: dict[str, Any] = {"type": "array", "items": {"type": "string"}}

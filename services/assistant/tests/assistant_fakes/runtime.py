@@ -16,6 +16,7 @@ import zipfile
 from typing import Any
 
 __all__ = [
+    "LISTING_JSONLD_CODE",
     "PRODUCT_CODE_V1",
     "PRODUCT_CODE_V2",
     "PRODUCT_CODE_V2_BREAKING",
@@ -58,6 +59,47 @@ def extract(material, params, ctx):
 PRODUCT_CODE_V2 = PRODUCT_CODE_V1.replace('class="price"', 'class="price(?:-new)?"')
 
 PRODUCT_CODE_V2_BREAKING = PRODUCT_CODE_V2.replace('fields["price"] = ', 'fields["price_value"] = ')
+
+LISTING_JSONLD_CODE = """import json
+import re
+
+_LD = re.compile(r'<script[^>]*type="application/ld\\+json"[^>]*>(.*?)</script>', re.S)
+
+
+def _products(node):
+    if isinstance(node, dict):
+        if node.get("@type") == "Product":
+            yield node
+        for value in node.values():
+            yield from _products(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _products(value)
+
+
+def extract(material, params, ctx):
+    entities = []
+    for block in _LD.findall(ctx.text()):
+        try:
+            doc = json.loads(block)
+        except ValueError:
+            continue
+        for item in _products(doc):
+            offer = item.get("offers") or {}
+            if not item.get("url") or offer.get("price") is None:
+                continue
+            fields = {
+                "title": item.get("name"),
+                "url": item["url"],
+                "price": {"amount": float(offer["price"]), "currency": offer.get("priceCurrency", "UAH")},
+            }
+            key = {"scope": material["source"].get("source_id", "local"), "natural": {"url": item["url"]}}
+            entities.append({"entity_type": "laptop", "key": key, "fields": fields})
+    if not entities:
+        return {"status": "empty", "entities": []}
+    return {"status": "success", "entities": entities}
+"""
+"""Reads products of schema.org JSON-LD (``ItemList`` of a category page): what a model writes for such pages."""
 
 
 class Ctx:
@@ -109,6 +151,16 @@ def compare(expected: Any, actual: Any, mode: str, pointer: str = "") -> list[di
                 diffs += compare(expected[k], actual[k], mode, f"{pointer}/{k}")
         return diffs
     if isinstance(expected, list) and isinstance(actual, list):
+        if mode == "subset":  # as the SDK: every expected item matches a distinct actual item, in any order
+            used: set[int] = set()
+            for i, exp in enumerate(expected):
+                match = next(
+                    (j for j, act in enumerate(actual) if j not in used and not compare(exp, act, mode)), None
+                )
+                if match is None:
+                    return [{"pointer": f"{pointer}/{i}", "expected": exp, "actual": None}]
+                used.add(match)
+            return []
         if len(expected) != len(actual):
             return [{"pointer": pointer, "expected": len(expected), "actual": len(actual)}]
         return [

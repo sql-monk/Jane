@@ -15,8 +15,9 @@ import httpx
 from jane_kit.errors import JaneError
 
 from .clients import Neighbours, RemoteError
-from .content import decode_text, material_bytes, material_label, truncate
+from .content import decode_text, material_bytes, material_label
 from .llm import BudgetExhausted, LlmSession, part
+from .material import material_text
 from .prompts import UNKNOWN, UNKNOWN_SCHEMA
 from .settings import ServiceLimits, Settings
 
@@ -36,8 +37,11 @@ async def run_unknown(
 ) -> dict[str, Any]:
     material = req["material"]
     raw = await material_bytes(material)
-    text = truncate(
-        decode_text(raw, (material.get("format") or {}).get("charset")), limits.unknown.max_sample_chars
+    text = material_text(
+        decode_text(raw, (material.get("format") or {}).get("charset")),
+        (material.get("format") or {}).get("media_type"),
+        limits.unknown.max_sample_chars,
+        limits.material,
     )
     llm = LlmSession(
         nb.llm,
@@ -48,6 +52,7 @@ async def run_unknown(
         task_id=req.get("task_id"),
         run_id=job_id,
         mode=settings.llm_completion_mode,
+        call=limits.llm_call,
     )
     try:
         out = await llm.ask(

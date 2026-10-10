@@ -74,7 +74,9 @@ class FakeCollector:
             "source_kind": c["request"]["source_kind"],
             "created_at": NOW,
             "stats": {
-                "discovered": len(c["items"]),
+                "discovered": c.get(
+                    "discovered", len(c["items"])
+                ),  # a scenario may model a larger crawl space
                 "fetched": len(c["items"]),
                 "by_strategy": {"sitemap": len(c["items"])},
             },

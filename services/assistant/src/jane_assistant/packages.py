@@ -232,7 +232,12 @@ class PackageDraft:
         return doc(files, diff, omitted)
 
     def archive(self) -> bytes:
-        """Deterministic zip (sorted paths, fixed timestamps) with ``jane-package.json``."""
+        """Deterministic, deflated zip (sorted paths, fixed timestamps) with ``jane-package.json``.
+
+        It only carries an unpublished draft to handler-runtime test runs (inline, up to
+        ``transfer.inline_max_bytes``); the registry stores and digests its own canonical (stored) zip of the
+        published files. Each entry is deflated explicitly: a ``ZipInfo`` entry would otherwise be stored, and
+        test fixtures of real pages (a reduced shop page is ~130 KB) did not fit the inline limit."""
         buf = io.BytesIO()
         entries = dict(self.files)
         entries[MANIFEST] = json.dumps(self.manifest, ensure_ascii=False, indent=1, sort_keys=True).encode()
@@ -240,6 +245,7 @@ class PackageDraft:
             for path in sorted(entries):
                 info = zipfile.ZipInfo(path, date_time=(1980, 1, 1, 0, 0, 0))
                 info.external_attr = 0o644 << 16
+                info.compress_type = zipfile.ZIP_DEFLATED
                 zf.writestr(info, entries[path])
         return buf.getvalue()
 

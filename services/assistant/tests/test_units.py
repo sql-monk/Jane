@@ -13,7 +13,7 @@ import pytest
 
 from jane_assistant.clients import LlmClient
 from jane_assistant.guards import SchemaValidator, check_code, sanitize_web_rules
-from jane_assistant.llm import BudgetExhausted, InvalidModelOutput, LlmSession
+from jane_assistant.llm import CUT_MARK, BudgetExhausted, InvalidModelOutput, LlmSession
 from jane_assistant.packages import DIFF_CUT, PackageDraft, bump, proposal_bytes, slug
 from jane_assistant.sampling import Sample, coverage, pick_diverse
 from jane_assistant.search import HttpJsonSearchProvider, StaticSearchProvider, direct_candidate
@@ -134,6 +134,11 @@ def test_package_draft_archive_is_deterministic_and_has_tests() -> None:
     }
     assert "extra" not in json.loads(d.files["tests/my-case/material.json"])
     assert d.archive() == d.copy().archive()
+    content = {"kind": "inline", "encoding": "utf-8", "media_type": "text/html"}
+    page = {**mat, "content": {**content, "data": "<div class='tile'>Laptop</div>" * 6_000}}
+    d.add_test("big page", page, "empty", None, "llm")
+    raw = sum(len(b) for b in d.files.values())
+    assert raw > 180_000 and len(d.archive()) < raw // 20  # a transport archive of real pages is deflated
     body = d.publish_body()
     assert "jane-package.json" not in body["files"] and body["manifest"]["tests"][0]["compare"] == "subset"
     assert (
@@ -230,12 +235,18 @@ def test_llm_session_budget_truncation_and_validation() -> None:
         return _completion({"x": 1})
 
     llm = _llm_session(
-        responder, max_input_tokens_per_request=10, budget={"amount": 1, "currency": "USD", "period": "run"}
+        responder, max_input_tokens_per_request=1200, budget={"amount": 1, "currency": "USD", "period": "run"}
     )
     schema = {"type": "object", "required": ["x"], "properties": {"x": {"type": "integer"}}}
-    data = [{"name": "a", "text": "y" * 100}, {"name": "b", "text": "z"}]
+    data = [{"name": "a", "text": "y" * 1000}, {"name": "b", "text": "z"}]
     assert asyncio.run(llm.ask("s", "do it", data, schema, model="cheap")) == {"x": 1}
-    assert len(seen[0]["data"]) == 1 and seen[0]["data"][0]["text"].startswith("y" * 40)
+    # Counted as the gateway counts: chars per token, the instructions, its preamble and every part's delimiters.
+    call = llm.call
+    room = int(1200 * call.chars_per_token) - len("do it") - call.prompt_overhead_chars
+    room -= call.part_overhead_chars + len("a")
+    assert len(seen[0]["data"]) == 1  # nothing is left for part b
+    text = seen[0]["data"][0]["text"]
+    assert len(text) == room and text == "y" * (room - len(CUT_MARK)) + CUT_MARK
     # R13: the whole run budget and the run id - the gateway counts the run itself (not "what is left")
     assert seen[0]["limits"]["budget"] == {"amount": 1, "currency": "USD", "period": "run"}
     assert seen[0]["scope"] == {"purpose": "onboarding", "run_id": "job_1"}

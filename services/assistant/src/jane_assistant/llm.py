@@ -11,8 +11,11 @@
   ``budget_exhausted`` (429, or a failed async job) stops it as well.
 * The call waits as long as the model needs: ``mode=sync`` with the client's own timeout
   (``limits.llm_call.request_timeout_ms``) or ``mode=async`` (202 + job, polled within
-  ``clients.job_wait_timeout_ms``). Data is cut to ``max_input_tokens_per_request`` (about 4 characters per
-  token) and the model's output to ``max_output_tokens_per_request``.
+  ``clients.job_wait_timeout_ms``). Data is cut to ``max_input_tokens_per_request`` counted like the gateway
+  counts it (``llm_call.chars_per_token`` characters per token, the instructions and the gateway's preamble and
+  delimiters included) and the model's output to ``max_output_tokens_per_request``. :meth:`LlmSession.room`
+  tells a step how many characters each of its materials may take, so materials are shown in full or as
+  digests rather than dropped.
 """
 
 from __future__ import annotations
@@ -26,12 +29,13 @@ from jsonschema import Draft202012Validator
 from jane_kit.errors import JaneError
 
 from .clients import LlmClient, RemoteError, idem_key
-from .settings import LlmLimits
+from .settings import LlmCallLimits, LlmLimits
 
 __all__ = ["BudgetExhausted", "InvalidModelOutput", "LlmSession", "part"]
 
-CHARS_PER_TOKEN = 4
-"""Conservative size estimate used to keep data under ``max_input_tokens_per_request``."""
+CUT_MARK = "\n[... truncated to fit max_input_tokens_per_request]"
+NAME_ALLOWANCE = 40
+"""Characters :meth:`LlmSession.room` assumes for the name and media type of a part it has not seen yet."""
 
 
 class BudgetExhausted(JaneError):
@@ -58,6 +62,8 @@ class LlmSession:
     """``scope.run_id`` of every call: the window of a ``period: run`` budget (default: ``job_key``)."""
     mode: str = "sync"
     """``CompletionRequest.mode``: ``sync`` or ``async`` (202 + job, awaited by the client)."""
+    call: LlmCallLimits = field(default_factory=LlmCallLimits)
+    """How request size is counted (``llm_call.chars_per_token``, ``*_overhead_chars``)."""
     spent: float = 0.0
     calls: int = 0
     currency: str = field(init=False)
@@ -76,16 +82,33 @@ class LlmSession:
     def cost(self) -> dict[str, Any]:
         return {"amount": round(self.spent, 6), "currency": self.currency}
 
-    def _fit(self, data: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        budget_chars = self.limits.max_input_tokens_per_request * CHARS_PER_TOKEN
+    def _part_overhead(self, p: dict[str, Any]) -> int:
+        return self.call.part_overhead_chars + len(str(p.get("name", ""))) + len(str(p.get("media_type", "")))
+
+    def data_budget(self, instructions: str) -> int:
+        """Characters of data parts (their delimiters included) one request may carry."""
+        total = int(self.limits.max_input_tokens_per_request * self.call.chars_per_token)
+        return total - len(instructions) - self.call.prompt_overhead_chars
+
+    def room(self, instructions: str, fixed: list[dict[str, Any]], count: int, cap: int) -> int:
+        """Characters each of ``count`` further data parts may take next to the ``fixed`` ones (at most ``cap``)."""
+        left = self.data_budget(instructions) - sum(
+            len(str(p.get("text", ""))) + self._part_overhead(p) for p in fixed
+        )
+        each = left // max(1, count) - self.call.part_overhead_chars - NAME_ALLOWANCE
+        return max(0, min(cap, each))
+
+    def _fit(self, instructions: str, data: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        budget = self.data_budget(instructions)
         out = []
         for p in data:
             text = str(p.get("text", ""))
-            if budget_chars <= 0:
+            budget -= self._part_overhead(p)
+            if budget <= 0:
                 break
-            if len(text) > budget_chars:
-                text = text[:budget_chars] + "\n[... truncated to fit max_input_tokens_per_request]"
-            budget_chars -= len(text)
+            if len(text) > budget:
+                text = text[: max(0, budget - len(CUT_MARK))] + CUT_MARK
+            budget -= len(text)
             out.append({**p, "text": text})
         return out
 
@@ -113,7 +136,7 @@ class LlmSession:
         request: dict[str, Any] = {
             "model": model,
             "instructions": instructions,
-            "data": self._fit(data),
+            "data": self._fit(instructions, data),
             "output_schema": output_schema,
             "max_output_tokens": self.limits.max_output_tokens_per_request,
             "temperature": 0,

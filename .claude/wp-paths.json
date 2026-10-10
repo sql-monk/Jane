@@ -232,6 +232,48 @@
         "scripts/**",
         "docs/delivery/post-m3/stream-c.md"
       ]
+    },
+    "24": {
+      "name": "storage-observability",
+      "allow": [
+        "services/storage/**",
+        "contracts/**",
+        "web/admin/src/api/generated/**"
+      ]
+    },
+    "25": {
+      "name": "materials-storage-browser",
+      "allow": [
+        "web/admin/src/pages/MaterialsPage.tsx",
+        "web/admin/src/pages/StoragesPage.tsx",
+        "web/admin/src/pages/materials-storage.test.tsx",
+        "web/admin/src/components/Storage*.tsx",
+        "web/admin/src/components/Material*.tsx",
+        "web/admin/src/api/types.ts",
+        "web/admin/src/App.tsx",
+        "web/admin/e2e/materials-storage.spec.ts",
+        "web/admin/src/materials-storage.css"
+      ]
+    },
+    "26": {
+      "name": "visual-chain-editor",
+      "allow": [
+        "web/admin/src/components/Chain*.tsx",
+        "web/admin/src/components/Property*.tsx",
+        "web/admin/src/components/DagView.tsx",
+        "web/admin/src/lib/property*.ts",
+        "web/admin/src/pages/TasksPage.tsx",
+        "web/admin/src/chain-editor.css",
+        "web/admin/e2e/chain-editor.spec.ts"
+      ]
+    },
+    "27": {
+      "name": "admin-browser-chain-acceptance",
+      "allow": [
+        "web/admin/**",
+        "tests/e2e/**",
+        "docs/acceptance/**"
+      ]
     }
   }
 }

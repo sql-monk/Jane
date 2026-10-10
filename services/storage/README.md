@@ -316,3 +316,31 @@ uv run --all-packages jane-storage-packages publish --registry http://localhost:
 `publish` робить `POST /v1/packages` (409 — уже є) і `POST /v1/packages/{id}/versions` з `PublishRequest`
 (registry.v1). Поки репозиторій (WP-05) не готовий, публікацію перевірено на моку з контракту
 (`tests/test_packages.py`).
+
+
+## Стан сховища (WP-24)
+
+`GET /v1/storage-status?connection_id=raw-files` потребує `storage:read` та повертає останню
+явну перевірку. `POST /v1/connections/raw-files/test` потребує `connections:write`, перевіряє
+health адаптера та оновлює snapshot. GET не відкриває адаптер, не читає payload та не обходить backend.
+GET `/v1/connections` і `/v1/connections/{id}` доступні також читачу `storage:read`.
+
+До перевірки, після рестарту, DELETE чи зміни визначення: availability `unknown`, checked_at null,
+невідомі числові показники null. Snapshot локальний процесу: за кількох реплік наступний GET може
+потрапити в іншу репліку і повернути unknown. Це відображається чесно; потрібна sticky routing,
+якщо оператор хоче бачити одну перевірку між репліками. Нові записи не оновлюють snapshot;
+використовуйте checked_at для оцінки свіжості та явну повторну перевірку.
+
+Filesystem під час явної перевірки рахує stored-object metadata у namespace підключення:
+`object_count` та суму payload `total_size_bytes`. Це не вільний/зайнятий диск, не кількість сутностей,
+не history або metadata overhead; файли поза індексом Jane не входять. Payload не читається.
+Інші адаптери наразі віддають null та `adapter_statistics_not_supported`; нулі лише для перевіреного
+порожнього файлового namespace. Причина помилки не містить resolved secrets.
+
+Фільтри матеріалів залишаються `source_id`, `material_id`/`material_ids`, `since`/`until` за `stored_at`
+(початок включно, кінець виключно), `connection_id`, cursor/limit. Стан обробки належить оркестратору;
+storage не читає його таблиці. Зовнішні сховища не обходяться заради статистики.
+
+Приклад для стороннього читача: `GET /v1/storage-status?connection_id=raw-files`
+з `Authorization: Bearer <ключ зі storage:read>`. Звичайна команда тестів:
+`uv run pytest services/storage/tests services/storage/adapters/files/tests -q`.

@@ -58,6 +58,7 @@ from .connections import AdapterPool, ConnectionRegistry
 from .content import ContentReader
 from .handler import StorageHandler
 from .packages import PackageCatalog, StoragePackage
+from .policy import redact
 from .registry_packages import RegistryPackages
 from .settings import CONNECTION_FIRST_OPTIONS, ServiceLimits, Settings, resolve_service_limits
 
@@ -109,7 +110,7 @@ def _many_cursor(cursor: str, count: int) -> tuple[int, str | None]:
 
 
 async def _clean_transit(transit: FileTransitStore, transfer: Any) -> None:
-    """The producer's cleaner of its transit blobs (ADR-0004 §2, files): every ``transit_cleanup_interval_seconds``."""
+    """The producer's cleaner of its transit blobs (ADR-0004 Р В РІР‚в„ўР вЂ™Р’В§2, files): every ``transit_cleanup_interval_seconds``."""
     while True:
         await asyncio.sleep(transfer.transit_cleanup_interval_seconds)
         try:
@@ -219,14 +220,14 @@ def _connection_validator(root: Path | None) -> Any:
 def build_app(
     settings: Settings | None = None, *, registry_transport: httpx.AsyncBaseTransport | None = None
 ) -> FastAPI:
-    """The storage service. ``registry_transport`` — HTTP transport to the registry (tests)."""
+    """The storage service. ``registry_transport`` Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎСљ HTTP transport to the registry (tests)."""
     settings = settings or Settings()
     resolved = resolve_service_limits(settings)
     limits: ServiceLimits = resolved.limits
     runner = JobRunner(limits=limits.jobs)
     keys = InMemoryIdempotencyStore(limits.idempotency)
     root = contracts_dir(Path(__file__).parent) if settings.validate_requests else None
-    # transit blobs of large RAW without a persistent URI (R18, ADR-0004 §2: written and removed here)
+    # transit blobs of large RAW without a persistent URI (R18, ADR-0004 Р В РІР‚в„ўР вЂ™Р’В§2: written and removed here)
     transit_blobs = FileTransitStore(settings.transit_dir, "storage") if settings.transit_dir else None
     registry = ConnectionRegistry(validator=_connection_validator(root), policy=settings.connection_policy())
     if settings.connections_file is not None:
@@ -494,6 +495,35 @@ def build_app(
         )
         return accepted(job, runner.location(job.job_id))
 
+    # Snapshots are process-local and tied to the connection definition, never a live scan on GET.
+    storage_checks: dict[str, tuple[str, dict[str, Any]]] = {}
+
+    def empty_statistics(reason: str) -> dict[str, Any]:
+        return {
+            "object_count": None,
+            "total_size_bytes": None,
+            "checked_at": None,
+            "scope": "connection_objects",
+            "unavailable_reason": reason,
+        }
+
+    @app.get("/v1/storage-status", tags=["objects"])
+    async def storage_status(connection_id: str) -> JSONResponse:
+        stored = registry.get(connection_id)
+        snapshot = storage_checks.get(connection_id)
+        if snapshot is not None and snapshot[0] == stored.etag:
+            return JSONResponse(snapshot[1])
+        return JSONResponse(
+            {
+                "connection_id": connection_id,
+                "kind": stored.kind,
+                "availability": "unknown",
+                "checked_at": None,
+                "message": None,
+                "statistics": empty_statistics("not_checked"),
+            }
+        )
+
     # ------------------------------------------------------------------ connections
     def connection_body(doc: Mapping[str, Any]) -> dict[str, Any]:
         return {
@@ -537,6 +567,7 @@ def build_app(
         stored, created = registry.put(body)
         if stored.etag != current:
             # a changed definition: new work opens a new adapter, work in progress finishes on the old one
+            storage_checks.pop(connection_id, None)
             await pool.forget(connection_id)
         return JSONResponse(
             connection_body(stored.document),
@@ -547,6 +578,7 @@ def build_app(
     @app.delete("/v1/connections/{connection_id}", status_code=204, tags=["connections"])
     async def delete_connection(connection_id: str) -> Response:
         registry.delete(connection_id)
+        storage_checks.pop(connection_id, None)
         await pool.forget(connection_id)
         return Response(status_code=204)
 
@@ -560,24 +592,58 @@ def build_app(
             "checked_at": format_ts(datetime.now().astimezone()),
             "secrets_resolved": resolved_secrets,
         }
+        statistics = empty_statistics("adapter_statistics_not_supported")
+
+        def remember() -> JSONResponse:
+            nonlocal statistics
+            if not out["ok"] and statistics["unavailable_reason"] == "adapter_statistics_not_supported":
+                statistics = empty_statistics("connection_unavailable")
+            storage_checks[connection_id] = (
+                stored.etag,
+                {
+                    "connection_id": connection_id,
+                    "kind": stored.kind,
+                    "availability": "available" if out["ok"] else "unavailable",
+                    "checked_at": out["checked_at"],
+                    "message": out.get("message"),
+                    "statistics": statistics,
+                },
+            )
+            return JSONResponse(out)
+
         violations = registry.policy_errors(connection_id)
         if violations:
             # config file / bypassing the API: no secret is read and the adapter is not opened
             out["message"] = "connection violates the secret policy of this executor: " + "; ".join(
                 f"{v.pointer} ({v.code}): {v.message}" for v in violations
             )
-            return JSONResponse(out)
+            return remember()
         if not all(resolved_secrets.values()):
             missing = sorted(k for k, v in resolved_secrets.items() if not v)
             out["message"] = f"secret(s) not resolvable in this executor: {missing}"
-            return JSONResponse(out)
+            return remember()
         try:
-            async with pool.lease(connection_id, stored.kind, {}) as adapter:
-                out["ok"] = await adapter.health()
-        except (AdapterError, JaneError) as exc:
-            out["message"] = str(exc)[:1000]
+            async with asyncio.timeout(limits.timeouts.request_timeout_ms / 1000):
+                async with pool.lease(connection_id, stored.kind, {}) as adapter:
+                    out["ok"] = await adapter.health()
+                    # Optional aggregate capability: never enumerate remote backend objects in the core.
+                    aggregate = getattr(adapter, "object_statistics", None)
+                    if out["ok"] and aggregate is not None:
+                        counts = await aggregate()
+                        statistics = {
+                            **counts,
+                            "checked_at": format_ts(datetime.now().astimezone()),
+                            "scope": "connection_objects",
+                            "unavailable_reason": None,
+                        }
+                    elif not out["ok"]:
+                        statistics = empty_statistics("connection_unavailable")
+        except (AdapterError, JaneError, TimeoutError) as exc:
+            out["ok"] = False
+            out["message"] = redact(str(exc), registry.secret_values(connection_id))[:1000]
+            statistics = empty_statistics("check_failed")
         out["latency_ms"] = int((asyncio.get_running_loop().time() - started) * 1000)
-        return JSONResponse(out)
+        return remember()
 
     # ------------------------------------------------------------------ storage.v1
     @asynccontextmanager
@@ -773,7 +839,7 @@ def build_app(
                 content_uri = getattr(adapter, "content_uri", None)
                 uri = content_uri(rec) if callable(content_uri) else None
                 if meta.get("stored_format") == "json":
-                    # The object is the JSON document of the Material (format.raw json, or the TZ §5 default for a
+                    # The object is the JSON document of the Material (format.raw json, or the TZ Р В РІР‚в„ўР вЂ™Р’В§5 default for a
                     # RAW that is not a web page): its bytes are not the material's content. Restore the original
                     # content embedded in the document; there is no persistent URI of those bytes.
                     original = _embedded_content(await call(adapter.read_object_content(object_id)))

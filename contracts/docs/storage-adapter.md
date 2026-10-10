@@ -166,3 +166,16 @@ sqlserver — за `key_hash`, mongodb — за `_id`, minio/s3 — за клю�
 
 Тести сумісності запускаються на локальних сервісах із docker compose (WP-01); S3 — на
 S3-сумісному замінникові, про що пишеться у звіті (критерій 12).
+
+
+## Спостереження за станом (WP-24)
+
+Storage Read API містить discovery підключень та `GET /v1/storage-status?connection_id=…`.
+Це snapshot останнього `POST /v1/connections/{id}/test`, локальний процесу; restart і зміна визначення
+роблять його unknown. GET ніколи не обходить backend. `checked_at` показує свіжість,
+`statistics.checked_at` — час останнього агрегату; null числові поля з `unavailable_reason` означають
+невідоме значення. `scope=connection_objects` означає лише збережені об’єкти namespace цього connection,
+а `total_size_bytes` — payload bytes з metadata, не disk usage. Filesystem підтримує explicit inventory
+індексу metadata, зовнішні адаптери поки не підтримують aggregate. Інвентаризація не змінює StorageAdapter
+Protocol: необов’язкова локальна capability `object_statistics` не є вимогою до сторонніх адаптерів.
+API не приписує стан обробки матеріалу: це власність оркестратора.

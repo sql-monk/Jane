@@ -51,6 +51,11 @@ def test_storage_needs_a_token_and_the_operation_scope(settings: Settings, h: Si
         conn = {"connection_id": "raw-x", "kind": "filesystem", "params": {"base_path": "/tmp/x"}}
         put = c.put("/v1/connections/raw-x", json=conn, headers=auth("k-storage-reader"))
         assert put.status_code == 403
-        assert c.get("/v1/connections", headers=auth("k-storage-reader")).status_code == 403
+        assert c.get("/v1/connections", headers=auth("k-storage-reader")).status_code == 200
         assert c.get("/v1/connections", headers=auth("k-storage-orchestrator")).status_code == 200
         assert c.get("/v1/jobs/job_unknown", headers=auth("k-storage-reader")).status_code == 403
+
+        assert c.get("/v1/storage-status", params=params).status_code == 401
+        assert c.get("/v1/storage-status", params=params, headers=auth("k-storage-nobody")).status_code == 403
+        assert c.get("/v1/storage-status", params=params, headers=auth("k-storage-reader")).status_code == 200
+        assert c.post("/v1/connections/raw-files/test", headers=auth("k-storage-reader")).status_code == 403

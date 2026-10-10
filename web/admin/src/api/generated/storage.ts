@@ -35,6 +35,92 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/connections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Підключення, відомі цьому виконавцю
+     * @description Необов'язково для виконавця без керованих підключень (див. опис API).
+     */
+    get: operations["listConnections"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/connections/{connection_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: components["parameters"]["ConnectionId"];
+      };
+      cookie?: never;
+    };
+    /** Прочитати підключення */
+    get: operations["getConnection"];
+    /**
+     * Створити або замінити підключення (секрети — лише посиланнями)
+     * @description Викликає оркестратор, синхронізуючи реєстр підключень, або адміністратор автономного
+     *     виконавця. Значення, схожі на секрети, у `params` відхиляються (`secret_detected`).
+     *     Виконавець без керованих підключень відповідає 501 `not_implemented`; клієнт не вважає це збоєм
+     *     (див. опис API). 404/405 — збій синхронізації.
+     */
+    put: operations["putConnection"];
+    post?: never;
+    /** Видалити підключення */
+    delete: operations["deleteConnection"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/connections/{connection_id}/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: components["parameters"]["ConnectionId"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Перевірити підключення й розв'язання секретів */
+    post: operations["testConnection"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/storage-status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Остання явна перевірка сховища та статистика об’єктів
+     * @description GET не відкриває адаптер і не обходить сховище. POST /v1/connections/{connection_id}/test оновлює process-local snapshot. Зміна визначення та рестарт скидають snapshot. Статистика охоплює лише об’єкти namespace підключення: payload bytes, не зайнятий диск або сутності. Непідтримувані агрегати мають null і причину. Час фіксує свіжість, запис нових об’єктів не оновлює snapshot.
+     */
+    get: operations["getStorageStatus"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/entities": {
     parameters: {
       query?: never;
@@ -161,6 +247,24 @@ export interface components {
       stored_at: components["schemas"]["Timestamp"];
       /** @description Відновлений Material (лише для RAW і лише якщо його вміст можна віддати, див. опис операції). */
       material?: components["schemas"]["material.schema"];
+    };
+    StorageStatus: {
+      connection_id: string;
+      kind: string;
+      /** @enum {string} */
+      availability: "unknown" | "available" | "unavailable";
+      /** Format: date-time */
+      checked_at: string | null;
+      message: string | null;
+      statistics: {
+        object_count: number | null;
+        total_size_bytes: number | null;
+        /** Format: date-time */
+        checked_at: string | null;
+        /** @enum {string} */
+        scope: "connection_objects";
+        unavailable_reason: string | null;
+      };
     };
     Health: {
       /** @enum {string} */
@@ -352,8 +456,64 @@ export interface components {
       /** @description Додаткові структуровані дані, специфічні для коду (наприклад 'limit', 'actual' для limit_exceeded). */
       details?: Record<string, unknown>;
     };
+    /**
+     * @example postgresql
+     * @example sqlserver
+     * @example mongodb
+     * @example s3
+     * @example minio
+     * @example filesystem
+     * @example llm_provider
+     * @example telegram_account
+     * @example search_provider
+     * @example http
+     */
+    ConnectionKind: string;
+    /**
+     * Format: date-time
+     * @description Момент часу RFC 3339 з часовою зоною; сервіси повертають UTC із суфіксом 'Z'.
+     */
+    Timestamp: string;
     /** @description Ідентифікатор, який обирає користувач (source_id, task_id, package_id, connection_id). Нижній регістр, цифри, '.', '_', '-'. */
     Slug: string;
+    SecretRef: string;
+    /** @description Довільні мітки ключ-значення для фільтрації й пошуку. Не для секретів. */
+    Labels: {
+      [key: string]: string;
+    };
+    /**
+     * Connection
+     * @description Кероване підключення (ТЗ §11): іменоване підключення до сховища, провайдера LLM, облікового запису Telegram тощо. Містить лише несекретні параметри та посилання на секрети (secret_refs). Значення секретів ніколи не передаються через API, не зберігаються в пакетах і не копіюються під час форку. Сервіс-виконавець розв'язує secret_refs у власному середовищі. Див. docs/adr/0006-secrets-and-connections.md.
+     */
+    "connection.schema": {
+      connection_id: components["schemas"]["Slug"];
+      kind: components["schemas"]["ConnectionKind"];
+      title?: string;
+      /** @description Несекретні параметри: host, port, database, schema, bucket, endpoint, region, base_path, api_base, model_aliases тощо. Сервіс відхиляє params, схожі на секрети (secret_detected). */
+      params?: {
+        [key: string]: string | number | boolean | unknown[] | Record<string, unknown>;
+      };
+      /** @description Ім'я секрету → посилання на нього. Схеми: env:<VAR>, file:<шлях у контейнері>, vault:<шлях>#<ключ> (опційний провайдер). */
+      secret_refs?: {
+        [key: string]: components["schemas"]["SecretRef"];
+      };
+      labels?: components["schemas"]["Labels"];
+    };
+    NextCursor: string | null;
+    ConnectionList: {
+      items: components["schemas"]["connection.schema"][];
+      next_cursor: components["schemas"]["NextCursor"];
+    };
+    ConnectionTestResult: {
+      ok: boolean;
+      checked_at: components["schemas"]["Timestamp"];
+      latency_ms?: number;
+      /** @description Для кожного secret_ref — чи вдалося його розв'язати в середовищі виконавця (без значень). */
+      secrets_resolved?: {
+        [key: string]: boolean;
+      };
+      message?: string;
+    };
     /** @description Ідентичність об'єкта. natural — значення ключових полів схеми (наприклад {"sku": "A-1"}); scope — простір імен (зазвичай source_id), щоб однакові SKU різних джерел не злилися. Сховище будує канонічний рядок ключа: scope + '|' + пари natural, відсортовані за іменем, серіалізовані як JSON без пробілів. */
     EntityKey: {
       scope: string;
@@ -363,11 +523,6 @@ export interface components {
     };
     /** @description Непрозорий ідентифікатор, згенерований сервісом-власником (наприклад 'mat_01J9Z...'). Клієнти не розбирають його структуру. */
     Id: string;
-    /**
-     * Format: date-time
-     * @description Момент часу RFC 3339 з часовою зоною; сервіси повертають UTC із суфіксом 'Z'.
-     */
-    Timestamp: string;
     Sha256Hex: string;
     /** @description Порядок спостережень. Порівняння: спочатку observed_at (час отримання матеріалу колектором), потім sequence (ревізія джерела, якщо є), потім observation_id лексикографічно. Більше — новіше. Час обробки чи доставки в порівнянні не бере участі. */
     ObservationOrder: {
@@ -392,7 +547,6 @@ export interface components {
       version?: number;
       updated_at: components["schemas"]["Timestamp"];
     };
-    NextCursor: string | null;
     /** @description Точна версія Semantic Versioning 2.0.0. Діапазони версій у посиланнях на пакети заборонені. */
     SemVer: string;
     /** @description Дайджест вмісту: 'sha256:' і 64 шістнадцяткові символи в нижньому регістрі. */
@@ -677,6 +831,15 @@ export interface components {
         "application/problem+json": components["schemas"]["problem.schema"];
       };
     };
+    /** @description If-Match не збігається з поточним ETag (`precondition_failed`). */
+    PreconditionFailed: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/problem+json": components["schemas"]["problem.schema"];
+      };
+    };
     /** @description Семантична помилка (`validation_failed`, `idempotency_key_reused`, `limit_exceeded`, `secret_detected`, `schema_mismatch` тощо). */
     UnprocessableEntity: {
       headers: {
@@ -693,9 +856,18 @@ export interface components {
     Cursor: string;
     /** @description Розмір сторінки. Значення понад максимум сервісу обрізається до максимуму. */
     Limit: number;
+    ConnectionId: components["schemas"]["Slug"];
+    /**
+     * @description ETag ресурсу для оптимістичного блокування. Розбіжність — 412 `precondition_failed`.
+     * @example "v7"
+     */
+    IfMatch: string;
   };
   requestBodies: never;
-  headers: never;
+  headers: {
+    /** @description Версія ресурсу для If-Match. */
+    ETag: string;
+  };
   pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -748,6 +920,182 @@ export interface operations {
         };
       };
       401: components["responses"]["Unauthenticated"];
+    };
+  };
+  listConnections: {
+    parameters: {
+      query?: {
+        /** @description Непрозорий курсор з `next_cursor` попередньої сторінки. */
+        cursor?: components["parameters"]["Cursor"];
+        /** @description Розмір сторінки. Значення понад максимум сервісу обрізається до максимуму. */
+        limit?: components["parameters"]["Limit"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Сторінка підключень (без значень секретів). */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ConnectionList"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+    };
+  };
+  getConnection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: components["parameters"]["ConnectionId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Підключення. */
+      200: {
+        headers: {
+          ETag: components["headers"]["ETag"];
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["connection.schema"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+    };
+  };
+  putConnection: {
+    parameters: {
+      query?: never;
+      header?: {
+        /**
+         * @description ETag ресурсу для оптимістичного блокування. Розбіжність — 412 `precondition_failed`.
+         * @example "v7"
+         */
+        "If-Match"?: components["parameters"]["IfMatch"];
+      };
+      path: {
+        connection_id: components["parameters"]["ConnectionId"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["connection.schema"];
+      };
+    };
+    responses: {
+      /** @description Підключення замінено. */
+      200: {
+        headers: {
+          ETag: components["headers"]["ETag"];
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["connection.schema"];
+        };
+      };
+      /** @description Підключення створено. */
+      201: {
+        headers: {
+          ETag: components["headers"]["ETag"];
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["connection.schema"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      412: components["responses"]["PreconditionFailed"];
+      422: components["responses"]["UnprocessableEntity"];
+      /** @description Виконавець не використовує підключень (`not_implemented`). */
+      501: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["problem.schema"];
+        };
+      };
+    };
+  };
+  deleteConnection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: components["parameters"]["ConnectionId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Видалено. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+    };
+  };
+  testConnection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: components["parameters"]["ConnectionId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Результат перевірки (невдала перевірка — теж 200 з ok=false). */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ConnectionTestResult"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+    };
+  };
+  getStorageStatus: {
+    parameters: {
+      query: {
+        connection_id: components["parameters"]["ConnectionIdQuery"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Останній стан або unknown до перевірки. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["StorageStatus"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
     };
   };
   listEntities: {

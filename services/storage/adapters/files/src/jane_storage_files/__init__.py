@@ -390,6 +390,17 @@ class _Store:
         next_cursor = _b64([format_ts(page[-1].stored_at), page[-1].object_id]) if more and page else None
         return page, next_cursor
 
+    def object_statistics(self) -> dict[str, int]:
+        """Explicit metadata inventory of this namespace, excluding blobs/entities/history overhead."""
+        count = total = 0
+        for entry in (self.root / "index" / "objects").glob("*.json"):
+            rec = self.get_object(entry.stem)
+            if rec is None:
+                raise AdapterError("object metadata index is incomplete", retryable=True)
+            count += 1
+            total += rec.size_bytes
+        return {"object_count": count, "total_size_bytes": total}
+
     # ------------------------------------------------------------------ entities
     def read_entity(self, entity_type: str, key: str) -> EntitySnapshot | None:
         doc = self.read_json(self.snapshot_path(entity_type, key))
@@ -614,6 +625,9 @@ class FilesystemAdapter:
 
     async def read_object_content(self, object_id: str) -> bytes:
         return await self._run(self.store.read_object_content, object_id)
+
+    async def object_statistics(self) -> dict[str, int]:
+        return await self._run(self.store.object_statistics)
 
     async def list_objects(
         self,

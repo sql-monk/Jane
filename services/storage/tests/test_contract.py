@@ -121,6 +121,15 @@ def test_storage_read_api_matches_contract(client: TestClient, h: SimpleNamespac
     api.get("/v1/objects/obj_missing", params={"connection_id": "raw-files"})
     content = api.get(f"/v1/objects/{object_id}/content", params={"connection_id": "raw-files"})
     assert content.content == h.PAGE
+    api.get("/v1/connections")
+    api.get("/v1/connections/raw-files")
+    api.get("/v1/storage-status", params={"connection_id": "raw-files"})
+    api.post("/v1/connections/raw-files/test")
+    api.get("/v1/storage-status", params={"connection_id": "raw-files"})
+    doc = client.get("/v1/connections/raw-files").json()
+    doc["connection_id"] = "contract-status"
+    assert api.put("/v1/connections/contract-status", json=doc).status_code == 201
+    api.delete("/v1/connections/contract-status")
     assert api.uncovered() == []
 
 

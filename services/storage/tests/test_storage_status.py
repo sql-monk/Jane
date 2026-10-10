@@ -119,28 +119,61 @@ def test_idempotent_status_jobs_and_unknown_connection(client: TestClient) -> No
     assert client.post("/v1/storage-status/checks", json=body).status_code == 422
 
 
-def test_slow_inventory_is_background(settings, monkeypatch) -> None:
+def test_slow_inventory_is_background(settings, monkeypatch, tmp_path: Path) -> None:
     import asyncio
+    import json
+    import threading
 
     from jane_storage.app import build_app
     from jane_storage_files import FilesystemAdapter
 
     original = FilesystemAdapter.object_statistics
+    entered = threading.Event()
+    release = asyncio.Event()
 
     async def delayed_real_inventory(self):
-        # Delay injection only; execute the real inventory rather than returning a mocked result.
-        await asyncio.sleep(0.2)
+        # Gate only execution time; after release run the actual filesystem inventory.
+        entered.set()
+        await release.wait()
         return await original(self)
 
     monkeypatch.setattr(FilesystemAdapter, "object_statistics", delayed_real_inventory)
-    settings = settings.with_overrides(limits={"timeouts": {"sync_response_max_ms": 1}})
+    limits_file = tmp_path / "status-limits.json"
+    limits_file.write_text(
+        json.dumps({"defaults": {"timeouts": {"sync_response_max_ms": 1, "request_timeout_ms": 5000}}}),
+        encoding="utf-8",
+    )
+    settings = settings.with_overrides(limits_file=limits_file)
     with TestClient(build_app(settings)) as client:
-        response = client.post(
-            "/v1/storage-status/checks",
-            json={"connection_id": "raw-files"},
-            headers={"Idempotency-Key": "slow-status"},
-        )
-        assert response.status_code == 202
-        assert response.json()["status"] == "queued"
-        assert client.post("/v1/connections/raw-files/test").json()["ok"] is True
-        assert inventory(client)["statistics"]["object_count"] == 0
+        actual = client.get("/v1/info").json()["limits"]["defaults"]["timeouts"]
+        assert actual["sync_response_max_ms"] == 1
+        assert actual["request_timeout_ms"] == 5000
+        try:
+            response = client.post(
+                "/v1/storage-status/checks",
+                json={"connection_id": "raw-files"},
+                headers={"Idempotency-Key": "slow-status"},
+            )
+            assert response.status_code == 202
+            job_id = response.json()["job_id"]
+            location = response.headers["Location"]
+            assert entered.wait(timeout=1), "original submitted job did not start inventory"
+            # HTTP acceptance arrived while the actual inventory remains blocked at its gate.
+            pending = client.get(location).json()
+            assert pending["job_id"] == job_id
+            assert pending["status"] == "running"
+            assert pending.get("result") is None
+            assert not release.is_set()
+            # Existing synchronous connection health check is independent of the gated inventory.
+            assert client.post("/v1/connections/raw-files/test").json()["ok"] is True
+        finally:
+            client.portal.call(release.set)
+        deadline = time.monotonic() + actual["request_timeout_ms"] / 1000
+        while time.monotonic() < deadline:
+            completed = client.get(location).json()
+            assert completed["job_id"] == job_id
+            if completed["status"] in {"succeeded", "failed", "cancelled"}:
+                break
+            time.sleep(0.01)
+        assert completed["status"] == "succeeded", completed
+        assert completed["result"]["statistics"]["object_count"] == 0

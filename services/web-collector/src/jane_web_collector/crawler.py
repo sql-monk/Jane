@@ -37,7 +37,7 @@ from jane_kit.config import LimitLayer, ResolvedLimits
 from jane_kit.jobs import JobCancelledError, JobContext
 
 from .connections import ConnectionPolicy, auth_headers
-from .discovery.links import extract_hrefs, html_meta, is_html, parse_html
+from .discovery.links import charset_of, extract_hrefs, html_meta, is_html, parse_html
 from .discovery.registry import Registry
 from .fetcher import Fetcher, FetchError, HttpResult
 from .host_limits import HostLimiter
@@ -283,7 +283,8 @@ class CrawlRun:
     ) -> list[str]:
         if not is_html(resource.media_type):
             return []
-        doc = parse_html(resource.body)
+        content_type = next((v for k, v in resource.headers.items() if k.lower() == "content-type"), None)
+        doc = parse_html(resource.body, charset_of(content_type))
         if doc is None:
             return []
         base = resource.final_url
@@ -701,7 +702,11 @@ class CrawlRun:
         canonical = self.normalizer.normalize(result.final_url) or url
         duplicate_of: str | None = None
         extra_done: list[FrontierRow] = []
-        doc = parse_html(result.body) if is_html(result.media_type) and result.status < 300 else None
+        doc = (
+            parse_html(result.body, result.charset)
+            if is_html(result.media_type) and result.status < 300
+            else None
+        )
         if canonical != url and canonical not in claimed:
             if self.state.known(self.collection_id, canonical):
                 duplicate_of = canonical

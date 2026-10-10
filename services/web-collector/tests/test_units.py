@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from jane_kit.config import LimitLayer
 from jane_web_collector.app import build_app
+from jane_web_collector.discovery.links import charset_of, html_meta, parse_html
 from jane_web_collector.robots import parse_robots
 from jane_web_collector.settings import ServiceLimits, resolve_service_limits, to_contract
 from jane_web_collector.testing import FAST_LIMITS, Site, drain, errors, make_settings, start, web_rules
@@ -206,3 +207,26 @@ def test_retries_follow_the_retry_policy(client: TestClient, flaky: str) -> None
     assert _Flaky.hits["/flaky"] == 3 and _Flaky.hits["/down"] == 3
     [err] = errors(client, cid)
     assert err["code"] == "source_unavailable" and err["http_status"] == 503 and err["attempts"] == 3
+
+
+@pytest.mark.parametrize(
+    ("body", "charset"),
+    [
+        ("<html><head><title>Ноутбуки</title></head></html>".encode(), "utf-8"),  # charset only in the header
+        ("<html><head><title>Ноутбуки</title></head></html>".encode(), None),  # valid UTF-8, no declaration
+        ('<html><head><meta charset="utf-8"><title>Ноутбуки</title></head></html>'.encode(), None),
+        ("<html><head><title>Ноутбуки</title></head></html>".encode("cp1251"), "windows-1251"),
+        (
+            '<html><head><meta charset="windows-1251"><title>Ноутбуки</title></head></html>'.encode("cp1251"),
+            None,
+        ),
+    ],
+)
+def test_html_title_is_decoded_with_the_page_encoding(body: bytes, charset: str | None) -> None:
+    # Without an encoding libxml2 reads undeclared pages as Latin-1: "Ноутбуки" became "ÐÐ¾ÑÑÐ±ÑÐºÐ¸".
+    assert html_meta(parse_html(body, charset))["title"] == "Ноутбуки"
+
+
+def test_charset_of_content_type() -> None:
+    assert charset_of('text/html; charset="UTF-8"') == "utf-8"
+    assert charset_of("text/html") is None and charset_of(None) is None

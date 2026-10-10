@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import codecs
+import re
 from collections.abc import Callable, Iterable
 from typing import Any
 
@@ -32,12 +34,43 @@ def is_html(media_type: str) -> bool:
     return media_type in HTML_TYPES
 
 
-def parse_html(body: bytes) -> Any | None:
+_META_CHARSET = re.compile(rb"""<meta[^>]+charset\s*=\s*["']?\s*([A-Za-z0-9_.:-]+)""", re.IGNORECASE)
+
+
+def _encoding(body: bytes, charset: str | None) -> str | None:
+    """The page's encoding: the response charset, else a ``<meta>`` declaration, else UTF-8 if the bytes are
+    valid UTF-8 (libxml2 alone falls back to Latin-1 and garbles e.g. Cyrillic titles)."""
+    declared = _META_CHARSET.search(body[:65536])
+    for candidate in (charset, declared.group(1).decode("ascii") if declared else None):
+        if candidate:
+            try:
+                return codecs.lookup(candidate).name
+            except LookupError:
+                continue
+    try:
+        body.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    return "utf-8"
+
+
+def charset_of(content_type: str | None) -> str | None:
+    """``charset`` parameter of a Content-Type header value."""
+    for part in (content_type or "").split(";")[1:]:
+        key, _, value = part.strip().partition("=")
+        if key.lower() == "charset" and value:
+            return value.strip("\"'").lower()
+    return None
+
+
+def parse_html(body: bytes, charset: str | None = None) -> Any | None:
     if not body.strip():
         return None
+    encoding = _encoding(body, charset)
+    parser = lxml.html.HTMLParser(encoding=encoding) if encoding else None
     try:
-        return lxml.html.document_fromstring(body)
-    except (etree.ParserError, ValueError):
+        return lxml.html.document_fromstring(body, parser=parser)
+    except (etree.ParserError, ValueError, LookupError):
         return None
 
 

@@ -514,7 +514,7 @@ class Engine:
             transit_ttl_seconds=limits.transfer.transit_ttl_seconds,
             store=self.transit,
         )
-        doc = parse_html(result.body) if is_html(result.media_type) else None
+        doc = parse_html(result.body, result.charset) if is_html(result.media_type) else None
         try:
             return build_material(
                 result,

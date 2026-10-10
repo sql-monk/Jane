@@ -61,8 +61,8 @@ test.describe("runs, progress, costs, cancellation, reprocessing, materials, res
     admin,
   }) => {
     await admin.goto("/materials");
-    await admin.getByLabel("Сховище (connection_id)").fill("raw-files");
-    const table = admin.getByRole("table", { name: "Збережені матеріали" });
+    await admin.getByLabel("Сховище", { exact: true }).selectOption("raw-files");
+    const table = admin.getByRole("table", { name: "Матеріали raw-files", exact: true });
     await expect(table).toContainText("https://shop.example.test/product/a-100");
     await table.getByRole("button", { name: "Переглянути" }).click();
     const preview = admin.getByTestId("content-preview");

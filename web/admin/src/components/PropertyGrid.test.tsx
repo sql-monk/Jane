@@ -44,3 +44,17 @@ it("adds/removes fields and array items, rejects collisions, retains invalid num
   expect(screen.getByRole("alert")).toHaveTextContent("попереднє значення збережено");
   expect(JSON.parse(screen.getByTestId("json").textContent!).params.items[2]).toBe(0);
 });
+
+it("retains an invalid number and its error when its parent is collapsed", () => {
+  render(<Harness />);
+  const number = screen.getByLabelText("Значення $.params.items[2]") as HTMLInputElement;
+  fireEvent.change(number, { target: { value: "" } });
+  fireEvent.blur(number);
+  fireEvent.click(screen.getByLabelText("Розгорнути $.params"));
+  expect(number).not.toBeVisible();
+  expect(number.isConnected).toBe(true);
+  fireEvent.click(screen.getByLabelText("Розгорнути $.params"));
+  expect(number).toBeVisible();
+  expect(number.value).toBe("");
+  expect(screen.getByRole("alert")).toHaveTextContent("Некоректне число");
+});

@@ -6,7 +6,7 @@ import type { Stage } from "../api/types";
 import { removeStage, renameStage, type JsonValue } from "../lib/property";
 import { checkJson, JsonEditor, toJsonText } from "./JsonEditor";
 import { DagView } from "./DagView";
-import { PropertyGrid, PropertyIssuesContext } from "./PropertyGrid";
+import { PropertyGrid, PropertyIssuesContext, PropertyDraftsBlockedContext } from "./PropertyGrid";
 import { ErrorBox, Field, LoadMore } from "./ui";
 import "../chain-editor.css";
 
@@ -41,6 +41,8 @@ export function ChainEditor({
   const [raw, setRaw] = useState(false);
   const [error, setError] = useState("");
   const [propertyIssues, setPropertyIssues] = useState<Record<string, string>>({});
+  const [editReset, setEditReset] = useState(0);
+  const hasDraftIssues = Boolean(error) || Object.keys(propertyIssues).length > 0;
   const reportIssue = useCallback(
     (key: string, issue: string) =>
       setPropertyIssues((previous) => {
@@ -61,136 +63,172 @@ export function ChainEditor({
   const patch = (next: Stage) => update(stages.map((s) => (s.stage_id === stage?.stage_id ? next : s)));
   return (
     <PropertyIssuesContext.Provider value={reportIssue}>
-      <div className="chain-editor">
-        <div className="button-row">
-          <button type="button" className="btn" onClick={() => setRaw(!raw)}>
-            {raw ? "Візуальний редактор" : "Редагувати JSON"}
-          </button>
-          <button
-            type="button"
-            className="btn"
-            disabled={!valid}
-            onClick={() => {
-              let id = `stage-${stages.length + 1}`;
-              while (stages.some((s) => s.stage_id === id)) id += "-new";
-              update([
-                ...stages,
-                {
-                  stage_id: id,
-                  kind: "handler",
-                  handler: { package_id: "", version: "" },
-                  params: {},
-                  inputs: stage ? [{ from: stage.stage_id }] : [],
-                },
-              ]);
-              setSelected(id);
-            }}
-          >
-            Додати етап-обробник
-          </button>
-          <button
-            type="button"
-            className="btn"
-            disabled={!valid || stages.some((s) => s.kind === "collect")}
-            onClick={() => {
-              let id = "collect";
-              while (stages.some((s) => s.stage_id === id)) id += "-new";
-              update([{ stage_id: id, kind: "collect", collector: { collector: "web" } }, ...stages]);
-              setSelected(id);
-            }}
-          >
-            Додати збір
-          </button>
-        </div>
-        {raw ? (
-          <JsonEditor text={text} onChange={onChange} label="Етапи завдання" minHeight="20rem" />
-        ) : valid ? (
-          <>
-            <DagView
-              stages={stages}
-              selected={stage?.stage_id ?? ""}
-              onSelect={setSelected}
-              requireCollect={requireCollect}
-            />
-            <div className="chain-layout">
-              <nav aria-label="Етапи">
-                {stages.map((s) => (
-                  <button
-                    className="btn"
-                    type="button"
-                    key={s.stage_id}
-                    aria-pressed={s === stage}
-                    onClick={() => setSelected(s.stage_id)}
-                  >
-                    {s.stage_id}
-                  </button>
-                ))}
-              </nav>
-              {stage ? (
-                <section aria-label="Вибраний етап">
-                  <h3>{stage.stage_id}</h3>
-                  <Field label="Ідентифікатор етапу">
-                    <input
-                      key={stage.stage_id}
-                      defaultValue={stage.stage_id}
-                      onBlur={(e) => {
-                        try {
-                          update(renameStage(stages, stage.stage_id, e.target.value));
-                          setSelected(e.target.value);
-                          setError("");
-                        } catch (err) {
-                          setError((err as Error).message);
-                          e.target.value = stage.stage_id;
-                        }
+      <PropertyDraftsBlockedContext.Provider value={hasDraftIssues}>
+        <div className="chain-editor">
+          <div className="button-row">
+            <button type="button" className="btn" disabled={hasDraftIssues} onClick={() => setRaw(!raw)}>
+              {raw ? "Візуальний редактор" : "Редагувати JSON"}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={!valid || hasDraftIssues}
+              onClick={() => {
+                let id = `stage-${stages.length + 1}`;
+                while (stages.some((s) => s.stage_id === id)) id += "-new";
+                update([
+                  ...stages,
+                  {
+                    stage_id: id,
+                    kind: "handler",
+                    handler: { package_id: "", version: "" },
+                    params: {},
+                    inputs: stage ? [{ from: stage.stage_id }] : [],
+                  },
+                ]);
+                setSelected(id);
+              }}
+            >
+              Додати етап-обробник
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={!valid || hasDraftIssues || stages.some((s) => s.kind === "collect")}
+              onClick={() => {
+                let id = "collect";
+                while (stages.some((s) => s.stage_id === id)) id += "-new";
+                update([{ stage_id: id, kind: "collect", collector: { collector: "web" } }, ...stages]);
+                setSelected(id);
+              }}
+            >
+              Додати збір
+            </button>
+          </div>
+          {raw ? (
+            <JsonEditor text={text} onChange={onChange} label="Етапи завдання" minHeight="20rem" />
+          ) : valid ? (
+            <>
+              <DagView
+                stages={stages}
+                selected={stage?.stage_id ?? ""}
+                onSelect={(id) => {
+                  if (!hasDraftIssues) setSelected(id);
+                }}
+                requireCollect={requireCollect}
+              />
+              <div className="chain-layout">
+                <nav aria-label="Етапи">
+                  {stages.map((s) => (
+                    <button
+                      className="btn"
+                      type="button"
+                      key={s.stage_id}
+                      aria-pressed={s === stage}
+                      disabled={hasDraftIssues}
+                      onClick={() => {
+                        if (!hasDraftIssues) setSelected(s.stage_id);
+                      }}
+                    >
+                      {s.stage_id}
+                    </button>
+                  ))}
+                </nav>
+                {stage ? (
+                  <section aria-label="Вибраний етап">
+                    <h3>{stage.stage_id}</h3>
+                    <Field label="Ідентифікатор етапу">
+                      <input
+                        key={`identity-${stage.stage_id}-${editReset}`}
+                        defaultValue={stage.stage_id}
+                        disabled={Object.keys(propertyIssues).length > 0}
+                        onBlur={(e) => {
+                          try {
+                            update(renameStage(stages, stage.stage_id, e.target.value));
+                            setSelected(e.target.value);
+                            setError("");
+                          } catch (err) {
+                            setError((err as Error).message);
+                            e.target.value = stage.stage_id;
+                          }
+                        }}
+                      />
+                    </Field>
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      disabled={hasDraftIssues}
+                      onClick={() => {
+                        update(removeStage(stages, stage.stage_id));
+                        setSelected(null);
+                      }}
+                    >
+                      Видалити етап і його зв’язки
+                    </button>
+                    <fieldset disabled={hasDraftIssues}>
+                      <ChainPackagePicker key={stage.stage_id} stage={stage} onChange={patch} />
+                    </fieldset>
+                    {stage.kind === "handler" ? (
+                      <ChainLinks
+                        key={`links-${stage.stage_id}-${editReset}`}
+                        stage={stage}
+                        stages={stages}
+                        onChange={patch}
+                        blocked={hasDraftIssues}
+                      />
+                    ) : null}
+                    <h4>Властивості етапу</h4>
+                    <p className="muted">Типи JSON зберігаються. Помилки схеми показано перед збереженням.</p>
+                    <PropertyGrid
+                      key={`properties-${stage.stage_id}-${editReset}`}
+                      objectRoot
+                      value={
+                        Object.fromEntries(
+                          Object.entries(stage).filter(
+                            ([k]) => k !== "stage_id" && k !== "kind" && k !== "inputs",
+                          ),
+                        ) as JsonValue
+                      }
+                      onChange={(v) => {
+                        if (v && typeof v === "object" && !Array.isArray(v))
+                          patch({
+                            ...v,
+                            stage_id: stage.stage_id,
+                            kind: stage.kind,
+                            ...(stage.inputs ? { inputs: stage.inputs } : {}),
+                          } as Stage);
                       }}
                     />
-                  </Field>
-                  <button
-                    type="button"
-                    className="btn btn-danger"
-                    onClick={() => {
-                      update(removeStage(stages, stage.stage_id));
-                      setSelected(null);
-                    }}
-                  >
-                    Видалити етап і його зв’язки
-                  </button>
-                  <ChainPackagePicker key={stage.stage_id} stage={stage} onChange={patch} />
-                  {stage.kind === "handler" ? (
-                    <ChainLinks stage={stage} stages={stages} onChange={patch} />
-                  ) : null}
-                  <h4>Властивості етапу</h4>
-                  <p className="muted">Типи JSON зберігаються. Помилки схеми показано перед збереженням.</p>
-                  <PropertyGrid
-                    objectRoot
-                    value={
-                      Object.fromEntries(
-                        Object.entries(stage).filter(
-                          ([k]) => k !== "stage_id" && k !== "kind" && k !== "inputs",
-                        ),
-                      ) as JsonValue
-                    }
-                    onChange={(v) => {
-                      if (v && typeof v === "object" && !Array.isArray(v))
-                        patch({
-                          ...v,
-                          stage_id: stage.stage_id,
-                          kind: stage.kind,
-                          ...(stage.inputs ? { inputs: stage.inputs } : {}),
-                        } as Stage);
-                    }}
-                  />
-                </section>
-              ) : (
-                <p>Додайте етап.</p>
-              )}
+                  </section>
+                ) : (
+                  <p>Додайте етап.</p>
+                )}
+              </div>
+            </>
+          ) : (
+            <p role="alert">
+              JSON етапів некоректний. Відкрийте JSON-режим для виправлення; текст збережено.
+            </p>
+          )}
+          {error ? <p role="alert">{error}</p> : null}
+          {hasDraftIssues ? (
+            <div role="alert">
+              <p>Є незавершені поля. Виправте їх перед зміною етапу, режиму чи збереженням.</p>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setEditReset((v) => v + 1);
+                  setPropertyIssues({});
+                  setError("");
+                }}
+              >
+                Відкинути незбережені поля
+              </button>
             </div>
-          </>
-        ) : (
-          <p role="alert">JSON етапів некоректний. Відкрийте JSON-режим для виправлення; текст збережено.</p>
-        )}
-        {error ? <p role="alert">{error}</p> : null}
-      </div>
+          ) : null}
+        </div>
+      </PropertyDraftsBlockedContext.Provider>
     </PropertyIssuesContext.Provider>
   );
 }
@@ -276,10 +314,12 @@ function ChainLinks({
   stage,
   stages,
   onChange,
+  blocked = false,
 }: {
   stage: Stage;
   stages: Stage[];
   onChange: (stage: Stage) => void;
+  blocked?: boolean;
 }) {
   const [from, setFrom] = useState("");
   const inputs = stage.inputs ?? [];
@@ -293,6 +333,7 @@ function ChainLinks({
           </strong>
           <Field label={`Вихід зв’язку ${i + 1}`}>
             <select
+              disabled={blocked}
               value={input.select ?? "output"}
               onChange={(e) =>
                 onChange({
@@ -303,12 +344,23 @@ function ChainLinks({
                 })
               }
             >
-              {["output", "input_material", "problems", "unmatched_materials"].map((v) => (
+              {!(
+                stages.find((s) => s.stage_id === input.from)?.kind === "collect"
+                  ? ["output", "unmatched_materials"]
+                  : ["output", "input_material", "problems"]
+              ).includes(input.select ?? "output") ? (
+                <option value={input.select}>Недопустимий: {input.select}</option>
+              ) : null}
+              {(stages.find((s) => s.stage_id === input.from)?.kind === "collect"
+                ? ["output", "unmatched_materials"]
+                : ["output", "input_material", "problems"]
+              ).map((v) => (
                 <option key={v}>{v}</option>
               ))}
             </select>
           </Field>
           <button
+            disabled={blocked}
             type="button"
             className="btn"
             onClick={() => onChange({ ...stage, inputs: inputs.filter((_, j) => j !== i) })}
@@ -330,6 +382,7 @@ function ChainLinks({
                 }
               />
               <button
+                disabled={blocked}
                 type="button"
                 className="btn"
                 onClick={() =>
@@ -349,6 +402,7 @@ function ChainLinks({
             </>
           ) : (
             <button
+              disabled={blocked}
               type="button"
               className="btn"
               onClick={() =>
@@ -368,7 +422,7 @@ function ChainLinks({
         </div>
       ))}
       <Field label="З’єднати з етапом">
-        <select value={from} onChange={(e) => setFrom(e.target.value)}>
+        <select disabled={blocked} value={from} onChange={(e) => setFrom(e.target.value)}>
           <option value="">—</option>
           {stages
             .filter((s) => s.stage_id !== stage.stage_id)
@@ -380,7 +434,7 @@ function ChainLinks({
       <button
         type="button"
         className="btn"
-        disabled={!stages.some((s) => s.stage_id === from) || from === stage.stage_id}
+        disabled={blocked || !stages.some((s) => s.stage_id === from) || from === stage.stage_id}
         onClick={() => {
           onChange({ ...stage, inputs: [...inputs, { from }] });
           setFrom("");

@@ -44,6 +44,14 @@ export function buildDag(stages: readonly Stage[], options: { requireCollect?: b
         issues.push(`етап «${stage.stage_id}» читає з невідомого етапу «${input.from}»`);
         continue;
       }
+      const sourceKind = byId.get(input.from)!.kind;
+      const select = input.select ?? "output";
+      if (
+        (sourceKind === "collect" && ["input_material", "problems"].includes(select)) ||
+        (sourceKind !== "collect" && select === "unmatched_materials")
+      ) {
+        issues.push(`недопустимий вихід «${select}» з етапу «${input.from}» (${sourceKind})`);
+      }
       edges.push({
         from: input.from,
         to: stage.stage_id,

@@ -273,7 +273,9 @@ export function TaskPage() {
               ]
         }
         active={tab}
-        onChange={setTab}
+        onChange={(next) => {
+          if (chainValid) setTab(next);
+        }}
       />
       {tab === "config" || tab === "chain" ? (
         <form

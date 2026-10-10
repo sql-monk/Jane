@@ -53,4 +53,21 @@ describe("lossless properties and graph mutations", () => {
       "рівно один",
     );
   });
+  it("matches orchestrator select restrictions for collect and handler sources", () => {
+    for (const select of ["input_material", "problems"] as const)
+      expect(
+        buildDag([stages[0]!, { ...stages[1]!, inputs: [{ from: "collect", select }] }]).issues.join(),
+      ).toContain("недопустимий вихід");
+    expect(
+      buildDag([
+        ...stages,
+        { ...stages[1]!, stage_id: "store", inputs: [{ from: "extract", select: "unmatched_materials" }] },
+      ]).issues.join(),
+    ).toContain("недопустимий вихід");
+    const valid = [
+      { ...stages[1]!, inputs: [{ from: "collect", select: "unmatched_materials" as const }] },
+      { ...stages[1]!, stage_id: "store", inputs: [{ from: "extract", select: "input_material" as const }] },
+    ];
+    expect(buildDag([stages[0]!, ...valid]).issues).toEqual([]);
+  });
 });

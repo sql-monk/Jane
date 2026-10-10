@@ -1,8 +1,9 @@
-import { createContext, Fragment, useContext, useEffect, useState } from "react";
+import { createContext, Fragment, useContext, useEffect, useId, useState } from "react";
 import { emptyValue, jsonType, moveItem, renameField, type JsonType, type JsonValue } from "../lib/property";
 
 const TYPES: JsonType[] = ["string", "number", "boolean", "null", "object", "array"];
 export const PropertyIssuesContext = createContext<(key: string, error: string) => void>(() => {});
+export const PropertyDraftsBlockedContext = createContext(false);
 export function PropertyGrid({
   value,
   onChange,
@@ -48,6 +49,7 @@ function PropertyRow({
   onMove,
   fixedType = false,
   prefix,
+  visible = true,
 }: {
   name: string;
   path: string;
@@ -59,21 +61,24 @@ function PropertyRow({
   onMove?: (delta: number) => void;
   fixedType?: boolean;
   prefix: string;
+  visible?: boolean;
 }) {
   const [open, setOpen] = useState(true);
   const [error, setError] = useState("");
   const reportIssue = useContext(PropertyIssuesContext);
+  const blocked = useContext(PropertyDraftsBlockedContext);
+  const issueId = useId();
   useEffect(() => {
-    reportIssue(`${prefix}:${path}`, error);
-    return () => reportIssue(`${prefix}:${path}`, "");
-  }, [reportIssue, prefix, path, error]);
+    reportIssue(issueId, error);
+    return () => reportIssue(issueId, "");
+  }, [reportIssue, issueId, error]);
   const type = jsonType(value);
   const container = type === "object" || type === "array";
   const object = type === "object" ? (value as Record<string, JsonValue>) : null;
   const array = type === "array" ? (value as JsonValue[]) : null;
   return (
     <Fragment>
-      <tr>
+      <tr hidden={!visible}>
         <td style={{ paddingLeft: `${depth + 0.5}rem` }}>
           {container ? (
             <button
@@ -89,6 +94,7 @@ function PropertyRow({
             <input
               aria-label={`Назва ${path}`}
               defaultValue={name}
+              disabled={blocked && !error}
               onChange={() => setError("Завершіть редагування назви поля")}
               key={name}
               onBlur={(e) => {
@@ -107,7 +113,7 @@ function PropertyRow({
         </td>
         <td>
           <select
-            disabled={fixedType}
+            disabled={fixedType || blocked}
             aria-label={`Тип ${path}`}
             value={type}
             onChange={(e) => {
@@ -166,6 +172,7 @@ function PropertyRow({
               <button
                 type="button"
                 aria-label={`Додати ${path}`}
+                disabled={blocked}
                 onClick={() => {
                   if (array) onChange([...array, ""]);
                   else {
@@ -182,26 +189,32 @@ function PropertyRow({
           ) : null}
           {onMove ? (
             <>
-              <button type="button" aria-label={`Вгору ${path}`} onClick={() => onMove(-1)}>
+              <button
+                disabled={blocked}
+                type="button"
+                aria-label={`Вгору ${path}`}
+                onClick={() => onMove(-1)}
+              >
                 ↑
               </button>
-              <button type="button" aria-label={`Вниз ${path}`} onClick={() => onMove(1)}>
+              <button disabled={blocked} type="button" aria-label={`Вниз ${path}`} onClick={() => onMove(1)}>
                 ↓
               </button>
             </>
           ) : null}
           {onRemove ? (
-            <button type="button" aria-label={`Видалити ${path}`} onClick={onRemove}>
+            <button disabled={blocked} type="button" aria-label={`Видалити ${path}`} onClick={onRemove}>
               ×
             </button>
           ) : null}
           {error ? <span role="alert">{error}</span> : null}
         </td>
       </tr>
-      {open && object
+      {object
         ? Object.entries(object).map(([key, item]) => (
             <PropertyRow
               prefix={prefix}
+              visible={visible && open}
               key={key}
               name={key}
               path={`${path}.${key}`}
@@ -213,10 +226,11 @@ function PropertyRow({
             />
           ))
         : null}
-      {open && array
+      {array
         ? array.map((item, index) => (
             <PropertyRow
               prefix={prefix}
+              visible={visible && open}
               key={index}
               name={String(index)}
               path={`${path}[${index}]`}

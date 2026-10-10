@@ -28,6 +28,7 @@ node_modules/
 
 # Dev stack state written by `just up` (ports, generated credentials)
 .jane/
+infra/compose.local.yaml
 
 # Build / coverage artefacts
 *.egg-info/

@@ -78,6 +78,9 @@ just down -v                # зупинити й видалити томи, з�
   сусідів — із середовища. Ключ адміністратора для адмінки: `just env` → `JANE_STACK_AUTH_ADMIN_API_KEY`.
   Матриця «хто кого викликає» — [docs/operations](../docs/operations/README.md#автентифікація-adr-0005);
   `infra/tests/test_auth_config.py` перевіряє її без стеку.
+- **Робоча локальна система.** Базовий файл свідомо не зв'язує сервіси (тести роблять це самі). Скопіюйте
+  `infra/compose.local.example.yaml` у `infra/compose.local.yaml` (поза Git) — `just up` додає його до кожного
+  виклику compose: виконавці оркестратора, registry для runtime/колектора/llm, сусіди асистента.
 - **Ключі зовнішніх провайдерів (ADR-0006).** `llm` бачить `.jane/secrets/` checkout (або `JANE_SECRETS_DIR`)
   лише для читання як `/run/secrets`: один файл — один секрет, у базі лише посилання `file:/run/secrets/<файл>`.
   `.jane/` поза Git. Реальний Anthropic — `scripts/llm_anthropic.py` ([services/llm](../services/llm/README.md)).

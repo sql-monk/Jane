@@ -26,6 +26,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_FILE = ROOT / "infra" / "compose.yaml"
+LOCAL_COMPOSE_FILE = ROOT / "infra" / "compose.local.yaml"
 STACK_DIR = ROOT / ".jane"
 UNIT_MARKERS = "not contract and not integration and not isolation"
 # Offline tests outside the workspace members and the root `testpaths`: examples (WP-14) and the limits
@@ -400,15 +401,22 @@ def load_or_create_credentials(project: str) -> dict[str, str]:
     return creds
 
 
+def compose_files() -> list[str]:
+    """`-f` arguments: infra/compose.yaml plus this checkout's git-ignored infra/compose.local.yaml, if present
+    (e.g. cross-service wiring for a working local system; CI and e2e never have it)."""
+    files = [COMPOSE_FILE, *([LOCAL_COMPOSE_FILE] if LOCAL_COMPOSE_FILE.is_file() else [])]
+    return [arg for f in files for arg in ("-f", str(f))]
+
+
 def compose(
     project: str, env: dict[str, str], *args: str, capture: bool = False
 ) -> subprocess.CompletedProcess[str]:
-    return run(["docker", "compose", "-f", str(COMPOSE_FILE), "-p", project, *args], env=env, capture=capture)
+    return run(["docker", "compose", *compose_files(), "-p", project, *args], env=env, capture=capture)
 
 
 def host_port(project: str, env: dict[str, str], service: str, container_port: int) -> int | None:
     r = subprocess.run(
-        ["docker", "compose", "-f", str(COMPOSE_FILE), "-p", project, "port", service, str(container_port)],
+        ["docker", "compose", *compose_files(), "-p", project, "port", service, str(container_port)],
         cwd=ROOT,
         env={**os.environ, **env},
         capture_output=True,

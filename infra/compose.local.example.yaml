@@ -1,0 +1,36 @@
+# Cross-service wiring for a working local system. The base infra/compose.yaml deliberately leaves it
+# optional (tests wire what they need). Copy to infra/compose.local.yaml (git-ignored): `just up` then
+# includes it in every compose call. Same executors as web/admin/scripts/configure-real-stack.mjs,
+# without its test fakes.
+services:
+  registry:
+    environment:
+      JANE_REGISTRY_RUNTIME_PROFILES: '["http://handler-runtime:8000/v1/info"]'
+  handler-runtime:
+    environment:
+      JANE_HANDLER_RUNTIME_REGISTRY_URL: http://registry:8000
+  web-collector:
+    environment:
+      JANE_WEB_COLLECTOR_REGISTRY_URL: http://registry:8000
+  orchestrator:
+    environment:
+      JANE_ORCHESTRATOR_EXECUTORS: >-
+        [{"executor": "web-collector", "role": "collector", "base_url": "http://web-collector:8101",
+          "capabilities": {"collector": "web"}},
+         {"executor": "handler-runtime", "role": "handler", "base_url": "http://handler-runtime:8000",
+          "capabilities": {"handler_kinds": ["extractor", "transform"], "default": true}},
+         {"executor": "storage", "role": "handler", "base_url": "http://storage:8000",
+          "capabilities": {"packages": ["jane.storage-*"], "handler_kinds": ["storage"]}},
+         {"executor": "storage-read", "role": "storage_read", "base_url": "http://storage:8000",
+          "sync_connections": false},
+         {"executor": "registry", "role": "registry", "base_url": "http://registry:8000"},
+         {"executor": "llm", "role": "llm", "base_url": "http://llm:8110", "capabilities": {"handler_kinds": ["llm"]}},
+         {"executor": "assistant", "role": "assistant", "base_url": "http://assistant:8000"}]
+  llm:
+    environment:
+      JANE_LLM_REGISTRY_URL: http://registry:8000
+  assistant:
+    environment:
+      JANE_ASSISTANT_REGISTRY_URL: http://registry:8000
+      JANE_ASSISTANT_ORCHESTRATOR_URL: http://orchestrator:8000
+      JANE_ASSISTANT_COLLECTOR_WEB_URL: http://web-collector:8101

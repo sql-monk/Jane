@@ -1,0 +1,90 @@
+{
+  "entities": [
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "citrus.ua",
+        "product_id": "790214",
+        "title": "Ноутбук Apple MacBook Neo A18 Pro Chip 13\" 8/256GB Citrus (MHFD4) 2026",
+        "url": "https://citrus.ua/noutbuki-i-ultrabuki/noutbuk-apple-macbook-neo-a18-pro-chip-13-8256-citrus-mhfd4-2026-790214.html",
+        "price": {
+          "amount": 40999.0,
+          "currency": "UAH"
+        },
+        "availability": "unknown",
+        "brand": "Apple"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "citrus.ua",
+          "product_id": "790214"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_fcadf938acf4c08ec2ec7df7",
+        "observed_at": "2026-10-10T19:11:18Z",
+        "material_id": "web:03fd47c9afd35676eb193d073f133c2d",
+        "content_sha256": "fcadf938acf4c08ec2ec7df707f2f764d7031703eb9cad4169e309bae7557aad"
+      }
+    },
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "citrus.ua",
+        "product_id": "788985",
+        "title": "Ноутбук Acer Aspire Lite AL15-46P Silver (NX.JXVEU.002)",
+        "url": "https://citrus.ua/noutbuki-i-ultrabuki/acer-aspire-lite-al15-46p-nxjxveu002-silver-788985.html",
+        "price": {
+          "amount": 23999.0,
+          "currency": "UAH"
+        },
+        "availability": "unknown",
+        "brand": "Acer",
+        "image": "https://cdn.citrus.ua/imgcache/size_180/uploads/shop/1/7/1775727398-acer-aspire-lite-15-al15-46p-10.webp"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "citrus.ua",
+          "product_id": "788985"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_fcadf938acf4c08ec2ec7df7",
+        "observed_at": "2026-10-10T19:11:18Z",
+        "material_id": "web:03fd47c9afd35676eb193d073f133c2d",
+        "content_sha256": "fcadf938acf4c08ec2ec7df707f2f764d7031703eb9cad4169e309bae7557aad"
+      }
+    },
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "citrus.ua",
+        "product_id": "798911",
+        "title": "Ноутбук Asus Vivobook Go 15 E1504FA-BQ2771 Mixed Black (90NB0ZR2-M04KH0)",
+        "url": "https://citrus.ua/noutbuki-i-ultrabuki/asus-vivobook-go-15-e1504fa-bq2771-90nb0zr2-m04kh0-mixed-black-798911.html",
+        "price": {
+          "amount": 22999.0,
+          "currency": "UAH"
+        },
+        "availability": "unknown",
+        "brand": "Asus",
+        "image": "https://cdn.citrus.ua/imgcache/size_180/uploads/shop/f/8/f8f123d0b1a9a7c37de770a03889c28b.webp"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "citrus.ua",
+          "product_id": "798911"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_fcadf938acf4c08ec2ec7df7",
+        "observed_at": "2026-10-10T19:11:18Z",
+        "material_id": "web:03fd47c9afd35676eb193d073f133c2d",
+        "content_sha256": "fcadf938acf4c08ec2ec7df707f2f764d7031703eb9cad4169e309bae7557aad"
+      }
+    }
+  ]
+}

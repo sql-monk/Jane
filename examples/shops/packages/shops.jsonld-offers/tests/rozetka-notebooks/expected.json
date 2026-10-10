@@ -1,0 +1,91 @@
+{
+  "entities": [
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "rozetka.com.ua",
+        "product_id": "621368348",
+        "title": "Ноутбук ASUS Vivobook 15 X1504VA-BQ4173 (90NB13Y2-M03RR0) Cool Silver / 15.6\" IPS / Intel Core 7 150U / RAM 8 ГБ / SSD 512 ГБ",
+        "url": "https://rozetka.com.ua/ua/asus-90nb13y2-m03rr0/p621368348/",
+        "price": {
+          "amount": 29999.0,
+          "currency": "UAH"
+        },
+        "availability": "in_stock",
+        "brand": "ASUS",
+        "image": "https://content2.rozetka.com.ua/goods/images/big_tile/382161121.jpg"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "rozetka.com.ua",
+          "product_id": "621368348"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_ce46f32c7a8375fe8b9b39ad",
+        "observed_at": "2026-10-10T19:11:18Z",
+        "material_id": "web:47cf538893352c3cafb82d0f9b1d9dfa",
+        "content_sha256": "ce46f32c7a8375fe8b9b39ad62460fe13e2b299ce9107f699603b3a5a99b4446"
+      }
+    },
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "rozetka.com.ua",
+        "product_id": "591360481",
+        "title": "Ноутбук Acer Aspire Lite AL15-46P-R4DH (NX.JXVEU.001) Light Silver / 15.6\" IPS / AMD Ryzen 3 5400U / RAM 8 ГБ / SSD 512 ГБ",
+        "url": "https://rozetka.com.ua/ua/acer-nx-jxveu-001/p591360481/",
+        "price": {
+          "amount": 23999.0,
+          "currency": "UAH"
+        },
+        "availability": "in_stock",
+        "brand": "Acer",
+        "image": "https://content1.rozetka.com.ua/goods/images/big_tile/665758326.jpg"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "rozetka.com.ua",
+          "product_id": "591360481"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_ce46f32c7a8375fe8b9b39ad",
+        "observed_at": "2026-10-10T19:11:18Z",
+        "material_id": "web:47cf538893352c3cafb82d0f9b1d9dfa",
+        "content_sha256": "ce46f32c7a8375fe8b9b39ad62460fe13e2b299ce9107f699603b3a5a99b4446"
+      }
+    },
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "rozetka.com.ua",
+        "product_id": "553197315",
+        "title": "Ноутбук Lenovo LOQ 15ARP9 (83JC00NFRA) Luna Grey / 15.6\" IPS 144 Гц / AMD Ryzen 5 7235HS / RAM 16 ГБ / SSD 512 ГБ / RTX 3050, 6 ГБ (TDP 95 Вт) / LAN / RGB Підсвітка клавіатури",
+        "url": "https://rozetka.com.ua/ua/lenovo-83jc00nfra/p553197315/",
+        "price": {
+          "amount": 48888.0,
+          "currency": "UAH"
+        },
+        "availability": "in_stock",
+        "brand": "Lenovo",
+        "image": "https://content2.rozetka.com.ua/goods/images/big_tile/666684379.jpg"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "rozetka.com.ua",
+          "product_id": "553197315"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_ce46f32c7a8375fe8b9b39ad",
+        "observed_at": "2026-10-10T19:11:18Z",
+        "material_id": "web:47cf538893352c3cafb82d0f9b1d9dfa",
+        "content_sha256": "ce46f32c7a8375fe8b9b39ad62460fe13e2b299ce9107f699603b3a5a99b4446"
+      }
+    }
+  ]
+}

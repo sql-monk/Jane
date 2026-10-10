@@ -1,0 +1,94 @@
+{
+  "schema_version": "1",
+  "package_id": "shops.jsonld-offers",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "Shops: product offers from schema.org JSON-LD",
+  "description": "Пропозиції товарів (назва, бренд, ціна, наявність, посилання) зі schema.org JSON-LD сторінок категорій: ItemList → Product → Offer (Rozetka, Citrus) або Product.offers зі списком Offer (Allo).",
+  "tags": ["shops", "prices", "json-ld", "schema-org"],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_shops_jsonld.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": ["material"],
+    "media_types": ["text/html"],
+    "content_kinds": ["page"]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "offer",
+        "schema": "schemas/offer.schema.json",
+        "key_fields": ["shop", "product_id"],
+        "description": "Товар магазину з поточною ціною й наявністю"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "rozetka-category-itemlist",
+      "input": {
+        "file": "tests/rozetka-notebooks/page.html",
+        "media_type": "text/html",
+        "url": "https://rozetka.com.ua/ua/notebooks/c80004/"
+      },
+      "expected_status": "success",
+      "expected": "tests/rozetka-notebooks/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "allo-category-offer-list",
+      "input": {
+        "file": "tests/allo-notebooks/page.html",
+        "media_type": "text/html",
+        "url": "https://allo.ua/ua/products/notebooks/"
+      },
+      "expected_status": "success",
+      "expected": "tests/allo-notebooks/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "citrus-category-itemlist",
+      "input": {
+        "file": "tests/citrus-notebooks/page.html",
+        "media_type": "text/html",
+        "url": "https://citrus.ua/noutbuki-i-ultrabuki/"
+      },
+      "expected_status": "success",
+      "expected": "tests/citrus-notebooks/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "page-without-offers-empty",
+      "input": {
+        "file": "tests/no-offers/page.html",
+        "media_type": "text/html",
+        "url": "https://rozetka.com.ua/ua/"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": ["Claude (coordinator)"],
+    "created_at": "2026-10-10T00:00:00Z",
+    "change_summary": "Shared JSON-LD offer extractor for laptop prices of Rozetka, Allo and Citrus."
+  },
+  "bindings_hint": {
+    "source_kinds": ["web"]
+  }
+}

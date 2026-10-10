@@ -1,0 +1,43 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "allo.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/ua/products/notebooks/"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "seed_list",
+      "strategy_id": "category-pages",
+      "urls": [
+        "https://allo.ua/ua/products/notebooks/",
+        "https://allo.ua/ua/products/notebooks/p-2/",
+        "https://allo.ua/ua/products/notebooks/p-3/",
+        "https://allo.ua/ua/products/notebooks/p-4/",
+        "https://allo.ua/ua/products/notebooks/p-5/"
+      ]
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "sections": [
+    {
+      "section_id": "notebooks",
+      "patterns": [
+        {
+          "value": "allo.ua/ua/products/notebooks/**"
+        }
+      ]
+    }
+  ],
+  "dedup": {
+    "use_link_rel_canonical": false
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "entities": [
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "allo.ua",
+        "product_id": "1203902",
+        "title": "Ноутбук Xiaomi Redmi Book Pro 16 U5/32G/1T/W11(JYU4649CN)",
+        "url": "https://allo.ua/ua/products/notebooks/noutbuk-xiaomi-redmi-book-pro-16-u5-32g-1t-w11-jyu4649cn.html",
+        "price": {
+          "amount": 54999.0,
+          "currency": "UAH"
+        },
+        "availability": "in_stock",
+        "image": "https://i.allo.ua/media/catalog/product/cache/3/image/710x600/602f0fa2c1f0d1ba5e241f914e856ff9/1/0/104.05.2026_11-48-1304.05.2026_11-49-50_208a4017a2.webp"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "allo.ua",
+          "product_id": "1203902"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_b3efccf22e5ea395d1c797a0",
+        "observed_at": "2026-10-10T19:11:18Z",
+        "material_id": "web:0a6d2a71e438c77de03346de07e91f61",
+        "content_sha256": "b3efccf22e5ea395d1c797a0a3a0884a30a3482ceaf5df3fcd724f971a76bfb5"
+      }
+    },
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "allo.ua",
+        "product_id": "1190437",
+        "title": "Ноутбук Xiaomi Redmi Book 16 2025 R7/16G/512GB/W11 (JYU4683CN)",
+        "url": "https://allo.ua/ua/products/notebooks/noutbuk-xiaomi-redmi-book-16-2025-r7-16g-512gb-w11-jyu4683cn.html",
+        "price": {
+          "amount": 38999.0,
+          "currency": "UAH"
+        },
+        "availability": "in_stock",
+        "image": "https://i.allo.ua/media/catalog/product/cache/3/image/710x600/602f0fa2c1f0d1ba5e241f914e856ff9/3/4/347347347_4_1_2_1_1.webp"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "allo.ua",
+          "product_id": "1190437"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_b3efccf22e5ea395d1c797a0",
+        "observed_at": "2026-10-10T19:11:18Z",
+        "material_id": "web:0a6d2a71e438c77de03346de07e91f61",
+        "content_sha256": "b3efccf22e5ea395d1c797a0a3a0884a30a3482ceaf5df3fcd724f971a76bfb5"
+      }
+    },
+    {
+      "entity_type": "offer",
+      "fields": {
+        "shop": "allo.ua",
+        "product_id": "1029355",
+        "title": "Ноутбук Xiaomi RedmiBook 16 2024 i5/16GB/512GB/W11 (JYU4585CN)",
+        "url": "https://allo.ua/ua/products/notebooks/noutbuk-xiaomi-redmibook-16-i5-16gb-512gb-w11-jyu4585cn.html",
+        "price": {
+          "amount": 34999.0,
+          "currency": "UAH"
+        },
+        "availability": "in_stock",
+        "image": "https://i.allo.ua/media/catalog/product/cache/3/image/710x600/602f0fa2c1f0d1ba5e241f914e856ff9/f/i/file_131725004452.webp"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "allo.ua",
+          "product_id": "1029355"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_b3efccf22e5ea395d1c797a0",
+        "observed_at": "2026-10-10T19:11:18Z",
+        "material_id": "web:0a6d2a71e438c77de03346de07e91f61",
+        "content_sha256": "b3efccf22e5ea395d1c797a0a3a0884a30a3482ceaf5df3fcd724f971a76bfb5"
+      }
+    }
+  ]
+}

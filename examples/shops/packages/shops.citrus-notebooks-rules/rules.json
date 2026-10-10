@@ -1,0 +1,43 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "citrus.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/noutbuki-i-ultrabuki/"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "seed_list",
+      "strategy_id": "category-pages",
+      "urls": [
+        "https://citrus.ua/noutbuki-i-ultrabuki/",
+        "https://citrus.ua/noutbuki-i-ultrabuki/page_2/",
+        "https://citrus.ua/noutbuki-i-ultrabuki/page_3/",
+        "https://citrus.ua/noutbuki-i-ultrabuki/page_4/",
+        "https://citrus.ua/noutbuki-i-ultrabuki/page_5/"
+      ]
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "sections": [
+    {
+      "section_id": "notebooks",
+      "patterns": [
+        {
+          "value": "citrus.ua/noutbuki-i-ultrabuki/**"
+        }
+      ]
+    }
+  ],
+  "dedup": {
+    "use_link_rel_canonical": false
+  }
+}

@@ -12,6 +12,9 @@ services:
   web-collector:
     environment:
       JANE_WEB_COLLECTOR_REGISTRY_URL: http://registry:8000
+      # Real shop pages are often 0.5-2 MB; without a blob store larger pages fail with limit_exceeded
+      # (default 256 KiB for inline delivery).
+      JANE_WEB_COLLECTOR_LIMITS__TRANSFER__INLINE_MAX_BYTES: "8388608"
   orchestrator:
     environment:
       JANE_ORCHESTRATOR_EXECUTORS: >-

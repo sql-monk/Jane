@@ -1,0 +1,43 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "rozetka.com.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/ua/notebooks/c80004/"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "seed_list",
+      "strategy_id": "category-pages",
+      "urls": [
+        "https://rozetka.com.ua/ua/notebooks/c80004/",
+        "https://rozetka.com.ua/ua/notebooks/c80004/page=2/",
+        "https://rozetka.com.ua/ua/notebooks/c80004/page=3/",
+        "https://rozetka.com.ua/ua/notebooks/c80004/page=4/",
+        "https://rozetka.com.ua/ua/notebooks/c80004/page=5/"
+      ]
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "sections": [
+    {
+      "section_id": "notebooks",
+      "patterns": [
+        {
+          "value": "rozetka.com.ua/ua/notebooks/c80004/**"
+        }
+      ]
+    }
+  ],
+  "dedup": {
+    "use_link_rel_canonical": false
+  }
+}

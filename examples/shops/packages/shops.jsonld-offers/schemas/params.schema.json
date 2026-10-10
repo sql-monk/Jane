@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "shops.jsonld-offers params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "default_currency": {
+      "description": "Валюта, якщо пропозиція її не вказує.",
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "default": "UAH"
+    }
+  }
+}

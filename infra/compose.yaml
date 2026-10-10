@@ -307,6 +307,11 @@ services:
       JANE_LLM_BLOB_ROOTS: '["/var/lib/jane/storage/objects", "/var/lib/jane/storage/transit/storage"]'
     volumes:
       - storage-data:/var/lib/jane/storage:ro
+      # Provider keys for `file:` secret references (ADR-0006): one file per secret in the git-ignored
+      # .jane/secrets of the checkout (or JANE_SECRETS_DIR), read-only at the service's default
+      # JANE_LLM_SECRET_FILES_DIR. Connections in the database keep only the reference, e.g.
+      # file:/run/secrets/anthropic_api_key (scripts/llm_anthropic.py).
+      - ${JANE_SECRETS_DIR:-../.jane/secrets}:/run/secrets:ro
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_LLM:-}:8110"]
     depends_on:
       pg-provision: { condition: service_completed_successfully }

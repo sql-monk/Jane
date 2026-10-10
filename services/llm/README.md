@@ -169,8 +169,10 @@ userinfo, `\` чи пробілами відхиляється). Політик�
   `secret_refs.api_key`; структурований вихід — `output_config.format` (JSON Schema) для моделей з
   `supports_structured_output`. `temperature` запиту/пакета **не передається** (нові моделі Claude не приймають
 параметрів семплювання; керування — промптом). Моделі й ціни за замовчуванням — з конфігурації (seed), приклад:
-  `claude-opus-5` ($5/$25 за 1M токенів), `claude-haiku-4-5` ($1/$5). **Не перевірено на реальному сервісі**
-  (ключа немає); форма запиту перевірена проти локального замінника API.
+  `claude-opus-5-5` ($4/$20 за 1M токенів), `claude-sonnet-5-5` ($2/$10), `claude-haiku-5-5` ($0.10/$0.50).
+  Dev-стек на реальному API: ключ одним рядком у `.jane/secrets/anthropic_api_key` (поза Git), потім
+  `uv run --no-project python scripts/llm_anthropic.py --project <проєкт> --check` — у базі llm лише посилання
+  `file:/run/secrets/anthropic_api_key`, провайдер, псевдоніми й денний бюджет платформи.
 - **`fake`** — детермінований провайдер для тестів цього й інших WP. Відповідь: ін'єкція в інструкціях (див.
   вище) → перший збіг зі скриптів підключення (`params.responses: [{when_data_contains | when_data_matches,
   output | output_text | error: unavailable|rejected}]`) → мінімальне значення, що відповідає схемі →

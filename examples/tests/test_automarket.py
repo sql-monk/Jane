@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -21,6 +22,51 @@ SPEC.loader.exec_module(automarket)
 
 def test_all_archives_documents_and_fixture_entity_fields() -> None:
     assert automarket.check_offline() == []
+
+
+@pytest.mark.parametrize("retryable", [False, True])
+def test_package_job_retries_only_explicitly_retryable_failures(retryable: bool) -> None:
+    ref = automarket.local_refs()["autos.rst-car-ads"]
+    first_key = hashlib.sha256(f"automarket-test:{ref['digest']}".encode()).hexdigest()
+    keys: list[str] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        key = request.headers["Idempotency-Key"]
+        keys.append(key)
+        job: dict[str, Any] = {
+            "job_id": "job_retry0" if key == first_key else "job_retry1",
+            "kind": "test_run",
+            "status": "failed" if key == first_key else "succeeded",
+            "created_at": "2026-10-11T00:00:00Z",
+        }
+        if key == first_key:
+            job["error"] = {
+                "type": "about:blank",
+                "title": "Service unavailable",
+                "status": 503,
+                "code": "service_unavailable",
+                "retryable": retryable,
+            }
+        else:
+            job["result"] = {"passed": 11, "failed": 0}
+        return httpx.Response(202, json=job)
+
+    api = automarket.ex.Api("http://handler.test", "handler", token=None)
+    api.http.close()
+    api.http = httpx.Client(base_url="http://handler.test", transport=httpx.MockTransport(respond))
+    api.client = ContractClient(automarket.ex.spec("handler"), api.http)
+    try:
+        if retryable:
+            assert automarket.test_package(api, ref, 10, 0.001, 2) == {"passed": 11, "failed": 0}
+            assert keys[0] != keys[1]
+            automarket.test_package(api, ref, 10, 0.001, 2)
+            assert keys[:2] == keys[2:]
+        else:
+            with pytest.raises(RuntimeError, match="service_unavailable"):
+                automarket.test_package(api, ref, 10, 0.001, 2)
+            assert keys == [first_key]
+    finally:
+        api.close()
 
 
 @pytest.mark.parametrize("failure", [None, "upload", "permission"])

@@ -53,6 +53,8 @@ class StackApi(ex.Api):
         retries: int,
         keepalive: float,
         http_timeout: float = 120,
+        container_name: str | None = None,
+        retry_delay: float = 2,
     ) -> None:
         super().__init__(base_url, api, token=token)
         self.http.close()
@@ -64,6 +66,8 @@ class StackApi(ex.Api):
         )
         self.client = ContractClient(ex.spec(api), self.http)
         self.transport_retries = retries
+        self.container_name = container_name
+        self.retry_delay = retry_delay
 
     def call(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         safe = method in {"GET", "HEAD", "OPTIONS", "PUT", "DELETE"} or "Idempotency-Key" in kwargs.get(
@@ -72,9 +76,12 @@ class StackApi(ex.Api):
         for attempt in range(self.transport_retries + 1):
             try:
                 return super().call(method, path, **kwargs)
-            except httpx.RemoteProtocolError:
+            except httpx.TransportError:
                 if not safe or attempt == self.transport_retries:
                     raise
+                if self.container_name:
+                    self.http.base_url = runtime_url(self.container_name, str(self.http.base_url))
+                time.sleep(self.retry_delay)
         raise RuntimeError("unreachable transport retry state")
 
 
@@ -233,30 +240,20 @@ def check_offline() -> list[str]:
 
 
 def connect(
-    stack_file: Path, *, retries: int = 2, keepalive: float = 2, http_timeout: float = 120
+    stack_file: Path,
+    *,
+    retries: int = 2,
+    keepalive: float = 2,
+    http_timeout: float = 120,
+    retry_delay: float = 2,
 ) -> tuple[ex.Services, ex.Api]:
     stack = ex.read_json(stack_file)
     token = stack.get("env", {}).get("JANE_API_KEY_ADMIN")
     urls = {name: service["url"] for name, service in stack["services"].items() if "url" in service}
-    docker = shutil.which("docker")
     project = stack.get("project") or stack_file.stem.removeprefix("stack-")
-    if docker:
-        for name in ("registry", "orchestrator", "storage", "handler-runtime"):
-            if urlsplit(urls[name]).hostname not in {"127.0.0.1", "localhost"}:
-                continue
-            published = subprocess.run(  # noqa: S603 - trusted local project name, argv only; read-only
-                [docker, "port", f"{project}-{name}-1", "8000/tcp"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if published.returncode == 0:
-                address = next(
-                    (line.strip() for line in published.stdout.splitlines() if line.startswith("127.0.0.1:")),
-                    None,
-                )
-                if address:
-                    urls[name] = f"http://{address}"
+    containers = {name: f"{project}-{name}-1" for name in urls}
+    for name in ("registry", "orchestrator", "storage", "handler-runtime"):
+        urls[name] = runtime_url(containers[name], urls[name])
     return ex.Services(
         StackApi(
             urls["registry"],
@@ -265,6 +262,8 @@ def connect(
             retries=retries,
             keepalive=keepalive,
             http_timeout=http_timeout,
+            container_name=containers["registry"],
+            retry_delay=retry_delay,
         ),
         StackApi(
             urls["orchestrator"],
@@ -273,6 +272,8 @@ def connect(
             retries=retries,
             keepalive=keepalive,
             http_timeout=http_timeout,
+            container_name=containers["orchestrator"],
+            retry_delay=retry_delay,
         ),
         StackApi(
             urls["storage"],
@@ -281,6 +282,8 @@ def connect(
             retries=retries,
             keepalive=keepalive,
             http_timeout=http_timeout,
+            container_name=containers["storage"],
+            retry_delay=retry_delay,
         ),
     ), StackApi(
         urls["handler-runtime"],
@@ -289,7 +292,29 @@ def connect(
         retries=retries,
         keepalive=keepalive,
         http_timeout=http_timeout,
+        container_name=containers["handler-runtime"],
+        retry_delay=retry_delay,
     )
+
+
+def runtime_url(container_name: str, fallback: str) -> str:
+    """Resolve a local container's current published port without changing shared metadata."""
+    docker = shutil.which("docker")
+    if docker is None or urlsplit(fallback).hostname not in {"127.0.0.1", "localhost"}:
+        return fallback
+    published = subprocess.run(  # noqa: S603 - trusted local project name, argv only; read-only
+        [docker, "port", container_name, "8000/tcp"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if published.returncode == 0:
+        address = next(
+            (line.strip() for line in published.stdout.splitlines() if line.startswith("127.0.0.1:")), None
+        )
+        if address:
+            return f"http://{address}"
+    return fallback
 
 
 def wait_job(api: ex.Api, job: dict[str, Any], timeout: float, poll: float) -> dict[str, Any]:
@@ -299,9 +324,33 @@ def wait_job(api: ex.Api, job: dict[str, Any], timeout: float, poll: float) -> d
             raise TimeoutError(f"job {job['job_id']} still {job['status']}")
         time.sleep(poll)
         job = api.call("GET", f"/v1/jobs/{job['job_id']}").json()
-    if job["status"] != "succeeded":
-        raise RuntimeError(f"job {job['job_id']}: {job['status']} {job.get('error')}")
     return job
+
+
+def test_package(
+    handler: ex.Api, ref: dict[str, str], timeout: float, poll: float, retries: int
+) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    identity = f"automarket-test:{ref['digest']}"
+    for attempt in range(retries + 1):
+        if time.monotonic() >= deadline:
+            raise TimeoutError(f"{ref['package_id']}: test retry deadline exceeded")
+        job = handler.call(
+            "POST",
+            "/v1/test-runs",
+            ok=(200, 202),
+            json={"handler": ref, "tests": "all"},
+            headers={"Idempotency-Key": hashlib.sha256(identity.encode()).hexdigest()},
+        ).json()
+        job = wait_job(handler, job, max(0, deadline - time.monotonic()), poll)
+        if job["status"] == "succeeded":
+            return dict(job["result"])
+        error = job.get("error") or {}
+        if job["status"] != "failed" or not error.get("retryable") or attempt == retries:
+            raise RuntimeError(f"job {job['job_id']}: {job['status']} {error}")
+        identity = f"automarket-test:{ref['digest']}:retry:{job['job_id']}"
+        ex.log(f"{ref['package_id']}: retrying failed test job {job['job_id']} after {error.get('code')}")
+    raise RuntimeError("unreachable test retry state")
 
 
 def upload_version(
@@ -342,7 +391,13 @@ def upload_version(
 
 
 def publish(
-    svc: ex.Services, handler: ex.Api, timeout: float, poll: float, *, allow_generated: bool = False
+    svc: ex.Services,
+    handler: ex.Api,
+    timeout: float,
+    poll: float,
+    *,
+    allow_generated: bool = False,
+    test_retries: int = 2,
 ) -> dict[str, dict[str, str]]:
     refs = local_refs()
     for pid, directory in package_dirs().items():
@@ -370,16 +425,7 @@ def publish(
         if version["digest"] != ref["digest"]:
             raise RuntimeError(f"{pid}: immutable registry version differs; bump version")
         if manifest["kind"] == "extractor":
-            job = handler.call(
-                "POST",
-                "/v1/test-runs",
-                ok=(200, 202),
-                json={"handler": ref, "tests": "all"},
-                headers={
-                    "Idempotency-Key": hashlib.sha256(f"automarket-test:{ref['digest']}".encode()).hexdigest()
-                },
-            ).json()
-            report = wait_job(handler, job, timeout, poll)["result"]
+            report = test_package(handler, ref, timeout, poll, test_retries)
             if report["failed"] or not report["passed"]:
                 raise RuntimeError(f"{pid}: runtime package tests failed: {report}")
             svc.registry.call(
@@ -615,6 +661,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--transport-retries", type=int, default=2)
     parser.add_argument("--keepalive", type=float, default=2)
     parser.add_argument("--http-timeout", type=float, default=120)
+    parser.add_argument("--retry-delay", type=float, default=2)
+    parser.add_argument("--test-retries", type=int, default=2)
     parser.add_argument(
         "--allow-generated-packages",
         action="store_true",
@@ -635,25 +683,31 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "check":
         print(f"automarket: {len(package_dirs())} packages and both source/task documents verified")
         return 0
-    if args.transport_retries < 0 or args.keepalive < 0:
+    if args.transport_retries < 0 or args.keepalive < 0 or args.retry_delay < 0 or args.test_retries < 0:
         parser.error("transport retry count and keepalive must not be negative")
     svc, handler = connect(
         args.stack_file,
         retries=args.transport_retries,
         keepalive=args.keepalive,
         http_timeout=args.http_timeout,
+        retry_delay=args.retry_delay,
     )
     try:
         if args.command == "apply":
-            refs = publish(
-                svc, handler, args.timeout, args.poll, allow_generated=args.allow_generated_packages
-            )
-            for connection in ("raw-files", "results-pg"):
-                svc.orchestrator.call("GET", f"/v1/connections/{connection}")
             disable_unavailable(svc.orchestrator)
             if args.cancel_active:
                 for task_id in ("ads-autoria", "ads-rst", "ads-avtobazar"):
                     cancel_active(svc.orchestrator, task_id, args.timeout)
+            refs = publish(
+                svc,
+                handler,
+                args.timeout,
+                args.poll,
+                allow_generated=args.allow_generated_packages,
+                test_retries=args.test_retries,
+            )
+            for connection in ("raw-files", "results-pg"):
+                svc.orchestrator.call("GET", f"/v1/connections/{connection}")
             for site, (source_id, task_id, *_rest) in SITES.items():
                 put_config(svc.orchestrator, "sources", source_id, source_doc(site, refs))
                 put_config(svc.orchestrator, "tasks", task_id, task_doc(site, refs, pages=args.pages))

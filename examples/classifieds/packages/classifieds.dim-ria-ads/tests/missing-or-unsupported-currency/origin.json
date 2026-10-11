@@ -1,0 +1,7 @@
+{
+  "derived_from": "tests/real-catalog/page.html",
+  "original_fixture_sha256": "dd3ea29dd92deacdc41aed4ce979ef97a960202587d293ea6a08a4b4b1cd3af8",
+  "source_url": "https://dom.ria.com/uk/arenda-kvartir/kiev/",
+  "regression_mutation": "Remove currency evidence in one card and replace currencyId by an unsupported object in the other; neither price may be emitted.",
+  "observation": "Regression derivative only; original listing identity, title, URL, amount and location remain unchanged."
+}

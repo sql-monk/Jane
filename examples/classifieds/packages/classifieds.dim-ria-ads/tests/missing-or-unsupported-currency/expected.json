@@ -1,0 +1,38 @@
+{
+  "entities": [
+    {
+      "entity_type": "classified_ad",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "dom.ria.com",
+          "listing_id": "33683279"
+        }
+      },
+      "fields": {
+        "site": "dom.ria.com",
+        "listing_id": "33683279",
+        "title": "Здається в оренду 1-кімнатна квартира 27 кв. м у Києві",
+        "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-borispolskaya-ulitsa-33683279.html",
+        "location": "Київ"
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "dom.ria.com",
+          "listing_id": "35018017"
+        }
+      },
+      "fields": {
+        "site": "dom.ria.com",
+        "listing_id": "35018017",
+        "title": "Здається в оренду 1-кімнатна квартира 55 кв. м у Києві",
+        "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-prichalnaya-ulitsa-35018017.html",
+        "location": "Київ"
+      }
+    }
+  ]
+}

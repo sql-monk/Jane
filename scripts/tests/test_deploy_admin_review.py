@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import subprocess
 import sys
 from argparse import Namespace
 from pathlib import Path
@@ -424,3 +425,156 @@ def test_new_shared_writer_during_build_aborts_before_mutation(
     with pytest.raises(deploy.DeploymentError, match="no containers were stopped"):
         instance.assert_stack_unchanged()
     assert len(calls) == 1
+
+
+def image_snapshot_fixture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, missing: str | None = None
+) -> tuple[Any, list[list[str]], list[dict[str, Any]], list[str]]:
+    """Run the actual apply/CI/build boundary against external command neighbors only."""
+    originals = []
+    for kind in (
+        "storage",
+        "orchestrator",
+        "priority",
+        "priority-copy",
+        "proxy",
+        "postgres",
+        "testsite",
+        "stopped",
+    ):
+        original = container()
+        original["Id"] = "old-" + kind
+        original["Name"] = "/jane-demo-" + kind + ("-1" if kind != "priority" else "")
+        original["Image"] = "image-" + ("priority" if kind == "priority-copy" else kind)
+        original["Config"]["Image"] = "current-tag-" + kind
+        if kind in {"orchestrator", "priority", "priority-copy", "stopped"}:
+            original["Config"]["Env"].append("JANE_ORCHESTRATOR_DATABASE_URL=postgresql://private-dsn")
+        if kind == "orchestrator":
+            original["Config"]["Cmd"] = ["python", "-m", "jane_orchestrator"]
+        if kind == "stopped":
+            original["State"]["Running"] = False
+        originals.append(original)
+    mandatory = sorted({"image-storage", "image-orchestrator", "image-priority", "image-proxy"})
+    image_metadata = {image: {"Id": image, "RepoTags": ["retained-" + image]} for image in mandatory}
+    if missing is not None:
+        del image_metadata["image-" + missing]
+    sha = "b" * 40
+    calls: list[list[str]] = []
+
+    def execute(args: list[str], **kwargs: Any) -> Any:
+        calls.append(args)
+        output: Any = b""
+        stderr = b""
+        code = 0
+        if args == ["whoami"]:
+            output = "test-user"
+        elif args[0] == "icacls":
+            pass
+        elif args[:2] == ["docker", "ps"]:
+            output = "\n".join(c["Id"] for c in originals).encode()
+        elif args[:2] == ["docker", "inspect"]:
+            output = json.dumps(originals).encode()
+        elif args[:3] == ["docker", "image", "inspect"]:
+            assert args[3:] == mandatory, (
+                "inspect only exact rollback image IDs, deterministically deduplicated"
+            )
+            if any(image not in image_metadata for image in args[3:]):
+                code, stderr = 1, b"Private Docker missing-image diagnostic\n"
+            else:
+                output = json.dumps([image_metadata[image] for image in args[3:]]).encode()
+        elif args[:2] == ["git", "rev-parse"]:
+            output = sha.encode()
+        elif args[:2] == ["git", "status"]:
+            pass
+        elif args[:2] == ["git", "remote"]:
+            output = b"https://github.com/test/Jane.git"
+        elif args[:2] == ["git", "merge-base"]:
+            assert args[2:] == ["--is-ancestor", "c" * 40, sha]
+        elif args[:2] == ["git", "archive"]:
+            code, stderr = 1, b"Injected build-neighbor archive failure\n"
+        elif args[:2] == ["gh", "api"]:
+            endpoint = args[2]
+            if endpoint.endswith("/jobs?per_page=100"):
+                output = json.dumps(
+                    {"jobs": [{"name": name, "conclusion": "success"} for name in deploy.CI_JOBS]}
+                ).encode()
+            elif endpoint.endswith("/commits/main"):
+                output = json.dumps({"sha": "c" * 40}).encode()
+            else:
+                assert endpoint.endswith("/actions/runs/123")
+                output = json.dumps(
+                    {
+                        "head_sha": sha,
+                        "status": "completed",
+                        "conclusion": "success",
+                        "path": ".github/workflows/ci.yml",
+                    }
+                ).encode()
+        else:
+            pytest.fail(f"Unexpected external command before the image/build boundary: {args[:3]}")
+        return subprocess.CompletedProcess(args, code, stdout=output, stderr=stderr)
+
+    monkeypatch.setattr(deploy.subprocess, "run", execute)
+    state_path = tmp_path / ".jane" / "stack-state.json"
+    state_path.parent.mkdir()
+    state_path.write_text(
+        json.dumps(
+            {
+                "project": "jane-demo",
+                "services": {
+                    "proxy": {"url": "http://127.0.0.1:54347"},
+                    "auth": {"admin_api_key": "private-test-token"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    instance = deploy.Deploy(
+        Namespace(stack_state=state_path, sha=sha, ci_run="123", strategy="recover", drain_seconds=None)
+    )
+
+    def reject_http(*_args: Any, **_kwargs: Any) -> None:
+        pytest.fail("Image metadata must be verified before any API or schedule mutation")
+
+    monkeypatch.setattr(instance.http, "open", reject_http)
+    return instance, calls, originals, mandatory
+
+
+def test_apply_ignores_orphaned_unrelated_images_and_keeps_full_container_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    instance, calls, originals, mandatory = image_snapshot_fixture(tmp_path, monkeypatch)
+    before = copy.deepcopy(originals)
+    with pytest.raises(deploy.DeploymentError, match="git operation failed"):
+        instance.apply()
+    image_call = ["docker", "image", "inspect", *mandatory]
+    archive_call = next(call for call in calls if call[:2] == ["git", "archive"])
+    assert calls.index(image_call) < calls.index(archive_call)
+    assert originals == before
+    assert json.loads((instance.backup / "original-containers.json").read_text()) == originals
+    images = json.loads((instance.backup / "original-images.json").read_text())
+    assert [image["Id"] for image in images] == mandatory
+    assert "image-testsite" not in mandatory and "image-stopped" not in mandatory
+    assert len(instance.writers) == 3 and len(mandatory) == 4
+    assert "Injected build-neighbor archive failure" in instance.log.read_text()
+    assert not any(call[:2] in (["docker", "stop"], ["docker", "build"]) for call in calls)
+
+
+@pytest.mark.parametrize("missing", ["storage", "orchestrator", "priority", "proxy"])
+def test_apply_missing_replaced_image_fails_and_logs_before_build_or_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, missing: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    instance, calls, originals, _mandatory = image_snapshot_fixture(tmp_path, monkeypatch, missing)
+    before = copy.deepcopy(originals)
+    with pytest.raises(deploy.DeploymentError, match="docker operation failed") as caught:
+        instance.apply()
+    assert originals == before
+    assert json.loads((instance.backup / "original-containers.json").read_text()) == originals
+    assert "Private Docker missing-image diagnostic" in instance.log.read_text()
+    assert "Private Docker" not in str(caught.value)
+    assert "Private Docker" not in capsys.readouterr().out
+    assert not (instance.backup / "original-images.json").exists()
+    assert not (instance.backup / "source.tar").exists()
+    assert not any(
+        call[:2] in (["git", "archive"], ["docker", "build"], ["docker", "stop"]) for call in calls
+    )

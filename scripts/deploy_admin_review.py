@@ -871,9 +871,10 @@ class Deploy:
         self.log = self.backup / "deployment.log"
         save_json(self.backup / "original-stack-state.json", self.state)
         save_json(self.backup / "original-containers.json", self.containers)
+        rollback_images = sorted({c["Image"] for c in [*self.writers, self.storage, self.proxy_container]})
         save_json(
             self.backup / "original-images.json",
-            json.loads(run(["docker", "image", "inspect", *{c["Image"] for c in self.containers}])),
+            json.loads(run(["docker", "image", "inspect", *rollback_images], log=self.log)),
         )
         release, tags = self.build(sha)
         self.assert_stack_unchanged()

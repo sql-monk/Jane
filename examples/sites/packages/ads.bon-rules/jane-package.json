@@ -1,0 +1,26 @@
+{
+  "schema_version": "1",
+  "package_id": "ads.bon-rules",
+  "version": "1.0.0",
+  "kind": "collector-rules",
+  "title": "BON.ua: electronics and home categories, first pages and new ad cards",
+  "description": "Правила Web Collector для bon.ua (колишній besplatka.ua): перші сторінки категорій «Електроніка, побутова техніка» й «Дім та Дача» (пагінація rel=next; кількість сторінок — limits.crawl.max_depth завдання) і картки оголошень з них. Сторінки категорій читаються щоразу; картка — один раз, далі не частіше limits.crawl.revisit_interval_seconds (revisit interval у зборі incremental). Сторінки 2+ мають rel=canonical на першу, тому дедуплікація за canonical вимкнена. robots.txt дотримується.",
+  "tags": [
+    "ads",
+    "classifieds",
+    "bon"
+  ],
+  "entry": {
+    "collector": "web",
+    "rules": "rules.json"
+  },
+  "tests": [],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (examples/sites: classifieds)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Hourly scan of BON.ua category pages with incremental ad cards."
+  }
+}

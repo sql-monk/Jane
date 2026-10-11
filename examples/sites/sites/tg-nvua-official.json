@@ -1,0 +1,133 @@
+{
+  "site": "tg-nvua-official",
+  "group": "telegram",
+  "title": "Telegram: NV (@nvua_official) — вебперегляд",
+  "url": "https://t.me/s/nvua_official",
+  "sources": [
+    {
+      "source_id": "tgweb-nvua-official",
+      "kind": "web",
+      "title": "Telegram @nvua_official (NV), t.me/s",
+      "description": "Публічний канал @nvua_official через вебперегляд https://t.me/s/nvua_official (без облікового запису Telegram): останні повідомлення каналу; пости — сутність post, сумісна зі шляхом через Telethon.",
+      "locator": {
+        "url": "https://t.me/s/nvua_official"
+      },
+      "collector_rules": "@pkg:telegram.nvua-official-web-rules",
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "expected_entity_types": [
+        "post"
+      ],
+      "labels": {
+        "group": "telegram",
+        "channel": "nvua_official",
+        "kind": "media"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "tgweb-nvua-official",
+      "title": "Telegram @nvua_official: пости кожні 15 хв",
+      "description": "Сторінка t.me/s каналу → RAW у files, пости (post) у PostgreSQL. Кожен запуск читає сторінку повністю: нові пости додаються, наявні (той самий channel + message_id) оновлюються — перегляди, редагування.",
+      "input": {
+        "source_id": "tgweb-nvua-official"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "full"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-files",
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "extract-posts",
+          "kind": "handler",
+          "handler": "@pkg:telegram.web-posts",
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "text/html"
+              }
+            }
+          ]
+        },
+        {
+          "stage_id": "store-posts",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-posts",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 900,
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 0,
+          "max_pages_per_run": 2
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "telegram",
+        "channel": "nvua_official",
+        "kind": "media"
+      }
+    }
+  ],
+  "verify": {
+    "tgweb-nvua-official": {
+      "post": {
+        "min": 5,
+        "required": [
+          "channel",
+          "message_id",
+          "url",
+          "published_at",
+          "title",
+          "text",
+          "views"
+        ]
+      }
+    }
+  }
+}

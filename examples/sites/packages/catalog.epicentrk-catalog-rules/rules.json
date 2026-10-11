@@ -8,31 +8,34 @@
       "https"
     ],
     "path_prefixes": [
-      "/ua/shop/",
-      "/upload/sitemap/new/products_ep/",
-      "/upload/sitemap/new/products_mp/"
+      "/ua/shop/"
     ],
     "include": [
       {
         "type": "regex",
-        "value": "^https://epicentrk\\.ua/ua/shop/[^/?#]+\\.html$"
+        "value": "^https://epicentrk\\.ua/ua/shop/[a-z0-9-]+/(\\?PAGEN_1=[0-9]+)?$"
       },
       {
         "type": "regex",
-        "value": "^https://epicentrk\\.ua/upload/sitemap/new/(?:products_ep/products_main_ua|products_mp/products_merchant_ua)(?:_[0-9]+)?\\.xml$"
+        "value": "^https://epicentrk\\.ua/ua/shop/[^/?#]+\\.html$"
       }
     ]
   },
   "strategies": [
     {
-      "type": "sitemap",
-      "strategy_id": "all-products",
-      "urls": [
-        "https://epicentrk.ua/upload/sitemap/new/products_ep/products_main_ua.xml",
-        "https://epicentrk.ua/upload/sitemap/new/products_mp/products_merchant_ua.xml"
+      "type": "listing",
+      "strategy_id": "categories",
+      "start_urls": [
+        "https://epicentrk.ua/ua/shop/elektrorubanki/",
+        "https://epicentrk.ua/ua/shop/kiyanki/",
+        "https://epicentrk.ua/ua/shop/leyki/"
       ],
-      "use_robots_txt": false,
-      "use_lastmod_for_revisit": false
+      "item_links": {
+        "value": "li[data-test-small-card] a[data-product-picture]"
+      },
+      "next_page": {
+        "value": "a[title=\"наступна сторінка\"]"
+      }
     }
   ],
   "robots": {
@@ -43,8 +46,18 @@
   },
   "sections": [
     {
+      "section_id": "categories",
+      "title": "Сторінки категорій і пагінації",
+      "patterns": [
+        {
+          "type": "regex",
+          "value": "^https://epicentrk\\.ua/ua/shop/[a-z0-9-]+/(\\?PAGEN_1=[0-9]+)?$"
+        }
+      ]
+    },
+    {
       "section_id": "products",
-      "title": "Усі українські картки товарів",
+      "title": "Сторінки товарів",
       "patterns": [
         {
           "type": "regex",
@@ -52,8 +65,5 @@
         }
       ]
     }
-  ],
-  "revisit": {
-    "mode": "interval"
-  }
+  ]
 }

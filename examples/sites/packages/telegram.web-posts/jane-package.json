@@ -1,0 +1,144 @@
+{
+  "schema_version": "1",
+  "package_id": "telegram.web-posts",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "Telegram channels: posts from the web preview t.me/s",
+  "description": "Повідомлення публічних Telegram-каналів зі сторінки вебперегляду https://t.me/s/<канал> (без облікового запису Telegram) як сутності post — той самий тип, ключ (channel + message_id) і обов'язкові поля, що й у channels.telegram-posts (шлях через Telethon), плюс перегляди, пересилання, зовнішні посилання, наявність медіа й позначка редагування. Сервісні повідомлення й пости лише з медіа пропускаються; сторінка читається щоразу, тож перегляди й редагування оновлюють той самий пост.",
+  "tags": [
+    "telegram",
+    "news",
+    "posts",
+    "web-preview"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_tgweb.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "post",
+        "schema": "schemas/post.schema.json",
+        "key_fields": [
+          "channel",
+          "message_id"
+        ],
+        "description": "Повідомлення каналу"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": [
+      "lxml>=6,<7"
+    ]
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "suspilnenews-feed",
+      "input": {
+        "file": "tests/suspilnenews/page.html",
+        "media_type": "text/html",
+        "url": "https://t.me/s/suspilnenews"
+      },
+      "expected_status": "success",
+      "expected": "tests/suspilnenews/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "ukrpravda-news-feed",
+      "input": {
+        "file": "tests/ukrpravda-news/page.html",
+        "media_type": "text/html",
+        "url": "https://t.me/s/ukrpravda_news"
+      },
+      "expected_status": "success",
+      "expected": "tests/ukrpravda-news/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "truexanewsua-aggregator-feed",
+      "input": {
+        "file": "tests/truexanewsua/page.html",
+        "media_type": "text/html",
+        "url": "https://t.me/s/truexanewsua"
+      },
+      "expected_status": "success",
+      "expected": "tests/truexanewsua/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "service-messages-empty",
+      "input": {
+        "file": "tests/service-messages/page.html",
+        "media_type": "text/html",
+        "url": "https://t.me/s/suspilnenews?before=6"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "media-only-empty",
+      "input": {
+        "file": "tests/media-only/page.html",
+        "media_type": "text/html",
+        "url": "https://t.me/s/truexanewsua"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "channel-info-page-empty",
+      "input": {
+        "file": "tests/channel-info/page.html",
+        "media_type": "text/html",
+        "url": "https://t.me/suspilnenews"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "not-a-channel-page-unrecognized",
+      "input": {
+        "file": "tests/not-a-channel/page.html",
+        "media_type": "text/html",
+        "url": "https://example.org/news/"
+      },
+      "expected_status": "unrecognized",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (subagent of the coordinator)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Posts of public news channels from t.me/s web preview pages."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ]
+  }
+}

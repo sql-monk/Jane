@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "telegram.web-posts params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "title_max_chars": {
+      "description": "Найбільша довжина заголовка (як у channels.telegram-posts).",
+      "type": "integer",
+      "minimum": 20,
+      "default": 200
+    }
+  }
+}

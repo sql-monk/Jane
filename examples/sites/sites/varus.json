@@ -1,14 +1,14 @@
 {
   "site": "varus",
   "group": "catalog",
-  "title": "VARUS: весь асортимент і періодичне оновлення цін",
+  "title": "VARUS (varus.ua): супермаркет — повний каталог чотирьох категорій і оновлення цін через каталожне API сайту",
   "url": "https://varus.ua/",
   "sources": [
     {
       "source_id": "varus",
       "kind": "web",
       "title": "VARUS — інтернет-супермаркет",
-      "description": "Увесь асортимент через публічне GraphQL API сайту: автоматичний обхід дерева категорій від головної ID 2, включно з усіма брендами, та всі сторінки кожної категорії до серверного повтору/порожньої відповіді. Поділ на категорії й бренди покриває товари поза першими 10 000 глобальних результатів. Усі властивості attributes(keys: []), ціни та наявність для регіону 0 без вибору магазину. robots.txt дотримується; 1 запит/с і один запит на хост.",
+      "description": "varus.ua (Vue Storefront): категорії «Йогурти», «Макаронні вироби», «Соки та нектари», «Засоби для миття посуду». Товари читаються через API, яким користуються сторінки категорій самого сайту (POST /api/graphql): HTML-сторінки категорій приходять із сервера без товарів. Запасний варіант замість NOVUS (zakaz.ua): robots.txt stores-api.zakaz.ua забороняє все (Disallow: /). robots.txt varus.ua дотримується (заборон немає); не частіше 1 запиту/с, один одночасний запит до хоста.",
       "locator": {
         "url": "https://varus.ua/"
       },
@@ -36,8 +36,8 @@
   "tasks": [
     {
       "task_id": "catalog-varus",
-      "title": "varus: весь асортимент, ціни й характеристики",
-      "description": "Кожні 15 хвилин продовження обмеженого обходу всього асортименту; черга й стан між запусками зберігаються. Отримані повні картки та ціни записуються у results-pg, історія спостережень зберігається. Повторне читання відомих товарів після 24 годин; фактична тривалість циклу залежить від розміру каталогу та доступності сайту.",
+      "title": "varus.ua: повний каталог чотирьох категорій",
+      "description": "Щоночі: списки товарів чотирьох категорій через каталожне API сайту (4 запити) → кожен товар — JSON-матеріал: RAW у raw-files, повні картки product (completeness: full) у results-pg.",
       "input": {
         "source_id": "varus"
       },
@@ -47,8 +47,21 @@
           "kind": "collect",
           "collector": {
             "collector": "web",
-            "mode": "incremental"
+            "mode": "full"
           }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-files",
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
         },
         {
           "stage_id": "extract-products",
@@ -89,19 +102,18 @@
         }
       ],
       "schedule": {
-        "type": "interval",
-        "interval_seconds": 900,
+        "type": "cron",
+        "cron": "40 2 * * *",
+        "timezone": "Europe/Kyiv",
         "overlap": "skip"
       },
       "limits": {
         "crawl": {
-          "max_depth": 10000,
-          "max_pages_per_run": 100,
-          "max_bytes_per_run": 67108864,
-          "max_material_bytes": 33554432,
-          "max_links_per_page": 60000,
-          "max_frontier_size": 2000000,
-          "revisit_interval_seconds": 86400
+          "max_depth": 2,
+          "max_pages_per_run": 20,
+          "max_bytes_per_run": 52428800,
+          "max_material_bytes": 8388608,
+          "max_links_per_page": 2000
         },
         "queue": {
           "max_inflight_materials": 500
@@ -117,7 +129,7 @@
     {
       "task_id": "prices-varus",
       "title": "varus.ua: оновлення цін і наявності",
-      "description": "Ручне допоміжне завдання сумісності. Автоматичне оновлення всього асортименту виконує основне завдання catalog-varus.",
+      "description": "Кожні 4 год: короткий запит каталожного API (правила catalog.varus-prices-rules: SKU, регіональні ціни, наявність) тих самих чотирьох категорій → часткове оновлення product (price, old_price, availability; completeness: partial) тих самих ключів shop + product_id.",
       "input": {
         "source_id": "varus"
       },
@@ -170,7 +182,9 @@
         }
       ],
       "schedule": {
-        "type": "manual"
+        "type": "interval",
+        "interval_seconds": 14400,
+        "overlap": "skip"
       },
       "limits": {
         "crawl": {

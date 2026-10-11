@@ -1,0 +1,63 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "dom.ria.com"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/uk/arenda-kvartir/kiev/",
+      "/uk/prodazha-kvartir/kiev/"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "listing",
+      "strategy_id": "kyiv-flats",
+      "start_urls": [
+        "https://dom.ria.com/uk/arenda-kvartir/kiev/",
+        "https://dom.ria.com/uk/prodazha-kvartir/kiev/"
+      ],
+      "item_links": {
+        "value": "a[href*='/uk/realty-']"
+      },
+      "page_param": {
+        "name": "page",
+        "start": 1,
+        "step": 1,
+        "stop_when_empty": true
+      }
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "normalization": {
+    "strip_query_params": [
+      "utm_*"
+    ]
+  },
+  "sections": [
+    {
+      "section_id": "rent",
+      "patterns": [
+        {
+          "value": "dom.ria.com/uk/arenda-kvartir/**"
+        }
+      ]
+    },
+    {
+      "section_id": "sale",
+      "patterns": [
+        {
+          "value": "dom.ria.com/uk/prodazha-kvartir/**"
+        }
+      ]
+    }
+  ],
+  "dedup": {
+    "use_link_rel_canonical": false
+  }
+}

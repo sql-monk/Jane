@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "post (повідомлення Telegram-каналу з вебперегляду t.me/s)",
+  "description": "Сумісна з post пакета channels.telegram-posts (шлях через Telethon): той самий ключ channel + message_id і ті самі обов'язкові поля; вебперегляд додає перегляди, пересилання, посилання, медіа й позначку редагування.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "channel",
+    "message_id",
+    "title",
+    "text"
+  ],
+  "properties": {
+    "channel": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Ім'я каналу (username) з data-post."
+    },
+    "message_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "url": {
+      "type": "string",
+      "minLength": 1,
+      "description": "https://t.me/<channel>/<message_id>"
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Час публікації, RFC 3339 UTC."
+    },
+    "title": {
+      "type": "string",
+      "description": "Перший рядок із літерами чи цифрами; довший — перше речення або обрізаний до title_max_chars."
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "views": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Перегляди на момент читання сторінки (99.4K → 99400; округлення Telegram)."
+    },
+    "forwarded_from": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Назва джерела пересланого повідомлення."
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Зовнішні посилання тексту й попереднього перегляду (без t.me та інших хостів Telegram), у порядку появи."
+    },
+    "has_media": {
+      "type": "boolean",
+      "description": "Повідомлення має фото, відео, альбом, документ, голосове, стікер чи геопозицію."
+    },
+    "edited": {
+      "type": "boolean",
+      "description": "Telegram позначив повідомлення як змінене."
+    }
+  }
+}

@@ -7,10 +7,8 @@ attribute table ``#product-attribute-specs-table``. The entity key is ``shop`` +
 Magento product id the category pages show in ``li.product-item[data-id]``, so the price task updates the
 same entities. Customer reviews (names of private persons) are not read.
 
-States (TZ §9): ``success`` - a priced product card (``completeness: full``), or the known metadata of an
-out-of-stock product without a price (``completeness: partial``); ``empty`` - not a product page. A missing
-id or title is ``unrecognized``; an in-stock/unknown product missing its price is ``unrecognized`` with its
-partial metadata. An absent price never clears the last observed price or discount in storage.
+States (TZ §9): ``success`` - a product card (``completeness: full``); ``empty`` - not a product page (category,
+information pages); ``unrecognized`` - a product page without the product id, title or price.
 """
 
 from __future__ import annotations
@@ -264,17 +262,8 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
     if not fields["title"]:
         return unrecognized("product page without a title", signature="missing-field:title")
     if price is None:
-        fields["completeness"] = "partial"
-        fields.pop("currency")
-        partial = entity("product", fields, completeness="partial")
-        if fields["availability"] == "out_of_stock":
-            return success([partial])
         ctx.log.warning("price not found", code="extract.missing_selector", selector="offers.price")
-        return unrecognized(
-            "product page without a price",
-            signature="missing-field:offers.price",
-            entities=[partial],
-        )
+        return unrecognized("product page without a price", signature="missing-field:offers.price")
     return success([entity("product", fields, cleared=cleared, completeness="full")])
 
 

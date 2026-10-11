@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "catalog.prostor-price-extractor",
-  "version": "1.1.1",
+  "version": "1.0.0",
   "kind": "extractor",
   "title": "prostor.ua: prices and availability from category pages",
-  "description": "Ціни й наявність товарів prostor.ua з плиток сторінок категорій (completeness: partial): shop, product_id, price, currency, availability, old_price — ті самі ключі, що й повні картки catalog.prostor-product-extractor; решта полів картки не змінюється. Без знижки old_price явно очищується (cleared). Товар без ціни з відомим статусом «немає в наявності» зберігає метадані/наявність частково; відсутність ціни не очищує попередню ціну чи знижку.",
+  "description": "Ціни й наявність товарів prostor.ua з плиток сторінок категорій (completeness: partial): shop, product_id, price, currency, availability, old_price — ті самі ключі, що й повні картки catalog.prostor-product-extractor; решта полів картки не змінюється. Без знижки old_price явно очищується (cleared).",
   "tags": [
     "catalog",
     "prostor",
@@ -93,36 +93,15 @@
       },
       "expected_status": "unrecognized",
       "origin": "problem_sample"
-    },
-    {
-      "name": "out-of-stock-without-price-availability-only",
-      "input": {
-        "file": "tests/out-of-stock-without-price/page.html",
-        "media_type": "text/html",
-        "url": "https://prostor.ua/ua/pobutova-himija/sredstva-dlya-stirki/"
-      },
-      "expected_status": "success",
-      "expected": "tests/out-of-stock-without-price/expected.json",
-      "compare": "exact",
-      "origin": "problem_sample"
     }
   ],
   "provenance": {
-    "created_by": "llm",
+    "created_by": "human",
     "authors": [
       "Claude (examples/sites: prostor)"
     ],
     "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Preserve known out-of-stock metadata/availability when the source has no price; omit price/currency and leave their last observations intact. Keep explicit old_price clearing for priced products without a discount. Reproducible Git LF bytes: normalize CRLF to LF without behavior changes.",
-    "based_on": {
-      "package_id": "catalog.prostor-price-extractor",
-      "version": "1.1.0"
-    },
-    "llm": {
-      "provider": "OpenAI",
-      "model": "Codex",
-      "reason": "improvement"
-    }
+    "change_summary": "Partial price and availability update of prostor.ua products from category page tiles."
   },
   "bindings_hint": {
     "source_kinds": [

@@ -1,0 +1,135 @@
+{
+  "site": "rst",
+  "group": "autos",
+  "title": "RST.ua — оголошення легкових авто",
+  "url": "https://rst.ua/ukr/oldcars/",
+  "sources": [
+    {
+      "source_id": "autos-rst",
+      "kind": "web",
+      "title": "RST.ua: каталог вживаних легкових авто",
+      "description": "Каталог /ukr/oldcars/ (порядок сайту: спершу платні ТОП-оголошення) і картки оголошень. Відсортований за датою список є лише на сторінках пошуку з параметрами (?task=newresults&sort=…), які robots.txt забороняє (/oldcars/?), тому не використовується.",
+      "locator": {
+        "url": "https://rst.ua/ukr/oldcars/"
+      },
+      "collector_rules": "@pkg:autos.rst-rules",
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "expected_entity_types": [
+        "car_ad"
+      ],
+      "labels": {
+        "group": "autos",
+        "site": "rst"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "ads-rst",
+      "title": "RST.ua: оголошення легкових авто щогодини",
+      "description": "Щогодини: перші 5 сторінок каталогу повністю (ціни й статус оголошень із плиток) + картки нових оголошень і раз на добу — вже відомих (revisit interval). RAW — у files, car_ad (ключ site + ad_id) — у PostgreSQL; повторний запуск оновлює ті самі оголошення.",
+      "input": {
+        "source_id": "autos-rst"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-files",
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "extract-ads",
+          "kind": "handler",
+          "handler": "@pkg:autos.rst-car-ads",
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "text/html"
+              }
+            }
+          ]
+        },
+        {
+          "stage_id": "store-ads",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-ads",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 5,
+          "max_pages_per_run": 130,
+          "revisit_interval_seconds": 86400
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "autos",
+        "site": "rst"
+      }
+    }
+  ],
+  "verify": {
+    "autos-rst": {
+      "car_ad": {
+        "min": 60,
+        "required": [
+          "site",
+          "ad_id",
+          "url",
+          "title",
+          "price",
+          "currency",
+          "make",
+          "model",
+          "year",
+          "status"
+        ]
+      }
+    }
+  }
+}

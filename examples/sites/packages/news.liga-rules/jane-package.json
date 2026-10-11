@@ -1,0 +1,26 @@
+{
+  "schema_version": "1",
+  "package_id": "news.liga-rules",
+  "version": "1.0.0",
+  "kind": "collector-rules",
+  "title": "LIGA.net: news feed -> article pages",
+  "description": "Правила Web Collector для LIGA.net: RSS-стрічка https://news.liga.net/ua/all/rss.xml (куди переадресовує www.liga.net/news/all/rss.xml); статті за пейволом (isAccessibleForFree: false) екстрактор пропускає → сторінки статей. Стрічка читається в кожному зборі, статті — інкрементально (revisit: never — уже завантажені не тягнуться повторно, крім тих, чия дата в стрічці пізніша за попереднє завантаження). robots.txt дотримується.",
+  "tags": [
+    "news",
+    "liga",
+    "articles"
+  ],
+  "entry": {
+    "collector": "web",
+    "rules": "rules.json"
+  },
+  "tests": [],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (news sites agent)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "LIGA.net: incremental collection of news articles from the site's feed."
+  }
+}

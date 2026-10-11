@@ -1,0 +1,40 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "news.liga.net",
+      "www.liga.net"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/ua/"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "feed",
+      "strategy_id": "rss",
+      "urls": [
+        "https://news.liga.net/ua/all/rss.xml"
+      ],
+      "autodiscover": false
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "normalization": {
+    "strip_query_params": [
+      "utm_*",
+      "fbclid",
+      "gclid",
+      "yclid",
+      "_ga"
+    ]
+  },
+  "revisit": {
+    "mode": "never"
+  }
+}

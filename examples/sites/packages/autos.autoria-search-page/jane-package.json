@@ -1,0 +1,99 @@
+{
+  "schema_version": "1",
+  "package_id": "autos.autoria-search-page",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "AUTO.RIA: search results page -> car_ad (partial)",
+  "description": "Оголошення зі сторінки результатів пошуку auto.ria.com (/uk/search/?...): серверний стан window.__PINIA__ (list.lists.items) - id, посилання, назва й рік, ціни в USD/UAH, пробіг, паливо й об'єм, коробка, тип кузова, перевірка VIN, статус (продано). Часткове оновлення того самого car_ad, що й autos.autoria-ad-page: ціну у валюті продавця сторінка пошуку не показує.",
+  "tags": [
+    "autos",
+    "autoria",
+    "car-ads"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_autoria_search.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "car_ad",
+        "schema": "schemas/car_ad.schema.json",
+        "key_fields": [
+          "site",
+          "ad_id"
+        ],
+        "description": "Оголошення про продаж легкового авто (часткове оновлення зі сторінки пошуку)"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "used-cars-by-date-page-0",
+      "input": {
+        "file": "tests/used-cars-by-date-page-0/page.html",
+        "media_type": "text/html",
+        "url": "https://auto.ria.com/uk/search/?abroad=0&category=1&customs_cleared=1&limit=20&order=7&page=0&search_type=2"
+      },
+      "expected_status": "success",
+      "expected": "tests/used-cars-by-date-page-0/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "sold-cars",
+      "input": {
+        "file": "tests/sold-cars/page.html",
+        "media_type": "text/html",
+        "url": "https://auto.ria.com/uk/search/?abroad=0&category=1&customs_cleared=1&is_sold=1&limit=20&order=7&page=0&search_type=2"
+      },
+      "expected_status": "success",
+      "expected": "tests/sold-cars/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "ad-page",
+      "input": {
+        "file": "tests/ad-page/page.html",
+        "media_type": "text/html",
+        "url": "https://auto.ria.com/uk/auto_buick_encore-gx_39734571.html"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (subagent: examples/sites autoria)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "AUTO.RIA car ads: partial car_ad updates from search results pages (window.__PINIA__)."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ]
+  }
+}

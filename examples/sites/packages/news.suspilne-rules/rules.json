@@ -1,0 +1,36 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "suspilne.media"
+    ],
+    "allowed_schemes": [
+      "https"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "sitemap",
+      "strategy_id": "news-sitemap",
+      "urls": [
+        "https://suspilne.media/suspilne/sitemap/sitemap-news.xml"
+      ],
+      "use_robots_txt": false
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "normalization": {
+    "strip_query_params": [
+      "utm_*",
+      "fbclid",
+      "gclid",
+      "yclid",
+      "_ga"
+    ]
+  },
+  "revisit": {
+    "mode": "never"
+  }
+}

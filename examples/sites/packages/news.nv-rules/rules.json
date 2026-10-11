@@ -1,0 +1,40 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "nv.ua"
+    ],
+    "include_subdomains": true,
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/ukr/"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "feed",
+      "strategy_id": "rss",
+      "urls": [
+        "https://nv.ua/ukr/rss/all.xml"
+      ],
+      "autodiscover": false
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "normalization": {
+    "strip_query_params": [
+      "utm_*",
+      "fbclid",
+      "gclid",
+      "yclid",
+      "_ga"
+    ]
+  },
+  "revisit": {
+    "mode": "never"
+  }
+}

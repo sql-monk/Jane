@@ -1,0 +1,42 @@
+{
+  "entities": [
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "avtobazar.infocar.ua",
+        "ad_id": "805342",
+        "url": "https://avtobazar.infocar.ua/car/rovenskaya-oblast/rovno/nissan/x-trail/suv-2006-805342.html",
+        "title": "Nissan X-Trail T-30",
+        "price": 7750,
+        "currency": "USD",
+        "status": "active",
+        "price_usd": 7750,
+        "price_uah": 348130,
+        "year": 2006,
+        "mileage_km": 201000,
+        "updated_at": "2026-10-11",
+        "engine_l": 2.5,
+        "fuel": "petrol_gas",
+        "transmission": "automatic",
+        "drive": "awd",
+        "body_type": "suv",
+        "color": "сірий",
+        "region": "Рівненська область",
+        "city": "Рівне",
+        "make": "Nissan",
+        "model": "X-Trail",
+        "image": "https://i3.infocar.ua/img/bazar2/806/805342/6311918_2.jpg",
+        "seller_type": "private",
+        "condition": "used",
+        "description": "Гаражне зберігання, магнітола, хороший стан, зимова резина, шкіряний салон, люк. Торг обовязково"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "avtobazar.infocar.ua",
+          "ad_id": "805342"
+        }
+      }
+    }
+  ]
+}

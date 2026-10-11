@@ -1,0 +1,200 @@
+{
+  "entities": [
+    {
+      "entity_type": "post",
+      "fields": {
+        "channel": "suspilnenews",
+        "message_id": 77184,
+        "url": "https://t.me/suspilnenews/77184",
+        "published_at": "2026-10-10T17:00:02Z",
+        "title": "Трамп заявив, що Україні час обрати нового президента, який зможе домовитися про завершення війни.",
+        "text": "Трамп заявив, що Україні час обрати нового президента, який зможе домовитися про завершення війни.\n\nПрезидент США поспілкувався з журналістами біля Білого дому. На запитання Суспільного про те, що він хотів би сказати українцям, які щодня страждають від російських обстрілів і потерпають від голоду в окупації, Трамп відповів, що Зеленський нібито «неодноразово міг завершити війну, але не зробив цього».\n\nТакож Трамп звинуватив українського президента в тому, що удари по російських НПЗ створюють проблеми для світу й американських фермерів.",
+        "views": 99400,
+        "links": [
+          "https://suspilne.media/1424407-tramp-zaaviv-so-ukraina-mae-zminiti-lidera-bo-zelenskij-ne-ukladae-ugod/"
+        ],
+        "has_media": false,
+        "edited": true
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "channel": "suspilnenews",
+          "message_id": 77184
+        }
+      }
+    },
+    {
+      "entity_type": "post",
+      "fields": {
+        "channel": "suspilnenews",
+        "message_id": 77186,
+        "url": "https://t.me/suspilnenews/77186",
+        "published_at": "2026-10-10T18:13:53Z",
+        "title": "Київ — відбій тривоги через загрозу дронів.",
+        "text": "Київ — відбій тривоги через загрозу дронів.",
+        "views": 28700,
+        "has_media": false,
+        "edited": false
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "channel": "suspilnenews",
+          "message_id": 77186
+        }
+      }
+    },
+    {
+      "entity_type": "post",
+      "fields": {
+        "channel": "suspilnenews",
+        "message_id": 77187,
+        "url": "https://t.me/suspilnenews/77187",
+        "published_at": "2026-10-10T18:27:56Z",
+        "title": "За добу через російські атаки в Україні загинула щонайменше 21 людина, понад 55 — поранені:",
+        "text": "За добу через російські атаки в Україні загинула щонайменше 21 людина, понад 55 — поранені:\n\n🔹 Через удар по Запоріжжю 20 загиблих. Ще 32 дістали поранень. Серед загиблих і поранених — діти.\n\n🔹 У Нікопольщині на Дніпропетровщині загинув 11-річний хлопчик, ще двоє дітей та троє дорослих дістали поранення.\n\n🔹 У Києві вже відомо про вісім постраждалих. Зокрема, медики госпіталізували 15-річну дівчину.\n\n🔹 У Харкові поранені четверо людей, серед них рятувальник. Ще одна жінка мала гостру реакцію на стрес.\n\n🔹 Один чоловік був поранений у Миколаєві, ще двоє жінок — у Снігурівці.\n\n🔹 РФ обстріляла передмістя Херсона — Комишани. Один чоловік отримав множинні осколкові поранення.\n\n🔹 На Житомирщині була постраждала внаслідок атаки на залізничну інфраструктуру Коростенської громади.\n\n🔹 З ранку 9 жовтня до ранку 10 жовтня, війська РФ майже 30 обстрілювали Сумщину — був поранений чоловік.\n\n🔹 Також поранений чоловік у Райгородку на Донеччині.",
+        "views": 47600,
+        "links": [
+          "https://suspilne.media/zaporizhzhia/1423965-armia-rf-obstrilala-zaporizza-10-zovtna-so-vidomo/",
+          "https://suspilne.media/dnipro/1424277-na-nikopolsini-cerez-ataku-rf-zaginuv-11-ricnij-hlopcik-se-dvoe-ditej-distali-poranenna-2/",
+          "https://suspilne.media/kyiv/1424179-u-kievi-lunal-vibuhi-rosiani-prodovzuut-atakuvati-stolicu/",
+          "https://suspilne.media/kharkiv/1424189-rf-atakuvala-medicnij-zaklad-u-slobidskomu-rajoni-harkova-aki-naslidki/?utm_source=copylink&utm_medium=ps",
+          "https://suspilne.media/mykolaiv/tag/obstrili/",
+          "https://suspilne.media/kherson/1424023-armia-rf-obstrilala-peredmista-hersona-komisani-travmovanij-colovik/",
+          "https://suspilne.media/zhytomyr/1424021-rosijski-vijska-atakuvali-zaliznicnu-infrastrukturu-na-zitomirsini-e-postrazdalij/",
+          "https://suspilne.media/sumy/1424007-poskodzenna-u-troh-gromadah-naslidki-atak-rf-za-dobu-po-sumsini/",
+          "https://suspilne.media/donbas/1424247-okupanti-obstrilali-rajgorodok-na-doneccini-poraneno-odnu-ludinu/"
+        ],
+        "has_media": false,
+        "edited": true
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "channel": "suspilnenews",
+          "message_id": 77187
+        }
+      }
+    },
+    {
+      "entity_type": "post",
+      "fields": {
+        "channel": "suspilnenews",
+        "message_id": 77190,
+        "url": "https://t.me/suspilnenews/77190",
+        "published_at": "2026-10-10T19:42:32Z",
+        "title": "Український народ сам має вирішувати, хто очолюватиме країну, а «заяви з-за кордону лише підтверджують, що президент добре виконує свою роботу», — так голова МЗС Сибіга відреагував на заяву Трампа…",
+        "text": "Український народ сам має вирішувати, хто очолюватиме країну, а «заяви з-за кордону лише підтверджують, що президент добре виконує свою роботу», — так голова МЗС Сибіга відреагував на заяву Трампа про те, що Україні потрібен новий лідер замість Зеленського.",
+        "views": 37600,
+        "links": [
+          "https://suspilne.media/1424447-zaavi-z-za-kordonu-pidtverdzuut-so-vin-dobre-vikonue-robotu-sibiga-pro-slova-trampa-sodo-zamini-zelenskogo/"
+        ],
+        "has_media": false,
+        "edited": false
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "channel": "suspilnenews",
+          "message_id": 77190
+        }
+      }
+    },
+    {
+      "entity_type": "post",
+      "fields": {
+        "channel": "suspilnenews",
+        "message_id": 77194,
+        "url": "https://t.me/suspilnenews/77194",
+        "published_at": "2026-10-10T20:42:24Z",
+        "title": "Першокласниця Єлизавета Сорочишина та восьмикласниця Анна Мур-Зак загинули внаслідок російського авіаудару по Запоріжжю вранці 10 жовтня, повідомили у Департаменті освіти і науки міста.",
+        "text": "Першокласниця Єлизавета Сорочишина та восьмикласниця Анна Мур-Зак загинули внаслідок російського авіаудару по Запоріжжю вранці 10 жовтня, повідомили у Департаменті освіти і науки міста.",
+        "views": 17800,
+        "forwarded_from": "Суспільне Запоріжжя",
+        "links": [
+          "https://suspilne.media/zaporizhzhia/1422725-u-zaporizzi-vnaslidok-aviaudaru-rf-zaginuli-dvi-ucenici-miskih-gimnazij-elizaveta-sorocisina-ta-anna-mur-zak/"
+        ],
+        "has_media": true,
+        "edited": false
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "channel": "suspilnenews",
+          "message_id": 77194
+        }
+      }
+    },
+    {
+      "entity_type": "post",
+      "fields": {
+        "channel": "suspilnenews",
+        "message_id": 77195,
+        "url": "https://t.me/suspilnenews/77195",
+        "published_at": "2026-10-10T21:00:59Z",
+        "title": "Армія РФ атакувала Дніпро — пошкоджений будинок на рівні 8-9 поверхів.",
+        "text": "Армія РФ атакувала Дніпро — пошкоджений будинок на рівні 8-9 поверхів. На місці працюють рятувальні і комунальні служби. Будинок відключили від комунікацій. Є витік газу, повідомили кореспондентам Суспільного в ДСНС.\n\nПопередньо, поранено троє людей, повідомив міський голова Філатов.",
+        "views": 17700,
+        "links": [
+          "https://suspilne.media/dnipro/1424475-vijska-rf-vdarili-po-dnipru-poskodzena-bagatopoverhivka/"
+        ],
+        "has_media": true,
+        "edited": true
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "channel": "suspilnenews",
+          "message_id": 77195
+        }
+      }
+    },
+    {
+      "entity_type": "post",
+      "fields": {
+        "channel": "suspilnenews",
+        "message_id": 77200,
+        "url": "https://t.me/suspilnenews/77200",
+        "published_at": "2026-10-10T22:16:16Z",
+        "title": "Кадри рятувальної операції поблизу пошкодженої багатоповерхівки. На місці працюють психологи. У однієї з жінок - гостра реакція на стрес, повідомили кореспондентам Суспільного у ДСНС",
+        "text": "Кадри рятувальної операції поблизу пошкодженої багатоповерхівки. На місці працюють психологи. У однієї з жінок - гостра реакція на стрес, повідомили кореспондентам Суспільного у ДСНС",
+        "views": 10600,
+        "forwarded_from": "Суспільне Дніпро",
+        "links": [
+          "https://suspilne.media/dnipro/1424475-vijska-rf-vdarili-po-dnipru-poskodzena-bagatopoverhivka/"
+        ],
+        "has_media": true,
+        "edited": false
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "channel": "suspilnenews",
+          "message_id": 77200
+        }
+      }
+    },
+    {
+      "entity_type": "post",
+      "fields": {
+        "channel": "suspilnenews",
+        "message_id": 77203,
+        "url": "https://t.me/suspilnenews/77203",
+        "published_at": "2026-10-10T22:30:53Z",
+        "title": "У Дніпрі пролунав вибух, повідомили наші кореспонденти.",
+        "text": "У Дніпрі пролунав вибух, повідомили наші кореспонденти.",
+        "views": 9190,
+        "has_media": false,
+        "edited": false
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "channel": "suspilnenews",
+          "message_id": 77203
+        }
+      }
+    }
+  ]
+}

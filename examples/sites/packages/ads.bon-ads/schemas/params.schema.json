@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ads.bon-ads params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "description_max_chars": {
+      "description": "Скільки символів опису оголошення зберігати (довший обрізається з «…»).",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000,
+      "default": 1000
+    }
+  }
+}

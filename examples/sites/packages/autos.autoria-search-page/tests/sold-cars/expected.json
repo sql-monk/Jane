@@ -1,0 +1,71 @@
+{
+  "entities": [
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "39287135",
+        "url": "https://auto.ria.com/uk/auto_mazda_626_39287135.html",
+        "title": "Mazda 626 1994",
+        "year": 1994,
+        "price_usd": 600.0,
+        "price_uah": 27000.0,
+        "mileage_km": 200000,
+        "fuel": "Газ/Бензин",
+        "engine_l": 2.0,
+        "body_type": "Хетчбек",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/mazda_626__626010025fx.webp",
+        "vin_checked": true,
+        "status": "sold"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "39287135"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_7e2fc344ef549e3c1baff46e",
+        "observed_at": "2026-10-11T02:50:06Z",
+        "material_id": "web:4a3682e005849d850e8fa5e00e305bf6",
+        "content_sha256": "7e2fc344ef549e3c1baff46eec017a15963d4b67a75c2e19c290868afa7c4b4c"
+      }
+    },
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "38291198",
+        "url": "https://auto.ria.com/uk/auto_citroen_berlingo_38291198.html",
+        "title": "Citroen Berlingo 2014",
+        "year": 2014,
+        "price_usd": 8150.0,
+        "price_uah": 366750.0,
+        "mileage_km": 210000,
+        "transmission": "Ручна / Механіка",
+        "fuel": "Дизель",
+        "engine_l": 1.6,
+        "body_type": "Мінівен",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/citroen_berlingo__603196968fx.webp",
+        "vin_checked": true,
+        "status": "sold"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "38291198"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_7e2fc344ef549e3c1baff46e",
+        "observed_at": "2026-10-11T02:50:06Z",
+        "material_id": "web:4a3682e005849d850e8fa5e00e305bf6",
+        "content_sha256": "7e2fc344ef549e3c1baff46eec017a15963d4b67a75c2e19c290868afa7c4b4c"
+      }
+    }
+  ]
+}

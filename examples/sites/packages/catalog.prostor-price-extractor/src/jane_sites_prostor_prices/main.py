@@ -9,9 +9,8 @@ wish-list button (``data-post`` JSON ``data.is_in_stock``). Each tile becomes a 
 these fields of the same entity and keeps the rest (TZ §6: a missing field is not a deletion). A tile without a
 discount clears ``old_price`` explicitly (``cleared``), so an ended discount does not linger.
 
-An out-of-stock tile without a price updates availability only and preserves the last observed price and
-discount. States (TZ §9): ``success`` - a category with priced or known out-of-stock tiles; ``empty`` - no
-product tiles; ``unrecognized`` - tiles without prices or a known out-of-stock status (the markup changed).
+States (TZ §9): ``success`` - a category page with priced tiles; ``empty`` - a page without product tiles;
+``unrecognized`` - tiles without a single price (the page markup changed).
 """
 
 from __future__ import annotations
@@ -86,32 +85,22 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
     for tile in page.tiles:
         product_id = tile.get("box_id") or tile.get("id")
         price = _number(tile.get("finalPrice"))
-        stock = tile.get("in_stock")
-        availability = {"1": "in_stock", "0": "out_of_stock"}.get(stock) if stock is not None else None
-        if not product_id or (price is None and availability != "out_of_stock"):
+        if not product_id or price is None:
             unpriced += 1
             continue
         if product_id in seen:
             continue
         seen.add(product_id)
-        if price is None:
-            entities.append(
-                entity(
-                    "product",
-                    {"shop": params["shop"], "product_id": product_id, "availability": availability},
-                    completeness="partial",
-                )
-            )
-            continue
         old_price = _number(tile.get("oldPrice"))
         if old_price is not None and old_price <= price:
             old_price = None
+        stock = tile.get("in_stock")
         fields = {
             "shop": params["shop"],
             "product_id": product_id,
             "price": price,
             "currency": params["default_currency"],
-            "availability": availability,
+            "availability": {"1": "in_stock", "0": "out_of_stock"}.get(stock) if stock is not None else None,
             "old_price": old_price,
         }
         cleared = ["old_price"] if old_price is None else None

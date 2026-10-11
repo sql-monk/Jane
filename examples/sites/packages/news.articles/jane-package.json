@@ -1,0 +1,186 @@
+{
+  "schema_version": "1",
+  "package_id": "news.articles",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "News: articles of news sites with full text",
+  "description": "Статті новинних сайтів: заголовок, дати публікації й оновлення (RFC 3339, UTC), автор, рубрика, лід, мова, теги, зображення й повний чистий текст (без меню, реклами, підписів до фото й «читайте також»). Метадані — зі schema.org JSON-LD (NewsArticle/Article), og:/article: meta; текст — з контейнера статті за таблицею сайтів (Українська правда, Укрінформ, Суспільне, УНІАН, LIGA, Радіо Свобода, Zaxid.net, NV) або params.sites, для невідомого сайту — JSON-LD articleBody. Сторінка без розмітки статті й стаття за пейволом — empty.",
+  "tags": [
+    "news",
+    "articles",
+    "json-ld",
+    "schema-org",
+    "full-text"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_news.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "article",
+        "schema": "schemas/article.schema.json",
+        "key_fields": [
+          "url"
+        ],
+        "description": "Новинна стаття з повним текстом; ключ — канонічний URL"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": [
+      "lxml>=6,<7",
+      "cssselect>=1.5",
+      "python-dateutil>=2.9"
+    ]
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "pravda-news",
+      "input": {
+        "file": "tests/pravda-news/page.html",
+        "media_type": "text/html",
+        "url": "https://www.pravda.com.ua/news/2026/10/11/8057413/"
+      },
+      "expected_status": "success",
+      "expected": "tests/pravda-news/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "ukrinform-news",
+      "input": {
+        "file": "tests/ukrinform-news/page.html",
+        "media_type": "text/html",
+        "url": "https://www.ukrinform.ua/rubric-world/4173143-u-nudeli-policia-zatrimala-ponad-2-tisaci-protestuvalnikiv-aki-vimagali-vidstavki-komisara-z-viboriv.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/ukrinform-news/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "suspilne-news",
+      "input": {
+        "file": "tests/suspilne-news/page.html",
+        "media_type": "text/html",
+        "url": "https://suspilne.media/1424497-estonia-ocikue-posilenna-migracijnogo-tisku-z-bilorusi-z-kinca-lipna-zatrimali-ponad-300-migrantiv/"
+      },
+      "expected_status": "success",
+      "expected": "tests/suspilne-news/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "unian-news",
+      "input": {
+        "file": "tests/unian-news/page.html",
+        "media_type": "text/html",
+        "url": "https://www.unian.ua/world/ce-ganba-dlya-ssha-u-kongresi-gotuyut-vidpovid-trampu-za-zakupivlyu-dizelyu-v-putina-13525146.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/unian-news/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "liga-news",
+      "input": {
+        "file": "tests/liga-news/page.html",
+        "media_type": "text/html",
+        "url": "https://news.liga.net/ua/politics/news/u-chekhii-vvazhaiut-shcho-putin-pislia-uhody-z-trampom-zakhoche-obhovoryty-myr-v-ukraini"
+      },
+      "expected_status": "success",
+      "expected": "tests/liga-news/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "svoboda-news",
+      "input": {
+        "file": "tests/svoboda-news/page.html",
+        "media_type": "text/html",
+        "url": "https://www.radiosvoboda.org/a/news-kallas-tramp-dyzel/33874257.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/svoboda-news/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "zaxid-news",
+      "input": {
+        "file": "tests/zaxid-news/page.html",
+        "media_type": "text/html",
+        "url": "https://zaxid.net/dvi_krayini_yes_vidmovilisya_peredati_ukrayini_raketi_patriot_termin_diyi_yakih_mayzhe_spliv_n1647604"
+      },
+      "expected_status": "success",
+      "expected": "tests/zaxid-news/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "nv-sport-news",
+      "input": {
+        "file": "tests/nv-sport-news/page.html",
+        "media_type": "text/html",
+        "url": "https://sport.nv.ua/ukr/football/bogdan-popov-zabiv-gol-za-empoli-u-seriji-b-drugiy-m-yach-u-sezoni-2026-27-50648915.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/nv-sport-news/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "liga-paywalled-article-empty",
+      "input": {
+        "file": "tests/liga-paywall/page.html",
+        "media_type": "text/html",
+        "url": "https://www.liga.net/ua/society/articles/arcelormittal-zupyniaietsia-shcho-bude-z-kryvym-rohom-iakyy-desiatylittiamy-zalezhav-vid-metalurhii"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "svoboda-news-listing-empty",
+      "input": {
+        "file": "tests/svoboda-listing/page.html",
+        "media_type": "text/html",
+        "url": "https://www.radiosvoboda.org/z/630"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (news sites agent)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Shared article extractor for eight Ukrainian news sites: JSON-LD/meta metadata and the full clean text of the article container."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": "1",
+  "package_id": "news.unian-rules",
+  "version": "1.0.0",
+  "kind": "collector-rules",
+  "title": "УНІАН: news feed -> article pages",
+  "description": "Правила Web Collector для УНІАН: RSS-стрічка https://rss.unian.net/site/news_ukr.rss (~100 новин) на хості rss.unian.net → сторінки статей. Стрічка читається в кожному зборі, статті — інкрементально (revisit: never — уже завантажені не тягнуться повторно, крім тих, чия дата в стрічці пізніша за попереднє завантаження). robots.txt дотримується.",
+  "tags": [
+    "news",
+    "unian",
+    "articles"
+  ],
+  "entry": {
+    "collector": "web",
+    "rules": "rules.json"
+  },
+  "tests": [],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (news sites agent)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "УНІАН: incremental collection of news articles from the site's feed."
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "site": "tg-suspilnenews",
+  "group": "telegram",
+  "title": "Telegram: Суспільне Новини (@suspilnenews) — вебперегляд",
+  "url": "https://t.me/s/suspilnenews",
+  "sources": [
+    {
+      "source_id": "tgweb-suspilnenews",
+      "kind": "web",
+      "title": "Telegram @suspilnenews (Суспільне Новини), t.me/s",
+      "description": "Публічний канал @suspilnenews через вебперегляд https://t.me/s/suspilnenews (без облікового запису Telegram): останні повідомлення каналу; пости — сутність post, сумісна зі шляхом через Telethon.",
+      "locator": {
+        "url": "https://t.me/s/suspilnenews"
+      },
+      "collector_rules": "@pkg:telegram.suspilnenews-web-rules",
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "expected_entity_types": [
+        "post"
+      ],
+      "labels": {
+        "group": "telegram",
+        "channel": "suspilnenews",
+        "kind": "media"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "tgweb-suspilnenews",
+      "title": "Telegram @suspilnenews: пости кожні 15 хв",
+      "description": "Сторінка t.me/s каналу → RAW у files, пости (post) у PostgreSQL. Кожен запуск читає сторінку повністю: нові пости додаються, наявні (той самий channel + message_id) оновлюються — перегляди, редагування.",
+      "input": {
+        "source_id": "tgweb-suspilnenews"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "full"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-files",
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "extract-posts",
+          "kind": "handler",
+          "handler": "@pkg:telegram.web-posts",
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "text/html"
+              }
+            }
+          ]
+        },
+        {
+          "stage_id": "store-posts",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-posts",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 900,
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 0,
+          "max_pages_per_run": 2
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "telegram",
+        "channel": "suspilnenews",
+        "kind": "media"
+      }
+    }
+  ],
+  "verify": {
+    "tgweb-suspilnenews": {
+      "post": {
+        "min": 5,
+        "required": [
+          "channel",
+          "message_id",
+          "url",
+          "published_at",
+          "title",
+          "text",
+          "views"
+        ]
+      }
+    }
+  }
+}

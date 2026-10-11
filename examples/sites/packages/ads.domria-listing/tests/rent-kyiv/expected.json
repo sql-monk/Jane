@@ -1,0 +1,231 @@
+{
+  "entities": [
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "dom.ria.com",
+        "ad_id": "33683279",
+        "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-borispolskaya-ulitsa-33683279.html",
+        "title": "Здається в оренду 1-кімнатна квартира 27 кв. м у Києві",
+        "category": "Квартира, довгострокова оренда",
+        "category_path": [
+          "Житло",
+          "Квартира",
+          "довгострокова оренда"
+        ],
+        "price": 9000.0,
+        "currency": "UAH",
+        "deal_type": "rent",
+        "city": "Київ",
+        "region": "Київська область",
+        "district": "Дарницький",
+        "published_at": "2025-11-11T17:03:59+02:00",
+        "refreshed_at": "2026-10-09T13:05:42+03:00",
+        "seller_type": "unknown",
+        "params": {
+          "Тип нерухомості": "Квартира",
+          "Житлова площа, м²": "16",
+          "Площа кухні, м²": "6",
+          "Метро": "Червоний хутір",
+          "Тип стін": "кирпич"
+        },
+        "image": "https://cdn.riastatic.com/photos/dom/photo/32617/3261790/326179006/326179006b.jpg",
+        "area_m2": 27.0,
+        "rooms": 1,
+        "floor": 3,
+        "floors_total": 27,
+        "price_per_m2": 333.0
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "dom.ria.com",
+          "ad_id": "33683279"
+        }
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "dom.ria.com",
+        "ad_id": "35013206",
+        "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-poznyaki-petra-grigorenko-prospekt-35013206.html",
+        "title": "Здається в оренду 2-кімнатна квартира 72.3 кв. м у Києві",
+        "category": "Квартира, довгострокова оренда",
+        "category_path": [
+          "Житло",
+          "Квартира",
+          "довгострокова оренда"
+        ],
+        "price": 22000.0,
+        "currency": "UAH",
+        "deal_type": "rent",
+        "city": "Київ",
+        "region": "Київська область",
+        "district": "Позняки",
+        "published_at": "2026-10-07T16:35:56+03:00",
+        "refreshed_at": "2026-10-10T09:31:44+03:00",
+        "seller_type": "unknown",
+        "params": {
+          "Тип нерухомості": "Квартира",
+          "Житлова площа, м²": "35.1",
+          "Площа кухні, м²": "12",
+          "Метро": "Позняки",
+          "Тип стін": "кирпич"
+        },
+        "image": "https://cdn.riastatic.com/photos/dom/photo/34654/3465429/346542929/346542929b.jpg",
+        "area_m2": 72.3,
+        "rooms": 2,
+        "floor": 4,
+        "floors_total": 23,
+        "price_per_m2": 304.0
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "dom.ria.com",
+          "ad_id": "35013206"
+        }
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "dom.ria.com",
+        "ad_id": "34147599",
+        "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-novoe-stroenie-saksaganskogo-ulitsa-34147599.html",
+        "title": "Здається в оренду 1-кімнатна квартира 56.8 кв. м у Києві",
+        "category": "Квартира, довгострокова оренда",
+        "category_path": [
+          "Житло",
+          "Квартира",
+          "довгострокова оренда"
+        ],
+        "price": 900.0,
+        "currency": "USD",
+        "deal_type": "rent",
+        "city": "Київ",
+        "region": "Київська область",
+        "district": "Нова забудова",
+        "published_at": "2026-08-13T13:34:10+03:00",
+        "refreshed_at": "2026-09-15T09:29:06+03:00",
+        "seller_type": "business",
+        "params": {
+          "Тип нерухомості": "Квартира",
+          "Житлова площа, м²": "22.4",
+          "Площа кухні, м²": "7",
+          "Метро": "Олімпійська",
+          "Тип стін": "монолитно-кирпичный",
+          "Новобудова": "ЖК Royal Tower"
+        },
+        "image": "https://cdn.riastatic.com/photos/dom/photo/33334/3333493/333349383/333349383b.jpg",
+        "area_m2": 56.8,
+        "rooms": 1,
+        "floor": 15,
+        "floors_total": 30,
+        "price_per_m2": 16.0
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "dom.ria.com",
+          "ad_id": "34147599"
+        }
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "dom.ria.com",
+        "ad_id": "34805085",
+        "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-sapernoe-pole-sapernoe-pole-ulitsa-34805085.html",
+        "title": "Здається в оренду 4-кімнатна квартира 158.8 кв. м у Києві",
+        "category": "Квартира, довгострокова оренда",
+        "category_path": [
+          "Житло",
+          "Квартира",
+          "довгострокова оренда"
+        ],
+        "price": 3500.0,
+        "currency": "USD",
+        "deal_type": "rent",
+        "city": "Київ",
+        "region": "Київська область",
+        "district": "Саперне Поле",
+        "published_at": "2026-09-04T08:38:15+03:00",
+        "refreshed_at": "2026-10-08T11:16:16+03:00",
+        "seller_type": "business",
+        "params": {
+          "Тип нерухомості": "Квартира",
+          "Житлова площа, м²": "94.5",
+          "Площа кухні, м²": "16.7",
+          "Метро": "Палац Україна",
+          "Тип стін": "монолитно-каркасный",
+          "Новобудова": "ЖК Бульвар фонтанів"
+        },
+        "image": "https://cdn.riastatic.com/photos/dom/photo/34300/3430067/343006759/343006759b.jpg",
+        "area_m2": 158.8,
+        "rooms": 4,
+        "floor": 7,
+        "floors_total": 17,
+        "price_per_m2": 22.0
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "dom.ria.com",
+          "ad_id": "34805085"
+        }
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "dom.ria.com",
+        "ad_id": "34037896",
+        "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-podolskiy-ivana-vygovskogo-marshala-grechko-ulitsa-34037896.html",
+        "title": "Здається в оренду 1-кімнатна квартира 48.3 кв. м у Києві",
+        "category": "Квартира, довгострокова оренда",
+        "category_path": [
+          "Житло",
+          "Квартира",
+          "довгострокова оренда"
+        ],
+        "price": 500.0,
+        "currency": "USD",
+        "deal_type": "rent",
+        "city": "Київ",
+        "region": "Київська область",
+        "district": "Подільський",
+        "published_at": "2026-09-10T17:23:44+03:00",
+        "refreshed_at": "2026-10-09T11:47:53+03:00",
+        "seller_type": "unknown",
+        "params": {
+          "Тип нерухомості": "Квартира",
+          "Житлова площа, м²": "16.4",
+          "Площа кухні, м²": "12.2",
+          "Тип стін": "керамический блок",
+          "Новобудова": "ЖК Нові Сирецькі Сади"
+        },
+        "image": "https://cdn.riastatic.com/photos/dom/photo/33116/3311636/331163689/331163689b.jpg",
+        "area_m2": 48.3,
+        "rooms": 1,
+        "floor": 2,
+        "floors_total": 24,
+        "price_per_m2": 10.0
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "dom.ria.com",
+          "ad_id": "34037896"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,158 @@
+{
+  "site": "bon",
+  "group": "classifieds",
+  "title": "BON.ua (колишній besplatka.ua): загальні оголошення «Електроніка» й «Дім та Дача» — щогодинний скан нових оголошень",
+  "url": "https://bon.ua/",
+  "sources": [
+    {
+      "source_id": "bon",
+      "kind": "web",
+      "title": "BON.ua — дошка оголошень",
+      "description": "bon.ua (besplatka.ua переадресовує сюди): категорії «Електроніка, побутова техніка» й «Дім та Дача». Сторінки категорій — щоразу, картки оголошень — нові одразу, відомі не частіше revisit_interval_seconds. robots.txt дотримується; не частіше 1 запиту/с, один одночасний запит до хоста. Запасний варіант для OLX (olx.ua віддає 403 боту JaneBot).",
+      "locator": {
+        "url": "https://bon.ua/"
+      },
+      "collector_rules": "@pkg:ads.bon-rules",
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "expected_entity_types": [
+        "classified_ad"
+      ],
+      "labels": {
+        "group": "classifieds",
+        "site": "bon"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "ads-bon",
+      "title": "bon.ua: свіжі оголошення двох категорій",
+      "description": "Щогодини: перші сторінки категорій (кількість — limits.crawl.max_depth) і нові картки (incremental, revisit interval) → RAW у raw-files; картка — повна сутність classified_ad, сторінка категорії — часткове оновлення тих самих ключів site + ad_id (назва, ціна, місто, дата) у results-pg.",
+      "input": {
+        "source_id": "bon"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-files",
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "extract-ads",
+          "kind": "handler",
+          "handler": "@pkg:ads.bon-ads",
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "text/html"
+              }
+            }
+          ],
+          "bindings": [
+            {
+              "url_patterns": [
+                {
+                  "value": "bon.ua/obyavlenie/**"
+                },
+                {
+                  "value": "bon.ua/electronika-i-bitovaya-tehnika**"
+                },
+                {
+                  "value": "bon.ua/mebel-interer-obihod**"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "store-ads",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-ads",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "in",
+                "value": [
+                  "success",
+                  "unrecognized"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 3,
+          "max_pages_per_run": 300,
+          "revisit_interval_seconds": 86400
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "classifieds",
+        "site": "bon",
+        "kind": "ads"
+      }
+    }
+  ],
+  "verify": {
+    "bon": {
+      "classified_ad": {
+        "min": 100,
+        "required": [
+          "site",
+          "ad_id",
+          "url",
+          "title",
+          "category",
+          "category_path",
+          "city",
+          "published_at",
+          "seller_type",
+          "deal_type"
+        ]
+      }
+    }
+  }
+}

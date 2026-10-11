@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "news.articles params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "default_timezone": {
+      "description": "Часовий пояс (IANA) для дат сторінки без зміщення (LIGA: article:published_time «2026-10-10 22:58:00»).",
+      "type": "string",
+      "minLength": 1,
+      "default": "Europe/Kyiv"
+    },
+    "min_text_chars": {
+      "description": "Коротший текст статті вважається не знайденим (unrecognized).",
+      "type": "integer",
+      "minimum": 1,
+      "default": 80
+    },
+    "sites": {
+      "description": "Правила сайтів за доменом поверх вбудованої таблиці пакета (sites.py): нові сайти або зміна селекторів без нової версії пакета.",
+      "type": "object",
+      "default": {},
+      "propertyNames": { "pattern": "^[a-z0-9.-]+$" },
+      "additionalProperties": { "$ref": "#/$defs/SiteRule" }
+    }
+  },
+  "$defs": {
+    "SiteRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "body": { "description": "CSS-селектор(и) контейнера тексту статті.", "type": "string", "minLength": 1 },
+        "remove": { "description": "CSS-селектори, що вилучаються з контейнера (реклама, вбудовування, «читайте також»).", "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "title": { "type": "string", "minLength": 1 },
+        "lead": { "type": "string", "minLength": 1 },
+        "author": { "type": "string", "minLength": 1 },
+        "section": { "type": "string", "minLength": 1 },
+        "tags": { "description": "CSS-селектор посилань-тегів; порожній рядок вимикає теги.", "type": "string" },
+        "drop": { "description": "Регулярні вирази: блок тексту, що відповідає, пропускається.", "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "stop": { "description": "Регулярні вирази: перший відповідний блок завершує текст.", "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+  }
+}

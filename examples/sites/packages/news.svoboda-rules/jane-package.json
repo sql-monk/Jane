@@ -1,0 +1,26 @@
+{
+  "schema_version": "1",
+  "package_id": "news.svoboda-rules",
+  "version": "1.0.0",
+  "kind": "collector-rules",
+  "title": "Радіо Свобода: news feed -> article pages",
+  "description": "Правила Web Collector для Радіо Свобода: сторінка «Новини» https://www.radiosvoboda.org/z/630 (стратегія listing, ~30 посилань /a/…): RSS /api/zrqiteuuir недоступна, бо robots.txt забороняє /api/*, а наступні сторінки (?p=) — /*?p=* → сторінки статей. Стрічка читається в кожному зборі, статті — інкрементально (revisit: never — уже завантажені не тягнуться повторно, крім тих, чия дата в стрічці пізніша за попереднє завантаження). robots.txt дотримується.",
+  "tags": [
+    "news",
+    "svoboda",
+    "articles"
+  ],
+  "entry": {
+    "collector": "web",
+    "rules": "rules.json"
+  },
+  "tests": [],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (news sites agent)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Радіо Свобода: incremental collection of news articles from the site's feed."
+  }
+}

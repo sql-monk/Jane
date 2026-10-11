@@ -1,0 +1,26 @@
+{
+  "schema_version": "1",
+  "package_id": "news.pravda-rules",
+  "version": "1.0.0",
+  "kind": "collector-rules",
+  "title": "Українська правда: news feed -> article pages",
+  "description": "Правила Web Collector для Українська правда: RSS-стрічка https://www.pravda.com.ua/rss/ (останні ~20 новин) → сторінки статей. Стрічка читається в кожному зборі, статті — інкрементально (revisit: never — уже завантажені не тягнуться повторно, крім тих, чия дата в стрічці пізніша за попереднє завантаження). robots.txt дотримується.",
+  "tags": [
+    "news",
+    "pravda",
+    "articles"
+  ],
+  "entry": {
+    "collector": "web",
+    "rules": "rules.json"
+  },
+  "tests": [],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (news sites agent)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Українська правда: incremental collection of news articles from the site's feed."
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "site": "news-unian",
+  "group": "news",
+  "title": "УНІАН: новини кожні 15 хвилин — повні тексти статей",
+  "url": "https://www.unian.ua/",
+  "sources": [
+    {
+      "source_id": "news-unian",
+      "kind": "web",
+      "title": "УНІАН — стрічка новин",
+      "description": "УНІАН: RSS-стрічка https://rss.unian.net/site/news_ukr.rss (~100 новин) на хості rss.unian.net. Статті — сторінки сайту з повним текстом. robots.txt дотримується, не частіше 1 запиту/с на хост.",
+      "locator": {
+        "url": "https://www.unian.ua/"
+      },
+      "collector_rules": "@pkg:news.unian-rules",
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "burst_per_host": 1,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "expected_entity_types": [
+        "article"
+      ],
+      "labels": {
+        "group": "news",
+        "site": "news-unian"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "news-unian",
+      "title": "УНІАН: нові статті кожні 15 хвилин",
+      "description": "Кожні 15 хв (пропуск, якщо попередній запуск ще йде): стрічка → нові сторінки статей (mode: incremental) → RAW у raw-files → news.articles (лише HTML) → article у results-pg (ключ — канонічний URL; оновлена стаття оновлює ту саму сутність).",
+      "input": {
+        "source_id": "news-unian"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-files",
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "extract-articles",
+          "kind": "handler",
+          "handler": "@pkg:news.articles",
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "text/html"
+              }
+            }
+          ]
+        },
+        {
+          "stage_id": "store-articles",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-articles",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 900,
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 1,
+          "max_pages_per_run": 200
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news",
+        "site": "news-unian"
+      }
+    }
+  ],
+  "verify": {
+    "news-unian": {
+      "article": {
+        "min": 30,
+        "required": [
+          "site",
+          "url",
+          "title",
+          "published_at",
+          "text"
+        ]
+      }
+    }
+  }
+}

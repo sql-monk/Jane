@@ -1,0 +1,41 @@
+{
+  "entities": [
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "avtobazar.infocar.ua",
+        "ad_id": "824227",
+        "url": "https://avtobazar.infocar.ua/car/kievskaya-oblast/brovary/tesla/model-3/sedan-2018-824227.html",
+        "title": "Tesla Model 3",
+        "price": 18500,
+        "currency": "USD",
+        "status": "active",
+        "price_usd": 18500,
+        "price_uah": 831020,
+        "year": 2018,
+        "mileage_km": 136000,
+        "updated_at": "2026-10-10",
+        "fuel": "electric",
+        "transmission": "automatic",
+        "drive": "rear",
+        "body_type": "sedan",
+        "color": "срібний",
+        "region": "Київська область",
+        "city": "Бровари",
+        "make": "Tesla",
+        "model": "Model 3",
+        "image": "https://i3.infocar.ua/img/bazar2/825/824227/6536881_2.jpg",
+        "seller_type": "private",
+        "condition": "used",
+        "description": "Tesla Model 3 Long Range 75 kwt проїде більше ніж інші, дальнобійна версія. Свій домашній автомобіль, не площадка і не перекуп! Авто в прекрасному стані, всі сертифікати живі, працює абсолютно все і працює належним чином! Повний автопілот 2.5 Утримання в полосі, дістронік, активний функціонал з запобігання зіткнення з перешкодою та пішоходами, вібрує руль, звукове попередження, гальмування та рульове маневрування. Заряджання як від звичайної розетки так і від швидкісної зарядки, порт CCS2 Лед о…"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "avtobazar.infocar.ua",
+          "ad_id": "824227"
+        }
+      }
+    }
+  ]
+}

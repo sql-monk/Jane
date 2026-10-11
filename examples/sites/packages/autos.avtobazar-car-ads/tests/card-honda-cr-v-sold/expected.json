@@ -1,0 +1,42 @@
+{
+  "entities": [
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "avtobazar.infocar.ua",
+        "ad_id": "800000",
+        "url": "https://avtobazar.infocar.ua/car/kievskaya-oblast/kiev/honda/cr-v/suv-2013-800000.html",
+        "title": "Honda CR-V",
+        "price": 14200,
+        "currency": "USD",
+        "status": "sold",
+        "price_usd": 14200,
+        "price_uah": 637864,
+        "year": 2013,
+        "mileage_km": 160000,
+        "updated_at": "2020-09-01",
+        "engine_l": 2.4,
+        "fuel": "petrol",
+        "transmission": "automatic",
+        "drive": "awd",
+        "body_type": "suv",
+        "color": "срібний",
+        "region": "Київська область",
+        "city": "Київ",
+        "make": "Honda",
+        "model": "CR-V",
+        "image": "https://i3.infocar.ua/img/bazar2/800/800000/6251167_2.jpg",
+        "seller_type": "private",
+        "condition": "used",
+        "description": "Honda CR-V 2013г полный привод. 2.4 инжектор. 160000км. АКПП. климат/круиз-контроль.датчик света. электропакет. КОЖА. подогрев электросидений и зеркал. электролюк.R-камера.компьютер.ABS.ESP.SRS.CD MP-3.AUX.блютуз.мультируль. тонировка.литые диски. серебристый \"металлик\". хорошее состояние. 14200 у.е."
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "avtobazar.infocar.ua",
+          "ad_id": "800000"
+        }
+      }
+    }
+  ]
+}

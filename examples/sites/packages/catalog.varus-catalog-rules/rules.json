@@ -8,38 +8,89 @@
       "https"
     ],
     "path_prefixes": [
-      "/"
+      "/api/"
     ]
   },
   "strategies": [
     {
       "type": "api_feed",
-      "strategy_id": "all-products",
-      "url": "https://varus.ua/api/graphql?catalog=all-products",
+      "strategy_id": "yogurti",
+      "url": "https://varus.ua/api/graphql?category=yogurti",
       "method": "POST",
       "body": {
         "operationName": "VarusCatalog",
-        "query": "query VarusCatalog($id: ID!, $page: Int!, $pageSize: Int) { category(id: $id, shopId: null, regionId: 0, locale: \"ua\", deliveryMethod: null) { id children { id } products(page: $page, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { total totalPages page pageSize items { id sku name urlKey weight volume regionalPriceInfo { price specialPrice specialFrom specialTo } regionalAvailability { inStock available } qtyStep { isDecimal } brand { name } primaryCategory { name urlKey } categories { name urlKey level isProductCategory } gallery { mainImageTimestamp } attributes(keys: []) { code label ... on TextAttributeValue { textValue: value } ... on NumberAttributeValue { numberValue: value } ... on EnumAttributeValue { option { label } } ... on MultiEnumAttributeValue { options { label } } ... on BooleanAttributeValue { boolValue: value } } } } } }",
+        "query": "query VarusCatalog($id: ID!, $pageSize: Int) { category(id: $id, shopId: null, regionId: 0, locale: \"ua\", deliveryMethod: null) { p1: products(page: 1, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p2: products(page: 2, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p3: products(page: 3, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p4: products(page: 4, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p5: products(page: 5, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p6: products(page: 6, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p7: products(page: 7, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p8: products(page: 8, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p9: products(page: 9, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } } } fragment Item on Product { id sku name urlKey weight volume regionalPriceInfo { price specialPrice specialFrom specialTo } regionalAvailability { inStock available } qtyStep { isDecimal } brand { name } primaryCategory { name urlKey } categories { name urlKey level isProductCategory } gallery { mainImageTimestamp } attributes(keys: [\"countrymanufacturerforsite\", \"packingtype\", \"energyKcal\", \"protein\", \"fat\", \"carb\", \"ageWms\", \"temperature\", \"foryogurt_producttypeyogurt\", \"foryogurt_fatyogurt\", \"foryogurt_maintasteyogurt\", \"foryogurt_additivesyogurt\", \"foryogurt_typecontaineryogurt\", \"foryogurt_lactoseyogurt\"]) { code label ... on TextAttributeValue { textValue: value } ... on NumberAttributeValue { numberValue: value } ... on EnumAttributeValue { option { label } } ... on MultiEnumAttributeValue { options { label } } ... on BooleanAttributeValue { boolValue: value } } }",
         "variables": {
-          "id": "2",
-          "page": 1,
+          "id": "53041",
           "pageSize": 48
         }
       },
-      "items_path": "$.data.category.products.items[*]",
+      "items_path": "$.data.category.*.items[*]",
       "url_path": "$.urlKey",
       "emit_items_as_materials": true,
       "pagination": {
-        "type": "page",
-        "body_page_path": "$.variables.page",
-        "page_param": "page"
+        "type": "none"
+      }
+    },
+    {
+      "type": "api_feed",
+      "strategy_id": "makaronni-virobi",
+      "url": "https://varus.ua/api/graphql?category=makaronni-virobi",
+      "method": "POST",
+      "body": {
+        "operationName": "VarusCatalog",
+        "query": "query VarusCatalog($id: ID!, $pageSize: Int) { category(id: $id, shopId: null, regionId: 0, locale: \"ua\", deliveryMethod: null) { p1: products(page: 1, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p2: products(page: 2, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p3: products(page: 3, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p4: products(page: 4, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p5: products(page: 5, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p6: products(page: 6, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p7: products(page: 7, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } } } fragment Item on Product { id sku name urlKey weight volume regionalPriceInfo { price specialPrice specialFrom specialTo } regionalAvailability { inStock available } qtyStep { isDecimal } brand { name } primaryCategory { name urlKey } categories { name urlKey level isProductCategory } gallery { mainImageTimestamp } attributes(keys: [\"countrymanufacturerforsite\", \"packingtype\", \"energyKcal\", \"protein\", \"fat\", \"carb\", \"ageWms\", \"temperature\", \"forpasta_viewpasta\", \"forpasta_flourtypepasta\", \"forpasta_pastashapepasta\", \"glutenFreePasta\", \"packagingPasta\"]) { code label ... on TextAttributeValue { textValue: value } ... on NumberAttributeValue { numberValue: value } ... on EnumAttributeValue { option { label } } ... on MultiEnumAttributeValue { options { label } } ... on BooleanAttributeValue { boolValue: value } } }",
+        "variables": {
+          "id": "52903",
+          "pageSize": 48
+        }
       },
-      "partitions": {
-        "items_path": "$.data.category.children[*].id",
-        "body_path": "$.variables.id",
-        "url_param": "category"
+      "items_path": "$.data.category.*.items[*]",
+      "url_path": "$.urlKey",
+      "emit_items_as_materials": true,
+      "pagination": {
+        "type": "none"
+      }
+    },
+    {
+      "type": "api_feed",
+      "strategy_id": "soki",
+      "url": "https://varus.ua/api/graphql?category=soki",
+      "method": "POST",
+      "body": {
+        "operationName": "VarusCatalog",
+        "query": "query VarusCatalog($id: ID!, $pageSize: Int) { category(id: $id, shopId: null, regionId: 0, locale: \"ua\", deliveryMethod: null) { p1: products(page: 1, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p2: products(page: 2, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p3: products(page: 3, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p4: products(page: 4, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p5: products(page: 5, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p6: products(page: 6, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p7: products(page: 7, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p8: products(page: 8, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p9: products(page: 9, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p10: products(page: 10, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } } } fragment Item on Product { id sku name urlKey weight volume regionalPriceInfo { price specialPrice specialFrom specialTo } regionalAvailability { inStock available } qtyStep { isDecimal } brand { name } primaryCategory { name urlKey } categories { name urlKey level isProductCategory } gallery { mainImageTimestamp } attributes(keys: [\"countrymanufacturerforsite\", \"packingtype\", \"energyKcal\", \"protein\", \"fat\", \"carb\", \"ageWms\", \"temperature\", \"tasteJuice\", \"forjuice_typejuice\", \"sugarFreeJuice\", \"forjuice_containertypejuice\", \"forjuice_pulpjuice\", \"forjuice_typemethodpreparationjuice\"]) { code label ... on TextAttributeValue { textValue: value } ... on NumberAttributeValue { numberValue: value } ... on EnumAttributeValue { option { label } } ... on MultiEnumAttributeValue { options { label } } ... on BooleanAttributeValue { boolValue: value } } }",
+        "variables": {
+          "id": "52959",
+          "pageSize": 48
+        }
       },
-      "item_url_base": "https://varus.ua/"
+      "items_path": "$.data.category.*.items[*]",
+      "url_path": "$.urlKey",
+      "emit_items_as_materials": true,
+      "pagination": {
+        "type": "none"
+      }
+    },
+    {
+      "type": "api_feed",
+      "strategy_id": "zasobi-dlya-mittya-posudu",
+      "url": "https://varus.ua/api/graphql?category=zasobi-dlya-mittya-posudu",
+      "method": "POST",
+      "body": {
+        "operationName": "VarusCatalog",
+        "query": "query VarusCatalog($id: ID!, $pageSize: Int) { category(id: $id, shopId: null, regionId: 0, locale: \"ua\", deliveryMethod: null) { p1: products(page: 1, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p2: products(page: 2, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p3: products(page: 3, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p4: products(page: 4, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p5: products(page: 5, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } p6: products(page: 6, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { items { ...Item } } } } fragment Item on Product { id sku name urlKey weight volume regionalPriceInfo { price specialPrice specialFrom specialTo } regionalAvailability { inStock available } qtyStep { isDecimal } brand { name } primaryCategory { name urlKey } categories { name urlKey level isProductCategory } gallery { mainImageTimestamp } attributes(keys: [\"countrymanufacturerforsite\", \"packingtype\", \"energyKcal\", \"protein\", \"fat\", \"carb\", \"ageWms\", \"temperature\", \"dishdetergent_appointmentdishdetergent\", \"dishdetergent_formatdishdetergent\", \"dishdetergent_organicdishdetergent\", \"dishdetergent_chlorinedishdetergent\", \"dishdetergent_phosphatesdishdetergent\", \"dishdetergent_containerdishdetergent\"]) { code label ... on TextAttributeValue { textValue: value } ... on NumberAttributeValue { numberValue: value } ... on EnumAttributeValue { option { label } } ... on MultiEnumAttributeValue { options { label } } ... on BooleanAttributeValue { boolValue: value } } }",
+        "variables": {
+          "id": "53169",
+          "pageSize": 48
+        }
+      },
+      "items_path": "$.data.category.*.items[*]",
+      "url_path": "$.urlKey",
+      "emit_items_as_materials": true,
+      "pagination": {
+        "type": "none"
+      }
     }
   ],
   "robots": {
@@ -48,8 +99,5 @@
   "dedup": {
     "key": "canonical_url",
     "use_link_rel_canonical": false
-  },
-  "revisit": {
-    "mode": "interval"
   }
 }

@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "catalog.yakaboo-catalog-rules",
-  "version": "1.1.1",
+  "version": "1.0.0",
   "kind": "collector-rules",
-  "title": "yakaboo.ua: full assortment from sitemap",
-  "description": "Повний асортимент із динамічного sitemap index, оголошеного в robots.txt; усі вкладені sitemap, лише українські товарні URL без category/filter/author/brand сторінок. Жодного фіксованого списку розділів чи номерів sitemap. Обхід продовжується між обмеженими запусками; ціна й характеристики повторно читаються після інтервалу revisit.",
+  "title": "yakaboo.ua: full scan of three book sections",
+  "description": "Правила Web Collector для повного каталогу yakaboo.ua: розділи «Український детектив», «Українське фентезі» й добірка «Сучасні українські автори» — усі сторінки пагінації (посилання «Вперед», ?p=N) і картки книжок з них (div.category-card a.category-card__name). Розділи позначені section categories, книжки — books. robots.txt дотримується; частота й ліміти — у джерелі й завданні.",
   "tags": [
     "catalog",
     "yakaboo",
@@ -16,20 +16,11 @@
   },
   "tests": [],
   "provenance": {
-    "created_by": "llm",
+    "created_by": "human",
     "authors": [
       "Claude (examples/sites: yakaboo)"
     ],
     "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Повний асортимент із динамічного sitemap index, оголошеного в robots.txt; усі вкладені sitemap, лише українські товарні URL без category/filter/author/brand сторінок. Жодного фіксованого списку розділів чи номерів sitemap. Обхід продовжується між обмеженими запусками; ціна й характеристики повторно читаються після інтервалу revisit. Reproducible Git LF bytes: normalize CRLF to LF without behavior changes.",
-    "based_on": {
-      "package_id": "catalog.yakaboo-catalog-rules",
-      "version": "1.1.0"
-    },
-    "llm": {
-      "provider": "OpenAI",
-      "model": "Codex",
-      "reason": "improvement"
-    }
+    "change_summary": "Full scan of three yakaboo.ua book sections: pagination and product pages."
   }
 }

@@ -1,0 +1,37 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "www.unian.ua",
+      "rss.unian.net"
+    ],
+    "allowed_schemes": [
+      "https"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "feed",
+      "strategy_id": "rss",
+      "urls": [
+        "https://rss.unian.net/site/news_ukr.rss"
+      ],
+      "autodiscover": false
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "normalization": {
+    "strip_query_params": [
+      "utm_*",
+      "fbclid",
+      "gclid",
+      "yclid",
+      "_ga"
+    ]
+  },
+  "revisit": {
+    "mode": "never"
+  }
+}

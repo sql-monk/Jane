@@ -1,0 +1,134 @@
+{
+  "entities": [
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "bon.ua",
+        "ad_id": "98730528",
+        "url": "https://bon.ua/obyavlenie/kuplyu-6fdf11",
+        "title": "Куплю Осциллограф,генератор,частотомер,вольтметр,измерительные приборы",
+        "category": "Електроніка, побутова техніка",
+        "price": 1000.0,
+        "currency": "UAH",
+        "city": "Київ",
+        "published_at": "2026-01-25"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "bon.ua",
+          "ad_id": "98730528"
+        }
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "bon.ua",
+        "ad_id": "46574404",
+        "url": "https://bon.ua/obyavlenie/radiodetali-platy-7cf3ed",
+        "title": "Куплю Радиодетали,платы,осциллограф,частотомер,вольтметр,платы,реле",
+        "category": "Електроніка, побутова техніка",
+        "city": "Київ",
+        "published_at": "2026-01-25"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "bon.ua",
+          "ad_id": "46574404"
+        }
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "bon.ua",
+        "ad_id": "102666438",
+        "url": "https://bon.ua/obyavlenie/makroobyektiv-nikon-af-micro-105mm-f-2-8-japan-a85a71",
+        "title": "макрооб'єктив Nikon AF Micro 105mm f/2.8 JAPAN",
+        "category": "Електроніка, побутова техніка",
+        "price": 9999.0,
+        "currency": "UAH",
+        "city": "Харків",
+        "published_at": "2026-10-08"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "bon.ua",
+          "ad_id": "102666438"
+        }
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "bon.ua",
+        "ad_id": "102669014",
+        "url": "https://bon.ua/obyavlenie/kolonka-proove-funk-15w-app-black-psfn1501ap01-96d1f7",
+        "title": "Колонка Proove Funk 15W (APP) Black (PSFN1501AP01)",
+        "category": "Електроніка, побутова техніка",
+        "price": 2499.0,
+        "currency": "UAH",
+        "city": "Харків",
+        "published_at": "2026-10-11"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "bon.ua",
+          "ad_id": "102669014"
+        }
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "bon.ua",
+        "ad_id": "102668995",
+        "url": "https://bon.ua/obyavlenie/wi-fi-adapter-hoco-hi37-wifi4-black-07ba4e",
+        "title": "Wi-Fi адаптер Hoco HI37 WiFi4 Black",
+        "category": "Електроніка, побутова техніка",
+        "price": 220.0,
+        "currency": "UAH",
+        "city": "Харків",
+        "published_at": "2026-10-11"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "bon.ua",
+          "ad_id": "102668995"
+        }
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "bon.ua",
+        "ad_id": "101818142",
+        "url": "https://bon.ua/obyavlenie/moshchnyi-transformator-s-svch-pechi-dlya-spottera-svarki-1a26a0",
+        "title": "Мощный трансформатор с СВЧ печи для споттера, сварки. Микроволновка.",
+        "category": "Електроніка, побутова техніка",
+        "price": 699.0,
+        "currency": "UAH",
+        "city": "Дніпро",
+        "published_at": "2026-10-11"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "bon.ua",
+          "ad_id": "101818142"
+        }
+      }
+    }
+  ]
+}

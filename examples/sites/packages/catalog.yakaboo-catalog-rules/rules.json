@@ -2,52 +2,70 @@
   "collector": "web",
   "scope": {
     "allowed_domains": [
-      "www.yakaboo.ua",
-      "static.yakaboo.ua"
+      "www.yakaboo.ua"
     ],
     "allowed_schemes": [
       "https"
     ],
+    "path_prefixes": [
+      "/ua/"
+    ],
     "include": [
       {
-        "type": "regex",
-        "value": "^https://www\\.yakaboo\\.ua/ua/[^/?]+\\.html$"
+        "value": "www.yakaboo.ua/ua/*.html"
       },
       {
-        "type": "regex",
-        "value": "^https://static\\.yakaboo\\.ua/media/sitemap/[^/?]+\\.xml(?:\\.gz)?$"
+        "value": "www.yakaboo.ua/ua/knigi/hudozhestvennaja-literatura/detektiv/ukrains-kij-detektiv.html**"
+      },
+      {
+        "value": "www.yakaboo.ua/ua/knigi/hudozhestvennaja-literatura/fjentezi/ukrains-ke-fentezi.html**"
+      },
+      {
+        "value": "www.yakaboo.ua/ua/knigi/dobirki-yakaboo/suchasni-ukrains-ki-avtori.html**"
       }
     ]
   },
   "strategies": [
     {
-      "type": "sitemap",
-      "strategy_id": "whole-assortment",
-      "urls": [
-        "https://static.yakaboo.ua/media/sitemap/sitemap.xml"
+      "type": "listing",
+      "strategy_id": "sections",
+      "start_urls": [
+        "https://www.yakaboo.ua/ua/knigi/hudozhestvennaja-literatura/detektiv/ukrains-kij-detektiv.html",
+        "https://www.yakaboo.ua/ua/knigi/hudozhestvennaja-literatura/fjentezi/ukrains-ke-fentezi.html",
+        "https://www.yakaboo.ua/ua/knigi/dobirki-yakaboo/suchasni-ukrains-ki-avtori.html"
       ],
-      "use_robots_txt": true,
-      "use_lastmod_for_revisit": false
+      "item_links": {
+        "value": "div.category-card a.category-card__name"
+      },
+      "next_page": {
+        "value": "div.yb-pagination__nav-list + a.yb-pagination__nav-btn--arrow"
+      }
     }
   ],
   "robots": {
     "mode": "respect"
   },
-  "revisit": {
-    "mode": "interval"
-  },
-  "dedup": {
-    "key": "canonical_url",
-    "use_link_rel_canonical": true
+  "normalization": {
+    "strip_query_params": [
+      "utm_*"
+    ]
   },
   "sections": [
     {
-      "section_id": "books",
-      "title": "Усі товарні картки українською (книжки та інші товари)",
+      "section_id": "categories",
+      "title": "Сторінки розділів (з пагінацією ?p=N)",
       "patterns": [
         {
-          "type": "regex",
-          "value": "^https://www\\.yakaboo\\.ua/ua/[^/?]+\\.html$"
+          "value": "www.yakaboo.ua/ua/knigi/**"
+        }
+      ]
+    },
+    {
+      "section_id": "books",
+      "title": "Сторінки книжок",
+      "patterns": [
+        {
+          "value": "www.yakaboo.ua/ua/*.html"
         }
       ]
     }

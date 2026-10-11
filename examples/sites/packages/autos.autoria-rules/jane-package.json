@@ -1,0 +1,26 @@
+{
+  "schema_version": "1",
+  "package_id": "autos.autoria-rules",
+  "version": "1.0.0",
+  "kind": "collector-rules",
+  "title": "AUTO.RIA: newest used passenger cars, search pages + ad pages",
+  "description": "Правила Web Collector для auto.ria.com: сторінки пошуку вживаних легкових авто, відсортовані за датою додавання (order=7), з пагінацією параметром page (кількість сторінок - crawl.max_depth завдання), і сторінки оголошень із них (a.product-card). Сторінки пошуку читаються повністю в кожному зборі; оголошення - за revisit.mode=interval (crawl.revisit_interval_seconds). robots.txt дотримується, /bff/ і API не використовуються.",
+  "tags": [
+    "autos",
+    "autoria",
+    "car-ads"
+  ],
+  "entry": {
+    "collector": "web",
+    "rules": "rules.json"
+  },
+  "tests": [],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (subagent: examples/sites autoria)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Newest used passenger cars of auto.ria.com: N search pages by date and their ads."
+  }
+}

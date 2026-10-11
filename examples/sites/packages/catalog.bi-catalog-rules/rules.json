@@ -8,30 +8,29 @@
       "https"
     ],
     "path_prefixes": [
-      "/ukr/product/",
-      "/sitemap-index.xml",
-      "/sitemap_product"
-    ],
-    "include": [
-      {
-        "type": "regex",
-        "value": "^https://bi\\.ua/ukr/product/[^/?#]+\\.html$"
-      },
-      {
-        "type": "regex",
-        "value": "^https://bi\\.ua/(?:sitemap-index|sitemap_product(?:_[0-9]+)?)\\.xml$"
-      }
+      "/ukr/detskij-transport/samokatyi/",
+      "/ukr/detskij-transport/begovelyi/",
+      "/ukr/detskij-transport/velosipedyi/",
+      "/ukr/product/"
     ]
   },
   "strategies": [
     {
-      "type": "sitemap",
-      "strategy_id": "all-products",
-      "urls": [
-        "https://bi.ua/sitemap-index.xml"
+      "type": "listing",
+      "strategy_id": "categories",
+      "start_urls": [
+        "https://bi.ua/ukr/detskij-transport/samokatyi/",
+        "https://bi.ua/ukr/detskij-transport/begovelyi/",
+        "https://bi.ua/ukr/detskij-transport/velosipedyi/"
       ],
-      "use_robots_txt": false,
-      "use_lastmod_for_revisit": false
+      "item_links": {
+        "type": "css",
+        "value": "a.goodsItemLink.good"
+      },
+      "next_page": {
+        "type": "css",
+        "value": "div.pagin a.pagLink.ac + a.pagLink"
+      }
     }
   ],
   "robots": {
@@ -44,17 +43,28 @@
   },
   "sections": [
     {
-      "section_id": "products",
-      "title": "Усі українські картки товарів",
+      "section_id": "categories",
+      "title": "Сторінки категорій (з пагінацією ?page=N)",
       "patterns": [
         {
-          "type": "regex",
-          "value": "^https://bi\\.ua/ukr/product/[^/?#]+\\.html$"
+          "value": "bi.ua/ukr/detskij-transport/samokatyi/**"
+        },
+        {
+          "value": "bi.ua/ukr/detskij-transport/begovelyi/**"
+        },
+        {
+          "value": "bi.ua/ukr/detskij-transport/velosipedyi/**"
+        }
+      ]
+    },
+    {
+      "section_id": "products",
+      "title": "Картки товарів",
+      "patterns": [
+        {
+          "value": "bi.ua/ukr/product/*"
         }
       ]
     }
-  ],
-  "revisit": {
-    "mode": "interval"
-  }
+  ]
 }

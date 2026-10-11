@@ -1,0 +1,37 @@
+{
+  "entities": [
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "rst.ua",
+        "ad_id": "15478392",
+        "url": "https://rst.ua/ukr/oldcars/jaguar/i-pace/jaguar_i-pace_15478392.html",
+        "title": "JAGUAR I-Pace SE R-Dynamic",
+        "price": 36500,
+        "currency": "USD",
+        "price_usd": 36500,
+        "price_uah": 1644400,
+        "make": "JAGUAR",
+        "model": "I-Pace",
+        "status": "active",
+        "condition": "used",
+        "year": 2023,
+        "mileage_km": 83000,
+        "region": "Дніпропетровська область",
+        "city": "Дніпро",
+        "fuel": "electric",
+        "drive": "awd",
+        "body_type": "suv",
+        "color": "білий",
+        "description": "Модельний рік - 2024! • Ідеальний стан: Автомобіль без жодного підфарбування, сколів чи подряпин, в плівці по колу - polor ulti pro • Офіційна гарантія: Куплений у офіційного дилера в Україні. На гарантії до 2029 року. Окремо на батарею 8 років до 2032 • Динаміка суперкара: Розгін 0–100 км/год всього за 4.8 секунди • Зберігання: Домашній навіс, заряджався дбайливо на домашній станції • Топова комплектація SE R-Dynamic: Спортивний стиль: Агресивний обвіс R-Dynamic, матрична LED-оптика, фірмові д…"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "rst.ua",
+          "ad_id": "15478392"
+        }
+      }
+    }
+  ]
+}

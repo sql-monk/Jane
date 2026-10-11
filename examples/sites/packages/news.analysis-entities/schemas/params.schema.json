@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Параметри news.analysis-entities",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "item_scope": {
+      "description": "Простір ключів news_item і news_mention (зазвичай source_id завдання, щоб verify й історія читалися за джерелом).",
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]{0,98}[a-z0-9])?$",
+      "default": "news"
+    },
+    "event_scope": {
+      "description": "Простір ключів news_event — спільний для всіх джерел, інакше події різних джерел не об'єднаються.",
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]{0,98}[a-z0-9])?$",
+      "default": "news"
+    },
+    "emit_mentions": {
+      "description": "Видавати news_mention — плаский рядок на кожну згадку (url + canonical_name).",
+      "type": "boolean",
+      "default": true
+    },
+    "max_mentions": {
+      "description": "Найбільше згадок на одну новину.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 50,
+      "default": 12
+    },
+    "max_event_lag_days": {
+      "description": "Дата події від LLM приймається, лише якщо вона не пізніша за дату публікації й не раніша більш ніж на стільки днів; інакше в ключі — дата публікації (Київ).",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 30,
+      "default": 3
+    }
+  }
+}

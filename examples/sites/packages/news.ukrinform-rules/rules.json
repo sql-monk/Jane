@@ -1,0 +1,40 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "www.ukrinform.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/rss/",
+      "/rubric-"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "feed",
+      "strategy_id": "rss",
+      "urls": [
+        "https://www.ukrinform.ua/rss/block-lastnews"
+      ],
+      "autodiscover": false
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "normalization": {
+    "strip_query_params": [
+      "utm_*",
+      "fbclid",
+      "gclid",
+      "yclid",
+      "_ga"
+    ]
+  },
+  "revisit": {
+    "mode": "never"
+  }
+}

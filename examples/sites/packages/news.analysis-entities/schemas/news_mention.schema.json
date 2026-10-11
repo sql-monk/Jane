@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "news_mention (згадка в новині: як матеріал пише про особу, організацію, країну)",
+  "description": "Плаский рядок для аналітики; ключ — url + canonical_name.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["url", "canonical_name", "entity_key", "type", "role", "sentiment", "source", "source_kind"],
+  "properties": {
+    "url": { "type": "string", "pattern": "^https?://" },
+    "canonical_name": { "type": "string", "minLength": 1 },
+    "entity_key": { "type": "string" },
+    "name": { "type": "string" },
+    "type": { "type": "string", "enum": ["person", "organization", "country", "location", "other"] },
+    "role": { "type": "string", "enum": ["subject", "object", "mentioned"] },
+    "sentiment": { "type": "string", "enum": ["positive", "neutral", "negative"] },
+    "evidence": { "type": "string" },
+    "source": { "type": "string", "minLength": 1 },
+    "source_kind": { "type": "string", "enum": ["web", "telegram"] },
+    "published_at": { "type": "string", "format": "date-time" },
+    "event_key": { "type": "string" }
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "schema_version": "1",
+  "package_id": "ads.domria-listing",
+  "version": "1.0.1",
+  "kind": "extractor",
+  "title": "DIM.RIA: classified ads from catalog pages",
+  "description": "Оголошення DIM.RIA (dom.ria.com) зі сторінок каталогу (оренда й продаж квартир): стан сторінки window.__INITIAL_STATE__ → classified_ad (ціна, валюта, площа, кімнати, поверх, район, дати публікації й актуалізації). Картки не потрібні. Без персональних даних: продавець, телефони, вулиця, номери будинку й квартири, координати й вільний опис не зберігаються.",
+  "tags": [
+    "ads",
+    "classifieds",
+    "real-estate",
+    "domria"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_ads_domria.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "output": {
+    "entities": [
+      {
+        "entity_type": "classified_ad",
+        "schema": "schemas/classified_ad.schema.json",
+        "key_fields": [
+          "site",
+          "ad_id"
+        ],
+        "description": "Оголошення про нерухомість (повна сутність зі сторінки каталогу)"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": [
+      "python-dateutil>=2.9"
+    ]
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "rent-kyiv-catalog-page",
+      "input": {
+        "file": "tests/rent-kyiv/page.html",
+        "media_type": "text/html",
+        "url": "https://dom.ria.com/uk/arenda-kvartir/kiev/"
+      },
+      "expected_status": "success",
+      "expected": "tests/rent-kyiv/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "sale-kyiv-catalog-page-with-newbuild-promo",
+      "input": {
+        "file": "tests/sale-kyiv/page.html",
+        "media_type": "text/html",
+        "url": "https://dom.ria.com/uk/prodazha-kvartir/kiev/"
+      },
+      "expected_status": "success",
+      "expected": "tests/sale-kyiv/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "home-page-empty",
+      "input": {
+        "file": "tests/home-page/page.html",
+        "media_type": "text/html",
+        "url": "https://dom.ria.com/uk/"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (examples/sites: classifieds)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Classified ads of DIM.RIA catalog pages (rent and sale of flats in Kyiv) from the server-rendered page state. 1.0.1: typing only (dateutil import annotated for mypy), same behaviour."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "url_patterns": [
+      "/uk/arenda-kvartir/*",
+      "/uk/prodazha-kvartir/*"
+    ]
+  }
+}

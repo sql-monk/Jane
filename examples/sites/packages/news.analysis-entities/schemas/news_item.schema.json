@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "news_item (розібрана новина: стаття сайту або пост Telegram)",
+  "description": "Ключ — url (для поста — https://t.me/<channel>/<message_id>); однаковий формат для статей і постів.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["url", "source", "source_kind", "title", "tonality", "mentions"],
+  "properties": {
+    "url": { "type": "string", "pattern": "^https?://" },
+    "source": { "description": "Домен сайту (fields.site статті) або username каналу.", "type": "string", "minLength": 1 },
+    "source_kind": { "type": "string", "enum": ["web", "telegram"] },
+    "channel": { "type": "string", "minLength": 1 },
+    "message_id": { "type": "integer", "minimum": 0 },
+    "published_at": { "type": "string", "format": "date-time" },
+    "title": { "description": "Заголовок статті дослівно; для поста — згенерований LLM.", "type": "string", "minLength": 1 },
+    "summary": { "type": "string" },
+    "language": { "description": "ISO 639-1.", "type": "string" },
+    "content_type": {
+      "type": "string",
+      "enum": ["news", "opinion", "analysis", "interview", "advertisement", "announcement", "other"]
+    },
+    "topics": {
+      "description": "Рубрики з фіксованого переліку, перша — головна.",
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "string",
+        "enum": ["war", "politics", "international", "economy", "energy", "society", "crime", "incidents", "health", "education", "culture", "sports", "science_tech", "weather", "other"]
+      }
+    },
+    "countries": { "type": "array", "items": { "type": "string", "pattern": "^[A-Z]{2}$" } },
+    "places": { "type": "array", "items": { "type": "string" } },
+    "tonality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "score"],
+      "properties": {
+        "label": { "type": "string", "enum": ["positive", "neutral", "negative"] },
+        "score": { "type": "number", "minimum": -1, "maximum": 1 }
+      }
+    },
+    "mentions": {
+      "description": "Суб'єкти й об'єкти новини та як текст написаний щодо кожного.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "canonical_name", "entity_key", "type", "role", "sentiment"],
+        "properties": {
+          "name": { "type": "string" },
+          "canonical_name": { "type": "string", "minLength": 1 },
+          "entity_key": { "description": "Нормалізований ідентифікатор (абревіатура, ISO-код країни, прізвище латиницею).", "type": "string" },
+          "type": { "type": "string", "enum": ["person", "organization", "country", "location", "other"] },
+          "role": { "type": "string", "enum": ["subject", "object", "mentioned"] },
+          "sentiment": { "type": "string", "enum": ["positive", "neutral", "negative"] },
+          "evidence": { "type": "string" }
+        }
+      }
+    },
+    "key_facts": { "type": "array", "items": { "type": "string" } },
+    "quoted_sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "kind"],
+        "properties": {
+          "name": { "type": "string" },
+          "kind": { "type": "string", "enum": ["official", "expert", "media", "eyewitness", "document", "social_media", "anonymous", "other"] }
+        }
+      }
+    },
+    "fact_or_opinion": { "type": "string", "enum": ["fact", "opinion", "mixed"] },
+    "importance": { "type": "string", "enum": ["low", "medium", "high"] },
+    "manipulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clickbait", "signals"],
+      "properties": {
+        "clickbait": { "type": "boolean" },
+        "signals": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["emotional_language", "sensational_headline", "unverified_claims", "one_sided", "missing_source", "propaganda_narrative", "hate_speech"] }
+        }
+      }
+    },
+    "event_key": { "description": "Ключ news_event: <дата>:<клас>:<якір>.", "type": "string" },
+    "event_type": { "type": "string" },
+    "event_date": { "type": "string", "format": "date" },
+    "event_title": { "type": "string" }
+  }
+}

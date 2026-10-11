@@ -1,0 +1,49 @@
+{
+  "entities": [
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "40547502",
+        "url": "https://auto.ria.com/uk/auto_lexus_es_40547502.html",
+        "title": "Lexus ES 2019",
+        "price": 29500.0,
+        "currency": "USD",
+        "make": "Lexus",
+        "model": "ES",
+        "year": 2019,
+        "price_usd": 29500.0,
+        "price_uah": 1327500.0,
+        "mileage_km": 122000,
+        "transmission": "Автомат",
+        "fuel": "Бензин",
+        "engine_l": 2.49,
+        "body_type": "Седан",
+        "drive": "Передній",
+        "color": "Синій металік",
+        "region": "Одеська обл.",
+        "city": "Одеса",
+        "seller_type": "dealer",
+        "condition": "used",
+        "published_at": "2026-10-11",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/lexus_es__660900391fx.webp",
+        "status": "active",
+        "description": "Офіційний автомобіль, без ДТП та підфарбувань. Передня частина автомобіля в бронеплівці. Адаптивна LED-оптика, безключовий доступ, розширений пакет шкіри, auto hold, start stop, чорна стеля, мультикермо з підрульовими пелюстками, режими їзди, підігрів сидінь, комбінований двоколірний салон, LED-панель приладів, електрорегулювання сидінь, пам’ять сидіння водія, двозонний клімат-контроль, круїз-контроль, контроль сліпих зон, утримання в смузі, попередження про лобове зіткнення, камера заднього ви…"
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "40547502"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_31ed0f337637302b70c02820",
+        "observed_at": "2026-10-11T02:50:05Z",
+        "material_id": "web:51f968ef3b35da4db7a034c7d6dd86ca",
+        "content_sha256": "31ed0f337637302b70c028201440a62fcda544ce1660c5b543912e06dbd0b0ff"
+      }
+    }
+  ]
+}

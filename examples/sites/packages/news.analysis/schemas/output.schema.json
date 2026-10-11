@@ -1,0 +1,400 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Розбір новин (вихід моделі)",
+  "description": "Один елемент items на кожну вхідну сутність article або post, у тому ж порядку. Порожній об'єкт {} — у даних немає жодної статті чи поста. Схема лише структурна (без обмежень довжин і діапазонів): невідповідність провалює весь виклик, тож довжини й діапазони нормалізує пакет news.analysis-entities.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Item"
+      }
+    }
+  },
+  "$defs": {
+    "Ref": {
+      "description": "Ідентифікатори вхідної сутності, скопійовані символ у символ.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_type",
+        "url",
+        "source",
+        "published_at",
+        "observation_id",
+        "observed_at"
+      ],
+      "properties": {
+        "entity_type": {
+          "type": "string",
+          "enum": [
+            "article",
+            "post"
+          ]
+        },
+        "url": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "description": "fields.site статті або fields.channel поста."
+        },
+        "channel": {
+          "type": "string"
+        },
+        "message_id": {
+          "type": "integer"
+        },
+        "published_at": {
+          "type": "string"
+        },
+        "observation_id": {
+          "type": "string"
+        },
+        "observed_at": {
+          "type": "string"
+        }
+      }
+    },
+    "Tonality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "score"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "enum": [
+            "positive",
+            "neutral",
+            "negative"
+          ]
+        },
+        "score": {
+          "type": "number"
+        }
+      }
+    },
+    "Mention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "canonical_name",
+        "type",
+        "role",
+        "sentiment",
+        "evidence"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "canonical_name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "person",
+            "organization",
+            "country",
+            "location",
+            "other"
+          ]
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "subject",
+            "object",
+            "mentioned"
+          ]
+        },
+        "sentiment": {
+          "type": "string",
+          "enum": [
+            "positive",
+            "neutral",
+            "negative"
+          ]
+        },
+        "evidence": {
+          "type": "string"
+        }
+      }
+    },
+    "QuotedSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "official",
+            "expert",
+            "media",
+            "eyewitness",
+            "document",
+            "social_media",
+            "anonymous",
+            "other"
+          ]
+        }
+      }
+    },
+    "Manipulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clickbait",
+        "signals"
+      ],
+      "properties": {
+        "clickbait": {
+          "type": "boolean"
+        },
+        "signals": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "emotional_language",
+              "sensational_headline",
+              "unverified_claims",
+              "one_sided",
+              "missing_source",
+              "propaganda_narrative",
+              "hate_speech"
+            ]
+          }
+        }
+      }
+    },
+    "Event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "title",
+        "date",
+        "country",
+        "region",
+        "settlement",
+        "actor",
+        "actor_type",
+        "counterpart",
+        "parties",
+        "participants",
+        "description"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "strike",
+            "combat",
+            "incident",
+            "weather",
+            "diplomacy",
+            "statement",
+            "decision",
+            "crime_justice",
+            "economy",
+            "military_aid",
+            "humanitarian",
+            "sports",
+            "culture_science",
+            "memorial",
+            "other",
+            "none"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "description": "YYYY-MM-DD за київським часом."
+        },
+        "country": {
+          "type": "string",
+          "description": "ISO 3166-1 alpha-2 або порожньо."
+        },
+        "region": {
+          "type": "string"
+        },
+        "settlement": {
+          "type": "string"
+        },
+        "actor": {
+          "type": "string"
+        },
+        "actor_type": {
+          "type": "string",
+          "enum": [
+            "person",
+            "organization",
+            "country",
+            "none"
+          ]
+        },
+        "counterpart": {
+          "type": "string"
+        },
+        "parties": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "participants": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "Item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "content_type",
+        "title",
+        "summary",
+        "language",
+        "topics",
+        "countries",
+        "places",
+        "tonality",
+        "mentions",
+        "key_facts",
+        "quoted_sources",
+        "fact_or_opinion",
+        "importance",
+        "manipulation",
+        "event"
+      ],
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/Ref"
+        },
+        "content_type": {
+          "type": "string",
+          "enum": [
+            "news",
+            "opinion",
+            "analysis",
+            "interview",
+            "advertisement",
+            "announcement",
+            "other"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string",
+          "description": "ISO 639-1."
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "war",
+              "politics",
+              "international",
+              "economy",
+              "energy",
+              "society",
+              "crime",
+              "incidents",
+              "health",
+              "education",
+              "culture",
+              "sports",
+              "science_tech",
+              "weather",
+              "other"
+            ]
+          }
+        },
+        "countries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "places": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tonality": {
+          "$ref": "#/$defs/Tonality"
+        },
+        "mentions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Mention"
+          }
+        },
+        "key_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "quoted_sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QuotedSource"
+          }
+        },
+        "fact_or_opinion": {
+          "type": "string",
+          "enum": [
+            "fact",
+            "opinion",
+            "mixed"
+          ]
+        },
+        "importance": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "manipulation": {
+          "$ref": "#/$defs/Manipulation"
+        },
+        "event": {
+          "$ref": "#/$defs/Event"
+        }
+      }
+    }
+  }
+}

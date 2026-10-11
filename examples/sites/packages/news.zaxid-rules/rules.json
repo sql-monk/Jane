@@ -1,0 +1,45 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "zaxid.net"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "include": [
+      {
+        "value": "zaxid.net/rss/**"
+      },
+      {
+        "type": "regex",
+        "value": "^https://zaxid\\.net/[^/?#]+_n\\d+$"
+      }
+    ]
+  },
+  "strategies": [
+    {
+      "type": "feed",
+      "strategy_id": "rss",
+      "urls": [
+        "https://zaxid.net/rss/all.xml"
+      ],
+      "autodiscover": false
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "normalization": {
+    "strip_query_params": [
+      "utm_*",
+      "fbclid",
+      "gclid",
+      "yclid",
+      "_ga"
+    ]
+  },
+  "revisit": {
+    "mode": "never"
+  }
+}

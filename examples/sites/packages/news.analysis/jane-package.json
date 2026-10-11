@@ -1,0 +1,51 @@
+{
+  "schema_version": "1",
+  "package_id": "news.analysis",
+  "version": "1.0.0",
+  "kind": "llm",
+  "title": "News analysis: source, event, tonality, mentions",
+  "description": "LLM-розбір новин зі статей сайтів (article пакета news.articles) і постів Telegram (post пакета telegram.web-posts): заголовок (для постів — згенерований), короткий зміст, мова, теми з фіксованого переліку, географія, тональність, згадані особи/організації/країни з роллю (суб'єкт/об'єкт) і тональністю тексту щодо кожної з цитатою-доказом, ключові факти, цитовані джерела, факт чи думка, важливість, ознаки маніпуляції й структурований опис події за жорсткими правилами (тип, дата, місце, головний суб'єкт, сторони). Вхід — сутності попереднього етапу, вихід — дані (output.data): сутності news_item / news_event / news_mention і ключ події будує детермінований пакет news.analysis-entities. Текст сутностей передається моделі лише як недовірені дані.",
+  "tags": [
+    "news",
+    "telegram",
+    "llm",
+    "sentiment",
+    "events"
+  ],
+  "entry": {
+    "executor": "llm",
+    "instructions": "prompts/instructions.md",
+    "output_schema": "schemas/output.schema.json",
+    "model": "cheap",
+    "temperature": 0,
+    "max_output_tokens": 16000
+  },
+  "input": {
+    "accepts": [
+      "entities"
+    ],
+    "entity_types": [
+      "article",
+      "post"
+    ]
+  },
+  "output": {
+    "data_schema": "schemas/output.schema.json"
+  },
+  "required_connections": [],
+  "tests": [],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (news analysis)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Initial version: per-item analysis of articles and Telegram posts with a structured event description for cross-source grouping."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web",
+      "telegram"
+    ]
+  }
+}

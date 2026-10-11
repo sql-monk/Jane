@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "article (новинна стаття сайту)",
+  "description": "Стаття новинного сайту з повним чистим текстом. Інтерфейс для LLM-розбору новин: назви полів не змінюються, нові поля лише додаються.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["site", "url", "title", "published_at", "text"],
+  "properties": {
+    "site": {
+      "description": "Домен сайту без www (nv.ua і для sport.nv.ua).",
+      "type": "string",
+      "pattern": "^[a-z0-9.-]+$"
+    },
+    "url": {
+      "description": "Канонічний URL статті без utm/fbclid-параметрів і якоря; ключ сутності.",
+      "type": "string",
+      "pattern": "^https?://[^#\\s]+$"
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "published_at": {
+      "description": "Час публікації, RFC 3339 в UTC (суфікс Z).",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "text": {
+      "description": "Повний текст статті: абзаци, підзаголовки й пункти списків через порожній рядок; без меню, реклами, підписів до фото й блоків «читайте також».",
+      "type": "string",
+      "minLength": 1
+    },
+    "modified_at": {
+      "description": "Час останнього оновлення, RFC 3339 в UTC.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "author": { "description": "Автор(и) через кому; назва самого видання не вважається автором.", "type": "string", "minLength": 1 },
+    "section": { "description": "Рубрика сайту.", "type": "string", "minLength": 1 },
+    "lead": { "description": "Лід / підзаголовок / опис статті.", "type": "string", "minLength": 1 },
+    "language": { "type": "string", "enum": ["uk", "en", "ru"] },
+    "tags": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "image": { "description": "Головне зображення (og:image).", "type": "string", "minLength": 1 }
+  }
+}

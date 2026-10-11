@@ -1,0 +1,43 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "www.radiosvoboda.org"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/z/630",
+      "/a/"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "listing",
+      "strategy_id": "news-list",
+      "start_urls": [
+        "https://www.radiosvoboda.org/z/630"
+      ],
+      "item_links": {
+        "type": "css",
+        "value": "ul.archive-list a[href^='/a/']"
+      }
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "normalization": {
+    "strip_query_params": [
+      "utm_*",
+      "fbclid",
+      "gclid",
+      "yclid",
+      "_ga"
+    ]
+  },
+  "revisit": {
+    "mode": "never"
+  }
+}

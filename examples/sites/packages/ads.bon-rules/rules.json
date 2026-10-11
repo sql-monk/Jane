@@ -1,0 +1,64 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "bon.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/electronika-i-bitovaya-tehnika",
+      "/mebel-interer-obihod",
+      "/obyavlenie/"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "listing",
+      "strategy_id": "categories",
+      "start_urls": [
+        "https://bon.ua/electronika-i-bitovaya-tehnika",
+        "https://bon.ua/mebel-interer-obihod"
+      ],
+      "item_links": {
+        "value": "div.msg-one a.m-title"
+      }
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "normalization": {
+    "strip_query_params": [
+      "utm_*"
+    ]
+  },
+  "sections": [
+    {
+      "section_id": "ads",
+      "patterns": [
+        {
+          "value": "bon.ua/obyavlenie/**"
+        }
+      ]
+    },
+    {
+      "section_id": "categories",
+      "patterns": [
+        {
+          "value": "bon.ua/electronika-i-bitovaya-tehnika**"
+        },
+        {
+          "value": "bon.ua/mebel-interer-obihod**"
+        }
+      ]
+    }
+  ],
+  "dedup": {
+    "use_link_rel_canonical": false
+  },
+  "revisit": {
+    "mode": "interval"
+  }
+}

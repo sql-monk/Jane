@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "catalog.varus-product-extractor",
-  "version": "1.1.1",
+  "version": "1.0.0",
   "kind": "extractor",
   "title": "varus.ua: full product cards from the catalog API",
-  "description": "Повні картки всього асортименту з публічного GraphQL API, головна категорія та динамічне дерево категорій. Усі властивості товару через attributes(keys: []), ціни регіону 0, базові й акційні ціни, одиниця продажу, вага, обʼєм, країна та шлях категорій. Реальні контрольні приклади: овочі, вагові фрукти, випічка, молочні товари, напої й побутова хімія. Ціна відсутня у наявного товару — unrecognized.",
+  "description": "Повні картки товарів супермаркету VARUS (varus.ua) з елементів каталожного API сайту (GraphQL, той самий запит, що й сторінки категорій; кожен товар — окремий JSON-матеріал стратегії api_feed): назва, ціна й ціна без акції (регіональні ціни для відвідувача без вибраного магазину), наявність, бренд, категорія й шлях категорій, зображення, одиниця, вага/об'єм, країна виробництва, характеристики (completeness: full). Ключ — shop + product_id (SKU). Товар без ціни (немає в наявності) не надсилає price — лишається остання відома.",
   "tags": [
     "catalog",
     "varus",
@@ -116,70 +116,15 @@
       },
       "expected_status": "unrecognized",
       "origin": "human"
-    },
-    {
-      "name": "whole-assortment-fresh-vegetables",
-      "input": {
-        "file": "tests/whole-assortment-fresh-vegetables/item.json",
-        "media_type": "application/json",
-        "url": "https://varus.ua/api/tomat-green-agro-cherry-time-90-h"
-      },
-      "expected_status": "success",
-      "expected": "tests/whole-assortment-fresh-vegetables/expected.json",
-      "compare": "subset",
-      "origin": "llm"
-    },
-    {
-      "name": "whole-assortment-weighted-fruit",
-      "input": {
-        "file": "tests/whole-assortment-weighted-fruit/item.json",
-        "media_type": "application/json",
-        "url": "https://varus.ua/api/yabluko-baia-marisa-vahove"
-      },
-      "expected_status": "success",
-      "expected": "tests/whole-assortment-weighted-fruit/expected.json",
-      "compare": "subset",
-      "origin": "llm"
-    },
-    {
-      "name": "whole-assortment-bakery-sale",
-      "input": {
-        "file": "tests/whole-assortment-bakery-sale/item.json",
-        "media_type": "application/json",
-        "url": "https://varus.ua/api/prianyk-khlibodar-na-khodu-na-medu-30-h"
-      },
-      "expected_status": "success",
-      "expected": "tests/whole-assortment-bakery-sale/expected.json",
-      "compare": "subset",
-      "origin": "llm"
-    },
-    {
-      "name": "in-stock-without-price",
-      "input": {
-        "file": "tests/in-stock-without-price/item.json",
-        "media_type": "application/json",
-        "url": "https://varus.ua/api/tomat-green-agro-cherry-time-90-h"
-      },
-      "expected_status": "unrecognized",
-      "origin": "problem_sample"
     }
   ],
   "provenance": {
-    "created_by": "llm",
+    "created_by": "human",
     "authors": [
       "Claude (examples/sites: varus)"
     ],
     "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Verify whole-assortment GraphQL items with all attributes: vegetables, weighted fruit, bakery discounts and missing-price boundary. Reproducible Git LF bytes: normalize CRLF to LF without behavior changes.",
-    "based_on": {
-      "package_id": "catalog.varus-product-extractor",
-      "version": "1.1.0"
-    },
-    "llm": {
-      "provider": "OpenAI",
-      "model": "Codex",
-      "reason": "improvement"
-    }
+    "change_summary": "Full product cards of varus.ua from the items of the site's catalog API."
   },
   "bindings_hint": {
     "source_kinds": [

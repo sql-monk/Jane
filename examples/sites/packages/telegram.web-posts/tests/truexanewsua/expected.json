@@ -1,0 +1,115 @@
+{
+  "entities": [
+    {
+      "entity_type": "post",
+      "fields": {
+        "channel": "truexanewsua",
+        "message_id": 146051,
+        "url": "https://t.me/truexanewsua/146051",
+        "published_at": "2026-10-10T16:30:48Z",
+        "title": "❗️Завтра, з 16:00 до 23:59, будуть графіки відключень для всіх категорій споживачів у частині регіонів України, – Укренерго.",
+        "text": "❗️Завтра, з 16:00 до 23:59, будуть графіки відключень для всіх категорій споживачів у частині регіонів України, – Укренерго.\n\nПричина – наслідки російських ракетно-дронових атак на енергооб’єкти.\n\nТРУХА⚡️Україна | Надіслати новину",
+        "views": 500000,
+        "has_media": false,
+        "edited": true
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "channel": "truexanewsua",
+          "message_id": 146051
+        }
+      }
+    },
+    {
+      "entity_type": "post",
+      "fields": {
+        "channel": "truexanewsua",
+        "message_id": 146054,
+        "url": "https://t.me/truexanewsua/146054",
+        "published_at": "2026-10-10T16:48:35Z",
+        "title": "Україні час призначити нового президента, – Трамп.",
+        "text": "Україні час призначити нового президента, – Трамп.\n\nТакож він стверджує, що Зеленський «багато разів» міг урегулювати війну, але вирішив цього не робити. І додав, що росія постачає значну частину дизельного пального у світі, а атаки на переробку створюють глобальний дефіцит і проблеми для американських фермерів.\n\nТРУХА⚡️Україна | Надіслати новину",
+        "views": 491000,
+        "has_media": true,
+        "edited": true
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "channel": "truexanewsua",
+          "message_id": 146054
+        }
+      }
+    },
+    {
+      "entity_type": "post",
+      "fields": {
+        "channel": "truexanewsua",
+        "message_id": 146058,
+        "url": "https://t.me/truexanewsua/146058",
+        "published_at": "2026-10-10T17:31:15Z",
+        "title": "Столиця – загроза БПЛА.",
+        "text": "Столиця – загроза БПЛА.\n\nUPD: відбій.\n\nСитуація в Києві: https://t.me/kyiv",
+        "views": 498000,
+        "has_media": true,
+        "edited": true
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "channel": "truexanewsua",
+          "message_id": 146058
+        }
+      }
+    },
+    {
+      "entity_type": "post",
+      "fields": {
+        "channel": "truexanewsua",
+        "message_id": 146060,
+        "url": "https://t.me/truexanewsua/146060",
+        "published_at": "2026-10-10T18:47:15Z",
+        "title": "😳 Нові iPhone 18 Pro та iPhone 18 Pro Max схильні до втрати кольору та подряпин: особливо помітно це на бордових та чорних версіях, – соцмережі.",
+        "text": "😳 Нові iPhone 18 Pro та iPhone 18 Pro Max схильні до втрати кольору та подряпин: особливо помітно це на бордових та чорних версіях, – соцмережі.\n\nНаразі невідомо, наскільки поширеною є проблема.\n\nТРУХА⚡️Україна | Надіслати новину",
+        "views": 452000,
+        "links": [
+          "https://glavcom.ua/techno/devices/novij-iphone-18-pro-pochav-vtrachati-kolir-koristuvachi-skarzhatsja-na-korpus-smartfona-1147676.html"
+        ],
+        "has_media": true,
+        "edited": false
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "channel": "truexanewsua",
+          "message_id": 146060
+        }
+      }
+    },
+    {
+      "entity_type": "post",
+      "fields": {
+        "channel": "truexanewsua",
+        "message_id": 146064,
+        "url": "https://t.me/truexanewsua/146064",
+        "published_at": "2026-10-10T19:36:40Z",
+        "title": "🔞Тигр загриз чоловіка в зоопарку Англії.",
+        "text": "🔞Тигр загриз чоловіка в зоопарку Англії.\n\n38-річний хлопець навіщось заліз у вольєр, поки працівники зоопарку не бачили. Слабоумство і відвага 😐\n\nТРУХА⚡️Україна | Надіслати новину",
+        "views": 386000,
+        "links": [
+          "https://www.independent.co.uk/news/uk/home-news/yorkshire-wildlife-park-tiger-enclosure-zoo-closed-latest-updates-b3064608.html"
+        ],
+        "has_media": true,
+        "edited": false
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "channel": "truexanewsua",
+          "message_id": 146064
+        }
+      }
+    }
+  ]
+}

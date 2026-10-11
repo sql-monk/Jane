@@ -1,0 +1,155 @@
+{
+  "site": "domria",
+  "group": "classifieds",
+  "title": "DIM.RIA (dom.ria.com): оголошення оренди й продажу квартир у Києві — щогодинний скан перших сторінок каталогу",
+  "url": "https://dom.ria.com/uk/",
+  "sources": [
+    {
+      "source_id": "domria",
+      "kind": "web",
+      "title": "DIM.RIA — оголошення про нерухомість",
+      "description": "dom.ria.com: каталоги «Оренда квартир у Києві» й «Продаж квартир у Києві». Поля оголошень беруться зі стану сторінки каталогу, картки не завантажуються. robots.txt дотримується; не частіше 1 запиту/с, один одночасний запит до хоста. OLX (olx.ua) не підключено: CloudFront відповідає 403 на будь-який запит з User-Agent JaneBot, зокрема на robots.txt.",
+      "locator": {
+        "url": "https://dom.ria.com/uk/"
+      },
+      "collector_rules": "@pkg:ads.domria-rules",
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "expected_entity_types": [
+        "classified_ad"
+      ],
+      "labels": {
+        "group": "classifieds",
+        "site": "domria"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "ads-domria",
+      "title": "dom.ria.com: свіжі оголошення квартир у Києві (оренда, продаж)",
+      "description": "Щогодини: перші сторінки двох каталогів (кількість — limits.crawl.max_depth) → RAW у raw-files, повні сутності classified_ad у results-pg; ті самі ключі site + ad_id оновлюються (ціна, дата актуалізації), нові оголошення додаються.",
+      "input": {
+        "source_id": "domria"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-files",
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "extract-ads",
+          "kind": "handler",
+          "handler": "@pkg:ads.domria-listing",
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "text/html"
+              }
+            }
+          ],
+          "bindings": [
+            {
+              "url_patterns": [
+                {
+                  "value": "dom.ria.com/uk/arenda-kvartir/**"
+                },
+                {
+                  "value": "dom.ria.com/uk/prodazha-kvartir/**"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "store-ads",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-ads",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "in",
+                "value": [
+                  "success",
+                  "unrecognized"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 3,
+          "max_pages_per_run": 20
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "classifieds",
+        "site": "domria",
+        "kind": "ads"
+      }
+    }
+  ],
+  "verify": {
+    "domria": {
+      "classified_ad": {
+        "min": 80,
+        "required": [
+          "site",
+          "ad_id",
+          "url",
+          "title",
+          "category",
+          "price",
+          "currency",
+          "deal_type",
+          "city",
+          "area_m2",
+          "published_at"
+        ]
+      }
+    }
+  }
+}

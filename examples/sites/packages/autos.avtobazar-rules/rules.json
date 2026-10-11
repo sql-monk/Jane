@@ -1,0 +1,43 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "avtobazar.infocar.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/car/",
+      "/rss/bazar.php"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "feed",
+      "strategy_id": "new-ads-feed",
+      "urls": [
+        "https://avtobazar.infocar.ua/rss/bazar.php"
+      ],
+      "autodiscover": false
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "revisit": {
+    "mode": "interval"
+  },
+  "sections": [
+    {
+      "section_id": "ad",
+      "title": "Картки оголошень легкових авто",
+      "patterns": [
+        {
+          "type": "regex",
+          "value": "^https://avtobazar\\.infocar\\.ua/car/([^/]+/){4}[^/]*-\\d+\\.html$"
+        }
+      ]
+    }
+  ]
+}

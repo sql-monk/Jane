@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "catalog.varus-catalog-rules",
-  "version": "1.1.1",
+  "version": "1.0.0",
   "kind": "collector-rules",
-  "title": "varus.ua: full assortment with GraphQL pagination",
-  "description": "Увесь асортимент через публічне API сайту: автоматичний обхід дерева категорій від головної ID 2, включно з усіма брендами. Кожна категорія пагінується products(page: $page) без aliases і фіксованих останніх сторінок; повторні URL після серверного clamp завершують її пагінацію. Поділ за дочірніми категоріями та брендами обходить обмеження 10 000 результатів глобальної категорії. attributes(keys: []) повертає всі властивості; ціни регіону 0 без вибору магазину.",
+  "title": "varus.ua: full catalog of four categories via the site's catalog API",
+  "description": "Правила Web Collector для повного каталогу VARUS (varus.ua): категорії «Йогурти», «Макаронні вироби», «Соки та нектари», «Засоби для миття посуду». Стратегія api_feed читає списки товарів через API, яким користуються сторінки категорій самого сайту (POST https://varus.ua/api/graphql, запит CategoryPageById у скороченому вигляді: сторінки по 48 товарів як псевдоніми p1…pN одного запиту, сортування NEWEST), і видає кожен товар як окремий JSON-матеріал (emit_items_as_materials) з повними полями картки: SKU, назва, urlKey, регіональні ціни, наявність, бренд, категорії, вага/об'єм, характеристики. Сторінки HTML категорій сайт рендерить без товарів (товари довантажує цей самий API), тому HTML не читається. Ємність — сторінок × 48 на категорію (запас ~50 %); robots.txt дотримується (/api/ дозволено); ліміти — у джерелі й завданні.",
   "tags": [
     "catalog",
     "varus",
@@ -17,20 +17,11 @@
   },
   "tests": [],
   "provenance": {
-    "created_by": "llm",
+    "created_by": "human",
     "authors": [
       "Claude (examples/sites: varus)"
     ],
     "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Увесь асортимент через публічне API сайту: автоматичний обхід дерева категорій від головної ID 2, включно з усіма брендами. Кожна категорія пагінується products(page: $page) без aliases і фіксованих останніх сторінок; повторні URL після серверного clamp завершують її пагінацію. Поділ за дочірніми категоріями та брендами обходить обмеження 10 000 результатів глобальної категорії. attributes(keys: []) повертає всі властивості; ціни регіону 0 без вибору магазину. Reproducible Git LF bytes: normalize CRLF to LF without behavior changes.",
-    "based_on": {
-      "package_id": "catalog.varus-catalog-rules",
-      "version": "1.1.0"
-    },
-    "llm": {
-      "provider": "OpenAI",
-      "model": "Codex",
-      "reason": "improvement"
-    }
+    "change_summary": "Catalog API (GraphQL) of four varus.ua categories, every product item emitted as a JSON material."
   }
 }

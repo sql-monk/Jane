@@ -7,14 +7,10 @@
     "shop",
     "product_id",
     "title",
+    "price",
+    "currency",
     "url",
     "completeness"
-  ],
-  "allOf": [
-    {
-      "if": {"properties": {"completeness": {"const": "full"}}},
-      "then": {"required": ["price", "currency"]}
-    }
   ],
   "properties": {
     "shop": {

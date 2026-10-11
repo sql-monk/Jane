@@ -1,0 +1,37 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "t.me"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/s/hromadske_ua"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "seed_list",
+      "strategy_id": "channel-feed",
+      "urls": [
+        "https://t.me/s/hromadske_ua"
+      ]
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "dedup": {
+    "use_link_rel_canonical": false
+  },
+  "revisit": {
+    "mode": "interval"
+  },
+  "limits": {
+    "crawl": {
+      "revisit_interval_seconds": 600
+    }
+  }
+}

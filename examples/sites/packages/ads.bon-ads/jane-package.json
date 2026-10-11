@@ -1,0 +1,130 @@
+{
+  "schema_version": "1",
+  "package_id": "ads.bon-ads",
+  "version": "1.0.1",
+  "kind": "extractor",
+  "title": "BON.ua: classified ads from ad cards and category pages",
+  "description": "Оголошення BON.ua (колишній besplatka.ua). Картка /obyavlenie/… → повна сутність classified_ad (номер, назва, ціна, валюта, шлях категорії, місто, область, район, дата розміщення, тип продавця, стан, параметри, фото, опис ≤ description_max_chars); сторінка категорії → часткові сутності тих самих ключів (назва, ціна, місто, дата) для щогодинного оновлення. Без персональних даних: ім'я продавця, профіль і координати не зберігаються, телефони й e-mail в описі маскуються.",
+  "tags": [
+    "ads",
+    "classifieds",
+    "bon"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_ads_bon.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "classified_ad",
+        "schema": "schemas/classified_ad.schema.json",
+        "key_fields": [
+          "site",
+          "ad_id"
+        ],
+        "description": "Оголошення (картка — повна сутність, сторінка категорії — часткове оновлення)"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": [
+      "lxml>=6"
+    ]
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "card-private-seller",
+      "input": {
+        "file": "tests/card-private/page.html",
+        "media_type": "text/html",
+        "url": "https://bon.ua/obyavlenie/makroobyektiv-nikon-af-micro-105mm-f-2-8-japan-a85a71"
+      },
+      "expected_status": "success",
+      "expected": "tests/card-private/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "card-shop-seller",
+      "input": {
+        "file": "tests/card-shop/page.html",
+        "media_type": "text/html",
+        "url": "https://bon.ua/obyavlenie/kolonka-proove-funk-15w-app-black-psfn1501ap01-96d1f7"
+      },
+      "expected_status": "success",
+      "expected": "tests/card-shop/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "card-wanted-ad",
+      "input": {
+        "file": "tests/card-wanted/page.html",
+        "media_type": "text/html",
+        "url": "https://bon.ua/obyavlenie/kuplyu-radiostancii-racii-pribory-platy-78eccd"
+      },
+      "expected_status": "success",
+      "expected": "tests/card-wanted/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "category-page-partial",
+      "input": {
+        "file": "tests/listing-electronics/page.html",
+        "media_type": "text/html",
+        "url": "https://bon.ua/electronika-i-bitovaya-tehnika"
+      },
+      "expected_status": "success",
+      "expected": "tests/listing-electronics/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "home-page-empty",
+      "input": {
+        "file": "tests/home-page/page.html",
+        "media_type": "text/html",
+        "url": "https://bon.ua/"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (examples/sites: classifieds)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Classified ads of BON.ua: complete entities from ad cards, partial refresh from category pages. 1.0.1: typing only (lxml import annotated for mypy), same behaviour."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "url_patterns": [
+      "/obyavlenie/*",
+      "/electronika-i-bitovaya-tehnika*",
+      "/mebel-interer-obihod*"
+    ]
+  }
+}

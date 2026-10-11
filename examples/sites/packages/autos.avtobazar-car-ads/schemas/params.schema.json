@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "autos.avtobazar-car-ads params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "description_max_chars": {
+      "description": "Найбільша довжина поля description (текст оголошення обрізається, телефони в ньому приховуються).",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 500,
+      "default": 500
+    }
+  }
+}

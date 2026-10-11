@@ -1,0 +1,179 @@
+{
+  "entities": [
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "dom.ria.com",
+        "ad_id": "34999381",
+        "url": "https://dom.ria.com/uk/realty-prodaja-kvartira-kiev-darnitskiy-zarechnaya-ulitsa-34999381.html",
+        "title": "Продається 3-кімнатна квартира 67.2 кв. м у Києві",
+        "category": "Квартира, продаж",
+        "category_path": [
+          "Житло",
+          "Квартира",
+          "продаж"
+        ],
+        "price": 195000.0,
+        "currency": "USD",
+        "deal_type": "sale",
+        "city": "Київ",
+        "region": "Київська область",
+        "district": "Дарницький",
+        "published_at": "2026-10-07T16:41:21+03:00",
+        "refreshed_at": "2026-10-10T12:33:53+03:00",
+        "seller_type": "unknown",
+        "params": {
+          "Тип нерухомості": "Квартира",
+          "Житлова площа, м²": "46.9",
+          "Метро": "Славутич",
+          "Тип стін": "монолитно-кирпичный",
+          "Новобудова": "ЖК Славутич"
+        },
+        "image": "https://cdn.riastatic.com/photos/dom/photo/34635/3463501/346350119/346350119b.jpg",
+        "area_m2": 67.2,
+        "rooms": 3,
+        "floor": 8,
+        "floors_total": 24,
+        "price_per_m2": 2902.0
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "dom.ria.com",
+          "ad_id": "34999381"
+        }
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "dom.ria.com",
+        "ad_id": "34901418",
+        "url": "https://dom.ria.com/uk/realty-prodaja-kvartira-kiev-sotsgorod-regeneratornaya-ulitsa-34901418.html",
+        "title": "Продається 3-кімнатна квартира 86.9 кв. м у Києві",
+        "category": "Квартира, продаж",
+        "category_path": [
+          "Житло",
+          "Квартира",
+          "продаж"
+        ],
+        "price": 133000.0,
+        "currency": "USD",
+        "deal_type": "sale",
+        "city": "Київ",
+        "region": "Київська область",
+        "district": "Соцмісто",
+        "published_at": "2026-09-22T10:10:39+03:00",
+        "refreshed_at": "2026-10-01T13:34:08+03:00",
+        "seller_type": "unknown",
+        "params": {
+          "Тип нерухомості": "Квартира",
+          "Площа кухні, м²": "13.8",
+          "Тип стін": "газоблок",
+          "Новобудова": "ЖК Комфорт Таун"
+        },
+        "image": "https://cdn.riastatic.com/photos/dom/photo/34472/3447261/344726118/344726118b.jpg",
+        "area_m2": 86.9,
+        "rooms": 3,
+        "floor": 1,
+        "floors_total": 10,
+        "price_per_m2": 1530.0
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "dom.ria.com",
+          "ad_id": "34901418"
+        }
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "dom.ria.com",
+        "ad_id": "34921454",
+        "url": "https://dom.ria.com/uk/realty-prodaja-kvartira-kiev-podolskiy-aleksandra-olesya-ulitsa-34921454.html",
+        "title": "Продається 1-кімнатна квартира 44 кв. м у Києві",
+        "category": "Квартира, продаж",
+        "category_path": [
+          "Житло",
+          "Квартира",
+          "продаж"
+        ],
+        "price": 116900.0,
+        "currency": "USD",
+        "deal_type": "sale",
+        "city": "Київ",
+        "region": "Київська область",
+        "district": "Подільський",
+        "published_at": "2026-09-19T17:24:23+03:00",
+        "refreshed_at": "2026-10-07T11:00:11+03:00",
+        "seller_type": "unknown",
+        "params": {
+          "Тип нерухомості": "Квартира",
+          "Тип стін": "газоблок",
+          "Новобудова": "ЖК Варшавський 3"
+        },
+        "image": "https://cdn.riastatic.com/photos/dom/photo/34509/3450967/345096759/345096759b.jpg",
+        "area_m2": 44.0,
+        "rooms": 1,
+        "floor": 9,
+        "floors_total": 25,
+        "price_per_m2": 2657.0
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "dom.ria.com",
+          "ad_id": "34921454"
+        }
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "fields": {
+        "site": "dom.ria.com",
+        "ad_id": "34189575",
+        "url": "https://dom.ria.com/uk/realty-prodaja-kvartira-kiev-staryy-kiev-bolshaya-jitomirskaya-ulitsa-34189575.html",
+        "title": "Продається 3-кімнатна квартира 103 кв. м у Києві",
+        "category": "Квартира, продаж",
+        "category_path": [
+          "Житло",
+          "Квартира",
+          "продаж"
+        ],
+        "price": 590000.0,
+        "currency": "USD",
+        "deal_type": "sale",
+        "city": "Київ",
+        "region": "Київська область",
+        "district": "Старий Київ",
+        "published_at": "2026-08-10T17:40:06+03:00",
+        "refreshed_at": "2026-10-06T11:56:04+03:00",
+        "seller_type": "unknown",
+        "params": {
+          "Тип нерухомості": "Квартира",
+          "Метро": "Золоті ворота",
+          "Тип стін": "кирпич"
+        },
+        "image": "https://cdn.riastatic.com/photos/dom/photo/34185/3418522/341852273/341852273b.jpg",
+        "area_m2": 103.0,
+        "rooms": 3,
+        "floor": 4,
+        "floors_total": 9,
+        "price_per_m2": 5728.0
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "dom.ria.com",
+          "ad_id": "34189575"
+        }
+      }
+    }
+  ]
+}

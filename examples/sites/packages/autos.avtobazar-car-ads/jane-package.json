@@ -1,0 +1,117 @@
+{
+  "schema_version": "1",
+  "package_id": "autos.avtobazar-car-ads",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "Avtobazar InfoCar: car ads from ad cards",
+  "description": "Оголошення легкових авто «Автобазар InfoCar» (avtobazar.infocar.ua; сутність car_ad, ключ site + ad_id — та сама схема, що й у autos.autoria-* та autos.rst-*): назва, рік, ціна в у.о. (USD) і перерахунок сайту в UAH, пробіг, об'єм і паливо, КПП, привід, кузов, колір, дата оновлення, регіон, місто, марка й модель (хлібні крихти), фото, текст продавця до 500 символів, тип продавця й стан (приватне оголошення б.у.; «Стан: битий…» — damaged), статус (div#deleted «вже продано» — sold). Ім'я, телефони й QR-візитка продавця не читаються; телефони й e-mail у тексті приховуються. Інші сторінки — empty.",
+  "tags": [
+    "autos",
+    "avtobazar",
+    "infocar",
+    "car-ads"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_autos_avtobazar.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "car_ad",
+        "schema": "schemas/car_ad.schema.json",
+        "key_fields": [
+          "site",
+          "ad_id"
+        ],
+        "description": "Оголошення про продаж легкового авто з поточною ціною й статусом"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": [
+      "lxml>=6"
+    ]
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "card-nissan-x-trail-petrol-lpg",
+      "input": {
+        "file": "tests/card-nissan-x-trail/page.html",
+        "media_type": "text/html",
+        "url": "https://avtobazar.infocar.ua/car/rovenskaya-oblast/rovno/nissan/x-trail/suv-2006-805342.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/card-nissan-x-trail/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "card-tesla-model-3-electric",
+      "input": {
+        "file": "tests/card-tesla-model-3/page.html",
+        "media_type": "text/html",
+        "url": "https://avtobazar.infocar.ua/car/kievskaya-oblast/brovary/tesla/model-3/sedan-2018-824227.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/card-tesla-model-3/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "card-honda-cr-v-sold",
+      "input": {
+        "file": "tests/card-honda-cr-v-sold/page.html",
+        "media_type": "text/html",
+        "url": "https://avtobazar.infocar.ua/car/kievskaya-oblast/kiev/honda/cr-v/suv-2013-800000.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/card-honda-cr-v-sold/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "category-landing-empty",
+      "input": {
+        "file": "tests/category-landing/page.html",
+        "media_type": "text/html",
+        "url": "https://avtobazar.infocar.ua/car/"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (autos agent)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Avtobazar InfoCar car ads (replacement for avtobazar.ua, which now redirects to the news site autocentre.ua) with the shared car_ad entity."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "url_patterns": [
+      "/car/*"
+    ]
+  }
+}

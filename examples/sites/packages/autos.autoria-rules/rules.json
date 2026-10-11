@@ -1,0 +1,68 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "auto.ria.com"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/uk/search/",
+      "/uk/auto_"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "listing",
+      "strategy_id": "used-cars-by-date",
+      "start_urls": [
+        "https://auto.ria.com/uk/search/?abroad=0&category=1&customs_cleared=1&limit=20&order=7&page=0&search_type=2"
+      ],
+      "item_links": {
+        "type": "css",
+        "value": "a.product-card[href]"
+      },
+      "page_param": {
+        "name": "page",
+        "start": 0,
+        "step": 1,
+        "stop_when_empty": true
+      }
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "normalization": {
+    "strip_query_params": [
+      "utm_*"
+    ]
+  },
+  "sections": [
+    {
+      "section_id": "search",
+      "title": "Результати пошуку",
+      "patterns": [
+        {
+          "value": "auto.ria.com/uk/search/**"
+        }
+      ]
+    },
+    {
+      "section_id": "ad",
+      "title": "Сторінки оголошень",
+      "patterns": [
+        {
+          "value": "auto.ria.com/uk/auto_*.html"
+        }
+      ]
+    }
+  ],
+  "dedup": {
+    "use_link_rel_canonical": false
+  },
+  "revisit": {
+    "mode": "interval"
+  }
+}

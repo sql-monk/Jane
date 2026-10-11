@@ -1,0 +1,183 @@
+{
+  "site": "autoria",
+  "group": "autos",
+  "title": "AUTO.RIA: свіжі оголошення про продаж легкових авто",
+  "url": "https://auto.ria.com/uk/",
+  "sources": [
+    {
+      "source_id": "autoria-cars",
+      "kind": "web",
+      "title": "AUTO.RIA - вживані легкові авто",
+      "description": "auto.ria.com: пошук вживаних легкових авто за датою додавання і сторінки оголошень. Офіційний API потребує ключа, тому лише публічні сторінки, дозволені robots.txt.",
+      "locator": {
+        "url": "https://auto.ria.com/uk/"
+      },
+      "collector_rules": "@pkg:autos.autoria-rules",
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "expected_entity_types": [
+        "car_ad"
+      ],
+      "change_policy": {
+        "llm_versions": "manual_approval"
+      },
+      "labels": {
+        "example": "sites",
+        "group": "autos",
+        "site": "autoria"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "ads-autoria",
+      "title": "AUTO.RIA: свіжі оголошення легкових авто щогодини",
+      "description": "Перші сторінки пошуку вживаних легкових авто за датою додавання (кількість - crawl.max_depth) читаються повністю в кожному запуску й оновлюють ціни/статус перелічених оголошень; сторінки оголошень завантажуються інкрементально (нові - одразу, відомі - не частіше за crawl.revisit_interval_seconds). RAW -> raw-files, car_ad -> results-pg.",
+      "input": {
+        "source_id": "autoria-cars"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-files",
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "extract-search",
+          "kind": "handler",
+          "handler": "@pkg:autos.autoria-search-page",
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "text/html"
+              }
+            }
+          ],
+          "bindings": [
+            {
+              "sections": [
+                "search"
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "extract-ad",
+          "kind": "handler",
+          "handler": "@pkg:autos.autoria-ad-page",
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "text/html"
+              }
+            }
+          ],
+          "bindings": [
+            {
+              "sections": [
+                "ad"
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "store-ads",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-search",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            },
+            {
+              "from": "extract-ad",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 5,
+          "max_pages_per_run": 120,
+          "max_bytes_per_run": 268435456,
+          "max_material_bytes": 4194304,
+          "revisit_interval_seconds": 21600
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "example": "sites",
+        "group": "autos",
+        "site": "autoria",
+        "kind": "car-ads"
+      }
+    }
+  ],
+  "verify": {
+    "autoria-cars": {
+      "car_ad": {
+        "min": 60,
+        "required": [
+          "site",
+          "ad_id",
+          "url",
+          "title",
+          "price",
+          "currency",
+          "year",
+          "status"
+        ]
+      }
+    }
+  }
+}

@@ -79,6 +79,21 @@
     "light": "43c6ea40e11865de894bea3d8e78c0833d0126ba3b874a6c488acac2bd57b1bc",
     "dark": "53d015a00babf7f4263dfe0432d53e9414065a53ad75185ad35ce995b1ddf9ea"
   },
+  "packages/fork-port": {
+    "drawio": "4e432a39f9efb99229902a9eff064fa393313c2b6f19eebe7332806757dd5529",
+    "light": "e8f5d184b038aa910f8330c55b2ee3cc61c00cc01524c6d36d048566dc11bfab",
+    "dark": "7f31a18f0545e072ee5b4ecf073878b5f4de98c293d6da9e8a58cf871cb35289"
+  },
+  "packages/publish-sequence": {
+    "drawio": "fc5e33d657e61f54d4f57d511343d35b48ed9c68a9e3c2b35c5fa3a35da1788c",
+    "light": "eb6e25427cf9ff492f8d4789c27ae086012fdcb307b629290ddf97086c84c6d8",
+    "dark": "1466867c37e05a20eebfc5cab9e00e9ad190234c1fdbd34b4f627e68fc6f8a32"
+  },
+  "packages/version-states": {
+    "drawio": "2b87219ddafc2f5342ff408e72f4e14661f0abebb0385cdb41a9c2cd8355ea1a",
+    "light": "f7b38dcbcd0d364aeb801c23935e98c85f174eb50c8b6166a903ff888f8615b5",
+    "dark": "b14641e7d1ba5a0732e5fe31e4e3c17331b2bd47e31e50d02602f5403ea27525"
+  },
   "platform/composition": {
     "drawio": "4ce63d7f87feaa558e60a42da57def6718fda505abe78564db452f93d9d354f6",
     "light": "4ed9f61f46ec6ef0f56b8e4e2881f9f310e9ad471cf935d9729153f4e70769fa",
@@ -98,6 +113,16 @@
     "drawio": "46f9c06065092db1218ba4a44fa8b0931fe97a9b79ff6230854b81ba75fa0f51",
     "light": "8e0904b5c691013f80a4e71ff704d70ba2b9064f4a636d5863a14c201061d67f",
     "dark": "968d945e1afb61f592e520124d9bcc41b9cffc178d99eef922c545a50c871aab"
+  },
+  "registry/context": {
+    "drawio": "95ba670dbe82493a63fa7964a555ff128b5e2141cb18d7120e874e59d6f4c75a",
+    "light": "11f92456d7fb3ea5469aace8b2f0b4b16d1e7f2f20eca647652dbfd320040cc3",
+    "dark": "395a9151ac4dbad205c92bc4e802865a54a434ab202452e033fb81b2f1ed40b2"
+  },
+  "registry/er": {
+    "drawio": "790fb81cc57bfb2dcf2e7168c356d933cdbfa0aa65a6b7325c733dc2b5b36dad",
+    "light": "b1600bc4da9101eedead5ee02979d4e458058d3756be7aaeaed2ee3f45860980",
+    "dark": "c00b3fbaccc8838c02a1a988ccb2405264648f267c782e9a0c80bc479acd3940"
   },
   "storage/components": {
     "drawio": "a5e0dc447b1814af8168c3c4dfb555670bf74f5beedf008f0dcbb481c649ff95",

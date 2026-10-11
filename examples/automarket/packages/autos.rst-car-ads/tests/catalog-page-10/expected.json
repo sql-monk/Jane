@@ -1,0 +1,64 @@
+{
+  "entities": [
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "rst.ua",
+        "ad_id": "15478392",
+        "url": "https://rst.ua/ukr/oldcars/jaguar/i-pace/jaguar_i-pace_15478392.html",
+        "title": "JAGUAR I-Pace SE R-Dynamic",
+        "price": 36500,
+        "currency": "USD",
+        "price_usd": 36500,
+        "price_uah": 1644400,
+        "make": "JAGUAR",
+        "model": "I-Pace",
+        "status": "active",
+        "condition": "used",
+        "year": 2023,
+        "fuel": "electric",
+        "mileage_km": 83000,
+        "city": "Дніпро",
+        "image": "https://i1.rst.ua/oldcars/jaguar/i-pace/middle/15478392-1.jpg"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "rst.ua",
+          "ad_id": "15478392"
+        }
+      }
+    },
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "rst.ua",
+        "ad_id": "15480446",
+        "url": "https://rst.ua/ukr/oldcars/lexus/nx/lexus_nx_15480446.html",
+        "title": "LEXUS NX 300H",
+        "price": 26850,
+        "currency": "USD",
+        "price_usd": 26850,
+        "price_uah": 1209600,
+        "make": "LEXUS",
+        "model": "NX",
+        "status": "active",
+        "condition": "used",
+        "year": 2015,
+        "engine_l": 2.5,
+        "fuel": "hybrid",
+        "transmission": "automatic",
+        "mileage_km": 173000,
+        "region": "Київська область",
+        "image": "https://i0.rst.ua/oldcars/lexus/nx/middle/15480446-1.jpg"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "rst.ua",
+          "ad_id": "15480446"
+        }
+      }
+    }
+  ]
+}

@@ -1,4 +1,19 @@
 {
+  "admin/async-job": {
+    "drawio": "bbdfd9c72e20e359766a6acc48e7f8d6459d74b73c52c79cde6ed8c6b3a9a2f6",
+    "light": "d81f1f33803bf967bfcd9f0785a1b2563c0eaf64b415670efa06b114143e704e",
+    "dark": "5ceee223eab2c17601f7e6791f98100dc898f5b64dffdda7a511b66437742691"
+  },
+  "admin/deployment": {
+    "drawio": "1535e084dcf82d4ac14aa3212122996e199b12f4428f91ccf6dfea843ae1c142",
+    "light": "43c5c0fb3de1e40a5294a167a0d89505240ba90bcb83c7f6975e605dc0542356",
+    "dark": "624c339f0af75cf0f38f38d5cb26da7e0f2c0c6f5c260462462965ecfeaf8531"
+  },
+  "admin/pages-api": {
+    "drawio": "75c1150f99ebc96b9d69aafcc6fcd27a48e47e61c00cf20ce29249c27e3326bb",
+    "light": "0811351e3565a67a4655950e1bc5d2293e26ad9cb55395d16735ee338f1c62c6",
+    "dark": "5dbed6b41d0ddf5d8c40875f9d9d6d5c7c505e95a9eaab53dea093a92da29258"
+  },
   "extractor-sdk/author-workflow": {
     "drawio": "c6b704d104d5253e697237c4f5ba7a03f2f99318f75650b99f9b9f6131c4c94e",
     "light": "41539cb56fa523745acd33582a973550dc8824f268c008a92d4e4b62ae04844f",
@@ -68,5 +83,10 @@
     "drawio": "d7d93cbe48bdd703268b0c08e7ff912a1386de200c217a3bb084e0bcc961e6c2",
     "light": "721f86df12f1341eb170860aa6bef79eba06a6ca5032c7f80c3aad1170a0212f",
     "dark": "a2e897d6ed5f0500f19d9d770cec21b039c792c0fb13c97840ce10146b95a4d3"
+  },
+  "user-guide/source-to-results": {
+    "drawio": "562d3f31960c34d901a516581dc4e1ea6a0db99265060558f8c230fb6a8b0c0c",
+    "light": "4b96792230a7c0f938da1a350fab302c8ac443a117f4aaf4090ba67a3ba24a29",
+    "dark": "e2b85d625ec5ec7a899a1a9a2dee9384269f30eceb1e5024727c73863cc1b5ed"
   }
 }

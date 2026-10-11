@@ -19,6 +19,11 @@ services:
       # Real shop pages are often 0.5-2 MB; without a blob store larger pages fail with limit_exceeded
       # (default 256 KiB for inline delivery).
       JANE_WEB_COLLECTOR_LIMITS__TRANSFER__INLINE_MAX_BYTES: "8388608"
+      # examples/sites: ~30 periodic sources (news and Telegram every 15 min next to hour-long catalog scans).
+      # The default of 4 collections at once queues the short ones behind the long ones; a full catalog scan
+      # at 1 request/s also needs more than the default job limit of one hour.
+      JANE_WEB_COLLECTOR_JOBS__MAX_CONCURRENT_JOBS: "32"
+      JANE_WEB_COLLECTOR_JOBS__JOB_TIMEOUT_MS: "14400000"
   telegram-collector:
     build:
       # real Telegram: Telethon in the image; the account comes from the tg-main connection whose secrets are

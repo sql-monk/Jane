@@ -237,16 +237,35 @@ def upsert(orch: ex.Api, collection: str, id_field: str, doc: dict[str, Any]) ->
     return r.status_code
 
 
-def run_tasks(svc: ex.Services, task_ids: Sequence[str], timeout_s: float) -> int:
-    runs = {t: ex.start_run(svc.orchestrator, t, "examples/sites: manual run") for t in task_ids}
+def run_tasks(
+    svc: ex.Services, task_ids: Sequence[str], timeout_s: float, sources: Mapping[str, str] | None = None
+) -> int:
+    """Tasks of different sources run together; tasks of one source (``sources``: task_id -> source_id) one
+    after another - the collector keeps one collection per source state (state_key = source_id) and refuses
+    a second one with 409 conflict (a full catalog and a price check of the same shop)."""
+    waves: list[list[str]] = []
+    per_source: dict[str, int] = {}
+    for task_id in task_ids:
+        source = (sources or {}).get(task_id, task_id)
+        n = per_source[source] = per_source.get(source, -1) + 1
+        if n == len(waves):
+            waves.append([])
+        waves[n].append(task_id)
     failed = 0
-    for task_id, run_id in runs.items():
-        run = ex.wait_run(svc.orchestrator, run_id, timeout_s)
-        ex.log(
-            f"run {task_id} ({run_id}): {run['status']} counters={run.get('counters')} error={run.get('error')}"
-        )
-        failed += run["status"] != "succeeded"
+    for wave in waves:
+        runs = {t: ex.start_run(svc.orchestrator, t, "examples/sites: manual run") for t in wave}
+        for task_id, run_id in runs.items():
+            run = ex.wait_run(svc.orchestrator, run_id, timeout_s)
+            ex.log(
+                f"run {task_id} ({run_id}): {run['status']} counters={run.get('counters')} "
+                f"error={run.get('error')}"
+            )
+            failed += run["status"] != "succeeded"
     return failed
+
+
+def task_sources(sites: Sequence[Mapping[str, Any]]) -> dict[str, str]:
+    return {t["task_id"]: t["input"]["source_id"] for s in sites for t in s["tasks"]}
 
 
 def cmd_apply(ns: argparse.Namespace) -> int:
@@ -265,7 +284,8 @@ def cmd_apply(ns: argparse.Namespace) -> int:
                 upsert(svc.orchestrator, "tasks", "task_id", resolve(task, refs))
         if not ns.run:
             return 0
-        return 1 if run_tasks(svc, [t["task_id"] for s in sites for t in s["tasks"]], ns.timeout) else 0
+        task_ids = [t["task_id"] for s in sites for t in s["tasks"]]
+        return 1 if run_tasks(svc, task_ids, ns.timeout, task_sources(sites)) else 0
     finally:
         svc.close()
 
@@ -275,7 +295,7 @@ def cmd_run(ns: argparse.Namespace) -> int:
     task_ids = ns.task or [t["task_id"] for t in site["tasks"]]
     svc = ex.Services.of_project(ns.project)
     try:
-        return 1 if run_tasks(svc, task_ids, ns.timeout) else 0
+        return 1 if run_tasks(svc, task_ids, ns.timeout, task_sources([site])) else 0
     finally:
         svc.close()
 

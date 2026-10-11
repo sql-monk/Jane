@@ -3,9 +3,9 @@
   "mode": "docker",
   "verified": true,
   "urls": {
-    "storage": "http://127.0.0.1:54345",
-    "orchestrator": "http://127.0.0.1:52310",
+    "registry": "http://127.0.0.1:62129",
     "handler-runtime": "http://127.0.0.1:62130",
-    "registry": "http://127.0.0.1:62129"
+    "orchestrator": "http://127.0.0.1:52310",
+    "storage": "http://127.0.0.1:54345"
   }
 }

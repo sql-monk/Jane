@@ -2,12 +2,12 @@
   "site": "olx",
   "source_id": "classified-olx",
   "run": {
-    "run_id": "run_01M4MM8KKSAY0V7R237MFZBW1T",
+    "run_id": "run_01M4MQXJ08Z5C001W85KVWE90H",
     "task_id": "classifieds-olx",
     "trigger": "manual",
     "status": "failed",
-    "started_at": "2026-10-11T04:41:53.013Z",
-    "finished_at": "2026-10-11T04:46:58.969Z",
+    "started_at": "2026-10-11T05:45:38.420Z",
+    "finished_at": "2026-10-11T05:50:38.860Z",
     "counters": {
       "materials": 0,
       "unknown_materials": 0

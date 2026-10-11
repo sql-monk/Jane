@@ -34,7 +34,8 @@ URL, бюджети та розклад зберігаються у [sites.json]
 | Browser transport, попередній render_js і egress | `2 passed in 12.23s`; `53 passed, 2 deselected in 118.01s` — усі 55 випадків, без skip |
 | Новий облік повного завантаження, budget, truncation/204 та redirects | `7 passed in 54.63s`, без skip |
 | Наявні HTTP GET/POST після зміни обліку | `5 passed in 7.26s` |
-| Налаштування, відновлення та незалежна перевірка полів | `44 passed in 3.41s` |
+| Тайм-аут browser page pool, cancellation і наступний реальний GET після звільнення слота | Незалежно `2 passed in 0.62s`; Chromium `1 passed in 7.45s`, без skip |
+| Налаштування, відновлення та незалежна перевірка полів | `53 passed in 2.80s`; незалежно нові перевірки RIA та fixtures — `14 passed, 39 deselected in 0.48s` |
 | П'ять екстракторів у запущеному Handler Runtime | Для кожного `2 passed, 0 failed`; фактичні звіти збережено в Registry |
 | Collector ruff / mypy | `All checks passed!`; `Success: no issues found in 23 source files` |
 | Контракти, незалежний guardian | lint PASS; compatibility — 0 breaking changes, 0 warnings; OpenAPI diff — без змін API |
@@ -59,9 +60,25 @@ node web/admin/scripts/gen-api.mjs --check
 
 Перевірка кожного запуску повинна підтвердити не лише `succeeded`, а й ненульову кількість сутностей, SHA-256 збереженого RAW, observation lineage, кожне видане поле та стан PostgreSQL. Ціна/валюта/місце мають походити з тієї самої картки або JSON-об'єкта, що й ID, заголовок та URL.
 
-Перші п'ять запусків перервалися після перевідтворення сервісів. Фактичні невдалі звіти збережено в [attempt1](../../examples/classifieds/deployed/attempt1). Нові AUTO.RIA, DIM.RIA і RIA.com отримали матеріали, але їхні downstream items не отримали жодної спроби до таймауту. Shafa повернув нуль через redirect scope; правила виправлено до 1.0.1.
+Перші п'ять запусків перервалися після перевідтворення сервісів. Фактичні невдалі звіти збережено в [attempt1](../../examples/classifieds/deployed/attempt1). Наступна спроба [attempt2](../../examples/classifieds/deployed/attempt2) отримала матеріали AUTO.RIA, DIM.RIA і RIA.com, але downstream items не отримали спроби до таймауту. Shafa повернув нуль через redirect scope; правила виправлено до 1.0.1.
 
-Незалежна діагностика підтвердила у фактично імпортованому основному Orchestrator глобальне `ORDER BY i.seq`, 12 workers та очікування `idempotency_in_progress` до 120000 ms. Давній backlog перешкоджає обробці нових завдань. Узгоджується спільне розгортання справедливої черги із чатом новин; чужі задачі, стани й дані не скидаються.
+Незалежна діагностика підтвердила початкову глобальну FIFO чергу Orchestrator. Після узгодженого розгортання фактично імпортований сервіс використовує `run_round_robin`, 12 workers та коротке очікування `idempotency_in_progress` 1000 ms. Це дозволило завершити DIM.RIA і Shafa.
+
+Незалежний рев'юер повторно перевірив чотири сайти через актуальні API. О 09:00 `Europe/Kyiv` розклад самостійно створив ці запуски (`trigger: schedule`); вони завершилися за 26–33 s. Для кожного — один RAW із правильним SHA-256, observation lineage, відповідність усіх виданих полів власній картці/JSON та поточному стану PostgreSQL; `verified: true`, помилок немає.
+
+| Сайт | Запуск | Перевірені сутності |
+| --- | --- | --- |
+| AUTO.RIA | `run_01M4MRQXDASCK15AMVRNCHV8XK` | 21 |
+| DIM.RIA | `run_01M4MRQXDWWPJESKN1KDENDJ53` | 22 |
+| RIA.com | `run_01M4MRQXE1Z4SXDZ25SZ3YGDYS` | 20 |
+| Shafa.ua | `run_01M4MRQXF6DX6PHGPN1ASR5EZ2` | 24 |
+| OLX | Очікує успішного реального запуску | Не підтверджено |
+
+RIA.com потребував виправлення саме незалежної перевірки: суцільний текст картки з'єднував число моделі з ціною. Екстрактор і PostgreSQL уже містили правильні значення. Тепер перевірка читає лише `span.price.js-price` всередині власного `adv_<listing_id>`; дев'ять нових regression cases відхиляють неправильні поля, суму/валюту та ціну сусідньої картки. Опубліковані архіви залишилися байтово незмінними.
+
+AUTO.RIA та RIA.com у третій спробі отримали по одному матеріалу, але `/materials` відповідав за 31–35 секунд, collection lease втрачався та відновлювався. Run досягнув бюджету 300 секунд. Діагностика власника Collector підтвердила синхронний sitemap commit до 60000 URL і сканування всієї frontier на heartbeat. Прийнято та розгорнуто спільне виправлення `1d1420f`: короткі порції seed transactions, індексовані лічильники та продовження budget без масового UPDATE; continuation і всі черги збережено. Heartbeat 500 ms обмежує порції запису приблизно до 125 ms; у контрольному вимірюванні `/healthz` відповів за 1,031 s, `/materials` — за 0,812–1,953 s. Подальші живі запуски AUTO.RIA та RIA.com завершилися успішно.
+
+OLX `run_01M4MQXJ08Z5C001W85KVWE90H` досягнув deadline без матеріалів. Із того самого live image та тих самих effective limits незалежна native Chromium перевірка отримала `robots.txt` HTTP 200 за 2,878 s (`allowed=true`, Crawl-delay відсутній), каталог HTTP 200, 3736656 байтів, 52 картки за 4,694 s. Це підтверджує доступність OLX, але не є підтвердженням production сутностей. Прийнято патч `15bb32d`: очікування browser page pool обмежене наявним `request_timeout_ms`, warning містить лише host і ліміт. Driver start та `render_js` залишені в попередній реалізації. У scheduled запуску OLX о 09:00 власний host slot уже надано й утримувався понад 79 s, waiter/backoff відсутні: затримка виникає далі всередині браузера. Узгоджується спільне розгортання guard та окремого виправлення синхронного sitemap parsing. Остаточне прийняття залишається відкритим до RAW/PG перевірки OLX.
 
 ## GitHub CI
 

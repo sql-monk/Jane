@@ -2,12 +2,12 @@
   "site": "dim-ria",
   "source_id": "classified-dim-ria",
   "run": {
-    "run_id": "run_01M4MNESP8NGS52HQRD4AS8PNM",
+    "run_id": "run_01M4MRQXDWWPJESKN1KDENDJ53",
     "task_id": "classifieds-dim-ria",
-    "trigger": "manual",
+    "trigger": "schedule",
     "status": "succeeded",
-    "started_at": "2026-10-11T05:02:36.406Z",
-    "finished_at": "2026-10-11T05:03:28.006Z",
+    "started_at": "2026-10-11T06:00:03.107Z",
+    "finished_at": "2026-10-11T06:00:30.143Z",
     "counters": {
       "materials": 1,
       "unknown_materials": 0
@@ -70,11 +70,11 @@
       },
       "observation": {
         "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
-        "observed_at": "2026-10-11T05:03:16Z",
-        "content_sha256": "3db4f6d28c85e5a82485d6ffb8f4903e05a0e48a27f6835fe0d97fac575c2869",
-        "observation_id": "obs_01a12958056500000b29fc25"
+        "observed_at": "2026-10-11T06:00:18Z",
+        "content_sha256": "a39719ea6eafa834cc2401f9c4439120aa7bffc724e0c9682db159b3d190dc82",
+        "observation_id": "obs_01a1298c3cfa0000ad4ab2da"
       },
-      "raw_object_id": "obj_b89542cb6358b46b9e28bb212789b736",
+      "raw_object_id": "obj_0939d2312d39c49673c6a953670fdc55",
       "verified": true,
       "evidence_kind": "json",
       "checked_fields": [
@@ -100,11 +100,11 @@
       },
       "observation": {
         "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
-        "observed_at": "2026-10-11T05:03:16Z",
-        "content_sha256": "3db4f6d28c85e5a82485d6ffb8f4903e05a0e48a27f6835fe0d97fac575c2869",
-        "observation_id": "obs_01a12958056500000b29fc25"
+        "observed_at": "2026-10-11T06:00:18Z",
+        "content_sha256": "a39719ea6eafa834cc2401f9c4439120aa7bffc724e0c9682db159b3d190dc82",
+        "observation_id": "obs_01a1298c3cfa0000ad4ab2da"
       },
-      "raw_object_id": "obj_b89542cb6358b46b9e28bb212789b736",
+      "raw_object_id": "obj_0939d2312d39c49673c6a953670fdc55",
       "verified": true,
       "evidence_kind": "json",
       "checked_fields": [
@@ -130,11 +130,11 @@
       },
       "observation": {
         "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
-        "observed_at": "2026-10-11T05:03:16Z",
-        "content_sha256": "3db4f6d28c85e5a82485d6ffb8f4903e05a0e48a27f6835fe0d97fac575c2869",
-        "observation_id": "obs_01a12958056500000b29fc25"
+        "observed_at": "2026-10-11T06:00:18Z",
+        "content_sha256": "a39719ea6eafa834cc2401f9c4439120aa7bffc724e0c9682db159b3d190dc82",
+        "observation_id": "obs_01a1298c3cfa0000ad4ab2da"
       },
-      "raw_object_id": "obj_b89542cb6358b46b9e28bb212789b736",
+      "raw_object_id": "obj_0939d2312d39c49673c6a953670fdc55",
       "verified": true,
       "evidence_kind": "json",
       "checked_fields": [
@@ -164,8 +164,8 @@
       "package_id": "jane.storage-postgresql"
     }
   },
-  "raw_objects": 1,
-  "persisted_entities": 22,
+  "raw_objects": 2,
+  "persisted_entities": 24,
   "extraction_items": 1,
   "checked_entities": 22,
   "checked_raw_objects": 1

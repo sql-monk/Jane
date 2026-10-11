@@ -1,0 +1,20 @@
+{
+  "entities": [
+    {
+      "entity_type": "article",
+      "fields": {
+        "channel": "tass_agency",
+        "message_id": 399744,
+        "url": "https://t.me/tass_agency/399744",
+        "title": "Переход на обновленную модель высшего образования будет завершен к 2030 году, сообщил глава Минобрнауки РФ Фальков.Срок обучения в",
+        "text": "Переход на обновленную модель высшего образования будет завершен к 2030 году, сообщил глава Минобрнауки РФ Фальков.Срок обучения в",
+        "source_name": "ТАСС",
+        "source_kind": "telegram",
+        "transport": "telegram_public_web",
+        "region": "russia",
+        "language": "ru",
+        "published_at": "2026-10-11T03:53:01Z"
+      }
+    }
+  ]
+}

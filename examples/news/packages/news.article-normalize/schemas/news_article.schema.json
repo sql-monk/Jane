@@ -1,0 +1,494 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Normalized news article",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "material_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "headline": {
+      "type": "string",
+      "minLength": 1
+    },
+    "headline_ukrainian": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_language": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reporting_kind": {
+      "enum": [
+        "news",
+        "opinion",
+        "analysis",
+        "press_release"
+      ]
+    },
+    "topics": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "locations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "sentiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "enum": [
+            "positive",
+            "neutral",
+            "negative"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "explanation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "quote": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "attribution": {
+                "enum": [
+                  "author",
+                  "quoted_source"
+                ]
+              }
+            },
+            "required": [
+              "quote",
+              "reason",
+              "attribution"
+            ]
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "label",
+        "confidence",
+        "explanation",
+        "evidence"
+      ]
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "canonical_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "enum": [
+              "person",
+              "organization",
+              "country",
+              "place",
+              "product",
+              "group",
+              "other"
+            ]
+          },
+          "role": {
+            "enum": [
+              "subject",
+              "object",
+              "mentioned"
+            ]
+          },
+          "attitude": {
+            "type": "string",
+            "enum": [
+              "positive",
+              "neutral",
+              "negative"
+            ]
+          },
+          "attitude_confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "quote": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "attribution": {
+                  "enum": [
+                    "author",
+                    "quoted_source"
+                  ]
+                }
+              },
+              "required": [
+                "quote",
+                "reason",
+                "attribution"
+              ]
+            },
+            "minItems": 1
+          },
+          "factual_impact": {
+            "enum": [
+              "beneficial",
+              "harmful",
+              "neutral",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "canonical_name",
+          "type",
+          "role",
+          "attitude",
+          "attitude_confidence",
+          "evidence"
+        ]
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "date": {
+              "type": "string",
+              "format": "date"
+            },
+            "primary_actor": {
+              "type": "string",
+              "minLength": 1
+            },
+            "action": {
+              "type": "string",
+              "minLength": 1
+            },
+            "object": {
+              "type": "string",
+              "minLength": 1
+            },
+            "location": {
+              "type": "string",
+              "minLength": 1
+            },
+            "country": {
+              "type": "string",
+              "minLength": 1
+            },
+            "time": {
+              "type": "string",
+              "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+            }
+          },
+          "required": []
+        },
+        "identity_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "quote": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "attribution": {
+                "enum": [
+                  "author",
+                  "quoted_source"
+                ]
+              }
+            },
+            "required": [
+              "quote",
+              "reason",
+              "attribution"
+            ]
+          }
+        },
+        "identity_specificity": {
+          "enum": [
+            "specific",
+            "broad",
+            "unknown"
+          ]
+        },
+        "identity_kind": {
+          "enum": [
+            "actor_action",
+            "incident"
+          ]
+        },
+        "date_resolution": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "enum": [
+                "explicit",
+                "publication_weekday",
+                "publication_today"
+              ]
+            },
+            "quote": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reference_published_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "required": [
+            "method",
+            "quote"
+          ]
+        },
+        "time_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "quote": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "attribution": {
+              "enum": [
+                "author",
+                "quoted_source"
+              ]
+            }
+          },
+          "required": [
+            "quote",
+            "reason",
+            "attribution"
+          ]
+        }
+      },
+      "required": [
+        "summary",
+        "canonical",
+        "identity_confidence",
+        "evidence",
+        "identity_specificity"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "identity_kind": {
+                "const": "incident"
+              },
+              "canonical": {
+                "required": [
+                  "date"
+                ]
+              }
+            },
+            "required": [
+              "identity_kind",
+              "canonical"
+            ]
+          },
+          "then": {
+            "required": [
+              "date_resolution"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "identity_kind": {
+                "const": "incident"
+              },
+              "canonical": {
+                "required": [
+                  "time"
+                ]
+              }
+            },
+            "required": [
+              "identity_kind",
+              "canonical"
+            ]
+          },
+          "then": {
+            "required": [
+              "time_evidence"
+            ]
+          }
+        }
+      ]
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_kind": {
+      "enum": [
+        "web",
+        "telegram"
+      ]
+    },
+    "url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "fetched_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "edited_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "analysis_language": {
+      "const": "uk"
+    },
+    "evidence_validation": {
+      "enum": [
+        "verified",
+        "unavailable"
+      ]
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_grouping": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "grouped",
+            "ungrouped"
+          ]
+        },
+        "method": {
+          "const": "exact_canonical_identity"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "status",
+        "method",
+        "reason"
+      ]
+    },
+    "transport": {
+      "type": "string",
+      "minLength": 1
+    },
+    "region": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "headline",
+    "headline_ukrainian",
+    "summary",
+    "source_language",
+    "reporting_kind",
+    "topics",
+    "locations",
+    "sentiment",
+    "entities",
+    "event",
+    "material_id",
+    "analysis_language",
+    "evidence_validation",
+    "event_grouping",
+    "url"
+  ]
+}

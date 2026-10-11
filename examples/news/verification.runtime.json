@@ -1,0 +1,2683 @@
+{
+  "verified_at": "2026-10-11T05:27:12.322325+00:00",
+  "sources": [
+    {
+      "source_id": "news-web-pravda",
+      "source_name": "Українська правда",
+      "region": "ukraine",
+      "transport": "rss",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 3600
+      },
+      "stages": [
+        {
+          "kind": "collect",
+          "stage_id": "collect",
+          "collector": {
+            "mode": "incremental",
+            "collector": "web"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "handler": {
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+            "version": "1.0.0",
+            "package_id": "jane.storage-files"
+          },
+          "stage_id": "store-raw",
+          "connections": {
+            "target": "raw-files"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "params": {
+            "region": "ukraine",
+            "language": "uk",
+            "source_id": "news-web-pravda",
+            "source_name": "Українська правда"
+          },
+          "handler": {
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3",
+            "version": "1.0.2",
+            "package_id": "news.web-article"
+          },
+          "stage_id": "prepare",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98",
+            "version": "1.1.1",
+            "package_id": "news.article-analysis"
+          },
+          "stage_id": "analyse",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "params": {
+            "region": "ukraine",
+            "source_id": "news-web-pravda",
+            "transport": "rss_article",
+            "source_kind": "web",
+            "source_name": "Українська правда",
+            "min_grouping_confidence": 0.75
+          },
+          "handler": {
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+            "version": "1.1.2",
+            "package_id": "news.article-normalize"
+          },
+          "stage_id": "verify",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+            "version": "1.0.0",
+            "package_id": "jane.storage-postgresql"
+          },
+          "stage_id": "store-news",
+          "on_failure": "fail_run",
+          "connections": {
+            "target": "results-pg"
+          }
+        }
+      ],
+      "verified_articles": 1,
+      "articles": [
+        {
+          "url": "https://www.pravda.com.ua/news/2026/10/11/8057417/",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Рік Лора",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Джош Шапіро",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Дарія Девлін",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Елізабет Гірц",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "ShotSpotter",
+              "type": "product",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Associated Press",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Ері",
+              "type": "place",
+              "role": "object",
+              "attitude": "neutral"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "source_id": "news-web-ukrinform",
+      "source_name": "Укрінформ",
+      "region": "ukraine",
+      "transport": "rss",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 3600
+      },
+      "stages": [
+        {
+          "kind": "collect",
+          "stage_id": "collect",
+          "collector": {
+            "mode": "incremental",
+            "collector": "web"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "handler": {
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+            "version": "1.0.0",
+            "package_id": "jane.storage-files"
+          },
+          "stage_id": "store-raw",
+          "connections": {
+            "target": "raw-files"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "params": {
+            "region": "ukraine",
+            "language": "uk",
+            "source_id": "news-web-ukrinform",
+            "source_name": "Укрінформ"
+          },
+          "handler": {
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3",
+            "version": "1.0.2",
+            "package_id": "news.web-article"
+          },
+          "stage_id": "prepare",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98",
+            "version": "1.1.1",
+            "package_id": "news.article-analysis"
+          },
+          "stage_id": "analyse",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "params": {
+            "region": "ukraine",
+            "source_id": "news-web-ukrinform",
+            "transport": "rss_article",
+            "source_kind": "web",
+            "source_name": "Укрінформ",
+            "min_grouping_confidence": 0.75
+          },
+          "handler": {
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+            "version": "1.1.2",
+            "package_id": "news.article-normalize"
+          },
+          "stage_id": "verify",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+            "version": "1.0.0",
+            "package_id": "jane.storage-postgresql"
+          },
+          "stage_id": "store-news",
+          "on_failure": "fail_run",
+          "connections": {
+            "target": "results-pg"
+          }
+        }
+      ],
+      "verified_articles": 1,
+      "articles": [
+        {
+          "url": "https://www.ukrinform.ua/rubric-regions/4173138-zitelku-rivnensini-pidozruut-u-samovilnomu-zahoplenni-zemel-oboroni.html",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "обласна поліція",
+              "type": "organization",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Укрінформ",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "45-річна жителька селища Оржів",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "квартирно-експлуатаційний відділ міста Рівне",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "селище Оржів",
+              "type": "place",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "source_id": "news-web-bbc",
+      "source_name": "BBC News",
+      "region": "europe",
+      "transport": "rss",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 3600
+      },
+      "stages": [
+        {
+          "kind": "collect",
+          "stage_id": "collect",
+          "collector": {
+            "mode": "incremental",
+            "collector": "web"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "handler": {
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+            "version": "1.0.0",
+            "package_id": "jane.storage-files"
+          },
+          "stage_id": "store-raw",
+          "connections": {
+            "target": "raw-files"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "params": {
+            "region": "europe",
+            "language": "en",
+            "source_id": "news-web-bbc",
+            "source_name": "BBC News"
+          },
+          "handler": {
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3",
+            "version": "1.0.2",
+            "package_id": "news.web-article"
+          },
+          "stage_id": "prepare",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98",
+            "version": "1.1.1",
+            "package_id": "news.article-analysis"
+          },
+          "stage_id": "analyse",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "params": {
+            "region": "europe",
+            "source_id": "news-web-bbc",
+            "transport": "rss_article",
+            "source_kind": "web",
+            "source_name": "BBC News",
+            "min_grouping_confidence": 0.75
+          },
+          "handler": {
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+            "version": "1.1.2",
+            "package_id": "news.article-normalize"
+          },
+          "stage_id": "verify",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+            "version": "1.0.0",
+            "package_id": "jane.storage-postgresql"
+          },
+          "stage_id": "store-news",
+          "on_failure": "fail_run",
+          "connections": {
+            "target": "results-pg"
+          }
+        }
+      ],
+      "verified_articles": 2,
+      "articles": [
+        {
+          "url": "https://www.bbc.co.uk/news/articles/cqe8r5l7n92jo",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Donald Trump",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Volodymyr Zelensky",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Vladimir Putin",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        },
+        {
+          "url": "https://www.bbc.co.uk/news/articles/cw33x4y8k82no",
+          "event_id": "news-event-813fbcab5cfd8bc2e1993a4657e05170",
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "exact_canonical_identity",
+            "status": "grouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "King Khalid International Airport",
+              "type": "place",
+              "role": "object",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Houthis",
+              "type": "group",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Saudi-led coalition",
+              "type": "group",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Saudi Arabia",
+              "type": "country",
+              "role": "object",
+              "attitude": "neutral"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "source_id": "news-web-guardian",
+      "source_name": "The Guardian",
+      "region": "europe",
+      "transport": "rss",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 3600
+      },
+      "stages": [
+        {
+          "kind": "collect",
+          "stage_id": "collect",
+          "collector": {
+            "mode": "incremental",
+            "collector": "web"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "handler": {
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+            "version": "1.0.0",
+            "package_id": "jane.storage-files"
+          },
+          "stage_id": "store-raw",
+          "connections": {
+            "target": "raw-files"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "params": {
+            "region": "europe",
+            "language": "en",
+            "source_id": "news-web-guardian",
+            "source_name": "The Guardian"
+          },
+          "handler": {
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3",
+            "version": "1.0.2",
+            "package_id": "news.web-article"
+          },
+          "stage_id": "prepare",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98",
+            "version": "1.1.1",
+            "package_id": "news.article-analysis"
+          },
+          "stage_id": "analyse",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "params": {
+            "region": "europe",
+            "source_id": "news-web-guardian",
+            "transport": "rss_article",
+            "source_kind": "web",
+            "source_name": "The Guardian",
+            "min_grouping_confidence": 0.75
+          },
+          "handler": {
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+            "version": "1.1.2",
+            "package_id": "news.article-normalize"
+          },
+          "stage_id": "verify",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+            "version": "1.0.0",
+            "package_id": "jane.storage-postgresql"
+          },
+          "stage_id": "store-news",
+          "on_failure": "fail_run",
+          "connections": {
+            "target": "results-pg"
+          }
+        }
+      ],
+      "verified_articles": 1,
+      "articles": [
+        {
+          "url": "https://www.theguardian.com/society/2026/oct/09/vaccine-trial-guinea-bissau-rfk-jr",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Robert F Kennedy Jr",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Stig Børsen Hansen",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Paul Offit",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Guinea-Bissau",
+              "type": "country",
+              "role": "object",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Centers for Disease Control and Prevention",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "University of Southern Denmark",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "source_id": "news-web-npr",
+      "source_name": "NPR",
+      "region": "usa",
+      "transport": "rss",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 3600
+      },
+      "stages": [
+        {
+          "kind": "collect",
+          "stage_id": "collect",
+          "collector": {
+            "mode": "incremental",
+            "collector": "web"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "handler": {
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+            "version": "1.0.0",
+            "package_id": "jane.storage-files"
+          },
+          "stage_id": "store-raw",
+          "connections": {
+            "target": "raw-files"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "params": {
+            "region": "usa",
+            "language": "en",
+            "source_id": "news-web-npr",
+            "source_name": "NPR"
+          },
+          "handler": {
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3",
+            "version": "1.0.2",
+            "package_id": "news.web-article"
+          },
+          "stage_id": "prepare",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98",
+            "version": "1.1.1",
+            "package_id": "news.article-analysis"
+          },
+          "stage_id": "analyse",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "params": {
+            "region": "usa",
+            "source_id": "news-web-npr",
+            "transport": "rss_article",
+            "source_kind": "web",
+            "source_name": "NPR",
+            "min_grouping_confidence": 0.75
+          },
+          "handler": {
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+            "version": "1.1.2",
+            "package_id": "news.article-normalize"
+          },
+          "stage_id": "verify",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+            "version": "1.0.0",
+            "package_id": "jane.storage-postgresql"
+          },
+          "stage_id": "store-news",
+          "on_failure": "fail_run",
+          "connections": {
+            "target": "results-pg"
+          }
+        }
+      ],
+      "verified_articles": 1,
+      "articles": [
+        {
+          "url": "https://www.npr.org/2026/10/10/g-s1-147682/attack-on-riyadh-airport-killed-12-people-and-wounded-over-300-more-saudi-authorities-say",
+          "event_id": "news-event-813fbcab5cfd8bc2e1993a4657e05170",
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "exact_canonical_identity",
+            "status": "grouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "King Khalid International Airport",
+              "type": "place",
+              "role": "object",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Houthi",
+              "type": "group",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Saudi Arabia",
+              "type": "country",
+              "role": "object",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Donald Trump",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Saudi civil aviation authorities",
+              "type": "organization",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "United States",
+              "type": "country",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Iran",
+              "type": "country",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "source_id": "news-web-abc",
+      "source_name": "ABC News",
+      "region": "usa",
+      "transport": "rss",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 3600
+      },
+      "stages": [
+        {
+          "kind": "collect",
+          "stage_id": "collect",
+          "collector": {
+            "mode": "incremental",
+            "collector": "web"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "handler": {
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+            "version": "1.0.0",
+            "package_id": "jane.storage-files"
+          },
+          "stage_id": "store-raw",
+          "connections": {
+            "target": "raw-files"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "params": {
+            "region": "usa",
+            "language": "en",
+            "source_id": "news-web-abc",
+            "source_name": "ABC News"
+          },
+          "handler": {
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3",
+            "version": "1.0.2",
+            "package_id": "news.web-article"
+          },
+          "stage_id": "prepare",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98",
+            "version": "1.1.1",
+            "package_id": "news.article-analysis"
+          },
+          "stage_id": "analyse",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "params": {
+            "region": "usa",
+            "source_id": "news-web-abc",
+            "transport": "rss_article",
+            "source_kind": "web",
+            "source_name": "ABC News",
+            "min_grouping_confidence": 0.75
+          },
+          "handler": {
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+            "version": "1.1.2",
+            "package_id": "news.article-normalize"
+          },
+          "stage_id": "verify",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+            "version": "1.0.0",
+            "package_id": "jane.storage-postgresql"
+          },
+          "stage_id": "store-news",
+          "on_failure": "fail_run",
+          "connections": {
+            "target": "results-pg"
+          }
+        }
+      ],
+      "verified_articles": 1,
+      "articles": [
+        {
+          "url": "https://abcnews.com/International/wireStory/ethiopia-tells-acting-defense-eritrea-137153814",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Ethiopia",
+              "type": "country",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Eritrea",
+              "type": "country",
+              "role": "object",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Gedion Timothewos",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Yemane Gebremeskel",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Abiy Ahmed",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "UN Security Council",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "TPLF",
+              "type": "group",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Tigray Peace Force",
+              "type": "group",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "source_id": "news-web-ria",
+      "source_name": "РИА Новости",
+      "region": "russia",
+      "transport": "rss",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 3600
+      },
+      "stages": [
+        {
+          "kind": "collect",
+          "stage_id": "collect",
+          "collector": {
+            "mode": "incremental",
+            "collector": "web"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "handler": {
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+            "version": "1.0.0",
+            "package_id": "jane.storage-files"
+          },
+          "stage_id": "store-raw",
+          "connections": {
+            "target": "raw-files"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "params": {
+            "region": "russia",
+            "language": "ru",
+            "source_id": "news-web-ria",
+            "source_name": "РИА Новости"
+          },
+          "handler": {
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3",
+            "version": "1.0.2",
+            "package_id": "news.web-article"
+          },
+          "stage_id": "prepare",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98",
+            "version": "1.1.1",
+            "package_id": "news.article-analysis"
+          },
+          "stage_id": "analyse",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "params": {
+            "region": "russia",
+            "source_id": "news-web-ria",
+            "transport": "rss_article",
+            "source_kind": "web",
+            "source_name": "РИА Новости",
+            "min_grouping_confidence": 0.75
+          },
+          "handler": {
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+            "version": "1.1.2",
+            "package_id": "news.article-normalize"
+          },
+          "stage_id": "verify",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+            "version": "1.0.0",
+            "package_id": "jane.storage-postgresql"
+          },
+          "stage_id": "store-news",
+          "on_failure": "fail_run",
+          "connections": {
+            "target": "results-pg"
+          }
+        }
+      ],
+      "verified_articles": 4,
+      "articles": [
+        {
+          "url": "https://ria.ru/20261011/bpla-2123757892.html",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Ростовская область",
+              "type": "place",
+              "role": "object",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Юрий Слюсарь",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "РИА Новости",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        },
+        {
+          "url": "https://ria.ru/20261011/goll-2123758083.html",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Пьер де Голль",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Шарль де Голль",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Россия",
+              "type": "country",
+              "role": "object",
+              "attitude": "neutral"
+            }
+          ]
+        },
+        {
+          "url": "https://ria.ru/20261011/ogranicheniya-2123758259.html",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Росавиация",
+              "type": "organization",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "аэропорт Калуги",
+              "type": "place",
+              "role": "object",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Аэропорты Иваново",
+              "type": "place",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        },
+        {
+          "url": "https://ria.ru/20261011/opasnost-2123756148.html",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "ГУ МЧС по региону",
+              "type": "organization",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Крым",
+              "type": "place",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "source_id": "news-web-rt",
+      "source_name": "RT на русском",
+      "region": "russia",
+      "transport": "rss",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 3600
+      },
+      "stages": [
+        {
+          "kind": "collect",
+          "stage_id": "collect",
+          "collector": {
+            "mode": "incremental",
+            "collector": "web"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "handler": {
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+            "version": "1.0.0",
+            "package_id": "jane.storage-files"
+          },
+          "stage_id": "store-raw",
+          "connections": {
+            "target": "raw-files"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "params": {
+            "region": "russia",
+            "language": "ru",
+            "source_id": "news-web-rt",
+            "source_name": "RT на русском"
+          },
+          "handler": {
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3",
+            "version": "1.0.2",
+            "package_id": "news.web-article"
+          },
+          "stage_id": "prepare",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98",
+            "version": "1.1.1",
+            "package_id": "news.article-analysis"
+          },
+          "stage_id": "analyse",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "params": {
+            "region": "russia",
+            "source_id": "news-web-rt",
+            "transport": "rss_article",
+            "source_kind": "web",
+            "source_name": "RT на русском",
+            "min_grouping_confidence": 0.75
+          },
+          "handler": {
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+            "version": "1.1.2",
+            "package_id": "news.article-normalize"
+          },
+          "stage_id": "verify",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+            "version": "1.0.0",
+            "package_id": "jane.storage-postgresql"
+          },
+          "stage_id": "store-news",
+          "on_failure": "fail_run",
+          "connections": {
+            "target": "results-pg"
+          }
+        }
+      ],
+      "verified_articles": 3,
+      "articles": [
+        {
+          "url": "https://russian.rt.com/russia/news/1693254-tykva-privolzhie-rossiya",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Наталья Худякова",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Россельхозбанк",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Владимир Путин",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Россия",
+              "type": "country",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        },
+        {
+          "url": "https://russian.rt.com/ussr/news/1693259-vladimir-bpla-pozhar",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Александр Авдеев",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Владимирская область",
+              "type": "place",
+              "role": "object",
+              "attitude": "neutral"
+            }
+          ]
+        },
+        {
+          "url": "https://russian.rt.com/world/news/1693257-avstriya-taynyy-gruz",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Raiffeisen Bank International",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Австрийская партия свободы (FPÖ)",
+              "type": "group",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Кристиан Хафенекер",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Kronen Zeitung",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Руслан Кравченко",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Австрия",
+              "type": "country",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "source_id": "news-tg-suspilnenews",
+      "source_name": "Суспільне Новини",
+      "region": "ukraine",
+      "transport": "telegram_public_web",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 3600
+      },
+      "stages": [
+        {
+          "kind": "collect",
+          "stage_id": "collect",
+          "collector": {
+            "mode": "incremental",
+            "collector": "web"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "handler": {
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+            "version": "1.0.0",
+            "package_id": "jane.storage-files"
+          },
+          "stage_id": "store-raw",
+          "connections": {
+            "target": "raw-files"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "params": {
+            "region": "ukraine",
+            "language": "uk",
+            "max_posts": 3,
+            "source_name": "Суспільне Новини"
+          },
+          "handler": {
+            "digest": "sha256:9c17eb10b74ef3fa5df26b458ca992f64333b33bd9741229528afb0bdbddcac3",
+            "version": "1.0.1",
+            "package_id": "news.telegram-public-posts"
+          },
+          "stage_id": "prepare",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98",
+            "version": "1.1.1",
+            "package_id": "news.article-analysis"
+          },
+          "stage_id": "analyse",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "params": {
+            "region": "ukraine",
+            "source_id": "news-tg-suspilnenews",
+            "transport": "telegram_public_web",
+            "source_kind": "telegram",
+            "source_name": "Суспільне Новини",
+            "min_grouping_confidence": 0.75
+          },
+          "handler": {
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+            "version": "1.1.2",
+            "package_id": "news.article-normalize"
+          },
+          "stage_id": "verify",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+            "version": "1.0.0",
+            "package_id": "jane.storage-postgresql"
+          },
+          "stage_id": "store-news",
+          "on_failure": "fail_run",
+          "connections": {
+            "target": "results-pg"
+          }
+        }
+      ],
+      "verified_articles": 4,
+      "articles": [
+        {
+          "url": "https://t.me/suspilnenews/77203",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Дніпро",
+              "type": "place",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        },
+        {
+          "url": "https://t.me/suspilnenews/77204",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Дніпро",
+              "type": "place",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        },
+        {
+          "url": "https://t.me/suspilnenews/77205",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "армія РФ",
+              "type": "organization",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Олександр Ганжа",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        },
+        {
+          "url": "https://t.me/suspilnenews/77206",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Фіцпатрік",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "російської нафти",
+              "type": "product",
+              "role": "object",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Палата представників",
+              "type": "organization",
+              "role": "object",
+              "attitude": "neutral"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "source_id": "news-tg-dwglavnoe",
+      "source_name": "DW Главное",
+      "region": "europe",
+      "transport": "telegram_public_web",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 3600
+      },
+      "stages": [
+        {
+          "kind": "collect",
+          "stage_id": "collect",
+          "collector": {
+            "mode": "incremental",
+            "collector": "web"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "handler": {
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+            "version": "1.0.0",
+            "package_id": "jane.storage-files"
+          },
+          "stage_id": "store-raw",
+          "connections": {
+            "target": "raw-files"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "params": {
+            "region": "europe",
+            "language": "ru",
+            "max_posts": 3,
+            "source_name": "DW Главное"
+          },
+          "handler": {
+            "digest": "sha256:9c17eb10b74ef3fa5df26b458ca992f64333b33bd9741229528afb0bdbddcac3",
+            "version": "1.0.1",
+            "package_id": "news.telegram-public-posts"
+          },
+          "stage_id": "prepare",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98",
+            "version": "1.1.1",
+            "package_id": "news.article-analysis"
+          },
+          "stage_id": "analyse",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "params": {
+            "region": "europe",
+            "source_id": "news-tg-dwglavnoe",
+            "transport": "telegram_public_web",
+            "source_kind": "telegram",
+            "source_name": "DW Главное",
+            "min_grouping_confidence": 0.75
+          },
+          "handler": {
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+            "version": "1.1.2",
+            "package_id": "news.article-normalize"
+          },
+          "stage_id": "verify",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+            "version": "1.0.0",
+            "package_id": "jane.storage-postgresql"
+          },
+          "stage_id": "store-news",
+          "on_failure": "fail_run",
+          "connections": {
+            "target": "results-pg"
+          }
+        }
+      ],
+      "verified_articles": 1,
+      "articles": [
+        {
+          "url": "https://t.me/dwglavnoe/69500",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Трамп",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Зеленский",
+              "type": "person",
+              "role": "object",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Андрей Сибига, глава МИД Украины",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Кирилл Дмитриев, спецпредставитель президента РФ",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Эндрю Бёрнем, премьер-министр Великобритании",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Карин Прин, министр ФРГ по делам семьи",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Максимилиан Кра, депутат бундестага",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "source_id": "news-tg-golosameriki",
+      "source_name": "Голос Америки (VOA)",
+      "region": "usa",
+      "transport": "telegram_public_web",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 3600
+      },
+      "stages": [
+        {
+          "kind": "collect",
+          "stage_id": "collect",
+          "collector": {
+            "mode": "incremental",
+            "collector": "web"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "handler": {
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+            "version": "1.0.0",
+            "package_id": "jane.storage-files"
+          },
+          "stage_id": "store-raw",
+          "connections": {
+            "target": "raw-files"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "params": {
+            "region": "usa",
+            "language": "ru",
+            "max_posts": 3,
+            "source_name": "Голос Америки (VOA)"
+          },
+          "handler": {
+            "digest": "sha256:9c17eb10b74ef3fa5df26b458ca992f64333b33bd9741229528afb0bdbddcac3",
+            "version": "1.0.1",
+            "package_id": "news.telegram-public-posts"
+          },
+          "stage_id": "prepare",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98",
+            "version": "1.1.1",
+            "package_id": "news.article-analysis"
+          },
+          "stage_id": "analyse",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "params": {
+            "region": "usa",
+            "source_id": "news-tg-golosameriki",
+            "transport": "telegram_public_web",
+            "source_kind": "telegram",
+            "source_name": "Голос Америки (VOA)",
+            "min_grouping_confidence": 0.75
+          },
+          "handler": {
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+            "version": "1.1.2",
+            "package_id": "news.article-normalize"
+          },
+          "stage_id": "verify",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+            "version": "1.0.0",
+            "package_id": "jane.storage-postgresql"
+          },
+          "stage_id": "store-news",
+          "on_failure": "fail_run",
+          "connections": {
+            "target": "results-pg"
+          }
+        }
+      ],
+      "verified_articles": 3,
+      "articles": [
+        {
+          "url": "https://t.me/golosameriki/44236",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Уиткофф",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Кушнер",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Украина",
+              "type": "country",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        },
+        {
+          "url": "https://t.me/golosameriki/44237",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Эван Гершкович",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "The Wall Street Journal",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "The New York Times",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        },
+        {
+          "url": "https://t.me/golosameriki/44238",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "Дональд Трамп",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Владимир Путин",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "США",
+              "type": "country",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "РФ",
+              "type": "country",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Ормузским проливом",
+              "type": "place",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "source_id": "news-tg-tass-agency",
+      "source_name": "ТАСС",
+      "region": "russia",
+      "transport": "telegram_public_web",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 3600
+      },
+      "stages": [
+        {
+          "kind": "collect",
+          "stage_id": "collect",
+          "collector": {
+            "mode": "incremental",
+            "collector": "web"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "handler": {
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+            "version": "1.0.0",
+            "package_id": "jane.storage-files"
+          },
+          "stage_id": "store-raw",
+          "connections": {
+            "target": "raw-files"
+          }
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "params": {
+            "region": "russia",
+            "language": "ru",
+            "max_posts": 3,
+            "source_name": "ТАСС"
+          },
+          "handler": {
+            "digest": "sha256:9c17eb10b74ef3fa5df26b458ca992f64333b33bd9741229528afb0bdbddcac3",
+            "version": "1.0.1",
+            "package_id": "news.telegram-public-posts"
+          },
+          "stage_id": "prepare",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98",
+            "version": "1.1.1",
+            "package_id": "news.article-analysis"
+          },
+          "stage_id": "analyse",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "params": {
+            "region": "russia",
+            "source_id": "news-tg-tass-agency",
+            "transport": "telegram_public_web",
+            "source_kind": "telegram",
+            "source_name": "ТАСС",
+            "min_grouping_confidence": 0.75
+          },
+          "handler": {
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+            "version": "1.1.2",
+            "package_id": "news.article-normalize"
+          },
+          "stage_id": "verify",
+          "on_failure": "fail_run"
+        },
+        {
+          "kind": "handler",
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "op": "eq",
+                "field": "result.status",
+                "value": "success"
+              }
+            }
+          ],
+          "handler": {
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+            "version": "1.0.0",
+            "package_id": "jane.storage-postgresql"
+          },
+          "stage_id": "store-news",
+          "on_failure": "fail_run",
+          "connections": {
+            "target": "results-pg"
+          }
+        }
+      ],
+      "verified_articles": 1,
+      "articles": [
+        {
+          "url": "https://t.me/tass_agency/399749",
+          "event_id": null,
+          "grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "unverified_event_date",
+            "status": "ungrouped"
+          },
+          "sentiment": "neutral",
+          "entities": [
+            {
+              "name": "аэропорт Сочи",
+              "type": "place",
+              "role": "object",
+              "attitude": "neutral"
+            },
+            {
+              "name": "Сочи",
+              "type": "place",
+              "role": "mentioned",
+              "attitude": "neutral"
+            },
+            {
+              "name": "оперштаб Кубани",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "label": "bbc_exact",
+      "run_id": "run_01M4MJHZNP88WTS8C6EQPBBPBA",
+      "status": "succeeded",
+      "trigger": "manual",
+      "stages": {
+        "collect:completed:": 1,
+        "store-raw:completed:success": 1,
+        "prepare:completed:success": 1,
+        "analyse:completed:success": 1,
+        "verify:completed:success": 1,
+        "store-news:completed:success": 1
+      },
+      "error_count": 0
+    },
+    {
+      "label": "telegram_susp",
+      "run_id": "run_01M4MJHZQMGN2FGWCSSVXARA07",
+      "status": "succeeded",
+      "trigger": "manual",
+      "stages": {
+        "collect:completed:": 1,
+        "store-raw:completed:success": 1,
+        "prepare:completed:success": 1,
+        "analyse:completed:success": 1,
+        "verify:completed:success": 1,
+        "store-news:completed:success": 1
+      },
+      "error_count": 0
+    },
+    {
+      "label": "rt_rss",
+      "run_id": "run_01M4MKNJHHCK7RP5TVWV4VGK0Q",
+      "status": "succeeded",
+      "trigger": "manual",
+      "stages": {
+        "collect:completed:": 3,
+        "store-raw:completed:success": 3,
+        "prepare:completed:success": 3,
+        "analyse:completed:success": 3,
+        "verify:completed:success": 3,
+        "store-news:completed:success": 3
+      },
+      "error_count": 0
+    },
+    {
+      "label": "ria_schedule",
+      "run_id": "run_01M4MKRSD091S7RVYD431YDSDT",
+      "status": "succeeded",
+      "trigger": "schedule",
+      "stages": {
+        "collect:completed:": 3,
+        "store-raw:completed:success": 3,
+        "prepare:completed:success": 3,
+        "analyse:completed:success": 3,
+        "verify:completed:success": 3,
+        "store-news:completed:success": 3
+      },
+      "error_count": 0
+    },
+    {
+      "label": "dw_schedule",
+      "run_id": "run_01M4MKRSE16EJ195JKST8X4TY6",
+      "status": "failed",
+      "trigger": "schedule",
+      "stages": {
+        "collect:completed:": 1,
+        "store-raw:completed:success": 1,
+        "prepare:completed:success": 1,
+        "analyse:failed:failed": 1
+      },
+      "error_count": 1
+    },
+    {
+      "label": "voa_schedule",
+      "run_id": "run_01M4MKRSEHK71WKC9TM47XHNAR",
+      "status": "succeeded",
+      "trigger": "schedule",
+      "stages": {
+        "collect:completed:": 1,
+        "store-raw:completed:success": 1,
+        "prepare:completed:success": 1,
+        "analyse:completed:success": 1,
+        "verify:completed:success": 1,
+        "store-news:completed:success": 1
+      },
+      "error_count": 0
+    },
+    {
+      "label": "tass_schedule",
+      "run_id": "run_01M4MKRSE52N6ZX1C2GC0K2DEA",
+      "status": "failed",
+      "trigger": "schedule",
+      "stages": {
+        "collect:completed:": 1,
+        "store-raw:completed:success": 1,
+        "prepare:completed:success": 1,
+        "analyse:completed:success": 1,
+        "verify:failed:failed": 1
+      },
+      "error_count": 1
+    }
+  ],
+  "runtime": {
+    "handler-runtime": {
+      "container": "jane-demo-handler-runtime-1",
+      "image": "jane-demo-operations-handler-runtime:stage1",
+      "status": "running",
+      "health": "healthy",
+      "ports": {
+        "8000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "62130"
+          }
+        ]
+      },
+      "source_sha256": {
+        "jane_handler_runtime.executor": "50ac762e18669ecf16fa40f8fbd05010dfc86cfe22c2576630682445f39cbd84"
+      },
+      "imported_limits": {
+        "jobs": {
+          "max_concurrent_jobs": 8,
+          "max_queued_jobs": 1000,
+          "job_timeout_ms": 3600000,
+          "job_retention_seconds": 86400,
+          "queue_full_retry_after_seconds": 1
+        }
+      }
+    },
+    "orchestrator": {
+      "container": "jane-demo-orchestrator-1",
+      "image": "jane-demo-operations-orchestrator:stage1",
+      "status": "running",
+      "health": "healthy",
+      "ports": {
+        "8000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "52310"
+          }
+        ]
+      },
+      "source_sha256": {
+        "jane_orchestrator.engine": "eab44f17ea406e170a3e866e0ddcdde263382f7c7c1a247157020b5d7d2f15e0",
+        "jane_orchestrator.settings": "35b08610e4588d78627a6c90cb217662ad42e8bbc1b49374bd6e87fa7c7c0a26"
+      },
+      "imported_limits": {
+        "engine": {
+          "workers": 12,
+          "item_queue_ordering": "run_round_robin",
+          "task_ids": [],
+          "lease_ms": 30000,
+          "heartbeat_ms": 10000,
+          "poll_interval_ms": 500,
+          "feed_page_size": 100,
+          "feed_wait_ms": 1000,
+          "backpressure_recheck_ms": 500,
+          "scheduler_interval_ms": 1000,
+          "sync_retry_ms": 5000,
+          "sync_max_attempts": 5,
+          "executor_health_timeout_ms": 2000,
+          "executor_keepalive_expiry_ms": 4000,
+          "executor_stale_connection_retries": 1,
+          "job_poll_interval_ms": 500,
+          "idempotency_in_progress_poll_ms": 500,
+          "idempotency_in_progress_max_wait_ms": 1000,
+          "idempotency_in_progress_retry_ms": 5000,
+          "problem_samples": 10,
+          "trace_outputs_max": 100,
+          "attempt_history_max": 20,
+          "stored_selection_max_ids": 10000,
+          "stored_material_ids_per_request": 100,
+          "db_pool_max": 10,
+          "max_lease_reclaims": 5,
+          "schedule_batch": 20,
+          "reap_batch": 50
+        }
+      }
+    },
+    "llm": {
+      "container": "jane-demo-llm-1",
+      "image": "jane-demo-operations-llm:stage1",
+      "status": "running",
+      "health": "healthy",
+      "ports": {
+        "8110/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "50448"
+          }
+        ]
+      },
+      "source_sha256": {
+        "jane_llm.handler": "b7060ef1883db2692f84e094d77af2fb2d737bfff4d63c1e4f55b9ee11c182ea"
+      },
+      "imported_limits": {
+        "jobs": {
+          "max_concurrent_jobs": 4,
+          "max_queued_jobs": 1000,
+          "job_timeout_ms": 3600000,
+          "job_retention_seconds": 86400,
+          "queue_full_retry_after_seconds": 1
+        }
+      }
+    },
+    "web-collector": {
+      "container": "jane-demo-web-collector-1",
+      "image": "jane-demo-operations-web-collector:stage1",
+      "status": "running",
+      "health": "unhealthy",
+      "ports": {
+        "8101/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "55683"
+          }
+        ]
+      },
+      "source_sha256": {
+        "jane_web_collector.crawler": "72d451c9ff12d90f16f2a494e7ae9b63f7685c17daf33f5e7aaf2ff79b5181ca",
+        "jane_web_collector.state": "c0b17d951c138dafda896c548b8d07ba547e49f51b40d77d95592d5c79003cc3"
+      },
+      "imported_limits": {
+        "jobs": {
+          "max_concurrent_jobs": 32,
+          "max_queued_jobs": 1000,
+          "job_timeout_ms": 14400000,
+          "job_retention_seconds": 86400,
+          "queue_full_retry_after_seconds": 1
+        }
+      }
+    }
+  },
+  "all_verified": true
+}

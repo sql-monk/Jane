@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "require_verified_evidence": {
+      "type": "boolean",
+      "default": true
+    },
+    "min_grouping_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.9
+    },
+    "event_scope": {
+      "type": "string",
+      "minLength": 1,
+      "default": "news-events"
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "region": {
+      "type": "string",
+      "minLength": 1
+    },
+    "transport": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_kind": {
+      "enum": [
+        "web",
+        "telegram"
+      ]
+    }
+  },
+  "required": []
+}

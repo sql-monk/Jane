@@ -1,0 +1,12 @@
+{
+  "entities": [
+    {
+      "entity_type": "news_article",
+      "fields": {
+        "sentiment": {
+          "label": "neutral"
+        }
+      }
+    }
+  ]
+}

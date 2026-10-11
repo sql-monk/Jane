@@ -1,0 +1,38 @@
+{
+  "entities": [
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "rst.ua",
+        "ad_id": "15485005",
+        "url": "https://rst.ua/ukr/oldcars/nissan/rogue/nissan_rogue_15485005.html",
+        "title": "NISSAN Rogue SL",
+        "price": 15000,
+        "currency": "USD",
+        "price_usd": 15000,
+        "price_uah": 675800,
+        "make": "NISSAN",
+        "model": "Rogue",
+        "status": "active",
+        "condition": "used",
+        "year": 2016,
+        "region": "Харківська область",
+        "city": "Люботин",
+        "engine_l": 2.5,
+        "fuel": "petrol",
+        "transmission": "automatic",
+        "drive": "awd",
+        "body_type": "suv",
+        "color": "синій",
+        "description": "Всі питання по тел, [телефон] • цікавить обмін на Ниву"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "rst.ua",
+          "ad_id": "15485005"
+        }
+      }
+    }
+  ]
+}

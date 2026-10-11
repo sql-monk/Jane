@@ -1,0 +1,39 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "t.me"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/s/dwglavnoe"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "seed_list",
+      "strategy_id": "public-channel",
+      "urls": [
+        "https://t.me/s/dwglavnoe"
+      ]
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "fetch": {
+    "accept_media_types": [
+      "text/html"
+    ],
+    "render_js": false
+  },
+  "dedup": {
+    "key": "canonical_url_and_content",
+    "use_link_rel_canonical": false
+  },
+  "revisit": {
+    "mode": "if_changed"
+  }
+}

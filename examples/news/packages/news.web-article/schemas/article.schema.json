@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["url", "title", "text", "source_id", "source_name", "source_kind", "region", "language", "transport"],
+  "properties": {
+    "url": {"type": "string", "format": "uri"},
+    "title": {"type": "string", "minLength": 1},
+    "text": {"type": "string", "minLength": 1},
+    "source_id": {"type": "string"},
+    "source_name": {"type": "string"},
+    "source_kind": {"const": "web"},
+    "region": {"type": "string"},
+    "language": {"type": "string"},
+    "transport": {"const": "rss_article"},
+    "published_at": {"type": "string"},
+    "author": {"type": "string"}
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": "1",
+  "package_id": "news.web-rules-pravda",
+  "version": "1.0.0",
+  "kind": "collector-rules",
+  "title": "Українська правда RSS",
+  "description": "Стрічка RSS і HTML новин; robots.txt дотримується, максимум 5 матеріалів за запуск.",
+  "tags": [
+    "news",
+    "rss",
+    "ukraine"
+  ],
+  "entry": {
+    "collector": "web",
+    "rules": "rules.json"
+  },
+  "tests": [],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Codex"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Onboard a live news feed and article with robots-respecting hourly collection."
+  }
+}

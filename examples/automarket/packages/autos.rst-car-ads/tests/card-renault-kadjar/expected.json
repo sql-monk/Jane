@@ -1,0 +1,39 @@
+{
+  "entities": [
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "rst.ua",
+        "ad_id": "15483875",
+        "url": "https://rst.ua/ukr/oldcars/renault/kadjar/renault_kadjar_15483875.html",
+        "title": "RENAULT Kadjar BOSE",
+        "price": 15900,
+        "currency": "USD",
+        "price_usd": 15900,
+        "price_uah": 716300,
+        "make": "RENAULT",
+        "model": "Kadjar",
+        "status": "active",
+        "condition": "used",
+        "year": 2016,
+        "mileage_km": 163000,
+        "region": "Кіровоградська область",
+        "city": "Новоархангельськ",
+        "engine_l": 1.6,
+        "fuel": "diesel",
+        "transmission": "manual",
+        "drive": "front",
+        "body_type": "suv",
+        "color": "сірий",
+        "description": "BOSE! FULL LED! Понорама! Свіжа тільки заїхала! 96kv 130л. 6-Ступка! Гарний Збережений Комбінований Шкіра +Алькантара салон! Безключовий доступ! Новігація!Партроніки 360 Перед, Зад.!Колір Суперовий, Стильний Сіра Перла Металік Хамеліон (МокрийАсавльт)! Максимальна комплектація! Машина просто Супер! У Рідній фарбі ! З Рідним Малим пробігом! Всі скла заводські! Доглянутий салон Стан як візуально, так і технічно добре збереженого авто! На свої роки стан на 5 із 5! 100% розмитнено та зроблений серт…"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "rst.ua",
+          "ad_id": "15483875"
+        }
+      }
+    }
+  ]
+}

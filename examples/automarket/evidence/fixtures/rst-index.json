@@ -1,0 +1,66 @@
+{
+  "source_id": "autos-rst",
+  "run_id": "run_01M4MMPSJAW5BD6KHBZF5T1TYN",
+  "collection_id": "job_6b0dc206a19541c293368a00e8adc680",
+  "object_id": "obj_d03dbf0bea964cb00b28dbb21ccf5b1d",
+  "observation_id": "obs_01a1294b72a800005faa283d",
+  "fetched_at": "2026-10-11T04:49:32Z",
+  "locator": {
+    "canonical_url": "https://rst.ua/ukr/oldcars/",
+    "final_url": "https://rst.ua/ukr/oldcars/",
+    "url": "https://rst.ua/ukr/oldcars/"
+  },
+  "http_status": 200,
+  "content_type": "text/html; charset=CP1251",
+  "charset": "cp1251",
+  "sha256": "8af88198dbb1216ea268ced15a28775c3804b4bfb9ecab1dcde3c45d0f3bfbe2",
+  "size_bytes": 70162,
+  "collector_rules": {
+    "digest": "sha256:30b3158f243726fd5ae040e809e3c81d660fded14afb22e37c682c1596bfafd8",
+    "package_id": "autos.rst-rules",
+    "version": "1.1.0"
+  },
+  "expected_ad_urls": [
+    "https://rst.ua/ukr/oldcars/hyundai/santafe/hyundai_santafe_15275865.html",
+    "https://rst.ua/ukr/oldcars/maserati/levante/maserati_levante_15478335.html",
+    "https://rst.ua/ukr/oldcars/gmc/acadia/gmc_acadia_15481914.html",
+    "https://rst.ua/ukr/oldcars/nissan/rogue/nissan_rogue_15485005.html",
+    "https://rst.ua/ukr/oldcars/mercedes/gls/mercedes_gls_15431541.html",
+    "https://rst.ua/ukr/oldcars/volkswagen/passat/volkswagen_passat_15400674.html",
+    "https://rst.ua/ukr/oldcars/mercedes/vito/mercedes_vito_15481290.html",
+    "https://rst.ua/ukr/oldcars/mercedes/sprinter/mercedes_sprinter_15307308.html",
+    "https://rst.ua/ukr/oldcars/renault/kangoo/renault_kangoo_15469291.html",
+    "https://rst.ua/ukr/oldcars/mazda/cx-90/mazda_cx-90_15449338.html",
+    "https://rst.ua/ukr/oldcars/nissan/qashqai/nissan_qashqai_15487251.html",
+    "https://rst.ua/ukr/oldcars/mercedes/g-class/mercedes_g-class_15483157.html",
+    "https://rst.ua/ukr/oldcars/renault/espace/renault_espace_15483860.html",
+    "https://rst.ua/ukr/oldcars/renault/kadjar/renault_kadjar_15483875.html",
+    "https://rst.ua/ukr/oldcars/renault/koleos/renault_koleos_15302911.html",
+    "https://rst.ua/ukr/oldcars/renault/kadjar/renault_kadjar_15468663.html",
+    "https://rst.ua/ukr/oldcars/renault/kangoo/renault_kangoo_15478622.html",
+    "https://rst.ua/ukr/oldcars/volkswagen/tiguan/volkswagen_tiguan_15470482.html",
+    "https://rst.ua/ukr/oldcars/renault/duster/renault_duster_15389325.html",
+    "https://rst.ua/ukr/oldcars/renault/megane/renault_megane_15481784.html"
+  ],
+  "expected_next_page": "https://rst.ua/ukr/oldcars/2.html",
+  "collection_stats": {
+    "discovered": 21,
+    "fetched": 1,
+    "emitted": 1,
+    "acknowledged": 1,
+    "unacked": 0,
+    "duplicates": 0,
+    "skipped_out_of_scope": 0,
+    "skipped_robots": 0,
+    "not_modified": 20,
+    "errors": 0,
+    "frontier_size": 0,
+    "bytes_fetched": 70162,
+    "by_strategy": {
+      "used-cars-catalog": 21
+    },
+    "continuation_pending": 0,
+    "overflow_pending": 0
+  },
+  "diagnosis": "All 20 ad URLs were admitted and skipped as not_modified by the six-hour incremental revisit interval; catalog navigation and sections were correct."
+}

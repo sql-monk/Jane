@@ -73,8 +73,9 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
         }
         amount = _amount(ad.get("price"))
         currency = _CURRENCIES.get(_text(ad.get("currency_type")))
-        if not currency:
-            currency = _CURRENCY_IDS.get(ad.get("currencyId"))
+        currency_id = ad.get("currencyId")
+        if not currency and isinstance(currency_id, int) and not isinstance(currency_id, bool):
+            currency = _CURRENCY_IDS.get(currency_id)
         if amount is not None and currency:
             fields["price"] = {"amount": amount, "currency": currency}
         if location := _text(ad.get("city_name_uk")):

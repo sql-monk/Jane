@@ -37,8 +37,8 @@
       "kind": "handler",
       "handler": {
         "package_id": "classifieds.dim-ria-ads",
-        "version": "1.0.0",
-        "digest": "sha256:fc6c0ea61841f8d45491b5adac18389a40b9593f754885d05ed193b120830481"
+        "version": "1.0.1",
+        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d"
       },
       "inputs": [
         {

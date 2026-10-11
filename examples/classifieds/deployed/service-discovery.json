@@ -4,8 +4,8 @@
   "verified": true,
   "urls": {
     "storage": "http://127.0.0.1:54345",
-    "handler-runtime": "http://127.0.0.1:62130",
     "registry": "http://127.0.0.1:62129",
+    "handler-runtime": "http://127.0.0.1:62130",
     "orchestrator": "http://127.0.0.1:52310"
   }
 }

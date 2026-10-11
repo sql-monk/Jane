@@ -36,7 +36,8 @@ URL, бюджети та розклад зберігаються у [sites.json]
 | Наявні HTTP GET/POST після зміни обліку | `5 passed in 7.26s` |
 | Тайм-аут browser page pool, cancellation і наступний реальний GET після звільнення слота | Незалежно `2 passed in 0.62s`; Chromium `1 passed in 7.45s`, без skip |
 | Налаштування, відновлення та незалежна перевірка полів | `66 passed in 2.46s`; незалежно OLX/RIA, усі п'ять fixtures і JSON PINIA — `30 passed, 36 deselected in 0.44s` |
-| П'ять екстракторів у запущеному Handler Runtime | Для кожного `2 passed, 0 failed`; фактичні звіти збережено в Registry |
+| П'ять екстракторів у запущеному Handler Runtime | DIM.RIA 1.0.1 — `4 passed, 0 failed`; решта — `2 passed, 0 failed`; фактичні звіти збережено в Registry |
+| Повна директорія прикладів після виправлення namespace | `uv run --all-packages mypy examples`: `Success: no issues found in 84 source files`; незалежно helper — `66 passed in 2.14s`; CLI check — усі п'ять сайтів, `errors: []` |
 | Collector ruff / mypy | `All checks passed!`; `Success: no issues found in 23 source files` |
 | Контракти, незалежний guardian | lint PASS; compatibility — 0 breaking changes, 0 warnings; OpenAPI diff — без змін API |
 | Згенеровані адміністративні клієнти | `gen-api: 10 files up to date` |
@@ -69,7 +70,7 @@ node web/admin/scripts/gen-api.mjs --check
 | Сайт | Запуск | Перевірені сутності |
 | --- | --- | --- |
 | AUTO.RIA | `run_01M4MRQXDASCK15AMVRNCHV8XK` | 21 |
-| DIM.RIA | `run_01M4MRQXDWWPJESKN1KDENDJ53` | 22 |
+| DIM.RIA 1.0.1 | `run_01M4MVGDHY3QBDPNYTNYBMGSZP` | 22 |
 | RIA.com | `run_01M4MRQXE1Z4SXDZ25SZ3YGDYS` | 20 |
 | Shafa.ua | `run_01M4MRQXF6DX6PHGPN1ASR5EZ2` | 24 |
 | OLX | `run_01M4MT7Q936YWM5MF2Z34R3P9B` | 52 |
@@ -86,6 +87,8 @@ OLX `run_01M4MQXJ08Z5C001W85KVWE90H` досягнув deadline без матер
 
 Уточнено автоматичну перевірку OLX: вона читає ціну лише з власного `p[data-testid=ad-price]`, а DOM evidence виключає невидимий style/script/svg. Число моделі більше не з'єднується з ціною; CSS не перевищує текстовий cap5000. `RawNode.text()` для JSON scripts збережено. Додано 13 regression cases, включно з хибними полями, ціною сусідньої картки та прихованими числами; опубліковані пакети не змінювалися.
 
+Повний mypy після першої публікації виявив дубль назви модуля прикладу та неперевірений optional `currencyId` у DIM.RIA. Додано локальний `classifieds/__init__.py`; helper і його 66 tests не змінено. DIM.RIA 1.0.1 звужує fallback до цілих ID валюти, виключає bool та зберігає mapping 1/2/3. Два додаткові regression fixtures походять від реального прикладу, але явно позначені як модифіковані тестові дані; наявні cases і схеми збережено. Новий архів `sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d` пройшов чотири тести у запущеному runtime, схвалений і зафіксований у DIM task. Повторний реальний запуск із 1.0.1 отримав та підтвердив 22 сутності, один RAW і всі поля/PG/lineage без помилок. Старий 1.0.0 лишається схваленим із початковим digest; обидва архіви перевірено через Registry — [dim-ria-version-upgrade.json](../../examples/classifieds/deployed/dim-ria-version-upgrade.json). Попередній scheduled proof 1.0.0 збережено в історії коміту `5c70075`; сервісів не перезапускали.
+
 ## Поточне розгортання
 
 Collector — `jane-demo-classifieds-browser-guard:15bb32d-947803d4`, image `sha256:82ad1d201b6656a5f36d7f1d3c4358da19f5e9adf5166a37718c95f67154c786`. Образ походить від точного поточного operations image `947803d4` і додає лише прийнятий `render.py`. Після оновлення пройшли всі 25 перевірок: ENV, порти, томи, мережі, group_add, healthcheck, команда, користувач, shm та решта Collector/Discovery/Kit/schema збережені. Доказ — [collector-rollout.json](../../examples/classifieds/deployed/collector-rollout.json).
@@ -96,7 +99,7 @@ Collector — `jane-demo-classifieds-browser-guard:15bb32d-947803d4`, image `sha
 
 ## GitHub CI
 
-База `main` перед фінальною публікацією — `cad468925e8cc716b26d9d6e49ed76f49fa615f7`. Її [CI 38116615586](https://github.com/sql-monk/Jane/actions/runs/38116615586) завершився успішно: 13 required jobs, включно з e2e; manual-only limits job очікувано пропущено. Це перевірка бази, а не нових файлів оголошень. Новий результат узгоджується зі спільною інтеграцією адмінки для одного CI на точному фінальному SHA; до його завершення загальний CI нової реалізації не оголошується успішним.
+База `main` перед фінальною публікацією — `cad468925e8cc716b26d9d6e49ed76f49fa615f7`. Її [CI 38116615586](https://github.com/sql-monk/Jane/actions/runs/38116615586) завершився успішно: 13 required jobs, включно з e2e; manual-only limits job очікувано пропущено. Перший фінальний [коміт 5c70075](https://github.com/sql-monk/Jane/commit/5c7007569b22c62ffd629f18a24762d8c5fa22d6) збережено в `main` звичайним fast-forward. Його [CI 38118879096](https://github.com/sql-monk/Jane/actions/runs/38118879096) зупинився на подвійній назві модуля в `mypy examples`; усі сервісні перевірки типів пройшли. Вузьке виправлення namespace та DIM.RIA 1.0.1 незалежно прийнято після повного mypy прикладів, 66 helper tests і чотирьох пакетних тестів. Для виправленого коміту потрібен новий автоматичний CI на точному SHA; спільна інтеграція адмінки отримує той самий прийнятий результат для свого остаточного CI.
 
 ## Межі та повторний запуск
 

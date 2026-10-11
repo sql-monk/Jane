@@ -1,0 +1,21 @@
+{
+  "captured_at": "2026-10-11T06:48:17.926622+00:00",
+  "package_id": "classifieds.dim-ria-ads",
+  "previous_verified_run_id": "run_01M4MRQXDWWPJESKN1KDENDJ53",
+  "versions": {
+    "1.0.0": {
+      "version": "1.0.0",
+      "digest": "sha256:fc6c0ea61841f8d45491b5adac18389a40b9593f754885d05ed193b120830481",
+      "status": "approved",
+      "archive_digest_verified": true,
+      "test_status": "passed"
+    },
+    "1.0.1": {
+      "version": "1.0.1",
+      "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+      "status": "approved",
+      "archive_digest_verified": true,
+      "test_status": "passed"
+    }
+  }
+}

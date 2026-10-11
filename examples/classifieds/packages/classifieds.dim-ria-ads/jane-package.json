@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "package_id": "classifieds.dim-ria-ads",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "extractor",
   "title": "DIM.RIA — public property advertisements",
   "description": "Публічні картки нерухомості зі стану каталогу; без контактів продавця та приватних адрес.",
@@ -61,6 +61,30 @@
         "url": "https://dom.ria.com/uk/arenda-kvartir/kiev/"
       },
       "expected_status": "empty"
+    },
+    {
+      "name": "currency-id-fallback",
+      "input": {
+        "file": "tests/currency-id-fallback/page.html",
+        "media_type": "text/html",
+        "url": "https://dom.ria.com/uk/arenda-kvartir/kiev/"
+      },
+      "expected_status": "success",
+      "expected": "tests/currency-id-fallback/expected.json",
+      "compare": "exact",
+      "origin": "problem_sample"
+    },
+    {
+      "name": "missing-or-unsupported-currency",
+      "input": {
+        "file": "tests/missing-or-unsupported-currency/page.html",
+        "media_type": "text/html",
+        "url": "https://dom.ria.com/uk/arenda-kvartir/kiev/"
+      },
+      "expected_status": "success",
+      "expected": "tests/missing-or-unsupported-currency/expected.json",
+      "compare": "exact",
+      "origin": "problem_sample"
     }
   ],
   "provenance": {
@@ -68,8 +92,13 @@
     "authors": [
       "Codex"
     ],
-    "created_at": "2026-10-11T03:59:16.069696Z",
-    "change_summary": "Site-specific extraction of public catalog cards; compact success fixtures copied from live HTML, without personal contacts."
+    "created_at": "2026-10-11T06:45:39Z",
+    "change_summary": "Narrow currencyId fallback to integer IDs; retain USD/EUR/UAH mappings, omit price when currency evidence is missing or unsupported, and add regression derivatives of the real catalog fixture.",
+    "based_on": {
+      "package_id": "classifieds.dim-ria-ads",
+      "version": "1.0.0",
+      "digest": "sha256:fc6c0ea61841f8d45491b5adac18389a40b9593f754885d05ed193b120830481"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

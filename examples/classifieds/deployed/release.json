@@ -32,8 +32,8 @@
     },
     "classifieds.dim-ria-ads": {
       "package_id": "classifieds.dim-ria-ads",
-      "version": "1.0.0",
-      "digest": "sha256:fc6c0ea61841f8d45491b5adac18389a40b9593f754885d05ed193b120830481"
+      "version": "1.0.1",
+      "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d"
     },
     "classifieds.dim-ria-rules": {
       "package_id": "classifieds.dim-ria-rules",
@@ -429,10 +429,9 @@
     "classifieds.dim-ria-ads": {
       "package": {
         "package_id": "classifieds.dim-ria-ads",
-        "version": "1.0.0",
-        "digest": "sha256:fc6c0ea61841f8d45491b5adac18389a40b9593f754885d05ed193b120830481"
+        "version": "1.0.1",
+        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d"
       },
-      "reused_runtime_test_report": true,
       "runtime_test_report": {
         "cases": [
           {
@@ -468,19 +467,19 @@
                       "location": "Київ",
                       "listing_id": "33683279"
                     },
-                    "schema": "classifieds.dim-ria-ads@1.0.0#classified_ad",
+                    "schema": "classifieds.dim-ria-ads@1.0.1#classified_ad",
                     "provenance": {
                       "package": {
-                        "digest": "sha256:fc6c0ea61841f8d45491b5adac18389a40b9593f754885d05ed193b120830481",
-                        "version": "1.0.0",
+                        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                        "version": "1.0.1",
                         "package_id": "classifieds.dim-ria-ads"
                       },
-                      "invocation_id": "inv_f8bcdc65c94640ad99955ef3bcd220b7"
+                      "invocation_id": "inv_f0d9a3da29ff4ea582638d6591aa9317"
                     },
                     "entity_type": "classified_ad",
                     "observation": {
                       "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
-                      "observed_at": "2026-10-11T04:27:10Z",
+                      "observed_at": "2026-10-11T06:47:51Z",
                       "content_sha256": "dd3ea29dd92deacdc41aed4ce979ef97a960202587d293ea6a08a4b4b1cd3af8",
                       "observation_id": "obs_local_dd3ea29dd92deacdc41aed4c"
                     }
@@ -504,19 +503,19 @@
                       "location": "Київ",
                       "listing_id": "35018017"
                     },
-                    "schema": "classifieds.dim-ria-ads@1.0.0#classified_ad",
+                    "schema": "classifieds.dim-ria-ads@1.0.1#classified_ad",
                     "provenance": {
                       "package": {
-                        "digest": "sha256:fc6c0ea61841f8d45491b5adac18389a40b9593f754885d05ed193b120830481",
-                        "version": "1.0.0",
+                        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                        "version": "1.0.1",
                         "package_id": "classifieds.dim-ria-ads"
                       },
-                      "invocation_id": "inv_f8bcdc65c94640ad99955ef3bcd220b7"
+                      "invocation_id": "inv_f0d9a3da29ff4ea582638d6591aa9317"
                     },
                     "entity_type": "classified_ad",
                     "observation": {
                       "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
-                      "observed_at": "2026-10-11T04:27:10Z",
+                      "observed_at": "2026-10-11T06:47:51Z",
                       "content_sha256": "dd3ea29dd92deacdc41aed4ce979ef97a960202587d293ea6a08a4b4b1cd3af8",
                       "observation_id": "obs_local_dd3ea29dd92deacdc41aed4c"
                     }
@@ -525,25 +524,25 @@
               },
               "status": "success",
               "handler": {
-                "digest": "sha256:fc6c0ea61841f8d45491b5adac18389a40b9593f754885d05ed193b120830481",
-                "version": "1.0.0",
+                "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                "version": "1.0.1",
                 "package_id": "classifieds.dim-ria-ads"
               },
               "duplicate": false,
               "test_mode": true,
-              "started_at": "2026-10-11T04:27:47.612Z",
+              "started_at": "2026-10-11T06:47:52.148Z",
               "diagnostics": {
                 "metrics": {
-                  "cpu_ms": 339,
-                  "duration_ms": 3463,
+                  "cpu_ms": 175,
+                  "duration_ms": 739,
                   "output_bytes": 1122,
-                  "peak_memory_mb": 12.1
+                  "peak_memory_mb": 12.2
                 }
               },
-              "finished_at": "2026-10-11T04:27:55.091Z",
+              "finished_at": "2026-10-11T06:47:53.315Z",
               "delivery_key": "test:real-catalog-excerpt",
               "handler_kind": "extractor",
-              "invocation_id": "inv_f8bcdc65c94640ad99955ef3bcd220b7"
+              "invocation_id": "inv_f0d9a3da29ff4ea582638d6591aa9317"
             },
             "actual_status": "success",
             "expected_status": "success"
@@ -565,39 +564,257 @@
               },
               "status": "empty",
               "handler": {
-                "digest": "sha256:fc6c0ea61841f8d45491b5adac18389a40b9593f754885d05ed193b120830481",
-                "version": "1.0.0",
+                "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                "version": "1.0.1",
                 "package_id": "classifieds.dim-ria-ads"
               },
               "duplicate": false,
               "test_mode": true,
-              "started_at": "2026-10-11T04:27:55.106Z",
+              "started_at": "2026-10-11T06:47:53.383Z",
               "diagnostics": {
                 "metrics": {
-                  "cpu_ms": 346,
-                  "duration_ms": 2604,
+                  "cpu_ms": 197,
+                  "duration_ms": 652,
                   "output_bytes": 153,
-                  "peak_memory_mb": 12.4
+                  "peak_memory_mb": 12.9
                 }
               },
-              "finished_at": "2026-10-11T04:28:03.647Z",
+              "finished_at": "2026-10-11T06:47:54.477Z",
               "delivery_key": "test:page-without-advertisements",
               "handler_kind": "extractor",
-              "invocation_id": "inv_c6717d8943094cafad543b90ee7aa696"
+              "invocation_id": "inv_a04edd741e6841f38c3116cb5388e38d"
             },
             "actual_status": "empty",
             "expected_status": "empty"
+          },
+          {
+            "name": "currency-id-fallback",
+            "passed": true,
+            "result": {
+              "inputs": [
+                {
+                  "kind": "material",
+                  "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                  "content_sha256": "3dd4916ca1111c8629fac92c16aa1230c23c926ed303573279b28f5f746c8232",
+                  "observation_id": "obs_local_3dd4916ca1111c8629fac92c"
+                }
+              ],
+              "output": {
+                "entities": [
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "dom.ria.com",
+                        "listing_id": "33683279"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-borispolskaya-ulitsa-33683279.html",
+                      "site": "dom.ria.com",
+                      "price": {
+                        "amount": 9000.0,
+                        "currency": "UAH"
+                      },
+                      "title": "Здається в оренду 1-кімнатна квартира 27 кв. м у Києві",
+                      "location": "Київ",
+                      "listing_id": "33683279"
+                    },
+                    "schema": "classifieds.dim-ria-ads@1.0.1#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                        "version": "1.0.1",
+                        "package_id": "classifieds.dim-ria-ads"
+                      },
+                      "invocation_id": "inv_1f96d5244dc74fc786ee3f8edca516fb"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                      "observed_at": "2026-10-11T06:47:52Z",
+                      "content_sha256": "3dd4916ca1111c8629fac92c16aa1230c23c926ed303573279b28f5f746c8232",
+                      "observation_id": "obs_local_3dd4916ca1111c8629fac92c"
+                    }
+                  },
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "dom.ria.com",
+                        "listing_id": "35018017"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-prichalnaya-ulitsa-35018017.html",
+                      "site": "dom.ria.com",
+                      "price": {
+                        "amount": 36000.0,
+                        "currency": "UAH"
+                      },
+                      "title": "Здається в оренду 1-кімнатна квартира 55 кв. м у Києві",
+                      "location": "Київ",
+                      "listing_id": "35018017"
+                    },
+                    "schema": "classifieds.dim-ria-ads@1.0.1#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                        "version": "1.0.1",
+                        "package_id": "classifieds.dim-ria-ads"
+                      },
+                      "invocation_id": "inv_1f96d5244dc74fc786ee3f8edca516fb"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                      "observed_at": "2026-10-11T06:47:52Z",
+                      "content_sha256": "3dd4916ca1111c8629fac92c16aa1230c23c926ed303573279b28f5f746c8232",
+                      "observation_id": "obs_local_3dd4916ca1111c8629fac92c"
+                    }
+                  }
+                ]
+              },
+              "status": "success",
+              "handler": {
+                "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                "version": "1.0.1",
+                "package_id": "classifieds.dim-ria-ads"
+              },
+              "duplicate": false,
+              "test_mode": true,
+              "started_at": "2026-10-11T06:47:54.504Z",
+              "diagnostics": {
+                "metrics": {
+                  "cpu_ms": 206,
+                  "duration_ms": 965,
+                  "output_bytes": 1123,
+                  "peak_memory_mb": 12.2
+                }
+              },
+              "finished_at": "2026-10-11T06:47:55.920Z",
+              "delivery_key": "test:currency-id-fallback",
+              "handler_kind": "extractor",
+              "invocation_id": "inv_1f96d5244dc74fc786ee3f8edca516fb"
+            },
+            "actual_status": "success",
+            "expected_status": "success"
+          },
+          {
+            "name": "missing-or-unsupported-currency",
+            "passed": true,
+            "result": {
+              "inputs": [
+                {
+                  "kind": "material",
+                  "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                  "content_sha256": "e2a426bfcdd896892b8a89a220588dc7386dee51cc2f67dbfe4913abb42bc11b",
+                  "observation_id": "obs_local_e2a426bfcdd896892b8a89a2"
+                }
+              ],
+              "output": {
+                "entities": [
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "dom.ria.com",
+                        "listing_id": "33683279"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-borispolskaya-ulitsa-33683279.html",
+                      "site": "dom.ria.com",
+                      "title": "Здається в оренду 1-кімнатна квартира 27 кв. м у Києві",
+                      "location": "Київ",
+                      "listing_id": "33683279"
+                    },
+                    "schema": "classifieds.dim-ria-ads@1.0.1#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                        "version": "1.0.1",
+                        "package_id": "classifieds.dim-ria-ads"
+                      },
+                      "invocation_id": "inv_005c6fa441114f89a6b547f34c1b8ea0"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                      "observed_at": "2026-10-11T06:47:52Z",
+                      "content_sha256": "e2a426bfcdd896892b8a89a220588dc7386dee51cc2f67dbfe4913abb42bc11b",
+                      "observation_id": "obs_local_e2a426bfcdd896892b8a89a2"
+                    }
+                  },
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "dom.ria.com",
+                        "listing_id": "35018017"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-prichalnaya-ulitsa-35018017.html",
+                      "site": "dom.ria.com",
+                      "title": "Здається в оренду 1-кімнатна квартира 55 кв. м у Києві",
+                      "location": "Київ",
+                      "listing_id": "35018017"
+                    },
+                    "schema": "classifieds.dim-ria-ads@1.0.1#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                        "version": "1.0.1",
+                        "package_id": "classifieds.dim-ria-ads"
+                      },
+                      "invocation_id": "inv_005c6fa441114f89a6b547f34c1b8ea0"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                      "observed_at": "2026-10-11T06:47:52Z",
+                      "content_sha256": "e2a426bfcdd896892b8a89a220588dc7386dee51cc2f67dbfe4913abb42bc11b",
+                      "observation_id": "obs_local_e2a426bfcdd896892b8a89a2"
+                    }
+                  }
+                ]
+              },
+              "status": "success",
+              "handler": {
+                "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                "version": "1.0.1",
+                "package_id": "classifieds.dim-ria-ads"
+              },
+              "duplicate": false,
+              "test_mode": true,
+              "started_at": "2026-10-11T06:47:55.929Z",
+              "diagnostics": {
+                "metrics": {
+                  "cpu_ms": 191,
+                  "duration_ms": 671,
+                  "output_bytes": 1025,
+                  "peak_memory_mb": 12.1
+                }
+              },
+              "finished_at": "2026-10-11T06:47:57.080Z",
+              "delivery_key": "test:missing-or-unsupported-currency",
+              "handler_kind": "extractor",
+              "invocation_id": "inv_005c6fa441114f89a6b547f34c1b8ea0"
+            },
+            "actual_status": "success",
+            "expected_status": "success"
           }
         ],
         "failed": 0,
-        "passed": 2,
+        "passed": 4,
         "package": {
-          "digest": "sha256:fc6c0ea61841f8d45491b5adac18389a40b9593f754885d05ed193b120830481",
-          "version": "1.0.0",
+          "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+          "version": "1.0.1",
           "package_id": "classifieds.dim-ria-ads"
         },
-        "started_at": "2026-10-11T04:27:47.601Z",
-        "finished_at": "2026-10-11T04:28:03.648Z"
+        "started_at": "2026-10-11T06:47:52.129Z",
+        "finished_at": "2026-10-11T06:47:57.080Z"
       }
     },
     "classifieds.dim-ria-rules": {
@@ -1324,8 +1541,8 @@
             "kind": "handler",
             "handler": {
               "package_id": "classifieds.dim-ria-ads",
-              "version": "1.0.0",
-              "digest": "sha256:fc6c0ea61841f8d45491b5adac18389a40b9593f754885d05ed193b120830481"
+              "version": "1.0.1",
+              "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d"
             },
             "inputs": [
               {

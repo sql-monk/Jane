@@ -73,4 +73,25 @@ describe("module operations", () => {
     const { container } = render(<TimeSeriesChart history={history} metric={history.metrics[0]!} />);
     expect(container.querySelectorAll("path.telemetry-line")).toHaveLength(3);
   });
+
+  it("keeps a downsampled history visible and still breaks an outage", () => {
+    const history: ModuleTelemetry = {
+      service: "storage",
+      instance_id: "a",
+      sample_interval_seconds: 5,
+      resolution_seconds: 120,
+      retention_seconds: 86400,
+      metrics: [{ key: "value", label: "Вимірювання", unit: "мс" }],
+      samples: [
+        { at: "2026-10-11T01:00:00Z", instance_id: "a", values: { value: 1 } },
+        { at: "2026-10-11T01:02:00Z", instance_id: "a", values: { value: 2 } },
+        { at: "2026-10-11T01:20:00Z", instance_id: "a", values: { value: 3 } },
+      ],
+    };
+    const { container } = render(<TimeSeriesChart history={history} metric={history.metrics[0]!} />);
+    const paths = container.querySelectorAll("path.telemetry-line");
+    expect(paths).toHaveLength(2);
+    expect(paths[0]?.getAttribute("d")).toContain(" L");
+    expect(container.querySelectorAll("circle.telemetry-point")).toHaveLength(1);
+  });
 });

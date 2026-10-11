@@ -42,7 +42,8 @@ export function TimeSeriesChart({
     if (
       value == null ||
       instance !== sample.instance_id ||
-      (previousAt !== null && at - previousAt > history.sample_interval_seconds * 3000)
+      (previousAt !== null &&
+        at - previousAt > (history.resolution_seconds ?? history.sample_interval_seconds) * 3000)
     ) {
       if (segment) points.push(segment);
       segment = "";
@@ -101,14 +102,12 @@ export function TimeSeriesChart({
         {points.map((path, i) => (
           <path key={i} d={path} className="telemetry-line" />
         ))}
-        {defined.length === 1 ? (
-          <circle
-            cx="36"
-            cy={150 - ((defined[0]?.values[metric.key] ?? 0) / max) * 124}
-            r="3"
-            className="telemetry-point"
-          />
-        ) : null}
+        {points
+          .filter((path) => !path.includes(" L"))
+          .map((path) => {
+            const [x, y] = path.slice(1).split(",").map(Number);
+            return <circle key={path} cx={x} cy={y} r="3" className="telemetry-point" />;
+          })}
         <text x="36" y="181">
           {new Date(first).toLocaleTimeString("uk-UA")}
         </text>
@@ -136,16 +135,14 @@ export function TelemetryCharts({
     queryKey: ["telemetry", module.executor, minutes],
     queryFn: () =>
       unwrap(
-        api
-          .module(module.executor)
-          .GET("/v1/telemetry", {
-            params: {
-              query: {
-                since: new Date(Date.now() - minutes * 60000).toISOString(),
-                limit: config.monitoring.max_points,
-              },
+        api.module(module.executor).GET("/v1/telemetry", {
+          params: {
+            query: {
+              since: new Date(Date.now() - minutes * 60000).toISOString(),
+              limit: config.monitoring.max_points,
             },
-          }),
+          },
+        }),
       ),
     refetchInterval: automatic ? config.monitoring.refresh_interval_ms : false,
   });
@@ -156,10 +153,13 @@ export function TelemetryCharts({
     Date.now() - Date.parse(latest.at) >
       Math.max(config.monitoring.stale_after_ms, (history?.sample_interval_seconds ?? 5) * 3000);
   const meaningful =
-    history?.metrics.filter(
-      (metric) =>
-        metric.key.startsWith("http_") || history.samples.some((sample) => sample.values[metric.key] != null),
-    ) ?? [];
+    history?.metrics
+      .filter(
+        (metric) =>
+          metric.key.startsWith("http_") ||
+          history.samples.some((sample) => sample.values[metric.key] != null),
+      )
+      .sort((a, b) => Number(a.key.startsWith("http_")) - Number(b.key.startsWith("http_"))) ?? [];
   const featured = compact
     ? meaningful.filter((metric) =>
         ["queue_depth", "oldest_queued_seconds", "materials_per_second", "stage_items_per_second"].includes(

@@ -168,6 +168,46 @@ const LABELS: Record<string, string> = {
   defaults: "Типові значення",
   hard_caps: "Жорсткі межі",
   profile: "Назва профілю",
+  state: "Стан і сесії",
+  onboarding: "Підключення джерел",
+  improvement: "Вдосконалення пакетів",
+  unknown: "Невідомі матеріали",
+  content: "Завантаження вмісту",
+  search: "Пошук",
+  material: "Приклади матеріалів",
+  packages: "Пакети обробників",
+  storage: "Запис у сховища",
+  monitoring: "Історія моніторингу",
+  pool_max_size: "Підключення до бази даних",
+  db_pool_max: "Підключення до бази даних",
+  in_progress_lease_ms: "Утримання активної операції, мс",
+  job_lease_ms: "Утримання фонового завдання, мс",
+  session_retention_seconds: "Зберігання сесій, с",
+  cpu_cores: "Процесорні ядра",
+  memory_mb: "Пам’ять пісочниці, МБ",
+  tmpfs_mb: "Тимчасова пам’ять, МБ",
+  max_output_bytes: "Розмір результату, байт",
+  max_processes: "Процеси в пісочниці",
+  max_archive_bytes: "Розмір архіву пакета, байт",
+  max_unpacked_bytes: "Розмір розпакованого пакета, байт",
+  max_files: "Файли в пакеті",
+  cache_max_entries: "Пакети в кеші",
+  max_input_bytes: "Вхідні дані, байт",
+  max_stored_results: "Збережені результати",
+  sync_retry_ms: "Пауза повторної доставки, мс",
+  sync_max_attempts: "Спроби доставки",
+  max_sample_chars: "Довжина прикладу, символи",
+  max_problem_samples: "Приклади проблем",
+  max_successful_examples: "Успішні приклади",
+  max_proposal_bytes: "Розмір пропозиції, байт",
+  min_confidence: "Мінімальна впевненість, 0–1",
+  max_fixture_bytes: "Розмір тестового матеріалу, байт",
+  max_list_items: "Елементи списку в прикладі",
+  max_string_chars: "Довжина рядка, символи",
+  short_string_chars: "Довжина короткого рядка, символи",
+  chars_per_token: "Символи на токен",
+  prompt_overhead_chars: "Службовий текст запиту, символи",
+  part_overhead_chars: "Службовий текст частини, символи",
 };
 
 const WORDS: Record<string, string> = {
@@ -204,6 +244,37 @@ const WORDS: Record<string, string> = {
   cache: "Кеш",
   shared: "Спільний",
   enabled: "Увімкнено",
+  pages: "Сторінки",
+  fetch: "Завантаження",
+  sample: "Приклад",
+  chars: "символи",
+  patterns: "Шаблони",
+  examples: "Приклади",
+  files: "Файли",
+  file: "Файл",
+  output: "Результат",
+  input: "Вхідні дані",
+  stored: "Збережені",
+  count: "Кількість",
+  query: "Запит",
+  requests: "Запити",
+  sessions: "Сесії",
+  page: "Сторінка",
+  transport: "Передавання",
+  items: "Елементи",
+  item: "Елемент",
+  text: "Текст",
+  depth: "Глибина",
+  history: "Історія",
+  models: "Моделі",
+  model: "Модель",
+  hosts: "Хости",
+  links: "Посилання",
+  urls: "Адреси",
+  url: "Адреса",
+  response: "Відповідь",
+  sync: "Синхронний",
+  lease: "Утримання",
 };
 
 export function fieldLabel(path: string): string {
@@ -219,6 +290,7 @@ export function fieldLabel(path: string): string {
 
 export function fieldGroup(path: string): string {
   const parts = path.split(".");
+  if (parts[1]?.startsWith("operations_")) return LABELS.monitoring!;
   return fieldLabel(
     parts[0] === "settings"
       ? "settings"
@@ -226,4 +298,20 @@ export function fieldGroup(path: string): string {
         ? (parts[2] ?? "contract")
         : (parts[1] ?? path),
   );
+}
+
+export function fieldHelp(path: string): string | undefined {
+  const name = path.split(".").at(-1) ?? path;
+  return {
+    workers: "Кількість виконавців, які одночасно обробляють чергу. Нуль зупиняє її обробку.",
+    run_workers: "Запускає фонову обробку операцій цього модуля.",
+    scheduler_enabled: "Дозволяє автоматично запускати завдання за розкладом.",
+    operations_sample_interval_seconds:
+      "Як часто модуль записує нову точку. Менше значення дає детальнішу історію.",
+    operations_retention_seconds: "Старші вимірювання автоматично видаляються. 86400 секунд — одна доба.",
+    operations_max_points: "Межа точок у відповіді. Для довгого періоду точки рівномірно проріджуються.",
+    log_level: "INFO підходить для звичайної роботи; DEBUG додає подробиці для діагностики.",
+    render_enabled: "Вмикає браузер для сайтів, що завантажують дані через JavaScript.",
+    pool_max_size: "Максимум одночасних підключень модуля до його бази даних.",
+  }[name];
 }

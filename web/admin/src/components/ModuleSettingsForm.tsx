@@ -1,7 +1,20 @@
 import { useEffect, useState } from "react";
 import { useBeforeUnload } from "react-router-dom";
-import { fieldGroup, fieldLabel, type ModuleConfiguration, type ModuleField } from "../lib/modules";
+import {
+  fieldGroup,
+  fieldHelp,
+  fieldLabel,
+  type ModuleConfiguration,
+  type ModuleField,
+} from "../lib/modules";
 import { ErrorBox, Notice } from "./ui";
+
+function isPrimary(path: string): boolean {
+  return (
+    /settings\.(log_level|render_enabled|render_wait_until|run_workers|scheduler_enabled)$/.test(path) ||
+    /limits\.(engine\.workers|(?:contract\.)?(concurrency|timeouts|rate|crawl|sandbox)\.)/.test(path)
+  );
+}
 
 function FieldControl({
   field,
@@ -80,6 +93,7 @@ export function ModuleSettingsForm({
 }) {
   const [values, setValues] = useState(configuration.overrides);
   const [search, setSearch] = useState("");
+  const [advanced, setAdvanced] = useState(false);
   const dirty = JSON.stringify(values) !== JSON.stringify(configuration.overrides);
   useBeforeUnload((event) => {
     if (dirty) event.preventDefault();
@@ -102,6 +116,7 @@ export function ModuleSettingsForm({
   }, [dirty]);
   const groups = new Map<string, ModuleField[]>();
   for (const field of configuration.fields) {
+    if (!advanced && !search && !isPrimary(field.path)) continue;
     if (
       search &&
       !`${fieldLabel(field.path)} ${field.description ?? ""}`
@@ -136,6 +151,13 @@ export function ModuleSettingsForm({
           placeholder="Паралельність, час очікування…"
         />
       </label>
+      <label className="module-filter">
+        <span>
+          <input type="checkbox" checked={advanced} onChange={(event) => setAdvanced(event.target.checked)} />{" "}
+          Показати розширені налаштування
+        </span>
+        <small className="muted">Пошук охоплює всі параметри, включно з розширеними.</small>
+      </label>
       {[...groups].map(([group, fields], index) => (
         <details className="module-setting-group" key={group} open={Boolean(search) || index < 2}>
           <summary>
@@ -146,7 +168,9 @@ export function ModuleSettingsForm({
             <div className="module-setting-row" key={field.path}>
               <div>
                 <strong>{fieldLabel(field.path)}</strong>
-                {field.description ? <p>{field.description}</p> : null}
+                {fieldHelp(field.path) || field.description ? (
+                  <p>{fieldHelp(field.path) ?? field.description}</p>
+                ) : null}
                 <small>
                   Активне: {String(field.value)} ·{" "}
                   {field.origin === "module" ? "Налаштовано для модуля" : "Початкова конфігурація"}

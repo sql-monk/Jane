@@ -25,6 +25,11 @@
       "type": "integer",
       "minimum": 60
     },
+    "resolution_seconds": {
+      "type": "number",
+      "minimum": 1,
+      "description": "Nominal spacing after bounded downsampling; source sampling frequency remains sample_interval_seconds."
+    },
     "metrics": {
       "type": "array",
       "items": {

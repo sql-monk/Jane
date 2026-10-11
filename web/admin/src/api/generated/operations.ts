@@ -127,6 +127,8 @@ export interface components {
       instance_id: string;
       sample_interval_seconds: number;
       retention_seconds: number;
+      /** @description Nominal spacing after bounded downsampling; source sampling frequency remains sample_interval_seconds. */
+      resolution_seconds?: number;
       metrics: {
         key: string;
         label: string;

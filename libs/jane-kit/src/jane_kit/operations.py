@@ -194,6 +194,8 @@ class Operations:
         overrides = json.loads(row["document"])
         fields = self.fields()
         for field in fields:
+            if field["value"] != field["inherited_value"]:
+                field["origin"] = "module"
             if field["path"] in overrides:
                 field["configured_value"] = overrides[field["path"]]
                 field["origin"] = "module" if field["value"] == overrides[field["path"]] else field["origin"]
@@ -376,6 +378,8 @@ class Operations:
             "service": self.settings.service_name,
             "instance_id": self.settings.instance_id,
             "sample_interval_seconds": self.settings.operations_sample_interval_seconds,
+            "resolution_seconds": self.settings.operations_sample_interval_seconds
+            * (max(1, math.ceil((count - 1) / (limit - 1))) if count else 1),
             "retention_seconds": self.settings.operations_retention_seconds,
             "metrics": self.definitions(),
             "samples": [

@@ -154,6 +154,7 @@ def test_reset_inherited_values_requires_restart(tmp_path):
         assert result.json()["pending_restart"]
         workers = next(f for f in result.json()["fields"] if f["path"] == "limits.engine.workers")
         assert workers["inherited_value"] == 2 and workers["value"] == 3
+        assert workers["origin"] == "module"
     with TestClient(make_app(tmp_path)) as client:
         result = client.get("/v1/configuration").json()
         assert not result["pending_restart"]
@@ -172,3 +173,25 @@ def test_numeric_type_constraints(tmp_path, value):
             ).status_code
             == 422
         )
+
+
+def test_downsample_resolution_retains_history_endpoints(tmp_path):
+    import json
+    import time
+
+    from jane_kit.operations import Operations
+
+    app = make_app(tmp_path)
+    sampler = Operations(app, app.state.settings, None)
+    sampler.initialize()
+    start = time.time() - 1000
+    with sampler.connect() as db:
+        db.executemany(
+            "INSERT INTO samples (at,instance,document) VALUES (?,?,?)",
+            [(start + i * 5, "a", json.dumps({"http_inflight": i})) for i in range(201)],
+        )
+    history = sampler.telemetry(None, None, 11)
+    assert len(history["samples"]) == 11
+    assert history["resolution_seconds"] == 100
+    assert history["samples"][0]["values"]["http_inflight"] == 0
+    assert history["samples"][-1]["values"]["http_inflight"] == 200

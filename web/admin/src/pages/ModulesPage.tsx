@@ -7,12 +7,31 @@ import { ErrorBox, Loading, Notice, Page, Section, Status, Tabs } from "../compo
 import { TelemetryCharts } from "../components/TelemetryCharts";
 import { ModuleSettingsForm } from "../components/ModuleSettingsForm";
 
+function ModuleStatus({ value }: { value: string | undefined }) {
+  const labels: Record<string, string> = {
+    ok: "Працює",
+    degraded: "Працює з обмеженнями",
+    down: "Не працює",
+    unknown: "Немає даних",
+  };
+  return (
+    <span className={`badge badge-${value === "ok" ? "ok" : value === "down" ? "bad" : "muted"}`}>
+      {labels[value ?? "unknown"] ?? value}
+    </span>
+  );
+}
+
 function useModuleState(module: ModuleDefinition) {
   const api = useApi();
   const config = useConfig();
   const health = useQuery({
     queryKey: ["module-health", module.executor],
-    queryFn: () => unwrap(api.executor(module.executor).GET("/v1/health")),
+    queryFn: async () => {
+      const result = await api.executor(module.executor).GET("/v1/health");
+      // 503 is a valid Health response in the contract, including failing checks.
+      if (result.response.status === 503 && result.error && "status" in result.error) return result.error;
+      return unwrap(Promise.resolve(result));
+    },
     refetchInterval: config.monitoring.refresh_interval_ms,
   });
   const info = useQuery({
@@ -31,7 +50,7 @@ export function ModuleCard({ module }: { module: ModuleDefinition }) {
         <h2>
           <Link to={`/modules/${module.id}`}>{module.name}</Link>
         </h2>
-        <Status value={health.isError ? "unknown" : (health.data?.status ?? "unknown")} />
+        <ModuleStatus value={health.isError ? "unknown" : (health.data?.status ?? "unknown")} />
       </div>
       <p>{module.description}</p>
       <small className="muted">{info.data ? `Версія ${info.data.version}` : "Версія недоступна"}</small>
@@ -88,12 +107,10 @@ function ModuleDetail({ module }: { module: ModuleDefinition }) {
   const save = useMutation({
     mutationFn: (values: ModuleConfiguration["overrides"]) =>
       unwrapWithEtag(
-        api
-          .module(module.executor)
-          .PUT("/v1/configuration", {
-            params: { header: ifMatch(configuration.data?.etag) },
-            body: { values },
-          }),
+        api.module(module.executor).PUT("/v1/configuration", {
+          params: { header: ifMatch(configuration.data?.etag) },
+          body: { values },
+        }),
       ),
     onSuccess: (result) => queryClient.setQueryData(["module-configuration", module.executor], result),
   });
@@ -153,7 +170,7 @@ function ModuleDetail({ module }: { module: ModuleDefinition }) {
             <ErrorBox error={health.error} />
             <ErrorBox error={info.error} />
             {health.isLoading ? <Loading /> : null}
-            <Status value={health.isError ? "unknown" : (health.data?.status ?? "unknown")} />
+            <ModuleStatus value={health.isError ? "unknown" : (health.data?.status ?? "unknown")} />
             {info.data ? (
               <p>
                 Версія: {info.data.version} ·{" "}

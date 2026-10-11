@@ -117,6 +117,8 @@ test.describe("connections, LLM, limits and secrets @mock", () => {
   }) => {
     await admin.goto("/limits");
     await expect(admin.getByRole("heading", { name: /профіль dev-laptop/ })).toBeVisible();
+    await expect(admin.getByLabel("Назва профілю лімітів", { exact: true })).toHaveValue("dev-laptop");
+    await admin.getByText("Усі властивості лімітів", { exact: true }).click();
     await expect(admin.getByRole("table", { name: "Ліміти платформи" })).toBeVisible();
     const { body } = await captureRequest(admin, "PUT", "/api/orchestrator/v1/limits/platform", () =>
       admin.getByRole("button", { name: "Зберегти ліміти платформи" }).click(),

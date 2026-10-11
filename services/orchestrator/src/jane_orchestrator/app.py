@@ -94,6 +94,29 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.limits = resolved
 
+    def queue_probe() -> dict[str, float]:
+        core = holder["core"]
+        with core.db.conn() as conn:
+            row = conn.execute(
+                "SELECT count(*) FILTER (WHERE status IN ('queued','retrying')) AS queued, "
+                "count(*) FILTER (WHERE status IN ('leased','running')) AS active, "
+                "coalesce(max(extract(epoch FROM now()-created_at)) "
+                "FILTER (WHERE status IN ('queued','retrying')),0) AS oldest "
+                "FROM items WHERE status IN ('queued','retrying','leased','running')"
+            ).fetchone()
+        return {
+            "queue_depth": float(row["queued"]),
+            "active_items": float(row["active"]),
+            "oldest_queued_seconds": float(row["oldest"]),
+        }
+
+    app.state.operations_probe = queue_probe
+    app.state.operations_metric_definitions = [
+        {"key": "queue_depth", "label": "Черга елементів етапів", "unit": "елементів"},
+        {"key": "active_items", "label": "Елементи у виконанні", "unit": "елементів"},
+        {"key": "oldest_queued_seconds", "label": "Вік найстарішого елемента черги", "unit": "с"},
+    ]
+
     async def db_check() -> bool:
         core = holder.get("core")
         if core is None:

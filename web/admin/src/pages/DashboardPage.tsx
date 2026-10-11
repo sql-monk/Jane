@@ -8,6 +8,8 @@ import { ErrorBox, Loading, Page, Section, Status, Table } from "../components/u
 import { Icon, type IconName } from "../components/Icon";
 import { TaskQuickRun } from "../components/TaskQuickRun";
 import { formatDate, formatMoney, formatDuration, statusLabel } from "../lib/format";
+import { modules } from "../lib/modules";
+import { TelemetryCharts } from "../components/TelemetryCharts";
 
 function Metric({
   label,
@@ -153,6 +155,9 @@ export function DashboardPage() {
               : "Очікуємо дані сервісів"}
         </div>
       </div>
+      <Section title="Моніторинг платформи" actions={<Link to="/monitoring">Усі графіки →</Link>}>
+        <TelemetryCharts module={modules(config).find((module) => module.id === "orchestrator")!} compact />
+      </Section>
       <div className="metrics-grid">
         <Metric
           label="Джерела"

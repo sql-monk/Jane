@@ -18,6 +18,8 @@ RUN uv sync --frozen --no-dev --no-editable --package jane-template-service
 
 FROM ${PYTHON_IMAGE}
 RUN useradd --system --uid 10001 --no-create-home jane
+RUN mkdir -p /var/lib/jane-operations && chown jane /var/lib/jane-operations
+ENV JANE_TEMPLATE_SERVICE_OPERATIONS_DIR=/var/lib/jane-operations
 COPY --from=build /app/.venv /app/.venv
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \

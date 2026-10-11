@@ -1,0 +1,10 @@
+
+Running 3 tests using 1 worker
+
+(node:30516) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium] › e2e\module-operations.spec.ts:7:3 › module operations on a real stack › all eight module forms load, diagnostics and monitoring show real responses (15.2s)
+  ok 2 [chromium] › e2e\module-operations.spec.ts:31:3 › module operations on a real stack › saves a draft with ETag, rejects stale writes and restores the original overrides (1.8s)
+  ok 3 [chromium] › e2e\module-operations.spec.ts:69:3 › module operations on a real stack › period controls, refresh, basic/advanced forms and narrow screens work (2.1s)
+
+  3 passed (20.4s)

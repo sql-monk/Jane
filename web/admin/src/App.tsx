@@ -22,6 +22,8 @@ import { LlmPage } from "./pages/LlmPage";
 import { LimitsPage } from "./pages/LimitsPage";
 import { AssistantPage } from "./pages/AssistantPage";
 import { AuditPage } from "./pages/AuditPage";
+import { ModulesPage, ModulePage } from "./pages/ModulesPage";
+import { MonitoringPage } from "./pages/MonitoringPage";
 
 function Layout() {
   const auth = useAuth();
@@ -175,6 +177,9 @@ export function App() {
         <Route path="/auth/callback" element={<OidcCallbackPage />} />
         <Route element={<RequireAuth />}>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/monitoring" element={<MonitoringPage />} />
+          <Route path="/modules" element={<ModulesPage />} />
+          <Route path="/modules/:moduleId" element={<ModulePage />} />
           <Route path="/sources" element={<SourcesPage />} />
           <Route path="/sources/new" element={<SourcePage />} />
           <Route path="/sources/:sourceId" element={<SourcePage />} />

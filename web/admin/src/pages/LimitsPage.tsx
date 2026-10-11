@@ -18,6 +18,7 @@ import type { JsonValue } from "../lib/property";
 import { useSourceOptions, useTaskOptions } from "../lib/pickers";
 import { LoadMore } from "../components/ui";
 import { unwrap } from "../api/client";
+import { PlatformLimitsForm } from "../components/PlatformLimitsForm";
 
 export function LimitsPage() {
   const api = useApi();
@@ -97,19 +98,25 @@ export function LimitsPage() {
       >
         {platform.isLoading ? <Loading /> : null}
         <ErrorBox error={platform.error} />
-        {check.value && check.ok ? (
-          <PropertyIssuesContext.Provider value={reportPropertyIssue}>
-            <PropertyDraftsBlockedContext.Provider value={save.isPending}>
-              <PropertyGrid
-                objectRoot
-                value={check.value as JsonValue}
-                onChange={(value) => setText(toJsonText(value))}
-                label="Ліміти платформи"
-              />
-            </PropertyDraftsBlockedContext.Provider>
-          </PropertyIssuesContext.Provider>
-        ) : null}
-        <details>
+        <fieldset className="form-fields" disabled={save.isPending || Object.keys(propertyIssues).length > 0}>
+          <PlatformLimitsForm text={text} onChange={setText} />
+        </fieldset>
+        <details className="module-setting-group">
+          <summary>Усі властивості лімітів</summary>
+          {check.value && check.ok ? (
+            <PropertyIssuesContext.Provider value={reportPropertyIssue}>
+              <PropertyDraftsBlockedContext.Provider value={save.isPending}>
+                <PropertyGrid
+                  objectRoot
+                  value={check.value as JsonValue}
+                  onChange={(value) => setText(toJsonText(value))}
+                  label="Ліміти платформи"
+                />
+              </PropertyDraftsBlockedContext.Provider>
+            </PropertyIssuesContext.Provider>
+          ) : null}
+        </details>
+        <details className="module-setting-group">
           <summary>Редагувати ліміти як JSON</summary>
           <JsonEditor
             text={text}

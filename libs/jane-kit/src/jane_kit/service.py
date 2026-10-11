@@ -24,6 +24,7 @@ from jane_kit.errors import install_error_handlers
 from jane_kit.health import HealthRegistry, ServiceInfo, install_health
 from jane_kit.logs import bind_context, configure_logging
 from jane_kit.metrics import Metrics, install_metrics
+from jane_kit.operations import install_operations
 from jane_kit.tracing import TRACEPARENT, new_trace_id, parse_traceparent
 
 __all__ = ["REQUEST_ID_HEADER", "create_app", "run"]
@@ -81,9 +82,10 @@ def create_app(
             )
         check_scopes(app)
         if lifespan is None:
-            yield
+            async with operations.lifespan():
+                yield
         else:
-            async with lifespan(app):
+            async with lifespan(app), operations.lifespan():
                 yield
         logging.getLogger("jane.service").info("service stopped")
 
@@ -114,6 +116,7 @@ def create_app(
     if settings.metrics_enabled:
         app.state.metrics = Metrics(settings.service_name)
         install_metrics(app, app.state.metrics)
+    operations = install_operations(app, settings, limits)
 
     @app.middleware("http")
     async def _request_context(

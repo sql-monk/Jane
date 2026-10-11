@@ -28,6 +28,7 @@ __all__ = [
     "COLLECTOR",
     "HANDLER",
     "LLM",
+    "OPERATIONS",
     "ORCHESTRATOR",
     "REGISTRY",
     "STORAGE",
@@ -36,6 +37,13 @@ __all__ = [
 ]
 
 Scopes = str | tuple[str, ...]
+
+OPERATIONS: dict[str, Scopes] = {
+    "GET /v1/configuration": ("modules:read", "modules:write"),
+    "PUT /v1/configuration": "modules:write",
+    "GET /v1/telemetry": ("modules:read", "modules:write"),
+}
+"""Supplemental operations.v1 API, installed through BUILTIN_SCOPES in every service."""
 
 
 def _connections(*read: str) -> dict[str, Scopes]:

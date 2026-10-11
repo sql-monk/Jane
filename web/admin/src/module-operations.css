@@ -1,0 +1,212 @@
+.modules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 1rem;
+}
+.module-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  background: var(--surface);
+}
+.module-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.module-card h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+.module-card p {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.module-card-links,
+.module-related,
+.module-check {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: center;
+}
+.telemetry-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.telemetry-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 1rem;
+}
+.telemetry-chart {
+  min-width: 0;
+  border: 1px solid var(--border);
+  padding: 1rem;
+  border-radius: 12px;
+  background: var(--surface);
+}
+.telemetry-chart-title {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.telemetry-chart h3 {
+  font-size: 0.95rem;
+  margin: 0 0 0.75rem;
+}
+.telemetry-chart strong {
+  font-size: 1.4rem;
+}
+.telemetry-chart strong small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.telemetry-chart svg {
+  display: block;
+  width: 100%;
+  margin: 0.25rem 0;
+  overflow: visible;
+}
+.telemetry-chart svg text {
+  fill: var(--muted);
+  font-size: 11px;
+}
+.telemetry-line {
+  fill: none;
+  stroke: var(--accent, #6366f1);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.telemetry-point {
+  fill: var(--accent, #6366f1);
+}
+.telemetry-gridline {
+  stroke: var(--border);
+  stroke-dasharray: 3 4;
+}
+.telemetry-unavailable p {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.telemetry-stale {
+  color: var(--warn, #b45309);
+}
+.telemetry-footnote {
+  font-size: 0.8rem;
+  margin-top: 1rem;
+}
+.monitoring-status-grid {
+  margin-top: 1.5rem;
+}
+.monitoring-module-picker label,
+.module-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.module-filter input {
+  max-width: 28rem;
+  width: 100%;
+}
+.module-setting-group {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+.module-setting-group summary {
+  display: flex;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 1rem;
+  font-weight: 600;
+  background: var(--surface);
+}
+.module-setting-group summary span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.module-setting-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 22rem);
+  gap: 1.5rem;
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+  align-items: start;
+}
+.module-setting-row strong {
+  font-size: 0.9rem;
+}
+.module-setting-row p {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+}
+.module-setting-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin-top: 0.4rem;
+}
+.module-setting-control {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.module-setting-control input:not([type="checkbox"]),
+.module-setting-control select {
+  width: 100%;
+  min-width: 0;
+}
+.module-save {
+  position: sticky;
+  bottom: 0;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 10px;
+}
+.module-capabilities {
+  display: grid;
+  gap: 0.75rem;
+}
+.module-capabilities div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.module-capabilities dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .module-setting-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  .telemetry-toolbar {
+    gap: 0.75rem;
+  }
+  .module-filter {
+    align-items: start;
+    flex-direction: column;
+  }
+}

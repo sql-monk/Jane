@@ -325,7 +325,7 @@ export interface components {
       entity_count: number | null;
       total_size_bytes: number | null;
       types: components["schemas"]["EntityTypeSummary"][] | null;
-      /** @description postgresql_relation_with_indexes — фізичний розмір таблиці актуальних станів з індексами; snapshot_documents — байти JSON-файлів станів. Не включає історію, RAW чи delivery. */
+      /** @description postgresql_relation_with_indexes — фізичний розмір таблиці актуальних станів з індексами; snapshot_documents — байти JSON-файлів станів; mongodb_collections_with_indexes — розмір колекцій актуальних станів з індексами. Не включає історію, RAW чи delivery. */
       size_basis: string | null;
       /** Format: date-time */
       checked_at: string | null;

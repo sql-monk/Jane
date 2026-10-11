@@ -85,6 +85,8 @@
 ## Хід виконання
 
 - **B — готово.** `infra/compose.yaml`: Storage залежить від `mongodb` і отримує `JANE_SECRET_DEV_MONGO_USER/PASSWORD`; `results-mongo` в `infra/config/storage-connections.json`; `deploy/profiles/stack.py` піднімає MongoDB разом зі Storage й записує її адресу у файл стеку. Тести: `infra/tests` 19 passed, `deploy/profiles/tests/test_profiles_harness.py` 69 passed.
+- **A — готово.** `jane.storage-mongodb` 2.0.0 (`sha256:2307eeb9e72b59a234f812a9f8dc716b05a9ac4643e843a520dac2ba3d8faad3`): колекція на тип, історія в `<тип>.history`, ключі доставки через запис наміру в `_deliveries` (без сканування колекцій типів), ліниві індекси, каталог/пошук/статистика (`size_basis: mongodb_collections_with_indexes`). Тести адаптера на реальному MongoDB 8.0: 34 passed. Супутньо: опис `size_basis` у `storage.v1.yaml`, мітка в `StoragesPage.tsx`, `tests/e2e/test_m2_storage.py` під нову розкладку. Потоки C посилаються на `jane.storage-mongodb@2.0.0`.
+- Обмеження: документ стану несе `pending` і `search_text`, тож практична межа однієї сутності — кілька МіБ (ліміт BSON 16 МіБ); тип `system` з порожнім префіксом недопустимий (`system.*` зарезервовано MongoDB).
 - Відкладено: Storage ходить у MongoDB кореневим користувачем стеку, а не окремою роллю, як `jane_storage_results` у PostgreSQL (потрібен одноразовий `mongo-provision`).
 
 ### Нотатки для E (`jane-demo`)

@@ -174,7 +174,9 @@ function StorageCard({ connection }: { connection: StorageConnection }) {
               ? "Таблиця актуальних станів з індексами"
               : data?.entity_statistics?.size_basis === "snapshot_documents"
                 ? "Файли актуальних станів"
-                : "Недоступно",
+                : data?.entity_statistics?.size_basis === "mongodb_collections_with_indexes"
+                  ? "Колекції актуальних станів з індексами"
+                  : "Недоступно",
           ],
         ]}
       />

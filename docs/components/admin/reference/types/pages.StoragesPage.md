@@ -20,4 +20,4 @@ function StoragesPage(): React.JSX.Element
 function statisticsReasonLabel(reason: string): string
 ```
 
-Код: [StoragesPage.tsx:212](../../../../../web/admin/src/pages/StoragesPage.tsx#L212).
+Код: [StoragesPage.tsx:214](../../../../../web/admin/src/pages/StoragesPage.tsx#L214).

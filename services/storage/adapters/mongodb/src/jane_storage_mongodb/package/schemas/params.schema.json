@@ -5,9 +5,9 @@
   "additionalProperties": false,
   "properties": {
     "prefix": {
-      "description": "Префікс колекцій (типово 'jane_': jane_entities, jane_entity_history, jane_deliveries, jane_objects, jane_object_chunks).",
+      "description": "Префікс колекцій, типово порожній: <prefix><entity_type> (актуальний стан), <prefix><entity_type>.history, <prefix>_deliveries, <prefix>_objects, <prefix>_object_chunks. Простір <prefix>* належить одному підключенню; підключення в одній базі — з префіксами, жоден з яких не є початком іншого.",
       "type": "string",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,40}$"
+      "pattern": "^([A-Za-z_][A-Za-z0-9_]{0,40})?$"
     },
     "format": {
       "type": "object",

@@ -43,7 +43,7 @@ GET не відкриває адаптер і не обходить сховищ
 | `entity_statistics.entity_count` | `integer \| null` | так | мін. `0` |
 | `entity_statistics.total_size_bytes` | `integer \| null` | так | мін. `0` |
 | `entity_statistics.types` | `array \| null` | так |  |
-| `entity_statistics.size_basis` | `string \| null` | так | postgresql_relation_with_indexes — фізичний розмір таблиці актуальних станів з індексами; snapshot_documents — байти JSON-файлів станів. Не включає історію, RAW чи delivery. |
+| `entity_statistics.size_basis` | `string \| null` | так | postgresql_relation_with_indexes — фізичний розмір таблиці актуальних станів з індексами; snapshot_documents — байти JSON-файлів станів; mongodb_collections_with_indexes — розмір колекцій актуальних станів з індексами. Не включає історію, RAW чи delivery. |
 | `entity_statistics.checked_at` | `string \| null` (date-time) | так |  |
 | `entity_statistics.unavailable_reason` | `string \| null` | так |  |
 | `statistics` | `object` | так |  |

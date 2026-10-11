@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "jane.storage-mongodb",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "storage",
   "title": "MongoDB storage",
-  "description": "Зберігає сутності (актуальний стан і історію), записи доставок і RAW (вміст — частинами в окремій колекції) у MongoDB; набір реплік не потрібен. Без format.raw: вебсторінка (HTML/XHTML) — text/html байт-у-байт, будь-який інший RAW — JSON-документ Material із вбудованим вмістом; перевизначення — params.format.raw = original | html | json.",
+  "description": "Зберігає сутності в MongoDB — окрема колекція на кожен тип сутності (актуальний стан) і поруч колекція <тип>.history (історія), — записи доставок і RAW (вміст — частинами в окремій колекції); набір реплік не потрібен. Без format.raw: вебсторінка (HTML/XHTML) — text/html байт-у-байт, будь-який інший RAW — JSON-документ Material із вбудованим вмістом; перевизначення — params.format.raw = original | html | json.",
   "tags": [
     "storage",
     "mongodb"
@@ -53,9 +53,11 @@
   "provenance": {
     "created_by": "human",
     "authors": [
-      "WP-08"
+      "WP-08",
+      "mongo-entities"
     ],
-    "created_at": "2026-09-27T12:00:00Z"
+    "created_at": "2026-10-12T12:00:00Z",
+    "change_summary": "2.0.0: колекція на тип сутності (<prefix><entity_type>, <prefix><entity_type>.history), службові <prefix>_deliveries, <prefix>_objects, <prefix>_object_chunks; типовий префікс порожній; каталог типів, серверний пошук і статистика. Дані розкладки 1.x (jane_entities тощо) не читаються й не переносяться."
   },
   "bindings_hint": {
     "source_kinds": [

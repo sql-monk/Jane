@@ -131,11 +131,11 @@ def _native_mongodb(stack: E2EStack, obj: dict[str, Any], entity: dict[str, Any]
     )
     try:
         db = mongo["jane_e2e"]
-        doc = db["jane_objects"].find_one({"_id": obj["object_id"]})
+        doc = db["_objects"].find_one({"_id": obj["object_id"]})
         assert doc is not None and doc["sha256"] == obj["sha256"]
-        chunks = db["jane_object_chunks"].find({"object_id": obj["object_id"]}).sort("n", 1)
+        chunks = db["_object_chunks"].find({"object_id": obj["object_id"]}).sort("n", 1)
         assert b"".join(bytes(part["data"]) for part in chunks) == raw
-        state = db["jane_entities"].find_one({"_id": f"product|{key_digest(entity['canonical_key'])}"})
+        state = db["product"].find_one({"_id": key_digest(entity["canonical_key"])})
         assert state is not None and state["fields"] == entity["fields"]
     finally:
         mongo.close()

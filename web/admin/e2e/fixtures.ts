@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { test as base, expect, type Locator, type Page, type Request } from "@playwright/test";
 import { MOCK_SERVICES, apiTarget, mockPort, serviceTarget } from "../dev-proxy.ts";
+import type { ModuleTelemetry } from "../src/lib/modules";
 
 /**
  * Direct URL of a REAL service for seeding data in hybrid/real runs: JANE_ADMIN_TARGET_<API> (hybrid) or
@@ -16,6 +18,73 @@ export function realServiceUrl(api: string): string | undefined {
 }
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..");
+
+let telemetryExample: ModuleTelemetry | undefined;
+
+/** Read the shared Operations API example using the contract tools' YAML loader. */
+function operationsTelemetryExample(): ModuleTelemetry {
+  if (!telemetryExample) {
+    const source = execFileSync(
+      "uv",
+      [
+        "run",
+        "--quiet",
+        "--no-project",
+        "--with",
+        "pyyaml>=6",
+        "python",
+        "-c",
+        [
+          "import json, sys",
+          "from pathlib import Path",
+          'sys.path.insert(0, str(Path("contracts/tools").resolve()))',
+          "from _common import load_file",
+          'spec = load_file(Path("contracts/openapi/operations.v1.yaml"))',
+          'print(json.dumps(spec["paths"]["/v1/telemetry"]["get"]["responses"]["200"]["content"]["application/json"]["example"]))',
+        ].join("\n"),
+      ],
+      {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+      },
+    );
+    telemetryExample = JSON.parse(source) as ModuleTelemetry;
+  }
+  return telemetryExample;
+}
+
+/** Service mocks predate the shared Operations paths. Real and hybrid APIs remain real. */
+async function mockOperationsTelemetry(page: Page): Promise<void> {
+  const hybrid = Object.entries(process.env).some(
+    ([name, value]) => name.startsWith("JANE_ADMIN_TARGET_") && value?.trim(),
+  );
+  if (apiTarget() || hybrid) return;
+  const services = new Set([...MOCK_SERVICES.map(({ service }) => service), "telegram-collector"]);
+  const example = operationsTelemetryExample();
+  await page.route(
+    (url) => {
+      const parts = url.pathname.split("/");
+      return (
+        parts[1] === "api" && services.has(parts[2] ?? "") && parts.slice(3).join("/") === "v1/telemetry"
+      );
+    },
+    (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const service = new URL(route.request().url()).pathname.split("/")[2]!;
+      // Only the module identity changes; measurements and their timestamps stay from the contract.
+      const instanceId = `${service}-${example.instance_id}`;
+      return route.fulfill({
+        json: {
+          ...example,
+          service,
+          instance_id: instanceId,
+          samples: example.samples.map((sample) => ({ ...sample, instance_id: instanceId })),
+        },
+      });
+    },
+  );
+}
 
 /** Enter the same instant in a datetime-local field on both Windows and Linux browsers. */
 export async function fillInstant(page: Page, field: Locator, instant: string): Promise<void> {
@@ -81,6 +150,7 @@ export function mockUrl(api: string): string {
 }
 
 export async function login(page: Page): Promise<void> {
+  await mockOperationsTelemetry(page);
   await page.goto("/login");
   await page.getByLabel("Ключ API").fill(API_KEY);
   await page.getByRole("button", { name: "Увійти" }).click();

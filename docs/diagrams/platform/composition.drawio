@@ -1,0 +1,165 @@
+<mxfile host="drawio" version="31.4.5">
+  <diagram id="composition" name="Склад платформи">
+    <mxGraphModel adaptiveColors="none" grid="1" gridSize="10" page="0" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Boundaries: coordination and autonomous modules -->
+        <mxCell id="coord" value="Координація" style="rounded=1;arcSize=4;whiteSpace=wrap;html=0;fillColor=none;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4;fontStyle=1;fontSize=14;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=light-dark(#9673A6,#B39DDB);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="200" y="100" width="660" height="115" as="geometry"/>
+        </mxCell>
+        <mxCell id="auto" value="Автономні модулі: працюють і без Orchestrator" style="rounded=1;arcSize=3;whiteSpace=wrap;html=0;fillColor=none;verticalAlign=bottom;align=left;spacingLeft=12;spacingBottom=6;fontStyle=1;fontSize=14;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=light-dark(#57606A,#8B949E);strokeWidth=2;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="200" y="255" width="660" height="450" as="geometry"/>
+        </mxCell>
+        <mxCell id="grpCollectors" value="Колектори" style="rounded=1;arcSize=6;whiteSpace=wrap;html=0;fillColor=none;verticalAlign=top;align=center;spacingTop=4;fontStyle=1;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=light-dark(#6C8EBF,#79A6DC);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="230" y="305" width="250" height="185" as="geometry"/>
+        </mxCell>
+        <mxCell id="grpHandlers" value="Обробники" style="rounded=1;arcSize=6;whiteSpace=wrap;html=0;fillColor=none;verticalAlign=top;align=center;spacingTop=4;fontStyle=1;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="560" y="305" width="270" height="260" as="geometry"/>
+        </mxCell>
+
+        <!-- Clients -->
+        <mxCell id="admin" value="Admin UI&#xa;web/admin" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#F5F5F5,#2D333B);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="10" y="130" width="130" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="thirdparty" value="Сторонній&#xa;застосунок" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#F5F5F5,#2D333B);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="900" y="130" width="170" height="64" as="geometry"/>
+        </mxCell>
+
+        <!-- Coordination -->
+        <mxCell id="orch" value="Orchestrator&#xa;PostgreSQL: завдання, запуски" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#E1D5E7,#3A2D4D);strokeColor=light-dark(#9673A6,#B39DDB);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="380" y="133" width="220" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="assistant" value="Assistant&#xa;PostgreSQL: сесії" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#E1D5E7,#3A2D4D);strokeColor=light-dark(#9673A6,#B39DDB);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="680" y="133" width="160" height="64" as="geometry"/>
+        </mxCell>
+
+        <!-- Collectors -->
+        <mxCell id="web" value="Web Collector&#xa;SQLite: стан обходу" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#DAE8FC,#1C3557);strokeColor=light-dark(#6C8EBF,#79A6DC);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="250" y="340" width="210" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="tg" value="Telegram Collector&#xa;SQLite: курсори каналів" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#DAE8FC,#1C3557);strokeColor=light-dark(#6C8EBF,#79A6DC);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="250" y="415" width="210" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Handlers -->
+        <mxCell id="storage" value="Storage&#xa;дані в цільових сховищах" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="590" y="340" width="210" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="runtime" value="Handler Runtime&#xa;пісочниця екстракторів" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="590" y="415" width="210" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="llm" value="LLM gateway&#xa;PostgreSQL: бюджети, витрати" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="590" y="490" width="210" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Repository -->
+        <mxCell id="registry" value="Registry&#xa;PostgreSQL + S3: пакети, версії" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFE6CC,#4A3418);strokeColor=light-dark(#D79B00,#E3A541);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="405" y="600" width="230" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- External systems -->
+        <mxCell id="sources" value="Джерела&#xa;сайти, Telegram" style="rounded=0;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="10" y="372" width="140" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="stores" value="Сховища результатів&#xa;PostgreSQL, SQL Server,&#xa;MongoDB, MinIO, S3, файли" style="rounded=0;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="900" y="330" width="230" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="providers" value="Провайдери LLM&#xa;Anthropic; fake для тестів" style="rounded=0;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="900" y="490" width="230" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- API calls (solid) -->
+        <mxCell id="e1" value="API /v1" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.4;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin" target="coord">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" value="API /v1" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.0667;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin" target="auto">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="75" y="285"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="collector.v1" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.1818;exitY=1;exitDx=0;exitDy=0;entryX=0.76;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="orch" target="grpCollectors">
+          <mxGeometry x="-0.35" relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" value="handler.v1" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.9091;exitY=1;exitDx=0;exitDy=0;entryX=0.0741;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="orch" target="grpHandlers">
+          <mxGeometry x="-0.35" relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e5" value="registry.v1" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.6364;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="orch" target="registry">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e6" value="джерела,&#xa;завдання" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="assistant" target="orch">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e7" value="API модулів" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8485;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="assistant" target="auto">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e8" value="API напряму" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.0667;entryDx=0;entryDy=0;" edge="1" parent="1" source="thirdparty" target="auto">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="985" y="285"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Calls to external systems (dotted) -->
+        <mxCell id="e9" value="читання" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;dashed=1;dashPattern=2 3;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0;exitY=0.5514;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="grpCollectors" target="sources">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e10" value="запис" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;dashed=1;dashPattern=2 3;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="storage" target="stores">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e11" value="запити" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;dashed=1;dashPattern=2 3;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="llm" target="providers">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Optional dependencies (dashed) -->
+        <mxCell id="e12" value="правила" style="edgeStyle=none;rounded=0;html=0;endArrow=open;endFill=0;endSize=8;strokeWidth=1.5;dashed=1;dashPattern=6 4;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="grpCollectors" target="registry">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="355" y="630"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e13" value="пакети" style="edgeStyle=none;rounded=0;html=0;endArrow=open;endFill=0;endSize=8;strokeWidth=1.5;dashed=1;dashPattern=6 4;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.5185;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="grpHandlers" target="registry">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="630"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="lg1" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="200" y="737" as="sourcePoint"/>
+            <mxPoint x="250" y="737" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lt1" value="API-виклик" style="text;html=0;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);" vertex="1" parent="1">
+          <mxGeometry x="258" y="727" width="90" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg2" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=open;endFill=0;endSize=8;strokeWidth=1.5;dashed=1;dashPattern=6 4;strokeColor=light-dark(#424A53,#C9D1D9);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="370" y="737" as="sourcePoint"/>
+            <mxPoint x="420" y="737" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lt2" value="опційна залежність" style="text;html=0;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);" vertex="1" parent="1">
+          <mxGeometry x="428" y="727" width="130" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg3" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;dashed=1;dashPattern=2 3;strokeColor=light-dark(#424A53,#C9D1D9);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="580" y="737" as="sourcePoint"/>
+            <mxPoint x="630" y="737" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lt3" value="звернення до зовнішньої системи" style="text;html=0;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);" vertex="1" parent="1">
+          <mxGeometry x="638" y="727" width="200" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

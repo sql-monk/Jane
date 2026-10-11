@@ -1,0 +1,6 @@
+interface:
+  display_name: "Документація Jane"
+  short_description: "Структурований Markdown, діаграми й приклади Jane"
+  default_prompt: "Використай $jane-documentation, щоб оформити документацію Jane за DOCUMENTATION_REQUIREMENTS.md й перевірити її структуру, діаграми та блоки коду."
+policy:
+  allow_implicit_invocation: true

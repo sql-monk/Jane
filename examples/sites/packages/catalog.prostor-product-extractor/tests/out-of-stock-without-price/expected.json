@@ -1,0 +1,29 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "1723",
+        "title": "Сухий шампунь SYOSS для схильного до жирності волосся 200 мл",
+        "url": "https://prostor.ua/ua/product/sukhoy-shampun-syoss-dlya-sklonnykh-k-zhirnosti-volos-200-ml/",
+        "availability": "out_of_stock",
+        "brand": "Syoss",
+        "volume": 200.0,
+        "unit": "мл",
+        "attributes": {
+          "Brand": "Syoss",
+          "Об'єм": "200 мл"
+        },
+        "completeness": "partial"
+      },
+      "key": {
+        "natural": {
+          "shop": "prostor",
+          "product_id": "1723"
+        }
+      },
+      "completeness": "partial"
+    }
+  ]
+}

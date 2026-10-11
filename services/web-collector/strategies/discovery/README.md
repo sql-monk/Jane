@@ -1,5 +1,7 @@
 # Стратегії пошуку Web Collector (WP-03)
 
+Для повних дерев каталогу `api_feed` підтримує POST-пагінацію в JSON (`pagination.body_page_path`), динамічні розділи (`partitions`) та базовий URL відносних товарних посилань (`item_url_base`). Семантика, межі й сумісний приклад: [повний обхід розділів API](../../../../contracts/docs/discovery-strategy.md#повний-обхід-розділів-api-з-post-пагінацією). Початковий body зберігається незмінним; обрані поля змінюються лише в копії конкретного запиту. Незавершені великі обходи продовжуються зі збереженого checkpoint Web Collector.
+
 Пакет стратегій пошуку матеріалів для ядра Web Collector (WP-02): `sitemap`, `feed`, `listing`, `url_template`,
 `api_feed`. Інтерфейс — [`jane_contracts.discovery`](../../../../contracts/python/src/jane_contracts/discovery.py) і
 [`contracts/docs/discovery-strategy.md`](../../../../contracts/docs/discovery-strategy.md); параметри — розділ
@@ -127,7 +129,8 @@ uv run --all-packages pytest services/web-collector/strategies # лише WP-03,
 ## Відомі обмеження
 
 - `api_feed` з `method: POST`: ядро повторює запит за політикою `retries`, як GET, тож це має бути запит лише на
-  читання; параметри пагінації не переносяться в `body` (воно однакове для всіх сторінок).
+  читання; типовий `body` однаковий для всіх сторінок. Для POST можна явно задати
+  `pagination.body_page_path` та `partitions.body_path`: лише ці поля змінюються в копії запиту.
 - `api_feed` з `emit_items_as_materials`: якщо URL елемента в цьому зборі вже отримала чи видала інша стратегія,
   елемент не видається (один матеріал на канонічний URL; `stats.duplicates`).
 - `lastmod` лише **змушує** повторне відвідування (пізніший за попереднє завантаження); сайт із завжди «свіжим»

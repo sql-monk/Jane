@@ -1,0 +1,134 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "mplc-rubanok-elektricnij-hyundai-p-700-82-650-vt-16000-ob-hv-539902-1ef38706-d7b8-65e8-9564-e961ba117b46",
+        "price": 3051.0,
+        "currency": "UAH",
+        "old_price": 3112.0,
+        "availability": "in_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "mplc-rubanok-elektricnij-hyundai-p-700-82-650-vt-16000-ob-hv-539902-1ef38706-d7b8-65e8-9564-e961ba117b46"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "mplc-elektrorubanok-kraissmann-1300-eh-5-110-mozlivist-stacionarnogo-vikoristanna-1300-eh-5-110-1effa034-fe52-6b2e-b05f-dbc61055c5ef",
+        "price": 4067.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "mplc-elektrorubanok-kraissmann-1300-eh-5-110-mozlivist-stacionarnogo-vikoristanna-1300-eh-5-110-1effa034-fe52-6b2e-b05f-dbc61055c5ef"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-dewalt-dcp580n-dcb184",
+        "price": 21597.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-dewalt-dcp580n-dcb184"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "rubanok-akkumulyatornyy-dewalt-dcp580p2",
+        "price": 30799.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "rubanok-akkumulyatornyy-dewalt-dcp580p2"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-dwt-hb03-110-b",
+        "availability": "unknown"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-dwt-hb03-110-b"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-makita-1911b",
+        "availability": "out_of_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-makita-1911b"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-procraft-pe-1650-016503",
+        "availability": "out_of_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-procraft-pe-1650-016503"
+        }
+      }
+    }
+  ]
+}

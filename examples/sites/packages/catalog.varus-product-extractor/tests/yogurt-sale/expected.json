@@ -1,0 +1,48 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "varus",
+        "product_id": "2617643",
+        "title": "Йогурт Яготинський персик 1.5% 750г",
+        "url": "https://varus.ua/yogurt-1-5-persik-yagotinskiy-ppl-750g",
+        "price": 56.9,
+        "currency": "UAH",
+        "old_price": 83.9,
+        "availability": "in_stock",
+        "brand": "Яготинське",
+        "category": "Йогурти",
+        "category_path": [
+          "Молочні продукти та яйця",
+          "Йогурти"
+        ],
+        "image": "https://varus.ua/img/product/1140/1140/2617643",
+        "sku": "2617643",
+        "unit": "шт",
+        "weight": "750 г",
+        "country": "Україна",
+        "attributes": {
+          "Тип продукту": "йогурт питний",
+          "Додаткові добавки": "без добавок",
+          "Вміст лактози": "з лактозою",
+          "Жири": "1.5 г/100г",
+          "Вуглеводи": "12.4 г/100г",
+          "Білки": "2.8 г/100г",
+          "Калорійність ккал": "74 ккал/100г",
+          "Термін зберігання товару": "25",
+          "Температура зберігання": "до +6 ºC"
+        },
+        "completeness": "full"
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "varus",
+          "product_id": "2617643"
+        }
+      }
+    }
+  ]
+}

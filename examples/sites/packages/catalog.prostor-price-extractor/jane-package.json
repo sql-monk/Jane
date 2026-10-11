@@ -1,0 +1,140 @@
+{
+  "schema_version": "1",
+  "package_id": "catalog.prostor-price-extractor",
+  "version": "1.1.1",
+  "kind": "extractor",
+  "title": "prostor.ua: prices and availability from category pages",
+  "description": "Ціни й наявність товарів prostor.ua з плиток сторінок категорій (completeness: partial): shop, product_id, price, currency, availability, old_price — ті самі ключі, що й повні картки catalog.prostor-product-extractor; решта полів картки не змінюється. Без знижки old_price явно очищується (cleared). Товар без ціни з відомим статусом «немає в наявності» зберігає метадані/наявність частково; відсутність ціни не очищує попередню ціну чи знижку.",
+  "tags": [
+    "catalog",
+    "prostor",
+    "cosmetics",
+    "household",
+    "prices"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_prostor_prices.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "product",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення картки)"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "laundry-category-page-1",
+      "input": {
+        "file": "tests/laundry-page-1/page.html",
+        "media_type": "text/html",
+        "url": "https://prostor.ua/ua/pobutova-himija/sredstva-dlya-stirki/"
+      },
+      "expected_status": "success",
+      "expected": "tests/laundry-page-1/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "shampoo-category-last-page",
+      "input": {
+        "file": "tests/shampoo-page-11/page.html",
+        "media_type": "text/html",
+        "url": "https://prostor.ua/ua/volosy/shampuni/?p=11"
+      },
+      "expected_status": "success",
+      "expected": "tests/shampoo-page-11/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "product-card-empty",
+      "input": {
+        "file": "tests/product-card/page.html",
+        "media_type": "text/html",
+        "url": "https://prostor.ua/ua/product/antivozrastnoy-krem-loreal-paris-skin-expert-vozrast-ekspert-dnevnoy-ukhod-dlya-vsekh-tipov-kozhi-55-50-ml/"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "tiles-without-prices-unrecognized",
+      "input": {
+        "file": "tests/tiles-without-prices/page.html",
+        "media_type": "text/html",
+        "url": "https://prostor.ua/ua/pobutova-himija/sredstva-dlya-stirki/?p=8"
+      },
+      "expected_status": "unrecognized",
+      "origin": "problem_sample"
+    },
+    {
+      "name": "out-of-stock-without-price-availability-only",
+      "input": {
+        "file": "tests/out-of-stock-without-price/page.html",
+        "media_type": "text/html",
+        "url": "https://prostor.ua/ua/pobutova-himija/sredstva-dlya-stirki/"
+      },
+      "expected_status": "success",
+      "expected": "tests/out-of-stock-without-price/expected.json",
+      "compare": "exact",
+      "origin": "problem_sample"
+    }
+  ],
+  "provenance": {
+    "created_by": "llm",
+    "authors": [
+      "Claude (examples/sites: prostor)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Preserve known out-of-stock metadata/availability when the source has no price; omit price/currency and leave their last observations intact. Keep explicit old_price clearing for priced products without a discount. Reproducible Git LF bytes: normalize CRLF to LF without behavior changes.",
+    "based_on": {
+      "package_id": "catalog.prostor-price-extractor",
+      "version": "1.1.0"
+    },
+    "llm": {
+      "provider": "OpenAI",
+      "model": "Codex",
+      "reason": "improvement"
+    }
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "domains": [
+      "prostor.ua"
+    ],
+    "url_patterns": [
+      "prostor.ua/ua/ukhod-za-litsom/uvlazhnenie-i-pitanie/**",
+      "prostor.ua/ua/pobutova-himija/sredstva-dlya-stirki/**",
+      "prostor.ua/ua/volosy/shampuni/**"
+    ]
+  }
+}

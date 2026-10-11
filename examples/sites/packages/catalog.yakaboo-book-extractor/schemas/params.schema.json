@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "catalog.yakaboo-book-extractor params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "shop": {
+      "description": "Ідентифікатор магазину в ключі сутності (shop + product_id).",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "default": "yakaboo"
+    },
+    "default_currency": {
+      "description": "Валюта, якщо сторінка її не вказує.",
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "default": "UAH"
+    }
+  }
+}

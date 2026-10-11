@@ -1,0 +1,59 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "epicentrk.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/ua/shop/",
+      "/upload/sitemap/new/products_ep/",
+      "/upload/sitemap/new/products_mp/"
+    ],
+    "include": [
+      {
+        "type": "regex",
+        "value": "^https://epicentrk\\.ua/ua/shop/[^/?#]+\\.html$"
+      },
+      {
+        "type": "regex",
+        "value": "^https://epicentrk\\.ua/upload/sitemap/new/(?:products_ep/products_main_ua|products_mp/products_merchant_ua)(?:_[0-9]+)?\\.xml$"
+      }
+    ]
+  },
+  "strategies": [
+    {
+      "type": "sitemap",
+      "strategy_id": "all-products",
+      "urls": [
+        "https://epicentrk.ua/upload/sitemap/new/products_ep/products_main_ua.xml",
+        "https://epicentrk.ua/upload/sitemap/new/products_mp/products_merchant_ua.xml"
+      ],
+      "use_robots_txt": false,
+      "use_lastmod_for_revisit": false
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "dedup": {
+    "use_link_rel_canonical": false
+  },
+  "sections": [
+    {
+      "section_id": "products",
+      "title": "Усі українські картки товарів",
+      "patterns": [
+        {
+          "type": "regex",
+          "value": "^https://epicentrk\\.ua/ua/shop/[^/?#]+\\.html$"
+        }
+      ]
+    }
+  ],
+  "revisit": {
+    "mode": "interval"
+  }
+}

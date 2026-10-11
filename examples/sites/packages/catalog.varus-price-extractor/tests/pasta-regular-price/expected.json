@@ -1,0 +1,25 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "varus",
+        "product_id": "2663013",
+        "price": 49.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "varus",
+          "product_id": "2663013"
+        }
+      }
+    }
+  ]
+}

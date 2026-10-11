@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "product (лише ціна й наявність зі сторінки категорії epicentrk.ua)",
+  "description": "Часткове оновлення товару (completeness: partial): ті самі ключові поля, що й у повній картці catalog.epicentrk-products; решта полів картки не змінюється.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "shop",
+    "product_id",
+    "availability"
+  ],
+  "properties": {
+    "shop": {
+      "type": "string",
+      "minLength": 1
+    },
+    "product_id": {
+      "description": "Slug URL товару (/ua/shop/<slug>.html).",
+      "type": "string",
+      "minLength": 1
+    },
+    "price": {
+      "type": "number",
+      "minimum": 0
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "old_price": {
+      "description": "Закреслена ціна до знижки.",
+      "type": "number",
+      "minimum": 0
+    },
+    "availability": {
+      "type": "string",
+      "enum": [
+        "in_stock",
+        "out_of_stock",
+        "preorder",
+        "unknown"
+      ]
+    }
+  },
+  "dependentRequired": {
+    "price": [
+      "currency"
+    ],
+    "old_price": [
+      "price"
+    ]
+  },
+  "if": {
+    "required": [
+      "availability"
+    ],
+    "properties": {
+      "availability": {
+        "enum": [
+          "in_stock",
+          "preorder"
+        ]
+      }
+    }
+  },
+  "then": {
+    "required": [
+      "price",
+      "currency"
+    ]
+  }
+}

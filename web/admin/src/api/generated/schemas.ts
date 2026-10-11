@@ -411,12 +411,19 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
           },
           body: {
             description:
-              "JSON-тіло для method: POST (будь-яке JSON-значення), однакове для всіх сторінок; для GET не використовується.",
+              "JSON-тіло для method: POST; для GET не використовується. Однакове для всіх сторінок, крім полів, явно заданих pagination.body_page_path та partitions.body_path.",
           },
           items_path: { type: "string", description: "JSONPath до масиву елементів, наприклад '$.items'." },
           url_path: {
             type: "string",
             description: "JSONPath до URL матеріалу в елементі, наприклад '$.url'.",
+          },
+          item_url_base: {
+            type: "string",
+            format: "uri",
+            pattern: "^https?://",
+            description:
+              "Базовий URL для відносних URL товарів (наприклад https://shop.example.test/ для API під /api/). Якщо не задано — URL сторінки API. Результат завжди проходить звичайні scope, normalization і robots перевірки.",
           },
           lastmod_path: { type: "string" },
           emit_items_as_materials: {
@@ -424,6 +431,21 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
             default: false,
             description:
               "true — кожен елемент items_path видається як окремий Material: media_type application/json (елемент, серіалізований як JSON), content_kind json, material_id — від канонічного URL з url_path (той самий об'єкт, що й сторінка за цим URL), edited_at — з lastmod_path, discovery.parent_url — сторінка API, без http і locator.final_url. URL елементів не завантажуються; ядро закріплює їх у зборі, тож інша стратегія не завантажує той самий URL у цьому зборі (один матеріал на канонічний URL). У mode=incremental елементи підлягають revisit і dedup так само, як сторінки (if_changed — за зміною вмісту елемента).",
+          },
+          partitions: {
+            type: "object",
+            additionalProperties: false,
+            required: ["items_path", "body_path", "url_param"],
+            description:
+              "Для POST: рекурсивний обхід розділів API (наприклад категорій). Початковий ідентифікатор береться з body_path; кожна відповідь може містити дочірні ідентифікатори за items_path. Кожен розділ має власну пагінацію, body змінюється лише у копії; ідентифікатор також записується в url_param для унікального ключа навігації. Повтори й цикли усуваються; кількість і глибина розділів обмежуються crawl.max_frontier_size і crawl.max_depth.",
+            properties: {
+              items_path: { type: "string", minLength: 1 },
+              body_path: {
+                type: "string",
+                pattern: "^\\$\\.[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+              },
+              url_param: { type: "string", minLength: 1 },
+            },
           },
           pagination: {
             type: "object",
@@ -434,6 +456,12 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
               cursor_path: { type: "string" },
               cursor_param: { type: "string" },
               page_param: { type: "string" },
+              body_page_path: {
+                type: "string",
+                pattern: "^\\$\\.[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+                description:
+                  "Для POST із pagination.type=page: шлях до наявного цілого додатного номера сторінки у JSON body, наприклад $.variables.page. Колектор копіює body для кожного запиту й записує поточний номер сторінки. page_param також лишається в URL для унікального ключа навігаційної сторінки; початкове значення береться з body, якщо його немає в URL.",
+              },
             },
           },
         },

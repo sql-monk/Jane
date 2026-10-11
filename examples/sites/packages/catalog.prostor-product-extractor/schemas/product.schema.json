@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "product (повна картка товару prostor.ua)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "shop",
+    "product_id",
+    "title",
+    "url",
+    "completeness"
+  ],
+  "allOf": [
+    {
+      "if": {"properties": {"completeness": {"const": "full"}}},
+      "then": {"required": ["price", "currency"]}
+    }
+  ],
+  "properties": {
+    "shop": {
+      "type": "string",
+      "minLength": 1
+    },
+    "product_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Ідентифікатор товару в магазині (Magento product id)."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Поточна ціна, грн."
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "completeness": {
+      "type": "string",
+      "enum": [
+        "full",
+        "partial"
+      ],
+      "description": "full — поля повної картки (записує лише завдання каталогу)."
+    },
+    "brand": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category_path": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "old_price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Ціна до знижки, грн."
+    },
+    "availability": {
+      "type": "string",
+      "enum": [
+        "in_stock",
+        "out_of_stock",
+        "preorder",
+        "unknown"
+      ]
+    },
+    "image": {
+      "type": "string",
+      "format": "uri"
+    },
+    "sku": {
+      "type": "string",
+      "minLength": 1
+    },
+    "barcode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "volume": {
+      "type": "number",
+      "minimum": 0
+    },
+    "unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rating": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "reviews_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "attributes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

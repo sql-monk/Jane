@@ -1,0 +1,139 @@
+{
+  "schema_version": "1",
+  "package_id": "catalog.epicentrk-prices",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "Epicentr K: prices from category pages",
+  "description": "Ціни, старі ціни й наявність усіх товарів сторінки категорії epicentrk.ua (до 60 карток на сторінку) як часткові сутності product (completeness: partial) з тим самим ключем shop + product_id, що й повні картки catalog.epicentrk-products: оновлюють лише ціну й наявність.",
+  "tags": [
+    "sites",
+    "catalog",
+    "epicentrk",
+    "prices"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_epicentrk_prices.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "product",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення)"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": [
+      "lxml>=6"
+    ]
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "category-first-page-discounts",
+      "input": {
+        "file": "tests/category-first-page/page.html",
+        "media_type": "text/html",
+        "url": "https://epicentrk.ua/ua/shop/elektrorubanki/"
+      },
+      "expected_status": "success",
+      "expected": "tests/category-first-page/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "category-last-page-out-of-stock",
+      "input": {
+        "file": "tests/category-last-page/page.html",
+        "media_type": "text/html",
+        "url": "https://epicentrk.ua/ua/shop/elektrorubanki/?PAGEN_1=7"
+      },
+      "expected_status": "success",
+      "expected": "tests/category-last-page/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "category-page-mixed-tiles",
+      "input": {
+        "file": "tests/category-mixed-page/page.html",
+        "media_type": "text/html",
+        "url": "https://epicentrk.ua/ua/shop/elektrorubanki/?PAGEN_1=2"
+      },
+      "expected_status": "success",
+      "expected": "tests/category-mixed-page/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "category-garden",
+      "input": {
+        "file": "tests/category-garden/page.html",
+        "media_type": "text/html",
+        "url": "https://epicentrk.ua/ua/shop/leyki/"
+      },
+      "expected_status": "success",
+      "expected": "tests/category-garden/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "product-page-empty",
+      "input": {
+        "file": "tests/product-page/page.html",
+        "media_type": "text/html",
+        "url": "https://epicentrk.ua/ua/shop/elektrorubanok-zenit-zr-780-841510.html"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "tiles-without-links-unrecognized",
+      "input": {
+        "file": "tests/tiles-without-links/page.html",
+        "media_type": "text/html",
+        "url": "https://epicentrk.ua/ua/shop/kiyanki/"
+      },
+      "expected_status": "unrecognized",
+      "origin": "problem_sample"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (examples/sites)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Partial price and availability updates of epicentrk.ua products from category pages."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "url_patterns": [
+      "epicentrk.ua/ua/shop/*/"
+    ]
+  }
+}

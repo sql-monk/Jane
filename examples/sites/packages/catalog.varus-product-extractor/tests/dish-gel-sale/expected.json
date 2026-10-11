@@ -1,0 +1,46 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "varus",
+        "product_id": "2661639",
+        "title": "Гель для миття посуду Sarmix Ultra Golden Yuzu 500 мл",
+        "url": "https://varus.ua/gel-dlya-mittya-posudu-sarmix-ultra-golden-yuzu-500-ml",
+        "price": 69.5,
+        "currency": "UAH",
+        "old_price": 89.0,
+        "availability": "in_stock",
+        "brand": "Sarmix",
+        "category": "Засоби для миття посуду",
+        "category_path": [
+          "Побутова хімія",
+          "Засоби для миття посуду"
+        ],
+        "image": "https://varus.ua/img/product/1140/1140/2661639",
+        "sku": "2661639",
+        "unit": "шт",
+        "volume": "500 мл",
+        "country": "Україна",
+        "attributes": {
+          "Формат засобу": "гель",
+          "Призначення": "для ручного миття",
+          "Органічні": "ні",
+          "Містить хлор": "ні",
+          "Містить фосфати": "ні",
+          "Термін зберігання товару": "1095",
+          "Температура зберігання": "+5..+25 ºC"
+        },
+        "completeness": "full"
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "varus",
+          "product_id": "2661639"
+        }
+      }
+    }
+  ]
+}

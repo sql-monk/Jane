@@ -1,0 +1,32 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "varus",
+        "product_id": "2665342",
+        "sku": "2665342",
+        "currency": "UAH",
+        "availability": "in_stock",
+        "completeness": "full",
+        "title": "Пряник Хлібодар На ходу-на меду 30 г",
+        "price": 4.9,
+        "old_price": 8.9,
+        "weight": "30 г",
+        "category": "Пряники",
+        "attributes": {
+          "Вміст глютену": "з глютеном",
+          "Вміст цукру": "з цукром",
+          "Калорійність ккал": "363 ккал/100 г"
+        }
+      },
+      "key": {
+        "natural": {
+          "shop": "varus",
+          "product_id": "2665342"
+        }
+      },
+      "completeness": "full"
+    }
+  ]
+}

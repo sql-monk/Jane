@@ -9,6 +9,9 @@ Pagination (``pagination.type``):
 * ``next_url`` — ``next_url_path`` in the page gives the next page URL (absolute or relative);
 * ``cursor`` — ``cursor_path`` gives a token, the next page is ``url`` with ``cursor_param=<token>``;
 * ``page`` — ``page_param`` is incremented from its value in ``url`` (1 if absent) while pages have items.
+  With POST, optional ``body_page_path`` also writes that page number to an existing JSON object field
+  (for example ``$.variables.page``). Each request receives a separate copy of the body. If the URL has
+  no page number, the positive integer at that body path supplies the first page number.
 
 Pagination stops without a next page, on a repeated page URL or cursor, on a page with no new item URLs, on a
 non-2xx or non-JSON page, and at the pagination depth: page N counts as N-1 steps from the first page, its
@@ -19,7 +22,8 @@ R22 (``DiscoveryContext`` 1.1):
 
 * ``method: POST`` - every API page is requested with POST and ``body`` as JSON (``Content-Type:
   application/json``); pagination parameters (``cursor_param``, ``page_param``) stay query parameters of the
-  URL, ``next_url`` gives the next URL, and the same ``body`` is sent to every page. The query must be read-only:
+  URL, ``next_url`` gives the next URL. The body is unchanged unless ``body_page_path`` or ``partitions``
+  explicitly select fields to update in a separate request copy. The query must be read-only:
   the core retries it like a GET;
 * ``emit_items_as_materials: true`` - every item becomes a Material itself (``application/json``, the item
   serialized as JSON) through ``ctx.emit_material``: ``material_id`` from the item's ``url_path`` URL (the same
@@ -31,7 +35,10 @@ R22 (``DiscoveryContext`` 1.1):
 from __future__ import annotations
 
 import json
+import re
+from collections import deque
 from collections.abc import AsyncIterator, Mapping
+from copy import deepcopy
 from typing import Any, ClassVar
 
 from jane_contracts.discovery import DiscoveredMaterial, DiscoveredUrl, DiscoveryContext, FetchedResource
@@ -63,6 +70,25 @@ def _as_page_number(value: str | None, default: int = 1) -> int:
         return default
 
 
+def _body_keys(body: Any, path: str) -> tuple[list[str], Any]:
+    if not re.fullmatch(r"\$\.[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*", path):
+        raise ValueError("body path must be a JSON object path, such as $.variables.page")
+    keys = path[2:].split(".")
+    value = body
+    for key in keys:
+        if not isinstance(value, dict) or key not in value:
+            raise ValueError("body path must reference an existing field in body")
+        value = value[key]
+    return keys, value
+
+
+def _write_body(body: Any, keys: list[str], value: Any) -> None:
+    target = body
+    for key in keys[:-1]:
+        target = target[key]
+    target[keys[-1]] = value
+
+
 class ApiFeedStrategy:
     type_name: ClassVar[str] = "api_feed"
 
@@ -75,6 +101,7 @@ class ApiFeedStrategy:
         self.body: Any = config.get("body")
         self.emit_items = bool(config.get("emit_items_as_materials", False))
         self.url: str = str(config["url"])
+        self.item_url_base: str | None = str(config["item_url_base"]) if config.get("item_url_base") else None
         self.items_path = JsonPath(str(config["items_path"]))
         self.url_path = JsonPath(str(config["url_path"]))
         self.lastmod_path = JsonPath(str(config["lastmod_path"])) if config.get("lastmod_path") else None
@@ -92,7 +119,48 @@ class ApiFeedStrategy:
         self.cursor_path = JsonPath(pagination["cursor_path"]) if self.pagination == "cursor" else None
         self.cursor_param: str = str(pagination.get("cursor_param") or "")
         self.page_param: str = str(pagination.get("page_param") or "")
+        self.body_page_path: str = str(pagination.get("body_page_path") or "")
+        self._body_page_keys: list[str] = []
+        if self.body_page_path:
+            if self.method != "POST" or self.pagination != "page":
+                raise UnsupportedConfig("body_page_path requires POST and page pagination")
+            self._body_page_keys, value = _body_keys(self.body, self.body_page_path)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ValueError("body page number must be a positive integer")
+            initial_url_page = query_param(self.url, self.page_param)
+            if initial_url_page is None:
+                self.url = set_query_param(self.url, self.page_param, str(value))
+            elif not initial_url_page.isdigit() or int(initial_url_page) < 1:
+                raise ValueError("URL page number must be a positive integer")
+        partitions = config.get("partitions") or {}
+        self.partition_path = JsonPath(partitions["items_path"]) if partitions else None
+        self.partition_param = str(partitions.get("url_param") or "")
+        self._partition_body_keys: list[str] = []
+        self._partition_root: Any = None
+        if partitions:
+            if self.method != "POST" or not self.partition_param:
+                raise UnsupportedConfig("partitions require POST and a nonempty url_param")
+            if self.partition_param in {self.page_param, self.cursor_param}:
+                raise ValueError("partition url_param must differ from pagination parameters")
+            self._partition_body_keys, self._partition_root = _body_keys(self.body, partitions["body_path"])
+            if isinstance(self._partition_root, bool) or not isinstance(self._partition_root, str | int):
+                raise ValueError("partition root must be a string or integer")
+            if self._partition_body_keys == self._body_page_keys:
+                raise ValueError("partition and page body paths must differ")
+        self._active_partition: Any = self._partition_root
+        self._partition_children: list[Any] = []
         self.stats: dict[str, int] = {}
+
+    def page_body(self, url: str) -> Any:
+        """A fresh request body; configuration and prior requests are never mutated."""
+        if not self._body_page_keys and not self._partition_body_keys:
+            return self.body
+        body = deepcopy(self.body)
+        if self._body_page_keys:
+            _write_body(body, self._body_page_keys, _as_page_number(query_param(url, self.page_param)))
+        if self._partition_body_keys:
+            _write_body(body, self._partition_body_keys, self._active_partition)
+        return body
 
     def items(self, document: Any) -> list[Any]:
         found = self.items_path.find(document)
@@ -122,8 +190,33 @@ class ApiFeedStrategy:
     async def seeds(self, ctx: DiscoveryContext) -> AsyncIterator[DiscoveredUrl]:
         self.stats = {}  # seeds are re-run from scratch after a restart
         try:
-            async for cand in self._pages(ctx):
-                yield cand
+            if self.partition_path is None:
+                async for cand in self._pages(ctx):
+                    yield cand
+            else:
+                pending = deque([(self._partition_root, 0)])
+                known = {str(self._partition_root)}
+                max_partitions = limit(ctx, "crawl.max_frontier_size")
+                while pending:
+                    value, depth = pending.popleft()
+                    if ctx.is_cancelled():
+                        return
+                    if depth >= limit(ctx, "crawl.max_depth"):
+                        bump(self.stats, "partitions_over_depth")
+                        continue
+                    self._active_partition = value
+                    self._partition_children = []
+                    async for cand in self._pages(ctx):
+                        yield cand
+                    bump(self.stats, "partitions")
+                    for child in self._partition_children:
+                        if isinstance(child, bool) or not isinstance(child, str | int) or str(child) in known:
+                            continue
+                        if len(known) >= max_partitions:
+                            bump(self.stats, "partitions_over_limit")
+                            continue
+                        known.add(str(child))
+                        pending.append((child, depth + 1))
         except BudgetExhausted as exc:
             ctx.log.warning("api_feed stopped: budget exhausted", extra={"reason": str(exc)})
 
@@ -132,11 +225,15 @@ class ApiFeedStrategy:
         max_items = limit(ctx, "crawl.max_links_per_page")
         max_bytes = limit(ctx, "crawl.max_material_bytes")
         url: str | None = self.url
+        if self.partition_path is not None:
+            url = set_query_param(url, self.partition_param, str(self._active_partition))
         step = 0  # pagination steps from the first page; items of this page get depth step + 1
         pages_seen: set[str] = set()
         items_seen: set[str] = set()
         cursors: set[str] = set()
         while url is not None:
+            if self.partition_path is not None:
+                url = set_query_param(url, self.partition_param, str(self._active_partition))
             if ctx.is_cancelled():
                 return
             if step + 1 > max_depth:
@@ -150,13 +247,17 @@ class ApiFeedStrategy:
             if normalized is None or normalized in pages_seen:
                 return
             pages_seen.add(normalized)
-            resource = await fetch_document(ctx, normalized, method=self.method, body=self.body)
+            resource = await fetch_document(
+                ctx, normalized, method=self.method, body=self.page_body(normalized)
+            )
             if resource is None or not is_success(resource):
                 return
             document = self._json(ctx, resource, max_bytes)
             if document is None:
                 return
             bump(self.stats, "pages")
+            if self.partition_path is not None:
+                self._partition_children.extend(self.partition_path.find(document))
             items = self.items(document)
             if len(items) > max_items:
                 bump(self.stats, "items_over_limit", len(items) - max_items)
@@ -167,7 +268,11 @@ class ApiFeedStrategy:
             new = 0
             for item in items[:max_items]:
                 link = self.url_path.first(item)
-                target = safe_normalize(ctx, link, resource.final_url) if isinstance(link, str) else None
+                target = (
+                    safe_normalize(ctx, link, self.item_url_base or resource.final_url)
+                    if isinstance(link, str)
+                    else None
+                )
                 if target is None:
                     bump(self.stats, "items_without_url")
                     continue

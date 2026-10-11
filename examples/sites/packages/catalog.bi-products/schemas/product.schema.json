@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "product (bi.ua)",
+  "description": "Товар bi.ua. Повна картка (сторінка товару, completeness: full) має shop, product_id, title, price, currency, url і решту знайдених полів; часткове оновлення зі сторінки категорії (completeness: partial) — лише shop, product_id, price, currency, availability, old_price.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "shop",
+    "product_id"
+  ],
+  "properties": {
+    "shop": {
+      "type": "string",
+      "const": "bi.ua",
+      "description": "Магазин (домен)."
+    },
+    "product_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Код товару bi.ua (schema.org sku). Кожен колір/комплектація — окремий товар зі своїм кодом."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "price": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Поточна ціна, грн."
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "old_price": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Закреслена ціна до знижки, грн."
+    },
+    "availability": {
+      "type": "string",
+      "enum": [
+        "in_stock",
+        "out_of_stock",
+        "preorder",
+        "unknown"
+      ]
+    },
+    "url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "brand": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Найглибша категорія з «хлібних крихт»."
+    },
+    "category_path": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Категорії від кореня каталогу (без головної сторінки й самого товару)."
+    },
+    "image": {
+      "type": "string",
+      "format": "uri"
+    },
+    "sku": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Артикул виробника (schema.org mpn, «Артикул»)."
+    },
+    "weight": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Вага з характеристик «Вага»."
+    },
+    "unit": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Одиниця ваги (кг, г)."
+    },
+    "rating": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "reviews_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "attributes": {
+      "type": "object",
+      "description": "Характеристики товару: назва → значення.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

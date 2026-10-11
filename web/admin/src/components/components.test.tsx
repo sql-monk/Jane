@@ -46,8 +46,8 @@ describe("components", () => {
   it("TestReportView shows passed/failed cases of the contract example", () => {
     render(<TestReportView report={openapiExample<TestReport>("test-report")} />);
     expect(screen.getByText("problem-sample-2026-09-26")).toBeInTheDocument();
-    expect(screen.getAllByText("passed")).toHaveLength(2);
-    expect(screen.getByText("failed")).toBeInTheDocument();
+    expect(screen.getAllByText("Пройдено")).toHaveLength(2);
+    expect(screen.getByText("Помилка")).toHaveAttribute("data-status", "failed");
   });
 
   it("UnifiedDiff marks added and removed lines", () => {

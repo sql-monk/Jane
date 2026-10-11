@@ -98,7 +98,7 @@ test.describe("real registry: rules package, approval and independent fork @hybr
     expect(port.request.headers()["idempotency-key"]).toBeTruthy();
     expect(port.body).toEqual({ parent_version: "1.1.0", new_version: "1.1.0", base_version: "1.0.0" });
     const panel = admin.getByLabel("Перенесення змін батька");
-    await expect(panel.locator(".job-head .badge")).toHaveText("succeeded", { timeout: 120_000 });
+    await expect(panel.locator(".job-head .badge")).toHaveText("Успішно", { timeout: 120_000 });
     await expect
       .poll(async () => {
         const response = await request.get(`${base}/v1/packages/${forkId}/versions/1.1.0`, { headers });

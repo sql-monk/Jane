@@ -67,7 +67,7 @@ test.describe("real handler-runtime: package tests without writes @hybrid", () =
     });
 
     const panel = admin.getByLabel("Прогін тестів");
-    await expect(panel.locator(".job-head .badge")).toHaveText("succeeded", { timeout: 120_000 });
+    await expect(panel.locator(".job-head .badge")).toHaveText("Успішно", { timeout: 120_000 });
     const report = panel.getByLabel("Звіт тестів");
     await expect(report).toContainText(`${seeded.package_id}@${seeded.version}`);
     for (const name of testNames)
@@ -113,7 +113,7 @@ test.describe("real handler-runtime: package tests without writes @hybrid", () =
       tests: "all",
     });
     const retestPanel = admin.getByLabel("Прогін тестів");
-    await expect(retestPanel.locator(".job-head .badge")).toHaveText("succeeded", { timeout: 120_000 });
+    await expect(retestPanel.locator(".job-head .badge")).toHaveText("Успішно", { timeout: 120_000 });
     await expect(
       retestPanel
         .getByLabel("Звіт тестів")

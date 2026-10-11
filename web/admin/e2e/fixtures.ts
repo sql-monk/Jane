@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { test as base, expect, type Page, type Request } from "@playwright/test";
+import { test as base, expect, type Locator, type Page, type Request } from "@playwright/test";
 import { MOCK_SERVICES, apiTarget, mockPort, serviceTarget } from "../dev-proxy.ts";
 
 /**
@@ -16,6 +16,16 @@ export function realServiceUrl(api: string): string | undefined {
 }
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..");
+
+/** Enter the same instant in a datetime-local field on both Windows and Linux browsers. */
+export async function fillInstant(page: Page, field: Locator, instant: string): Promise<void> {
+  const value = await page.evaluate((timestamp) => {
+    const date = new Date(timestamp);
+    const two = (part: number) => String(part).padStart(2, "0");
+    return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}T${two(date.getHours())}:${two(date.getMinutes())}:${two(date.getSeconds())}.${String(date.getMilliseconds()).padStart(3, "0")}`;
+  }, instant);
+  await field.fill(value);
+}
 
 /** `contracts/examples/openapi/<name>.json` -> its `value` (contract examples are the only test data). */
 export function openapiExample<T = Record<string, unknown>>(name: string): T {

@@ -98,7 +98,7 @@ test.describe("admin workspace", () => {
     await expect(metric).toHaveAttribute("href", "/runs");
     await metric.click();
     await expect(admin).toHaveURL(/\/runs$/);
-    await expect(admin.getByRole("table", { name: "Запуски" })).toContainText("queued");
+    await expect(admin.getByRole("table", { name: "Запуски" })).toContainText("У черзі");
   });
   test("LLM reporting requests a rolling window and refreshes its upper bound @mock", async ({ admin }) => {
     await admin.goto("/");

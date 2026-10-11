@@ -147,15 +147,16 @@ test.describe("real orchestrator: sources, tasks, schedules, limits, connections
     await admin.getByLabel("Ідентифікатор (source_id)").fill(sourceId);
     await admin.getByLabel("Назва").fill(`E2E cancel ${sourceId}`);
     await admin.getByLabel("URL").fill(`${TESTSITE_URL}/`);
-    await admin.getByLabel("Пакет правил (package_id)").fill(rules.package_id);
-    await admin.getByLabel("Версія", { exact: true }).fill(rules.version);
+    await admin.getByLabel("Пакет правил", { exact: true }).selectOption(rules.package_id);
+    await admin.getByLabel("Версія пакета", { exact: true }).selectOption(rules.version);
     await admin.getByRole("button", { name: "Створити джерело" }).click();
     await expect(admin).toHaveURL(new RegExp(`/sources/${sourceId}$`));
 
     await admin.goto("/tasks/new");
     await admin.getByLabel("Ідентифікатор (task_id)").fill(taskId);
     await admin.getByLabel("Назва").fill(`E2E cancel ${taskId}`);
-    await admin.getByLabel("Джерело (source_id)").fill(sourceId);
+    await admin.getByLabel("Джерело (source_id)", { exact: true }).fill(sourceId);
+    await admin.getByText("Додатково: ліміти та повторні спроби", { exact: true }).click();
     await admin.getByRole("textbox", { name: "Ліміти завдання" }).fill(JSON.stringify(limits));
     await expect(admin.getByText("Відповідає схемі контракту")).toBeVisible();
     const created = await captureRequest(admin, "POST", "/api/orchestrator/v1/tasks", () =>
@@ -216,7 +217,7 @@ test.describe("real orchestrator: sources, tasks, schedules, limits, connections
     await expect(admin.getByText(`Помилки й пропуски збору ${collectionId}`)).toBeVisible({
       timeout: 30_000,
     });
-    await expect(status).toHaveText("running");
+    await expect(status).toHaveText("Виконується");
     await admin.getByRole("button", { name: "Скасувати запуск" }).click();
     await admin.getByLabel("Причина: Скасувати запуск").fill("e2e stop test run");
     const cancelled = await captureRequest(admin, "POST", `/api/orchestrator/v1/runs/${runId}/cancel`, () =>
@@ -240,7 +241,7 @@ test.describe("real orchestrator: sources, tasks, schedules, limits, connections
     const fetched = (stopped["stats"] as { fetched: number }).fetched;
     expect(fetched).toBeGreaterThan(0);
     expect(fetched, "the collection stopped before a full crawl").toBeLessThan(fullCrawl);
-    await expect(status).toHaveText("cancelled", { timeout: 30_000 });
+    await expect(status).toHaveText("Скасовано", { timeout: 30_000 });
     await expect(admin.getByRole("button", { name: "Скасувати запуск" })).toHaveCount(0);
     await expect(admin.getByRole("alert")).toHaveCount(0);
   });
@@ -259,7 +260,7 @@ test.describe("real orchestrator: sources, tasks, schedules, limits, connections
     const connectionId = uniqueId("e2e-conn");
     await admin.goto("/connections");
     await admin.getByRole("button", { name: "Нове підключення" }).click();
-    await admin.getByLabel("connection_id").fill(connectionId);
+    await admin.getByLabel("Ідентифікатор підключення").fill(connectionId);
     await admin.getByLabel("Тип").last().fill("filesystem");
     await admin.getByRole("button", { name: "Додати посилання" }).click();
     await admin.getByLabel("Ім'я секрету 1").fill("token");
@@ -293,7 +294,7 @@ test.describe("real orchestrator: sources, tasks, schedules, limits, connections
     await connectionRow.getByRole("button", { name: connectionId }).click();
     const connectionExecutors = admin.getByRole("table", { name: "Виконавці підключення" });
     const storageExecutor = connectionExecutors.getByRole("row", { name: /^storage\b/ });
-    await expect(storageExecutor).toContainText("synced");
+    await expect(storageExecutor).toContainText("Синхронізовано");
     const [tested] = await Promise.all([
       admin.waitForResponse(
         (r) =>
@@ -307,7 +308,7 @@ test.describe("real orchestrator: sources, tasks, schedules, limits, connections
     await expect(testResult).toContainText("Перевірка підключення не вдалася");
     await expect(
       testResult.getByRole("table", { name: "Розв'язання секретів" }).getByRole("row", { name: /token/ }),
-    ).toContainText("failed");
+    ).toContainText("Помилка");
     await admin.getByRole("button", { name: "Закрити" }).click();
 
     await admin.goto("/audit");

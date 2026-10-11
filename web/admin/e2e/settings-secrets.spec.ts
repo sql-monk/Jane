@@ -8,7 +8,7 @@ test.describe("connections, LLM, limits and secrets @mock", () => {
     await admin.goto("/connections");
     const table = admin.getByRole("table", { name: "Підключення" });
     await expect(table).toContainText("env:JANE_SECRET_RESULTS_PG_PASSWORD");
-    await expect(table).toContainText("synced");
+    await expect(table).toContainText("Синхронізовано");
   });
 
   test("secret values returned by a faulty service are never displayed", async ({ admin, request }) => {
@@ -24,8 +24,8 @@ test.describe("connections, LLM, limits and secrets @mock", () => {
       "env:JANE_SECRET_RESULTS_PG_PASSWORD",
     );
     await expectNoSecretLeak(admin, LEAKED);
-    await admin.getByRole("button", { name: "results-pg" }).click();
-    await expect(admin.getByLabel("connection_id")).toHaveValue("results-pg");
+    await admin.getByRole("button", { name: /Results DB · results-pg/ }).click();
+    await expect(admin.getByLabel("Ідентифікатор підключення")).toHaveValue("results-pg");
     await expectNoSecretLeak(admin, LEAKED);
     for (const input of await admin.locator("input").all()) {
       const value = await input.inputValue();
@@ -38,7 +38,7 @@ test.describe("connections, LLM, limits and secrets @mock", () => {
   }) => {
     await admin.goto("/connections");
     await admin.getByRole("button", { name: "Нове підключення" }).click();
-    await admin.getByLabel("connection_id").fill("results-pg");
+    await admin.getByLabel("Ідентифікатор підключення").fill("results-pg");
     await admin.getByRole("button", { name: "Додати посилання" }).click();
     await admin.getByLabel("Ім'я секрету 1").fill("password");
     await admin.getByLabel("Посилання на секрет 1").fill("hunter2-plain-value");
@@ -85,7 +85,7 @@ test.describe("connections, LLM, limits and secrets @mock", () => {
     await admin.getByRole("tab", { name: "Бюджети" }).click();
     await expect(admin.getByRole("table", { name: "Бюджети LLM" })).toContainText("news-tg-events");
     await admin.getByLabel("Рівень").selectOption("task");
-    await admin.getByLabel("Ідентифікатор").fill("shop-price-check");
+    await admin.getByLabel("Завдання", { exact: true }).selectOption("shop-price-check");
     await admin.getByLabel("Сума").fill("3");
     const { body } = await captureRequest(admin, "PUT", "/api/llm/v1/budgets/task/shop-price-check", () =>
       admin.getByRole("button", { name: "Зберегти бюджет" }).click(),
@@ -104,13 +104,13 @@ test.describe("connections, LLM, limits and secrets @mock", () => {
   }) => {
     await admin.goto("/limits");
     await expect(admin.getByRole("heading", { name: /профіль dev-laptop/ })).toBeVisible();
-    await expect(admin.getByText("Відповідає схемі контракту")).toBeVisible();
+    await expect(admin.getByRole("table", { name: "Ліміти платформи" })).toBeVisible();
     const { body } = await captureRequest(admin, "PUT", "/api/orchestrator/v1/limits/platform", () =>
       admin.getByRole("button", { name: "Зберегти ліміти платформи" }).click(),
     );
     expect(body["profile"]).toBe("dev-laptop");
-    await admin.getByLabel("Завдання").fill("shop-catalog");
-    await admin.getByLabel("Етап").fill("extract-products");
+    await admin.getByLabel("Завдання", { exact: true }).selectOption("shop-catalog");
+    await admin.getByLabel("Етап", { exact: true }).selectOption("extract-products");
     await admin.getByRole("button", { name: "Показати" }).click();
     const effective = admin.getByRole("table", { name: "Ефективні ліміти" });
     await expect(effective).toContainText("sandbox.memory_mb");

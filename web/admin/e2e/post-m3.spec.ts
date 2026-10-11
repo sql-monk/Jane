@@ -218,7 +218,7 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
     await admin.getByRole("tab", { name: "Елементи й помилки" }).click();
     const items = admin.getByRole("table", { name: "Елементи запуску" });
     const retrying = items.getByRole("row", { name: /web:0a1b2c3d4e5f60718293a4b5c6d7e8f9/ });
-    await expect(retrying).toContainText("retrying");
+    await expect(retrying).toContainText("Повторна спроба");
     await expect(retrying).toContainText("2026-09-27 10:00:09.512Z");
     await expect(retrying).toContainText("Помилка елемента (upstream_unavailable)");
     await retrying.getByText("2 подій").click();
@@ -231,7 +231,7 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
     await items.getByRole("link", { name: "web:9b1f0c1d2e3f40516273849a0b1c2d3e" }).click();
     const stages = admin.getByRole("table", { name: /Етапи obs_/ });
     const extract = stages.getByRole("row", { name: /extract-products/ });
-    await expect(extract).toContainText("completed");
+    await expect(extract).toContainText("Завершено");
     await extract.getByText("4 подій").click();
     const traced = extract.getByLabel("Історія спроб itm_01J9ZQ4B0000000000000001");
     await expect(traced.getByRole("listitem")).toHaveCount(4);
@@ -289,7 +289,7 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
 
     await admin.goto(`/runs/${RUN}`);
     await admin.getByRole("tab", { name: "Повторна обробка" }).click();
-    await admin.getByLabel("Сховище RAW (connection_id)").fill("raw-files");
+    await admin.getByLabel("Сховище RAW", { exact: true }).fill("raw-files");
     await admin.getByLabel("Точний вибір: RAW object_ids").fill("obj_01J9ZQ4C00000000000000D1, obj_2");
     await admin.getByLabel("Точний вибір: observation_ids").fill("obs_01J9ZQ4A0000000000000001");
     const ids = await captureRequest(admin, "POST", "/api/orchestrator/v1/reprocessing", () =>
@@ -307,10 +307,10 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
 
   test("package version: test summary of every context (registry test_summary)", async ({ admin }) => {
     await admin.goto("/packages/shop-example.product-extractor?version=1.2.0");
-    await expect(admin.getByTestId("test-summary-status")).toHaveText("passed");
+    await expect(admin.getByTestId("test-summary-status")).toHaveText("Пройдено");
     const contexts = admin.getByRole("table", { name: "Тести за контекстами" });
     const binding = contexts.getByRole("row", { name: /bindings:shop-catalog\/extract-products/ });
-    await expect(binding).toContainText("passed");
+    await expect(binding).toContainText("Пройдено");
     await expect(binding).toContainText("assistant");
     await expect(contexts.getByRole("row", { name: /^tests/ })).toContainText("handler-runtime@0.1.0");
   });

@@ -195,7 +195,7 @@ describe("attempt history (R25)", () => {
     await userEvent.click(screen.getByText("3 подій"));
     const items = within(screen.getByLabelText("Історія спроб itm_1")).getAllByRole("listitem");
     expect(items[1]).toHaveTextContent(
-      "retry_scheduled 2026-09-27 10:00:06.512Z, спроба 1, доступний з 2026-09-27 10:00:09.512Z, затримка 3000 мс, код upstream_unavailable",
+      "Повтор заплановано 27.09.26, 13:00:06 (Київ) · 512 мс, спроба 1, доступний з 27.09.26, 13:00:09 (Київ) · 512 мс, затримка 3000 мс, код upstream_unavailable",
     );
     expect(items[2]).toHaveTextContent("unknown_error");
     expect(document.body.textContent).not.toContain("leaked-secret-value");
@@ -221,7 +221,14 @@ describe("exact reprocessing selection (R06)", () => {
     ["object", { object_ids: ["obj_01J9ZQ4C00000000000000D1"] }],
     ["observation", { material_ids: [material.material_id], observation_ids: [material.observation_id] }],
   ])("a stored object: %s", async (mode, selection) => {
-    const requests = stubFetch((request) => (request.method === "POST" ? accepted() : undefined));
+    const task = openapiExample<TaskConfig>("task-catalog");
+    const requests = stubFetch((request, url) => {
+      if (request.method === "POST") return accepted();
+      if (url.pathname.endsWith(`/v1/tasks/${task.task_id}`)) return Response.json(task);
+      if (url.pathname.endsWith("/v1/tasks"))
+        return Response.json({ items: [{ task_id: task.task_id, title: task.title }], next_cursor: null });
+      return undefined;
+    });
     renderAt(
       "/",
       <ReprocessForm
@@ -233,8 +240,15 @@ describe("exact reprocessing selection (R06)", () => {
         }}
       />,
     );
-    await userEvent.type(screen.getByLabelText("Завдання"), "shop-catalog");
+    await screen.findByRole("option", { name: `${task.title} (${task.task_id})` });
+    expect(screen.getByLabelText("Що обробити")).toHaveValue("object");
+    await userEvent.selectOptions(screen.getByLabelText("Завдання"), task.task_id);
     await userEvent.selectOptions(screen.getByLabelText("Що обробити"), mode);
+    if (mode === "material") {
+      expect(screen.getByRole("button", { name: "Обробити повторно" })).toBeDisabled();
+      await userEvent.click(screen.getByLabelText("Підтверджую обробку всієї цієї вибірки"));
+    }
+    await screen.findByRole("option", { name: "extract-products" });
     await userEvent.click(screen.getByRole("button", { name: "Обробити повторно" }));
     expect(await screen.findByText("run page")).toBeInTheDocument();
     expect(await submitted(requests)).toEqual([
@@ -292,7 +306,7 @@ describe("collect stage versions (R05: collector.rules activations)", () => {
     const card = screen.getByRole("region", { name: "Етап collect" });
     expect(await within(card).findByText(`${rules.package_id}@${rules.version}`)).toBeInTheDocument();
     expect(within(card).getByText("(правила джерела)")).toBeInTheDocument();
-    await within(card).findByRole("option", { name: `${rules.version} (unknown)` });
+    await within(card).findByRole("option", { name: `${rules.version} — погоджено` });
     await userEvent.selectOptions(within(card).getByLabelText("Версія для collect"), rules.version);
     await userEvent.click(within(card).getByRole("button", { name: "Активувати" }));
     await userEvent.type(within(card).getByLabelText("Причина: Активувати"), "new rules");

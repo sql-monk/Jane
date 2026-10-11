@@ -78,8 +78,8 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
   await admin.getByLabel("Ідентифікатор (source_id)").fill(sourceId);
   await admin.getByLabel("Назва").fill(`M2 testsite ${sourceId}`);
   await admin.getByLabel("URL").fill(`${site}/`);
-  await admin.getByLabel("Пакет правил (package_id)").fill(rulesId);
-  await admin.getByLabel("Версія", { exact: true }).fill("1.0.0");
+  await admin.getByLabel("Пакет правил", { exact: true }).selectOption(rulesId);
+  await admin.getByLabel("Версія пакета", { exact: true }).selectOption("1.0.0");
   const createdSource = await captureRequest(admin, "POST", "/api/orchestrator/v1/sources", () =>
     admin.getByRole("button", { name: "Створити джерело" }).click(),
   );
@@ -167,11 +167,11 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
   await expect(traced.getByRole("row", { name: /store-products/ })).toContainText("results-pg");
   // attempt diagnostics of the real orchestrator (R25): the item was claimed and completed
   const tracedExtract = traced.getByRole("row", { name: /extract-products/ });
-  await expect(tracedExtract).toContainText("completed");
+  await expect(tracedExtract).toContainText("Завершено");
   await tracedExtract.getByText(/^\d+ подій$/).click();
   const attempts = tracedExtract.getByLabel(/^Історія спроб /).getByRole("listitem");
-  await expect(attempts.first()).toContainText("claimed");
-  await expect(attempts.last()).toContainText("completed");
+  await expect(attempts.first()).toContainText("Взято в роботу");
+  await expect(attempts.last()).toContainText("Завершено");
   await admin.goto(`/runs/${runId}`);
   await admin.getByRole("tab", { name: "Помилки колектора" }).click();
   await expect(admin.getByRole("table", { name: "Помилки колектора" })).toContainText("404");
@@ -180,7 +180,7 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
   await admin.getByRole("tab", { name: "Повторна обробка" }).click();
   const reprocessForm = admin.getByRole("form", { name: "Повторна обробка" });
   await expect(reprocessForm.getByLabel("Завдання")).toHaveValue(taskId);
-  await reprocessForm.getByLabel("Сховище RAW (connection_id)").fill("raw-files");
+  await reprocessForm.getByLabel("Сховище RAW", { exact: true }).fill("raw-files");
   await reprocessForm.getByLabel("Почати з етапу").fill("extract-products");
   await reprocessForm.getByLabel("Збережені з (RFC 3339)").fill(run["created_at"] as string);
   await reprocessForm.getByLabel("Причина").fill("M2 reprocess stored RAW of the run");

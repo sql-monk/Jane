@@ -144,7 +144,7 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
     const groups = admin.getByRole("table", { name: "Групи проблем" });
     const row = groups.getByRole("row", { name: new RegExp(sourceId) });
     await expect(row).toContainText(`${extractor.package_id}@1.0.0`);
-    await expect(row).toContainText("unrecognized");
+    await expect(row).toContainText("Не розпізнано");
     await expect(row).toContainText("unknown-availability");
     await expect(row).toContainText("open");
     const [filtered] = await Promise.all([
@@ -335,11 +335,11 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
 
     // ---- the published version passed its tests on every context (registry test_summary, WP-17)
     await admin.goto(`/packages/${extractor.package_id}?version=1.1.0`);
-    await expect(admin.getByTestId("test-summary-status")).toHaveText("passed");
+    await expect(admin.getByTestId("test-summary-status")).toHaveText("Пройдено");
     const contexts = admin.getByRole("table", { name: "Тести за контекстами" });
     await expect(
       contexts.getByRole("row", { name: new RegExp(`bindings:${taskId}/extract-products`) }),
-    ).toContainText("passed");
+    ).toContainText("Пройдено");
     await expect(contexts.getByRole("row", { name: /^tests/ })).toContainText("assistant");
     await expect(admin.getByRole("alert")).toHaveCount(0);
   });
@@ -548,7 +548,7 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
     ).toBeVisible();
     await expect(admin.getByText(`${site}/pages/careers`, { exact: true })).toBeVisible();
     const failedTrace = admin.getByRole("table", { name: `Етапи ${failedItem.observation_id} (${runId})` });
-    await expect(failedTrace.getByRole("row").filter({ hasText: "unknown-pages" })).toContainText("failed");
+    await expect(failedTrace.getByRole("row").filter({ hasText: "unknown-pages" })).toContainText("Помилка");
 
     // unknown materials: now forwarded; the trace leads to the LLM stage of run 2
     await admin.goto("/problems?tab=unknown");

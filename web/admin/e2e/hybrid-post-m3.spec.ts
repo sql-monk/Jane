@@ -209,7 +209,7 @@ test.describe("remaining post-M3 admin coverage @hybrid", () => {
       await admin.getByRole("tab", { name: "Повторна обробка" }).click();
       const form = admin.getByRole("form", { name: "Повторна обробка" });
       await expect(form.getByLabel("Завдання")).toHaveValue(data.taskId);
-      await form.getByLabel("Сховище RAW (connection_id)").fill("raw-files");
+      await form.getByLabel("Сховище RAW", { exact: true }).fill("raw-files");
       await form
         .getByLabel("Точний вибір: " + (mode === "object" ? "RAW object_ids" : "observation_ids"))
         .fill(mode === "object" ? data.raw.object.object_id : data.raw.material.observation_id);

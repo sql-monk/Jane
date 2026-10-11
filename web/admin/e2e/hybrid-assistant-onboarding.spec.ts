@@ -173,7 +173,7 @@ test.describe("real source onboarding in the admin @hybrid", () => {
     expect(accepted.request.headers()["idempotency-key"]).toBeTruthy();
     expect(accepted.body).toEqual({ activate: true, source_id: sourceId });
     const panel = view.getByLabel("Застосування варіанта");
-    await expect(panel.locator(".job-head .badge")).toHaveText("succeeded", { timeout: 600_000 });
+    await expect(panel.locator(".job-head .badge")).toHaveText("Успішно", { timeout: 600_000 });
     const result = panel.getByLabel("Результат застосування");
     await expect(result.locator(".kv-row", { hasText: "Активовано" })).toContainText("так");
     await expect(result.getByRole("link", { name: sourceId, exact: true })).toBeVisible();
@@ -208,11 +208,11 @@ test.describe("real source onboarding in the admin @hybrid", () => {
 
     // ---- 5. after a reload the session, its state and the acceptance result come back from the assistant API
     await admin.reload();
-    await expect(status).toHaveText("completed");
+    await expect(status).toHaveText("Завершено");
     const sessions = admin.getByRole("table", { name: "Сесії підключення" });
-    await expect(sessions.getByRole("row", { name: new RegExp(sessionId) })).toContainText("completed");
+    await expect(sessions.getByRole("row", { name: new RegExp(sessionId) })).toContainText("Завершено");
     const last = view.getByLabel("Останній job сесії");
-    await expect(last.locator(".job-head .badge")).toHaveText("succeeded");
+    await expect(last.locator(".job-head .badge")).toHaveText("Успішно");
     await expect(last.getByLabel("Результат застосування")).toContainText(source.collector_rules.package_id);
     await admin.getByLabel("Стан сесії").selectOption("completed");
     await expect(sessions.getByRole("row", { name: new RegExp(sessionId) })).toBeVisible();

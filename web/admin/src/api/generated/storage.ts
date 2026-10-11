@@ -181,6 +181,28 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/entity-types": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Типи фактично збережених сутностей і їх кількість
+     * @description Каталог поточного простору підключення; не очікувані типи джерел. Порожній items означає
+     *     відсутність сутностей. Приклад запиту — GET /v1/entity-types?connection_id=results-pg&limit=50.
+     *     Необов'язкова можливість адаптера: 501 not_implemented означає недоступність каталогу.
+     */
+    get: operations["listEntityTypes"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/entities": {
     parameters: {
       query?: never;
@@ -188,7 +210,13 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Актуальний стан сутностей */
+    /**
+     * Актуальний стан сутностей
+     * @description Необов’язковий search шукає без урахування регістру буквальний підрядок у canonical_key,
+     *     key і fields по всьому сховищу перед пагінацією. Без search поведінка незмінна.
+     *     Адаптер без можливості пошуку повертає 501 not_implemented. Курсор чинний для тих самих фільтрів.
+     *     Приклад: GET /v1/entities?connection_id=results-pg&entity_type=product&search=Kettle.
+     */
     get: operations["listEntities"];
     put?: never;
     post?: never;
@@ -289,6 +317,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    EntityTypeSummary: {
+      entity_type: string;
+      entity_count: number;
+    };
+    EntityStatistics: {
+      entity_count: number | null;
+      total_size_bytes: number | null;
+      types: components["schemas"]["EntityTypeSummary"][] | null;
+      /** @description postgresql_relation_with_indexes — фізичний розмір таблиці актуальних станів з індексами; snapshot_documents — байти JSON-файлів станів. Не включає історію, RAW чи delivery. */
+      size_basis: string | null;
+      /** Format: date-time */
+      checked_at: string | null;
+      unavailable_reason: string | null;
+    };
     StoredObject: {
       object: components["schemas"]["StoredObjectRef"];
       /** @description Короткі метадані матеріалу, з якого збережено об'єкт. */
@@ -316,6 +358,7 @@ export interface components {
       /** Format: date-time */
       checked_at: string | null;
       message: string | null;
+      entity_statistics?: components["schemas"]["EntityStatistics"];
       statistics: {
         object_count: number | null;
         total_size_bytes: number | null;
@@ -928,6 +971,23 @@ export interface components {
     };
   };
   responses: {
+    /** @description Каталог або пошук сутностей не підтримується цим адаптером. */
+    DiscoveryNotSupported: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        /**
+         * @example {
+         *       "type": "urn:jane:problem:not_implemented",
+         *       "title": "Not implemented",
+         *       "status": 501,
+         *       "code": "not_implemented"
+         *     }
+         */
+        "application/problem+json": components["schemas"]["problem.schema"];
+      };
+    };
     /** @description Немає або недійсний токен (`unauthenticated`). */
     Unauthenticated: {
       headers: {
@@ -1337,6 +1397,42 @@ export interface operations {
       404: components["responses"]["NotFound"];
     };
   };
+  listEntityTypes: {
+    parameters: {
+      query: {
+        connection_id: components["parameters"]["ConnectionIdQuery"];
+        /** @description Фактична key.scope сутності, визначена обробником; не source_id. */
+        scope?: string;
+        /** @description Непрозорий курсор з `next_cursor` попередньої сторінки. */
+        cursor?: components["parameters"]["Cursor"];
+        /** @description Розмір сторінки. Значення понад максимум сервісу обрізається до максимуму. */
+        limit?: components["parameters"]["Limit"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Сторінка типів у лексикографічному порядку. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            items: components["schemas"]["EntityTypeSummary"][];
+            next_cursor: components["schemas"]["NextCursor"];
+            search_supported: boolean;
+          };
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+      422: components["responses"]["UnprocessableEntity"];
+      501: components["responses"]["DiscoveryNotSupported"];
+    };
+  };
   listEntities: {
     parameters: {
       query: {
@@ -1345,6 +1441,8 @@ export interface operations {
         scope?: string;
         /** @description Канонічний ключ (EntityState.canonical_key); тоді сторінка містить 0 або 1 елемент. */
         key?: string;
+        /** @description Буквальний підрядок; пробіли на початку й кінці ігноруються. */
+        search?: string;
         updated_since?: string;
         /** @description Непрозорий курсор з `next_cursor` попередньої сторінки. */
         cursor?: components["parameters"]["Cursor"];
@@ -1372,6 +1470,7 @@ export interface operations {
       401: components["responses"]["Unauthenticated"];
       404: components["responses"]["NotFound"];
       422: components["responses"]["UnprocessableEntity"];
+      501: components["responses"]["DiscoveryNotSupported"];
     };
   };
   listEntityHistory: {

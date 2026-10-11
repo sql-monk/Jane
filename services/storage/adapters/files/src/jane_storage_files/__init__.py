@@ -477,6 +477,7 @@ class _Store:
         updated_since: datetime | None,
         cursor: str | None,
         limit: int,
+        search: str = "",
     ) -> tuple[list[EntitySnapshot], str | None]:
         folder = self.root / "entities" / entity_type
         snaps = []
@@ -489,6 +490,15 @@ class _Store:
                 continue
             if updated_since is not None and snap.updated_at < updated_since:
                 continue
+            if (
+                search
+                and search.casefold()
+                not in json.dumps(
+                    {"key": dict(snap.key), "fields": dict(snap.fields), "canonical_key": snap.canonical_key},
+                    ensure_ascii=False,
+                ).casefold()
+            ):
+                continue
             snaps.append(snap)
         snaps.sort(key=lambda s: s.canonical_key)
         if cursor is not None:
@@ -497,6 +507,54 @@ class _Store:
         page = snaps[:limit]
         next_cursor = _b64(page[-1].canonical_key) if len(snaps) > limit and page else None
         return page, next_cursor
+
+    def entity_statistics(self, stop: threading.Event) -> dict[str, Any]:
+        types: list[dict[str, Any]] = []
+        total = 0
+        for folder in sorted((self.root / "entities").glob("*")):
+            if not folder.is_dir():
+                continue
+            count = 0
+            for path in folder.glob("*.json"):
+                if stop.is_set():
+                    raise AdapterError("entity statistics cancelled", retryable=True)
+                doc = self.read_json(path)
+                if doc is None:
+                    raise AdapterError("entity inventory changed", retryable=True)
+                snapshot_from_json(doc)
+                count += 1
+                total += path.stat().st_size
+            if count:
+                types.append({"entity_type": folder.name, "entity_count": count})
+        return {
+            "entity_count": sum(row["entity_count"] for row in types),
+            "total_size_bytes": total,
+            "size_basis": "snapshot_documents",
+            "types": types,
+        }
+
+    def list_entity_types(
+        self, scope: str | None, cursor: str | None, limit: int
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        after = str(_unb64(cursor)) if cursor else None
+        rows = []
+        for folder in sorted((self.root / "entities").glob("*")):
+            if not folder.is_dir() or (after is not None and folder.name <= after):
+                continue
+            count = 0
+            for path in folder.glob("*.json"):
+                doc = self.read_json(path)
+                if doc is None:
+                    continue
+                snap = snapshot_from_json(doc)
+                if scope is None or snap.key.get("scope") == scope:
+                    count += 1
+            if count:
+                rows.append({"entity_type": folder.name, "entity_count": count})
+            if len(rows) > limit:
+                break
+        page = rows[:limit]
+        return page, _b64(page[-1]["entity_type"]) if len(rows) > limit else None
 
     def _delivery_complete(self, record: DeliveryRecord) -> bool:
         ack = dict(record.acks[0]) if record.acks else {}
@@ -667,6 +725,32 @@ class FilesystemAdapter:
         limit: int,
     ) -> tuple[Sequence[EntitySnapshot], str | None]:
         return await self._run(self.store.list_entities, entity_type, scope, updated_since, cursor, limit)
+
+    async def search_entities(
+        self,
+        entity_type: str,
+        *,
+        search: str,
+        scope: str | None = None,
+        updated_since: datetime | None = None,
+        cursor: str | None = None,
+        limit: int,
+    ) -> tuple[Sequence[EntitySnapshot], str | None]:
+        return await self._run(
+            self.store.list_entities, entity_type, scope, updated_since, cursor, limit, search
+        )
+
+    async def list_entity_types(
+        self, *, scope: str | None = None, cursor: str | None = None, limit: int
+    ) -> tuple[Sequence[Mapping[str, Any]], str | None]:
+        return await self._run(self.store.list_entity_types, scope, cursor, limit)
+
+    async def entity_statistics(self) -> dict[str, Any]:
+        stop = threading.Event()
+        try:
+            return await self._run(self.store.entity_statistics, stop)
+        finally:
+            stop.set()
 
     async def list_history(
         self, entity_type: str, canonical_key: str, *, cursor: str | None = None, limit: int

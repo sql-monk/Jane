@@ -61,6 +61,12 @@ function mockApi(handle?: (url: URL) => Response | Promise<Response> | undefined
       const override = await handle?.(url);
       if (override) return override;
       if (url.pathname.endsWith("/connections")) return Response.json({ items: [pg], next_cursor: null });
+      if (url.pathname.endsWith("/entity-types"))
+        return Response.json({
+          items: [{ entity_type: "offer", entity_count: 1 }],
+          next_cursor: null,
+          search_supported: true,
+        });
       if (url.pathname.endsWith("/sources"))
         return Response.json({ items: [{ ...source, expected_entity_types: ["offer"] }], next_cursor: null });
       if (url.pathname.endsWith("/entity-history"))
@@ -79,13 +85,14 @@ function entityRequests() {
 }
 
 describe("parsed results browser", () => {
-  it("infers the sole type from all source pages and discovers all configured stores", async () => {
+  it("infers the sole stored type from all catalog pages and discovers all configured stores", async () => {
     mockApi((url) => {
-      if (url.pathname.endsWith("/sources")) {
+      if (url.pathname.endsWith("/entity-types")) {
         expect(entityRequests()).toHaveLength(0);
         return Response.json({
-          items: [{ ...source, expected_entity_types: ["offer"] }],
-          next_cursor: url.searchParams.has("cursor") ? null : "source-next",
+          items: url.searchParams.has("cursor") ? [] : [{ entity_type: "offer", entity_count: 1 }],
+          next_cursor: url.searchParams.has("cursor") ? null : "type-next",
+          search_supported: true,
         });
       }
       if (url.pathname.endsWith("/connections"))
@@ -109,17 +116,24 @@ describe("parsed results browser", () => {
     expect(entityRequests().every((url) => url.searchParams.get("entity_type") === "offer")).toBe(true);
     expect(entityRequests().every((url) => !url.searchParams.has("scope"))).toBe(true);
   });
-  it("does not guess among multiple types and permits a custom type", async () => {
+  it("shows multiple actual types with readable choices and permits a custom type", async () => {
     mockApi((url) =>
-      url.pathname.endsWith("/sources")
+      url.pathname.endsWith("/entity-types")
         ? Response.json({
-            items: [{ ...source, expected_entity_types: ["offer", "product"] }],
+            items: [
+              { entity_type: "offer", entity_count: 3 },
+              { entity_type: "product", entity_count: 2 },
+            ],
             next_cursor: null,
+            search_supported: true,
           })
         : undefined,
     );
     mount();
-    await screen.findByText("Виберіть або введіть тип сутності, щоб переглянути розібрані дані.");
+    const choice = await screen.findByRole("link", { name: /Пропозиції магазинів/ });
+    expect(choice).toHaveTextContent("3 записів");
+    expect(choice).toHaveAttribute("href", "/results?connection_id=results-pg&entity_type=offer");
+    expect(screen.getByRole("link", { name: /Товари/ })).toHaveTextContent("2 записів");
     expect(entityRequests()).toHaveLength(0);
     expect(
       [...document.querySelectorAll("#result-entity-types option")].map((option) =>
@@ -145,12 +159,10 @@ describe("parsed results browser", () => {
     expect(query.get("key")).toBe("exact-key");
     expect(query.has("source_id")).toBe(false);
     await userEvent.clear(screen.getByLabelText(/^Тип результату/));
-    expect(
-      await screen.findByText("Виберіть або введіть тип сутності, щоб переглянути розібрані дані."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Виберіть тип із каталогу або введіть його назву.")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
-  it("isolates storage errors and cursors, labels local searching, and refreshes loaded data", async () => {
+  it("isolates storage errors and cursors, forwards server search, and refreshes loaded data", async () => {
     let refreshCount = 0;
     mockApi((url) => {
       if (url.pathname.endsWith("/connections"))
@@ -167,6 +179,13 @@ describe("parsed results browser", () => {
           { status: 503 },
         );
       refreshCount++;
+      if (url.searchParams.get("search") === "Beta")
+        return Response.json({
+          items: [
+            { ...offer, canonical_key: "search-beta", fields: { ...offer.fields, title: "Laptop Beta" } },
+          ],
+          next_cursor: null,
+        });
       return Response.json({
         items: [
           {
@@ -182,7 +201,7 @@ describe("parsed results browser", () => {
       });
     });
     mount();
-    const section = await screen.findByRole("region", { name: /results-pg/ });
+    const section = (await screen.findByRole("table", { name: "Сутності results-pg" })).closest("section")!;
     expect(
       await within(section).findByText(/Завантажено: 1. Показано: 1. Є наступна сторінка./),
     ).toBeInTheDocument();
@@ -194,18 +213,64 @@ describe("parsed results browser", () => {
         .filter((url) => url.searchParams.has("cursor"))
         .every((url) => url.searchParams.get("connection_id") === "results-pg"),
     ).toBe(true);
-    await userEvent.type(screen.getByLabelText(/^Пошук у завантажених результатах/), "Beta");
+    await userEvent.type(screen.getByLabelText(/^Пошук у всьому сховищі/), "Beta");
+    await userEvent.click(screen.getByRole("button", { name: "Знайти" }));
+    await waitFor(() =>
+      expect(entityRequests().some((url) => url.searchParams.get("search") === "Beta")).toBe(true),
+    );
     expect(
-      within(section).getByText(/Завантажено: 2. Показано: 1. Усі сторінки завантажено./),
+      await within(section).findByText(/Завантажено: 1. Показано: 1. Усі сторінки завантажено./),
     ).toBeInTheDocument();
     expect(within(section).queryByText("Laptop Alpha")).not.toBeInTheDocument();
     const beforeRefresh = refreshCount;
     await userEvent.click(within(section).getByRole("button", { name: "Оновити" }));
     await waitFor(() => expect(refreshCount).toBeGreaterThan(beforeRefresh));
-    expect(
-      screen.getByText("Шукає лише серед уже завантажених рядків. Натисніть «Показати ще», щоб додати дані."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Пошук по ключах і полях до розбиття на сторінки.")).toBeInTheDocument();
   });
+  it("searches a matching entity beyond the first page without loading preceding pages", async () => {
+    mockApi((url) => {
+      if (!url.pathname.endsWith("/entities")) return undefined;
+      return Response.json({
+        items: [
+          {
+            ...offer,
+            fields: { title: url.searchParams.get("search") ? "Needle beyond page 1" : "First page only" },
+          },
+        ],
+        next_cursor: url.searchParams.get("search") ? null : "unloaded-page",
+      });
+    });
+    mount("/results?connection_id=results-pg&entity_type=offer");
+    await screen.findByText("First page only");
+    await userEvent.type(screen.getByLabelText(/^Пошук у всьому сховищі/), "Needle");
+    await userEvent.click(screen.getByRole("button", { name: "Знайти" }));
+    expect(await screen.findByText("Needle beyond page 1")).toBeInTheDocument();
+    expect(entityRequests().some((url) => url.searchParams.has("cursor"))).toBe(false);
+    expect(entityRequests().at(-1)?.searchParams.get("search")).toBe("Needle");
+  });
+  it.each(["empty", "unsupported", "backend-error"])(
+    "distinguishes catalog %s from actual data",
+    async (scenario) => {
+      mockApi((url) => {
+        if (!url.pathname.endsWith("/entity-types")) return undefined;
+        if (scenario === "empty")
+          return Response.json({ items: [], next_cursor: null, search_supported: true });
+        const status = scenario === "unsupported" ? 501 : 502;
+        const code = scenario === "unsupported" ? "not_implemented" : "upstream_unavailable";
+        return Response.json(
+          { type: "urn:jane:problem:" + code, title: "Catalog unavailable", status, code },
+          { status },
+        );
+      });
+      mount();
+      if (scenario === "empty")
+        expect(await screen.findByText("У цьому сховищі ще немає розібраних даних.")).toBeInTheDocument();
+      else if (scenario === "unsupported")
+        expect(await screen.findByText(/Цей адаптер не надає каталог типів/)).toBeInTheDocument();
+      else expect(await screen.findByRole("alert")).toHaveTextContent("Не вдалося отримати каталог даних");
+      expect(entityRequests()).toHaveLength(0);
+    },
+  );
   it("renders zero prices, preserves unknown values and full metadata, and keeps unsafe URLs inert", async () => {
     mockApi((url) =>
       url.pathname.endsWith("/entities")
@@ -293,7 +358,7 @@ describe("parsed results browser", () => {
     await userEvent.click(screen.getByRole("button", { name: "Змінити посилання" }));
     expect(screen.queryByRole("table", { name: "Історія сутності" })).not.toBeInTheDocument();
   });
-  it.each(["Область даних", "Канонічний ключ", "Пошук у завантажених результатах"])(
+  it.each(["Область даних", "Канонічний ключ", "Пошук у всьому сховищі"])(
     "closes selected history when changing %s",
     async (label) => {
       mockApi();
@@ -304,6 +369,7 @@ describe("parsed results browser", () => {
         screen.getByLabelText((content) => content.startsWith(label)),
         "changed",
       );
+      if (label.startsWith("Пошук")) await userEvent.click(screen.getByRole("button", { name: "Знайти" }));
       expect(screen.queryByRole("table", { name: "Історія сутності" })).not.toBeInTheDocument();
     },
   );

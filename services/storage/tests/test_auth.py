@@ -55,6 +55,9 @@ def test_storage_needs_a_token_and_the_operation_scope(settings: Settings, h: Si
         assert c.get("/v1/connections", headers=auth("k-storage-orchestrator")).status_code == 200
         assert c.get("/v1/jobs/job_unknown", headers=auth("k-storage-reader")).status_code == 403
 
+        assert c.get("/v1/entity-types", params=params).status_code == 401
+        assert c.get("/v1/entity-types", params=params, headers=auth("k-storage-nobody")).status_code == 403
+        assert c.get("/v1/entity-types", params=params, headers=auth("k-storage-reader")).status_code == 200
         assert c.get("/v1/storage-status", params=params).status_code == 401
         assert c.get("/v1/storage-status", params=params, headers=auth("k-storage-nobody")).status_code == 403
         assert c.get("/v1/storage-status", params=params, headers=auth("k-storage-reader")).status_code == 200

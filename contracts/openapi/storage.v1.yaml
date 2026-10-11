@@ -403,11 +403,62 @@ paths:
           $ref: common.yaml#/components/responses/Unauthenticated
         '404':
           $ref: common.yaml#/components/responses/NotFound
+  /v1/entity-types:
+    get:
+      x-jane-scope: storage:read
+      operationId: listEntityTypes
+      summary: Типи фактично збережених сутностей і їх кількість
+      description: |
+        Каталог поточного простору підключення; не очікувані типи джерел. Порожній items означає
+        відсутність сутностей. Приклад запиту — GET /v1/entity-types?connection_id=results-pg&limit=50.
+        Необов'язкова можливість адаптера: 501 not_implemented означає недоступність каталогу.
+      tags: [entities]
+      parameters:
+        - $ref: '#/components/parameters/ConnectionIdQuery'
+        - name: scope
+          in: query
+          description: Фактична key.scope сутності, визначена обробником; не source_id.
+          schema: {type: string}
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Сторінка типів у лексикографічному порядку.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor, search_supported]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/EntityTypeSummary'}
+                  next_cursor:
+                    $ref: '../schemas/common/page.schema.json#/$defs/NextCursor'
+                  search_supported: {type: boolean}
+              examples:
+                catalog:
+                  $ref: '../examples/storage/entity-types.json'
+                empty:
+                  value: {items: [], next_cursor: null, search_supported: true}
+        '401':
+          $ref: 'common.yaml#/components/responses/Unauthenticated'
+        '404':
+          $ref: 'common.yaml#/components/responses/NotFound'
+        '422':
+          $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+        '501':
+          $ref: '#/components/responses/DiscoveryNotSupported'
   /v1/entities:
     get:
       x-jane-scope: storage:read
       operationId: listEntities
       summary: Актуальний стан сутностей
+      description: |
+        Необов’язковий search шукає без урахування регістру буквальний підрядок у canonical_key,
+        key і fields по всьому сховищу перед пагінацією. Без search поведінка незмінна.
+        Адаптер без можливості пошуку повертає 501 not_implemented. Курсор чинний для тих самих фільтрів.
+        Приклад: GET /v1/entities?connection_id=results-pg&entity_type=product&search=Kettle.
       tags: [entities]
       parameters:
         - $ref: '#/components/parameters/ConnectionIdQuery'
@@ -427,6 +478,11 @@ paths:
           description: Канонічний ключ (EntityState.canonical_key); тоді сторінка містить 0 або 1 елемент.
           schema:
             type: string
+        - name: search
+          in: query
+          required: false
+          description: Буквальний підрядок; пробіли на початку й кінці ігноруються.
+          schema: {type: string}
         - name: updated_since
           in: query
           required: false
@@ -475,6 +531,8 @@ paths:
           $ref: 'common.yaml#/components/responses/NotFound'
         '422':
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
+        '501':
+          $ref: '#/components/responses/DiscoveryNotSupported'
   /v1/entity-history:
     get:
       x-jane-scope: storage:read
@@ -737,6 +795,18 @@ paths:
         '404':
           $ref: 'common.yaml#/components/responses/NotFound'
 components:
+  responses:
+    DiscoveryNotSupported:
+      description: Каталог або пошук сутностей не підтримується цим адаптером.
+      content:
+        application/problem+json:
+          schema:
+            $ref: ../schemas/common/problem.schema.json
+          example:
+            type: urn:jane:problem:not_implemented
+            title: Not implemented
+            status: 501
+            code: not_implemented
   securitySchemes:
     bearerAuth:
       type: http
@@ -749,6 +819,26 @@ components:
       schema:
         $ref: '../schemas/common/defs.schema.json#/$defs/Slug'
   schemas:
+    EntityTypeSummary:
+      type: object
+      required: [entity_type, entity_count]
+      properties:
+        entity_type: {type: string}
+        entity_count: {type: integer, minimum: 0}
+    EntityStatistics:
+      type: object
+      required: [entity_count, total_size_bytes, types, size_basis, checked_at, unavailable_reason]
+      properties:
+        entity_count: {type: [integer, 'null'], minimum: 0}
+        total_size_bytes: {type: [integer, 'null'], minimum: 0}
+        types:
+          type: [array, 'null']
+          items: {$ref: '#/components/schemas/EntityTypeSummary'}
+        size_basis:
+          type: [string, 'null']
+          description: postgresql_relation_with_indexes — фізичний розмір таблиці актуальних станів з індексами; snapshot_documents — байти JSON-файлів станів. Не включає історію, RAW чи delivery.
+        checked_at: {type: [string, 'null'], format: date-time}
+        unavailable_reason: {type: [string, 'null']}
     StoredObject:
       type: object
       required: [object, stored_at]
@@ -812,6 +902,8 @@ components:
           type:
           - string
           - 'null'
+        entity_statistics:
+          $ref: "#/components/schemas/EntityStatistics"
         statistics:
           type: object
           required:

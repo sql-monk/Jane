@@ -187,3 +187,11 @@ Job read/cancel доступні handler:invoke, handler:test або connections
 connections:write. JobRunner застосовує concurrency/queue/timeout/retention budgets.
 
 Звичайний `POST /v1/connections/{id}/test` також оновлює availability/checked_at у cached snapshot, але скидає statistics до `null` із причиною `not_checked`, оскільки не виконує inventory. Щоб знову отримати counts/bytes, запускайте `POST /v1/storage-status/checks`.
+
+## Необов’язкове виявлення результатів і статистика
+
+Основний протокол `StorageAdapter` залишається зворотно сумісним. `EntityDiscoveryAdapter` додає `list_entity_types(scope, cursor, limit)` і `search_entities(entity_type, search, scope, updated_since, cursor, limit)`. PostgreSQL і файловий адаптер реалізують їх; інші адаптери не оголошують ці можливості. API повертає `501 not_implemented` для відсутньої можливості; клієнт може переглядати відомий тип звичайним `list_entities`.
+
+Каталог містить лише реально наявні актуальні стани, кількість — усі стани цього типу у вибраній області. Пошук буквального підрядка виконується в адаптері до пагінації у `canonical_key`, `key`, `fields`, без урахування регістру. `scope` ніколи автоматично не виводиться з ідентифікатора джерела або запуску. Курсор використовується лише з тими самими фільтрами.
+
+Необов’язковий `StorageStatisticsAdapter` описує `object_statistics` й `entity_statistics`. Фонова перевірка розділяє об’єкти та сутності. Байти об’єктів — розмір вмісту; байти сутностей мають `size_basis`: фізична таблиця PostgreSQL з індексами або файли документів станів. Історія, доставки й загальний розмір диска не підмінюють ці величини. Непідтримувані чи недоступні значення — `null` із `unavailable_reason`.

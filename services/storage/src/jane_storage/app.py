@@ -320,7 +320,9 @@ def build_app(
         lifespan=lifespan,
         capabilities=capabilities,
         limits=resolved,
-        auth_scopes=merge(HANDLER, STORAGE),  # ADR-0005 scopes per operation
+        auth_scopes=merge(
+            HANDLER, STORAGE, {"GET /v1/entity-types": "storage:read"}
+        ),  # ADR-0005 scopes per operation
     )
     app.state.limits = resolved
     app.state.registry = registry
@@ -507,6 +509,16 @@ def build_app(
             "unavailable_reason": reason,
         }
 
+    def empty_entity_statistics(reason: str) -> dict[str, Any]:
+        return {
+            "entity_count": None,
+            "total_size_bytes": None,
+            "types": None,
+            "size_basis": None,
+            "checked_at": None,
+            "unavailable_reason": reason,
+        }
+
     @app.get("/v1/storage-status", tags=["objects"])
     async def storage_status(connection_id: str) -> JSONResponse:
         stored = registry.get(connection_id)
@@ -521,6 +533,7 @@ def build_app(
                 "checked_at": None,
                 "message": None,
                 "statistics": empty_statistics("not_checked"),
+                "entity_statistics": empty_entity_statistics("not_checked"),
             }
         )
 
@@ -560,6 +573,7 @@ def build_app(
                 "checked_at": format_ts(datetime.now(UTC)),
                 "message": None,
                 "statistics": empty_statistics("connection_unavailable"),
+                "entity_statistics": empty_entity_statistics("connection_unavailable"),
             }
             try:
                 async with asyncio.timeout(limits.timeouts.request_timeout_ms / 1000):
@@ -580,10 +594,26 @@ def build_app(
                                     }
                                 except (AdapterError, ValueError, KeyError):
                                     out["statistics"] = empty_statistics("statistics_check_failed")
+                            entity_aggregate = getattr(adapter, "entity_statistics", None)
+                            out["entity_statistics"] = empty_entity_statistics(
+                                "adapter_statistics_not_supported"
+                            )
+                            if entity_aggregate is not None:
+                                try:
+                                    out["entity_statistics"] = {
+                                        **await entity_aggregate(),
+                                        "checked_at": format_ts(datetime.now(UTC)),
+                                        "unavailable_reason": None,
+                                    }
+                                except (AdapterError, ValueError, KeyError):
+                                    out["entity_statistics"] = empty_entity_statistics(
+                                        "statistics_check_failed"
+                                    )
             except (AdapterError, JaneError, TimeoutError) as exc:
                 out["message"] = redact(str(exc), registry.secret_values(connection_id))[:1000]
                 reason = "statistics_check_failed" if out["availability"] == "available" else "check_failed"
                 out["statistics"] = empty_statistics(reason)
+                out["entity_statistics"] = empty_entity_statistics(reason)
             # Definition changes during a probe must not publish a stale result for a new connection.
             try:
                 if registry.get(connection_id).etag == stored.etag:
@@ -735,6 +765,28 @@ def build_app(
                 str(exc), errors=[FieldError(parameter="cursor", message=str(exc))]
             ) from exc
 
+    @app.get("/v1/entity-types", tags=["entities"])
+    async def list_entity_types(
+        connection_id: str,
+        scope: str | None = None,
+        cursor: str | None = None,
+        limit: int | None = Query(default=None, ge=1),
+    ) -> JSONResponse:
+        async with reader(connection_id) as adapter:
+            catalog_reader = getattr(adapter, "list_entity_types", None)
+            if not callable(catalog_reader):
+                raise JaneError("This adapter does not support entity discovery", code="not_implemented")
+            page, next_cursor = await call(
+                catalog_reader(scope=scope, cursor=cursor, limit=clamp_limit(limit, limits.pages))
+            )
+            return JSONResponse(
+                {
+                    "items": [dict(row) for row in page],
+                    "next_cursor": next_cursor,
+                    "search_supported": callable(getattr(adapter, "search_entities", None)),
+                }
+            )
+
     @app.get("/v1/entities", tags=["entities"])
     async def list_entities(
         connection_id: str,
@@ -742,19 +794,34 @@ def build_app(
         scope: str | None = None,
         key: str | None = None,
         updated_since: datetime | None = None,
+        search: str | None = None,
         cursor: str | None = None,
         limit: int | None = Query(default=None, ge=1),
     ) -> JSONResponse:
         async with reader(connection_id) as adapter:
+            term = search.strip() if search else ""
+            if term and not callable(getattr(adapter, "search_entities", None)):
+                raise JaneError("This adapter does not support entity search", code="not_implemented")
             if key is not None:
                 snap = await call(adapter.read_entity(entity_type, key))
                 items = (
                     [snap] if snap is not None and (scope is None or snap.key.get("scope") == scope) else []
                 )
+                if term:
+                    items = [
+                        s
+                        for s in items
+                        if term.casefold()
+                        in json.dumps(
+                            {"canonical_key": s.canonical_key, "key": dict(s.key), "fields": dict(s.fields)},
+                            ensure_ascii=False,
+                        ).casefold()
+                    ]
                 return JSONResponse({"items": [entity_state(s) for s in items], "next_cursor": None})
             page, next_cursor = await call(
-                adapter.list_entities(
+                (adapter.search_entities if term else adapter.list_entities)(
                     entity_type,
+                    **({"search": term} if term else {}),
                     scope=scope,
                     updated_since=updated_since,
                     cursor=cursor,

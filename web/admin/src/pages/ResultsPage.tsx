@@ -1,9 +1,11 @@
+import { useQueries } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useApi } from "../app/context";
+import { useApi, useConfig } from "../app/context";
 import { unwrap } from "../api/client";
 import { useCursorList } from "../api/hooks";
 import type { EntityState, EntityHistoryEntry } from "../api/types";
+import type { components as StorageComponents } from "../api/generated/storage";
 import { storageName, useStorageConnections } from "../components/StorageConnections";
 import {
   ErrorBox,
@@ -17,6 +19,8 @@ import {
   Table,
   type Column,
 } from "../components/ui";
+import { ApiError } from "../api/problem";
+import { entityTypeLabel, resultsHref } from "../lib/results-context";
 import { formatDate } from "../lib/format";
 import "../results.css";
 
@@ -26,29 +30,60 @@ export function ResultsPage() {
   const api = useApi();
   const [params, setParams] = useSearchParams();
   const connections = useStorageConnections();
-  const sources = useCursorList(["result-source-types"], (cursor, limit) =>
-    unwrap(
-      api.orchestrator.GET("/v1/sources", { params: { query: { limit, ...(cursor ? { cursor } : {}) } } }),
-    ),
-  );
-  // Resolve the complete catalogs before inferring a unique type or claiming all stores are listed.
+  const { page_size } = useConfig();
   useEffect(() => {
     if (connections.hasMore && !connections.loadingMore && !connections.error) connections.loadMore();
   }, [connections]);
-  useEffect(() => {
-    if (sources.hasMore && !sources.loadingMore && !sources.error) sources.loadMore();
-  }, [sources]);
-  const types = [...new Set(sources.items.flatMap((source) => source.expected_entity_types ?? []))].sort();
-  const inferredType =
-    !sources.isLoading && !sources.hasMore && !sources.error && types.length === 1 ? types[0]! : "";
   const connectionId = params.get("connection_id") ?? "";
+  const ids = connectionId ? [connectionId] : connections.items.map((connection) => connection.connection_id);
+  const catalogs = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: ["entity-types", id, params.get("scope") ?? "", page_size],
+      queryFn: async () => {
+        const items: StorageComponents["schemas"]["EntityTypeSummary"][] = [];
+        let cursor: string | undefined;
+        let searchSupported: boolean;
+        const seen = new Set<string>();
+        do {
+          const page = await unwrap(
+            api.storage.GET("/v1/entity-types", {
+              params: {
+                query: {
+                  connection_id: id,
+                  limit: page_size,
+                  ...(params.get("scope") ? { scope: params.get("scope")! } : {}),
+                  ...(cursor ? { cursor } : {}),
+                },
+              },
+            }),
+          );
+          items.push(...page.items);
+          searchSupported = page.search_supported;
+          cursor = page.next_cursor ?? undefined;
+          if (cursor && seen.has(cursor)) throw new Error("Каталог повернув повторний курсор");
+          if (cursor) seen.add(cursor);
+        } while (cursor);
+        return { items, searchSupported };
+      },
+    })),
+  });
+  const types = [
+    ...new Set(catalogs.flatMap((catalog) => catalog.data?.items.map((row) => row.entity_type) ?? [])),
+  ].sort();
+  const complete =
+    !connections.isLoading &&
+    !connections.hasMore &&
+    !connections.error &&
+    catalogs.every((catalog) => catalog.isSuccess);
+  const inferredType = complete && types.length === 1 ? types[0]! : "";
   const entityType = params.has("entity_type") ? (params.get("entity_type") ?? "") : inferredType;
   const scope = params.get("scope") ?? "";
   const entityKey = params.get("key") ?? "";
-  const [search, setSearch] = useState("");
+  const search = params.get("search") ?? "";
+  const [searchDraft, setSearchDraft] = useState(search);
+  useEffect(() => setSearchDraft(search), [search]);
   const [history, setHistory] = useState<HistorySelection | null>(null);
   const context = JSON.stringify([connectionId, entityType, scope, entityKey, search]);
-  const ids = connectionId ? [connectionId] : connections.items.map((connection) => connection.connection_id);
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params);
     if (value || key === "entity_type") next.set(key, value);
@@ -88,8 +123,8 @@ export function ResultsPage() {
           label="Тип результату"
           hint={
             inferredType && !params.has("entity_type")
-              ? `Тип ${inferredType} обрано з каталогу джерел: це єдиний очікуваний тип.`
-              : "Виберіть очікуваний тип зі списку або введіть інший."
+              ? `Тип ${entityTypeLabel(inferredType)} обрано зі сховищ: це єдиний збережений тип.`
+              : "Виберіть фактично збережені дані нижче або введіть тип вручну для старого адаптера."
           }
         >
           <input
@@ -100,22 +135,29 @@ export function ResultsPage() {
           />
           <datalist id="result-entity-types">
             {types.map((type) => (
-              <option key={type} value={type} />
+              <option key={type} value={type}>
+                {entityTypeLabel(type)}
+              </option>
             ))}
           </datalist>
         </Field>
-        <Field
-          label="Пошук у завантажених результатах"
-          hint="Шукає лише серед уже завантажених рядків. Натисніть «Показати ще», щоб додати дані."
-        >
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => {
-              setHistory(null);
-              setSearch(event.target.value);
+        <Field label="Пошук у всьому сховищі" hint="Пошук по ключах і полях до розбиття на сторінки.">
+          <form
+            className="result-search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              update("search", searchDraft.trim());
             }}
-          />
+          >
+            <input
+              type="search"
+              value={searchDraft}
+              onChange={(event) => setSearchDraft(event.target.value)}
+            />
+            <button className="btn" type="submit" disabled={!entityType}>
+              Знайти
+            </button>
+          </form>
         </Field>
       </div>
       <details className="result-filters">
@@ -132,20 +174,72 @@ export function ResultsPage() {
           </Field>
         </div>
       </details>
-      {connections.isLoading || (!params.has("entity_type") && sources.isLoading) ? <Loading /> : null}
+      {connections.isLoading || catalogs.some((catalog) => catalog.isLoading) ? <Loading /> : null}
       <ErrorBox error={connections.error} title="Не вдалося отримати список сховищ" />
-      <ErrorBox
-        error={sources.error}
-        title="Не вдалося отримати очікувані типи; введіть тип сутності вручну"
-      />
-      {connections.error && connections.hasMore ? (
-        <LoadMore hasMore loading={connections.loadingMore} onClick={connections.loadMore} />
-      ) : null}
       {!connections.isLoading && !connections.error && !ids.length ? (
         <Notice>Немає налаштованих сховищ. Додайте підключення у розділі «Підключення».</Notice>
       ) : null}
-      {!entityType && !sources.isLoading ? (
-        <Notice>Виберіть або введіть тип сутності, щоб переглянути розібрані дані.</Notice>
+      {!params.get("entity_type") ? (
+        <div className="result-catalogs">
+          {catalogs.map((catalog, index) => {
+            const id = ids[index]!;
+            const title = storageName(
+              connections.items.find((connection) => connection.connection_id === id) ?? {
+                connection_id: id,
+                kind: "",
+              },
+            );
+            return (
+              <Section
+                key={id}
+                title={"Збережені дані: " + title}
+                actions={
+                  <button
+                    className="btn"
+                    type="button"
+                    disabled={catalog.isFetching}
+                    onClick={() => void catalog.refetch()}
+                  >
+                    Оновити каталог
+                  </button>
+                }
+              >
+                {catalog.error instanceof ApiError && catalog.error.problem.code === "not_implemented" ? (
+                  <Notice>
+                    Цей адаптер не надає каталог типів. Введіть тип результату вручну; можливість пошуку
+                    залежить від адаптера.
+                  </Notice>
+                ) : (
+                  <ErrorBox error={catalog.error} title="Не вдалося отримати каталог даних" />
+                )}
+                {catalog.isSuccess && !catalog.data.items.length ? (
+                  <Notice>У цьому сховищі ще немає розібраних даних.</Notice>
+                ) : null}
+                <div className="result-type-cards">
+                  {catalog.data?.items.map((row) => (
+                    <Link
+                      key={row.entity_type}
+                      className="result-type-card"
+                      to={resultsHref({
+                        connectionId: id,
+                        entityType: row.entity_type,
+                        scope,
+                        key: entityKey,
+                      })}
+                    >
+                      <strong>{entityTypeLabel(row.entity_type)}</strong>
+                      <span>{row.entity_count.toLocaleString("uk-UA")} записів</span>
+                      <small>{row.entity_type}</small>
+                    </Link>
+                  ))}
+                </div>
+              </Section>
+            );
+          })}
+        </div>
+      ) : null}
+      {!entityType && params.has("entity_type") ? (
+        <Notice>Виберіть тип із каталогу або введіть його назву.</Notice>
       ) : null}
       {entityType
         ? ids.map((id) => (
@@ -246,26 +340,27 @@ function StorageResults({
   onHistory: (key: string) => void;
 }) {
   const api = useApi();
-  const list = useCursorList(["entities", connectionId, entityType, scope, entityKey], (cursor, limit) =>
-    unwrap(
-      api.storage.GET("/v1/entities", {
-        params: {
-          query: {
-            connection_id: connectionId,
-            entity_type: entityType,
-            limit,
-            ...(cursor ? { cursor } : {}),
-            ...(scope ? { scope } : {}),
-            ...(entityKey ? { key: entityKey } : {}),
+  const list = useCursorList(
+    ["entities", connectionId, entityType, scope, entityKey, search],
+    (cursor, limit) =>
+      unwrap(
+        api.storage.GET("/v1/entities", {
+          params: {
+            query: {
+              connection_id: connectionId,
+              entity_type: entityType,
+              limit,
+              ...(cursor ? { cursor } : {}),
+              ...(scope ? { scope } : {}),
+              ...(entityKey ? { key: entityKey } : {}),
+              ...(search.trim() ? { search: search.trim() } : {}),
+            },
           },
-        },
-      }),
-    ),
+        }),
+      ),
   );
-  const term = search.trim().toLocaleLowerCase();
-  const rows = term
-    ? list.items.filter((entity) => JSON.stringify(entity).toLocaleLowerCase().includes(term))
-    : list.items;
+  const term = search.trim();
+  const rows = list.items;
   const common: Column<EntityState>[] = [
     { header: "Оновлено", cell: (entity) => formatDate(entity.updated_at) },
     {
@@ -332,6 +427,8 @@ function StorageResults({
         <Table
           label={explicitStore ? "Сутності" : `Сутності ${connectionId}`}
           rows={rows}
+          loading={list.isLoading}
+          error={list.error}
           rowKey={(entity) => entity.canonical_key ?? JSON.stringify(entity.key)}
           empty={
             list.isLoading
@@ -339,7 +436,7 @@ function StorageResults({
               : list.error
                 ? "Дані недоступні через помилку"
                 : term
-                  ? "Немає збігів серед завантажених результатів"
+                  ? "Немає збігів у сховищі"
                   : "Немає сутностей цього типу"
           }
           columns={[...(entityType === "offer" ? offerColumns : genericColumns), ...common]}
@@ -403,6 +500,8 @@ function EntityHistory({ selection, onClose }: { selection: HistorySelection; on
       <Table
         label="Історія сутності"
         rows={history.items}
+        loading={history.isLoading}
+        error={history.error}
         rowKey={(entry, index) => `${entry.delivery_key ?? ""}-${index}`}
         columns={[
           { header: "Отримано", cell: (entry) => formatDate(entry.received_at) },

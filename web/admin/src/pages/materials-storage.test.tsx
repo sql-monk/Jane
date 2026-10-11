@@ -204,6 +204,43 @@ describe("material and storage browser", () => {
     );
     expect(screen.queryByText("JANE_SECRET_RESULTS_PG_PASSWORD")).not.toBeInTheDocument();
   });
+  it("displays RAW and entity counts separately and links actual entity types", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        const url = new URL(request.url);
+        if (url.pathname.endsWith("/connections")) return Response.json({ items: [pg], next_cursor: null });
+        return Response.json({
+          connection_id: pg.connection_id,
+          kind: pg.kind,
+          availability: "available",
+          checked_at: "2026-10-11T08:00:00Z",
+          message: null,
+          statistics: {
+            object_count: 2,
+            total_size_bytes: 151,
+            scope: "connection_objects",
+            checked_at: "2026-10-11T08:00:00Z",
+            unavailable_reason: null,
+          },
+          entity_statistics: {
+            entity_count: 1172,
+            total_size_bytes: 65536,
+            size_basis: "postgresql_relation_with_indexes",
+            types: [{ entity_type: "offer", entity_count: 1172 }],
+            checked_at: "2026-10-11T08:00:00Z",
+            unavailable_reason: null,
+          },
+        });
+      }),
+    );
+    mount(<StoragesPage />, "/storages");
+    const link = await screen.findByRole("link", { name: /Пропозиції магазинів/ });
+    expect(link).toHaveAttribute("href", "/results?connection_id=results-pg&entity_type=offer");
+    expect(screen.getByText("Таблиця актуальних станів з індексами")).toBeInTheDocument();
+    expect(screen.getByText("RAW і документи результатів").nextElementSibling).toHaveTextContent("2");
+    expect(screen.getByText("Кількість сутностей").nextElementSibling).toHaveTextContent(/1.?172/);
+  });
   it("shows a failed check and releases the button after its terminal outcome", async () => {
     const job = {
       job_id: "job_status_check",

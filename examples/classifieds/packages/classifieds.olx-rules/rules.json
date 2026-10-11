@@ -1,0 +1,46 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "www.olx.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/uk/elektronika/noutbuki-i-aksesuary/noutbuki/"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "seed_list",
+      "strategy_id": "notebook-listing",
+      "urls": [
+        "https://www.olx.ua/uk/elektronika/noutbuki-i-aksesuary/noutbuki/"
+      ]
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "dedup": {
+    "use_link_rel_canonical": false
+  },
+  "fetch": {
+    "user_agent": "JaneBot/1.0",
+    "transport": "browser"
+  },
+  "limits": {
+    "crawl": {
+      "max_depth": 0,
+      "max_pages_per_run": 1
+    },
+    "rate": {
+      "requests_per_second_per_host": 0.5,
+      "min_delay_ms_per_host": 2000
+    },
+    "concurrency": {
+      "max_parallel_fetches_per_host": 1
+    }
+  }
+}

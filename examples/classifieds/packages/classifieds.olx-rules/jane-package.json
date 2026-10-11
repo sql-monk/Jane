@@ -1,0 +1,21 @@
+{
+  "schema_version": "1",
+  "package_id": "classifieds.olx-rules",
+  "version": "1.0.0",
+  "kind": "collector-rules",
+  "title": "OLX: public notebook listing via browser document transport",
+  "description": "Одна публічна сторінка ноутбуків; robots.txt дотримується. Звичайний браузерний транспорт, без виконання JS і без обходу CAPTCHA.",
+  "entry": {
+    "collector": "web",
+    "rules": "rules.json"
+  },
+  "tests": [],
+  "provenance": {
+    "created_by": "llm",
+    "authors": [
+      "Codex"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Public OLX cards: directly present title, listing identity, canonical URL, currency price and location."
+  }
+}

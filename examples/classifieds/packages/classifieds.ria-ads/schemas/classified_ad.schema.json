@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Public classified advertisement",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "site",
+    "listing_id",
+    "title",
+    "url"
+  ],
+  "properties": {
+    "site": {
+      "type": "string",
+      "minLength": 1
+    },
+    "listing_id": {
+      "type": "string",
+      "pattern": "^[0-9]+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "price": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "properties": {
+        "amount": {
+          "type": "number",
+          "minimum": 0
+        },
+        "currency": {
+          "type": "string",
+          "enum": [
+            "UAH",
+            "USD",
+            "EUR"
+          ]
+        }
+      }
+    },
+    "location": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

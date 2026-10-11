@@ -1,0 +1,27 @@
+{
+  "schema_version": "1",
+  "defaults": {
+    "source_limits": {
+      "rate": {"requests_per_second_per_host": 0.5, "min_delay_ms_per_host": 2000, "respect_crawl_delay": true},
+      "concurrency": {"max_parallel_fetches_per_host": 1}
+    },
+    "task_limits": {
+      "crawl": {"max_depth": 1, "max_pages_per_run": 5, "max_bytes_per_run": 20971520, "max_material_bytes": 5242880},
+      "timeouts": {"request_timeout_ms": 30000, "invocation_timeout_ms": 60000, "stage_timeout_ms": 180000, "run_timeout_ms": 300000}
+    },
+    "schedule": {"type": "cron", "cron": "0 9,21 * * *", "timezone": "Europe/Kyiv", "overlap": "skip"}
+  },
+  "sites": {
+    "olx": {
+      "title": "OLX.ua — оголошення ноутбуків",
+      "url": "https://www.olx.ua/uk/elektronika/noutbuki-i-aksesuary/noutbuki/",
+      "enabled": true,
+      "extractor": "classifieds.olx-ads",
+      "rules": "classifieds.olx-rules"
+    },
+    "auto-ria": {"title": "AUTO.RIA — оголошення автомобілів", "url": "https://auto.ria.com/uk/search/?indexName=auto&sort[0].order=dates.created.desc", "enabled": true, "extractor": "classifieds.auto-ria-ads", "rules": "classifieds.auto-ria-rules"},
+    "dim-ria": {"title": "DIM.RIA — оренда квартир у Києві", "url": "https://dom.ria.com/uk/arenda-kvartir/kiev/", "enabled": true, "extractor": "classifieds.dim-ria-ads", "rules": "classifieds.dim-ria-rules"},
+    "ria": {"title": "RIA.com — телефони та смарттехніка", "url": "https://www.ria.com/uk/c/mobile/", "enabled": true, "extractor": "classifieds.ria-ads", "rules": "classifieds.ria-rules"},
+    "shafa": {"title": "Shafa — публічні оголошення головної сторінки", "url": "https://shafa.ua/uk/", "enabled": true, "replaces": "izi", "replacement_reason": "Користувач погодив Shafa.ua замість IZI.ua, який перенаправляє на Shafa.", "extractor": "classifieds.shafa-ads", "rules": "classifieds.shafa-rules", "task_limits": {"crawl": {"max_depth": 0, "max_pages_per_run": 1, "max_bytes_per_run": 20971520, "max_material_bytes": 5242880}, "timeouts": {"request_timeout_ms": 30000, "invocation_timeout_ms": 60000, "stage_timeout_ms": 180000, "run_timeout_ms": 300000}}}
+  }
+}

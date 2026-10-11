@@ -1,0 +1,21 @@
+{
+  "schema_version": "1",
+  "package_id": "classifieds.shafa-rules",
+  "version": "1.0.1",
+  "kind": "collector-rules",
+  "title": "Shafa: one public listing page",
+  "description": "Одна публічна головна сторінка, без переходу на картки. robots.txt дотримується.",
+  "entry": {
+    "collector": "web",
+    "rules": "rules.json"
+  },
+  "tests": [],
+  "provenance": {
+    "created_by": "llm",
+    "authors": [
+      "Codex"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Allow only the two public homepages / and /uk/ so normal locale redirects remain in scope; keep one-page collection and robots respect."
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "source_id": "classified-ria",
+  "kind": "web",
+  "title": "RIA.com — телефони та смарттехніка",
+  "description": "Публічні оголошення https://www.ria.com/uk/c/mobile/; ліміти у examples/classifieds/sites.json.",
+  "locator": {
+    "url": "https://www.ria.com/uk/c/mobile/"
+  },
+  "collector_rules": {
+    "package_id": "classifieds.ria-rules",
+    "version": "1.0.0",
+    "digest": "sha256:5e4eaf9d597082178caabccdd6a9bb0d64578a35ebdf0a3228c50de798a77bbf"
+  },
+  "limits": {
+    "rate": {
+      "requests_per_second_per_host": 0.5,
+      "min_delay_ms_per_host": 2000,
+      "respect_crawl_delay": true
+    },
+    "concurrency": {
+      "max_parallel_fetches_per_host": 1
+    }
+  },
+  "forward_unknown_to_llm": false,
+  "expected_entity_types": [
+    "classified_ad"
+  ],
+  "labels": {
+    "group": "classifieds",
+    "site": "ria"
+  }
+}

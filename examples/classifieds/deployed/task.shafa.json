@@ -1,0 +1,103 @@
+{
+  "task_id": "classifieds-shafa",
+  "title": "Shafa — публічні оголошення головної сторінки: збір оголошень",
+  "enabled": true,
+  "description": "Збір → RAW у файлах → classified_ad у PostgreSQL. Публічні сторінки, обмежений обхід.",
+  "input": {
+    "source_id": "classified-shafa"
+  },
+  "stages": [
+    {
+      "stage_id": "collect",
+      "kind": "collect",
+      "collector": {
+        "collector": "web",
+        "mode": "full"
+      }
+    },
+    {
+      "stage_id": "store-raw",
+      "kind": "handler",
+      "handler": {
+        "package_id": "jane.storage-files",
+        "version": "1.0.0",
+        "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+      },
+      "connections": {
+        "target": "raw-files"
+      },
+      "inputs": [
+        {
+          "from": "collect"
+        }
+      ]
+    },
+    {
+      "stage_id": "extract-ads",
+      "kind": "handler",
+      "handler": {
+        "package_id": "classifieds.shafa-ads",
+        "version": "1.0.0",
+        "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce"
+      },
+      "inputs": [
+        {
+          "from": "collect",
+          "when": {
+            "field": "material.format.media_type",
+            "op": "eq",
+            "value": "text/html"
+          }
+        }
+      ]
+    },
+    {
+      "stage_id": "store-ads",
+      "kind": "handler",
+      "handler": {
+        "package_id": "jane.storage-postgresql",
+        "version": "1.0.0",
+        "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+      },
+      "connections": {
+        "target": "results-pg"
+      },
+      "inputs": [
+        {
+          "from": "extract-ads",
+          "select": "output",
+          "when": {
+            "field": "result.status",
+            "op": "eq",
+            "value": "success"
+          }
+        }
+      ]
+    }
+  ],
+  "schedule": {
+    "type": "cron",
+    "cron": "0 9,21 * * *",
+    "timezone": "Europe/Kyiv",
+    "overlap": "skip"
+  },
+  "limits": {
+    "crawl": {
+      "max_depth": 0,
+      "max_pages_per_run": 1,
+      "max_bytes_per_run": 20971520,
+      "max_material_bytes": 5242880
+    },
+    "timeouts": {
+      "request_timeout_ms": 30000,
+      "invocation_timeout_ms": 60000,
+      "stage_timeout_ms": 180000,
+      "run_timeout_ms": 300000
+    }
+  },
+  "forward_unknown_to_llm": false,
+  "labels": {
+    "group": "classifieds",
+    "site": "shafa"
+  }
+}

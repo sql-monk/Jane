@@ -1,0 +1,1 @@
+"""Public Shafa listing extraction."""

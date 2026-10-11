@@ -1,0 +1,82 @@
+{
+  "schema_version": "1",
+  "package_id": "classifieds.dim-ria-ads",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "DIM.RIA — public property advertisements",
+  "description": "Публічні картки нерухомості зі стану каталогу; без контактів продавця та приватних адрес.",
+  "entry": {
+    "runtime": "python",
+    "module": "jane_classifieds_dimria.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "classified_ad",
+        "schema": "schemas/classified_ad.schema.json",
+        "key_fields": [
+          "site",
+          "listing_id"
+        ]
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "real-catalog-excerpt",
+      "input": {
+        "file": "tests/real-catalog/page.html",
+        "media_type": "text/html",
+        "url": "https://dom.ria.com/uk/arenda-kvartir/kiev/"
+      },
+      "expected_status": "success",
+      "expected": "tests/real-catalog/expected.json",
+      "compare": "exact"
+    },
+    {
+      "name": "page-without-advertisements",
+      "input": {
+        "file": "tests/no-ads/page.html",
+        "media_type": "text/html",
+        "url": "https://dom.ria.com/uk/arenda-kvartir/kiev/"
+      },
+      "expected_status": "empty"
+    }
+  ],
+  "provenance": {
+    "created_by": "llm",
+    "authors": [
+      "Codex"
+    ],
+    "created_at": "2026-10-11T03:59:16.069696Z",
+    "change_summary": "Site-specific extraction of public catalog cards; compact success fixtures copied from live HTML, without personal contacts."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "domains": [
+      "dom.ria.com"
+    ]
+  }
+}

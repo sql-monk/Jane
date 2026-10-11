@@ -1,0 +1,44 @@
+{
+  "entities": [
+    {
+      "entity_type": "classified_ad",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "shafa",
+          "listing_id": "174879913"
+        }
+      },
+      "fields": {
+        "site": "shafa",
+        "listing_id": "174879913",
+        "title": "Trussardi 🌰 passeggiata in galleria vittorio emanuele ii 💯% оригінал",
+        "url": "https://shafa.ua/uk/cosmetics/parfyumeriya/duhi/174879913-trussardi-_-passeggiata-in-galleria-vittorio-emanuele-ii-_-original",
+        "price": {
+          "amount": 60.0,
+          "currency": "UAH"
+        }
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "shafa",
+          "listing_id": "175398588"
+        }
+      },
+      "fields": {
+        "site": "shafa",
+        "listing_id": "175398588",
+        "title": "Шорти лосіни для спорту workout знову в наявності в кольорах",
+        "url": "https://shafa.ua/uk/women/sport-otdyh/shorty/175398588-shorti-workout",
+        "price": {
+          "amount": 280.0,
+          "currency": "UAH"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "source_id": "classified-olx",
+  "kind": "web",
+  "title": "OLX.ua — оголошення ноутбуків",
+  "description": "Публічні оголошення https://www.olx.ua/uk/elektronika/noutbuki-i-aksesuary/noutbuki/; ліміти у examples/classifieds/sites.json.",
+  "locator": {
+    "url": "https://www.olx.ua/uk/elektronika/noutbuki-i-aksesuary/noutbuki/"
+  },
+  "collector_rules": {
+    "package_id": "classifieds.olx-rules",
+    "version": "1.0.0",
+    "digest": "sha256:da668ec03843cc1330d9608f9a623ea7cf8d4a4afe61f4b4722ce2740b2621e6"
+  },
+  "limits": {
+    "rate": {
+      "requests_per_second_per_host": 0.5,
+      "min_delay_ms_per_host": 2000,
+      "respect_crawl_delay": true
+    },
+    "concurrency": {
+      "max_parallel_fetches_per_host": 1
+    }
+  },
+  "forward_unknown_to_llm": false,
+  "expected_entity_types": [
+    "classified_ad"
+  ],
+  "labels": {
+    "group": "classifieds",
+    "site": "olx"
+  }
+}

@@ -1,0 +1,166 @@
+{
+  "site": "shafa",
+  "source_id": "classified-shafa",
+  "run": {
+    "run_id": "run_01M4MRQXF6DX6PHGPN1ASR5EZ2",
+    "task_id": "classifieds-shafa",
+    "trigger": "schedule",
+    "status": "succeeded",
+    "started_at": "2026-10-11T06:00:06.981Z",
+    "finished_at": "2026-10-11T06:00:39.434Z",
+    "counters": {
+      "materials": 1,
+      "unknown_materials": 0
+    },
+    "stages": {
+      "collect": {
+        "counts": {
+          "completed": 1
+        }
+      },
+      "store-raw": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+          "version": "1.0.0",
+          "package_id": "jane.storage-files"
+        }
+      },
+      "extract-ads": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce",
+          "version": "1.0.0",
+          "package_id": "classifieds.shafa-ads"
+        }
+      },
+      "store-ads": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+          "version": "1.0.0",
+          "package_id": "jane.storage-postgresql"
+        }
+      }
+    }
+  },
+  "verified": true,
+  "errors": [],
+  "samples": [
+    {
+      "fields": {
+        "url": "https://shafa.ua/men/nizhnee-bele/termobele/177641612-termobele-muzhskoe-v-stile-columbia-s-6xl-zimnee-haki-chornyy",
+        "site": "shafa",
+        "price": {
+          "amount": 779.0,
+          "currency": "UAH"
+        },
+        "title": "Термобелье мужское в стиле columbia s-6xl зимнее (хаки, чорный)",
+        "listing_id": "177641612"
+      },
+      "observation": {
+        "material_id": "web:2bf5eea65b4e702b5c53d30d18a086f8",
+        "observed_at": "2026-10-11T06:00:26Z",
+        "content_sha256": "995ee73f6fc7fa088327b483083d3887b8aa30548f0d6c2986eef9e1e6da9f2b",
+        "observation_id": "obs_01a1298c5a6c000009335c9a"
+      },
+      "raw_object_id": "obj_c3b1906313aefd63bbe85b5963d258df",
+      "verified": true,
+      "evidence_kind": "html",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price"
+      ]
+    },
+    {
+      "fields": {
+        "url": "https://shafa.ua/item/221714721-shkiryana-sumka-nizhno-rozheva-shkira",
+        "site": "shafa",
+        "price": {
+          "amount": 900.0,
+          "currency": "UAH"
+        },
+        "title": "Шкіряна сумка ніжно рожева шкіра",
+        "listing_id": "221714721"
+      },
+      "observation": {
+        "material_id": "web:2bf5eea65b4e702b5c53d30d18a086f8",
+        "observed_at": "2026-10-11T06:00:26Z",
+        "content_sha256": "995ee73f6fc7fa088327b483083d3887b8aa30548f0d6c2986eef9e1e6da9f2b",
+        "observation_id": "obs_01a1298c5a6c000009335c9a"
+      },
+      "raw_object_id": "obj_c3b1906313aefd63bbe85b5963d258df",
+      "verified": true,
+      "evidence_kind": "html",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price"
+      ]
+    },
+    {
+      "fields": {
+        "url": "https://shafa.ua/item/221703955-svetr-zhinochiy-demisezonniy-zimoviy-ruchnoyi-roboti-z-sumishi",
+        "site": "shafa",
+        "price": {
+          "amount": 4000.0,
+          "currency": "UAH"
+        },
+        "title": "Свитер женский демисезонный зимняя ручная работа из смеси мериносовой шерсти и ангоры трендового зеленого цвета шартрез колорблок",
+        "listing_id": "221703955"
+      },
+      "observation": {
+        "material_id": "web:2bf5eea65b4e702b5c53d30d18a086f8",
+        "observed_at": "2026-10-11T06:00:26Z",
+        "content_sha256": "995ee73f6fc7fa088327b483083d3887b8aa30548f0d6c2986eef9e1e6da9f2b",
+        "observation_id": "obs_01a1298c5a6c000009335c9a"
+      },
+      "raw_object_id": "obj_c3b1906313aefd63bbe85b5963d258df",
+      "verified": true,
+      "evidence_kind": "html",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price"
+      ]
+    }
+  ],
+  "packages": {
+    "store-raw": {
+      "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+      "version": "1.0.0",
+      "package_id": "jane.storage-files"
+    },
+    "extract-ads": {
+      "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce",
+      "version": "1.0.0",
+      "package_id": "classifieds.shafa-ads"
+    },
+    "store-ads": {
+      "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+      "version": "1.0.0",
+      "package_id": "jane.storage-postgresql"
+    }
+  },
+  "raw_objects": 2,
+  "persisted_entities": 48,
+  "extraction_items": 1,
+  "checked_entities": 24,
+  "checked_raw_objects": 1
+}

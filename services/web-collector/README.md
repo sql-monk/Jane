@@ -13,12 +13,14 @@
 стратегії `seed_list` (явний перелік / головна сторінка) і `recursive`. Решту стратегій додає WP-03.
 Сторінки, які будують вміст скриптами, рендеряться в headless Chromium за `fetch.render_js` — див.
 [«Рендеринг JavaScript»](#рендеринг-javascript-fetchrender_js).
+Для початкового запиту через мережевий стек Chromium є явний
+[браузерний транспорт](#браузерний-транспорт-fetchtransport).
 
 ## Незалежний запуск
 
 Без Docker (з кореня репозиторію):
 
-```
+```powershell
 uv sync --all-packages
 uv run --package jane-web-collector python -m jane_web_collector
 curl http://127.0.0.1:8101/v1/health
@@ -26,21 +28,22 @@ curl http://127.0.0.1:8101/v1/health
 
 У Docker (контекст — корінь репозиторію; стан — у томі `/var/lib/jane-web-collector`):
 
-```
+```powershell
 docker build -f services/web-collector/Dockerfile -t jane-web-collector .
 docker run --rm -p 8101:8101 -v jane-wc-state:/var/lib/jane-web-collector jane-web-collector
 ```
 
-З рендерингом JavaScript (`fetch.render_js`) — необов'язковий extra `render` (Playwright) і Chromium:
+Для браузерного транспорту (`fetch.transport=browser`) або рендерингу JavaScript (`fetch.render_js`)
+потрібні необов'язковий extra `render` (Playwright) і Chromium:
 
-```
-uv run --package jane-web-collector playwright install chromium        # локально, один раз
+```powershell
+uv run --package jane-web-collector --extra render playwright install chromium    # локально, один раз
 docker build -f services/web-collector/Dockerfile --build-arg EXTRAS="--extra render" -t jane-web-collector .
 ```
 
 В образі з extra `render` Chromium (headless shell) і його системні бібліотеки ставляться окремим шаром, що
 залежить лише від `uv.lock` (версія Playwright — заблокована), тож зміна коду не завантажує браузер знову; образ
-більший приблизно на 1 ГБ. Без extra образ не змінюється, а URL з `render_js` завершуються `not_implemented`.
+більший приблизно на 1 ГБ. Без extra URL з `render_js` або транспортом `browser` завершуються `not_implemented`.
 Локальний стек (`infra/compose.local.example.yaml`) збирає колектор з extra `render`.
 
 Правило конфігурації (перевіряється на старті, інакше сервіс не запускається):
@@ -63,7 +66,7 @@ jane-kit (`secrets`, `rules`, `content`). Спільного сховища дл
 
 ## Тести
 
-```
+```powershell
 just test web-collector                 # unit + contract + сценарії проти testsite, ~2 хв
 just test web-collector -m contract     # лише контрактні
 ```
@@ -84,7 +87,8 @@ just test web-collector -m contract     # лише контрактні
 Тести, яким потрібна незавершена колекція (409 на `DELETE /v1/states/…`, скасування, перехоплення після kill),
 утримують її через backpressure (`limits.queue.max_unacked_materials`), а не розраховують на повільний обхід.
 
-Тести рендерингу (`tests/test_render_js.py`, фікстура `chromium`) потребують headless Chromium:
+Тести рендерингу й браузерного транспорту (`tests/test_render_js.py`, `tests/test_browser_transport.py`,
+фікстура `chromium`) потребують headless Chromium:
 `uv run --package jane-web-collector playwright install chromium`. Без нього на машині розробника вони
 пропускаються з поясненням (`-ra`), а в CI (змінна `CI`) — падають; job `unit` у CI ставить Chromium сам.
 
@@ -108,7 +112,7 @@ just test web-collector -m contract     # лише контрактні
 | `CONTRACTS_DIR` | `JANE_CONTRACTS_DIR` або `contracts/` checkout | JSON Schema контрактів для валідації запитів і правил |
 | `DISCOVERY_PATH` | `services/web-collector/strategies/discovery` | пакет стратегій WP-03 |
 | `USER_AGENT` | `JaneBot/0.1 (+https://github.com/jane)` | типовий User-Agent; перше слово — токен для `robots.txt` |
-| `RENDER_ENABLED` | `true` | виконувати `fetch.render_js` (потрібні extra `render` і Chromium); `false` — такі URL завершуються `not_implemented` |
+| `RENDER_ENABLED` | `true` | доступність Chromium для `fetch.render_js` і `fetch.transport=browser` (потрібні extra `render` і Chromium); `false` — такі URL завершуються `not_implemented` |
 | `RENDER_WAIT_UNTIL` | `networkidle` | на що чекає сторінка перед знімком DOM: `domcontentloaded` / `load` / `networkidle` (0,5 с без мережевих запитів) |
 | `RENDER_BLOCK_RESOURCE_TYPES` | `["image", "media", "font"]` | JSON-масив типів ресурсів Playwright, яких браузер не запитує зовсім (економія трафіку) |
 | `RENDER_BROWSER_EXECUTABLE` | — | свій виконуваний файл Chromium; типово — встановлений `playwright install chromium` |
@@ -273,6 +277,50 @@ JANE_WEB_COLLECTOR_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 hex к�
   поза видимим ASCII відхиляється до HTTP-запиту; повідомлення про транспортні помилки не містять значень
   заголовків.
 
+## Браузерний транспорт (`fetch.transport`)
+
+`rules.fetch.transport` обирає клієнт початкового GET-запиту. Типове значення `http` використовує HTTP-клієнт
+колектора. Значення `browser` використовує звичайний мережевий стек Chromium через Playwright; JavaScript
+вимкнено, підресурси сторінки заблоковано. Матеріалом лишається початкове тіло HTTP-відповіді, а не знімок DOM.
+Це придатно для публічних сторінок, які віддають вміст браузеру, але відхиляють запит іншого HTTP-клієнта.
+
+Транспорт задають явно: відповідь `403` не вмикає браузер автоматично. Потрібні extra `render`, встановлений
+Chromium і `RENDER_ENABLED=true`; інструкція встановлення наведена в розділі
+[«Незалежний запуск»](#незалежний-запуск). Приклад правил для одного публічного URL:
+
+```json
+{
+  "collector": "web",
+  "scope": {"allowed_domains": ["www.olx.ua"]},
+  "strategies": [{"type": "seed_list", "urls": ["https://www.olx.ua/uk/elektronika/noutbuki-i-aksesuary/noutbuki/"]}],
+  "robots": {"mode": "respect"},
+  "fetch": {"transport": "browser", "user_agent": "JaneBot/1.0"},
+  "limits": {"crawl": {"max_depth": 0, "max_pages_per_run": 1}}
+}
+```
+
+- Перевірки `scope`, `robots.txt`, ліміти на хост і повтори виконує той самий
+  [`Fetcher`](src/jane_web_collector/fetcher.py). `robots.txt` теж отримується вибраним транспортом.
+  Chromium перехоплює відповідь переадресації до переходу; колектор перевіряє кожний `Location` перед наступним
+  запитом. Підресурси, service workers і подальші навігації не завантажуються.
+- Кожне мережеве з'єднання проходить через `EgressProxy` з перевіркою адрес DNS і з'єднанням із перевіреною
+  адресою. Налаштування [політики вихідних адрес](#політика-вихідних-адрес) діють і тут. Кожний GET має окремий
+  контекст браузера: cookies і стан сторінки між запитами не зберігаються.
+- Діють `timeouts.connect_timeout_ms`, `timeouts.request_timeout_ms`, `collector.render_max_pages`,
+  `collector.render_max_transfer_bytes`, `collector.render_launch_timeout_ms` і `collector.render_close_timeout_ms`.
+  Початкове тіло обрізається за `crawl.max_material_bytes`; матеріал має `truncated` і діагностику
+  `browser_transport`. У `stats.bytes_fetched` і бюджеті `crawl.max_bytes_per_run` враховується повне отримане
+  тіло, навіть якщо матеріал обрізано, або більший лічильник байтів проксі. Запити переадресацій і отримані
+  відповіді повторних спроб додаються до обліку. Ліміти запуску й закриття браузера застосовуються окремо від
+  тайм-ауту GET.
+- Підтримується GET з User-Agent і дозволеними заголовками `fetch.headers`. `fetch.connection_id` із цим
+  транспортом відхиляється під час валідації; POST завершується `not_implemented`. Без доступного Chromium
+  запит теж завершується `not_implemented`, без переходу на інший транспорт.
+
+`fetch.render_js` незалежно визначає, чи виконувати скрипти вже отриманого HTML. Наприклад,
+`transport=browser` без `render_js` зберігає початковий HTML; з `render_js=true` після GET додатково запускається
+описане нижче перетворення HTML на DOM.
+
 ## Рендеринг JavaScript (`fetch.render_js`)
 
 Деякі сайти будують вміст скриптами (ціни, JSON-LD, списки товарів): HTML від сервера його не містить.
@@ -282,7 +330,7 @@ JANE_WEB_COLLECTOR_API_KEYS=[{"name": "orchestrator", "sha256": "<sha256 hex к�
 (зокрема навігаційних HTML-сторінок стратегій — посилання беруться з відрендереного DOM) і для `POST /v1/fetches`;
 JSON, XML, sitemap, `robots.txt` і `POST` стратегій не рендеряться.
 
-- **Ті самі гарантії, що й без рендерингу.** Сторінку спершу завантажує звичайний fetcher: `scope`, `robots.txt`,
+- **Ті самі гарантії, що й без рендерингу.** Сторінку спершу завантажує fetcher вибраним транспортом: `scope`, `robots.txt`,
   перевірка кожного кроку переадресації, політика вихідних адрес, ліміти на хост (запит сторінки рахується як
   завжди), повтори, `crawl.max_material_bytes`, User-Agent і облікові дані підключення. Браузер сторінку **не
   запитує вдруге**: її першу навігацію обслуговує вже отримане тіло (`route.fulfill`). На будь-яку наступну

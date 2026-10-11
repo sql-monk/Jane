@@ -14,6 +14,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from typing import Protocol
 from urllib.parse import urljoin, urlsplit
 
 import httpx
@@ -108,6 +109,18 @@ HopCheck = Callable[[str], Awaitable[None]]
 DelayFor = Callable[[str], Awaitable[float | None]]
 
 
+class BrowserFetch(Protocol):
+    async def __call__(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str],
+        max_bytes: int,
+        limits: ServiceLimits,
+        timeouts: Timeouts | None = None,
+    ) -> tuple[int, dict[str, str], bytes, bool, int]: ...
+
+
 def _retry_after(value: str | None) -> float | None:
     if not value:
         return None
@@ -133,6 +146,8 @@ class Fetcher:
         auth_headers: Mapping[str, str] | None = None,
         connection_policy: ConnectionPolicy | None = None,
         crawl_delay_for: DelayFor | None = None,
+        transport: str = "http",
+        browser_fetch: BrowserFetch | None = None,
     ) -> None:
         self.client = client
         self.limits = limits
@@ -151,6 +166,15 @@ class Fetcher:
         self.auth_headers = dict(auth_headers or {})
         self.connection_policy = connection_policy or ConnectionPolicy()
         self.crawl_delay_for = crawl_delay_for
+        self.transport = transport
+        self.browser_fetch = browser_fetch
+        if transport == "browser" and self.auth_headers:
+            raise ValidationFailed(
+                "browser transport does not support managed connection credentials",
+                errors=[
+                    FieldError(pointer="/fetch/connection_id", message="unsupported with browser transport")
+                ],
+            )
 
     def _backoff(self, attempt: int) -> float:
         r = self.limits.retries
@@ -172,7 +196,7 @@ class Fetcher:
         timeouts: Timeouts | None = None,
         method: str = "GET",
         content: bytes | None = None,
-    ) -> tuple[int, dict[str, str], bytes, bool]:
+    ) -> tuple[int, dict[str, str], bytes, bool, int | None]:
         if any(not header_name_safe(name) or not header_value_safe(value) for name, value in headers.items()):
             raise FetchError("access_denied_by_policy", "HTTP request header rejected by policy")
         host = urlsplit(url).netloc
@@ -185,25 +209,33 @@ class Fetcher:
             raise FetchError(
                 "rate_limited", f"robots.txt Crawl-delay {delay}s exceeds the configured maximum wait"
             )
-        async with (
-            self.limiter.slot(host, delay),
-            self.client.stream(
+        async with self.limiter.slot(host, delay):
+            if self.transport == "browser":
+                if method != "GET":
+                    raise FetchError("not_implemented", "browser transport supports GET documents only")
+                if self.browser_fetch is None:
+                    raise FetchError(
+                        "not_implemented", "browser transport requires a configured Chromium browser"
+                    )
+                return await self.browser_fetch(
+                    url, headers=headers, max_bytes=max_bytes, limits=self.limits, timeouts=timeouts
+                )
+            async with self.client.stream(
                 method, url, headers=headers, content=content, timeout=self._timeout(timeouts)
-            ) as resp,
-        ):
-            chunks: list[bytes] = []
-            size = 0
-            truncated = False
-            async for chunk in resp.aiter_bytes():
-                if size + len(chunk) > max_bytes:
-                    chunks.append(chunk[: max_bytes - size])
-                    size = max_bytes
-                    truncated = True
-                    break
-                chunks.append(chunk)
-                size += len(chunk)
-            hdrs = {k.lower(): v for k, v in resp.headers.items()}
-            return resp.status_code, hdrs, b"".join(chunks), truncated
+            ) as resp:
+                chunks: list[bytes] = []
+                size = 0
+                truncated = False
+                async for chunk in resp.aiter_bytes():
+                    if size + len(chunk) > max_bytes:
+                        chunks.append(chunk[: max_bytes - size])
+                        size = max_bytes
+                        truncated = True
+                        break
+                    chunks.append(chunk)
+                    size += len(chunk)
+                hdrs = {k.lower(): v for k, v in resp.headers.items()}
+                return resp.status_code, hdrs, b"".join(chunks), truncated, None
 
     async def get(
         self,
@@ -223,16 +255,19 @@ class Fetcher:
         redirects: list[str] = []
         current = url
         total_attempts = 0
+        total_network_bytes: int | None = None
         if method != "GET":
             conditional = None
         while True:
             headers = {**self.headers, **self.auth_headers_for(current, url), **dict(conditional or {})}
             if method == "POST":
                 headers["Content-Type"] = "application/json"
-            status, hdrs, body, truncated, attempts = await self._with_retries(
+            status, hdrs, body, truncated, attempts, network_bytes = await self._with_retries(
                 current, headers, max_bytes, timeouts, method, json_body if method == "POST" else None
             )
             total_attempts += attempts
+            if network_bytes is not None:
+                total_network_bytes = (total_network_bytes or 0) + network_bytes
             if status in REDIRECT_STATUSES and "location" in hdrs:
                 if len(redirects) >= self.limits.crawl.max_redirects:
                     raise FetchError(
@@ -260,6 +295,16 @@ class Fetcher:
                 truncated=truncated,
                 redirects=redirects,
                 attempts=total_attempts,
+                network_bytes=total_network_bytes,
+                diagnostics=[
+                    {
+                        "level": "info",
+                        "code": "browser_transport",
+                        "message": "document fetched by Chromium with JavaScript disabled",
+                    }
+                ]
+                if self.transport == "browser"
+                else [],
             )
 
     def auth_headers_for(self, current: str, original: str) -> dict[str, str]:
@@ -287,13 +332,14 @@ class Fetcher:
         timeouts: Timeouts | None = None,
         method: str = "GET",
         content: bytes | None = None,
-    ) -> tuple[int, dict[str, str], bytes, bool, int]:
+    ) -> tuple[int, dict[str, str], bytes, bool, int, int | None]:
         max_attempts = self.limits.retries.max_attempts
         last_error = ""
         last_status: int | None = None
+        total_network_bytes: int | None = None
         for attempt in range(1, max_attempts + 1):
             try:
-                status, hdrs, body, truncated = await self._one_request(
+                status, hdrs, body, truncated, network_bytes = await self._one_request(
                     url, headers, max_bytes, timeouts, method, content
                 )
             except EgressDenied as exc:  # a policy decision: never retried
@@ -306,8 +352,10 @@ class Fetcher:
                 last_error = "HTTP transport failed"
                 last_status = None
             else:
+                if network_bytes is not None:
+                    total_network_bytes = (total_network_bytes or 0) + network_bytes
                 if status not in RETRY_STATUSES:
-                    return status, hdrs, body, truncated, attempt
+                    return status, hdrs, body, truncated, attempt, total_network_bytes
                 last_status = status
                 last_error = f"HTTP {status}"
                 wait = _retry_after(hdrs.get("retry-after"))

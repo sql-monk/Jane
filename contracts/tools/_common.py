@@ -19,7 +19,7 @@ CONTRACTS_DIR = Path(__file__).resolve().parent.parent
 SCHEMAS_DIR = CONTRACTS_DIR / "schemas"
 OPENAPI_DIR = CONTRACTS_DIR / "openapi"
 EXAMPLES_DIR = CONTRACTS_DIR / "examples"
-API_NAMES = ("collector", "handler", "storage", "registry", "orchestrator", "llm", "assistant")
+API_NAMES = ("collector", "handler", "storage", "registry", "orchestrator", "llm", "assistant", "operations")
 
 
 class _NoDatesLoader(yaml.SafeLoader):

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { EditorView } from "@codemirror/view";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -9,10 +10,11 @@ import { LlmPage, validProvider } from "../pages/LlmPage";
 import { ConnectionsPage } from "../pages/ConnectionsPage";
 import { PackagePage, PackagesPage } from "../pages/PackagesPage";
 import { AssistantPage } from "../pages/AssistantPage";
+import { LimitsPage } from "../pages/LimitsPage";
 import { ErrorBox, Field, ReasonAction, Table } from "./ui";
 import { UnsavedChangesProvider } from "./UnsavedChanges";
 import { openapiExample } from "../test/contracts";
-import type { Connection, Package, PackageManifest, Source } from "../api/types";
+import type { Connection, Package, PackageManifest, PlatformLimits, Source } from "../api/types";
 
 afterEach(() => {
   cleanup();
@@ -47,6 +49,80 @@ function dialogSupport() {
 }
 
 describe("admin settings review regressions", () => {
+  it("keeps invalid limits JSON editable without crashing or sending a write", async () => {
+    const limits = openapiExample<PlatformLimits>("platform-limits-dev");
+    const writes: Request[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        if (request.method === "PUT") writes.push(request);
+        return new URL(request.url).pathname.endsWith("/limits/platform")
+          ? Response.json(limits, { headers: { ETag: '"original-limits"' } })
+          : Response.json({ items: [], next_cursor: null });
+      }),
+    );
+    const user = userEvent.setup();
+    mount(<LimitsPage />, "/limits");
+    await screen.findByRole("textbox", { name: "Назва профілю лімітів" });
+    await user.click(screen.getByText("Редагувати ліміти як JSON", { exact: true }));
+    const editor = screen.getByLabelText("Ліміти платформи", { selector: ".cm-content" });
+    // Drive the real CodeMirror transaction; jsdom does not implement native editable selection.
+    const view = EditorView.findFromDOM(editor);
+    expect(view).not.toBeNull();
+    act(() => view!.dispatch({ changes: { from: 0, to: view!.state.doc.length, insert: "null" } }));
+    await screen.findByRole("alert", { name: "Помилки схеми: Ліміти платформи" });
+    expect(screen.queryByRole("textbox", { name: "Назва профілю лімітів" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Зберегти ліміти платформи" })).toBeDisabled();
+    expect(editor).toHaveAttribute("contenteditable", "true");
+    expect(writes).toEqual([]);
+    act(() =>
+      view!.dispatch({ changes: { from: 0, to: view!.state.doc.length, insert: JSON.stringify(limits) } }),
+    );
+    expect(await screen.findByRole("textbox", { name: "Назва профілю лімітів" })).toHaveValue(limits.profile);
+    expect(screen.getByRole("button", { name: "Зберегти ліміти платформи" })).toBeEnabled();
+  });
+  it("locks both limits editors during a pending write and preserves the submitted document", async () => {
+    const limits = openapiExample<PlatformLimits>("platform-limits-dev");
+    let finish: (() => void) | undefined;
+    let submitted: PlatformLimits | undefined;
+    let match: string | null = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        const url = new URL(request.url);
+        if (url.pathname.endsWith("/limits/platform")) {
+          if (request.method === "PUT") {
+            submitted = (await request.json()) as PlatformLimits;
+            match = request.headers.get("If-Match");
+            await new Promise<void>((resolve) => {
+              finish = resolve;
+            });
+            return Response.json(submitted, { headers: { ETag: '"saved-limits"' } });
+          }
+          return Response.json(limits, { headers: { ETag: '"original-limits"' } });
+        }
+        return Response.json({ items: [], next_cursor: null });
+      }),
+    );
+    const user = userEvent.setup();
+    mount(<LimitsPage />, "/limits");
+    const profile = await screen.findByRole("textbox", { name: "Назва профілю лімітів" });
+    await user.clear(profile);
+    await user.type(profile, "review-profile");
+    await user.click(screen.getByText("Усі властивості лімітів", { exact: true }));
+    const grid = screen.getByRole("table", { name: "Ліміти платформи" });
+    await user.click(screen.getByRole("button", { name: "Зберегти ліміти платформи" }));
+    await waitFor(() => expect(finish).toBeTypeOf("function"));
+    expect(profile).toBeDisabled();
+    expect(within(grid).getByLabelText("Значення $.profile", { exact: true })).toBeDisabled();
+    await user.type(profile, " newer");
+    expect(submitted).toEqual({ ...limits, profile: "review-profile" });
+    expect(match).toBe('"original-limits"');
+    finish?.();
+    await screen.findByText("Збережено");
+    expect(profile).toHaveValue("review-profile");
+    expect(profile).toBeEnabled();
+  });
   it("labels a search control inside a native form without including the submit button", () => {
     render(
       <Field label="Пошук у сховищі" hint="До розбиття на сторінки">

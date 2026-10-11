@@ -99,22 +99,30 @@ export function LimitsPage() {
         {platform.isLoading ? <Loading /> : null}
         <ErrorBox error={platform.error} />
         <fieldset className="form-fields" disabled={save.isPending || Object.keys(propertyIssues).length > 0}>
-          <PlatformLimitsForm text={text} onChange={setText} />
+          {check.ok && check.value ? (
+            <PlatformLimitsForm text={text} onChange={setText} />
+          ) : (
+            <p className="muted">
+              Для форм потрібен коректний документ лімітів. Перевірте розширений редактор.
+            </p>
+          )}
         </fieldset>
         <details className="module-setting-group">
           <summary>Усі властивості лімітів</summary>
-          {check.value && check.ok ? (
-            <PropertyIssuesContext.Provider value={reportPropertyIssue}>
-              <PropertyDraftsBlockedContext.Provider value={save.isPending}>
-                <PropertyGrid
-                  objectRoot
-                  value={check.value as JsonValue}
-                  onChange={(value) => setText(toJsonText(value))}
-                  label="Ліміти платформи"
-                />
-              </PropertyDraftsBlockedContext.Provider>
-            </PropertyIssuesContext.Provider>
-          ) : null}
+          <fieldset className="form-fields" disabled={save.isPending}>
+            {check.value && check.ok ? (
+              <PropertyIssuesContext.Provider value={reportPropertyIssue}>
+                <PropertyDraftsBlockedContext.Provider value={save.isPending}>
+                  <PropertyGrid
+                    objectRoot
+                    value={check.value as JsonValue}
+                    onChange={(value) => setText(toJsonText(value))}
+                    label="Ліміти платформи"
+                  />
+                </PropertyDraftsBlockedContext.Provider>
+              </PropertyIssuesContext.Provider>
+            ) : null}
+          </fieldset>
         </details>
         <details className="module-setting-group">
           <summary>Редагувати ліміти як JSON</summary>

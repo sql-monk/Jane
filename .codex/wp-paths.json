@@ -127,7 +127,9 @@
         "tests/e2e/**",
         "scripts/**",
         ".github/**",
-        "web/admin/README.md"
+        "web/admin/README.md",
+        "contracts/tools/_common.py",
+        "contracts/tools/check_contracts.py"
       ]
     },
     "33": {

@@ -79,6 +79,26 @@
     "light": "43c6ea40e11865de894bea3d8e78c0833d0126ba3b874a6c488acac2bd57b1bc",
     "dark": "53d015a00babf7f4263dfe0432d53e9414065a53ad75185ad35ce995b1ddf9ea"
   },
+  "orchestrator/data-model": {
+    "drawio": "e2997d964aac90191772a407ef99901344501e0dc4796fb2669bd439ece52dea",
+    "light": "91b1c56bd41d8eedacc1010c2f99b6b1232f2b873297d9c3c7ef581b9d268ed4",
+    "dark": "9e2a83ab0c41ae418cf718fc86e3b8095e2d0d409c8c2f7ad818e4c0ac4c8512"
+  },
+  "orchestrator/item-lease-retry": {
+    "drawio": "537136fa4e7b49a57475e11df31c9a23f265f158d993131109f4542a1efe4e8b",
+    "light": "63b16fcb3320341b40f084b36387cc74d0b7aa123dfae60f79f87a6c7222612e",
+    "dark": "f6bb40c47baf956cfc6c12d9bcffd4fc15ccb63975fb5ef4e34744d718069ee3"
+  },
+  "orchestrator/run-item-states": {
+    "drawio": "54159f20ee498e873a2e60fcdf0360bde4f56a4908c22f6ceabae02ed9b3da6a",
+    "light": "c6eef3bc09a76e08ad829d4f785ebb1c3877ad7e43c253a674cba8dc76fd319d",
+    "dark": "ea9487ba103c2417a6b5592014f3f2a04cecaad183a7e098d82e088930698917"
+  },
+  "orchestrator/run-sequence": {
+    "drawio": "0968138be41221f7be42d59eceb414d171c36881d5f24cc613332733b88fa1f3",
+    "light": "89c2ec37d1af9e6952e9dd971523d1f9e6f56de95f93684f637823d31fb58af3",
+    "dark": "7e40114f4ac0f74867c1c4ba9d76ed671ef7a99ed9dec15930c585d86fe32825"
+  },
   "packages/fork-port": {
     "drawio": "4e432a39f9efb99229902a9eff064fa393313c2b6f19eebe7332806757dd5529",
     "light": "e8f5d184b038aa910f8330c55b2ee3cc61c00cc01524c6d36d048566dc11bfab",

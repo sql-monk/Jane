@@ -1,0 +1,7 @@
+{
+  "source_id": "quickstart-testsite",
+  "kind": "web",
+  "title": "Jane test site",
+  "locator": {"url": "http://127.0.0.1:18620/"},
+  "collector_rules": {"package_id": "quickstart.testsite-rules", "version": "1.0.0"}
+}

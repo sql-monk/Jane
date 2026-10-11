@@ -1,0 +1,10 @@
+{
+  "schema_version": "1",
+  "package_id": "quickstart.testsite-rules",
+  "version": "1.0.0",
+  "kind": "collector-rules",
+  "title": "Quickstart: two product pages of the test site",
+  "entry": {"collector": "web", "rules": "rules.json"},
+  "tests": [],
+  "provenance": {"created_by": "human", "created_at": "2026-10-11T00:00:00Z"}
+}

@@ -1,0 +1,6 @@
+{
+  "connection_id": "quickstart-raw",
+  "kind": "filesystem",
+  "title": "Quickstart RAW files",
+  "params": {"base_path": ".jane/orchestrator-quickstart/raw"}
+}

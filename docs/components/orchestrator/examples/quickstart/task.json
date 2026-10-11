@@ -1,0 +1,16 @@
+{
+  "task_id": "quickstart-products",
+  "title": "Quickstart: collect two product pages and store RAW",
+  "input": {"source_id": "quickstart-testsite"},
+  "stages": [
+    {"stage_id": "collect", "kind": "collect", "collector": {"collector": "web"}},
+    {
+      "stage_id": "store-raw",
+      "kind": "handler",
+      "handler": {"package_id": "jane.storage-files", "version": "1.0.0"},
+      "connections": {"target": "quickstart-raw"},
+      "inputs": [{"from": "collect"}]
+    }
+  ],
+  "schedule": {"type": "manual"}
+}

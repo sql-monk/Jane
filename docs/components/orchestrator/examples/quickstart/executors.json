@@ -1,0 +1,8 @@
+[
+  {"executor": "web-collector", "role": "collector", "base_url": "http://127.0.0.1:18611",
+   "capabilities": {"collector": "web"}, "sync_connections": false},
+  {"executor": "storage", "role": "handler", "base_url": "http://127.0.0.1:18612",
+   "capabilities": {"packages": ["jane.storage-*"], "handler_kinds": ["storage"]}},
+  {"executor": "storage-read", "role": "storage_read", "base_url": "http://127.0.0.1:18612",
+   "sync_connections": false}
+]

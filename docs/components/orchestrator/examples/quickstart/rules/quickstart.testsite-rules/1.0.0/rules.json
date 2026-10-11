@@ -1,0 +1,15 @@
+{
+  "collector": "web",
+  "scope": {"allowed_domains": ["127.0.0.1"], "allowed_schemes": ["http"]},
+  "strategies": [
+    {
+      "type": "seed_list",
+      "strategy_id": "products",
+      "urls": [
+        "http://127.0.0.1:18620/product/laptop-four",
+        "http://127.0.0.1:18620/product/phone-alpha"
+      ]
+    }
+  ],
+  "robots": {"mode": "respect"}
+}

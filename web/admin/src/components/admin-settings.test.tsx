@@ -54,7 +54,7 @@ describe("admin settings review regressions", () => {
         </select>
       </Field>,
     );
-    const control = screen.getByRole("combobox", { name: "Рівень", exact: true });
+    const control = screen.getByRole("combobox", { name: "Рівень" });
     expect(control).toHaveAttribute("aria-invalid", "true");
     expect(control).toHaveAccessibleDescription("Область дії бюджету Виберіть джерело");
   });

@@ -325,9 +325,9 @@ def upload_version(
     changed = manifest["provenance"]["created_by"] == "llm" and not current.json()["auto_changes_allowed"]
     if changed and not allow_generated:
         raise RuntimeError(f"{pid}: publication requires explicit --allow-generated-packages authorization")
-    if changed:
-        policy_patch(True, current.headers["ETag"])
     try:
+        if changed:
+            policy_patch(True, current.headers["ETag"])
         return registry.call(
             "POST",
             f"{path}/versions",

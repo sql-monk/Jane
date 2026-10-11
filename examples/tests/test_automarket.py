@@ -23,8 +23,8 @@ def test_all_archives_documents_and_fixture_entity_fields() -> None:
     assert automarket.check_offline() == []
 
 
-@pytest.mark.parametrize("upload_fails", [False, True])
-def test_generated_upload_restores_registry_policy(upload_fails: bool) -> None:
+@pytest.mark.parametrize("failure", [None, "upload", "permission"])
+def test_generated_upload_restores_registry_policy(failure: str | None) -> None:
     policies: list[bool] = []
     allowed = False
 
@@ -34,9 +34,11 @@ def test_generated_upload_restores_registry_policy(upload_fails: bool) -> None:
             assert request.headers["if-match"] == '"policy"'
             allowed = json.loads(request.content)["auto_changes_allowed"]
             policies.append(allowed)
+            if allowed and failure == "permission":
+                raise httpx.RemoteProtocolError("permission response interrupted")
         if request.url.path.endswith("/versions"):
             assert allowed
-            if upload_fails:
+            if failure == "upload":
                 raise httpx.RemoteProtocolError("upload interrupted")
             return httpx.Response(
                 409,
@@ -66,7 +68,7 @@ def test_generated_upload_restores_registry_policy(upload_fails: bool) -> None:
         with pytest.raises(RuntimeError, match="explicit --allow-generated-packages"):
             automarket.upload_version(api, "autos.rst-car-ads", directory)
         assert policies == []
-        if upload_fails:
+        if failure:
             with pytest.raises(httpx.RemoteProtocolError):
                 automarket.upload_version(api, "autos.rst-car-ads", directory, allow_generated=True)
         else:

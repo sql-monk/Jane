@@ -52,7 +52,8 @@ uv run --all-packages python examples/automarket/setup_automarket.py verify --st
 Воркери оркестратора обробляють спільну чергу. Якщо великі попередні каталоги затримують обробку, можна додати обмежену кількість штатних воркерів без заміни контейнера API:
 
 ```powershell
-uv run python examples/automarket/queue_workers.py --stack-file .jane/stack-jane-demo.json --compose-root . --workers 6
+docker build -f services/orchestrator/Dockerfile -t jane-automarket-orchestrator:local .
+uv run python examples/automarket/queue_workers.py --stack-file .jane/stack-jane-demo.json --compose-root . --workers 2 --task-id ads-autoria --task-id ads-rst --image jane-automarket-orchestrator:local
 ```
 
-Додатковий контейнер має окреме ім'я `<project>-automarket-worker`, шість потоків за замовчуванням, вимкнений scheduler і політику рестарту `unless-stopped`. Він споживає спільну чергу, не має HTTP-портів і користується чинними підключеннями стеку. Кількість потоків налаштовується через `--workers`; ліміт паралельних викликів Handler Runtime залишається окремим обмеженням. Повторний виклик із тим самим числом використовує наявний контейнер.
+Додатковий контейнер має окреме ім'я `<project>-automarket-priority-worker`, два потоки в наведеній команді, вимкнений scheduler і політику рестарту `unless-stopped`. Необов'язковий внутрішній фільтр `JANE_ORCHESTRATOR_LIMITS__ENGINE__TASK_IDS` дозволяє йому споживати лише AUTO.RIA/RST зі спільної черги. Без фільтра штатний порядок загальної черги залишається чинним. Контейнер не має HTTP-портів і користується підключеннями стеку. Кількість потоків налаштовується через `--workers`; ліміт Handler Runtime залишається окремим обмеженням. Повторний виклик перевіряє project, кількість потоків, фільтр та образ перед використанням наявного контейнера.

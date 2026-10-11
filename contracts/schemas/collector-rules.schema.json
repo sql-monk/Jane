@@ -62,7 +62,6 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "transport": { "type": "string", "enum": ["http", "browser"], "default": "http", "description": "Транспорт початкового GET-запиту: http — звичайний HTTP-клієнт; browser — мережевий стек Chromium через контрольований egress proxy. Для browser повертаються оригінальні байти відповіді, JavaScript під час завантаження вимкнено; render_js окремо визначає потребу рендерингу. Межі, robots.txt, переадресації, ліміти, тайм-аути та перевірки вихідних адрес залишаються обов'язковими. Потрібна збірка Web Collector з Chromium; за відсутності підтримки — not_implemented. POST та автентифіковані запити через цей транспорт не підтримуються." },
             "user_agent": { "type": "string", "maxLength": 300 },
             "headers": {
               "description": "Додаткові несекретні заголовки. Автентифікація до сайту — лише через connection_id.",
@@ -283,7 +282,7 @@
         "body": { "description": "JSON-тіло для method: POST; для GET не використовується. Однакове для всіх сторінок, крім полів, явно заданих pagination.body_page_path та partitions.body_path." },
         "items_path": { "type": "string", "description": "JSONPath до масиву елементів, наприклад '$.items'." },
         "url_path": { "type": "string", "description": "JSONPath до URL матеріалу в елементі, наприклад '$.url'." },
-        "item_url_base": { "type": "string", "format": "uri", "pattern": "^https?://", "description": "Базовий URL для відносних URL товарів (наприклад https://shop.example.test/ для API під /api/). Якщо не задано — URL сторінки API. Результат проходить normalization і scope; robots перевіряється при HTTP-завантаженні, включно з навігацією API. Для emit_items_as_materials URL товару не завантажується." },
+        "item_url_base": { "type": "string", "format": "uri", "pattern": "^https?://", "description": "Базовий URL для відносних URL товарів (наприклад https://shop.example.test/ для API під /api/). Якщо не задано — URL сторінки API. Результат завжди проходить звичайні scope, normalization і robots перевірки." },
         "lastmod_path": { "type": "string" },
         "emit_items_as_materials": { "type": "boolean", "default": false, "description": "true — кожен елемент items_path видається як окремий Material: media_type application/json (елемент, серіалізований як JSON), content_kind json, material_id — від канонічного URL з url_path (той самий об'єкт, що й сторінка за цим URL), edited_at — з lastmod_path, discovery.parent_url — сторінка API, без http і locator.final_url. URL елементів не завантажуються; ядро закріплює їх у зборі, тож інша стратегія не завантажує той самий URL у цьому зборі (один матеріал на канонічний URL). У mode=incremental елементи підлягають revisit і dedup так само, як сторінки (if_changed — за зміною вмісту елемента)." },
         "partitions": {

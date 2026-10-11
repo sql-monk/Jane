@@ -12,7 +12,9 @@ import { ErrorBox, Notice } from "./ui";
 function isPrimary(path: string): boolean {
   return (
     /settings\.(log_level|render_enabled|render_wait_until|run_workers|scheduler_enabled)$/.test(path) ||
-    /limits\.(engine\.workers|(?:contract\.)?(concurrency|timeouts|rate|crawl|sandbox)\.)/.test(path)
+    /limits\.(engine\.workers|(?:contract\.)?(concurrency|timeouts|rate|crawl|sandbox|llm|telegram|provider)\.)/.test(
+      path,
+    )
   );
 }
 

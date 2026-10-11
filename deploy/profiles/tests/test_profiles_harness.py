@@ -407,6 +407,50 @@ def test_stack_credentials_and_names_are_isolated() -> None:
         jane_stack.profile_path("no-such-profile")
 
 
+def test_storage_starts_mongodb_and_the_stack_file_records_it() -> None:
+    """MongoDB of storage's connection results-mongo starts with storage as PostgreSQL does (compose
+    ``depends_on``), and ``up`` names it explicitly."""
+    base = yaml.safe_load(jane_stack.INFRA_COMPOSE.read_text(encoding="utf-8"))["services"]
+    for app, deps in jane_stack.INFRA_DEPENDENCIES.items():
+        for dep in deps:
+            assert base[app]["depends_on"][dep] == {"condition": "service_healthy"}, (app, dep)
+            assert base[dep]["ports"][0].endswith(f":{jane_stack.CONTAINER_PORTS[dep]}"), dep
+    assert jane_stack.with_infra(jane_stack.DEFAULT_SERVICES) == [*jane_stack.DEFAULT_SERVICES, "mongodb"]
+    assert jane_stack.with_infra(["mongodb", "storage", "storage"]) == ["mongodb", "storage"]
+    assert jane_stack.with_infra(["web-collector"]) == ["web-collector"]
+
+
+def test_up_records_the_mongodb_address_and_credentials(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The stack file gets the entry ``just up`` writes for MongoDB (``just env``, ``jane_kit.devstack``, the MongoDB
+    adapter tests read it); without ``url`` it stays out of the HTTP service URLs. Compose is not called."""
+    monkeypatch.setattr(jane_stack, "STACK_DIR", tmp_path)
+    monkeypatch.setattr(jane_stack, "RECORDINGS", tmp_path / "no-recordings")
+    monkeypatch.delenv("COMPOSE_PROFILES", raising=False)  # set by `up`, restored after the test
+    stack = jane_stack.Stack("jane-stack-mongo-test", verbose=False)
+    calls: list[tuple[str, ...]] = []
+    ports = {"storage": 18000, "mongodb": 27999}
+    monkeypatch.setattr(stack, "compose", lambda *args, **_: calls.append(args))
+    monkeypatch.setattr(stack, "host_port", lambda name: ports[name])
+
+    assert stack.up(["storage"]) == {"storage": "http://127.0.0.1:18000", "mongodb": "127.0.0.1:27999"}
+    assert calls[-1][-2:] == ("storage", "mongodb")
+    data = json.loads(jane_stack.stack_file("jane-stack-mongo-test").read_text(encoding="utf-8"))
+    user, password = data["env"]["JANE_MONGO_USER"], data["env"]["JANE_MONGO_PASSWORD"]
+    assert data["services"] == {
+        "storage": {"host": "127.0.0.1", "url": "http://127.0.0.1:18000"},
+        "mongodb": {
+            "host": "127.0.0.1",
+            "port": 27999,
+            "user": user,
+            "password": password,
+            "uri": f"mongodb://{user}:{password}@127.0.0.1:27999/?authSource=admin",
+        },
+    }
+    assert jane_stack.service_urls("jane-stack-mongo-test") == {"storage": "http://127.0.0.1:18000"}
+
+
 # ------------------------------------------------------------------------------------------ metrics
 def test_window_gap_and_concurrency_metrics() -> None:
     events = [ev(0.0, 1.0), ev(0.5, 1.5), ev(1.0, 2.0), ev(3.0, 3.1)]

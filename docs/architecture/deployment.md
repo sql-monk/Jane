@@ -41,6 +41,7 @@
 
 - **Інфраструктура** (`postgres`, `sqlserver`, `mongodb`, `minio`, `s3`, `testsite`, `proxy`) стартує типовою командою `just up` без аргументів. Сервіси застосунку вмикаються явно за назвою (compose-профілі): `just up storage assistant`.
 - **`pg-provision`** створює в `postgres` окрему роль і базу для кожного сервісу ([infra/postgres](../../infra/postgres/)).
+- **`storage`** стартує разом із `mongodb` (`depends_on`): підключення `results-mongo` з [infra/config/storage-connections.json](../../infra/config/storage-connections.json) пише сутності в базу `jane_results`, поруч із `results-pg` у PostgreSQL — [підключення Storage](../../infra/README.md#підключення-storage).
 - **Образи** замінюються змінними `JANE_IMAGE_<СЕРВІС>`.
 - **Порти на хості** — `JANE_PORT_<СЕРВІС>`; порожнє значення — Docker обирає вільний порт. Адреса публікації — `JANE_BIND` (типово `127.0.0.1`).
 - **Облікові дані** генерує `just up` у файл `.jane/stack-<проєкт>.json` поза Git: паролі баз, MinIO, S3, SQL Server, MongoDB і ключі API.

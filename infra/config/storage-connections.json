@@ -12,6 +12,13 @@
       "title": "Development results",
       "params": { "host": "postgres", "port": 5432, "database": "jane_storage_results", "schema": "public", "sslmode": "disable" },
       "secret_refs": { "username": "env:JANE_SECRET_DEV_PG_USER", "password": "env:JANE_SECRET_DEV_PG_PASSWORD" }
+    },
+    {
+      "connection_id": "results-mongo",
+      "kind": "mongodb",
+      "title": "Development results (MongoDB)",
+      "params": { "host": "mongodb", "port": 27017, "database": "jane_results", "auth_source": "admin" },
+      "secret_refs": { "username": "env:JANE_SECRET_DEV_MONGO_USER", "password": "env:JANE_SECRET_DEV_MONGO_PASSWORD" }
     }
   ]
 }

@@ -9,6 +9,7 @@ Compose files: ``infra/compose.yaml`` (WP-01) + ``deploy/profiles/compose.stack.
 (plan.md §3.4): a unique compose project, host ports chosen by Docker on 127.0.0.1, generated credentials,
 project-prefixed volumes and images. The stack file ``.jane/stack-<project>.json`` has the shape written by
 ``just up`` (``env`` + ``services``), so ``just env --project <project>`` and ``jane_kit.devstack`` read it too.
+With ``storage`` the stack also starts MongoDB (connection ``results-mongo``) and records its address.
 Stdlib only; works on Windows (Docker Desktop) and Linux.
 """
 
@@ -51,6 +52,7 @@ CONTAINER_PORTS = {
     "proxy": 8080,
     "postgres": 5432,
     "minio": 9000,
+    "mongodb": 27017,
     "storage": 8000,
     "handler-runtime": 8000,
     "web-collector": 8101,
@@ -61,6 +63,11 @@ CONTAINER_PORTS = {
     "assistant": 8000,
     "probe-site": 8080,
 }
+# Databases an application service of the stack needs besides PostgreSQL / MinIO (infra/compose.yaml `depends_on`
+# starts them too): `up` names them explicitly and records their address and credentials in the stack file in the
+# shape `just up` writes (scripts/dev.py `describe`), e.g. MongoDB of storage's connection results-mongo.
+INFRA_DEPENDENCIES: dict[str, tuple[str, ...]] = {"storage": ("mongodb",)}
+RECORDED_INFRA = frozenset(dep for deps in INFRA_DEPENDENCIES.values() for dep in deps)
 PG_PASSWORD_KEYS = (
     "JANE_PG_HANDLER_RUNTIME_PASSWORD",
     "JANE_PG_ORCHESTRATOR_PASSWORD",
@@ -125,6 +132,27 @@ def executors_for(services: Sequence[str], *, telegram_backend: str = "recorded"
         if e["executor"] == "telegram-collector" and telegram_backend != "recorded":
             e["sync_connections"] = True
     return out
+
+
+def with_infra(services: Sequence[str]) -> list[str]:
+    """``services`` plus the databases they need (``INFRA_DEPENDENCIES``), each once, in a stable order."""
+    out = list(dict.fromkeys(services))
+    for name in services:
+        out += [dep for dep in INFRA_DEPENDENCIES.get(name, ()) if dep not in out]
+    return out
+
+
+def infra_entry(name: str, port: int, env: Mapping[str, str], host: str = "127.0.0.1") -> dict[str, Any]:
+    """Stack-file entry of a recorded database: address and credentials, without ``url`` (not an HTTP service)."""
+    entry: dict[str, Any] = {"host": host, "port": port}
+    if name == "mongodb":
+        user, password = env["JANE_MONGO_USER"], env["JANE_MONGO_PASSWORD"]
+        entry |= {
+            "user": user,
+            "password": password,
+            "uri": f"mongodb://{user}:{password}@{host}:{port}/?authSource=admin",
+        }
+    return entry
 
 
 class StackError(RuntimeError):
@@ -291,6 +319,7 @@ class Stack:
 
     # ------------------------------------------------------------------ lifecycle
     def up(self, services: Sequence[str], *, wait_timeout_s: int = 900) -> dict[str, str]:
+        """Start ``services`` and the databases they need; ``{name: base URL, or host:port of a database}``."""
         if "handler-runtime" in services:
             self._prepare_sandbox()
         apps = sorted(APP_SERVICES & set(services))
@@ -307,6 +336,7 @@ class Stack:
             if not (recordings / path.name).exists():
                 shutil.copyfile(path, recordings / path.name)
         self._save({})
+        started = with_infra(services)
         self.compose(
             "up",
             "-d",
@@ -314,12 +344,21 @@ class Stack:
             "--wait",
             "--wait-timeout",
             str(wait_timeout_s),
-            *services,
+            *started,
             timeout=wait_timeout_s + 1800,
         )
-        urls = {name: f"http://127.0.0.1:{self.host_port(name)}" for name in services}
-        self._save({name: {"host": "127.0.0.1", "url": url} for name, url in urls.items()})
-        return urls
+        addresses: dict[str, str] = {}
+        recorded: dict[str, Any] = {}
+        for name in started:
+            port = self.host_port(name)
+            if name in RECORDED_INFRA:
+                addresses[name] = f"127.0.0.1:{port}"
+                recorded[name] = infra_entry(name, port, self.creds)
+            else:
+                addresses[name] = f"http://127.0.0.1:{port}"
+                recorded[name] = {"host": "127.0.0.1", "url": addresses[name]}
+        self._save(recorded)
+        return addresses
 
     def _save(self, services: Mapping[str, Any]) -> None:
         write_stack(
@@ -422,10 +461,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if ns.command == "up":
         services = list(ns.services or DEFAULT_SERVICES)
         services += (["telegram-collector"] if ns.telegram else []) + (["probe-site"] if ns.probe else [])
-        urls = stack.up(services, wait_timeout_s=ns.wait_timeout)
+        addresses = stack.up(services, wait_timeout_s=ns.wait_timeout)
         print(f"project: {project}   profile: {ns.profile}   stack file: {stack_file(project).as_posix()}")
-        for name, url in urls.items():
-            print(f"  {name:<18} {url}")
+        for name, address in addresses.items():
+            print(f"  {name:<18} {address}")
         return 0
     if ns.command == "env":
         for name, url in service_urls(project).items():

@@ -160,8 +160,12 @@ services:
       # PostgreSQL/MongoDB/SQL Server adapters) is returned by getObject as storage's transit blob
       # file:///var/lib/jane/storage/transit/storage/...; storage removes it after transfer.transit_ttl_seconds.
       JANE_STORAGE_TRANSIT_DIR: /var/lib/jane/storage/transit
+      # Secrets of the connections in config/storage-connections.json (secret_refs env:JANE_SECRET_DEV_*):
+      # results-pg - role jane_storage_results; results-mongo - the stack's MongoDB user (authSource admin).
       JANE_SECRET_DEV_PG_USER: jane_storage_results
       JANE_SECRET_DEV_PG_PASSWORD: ${JANE_PG_STORAGE_RESULTS_PASSWORD:?run `just up`}
+      JANE_SECRET_DEV_MONGO_USER: ${JANE_MONGO_USER:-jane}
+      JANE_SECRET_DEV_MONGO_PASSWORD: ${JANE_MONGO_PASSWORD:?run `just up`}
     volumes:
       - "storage-operations:/var/lib/jane-operations"
       - storage-data:/var/lib/jane/storage
@@ -172,6 +176,8 @@ services:
     ports: ["${JANE_BIND:-127.0.0.1}:${JANE_PORT_STORAGE:-}:8000"]
     depends_on:
       pg-provision: { condition: service_completed_successfully }
+      # Entities whose fields a package defines go to MongoDB (connection results-mongo): it starts with storage.
+      mongodb: { condition: service_healthy }
     healthcheck:
       <<: *healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=2)"]

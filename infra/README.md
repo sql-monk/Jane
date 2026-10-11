@@ -12,6 +12,7 @@
 - [Ізоляція проєктів і порти](#ізоляція-проєктів-і-порти)
 - [Облікові дані](#облікові-дані)
 - [PostgreSQL: бази й ролі сервісів](#postgresql-бази-й-ролі-сервісів)
+- [Підключення Storage](#підключення-storage)
 - [Proxy і адмінка](#proxy-і-адмінка)
 - [Локальне доповнення compose.local.yaml](#локальне-доповнення-composelocalyaml)
 - [Тести стеку](#тести-стеку)
@@ -60,7 +61,7 @@ infra/
 
 Пояснення до таблиці:
 
-- **Залежності запуску.** Сервіси з базою PostgreSQL і `storage` чекають успішного завершення `pg-provision`; `registry` — ще й здорового `minio`; `assistant` — здорового `llm`; `proxy` — здорового `testsite`. Профіль `assistant` вмикає також `llm`.
+- **Залежності запуску.** Сервіси з базою PostgreSQL і `storage` чекають успішного завершення `pg-provision`; `storage` — ще й здорового `mongodb` (підключення `results-mongo`); `registry` — здорового `minio`; `assistant` — здорового `llm`; `proxy` — здорового `testsite`. Профіль `assistant` вмикає також `llm`.
 - **Health-check.** Інфраструктурні сервіси перевіряються в `compose.yaml`; сервіси Jane — запитом `GET /v1/health` (у `compose.yaml` або `HEALTHCHECK` у Dockerfile). `just up` виконує `docker compose up --wait` і чекає стану `healthy`.
 - **Образи.** Кожен образ можна замінити змінною `JANE_IMAGE_<СЕРВІС>`, наприклад `JANE_IMAGE_POSTGRES`, `JANE_IMAGE_MINIO`, `JANE_IMAGE_S3`, `JANE_IMAGE_PROXY`.
 - **MinIO.** Upstream більше не публікує образи MinIO, тому типовим є сторонній community-образ `pgsty/minio`, закріплений дайджестом. Це ризик постачальника; іншу збірку MinIO задайте через `JANE_IMAGE_MINIO`.
@@ -150,6 +151,20 @@ just down -v --project jane-second
 - Таблиці в базах створюють самі сервіси під час старту; `provision.sql` створює лише бази й ролі. Як сервіси оновлюють схеми — [оновлення й міграції](../docs/operations/upgrades.md).
 - `jane_storage_results` — не база стану Storage, а приклад цільового сховища користувача. Storage під'єднується до неї через підключення з `secret_refs` (`env:JANE_SECRET_DEV_PG_USER`, `env:JANE_SECRET_DEV_PG_PASSWORD`).
 
+## Підключення Storage
+
+[config/storage-connections.json](config/storage-connections.json) монтується в контейнер `storage` (`JANE_STORAGE_CONNECTIONS_FILE`) і містить лише параметри та `secret_refs`. Значення секретів `compose.yaml` передає у змінних `JANE_SECRET_DEV_*` середовища `storage`, тож вони однакові для `just up`, `deploy/profiles/stack.py` і варіанта з `compose.local.yaml`.
+
+| Підключення | Адаптер | Куди пише | Секрети |
+|---|---|---|---|
+| `raw-files` | `filesystem` | том `storage-data` | — |
+| `results-pg` | `postgresql` | база `jane_storage_results` у `postgres` | `JANE_SECRET_DEV_PG_USER` (роль `jane_storage_results`), `JANE_SECRET_DEV_PG_PASSWORD` (`JANE_PG_STORAGE_RESULTS_PASSWORD`) |
+| `results-mongo` | `mongodb` | база `jane_results` у `mongodb`, `auth_source: admin` | `JANE_SECRET_DEV_MONGO_USER` (`JANE_MONGO_USER`), `JANE_SECRET_DEV_MONGO_PASSWORD` (`JANE_MONGO_PASSWORD`) |
+
+- `results-mongo` — для сутностей, поля яких задає пакет ([план](../docs/delivery/mongo-entities.md)): колекція на тип сутності, префікс колекцій — типовий для адаптера. Storage під'єднується користувачем MongoDB стеку (`jane`), окремого користувача для Storage немає.
+- `storage` залежить від `mongodb` у `compose.yaml`, тому `just up storage` і `stack.py up` запускають MongoDB разом зі Storage; адреса й облікові дані MongoDB — у файлі стеку (`just env` → `JANE_STACK_MONGODB_*`).
+- Файл лише засіває підключення під час старту Storage. Щоб завдання могли їх використовувати, ті самі документи реєструють в Orchestrator (`PUT /v1/connections/{id}`), який синхронізує їх із виконавцями.
+
 ## Proxy і адмінка
 
 `proxy` (Caddy) — єдина точка входу стеку на порту `JANE_PORT_PROXY`:
@@ -184,6 +199,7 @@ just integration infra/tests
 
 - `test_stack.py` — PostgreSQL, ізоляція ролей сервісів, SQL Server, MongoDB, обидва S3-сумісні сховища, тестовий сайт напряму й через proxy.
 - `test_auth_config.py` — генератори ключів у `scripts/dev.py`, `deploy/profiles/stack.py` і `jane_kit.devstack` збігаються; сервіси стартують із ключами API; службові ключі сервісів приймаються їхніми сусідами.
+- `test_storage_connections.py` — без стеку: підключення `config/storage-connections.json` відповідають контракту, проходять політику секретів Storage із середовищем контейнера з `compose.yaml`, їхні `secret_refs` розв'язуються, а бази, до яких вони звертаються, стартують разом зі `storage`.
 
 ## Обмеження
 

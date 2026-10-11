@@ -84,7 +84,7 @@ deploy\profiles\single-node.json: schema valid
 
 ## Стек з профілем: stack.py
 
-`stack.py` піднімає ізольований стек на базі `infra/compose.yaml` і доповнення `compose.stack.yaml`, у якому профіль змонтовано як файл лімітів кожного сервісу. Типовий набір сервісів — ланцюжок прикладів каталогу й перевірки цін: `testsite`, `registry`, `storage`, `handler-runtime`, `web-collector`, `orchestrator` (з їхніми залежностями PostgreSQL і MinIO).
+`stack.py` піднімає ізольований стек на базі `infra/compose.yaml` і доповнення `compose.stack.yaml`, у якому профіль змонтовано як файл лімітів кожного сервісу. Типовий набір сервісів — ланцюжок прикладів каталогу й перевірки цін: `testsite`, `registry`, `storage`, `handler-runtime`, `web-collector`, `orchestrator` (з їхніми залежностями PostgreSQL, MinIO і MongoDB — останню потребує Storage для підключення `results-mongo`).
 
 | Команда | Дія |
 |---|---|
@@ -109,6 +109,7 @@ uv run --all-packages python deploy/profiles/stack.py down --project jane-profil
 - **Профіль** — `--profile`, типово `dev-laptop`; допустимі `dev-laptop`, `ci`, `single-node`.
 - **Проєкт** — `--project`, або `JANE_STACK_PROJECT`, або `jane-stack-<6 символів хешу шляху checkout>`. Порти вибирає Docker на `127.0.0.1`.
 - **Облікові дані й ключі API** генеруються так само, як у `just up`, і зберігаються у `.jane/stack-<проєкт>.json`; `just env --project <проєкт>` читає цей файл.
+- **MongoDB** — якщо в стеку є `storage`, `up` запускає й `mongodb` і записує в `services.mongodb` файлу стеку адресу, користувача, пароль і `uri` (як `just up`; `just env` → `JANE_STACK_MONGODB_*`). `env` цього скрипта друкує лише HTTP-адреси, тому MongoDB там немає.
 - **Виконавці Orchestrator** записуються в `.jane/executors-<проєкт>.json` лише для запущених сервісів.
 - **Пісочниця** — образ `<проєкт>-python-extractor:1` збирається командою `jane-handler-runtime build-image`, якщо його немає. Групу Docker-сокета `stack.py` визначає пробним контейнером, якщо не задано `JANE_DOCKER_GID`.
 - **Telegram** — `--telegram` додає Telegram Collector з бекендом `recorded` (записи `examples/telegram/recordings`). Реальний бекенд — `JANE_TELEGRAM_BACKEND=telethon` і `JANE_TELEGRAM_EXTRAS=--extra telethon`; секрети облікового запису беруться з середовища оператора (`JANE_SECRET_TG_API_HASH`, `JANE_SECRET_TG_SESSION`). Реальний бекенд тут не перевірявся.

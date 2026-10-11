@@ -196,6 +196,12 @@ resolved.effective()  # {"limits": {...}, "provenance": {"crawl.max_depth": "tas
 
 ## Тести
 
+Для operations у Docker образ має створити writable `/var/lib/jane-operations` для користувача сервісу та задати `<PREFIX>OPERATIONS_DIR`. Штатні Dockerfile Jane це роблять; новий named volume успадковує права каталогу. Перевірка нового тому та наступного контейнера без запуску стека:
+
+```text
+python scripts/admin_operations_smoke.py --image jane-wp33-assistant:verified --settings-module jane_assistant.settings
+```
+
 ```
 just test jane-kit
 JANE_CONTRACTS_DIR=<шлях до contracts> just test jane-kit -m contract   # проти контрактів WP-00

@@ -18,6 +18,8 @@ RUN uv sync --frozen --no-dev --no-editable --package jane-llm
 
 FROM ${PYTHON_IMAGE}
 RUN useradd --system --uid 10001 --no-create-home jane
+RUN mkdir -p /var/lib/jane-operations && chown jane /var/lib/jane-operations
+ENV JANE_LLM_OPERATIONS_DIR=/var/lib/jane-operations
 COPY --from=build /app/.venv /app/.venv
 COPY services/llm/packages/ /app/packages/
 ENV PATH=/app/.venv/bin:$PATH \

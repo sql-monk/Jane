@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import Field
 
@@ -20,7 +22,7 @@ class ServiceLimits(Limits):
     engine: Engine = Engine()
 
 
-def make_app(path: Path, **kwargs):
+def make_app(path: Path, **kwargs: Any) -> FastAPI:
     settings = JaneSettings(operations_dir=path, **kwargs)
     limits = resolve_limits(
         ServiceLimits,
@@ -31,7 +33,7 @@ def make_app(path: Path, **kwargs):
     return app
 
 
-def test_configuration_constraints_etag_and_restart(tmp_path):
+def test_configuration_constraints_etag_and_restart(tmp_path: Path) -> None:
     app = make_app(tmp_path)
     with TestClient(app) as client:
         original = client.get("/v1/configuration")
@@ -78,7 +80,7 @@ def test_configuration_constraints_etag_and_restart(tmp_path):
         assert workers["origin"] == "module"
 
 
-def test_scope_and_protected_values(tmp_path):
+def test_scope_and_protected_values(tmp_path: Path) -> None:
     settings = {
         "auth_mode": "api_key",
         "api_keys": [
@@ -113,7 +115,7 @@ def test_scope_and_protected_values(tmp_path):
         )
 
 
-def test_durable_telemetry_and_unknown_metrics(tmp_path):
+def test_durable_telemetry_and_unknown_metrics(tmp_path: Path) -> None:
     app = make_app(tmp_path)
     with TestClient(app) as client:
         client.get("/v1/info")
@@ -137,7 +139,7 @@ def test_durable_telemetry_and_unknown_metrics(tmp_path):
         assert len(client.get("/v1/telemetry").json()["samples"]) >= count
 
 
-def test_reset_inherited_values_requires_restart(tmp_path):
+def test_reset_inherited_values_requires_restart(tmp_path: Path) -> None:
     with TestClient(make_app(tmp_path)) as client:
         tag = client.get("/v1/configuration").headers["etag"]
         client.put(
@@ -162,7 +164,7 @@ def test_reset_inherited_values_requires_restart(tmp_path):
 
 
 @pytest.mark.parametrize("value", [True, "2", 1.5])
-def test_numeric_type_constraints(tmp_path, value):
+def test_numeric_type_constraints(tmp_path: Path, value: bool | str | float) -> None:
     with TestClient(make_app(tmp_path)) as client:
         tag = client.get("/v1/configuration").headers["etag"]
         assert (
@@ -175,7 +177,7 @@ def test_numeric_type_constraints(tmp_path, value):
         )
 
 
-def test_downsample_resolution_retains_history_endpoints(tmp_path):
+def test_downsample_resolution_retains_history_endpoints(tmp_path: Path) -> None:
     import json
     import time
 

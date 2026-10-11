@@ -53,7 +53,7 @@ def read_overrides(settings: Any) -> dict[str, Any]:
     path = operations_path(settings) / "operations.sqlite3"
     if not path.exists():
         return {}
-    with closing(sqlite3.connect(path, timeout=5)) as db:
+    with closing(sqlite3.connect(path, timeout=settings.health_check_timeout_ms / 1000)) as db:
         row = db.execute("SELECT document FROM configuration WHERE id=1").fetchone()
     return json.loads(row[0]) if row else {}
 

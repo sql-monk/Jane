@@ -1,0 +1,58 @@
+[
+  {
+    "service": "web-collector",
+    "fields": 60,
+    "samples": 10,
+    "pending_restart": false,
+    "resolution_seconds": 80.0
+  },
+  {
+    "service": "telegram-collector",
+    "fields": 36,
+    "samples": 10,
+    "pending_restart": false,
+    "resolution_seconds": 170.0
+  },
+  {
+    "service": "handler-runtime",
+    "fields": 37,
+    "samples": 10,
+    "pending_restart": false,
+    "resolution_seconds": 170.0
+  },
+  {
+    "service": "storage",
+    "fields": 42,
+    "samples": 10,
+    "pending_restart": false,
+    "resolution_seconds": 145.0
+  },
+  {
+    "service": "llm",
+    "fields": 40,
+    "samples": 10,
+    "pending_restart": false,
+    "resolution_seconds": 145.0
+  },
+  {
+    "service": "assistant",
+    "fields": 91,
+    "samples": 10,
+    "pending_restart": false,
+    "resolution_seconds": 195.0
+  },
+  {
+    "service": "registry",
+    "fields": 40,
+    "samples": 10,
+    "pending_restart": false,
+    "resolution_seconds": 145.0
+  },
+  {
+    "service": "orchestrator",
+    "fields": 54,
+    "samples": 10,
+    "pending_restart": false,
+    "resolution_seconds": 140.0
+  }
+]

@@ -129,7 +129,11 @@
         ".github/**",
         "web/admin/README.md",
         "contracts/tools/_common.py",
-        "contracts/tools/check_contracts.py"
+        "contracts/tools/check_contracts.py",
+        "services/orchestrator/tests/test_admin_diagnostics.py",
+        "services/storage/tests/test_entity_discovery.py",
+        "services/storage/adapters/files/tests/test_files_adapter.py",
+        "services/web-collector/tests/test_browser_transport.py"
       ]
     },
     "33": {

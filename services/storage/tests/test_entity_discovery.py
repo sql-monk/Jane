@@ -128,13 +128,14 @@ def test_configured_read_deadline_returns_safe_problem(
         json.dumps({"defaults": {"timeouts": {"request_timeout_ms": 5}}}), encoding="utf-8"
     )
     spec = OpenAPISpec.load(Path(__file__).resolve().parents[3] / "contracts/openapi/storage.v1.yaml")
-    with TestClient(build_app(settings.with_overrides(limits_file=limits_file))) as client:
+    app = build_app(settings.with_overrides(limits_file=limits_file))
+    with TestClient(app) as client:
         assert client.get("/v1/info").json()["limits"]["defaults"]["timeouts"]["request_timeout_ms"] == 5
 
         # Warm the real connection so this regression measures cancellation of the operation,
         # rather than timing out during first-time schema initialization.
         async def warm_connection() -> None:
-            async with client.app.state.pool.lease("raw-files", "filesystem", {}):
+            async with app.state.pool.lease("raw-files", "filesystem", {}):
                 pass
 
         assert client.portal is not None

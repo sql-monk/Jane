@@ -8,12 +8,11 @@ from typing import Any
 import psycopg
 import pytest
 from orch_support import Neighbours, base_result, catalog_task, product_extractor, wait_until
+from test_features import setup, start, wait_run
 
 from jane_orchestrator.common import rfc3339
 from jane_orchestrator.runs import canonical_scope
 from jane_orchestrator.service import audit_changes
-
-from .test_features import setup, start, wait_run
 
 
 def test_canonical_scope_supports_pipes_inside_the_real_scope() -> None:
@@ -207,9 +206,11 @@ def test_failed_handler_retains_failure_kind_trace_and_exact_group_filter(
     # A handler can advance after the run row's most recent collector update.
     with psycopg.connect(db_dsn) as conn:
         conn.execute("UPDATE runs SET updated_at = created_at WHERE run_id = %s", (run["run_id"],))
-        latest = conn.execute(
+        latest_row = conn.execute(
             "SELECT max(updated_at) FROM items WHERE run_id = %s", (run["run_id"],)
-        ).fetchone()[0]
+        ).fetchone()
+        assert latest_row is not None
+        latest = latest_row[0]
     refreshed = client.get(f"/v1/runs/{run['run_id']}").json()
     assert refreshed["updated_at"] == rfc3339(latest)
     groups = client.get("/v1/problem-groups").json()["items"]

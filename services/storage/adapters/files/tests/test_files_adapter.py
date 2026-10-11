@@ -10,13 +10,13 @@ import sys
 import textwrap
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from jane_contracts.storage_adapter import AdapterError, DeliveryRecord, ResolvedConnection
+from jane_contracts.storage_adapter import AdapterError, DeliveryRecord, EntitySnapshot, ResolvedConnection
 from jane_storage.codec import delivery_to_json, dumps, utcnow
 from jane_storage.engine import StorageEngine
 from jane_storage.keys import canonical_key, key_digest
@@ -231,6 +231,9 @@ async def test_entity_scan_stops_after_cancelled_filesystem_read(
     # Instrument filesystem I/O and the executor, while running the actual adapter and scan.
     monkeypatch.setattr(Path, "read_bytes", gated_read)
     monkeypatch.setattr(asyncio, "to_thread", observed_to_thread)
+    task: asyncio.Task[
+        tuple[Sequence[Mapping[str, Any]], str | None] | tuple[Sequence[EntitySnapshot], str | None]
+    ]
     if operation == "catalog":
         task = asyncio.create_task(adapter.list_entity_types(limit=1))
     elif operation == "search":

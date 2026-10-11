@@ -1,7 +1,7 @@
 # Контракти Jane
 
 Машинозчитувані контракти всіх сервісів (ТЗ §13.1 п.6). Конвенції — скіл
-[`.claude/skills/jane-contracts`](../.claude/skills/jane-contracts/SKILL.md); рішення — [`docs/adr/`](../docs/adr/README.md).
+[`.claude/skills/jane-contracts`](../.claude/skills/jane-contracts/SKILL.md); документація модуля — [docs/components/contracts](../docs/components/contracts/README.md), рішення — `docs/adr/`.
 Після прийняття WP-00 змінюються лише через координатора й субагента `contract-guardian`.
 
 ## Структура

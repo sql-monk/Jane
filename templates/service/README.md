@@ -1,6 +1,6 @@
 # Template Service
 
-<!-- Шаблон README за DoD plan.md §4. Після `just new-service` замініть опис і приклади на свої. -->
+Це шаблон README за DoD `plan.md` §4: після `just new-service` замініть опис і приклади на свої ([новий сервіс](../../docs/development/new-service.md)).
 
 Призначення сервісу в одному-двох реченнях. Контракт: `contracts/openapi/template-service.v1.yaml`
 (конвенції — скіл `jane-contracts`).
@@ -9,15 +9,26 @@
 
 Без Docker (з кореня репозиторію):
 
-```
+```powershell
 uv sync --all-packages
 uv run --package jane-template-service python -m jane_template_service
-curl http://127.0.0.1:8000/v1/health
+```
+
+Перевірка з другого термінала, PowerShell:
+
+```powershell
+(Invoke-WebRequest http://127.0.0.1:8000/v1/health).Content
+```
+
+Bash:
+
+```bash
+curl -s http://127.0.0.1:8000/v1/health
 ```
 
 У Docker (контекст збірки — корінь репозиторію):
 
-```
+```powershell
 docker build -f templates/service/Dockerfile -t jane-template-service .
 docker run --rm -p 8000:8000 --env-file .jane/template-auth.env jane-template-service
 ```
@@ -34,10 +45,12 @@ lifespan. Власні реалізації протоколів не пишіт
 
 ## Тести
 
+```powershell
+just test template-service
+just test template-service -m integration
 ```
-just test template-service                  # unit + contract
-just test template-service -m integration   # потребує `just up`
-```
+
+Перша команда запускає unit- і контрактні тести, друга — інтеграційні (потребує `just up`).
 
 Контрактні тести (`tests/test_contract.py`) перевіряють `/v1/health`, `/v1/info`, `/v1/jobs` і помилки
 за `contracts/openapi/common.yaml`, а API сервісу — за його `*.v1.yaml` через `ContractClient`.
@@ -61,7 +74,7 @@ just test template-service -m integration   # потребує `just up`
 
 ## Автентифікація
 
-Автентифікацію реалізує jane-kit за [ADR-0005](../../docs/adr/0005-authentication.md).
+Автентифікацію реалізує jane-kit; режими й параметри — [jane-kit: конфігурація](../../docs/components/jane-kit/configuration.md#автентифікація).
 Для контейнера з `HOST=0.0.0.0` задайте `AUTH_MODE=api_key` (і `API_KEYS` / `API_KEYS_FILE`) або `jwt`
 з JWKS/issuer/audience. Таблиця `AUTH_SCOPES` передається в `create_app(auth_scopes=...)` і покриває
 приклад `POST /v1/examples/jobs`, читання й скасування job scope `handler:invoke`.

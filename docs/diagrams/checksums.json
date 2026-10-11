@@ -14,6 +14,21 @@
     "light": "0811351e3565a67a4655950e1bc5d2293e26ad9cb55395d16735ee338f1c62c6",
     "dark": "5dbed6b41d0ddf5d8c40875f9d9d6d5c7c505e95a9eaab53dea093a92da29258"
   },
+  "contracts/contract-change": {
+    "drawio": "2cec4f3ea9c8e08ba7fee97fd3613fe559ff25cde380a0c5f9f9eecd384c2998",
+    "light": "336b150a99016be62d0c618ad8dfee4b0e4b3e76f3b898b6eb88e2b991de3fe0",
+    "dark": "395c727dc67622182d9761d66dae62c99c12787f9721e7dcf06914eeab35bb70"
+  },
+  "contracts/contract-tooling": {
+    "drawio": "4335abb60162751a0d2fea613c32d083ad6bfaf2fff2d59f186976a199c627aa",
+    "light": "c0d44613afea83b1517260517f776322c17697c29eba32df8ea78e68d377746a",
+    "dark": "4d6c086d756bd242381c3e3a7a726329bbc06182623592cf475ee4f7ca512bbd"
+  },
+  "development/ci-pipeline": {
+    "drawio": "2bbb365bb7c123c63c350ab79ae007577c4c282ed21a99c9c01a2bf59fd9b643",
+    "light": "c001a0f91ef85894bdad67ca6e0639c06ffe49877b316abcb6b8dc1e59d4d914",
+    "dark": "aeb2e1a316ea9bbf4048d10c237e40c82cc6119f739b869ada87f66f3acd4e00"
+  },
   "extractor-sdk/author-workflow": {
     "drawio": "c6b704d104d5253e697237c4f5ba7a03f2f99318f75650b99f9b9f6131c4c94e",
     "light": "41539cb56fa523745acd33582a973550dc8824f268c008a92d4e4b62ae04844f",
@@ -48,6 +63,21 @@
     "drawio": "92a7801cdb0ec4d639b0f58dc5e5cf98c509830e3fc0ac92f458e7842699c480",
     "light": "10a5a8ac72c29491d80a79fbc58212322dff564d7f95149ace951e6e8b41156e",
     "dark": "8f11b67872296fbbf4fe69bf9f7c6fab565e6967855a62d5093814209252e952"
+  },
+  "jane-kit/job-states": {
+    "drawio": "dbd8efce352414f5d8ba6722978b0d16820f70538bb3414f758e6811d6385243",
+    "light": "e40f6f381687825592afbfc5c7455e968a05eb6279c6ada33ef41abe9720af69",
+    "dark": "0a69b93c6e7853641a1998a68a776993fde7e48eb50c11460d3e49bd35a3b9e1"
+  },
+  "jane-kit/limits-inheritance": {
+    "drawio": "434f9dede3f4307d518b0b08e378c55a828c96536bd4fb593c049ebca7d81bd0",
+    "light": "d39c1a3e0832f5ddb68af7168fcc39128ea37d7c9a53349a3512034224b06ffd",
+    "dark": "6a2d2e565af608b193993179f083b434b1b1502e10f6a59df092f846021c9e3d"
+  },
+  "jane-kit/request-pipeline": {
+    "drawio": "2433b4e47dbd97fa569b5ffee4b7ecc8e9bfd2d34230f3e05fcfc465cac274e4",
+    "light": "43c6ea40e11865de894bea3d8e78c0833d0126ba3b874a6c488acac2bd57b1bc",
+    "dark": "53d015a00babf7f4263dfe0432d53e9414065a53ad75185ad35ce995b1ddf9ea"
   },
   "platform/composition": {
     "drawio": "4ce63d7f87feaa558e60a42da57def6718fda505abe78564db452f93d9d354f6",

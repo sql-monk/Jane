@@ -12,17 +12,17 @@
 **Функція.** Код: [web/admin/src/pages/RunsPage.tsx:42](../../../../../../web/admin/src/pages/RunsPage.tsx#L42).
 
 ```typescript
-function RunsPage(): JSX.Element
+function RunsPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.pages.RunsPage.RunPage
 
 **Функція.** Код: [web/admin/src/pages/RunsPage.tsx:194](../../../../../../web/admin/src/pages/RunsPage.tsx#L194).
 
 ```typescript
-function RunPage(): JSX.Element
+function RunPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

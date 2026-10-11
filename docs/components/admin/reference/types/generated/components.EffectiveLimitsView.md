@@ -35,7 +35,7 @@ Flattens nested limits into `group.field` rows.
 **Функція.** Код: [web/admin/src/components/EffectiveLimitsView.tsx:23](../../../../../../web/admin/src/components/EffectiveLimitsView.tsx#L23).
 
 ```typescript
-function EffectiveLimitsView({ query, }: { query: { source_id?: string; task_id?: string; stage_id?: string; }; }): JSX.Element
+function EffectiveLimitsView({ query, }: { query: { source_id?: string; task_id?: string; stage_id?: string; }; }): any
 ```
 
 ### Параметри
@@ -44,7 +44,7 @@ function EffectiveLimitsView({ query, }: { query: { source_id?: string; task_id?
 |---|---|---|---|
 | `__0` | `{ query: { source_id?: string; task_id?: string; stage_id?: string; }; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ### Опис із вихідного коду
 

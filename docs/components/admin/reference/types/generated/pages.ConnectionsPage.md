@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/pages/ConnectionsPage.tsx:26](../../../../../../web/admin/src/pages/ConnectionsPage.tsx#L26).
 
 ```typescript
-function ConnectionsPage(): JSX.Element
+function ConnectionsPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

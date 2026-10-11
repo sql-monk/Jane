@@ -35,12 +35,12 @@ HANDLER: dict[str, Scopes] = {'POST /v1/invocations': 'handler:invoke', 'GET /v1
 **Константа.** Код: [libs/jane-kit/src/jane_kit/auth_scopes.py:80](../../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L80).
 
 ```python
-STORAGE: dict[str, Scopes] = {'GET /v1/entities': 'storage:read', 'GET /v1/entity-history': 'storage:read', 'GET /v1/objects': 'storage:read', 'GET /v1/objects/{object_id}': 'storage:read', 'GET /v1/objects/{object_id}/content': 'storage:read'}
+STORAGE: dict[str, Scopes] = {'POST /v1/storage-status/checks': 'connections:write', **_jobs((*_HANDLER_ANY, 'connections:write'), (*_HANDLER_ANY, 'connections:write')), **_connections('handler:invoke', 'storage:read'), 'GET /v1/storage-status': 'storage:read', 'GET /v1/entities': 'storage:read', 'GET /v1/entity-history': 'storage:read', 'GET /v1/objects': 'storage:read', 'GET /v1/objects/{object_id}': 'storage:read', 'GET /v1/objects/{object_id}/content': 'storage:read'}
 ```
 
 ## jane_kit.auth_scopes.LLM
 
-**Константа.** Код: [libs/jane-kit/src/jane_kit/auth_scopes.py:89](../../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L89).
+**Константа.** Код: [libs/jane-kit/src/jane_kit/auth_scopes.py:93](../../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L93).
 
 ```python
 LLM: dict[str, Scopes] = {'GET /v1/providers': _LLM_READ, 'GET /v1/providers/{provider_id}': _LLM_READ, 'PUT /v1/providers/{provider_id}': 'llm:admin', 'DELETE /v1/providers/{provider_id}': 'llm:admin', 'GET /v1/model-aliases': _LLM_READ, 'PUT /v1/model-aliases/{alias}': 'llm:admin', 'POST /v1/completions': 'llm:invoke', 'GET /v1/budgets': 'llm:admin', 'PUT /v1/budgets/{scope_type}/{scope_id}': 'llm:admin', 'DELETE /v1/budgets/{scope_type}/{scope_id}': 'llm:admin', 'GET /v1/usage': 'llm:admin', **_jobs(_LLM_READ, _LLM_READ)}
@@ -48,7 +48,7 @@ LLM: dict[str, Scopes] = {'GET /v1/providers': _LLM_READ, 'GET /v1/providers/{pr
 
 ## jane_kit.auth_scopes.ASSISTANT
 
-**Константа.** Код: [libs/jane-kit/src/jane_kit/auth_scopes.py:104](../../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L104).
+**Константа.** Код: [libs/jane-kit/src/jane_kit/auth_scopes.py:108](../../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L108).
 
 ```python
 ASSISTANT: dict[str, Scopes] = {'GET /v1/onboarding-sessions': 'assistant:use', 'POST /v1/onboarding-sessions': 'assistant:use', 'GET /v1/onboarding-sessions/{session_id}': 'assistant:use', 'POST /v1/onboarding-sessions/{session_id}/candidate-selection': 'assistant:use', 'POST /v1/onboarding-sessions/{session_id}/proposals/{proposal_id}/acceptance': 'assistant:use', 'GET /v1/improvement-runs': 'assistant:use', 'POST /v1/improvement-runs': 'assistant:use', 'POST /v1/unknown-materials': 'assistant:use', **_jobs('assistant:use', 'assistant:use')}
@@ -56,7 +56,7 @@ ASSISTANT: dict[str, Scopes] = {'GET /v1/onboarding-sessions': 'assistant:use', 
 
 ## jane_kit.auth_scopes.REGISTRY
 
-**Константа.** Код: [libs/jane-kit/src/jane_kit/auth_scopes.py:116](../../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L116).
+**Константа.** Код: [libs/jane-kit/src/jane_kit/auth_scopes.py:120](../../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L120).
 
 ```python
 REGISTRY: dict[str, Scopes] = {'GET /v1/packages': 'registry:read', 'POST /v1/packages': 'registry:write', 'GET /v1/packages/{package_id}': 'registry:read', 'PATCH /v1/packages/{package_id}': 'registry:write', 'GET /v1/packages/{package_id}/versions': 'registry:read', 'POST /v1/packages/{package_id}/versions': 'registry:write', 'GET /v1/packages/{package_id}/versions/{version}': 'registry:read', 'GET /v1/packages/{package_id}/versions/{version}/archive': 'registry:read', 'GET /v1/packages/{package_id}/versions/{version}/file': 'registry:read', 'POST /v1/packages/{package_id}/versions/{version}/status': 'registry:approve', 'POST /v1/packages/{package_id}/versions/{version}/test-results': 'registry:write', 'POST /v1/packages/{package_id}/forks': 'registry:write', 'GET /v1/packages/{package_id}/diff': 'registry:read', 'GET /v1/packages/{package_id}/upstream': 'registry:read', 'POST /v1/packages/{package_id}/upstream-ports': 'registry:write', **_jobs('registry:read', 'registry:write')}
@@ -64,7 +64,7 @@ REGISTRY: dict[str, Scopes] = {'GET /v1/packages': 'registry:read', 'POST /v1/pa
 
 ## jane_kit.auth_scopes.ORCHESTRATOR
 
-**Константа.** Код: [libs/jane-kit/src/jane_kit/auth_scopes.py:138](../../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L138).
+**Константа.** Код: [libs/jane-kit/src/jane_kit/auth_scopes.py:142](../../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L142).
 
 ```python
 ORCHESTRATOR: dict[str, Scopes] = {'GET /v1/sources': _O_READ, 'POST /v1/sources': _O_WRITE, 'GET /v1/sources/{source_id}': _O_READ, 'PUT /v1/sources/{source_id}': _O_WRITE, 'DELETE /v1/sources/{source_id}': _O_WRITE, 'GET /v1/tasks': _O_READ, 'POST /v1/tasks': _O_WRITE, 'GET /v1/tasks/{task_id}': _O_READ, 'PUT /v1/tasks/{task_id}': _O_WRITE, 'DELETE /v1/tasks/{task_id}': _O_WRITE, 'POST /v1/task-validations': _O_READ, 'POST /v1/tasks/{task_id}/runs': _O_WRITE, 'GET /v1/tasks/{task_id}/stages/{stage_id}/activations': _O_READ, 'POST /v1/tasks/{task_id}/stages/{stage_id}/activations': _O_WRITE, 'GET /v1/runs': _O_READ, 'GET /v1/runs/{run_id}': _O_READ, 'POST /v1/runs/{run_id}/cancel': _O_WRITE, 'GET /v1/runs/{run_id}/items': _O_READ, 'GET /v1/materials/{material_id}/trace': _O_READ, 'GET /v1/unknown-materials': _O_READ, 'GET /v1/problem-groups': _O_READ, 'PATCH /v1/problem-groups/{group_id}': _O_WRITE, 'POST /v1/reprocessing': _O_WRITE, 'GET /v1/connections': _O_READ, 'GET /v1/connections/{connection_id}': _O_READ, 'PUT /v1/connections/{connection_id}': _O_ADMIN, 'DELETE /v1/connections/{connection_id}': _O_ADMIN, 'GET /v1/limits/platform': _O_READ, 'PUT /v1/limits/platform': _O_ADMIN, 'GET /v1/limits/effective': _O_READ, 'GET /v1/executors': _O_READ, 'GET /v1/audit-events': _O_READ, **_jobs(_O_READ, _O_WRITE)}
@@ -72,7 +72,7 @@ ORCHESTRATOR: dict[str, Scopes] = {'GET /v1/sources': _O_READ, 'POST /v1/sources
 
 ## jane_kit.auth_scopes.TABLES
 
-**Константа.** Код: [libs/jane-kit/src/jane_kit/auth_scopes.py:174](../../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L174).
+**Константа.** Код: [libs/jane-kit/src/jane_kit/auth_scopes.py:178](../../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L178).
 
 ```python
 TABLES: dict[str, dict[str, Scopes]] = {'collector': COLLECTOR, 'handler': HANDLER, 'storage': STORAGE, 'llm': LLM, 'assistant': ASSISTANT, 'registry': REGISTRY, 'orchestrator': ORCHESTRATOR}
@@ -86,7 +86,7 @@ Contract name (``contracts/openapi/<name>.v1.yaml``) -> its table.
 
 ## jane_kit.auth_scopes.merge
 
-**Функція.** Код: [libs/jane-kit/src/jane_kit/auth_scopes.py:190](../../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L190).
+**Функція.** Код: [libs/jane-kit/src/jane_kit/auth_scopes.py:194](../../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L194).
 
 ```python
 def merge(*tables: Mapping[str, str | Sequence[str]]) -> dict[str, tuple[str, ...]]:

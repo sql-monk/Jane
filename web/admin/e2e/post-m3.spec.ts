@@ -253,7 +253,7 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
       material: { material_id: string; observation_id: string };
     };
     await admin.goto("/materials?connection_id=raw-files");
-    const table = admin.getByRole("table", { name: "Збережені матеріали" });
+    const table = admin.getByRole("table", { name: "Матеріали raw-files", exact: true });
     await table.getByRole("button", { name: "Повторно обробити" }).first().click();
     const form = admin.getByRole("form", { name: "Повторна обробка" });
     await expect(form.getByLabel("Що обробити").locator("option")).toHaveText([

@@ -12,17 +12,17 @@
 **Функція.** Код: [web/admin/src/pages/SourcesPage.tsx:26](../../../../../../web/admin/src/pages/SourcesPage.tsx#L26).
 
 ```typescript
-function SourcesPage(): JSX.Element
+function SourcesPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.pages.SourcesPage.SourcePage
 
 **Функція.** Код: [web/admin/src/pages/SourcesPage.tsx:148](../../../../../../web/admin/src/pages/SourcesPage.tsx#L148).
 
 ```typescript
-function SourcePage(): JSX.Element
+function SourcePage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

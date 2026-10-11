@@ -71,7 +71,7 @@ STRATEGY_LABELS: Record<string, string> = {
 **Функція.** Код: [web/admin/src/pages/RulesEditorPage.tsx:88](../../../../../../web/admin/src/pages/RulesEditorPage.tsx#L88).
 
 ```typescript
-function StrategiesSummary({ rules: ref }: { rules: PackageRef; }): JSX.Element
+function StrategiesSummary({ rules: ref }: { rules: PackageRef; }): any
 ```
 
 ### Параметри
@@ -80,7 +80,7 @@ function StrategiesSummary({ rules: ref }: { rules: PackageRef; }): JSX.Element
 |---|---|---|---|
 | `__0` | `{ rules: PackageRef; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ### Опис із вихідного коду
 
@@ -93,7 +93,7 @@ Read-only summary of the strategies a source uses (source page).
 **Функція.** Код: [web/admin/src/pages/RulesEditorPage.tsx:121](../../../../../../web/admin/src/pages/RulesEditorPage.tsx#L121).
 
 ```typescript
-function RulesEditorPage(): JSX.Element
+function RulesEditorPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/pages/LlmPage.tsx:24](../../../../../../web/admin/src/pages/LlmPage.tsx#L24).
 
 ```typescript
-function LlmPage(): JSX.Element
+function LlmPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

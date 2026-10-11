@@ -10,6 +10,7 @@ import { SourcesPage, SourcePage } from "./pages/SourcesPage";
 import { TasksPage, TaskPage } from "./pages/TasksPage";
 import { RunsPage, RunPage } from "./pages/RunsPage";
 import { MaterialsPage, MaterialTracePage } from "./pages/MaterialsPage";
+import { StoragesPage } from "./pages/StoragesPage";
 import { ResultsPage } from "./pages/ResultsPage";
 import { ProblemsPage } from "./pages/ProblemsPage";
 import { PackagesPage, PackagePage } from "./pages/PackagesPage";
@@ -124,7 +125,11 @@ function Layout() {
             <ThemeControl />
           </div>
         </header>
-        <main className="content" id="main-content" tabIndex={-1}>
+        <main
+          className={`content${location.pathname.startsWith("/materials") || location.pathname === "/storages" ? " storage-workspace" : ""}`}
+          id="main-content"
+          tabIndex={-1}
+        >
           {auth.expired ? (
             <div className="error-box" role="alert">
               Сесія недійсна або прострочена (401). <NavLink to="/login">Увійти знову</NavLink>
@@ -160,6 +165,7 @@ export function App() {
         <Route path="/runs" element={<RunsPage />} />
         <Route path="/runs/:runId" element={<RunPage />} />
         <Route path="/materials" element={<MaterialsPage />} />
+        <Route path="/storages" element={<StoragesPage />} />
         <Route path="/materials/:materialId/trace" element={<MaterialTracePage />} />
         <Route path="/results" element={<ResultsPage />} />
         <Route path="/problems" element={<ProblemsPage />} />

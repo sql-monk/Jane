@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/components/ConnectionPicker.tsx:7](../../../../../../web/admin/src/components/ConnectionPicker.tsx#L7).
 
 ```typescript
-function ConnectionPicker({ label, value, onChange, }: { label: string; value: string; onChange: (value: string) => void; }): JSX.Element
+function ConnectionPicker({ label, value, onChange, }: { label: string; value: string; onChange: (value: string) => void; }): any
 ```
 
 ### Параметри
@@ -20,7 +20,7 @@ function ConnectionPicker({ label, value, onChange, }: { label: string; value: s
 |---|---|---|---|
 | `__0` | `{ label: string; value: string; onChange: (value: string) => void; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ### Опис із вихідного коду
 

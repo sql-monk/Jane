@@ -5,7 +5,8 @@ import { useApi } from "../app/context";
 import { ifMatch, newIdempotencyKey, unwrap, unwrapWithEtag } from "../api/client";
 import { useCursorList } from "../api/hooks";
 import type { Job, RunRequest, Stage, TaskConfig, TaskValidation } from "../api/types";
-import { DagView } from "../components/DagView";
+import { ChainEditor } from "../components/ChainEditor";
+import { buildDag } from "../lib/dag";
 import { EffectiveLimitsView } from "../components/EffectiveLimitsView";
 import { JsonEditor, checkJson, toJsonText } from "../components/JsonEditor";
 import { ScheduleEditor } from "../components/ScheduleEditor";
@@ -222,6 +223,7 @@ export function TaskPage() {
   const [urlsText, setUrlsText] = useState("");
   const [validation, setValidation] = useState<TaskValidation | null>(null);
   const [saved, setSaved] = useState(false);
+  const [chainValid, setChainValid] = useState(true);
 
   useEffect(() => {
     const task = loaded.data?.data;
@@ -254,6 +256,16 @@ export function TaskPage() {
     if (retries.value !== undefined) task.retries = retries.value as NonNullable<TaskConfig["retries"]>;
     else delete task.retries;
     const issues = validateAgainst(SCHEMAS.task, task).map((i) => `${i.pointer} ${i.message}`);
+    if (
+      Array.isArray(task.stages) &&
+      task.stages.every(
+        (s) =>
+          s &&
+          typeof s.stage_id === "string" &&
+          (!s.inputs || (Array.isArray(s.inputs) && s.inputs.every((i) => i && typeof i.from === "string"))),
+      )
+    )
+      issues.push(...buildDag(task.stages).issues);
     return { task, issues };
   }, [draft, stagesText, limitsText, retriesText, urlsText]);
 
@@ -299,7 +311,6 @@ export function TaskPage() {
   };
 
   if (!isNew && loaded.isLoading) return <Loading />;
-  const currentStages = (checkJson(stagesText).value as Stage[] | undefined) ?? draft.stages;
 
   return (
     <Page
@@ -334,14 +345,16 @@ export function TaskPage() {
               ]
         }
         active={tab}
-        onChange={setTab}
+        onChange={(next) => {
+          if (chainValid) setTab(next);
+        }}
       />
       {tab === "config" || tab === "chain" ? (
         <form
           className="form"
           onSubmit={(e) => {
             e.preventDefault();
-            if (assembled.task && !assembled.issues.length) save.mutate(assembled.task);
+            if (chainValid && assembled.task && !assembled.issues.length) save.mutate(assembled.task);
           }}
         >
           {tab === "config" ? (
@@ -443,44 +456,14 @@ export function TaskPage() {
           ) : null}
           {tab === "chain" ? (
             <>
-              <Section title="Ланцюжок обробки (етапи й переходи)">
-                <DagView stages={currentStages} />
-              </Section>
-              <Section
-                title="Етапи (TaskConfig.stages)"
-                actions={
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => {
-                      const stages = (checkJson(stagesText).value as Stage[] | undefined) ?? [];
-                      const from = stages[stages.length - 1]?.stage_id ?? "collect";
-                      const stage: Stage = {
-                        stage_id: `stage-${stages.length + 1}`,
-                        kind: "handler",
-                        handler: { package_id: "", version: "" },
-                        inputs: [{ from }],
-                      };
-                      setSaved(false);
-                      setStagesText(toJsonText([...stages, stage]));
-                    }}
-                  >
-                    Додати етап-обробник
-                  </button>
-                }
-              >
-                <p className="muted">
-                  Кожен етап посилається на точну версію пакета. Розгалуження — кілька етапів з тим самим{" "}
-                  <code>inputs[].from</code>; умови — <code>when</code>; вибірка — <code>select</code>{" "}
-                  (output, input_material, problems, unmatched_materials).
-                </p>
-                <JsonEditor
-                  text={stagesText}
-                  onChange={(t) => (setSaved(false), setStagesText(t))}
-                  label="Етапи завдання"
-                  minHeight="20rem"
-                />
-              </Section>
+              <ChainEditor
+                onValidityChange={setChainValid}
+                text={stagesText}
+                onChange={(t) => {
+                  setSaved(false);
+                  setStagesText(t);
+                }}
+              />
             </>
           ) : null}
           {assembled.issues.length ? (
@@ -494,15 +477,15 @@ export function TaskPage() {
             <button
               type="button"
               className="btn"
-              disabled={!assembled.task || validate.isPending}
-              onClick={() => assembled.task && validate.mutate(assembled.task)}
+              disabled={!chainValid || !assembled.task || validate.isPending}
+              onClick={() => chainValid && assembled.task && validate.mutate(assembled.task)}
             >
               Перевірити в оркестраторі
             </button>
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={save.isPending || !assembled.task || assembled.issues.length > 0}
+              disabled={!chainValid || save.isPending || !assembled.task || assembled.issues.length > 0}
             >
               {isNew ? "Створити завдання" : "Зберегти"}
             </button>

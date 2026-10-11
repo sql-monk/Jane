@@ -58,6 +58,7 @@ from .connections import AdapterPool, ConnectionRegistry
 from .content import ContentReader
 from .handler import StorageHandler
 from .packages import PackageCatalog, StoragePackage
+from .policy import redact
 from .registry_packages import RegistryPackages
 from .settings import CONNECTION_FIRST_OPTIONS, ServiceLimits, Settings, resolve_service_limits
 
@@ -219,7 +220,7 @@ def _connection_validator(root: Path | None) -> Any:
 def build_app(
     settings: Settings | None = None, *, registry_transport: httpx.AsyncBaseTransport | None = None
 ) -> FastAPI:
-    """The storage service. ``registry_transport`` — HTTP transport to the registry (tests)."""
+    """The storage service. ``registry_transport`` Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎСљ HTTP transport to the registry (tests)."""
     settings = settings or Settings()
     resolved = resolve_service_limits(settings)
     limits: ServiceLimits = resolved.limits
@@ -494,6 +495,114 @@ def build_app(
         )
         return accepted(job, runner.location(job.job_id))
 
+    # Snapshots are process-local and tied to the connection definition, never a live scan on GET.
+    storage_checks: dict[str, tuple[str, dict[str, Any]]] = {}
+
+    def empty_statistics(reason: str) -> dict[str, Any]:
+        return {
+            "object_count": None,
+            "total_size_bytes": None,
+            "checked_at": None,
+            "scope": "connection_objects",
+            "unavailable_reason": reason,
+        }
+
+    @app.get("/v1/storage-status", tags=["objects"])
+    async def storage_status(connection_id: str) -> JSONResponse:
+        stored = registry.get(connection_id)
+        snapshot = storage_checks.get(connection_id)
+        if snapshot is not None and snapshot[0] == stored.etag:
+            return JSONResponse(snapshot[1])
+        return JSONResponse(
+            {
+                "connection_id": connection_id,
+                "kind": stored.kind,
+                "availability": "unknown",
+                "checked_at": None,
+                "message": None,
+                "statistics": empty_statistics("not_checked"),
+            }
+        )
+
+    @app.post("/v1/storage-status/checks", status_code=202, tags=["objects"])
+    async def check_storage_status(request: Request) -> Response:
+        body = await read_body(request)
+        if (
+            not isinstance(body, dict)
+            or set(body) != {"connection_id"}
+            or not isinstance(body["connection_id"], str)
+        ):
+            raise ValidationFailed("connection_id is required and no other fields are accepted")
+        connection_id = body["connection_id"]
+        stored = registry.get(connection_id)  # Unknown connection fails before creating a job.
+        key = request.headers.get(IDEMPOTENCY_HEADER)
+        if not key:
+            raise ValidationFailed("Idempotency-Key is required")
+        fingerprint = _fingerprint({"operation": "storage_status_check", "body": body})
+        existing = await keys.begin(key, fingerprint, float(limits.idempotency.idempotency_ttl_seconds))
+        if existing is not None:
+            if existing.fingerprint != fingerprint:
+                raise IdempotencyKeyReused("the key was used with a different request")
+            if existing.response is None:
+                raise IdempotencyInProgress("a request with this key is still running")
+            return JSONResponse(
+                existing.response.body,
+                status_code=202,
+                headers={**existing.response.headers, REPLAY_HEADER: "true"},
+            )
+
+        async def work(ctx: JobContext) -> dict[str, Any]:
+            await ctx.check_cancelled()
+            out: dict[str, Any] = {
+                "connection_id": connection_id,
+                "kind": stored.kind,
+                "availability": "unavailable",
+                "checked_at": format_ts(datetime.now(UTC)),
+                "message": None,
+                "statistics": empty_statistics("connection_unavailable"),
+            }
+            try:
+                async with asyncio.timeout(limits.timeouts.request_timeout_ms / 1000):
+                    async with pool.lease(connection_id, stored.kind, {}) as adapter:
+                        healthy = await adapter.health()
+                        out["availability"] = "available" if healthy else "unavailable"
+                        if healthy:
+                            aggregate = getattr(adapter, "object_statistics", None)
+                            out["statistics"] = empty_statistics("adapter_statistics_not_supported")
+                            if aggregate is not None:
+                                try:
+                                    counts = await aggregate()
+                                    out["statistics"] = {
+                                        **counts,
+                                        "scope": "connection_objects",
+                                        "checked_at": format_ts(datetime.now(UTC)),
+                                        "unavailable_reason": None,
+                                    }
+                                except (AdapterError, ValueError, KeyError):
+                                    out["statistics"] = empty_statistics("statistics_check_failed")
+            except (AdapterError, JaneError, TimeoutError) as exc:
+                out["message"] = redact(str(exc), registry.secret_values(connection_id))[:1000]
+                reason = "statistics_check_failed" if out["availability"] == "available" else "check_failed"
+                out["statistics"] = empty_statistics(reason)
+            # Definition changes during a probe must not publish a stale result for a new connection.
+            try:
+                if registry.get(connection_id).etag == stored.etag:
+                    storage_checks[connection_id] = (stored.etag, out)
+            except NotFound:
+                pass
+            return out
+
+        try:
+            job = await runner.submit("storage_status_check", work, idempotency_key=key)
+            response = accepted(job, runner.location(job.job_id))
+            await keys.complete(
+                key, StoredResponse(202, job.wire(), {"Location": runner.location(job.job_id)})
+            )
+            return response
+        except BaseException:
+            await keys.release(key)
+            raise
+
     # ------------------------------------------------------------------ connections
     def connection_body(doc: Mapping[str, Any]) -> dict[str, Any]:
         return {
@@ -537,6 +646,7 @@ def build_app(
         stored, created = registry.put(body)
         if stored.etag != current:
             # a changed definition: new work opens a new adapter, work in progress finishes on the old one
+            storage_checks.pop(connection_id, None)
             await pool.forget(connection_id)
         return JSONResponse(
             connection_body(stored.document),
@@ -547,6 +657,7 @@ def build_app(
     @app.delete("/v1/connections/{connection_id}", status_code=204, tags=["connections"])
     async def delete_connection(connection_id: str) -> Response:
         registry.delete(connection_id)
+        storage_checks.pop(connection_id, None)
         await pool.forget(connection_id)
         return Response(status_code=204)
 
@@ -560,24 +671,46 @@ def build_app(
             "checked_at": format_ts(datetime.now().astimezone()),
             "secrets_resolved": resolved_secrets,
         }
+        statistics = empty_statistics("not_checked")
+
+        def remember() -> JSONResponse:
+            nonlocal statistics
+            if not out["ok"] and statistics["unavailable_reason"] == "not_checked":
+                statistics = empty_statistics("connection_unavailable")
+            storage_checks[connection_id] = (
+                stored.etag,
+                {
+                    "connection_id": connection_id,
+                    "kind": stored.kind,
+                    "availability": "available" if out["ok"] else "unavailable",
+                    "checked_at": out["checked_at"],
+                    "message": out.get("message"),
+                    "statistics": statistics,
+                },
+            )
+            return JSONResponse(out)
+
         violations = registry.policy_errors(connection_id)
         if violations:
             # config file / bypassing the API: no secret is read and the adapter is not opened
             out["message"] = "connection violates the secret policy of this executor: " + "; ".join(
                 f"{v.pointer} ({v.code}): {v.message}" for v in violations
             )
-            return JSONResponse(out)
+            return remember()
         if not all(resolved_secrets.values()):
             missing = sorted(k for k, v in resolved_secrets.items() if not v)
             out["message"] = f"secret(s) not resolvable in this executor: {missing}"
-            return JSONResponse(out)
+            return remember()
         try:
-            async with pool.lease(connection_id, stored.kind, {}) as adapter:
-                out["ok"] = await adapter.health()
-        except (AdapterError, JaneError) as exc:
-            out["message"] = str(exc)[:1000]
+            async with asyncio.timeout(limits.timeouts.request_timeout_ms / 1000):
+                async with pool.lease(connection_id, stored.kind, {}) as adapter:
+                    out["ok"] = await adapter.health()
+        except (AdapterError, JaneError, TimeoutError) as exc:
+            out["ok"] = False
+            out["message"] = redact(str(exc), registry.secret_values(connection_id))[:1000]
+            statistics = empty_statistics("check_failed")
         out["latency_ms"] = int((asyncio.get_running_loop().time() - started) * 1000)
-        return JSONResponse(out)
+        return remember()
 
     # ------------------------------------------------------------------ storage.v1
     @asynccontextmanager

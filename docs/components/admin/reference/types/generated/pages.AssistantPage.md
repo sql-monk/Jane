@@ -34,7 +34,7 @@ The session of an onboarding Job: `labels.session_id`, or its `links.session` (/
 **Функція.** Код: [web/admin/src/pages/AssistantPage.tsx:76](../../../../../../web/admin/src/pages/AssistantPage.tsx#L76).
 
 ```typescript
-function AssistantPage(): JSX.Element
+function AssistantPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

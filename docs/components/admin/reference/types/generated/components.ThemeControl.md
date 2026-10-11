@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/components/ThemeControl.tsx:4](../../../../../../web/admin/src/components/ThemeControl.tsx#L4).
 
 ```typescript
-function ThemeControl(): JSX.Element
+function ThemeControl(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/pages/ResultsPage.tsx:11](../../../../../../web/admin/src/pages/ResultsPage.tsx#L11).
 
 ```typescript
-function ResultsPage(): JSX.Element
+function ResultsPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

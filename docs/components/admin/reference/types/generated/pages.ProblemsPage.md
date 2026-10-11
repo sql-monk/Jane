@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/pages/ProblemsPage.tsx:32](../../../../../../web/admin/src/pages/ProblemsPage.tsx#L32).
 
 ```typescript
-function ProblemsPage(): JSX.Element
+function ProblemsPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

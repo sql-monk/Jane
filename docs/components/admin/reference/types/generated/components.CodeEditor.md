@@ -37,7 +37,7 @@ function languageOfPath(path: string): EditorLanguage
 **Функція.** Код: [web/admin/src/components/CodeEditor.tsx:68](../../../../../../web/admin/src/components/CodeEditor.tsx#L68).
 
 ```typescript
-function CodeEditor({ value, onChange, language, label, readOnly, minHeight, }: { value: string; onChange?: (value: string) => void; language: EditorLanguage; label: string; readOnly?: boolean; minHeight?: string; }): JSX.Element
+function CodeEditor({ value, onChange, language, label, readOnly, minHeight, }: { value: string; onChange?: (value: string) => void; language: EditorLanguage; label: string; readOnly?: boolean; minHeight?: string; }): any
 ```
 
 ### Параметри
@@ -46,7 +46,7 @@ function CodeEditor({ value, onChange, language, label, readOnly, minHeight, }: 
 |---|---|---|---|
 | `__0` | `{ value: string; onChange?: (value: string) => void; language: EditorLanguage; label: string; readOnly?: boolean; minHeight?: string; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ### Опис із вихідного коду
 

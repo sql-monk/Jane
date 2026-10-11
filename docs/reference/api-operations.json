@@ -10,7 +10,7 @@
       "telegram-collector",
       "web-collector"
     ],
-    "operations": 135
+    "operations": 144
   },
   "deterministic": true,
   "format_version": 1,
@@ -161,7 +161,7 @@
     },
     {
       "path": "contracts/openapi/storage.v1.yaml",
-      "sha256": "04ae9ab3fb2673fac1d94d12b75bfd1d6c2ba9f7ab01bf29e1c4cf71e5b01405"
+      "sha256": "82feeda05fa54bc17b6f1e053251ffab77e0833afa7ba3ee5f4d77856af5ce51"
     },
     {
       "path": "contracts/schemas/collector-rules.schema.json",
@@ -15235,6 +15235,689 @@
     {
       "component": "storage",
       "definition_source": "contracts/openapi/storage.v1.yaml",
+      "description": "Необов'язково для виконавця без керованих підключень (див. опис API).",
+      "document": "docs/components/storage/reference/api/generated/listConnections.md",
+      "errors": [
+        "401"
+      ],
+      "extensions": {
+        "x-jane-scope": [
+          "connections:write",
+          "handler:invoke",
+          "storage:read"
+        ]
+      },
+      "method": "GET",
+      "operation_id": "listConnections",
+      "parameters": [
+        {
+          "description": "Непрозорий курсор з `next_cursor` попередньої сторінки.",
+          "in": "query",
+          "name": "cursor",
+          "required": false,
+          "schema": {
+            "maxLength": 2048,
+            "type": "string"
+          }
+        },
+        {
+          "description": "Розмір сторінки. Значення понад максимум сервісу обрізається до максимуму.",
+          "in": "query",
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "default": 50,
+            "minimum": 1,
+            "type": "integer"
+          }
+        }
+      ],
+      "path": "/v1/connections",
+      "request_body": {},
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "list": {
+                  "$ref": "common.yaml#/components/pathItems/Connections/get/responses/200/content/application~1json/examples/list"
+                }
+              },
+              "schema": {
+                "$ref": "../schemas/common/connection.schema.json#/$defs/ConnectionList"
+              }
+            }
+          },
+          "description": "Сторінка підключень (без значень секретів)."
+        },
+        "401": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "unauthenticated": {
+                  "value": {
+                    "code": "unauthenticated",
+                    "status": 401,
+                    "title": "Unauthenticated",
+                    "type": "urn:jane:problem:unauthenticated"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Немає або недійсний токен (`unauthenticated`)."
+        }
+      },
+      "schema_links": [
+        {
+          "file": "contracts/schemas/common/connection.schema.json",
+          "pointer": "/$defs/ConnectionList"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/pathItems/Connections/get/responses/200/content/application~1json/examples/list"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/schemas/Problem"
+        }
+      ],
+      "scope": [
+        "connections:write",
+        "handler:invoke",
+        "storage:read"
+      ],
+      "security": [
+        {
+          "bearerAuth": []
+        }
+      ],
+      "source": "contracts/openapi/storage.v1.yaml",
+      "summary": "Підключення, відомі цьому виконавцю",
+      "tags": [
+        "connections"
+      ]
+    },
+    {
+      "component": "storage",
+      "definition_source": "contracts/openapi/storage.v1.yaml",
+      "description": null,
+      "document": "docs/components/storage/reference/api/generated/deleteConnection.md",
+      "errors": [
+        "401",
+        "404"
+      ],
+      "extensions": {
+        "x-jane-scope": "connections:write"
+      },
+      "method": "DELETE",
+      "operation_id": "deleteConnection",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "connection_id",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/common/defs.schema.json#/$defs/Slug"
+          }
+        }
+      ],
+      "path": "/v1/connections/{connection_id}",
+      "request_body": {},
+      "responses": {
+        "204": {
+          "description": "Видалено."
+        },
+        "401": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "unauthenticated": {
+                  "value": {
+                    "code": "unauthenticated",
+                    "status": 401,
+                    "title": "Unauthenticated",
+                    "type": "urn:jane:problem:unauthenticated"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Немає або недійсний токен (`unauthenticated`)."
+        },
+        "404": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "notFound": {
+                  "$ref": "#/components/examples/ProblemNotFound"
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Ресурс не знайдено (`not_found`)."
+        }
+      },
+      "schema_links": [
+        {
+          "file": "contracts/schemas/common/defs.schema.json",
+          "pointer": "/$defs/Slug"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/schemas/Problem"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/ProblemNotFound"
+        }
+      ],
+      "scope": "connections:write",
+      "security": [
+        {
+          "bearerAuth": []
+        }
+      ],
+      "source": "contracts/openapi/storage.v1.yaml",
+      "summary": "Видалити підключення",
+      "tags": [
+        "connections"
+      ]
+    },
+    {
+      "component": "storage",
+      "definition_source": "contracts/openapi/storage.v1.yaml",
+      "description": null,
+      "document": "docs/components/storage/reference/api/generated/getConnection.md",
+      "errors": [
+        "401",
+        "404"
+      ],
+      "extensions": {
+        "x-jane-scope": [
+          "connections:write",
+          "handler:invoke",
+          "storage:read"
+        ]
+      },
+      "method": "GET",
+      "operation_id": "getConnection",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "connection_id",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/common/defs.schema.json#/$defs/Slug"
+          }
+        }
+      ],
+      "path": "/v1/connections/{connection_id}",
+      "request_body": {},
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "pg": {
+                  "$ref": "../examples/openapi/connection-pg.json"
+                }
+              },
+              "schema": {
+                "$ref": "../schemas/common/connection.schema.json"
+              }
+            }
+          },
+          "description": "Підключення.",
+          "headers": {
+            "ETag": {
+              "$ref": "common.yaml#/components/headers/ETag"
+            }
+          }
+        },
+        "401": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "unauthenticated": {
+                  "value": {
+                    "code": "unauthenticated",
+                    "status": 401,
+                    "title": "Unauthenticated",
+                    "type": "urn:jane:problem:unauthenticated"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Немає або недійсний токен (`unauthenticated`)."
+        },
+        "404": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "notFound": {
+                  "$ref": "#/components/examples/ProblemNotFound"
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Ресурс не знайдено (`not_found`)."
+        }
+      },
+      "schema_links": [
+        {
+          "file": "contracts/schemas/common/defs.schema.json",
+          "pointer": "/$defs/Slug"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/headers/ETag"
+        },
+        {
+          "file": "contracts/schemas/common/connection.schema.json",
+          "pointer": ""
+        },
+        {
+          "file": "contracts/examples/openapi/connection-pg.json",
+          "pointer": ""
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/schemas/Problem"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/ProblemNotFound"
+        }
+      ],
+      "scope": [
+        "connections:write",
+        "handler:invoke",
+        "storage:read"
+      ],
+      "security": [
+        {
+          "bearerAuth": []
+        }
+      ],
+      "source": "contracts/openapi/storage.v1.yaml",
+      "summary": "Прочитати підключення",
+      "tags": [
+        "connections"
+      ]
+    },
+    {
+      "component": "storage",
+      "definition_source": "contracts/openapi/storage.v1.yaml",
+      "description": "Викликає оркестратор, синхронізуючи реєстр підключень, або адміністратор автономного\nвиконавця. Значення, схожі на секрети, у `params` відхиляються (`secret_detected`).\nВиконавець без керованих підключень відповідає 501 `not_implemented`; клієнт не вважає це збоєм\n(див. опис API). 404/405 — збій синхронізації.\n",
+      "document": "docs/components/storage/reference/api/generated/putConnection.md",
+      "errors": [
+        "401",
+        "412",
+        "422",
+        "501"
+      ],
+      "extensions": {
+        "x-jane-scope": "connections:write"
+      },
+      "method": "PUT",
+      "operation_id": "putConnection",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "connection_id",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/common/defs.schema.json#/$defs/Slug"
+          }
+        },
+        {
+          "description": "ETag ресурсу для оптимістичного блокування. Розбіжність — 412 `precondition_failed`.",
+          "example": "\"v7\"",
+          "in": "header",
+          "name": "If-Match",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "path": "/v1/connections/{connection_id}",
+      "request_body": {
+        "content": {
+          "application/json": {
+            "examples": {
+              "llm": {
+                "$ref": "../examples/openapi/connection-llm.json"
+              },
+              "pg": {
+                "$ref": "../examples/openapi/connection-pg.json"
+              }
+            },
+            "schema": {
+              "$ref": "../schemas/common/connection.schema.json"
+            }
+          }
+        },
+        "required": true
+      },
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "pg": {
+                  "$ref": "../examples/openapi/connection-pg.json"
+                }
+              },
+              "schema": {
+                "$ref": "../schemas/common/connection.schema.json"
+              }
+            }
+          },
+          "description": "Підключення замінено.",
+          "headers": {
+            "ETag": {
+              "$ref": "common.yaml#/components/headers/ETag"
+            }
+          }
+        },
+        "201": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "pg": {
+                  "$ref": "../examples/openapi/connection-pg.json"
+                }
+              },
+              "schema": {
+                "$ref": "../schemas/common/connection.schema.json"
+              }
+            }
+          },
+          "description": "Підключення створено.",
+          "headers": {
+            "ETag": {
+              "$ref": "common.yaml#/components/headers/ETag"
+            }
+          }
+        },
+        "401": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "unauthenticated": {
+                  "value": {
+                    "code": "unauthenticated",
+                    "status": 401,
+                    "title": "Unauthenticated",
+                    "type": "urn:jane:problem:unauthenticated"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Немає або недійсний токен (`unauthenticated`)."
+        },
+        "412": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "precondition": {
+                  "value": {
+                    "code": "precondition_failed",
+                    "status": 412,
+                    "title": "Precondition failed",
+                    "type": "urn:jane:problem:precondition_failed"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "If-Match не збігається з поточним ETag (`precondition_failed`)."
+        },
+        "422": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "idempotencyReused": {
+                  "$ref": "#/components/examples/ProblemIdempotencyReused"
+                },
+                "validation": {
+                  "$ref": "#/components/examples/ProblemValidation"
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Семантична помилка (`validation_failed`, `idempotency_key_reused`, `limit_exceeded`, `secret_detected`, `schema_mismatch` тощо)."
+        },
+        "501": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "notImplemented": {
+                  "value": {
+                    "code": "not_implemented",
+                    "status": 501,
+                    "title": "Not implemented",
+                    "type": "urn:jane:problem:not_implemented"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "../schemas/common/problem.schema.json"
+              }
+            }
+          },
+          "description": "Виконавець не використовує підключень (`not_implemented`)."
+        }
+      },
+      "schema_links": [
+        {
+          "file": "contracts/schemas/common/defs.schema.json",
+          "pointer": "/$defs/Slug"
+        },
+        {
+          "file": "contracts/schemas/common/connection.schema.json",
+          "pointer": ""
+        },
+        {
+          "file": "contracts/examples/openapi/connection-pg.json",
+          "pointer": ""
+        },
+        {
+          "file": "contracts/examples/openapi/connection-llm.json",
+          "pointer": ""
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/headers/ETag"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/schemas/Problem"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/ProblemValidation"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/ProblemIdempotencyReused"
+        },
+        {
+          "file": "contracts/schemas/common/problem.schema.json",
+          "pointer": ""
+        }
+      ],
+      "scope": "connections:write",
+      "security": [
+        {
+          "bearerAuth": []
+        }
+      ],
+      "source": "contracts/openapi/storage.v1.yaml",
+      "summary": "Створити або замінити підключення (секрети — лише посиланнями)",
+      "tags": [
+        "connections"
+      ]
+    },
+    {
+      "component": "storage",
+      "definition_source": "contracts/openapi/storage.v1.yaml",
+      "description": null,
+      "document": "docs/components/storage/reference/api/generated/testConnection.md",
+      "errors": [
+        "401",
+        "404"
+      ],
+      "extensions": {
+        "x-jane-no-idempotency-key": "read-only check without side effects",
+        "x-jane-scope": "connections:write"
+      },
+      "method": "POST",
+      "operation_id": "testConnection",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "connection_id",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/common/defs.schema.json#/$defs/Slug"
+          }
+        }
+      ],
+      "path": "/v1/connections/{connection_id}/test",
+      "request_body": {},
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "missingSecret": {
+                  "value": {
+                    "checked_at": "2026-09-27T10:00:00Z",
+                    "message": "environment variable RESULTS_PG_PASSWORD is not set",
+                    "ok": false,
+                    "secrets_resolved": {
+                      "password": false,
+                      "username": true
+                    }
+                  }
+                },
+                "ok": {
+                  "value": {
+                    "checked_at": "2026-09-27T10:00:00Z",
+                    "latency_ms": 12,
+                    "ok": true,
+                    "secrets_resolved": {
+                      "password": true,
+                      "username": true
+                    }
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "../schemas/common/connection.schema.json#/$defs/ConnectionTestResult"
+              }
+            }
+          },
+          "description": "Результат перевірки (невдала перевірка — теж 200 з ok=false)."
+        },
+        "401": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "unauthenticated": {
+                  "value": {
+                    "code": "unauthenticated",
+                    "status": 401,
+                    "title": "Unauthenticated",
+                    "type": "urn:jane:problem:unauthenticated"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Немає або недійсний токен (`unauthenticated`)."
+        },
+        "404": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "notFound": {
+                  "$ref": "#/components/examples/ProblemNotFound"
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Ресурс не знайдено (`not_found`)."
+        }
+      },
+      "schema_links": [
+        {
+          "file": "contracts/schemas/common/defs.schema.json",
+          "pointer": "/$defs/Slug"
+        },
+        {
+          "file": "contracts/schemas/common/connection.schema.json",
+          "pointer": "/$defs/ConnectionTestResult"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/schemas/Problem"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/ProblemNotFound"
+        }
+      ],
+      "scope": "connections:write",
+      "security": [
+        {
+          "bearerAuth": []
+        }
+      ],
+      "source": "contracts/openapi/storage.v1.yaml",
+      "summary": "Перевірити підключення й розв'язання секретів",
+      "tags": [
+        "connections"
+      ]
+    },
+    {
+      "component": "storage",
+      "definition_source": "contracts/openapi/storage.v1.yaml",
       "description": null,
       "document": "docs/components/storage/reference/api/generated/listEntities.md",
       "errors": [
@@ -15832,6 +16515,293 @@
       "component": "storage",
       "definition_source": "contracts/openapi/storage.v1.yaml",
       "description": null,
+      "document": "docs/components/storage/reference/api/generated/getJob.md",
+      "errors": [
+        "401",
+        "404"
+      ],
+      "extensions": {
+        "x-jane-scope": [
+          "handler:invoke",
+          "handler:test",
+          "connections:write"
+        ]
+      },
+      "method": "GET",
+      "operation_id": "getJob",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "job_id",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/common/defs.schema.json#/$defs/Id"
+          }
+        }
+      ],
+      "path": "/v1/jobs/{job_id}",
+      "request_body": {},
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "failed": {
+                  "$ref": "common.yaml#/components/examples/JobFailed"
+                },
+                "running": {
+                  "$ref": "common.yaml#/components/examples/JobRunning"
+                }
+              },
+              "schema": {
+                "$ref": "common.yaml#/components/schemas/Job"
+              }
+            }
+          },
+          "description": "Поточний стан job."
+        },
+        "401": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "unauthenticated": {
+                  "value": {
+                    "code": "unauthenticated",
+                    "status": 401,
+                    "title": "Unauthenticated",
+                    "type": "urn:jane:problem:unauthenticated"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Немає або недійсний токен (`unauthenticated`)."
+        },
+        "404": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "notFound": {
+                  "$ref": "#/components/examples/ProblemNotFound"
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Ресурс не знайдено (`not_found`)."
+        }
+      },
+      "schema_links": [
+        {
+          "file": "contracts/schemas/common/defs.schema.json",
+          "pointer": "/$defs/Id"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/schemas/Job"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/JobRunning"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/JobFailed"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/schemas/Problem"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/ProblemNotFound"
+        }
+      ],
+      "scope": [
+        "handler:invoke",
+        "handler:test",
+        "connections:write"
+      ],
+      "security": [
+        {
+          "bearerAuth": []
+        }
+      ],
+      "source": "contracts/openapi/storage.v1.yaml",
+      "summary": "Стан, прогрес і результат тривалої операції",
+      "tags": [
+        "jobs"
+      ]
+    },
+    {
+      "component": "storage",
+      "definition_source": "contracts/openapi/storage.v1.yaml",
+      "description": "202 — скасування прийнято, job переходить у `cancelling`, далі в `cancelled`.\n200 — job уже в термінальному стані; повертається як є, без змін.\nПовторний виклик безпечний, тому Idempotency-Key не потрібен.\n",
+      "document": "docs/components/storage/reference/api/generated/cancelJob.md",
+      "errors": [
+        "401",
+        "404"
+      ],
+      "extensions": {
+        "x-jane-no-idempotency-key": "cancellation is idempotent by nature",
+        "x-jane-scope": [
+          "handler:invoke",
+          "handler:test",
+          "connections:write"
+        ]
+      },
+      "method": "POST",
+      "operation_id": "cancelJob",
+      "parameters": [
+        {
+          "in": "path",
+          "name": "job_id",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/common/defs.schema.json#/$defs/Id"
+          }
+        }
+      ],
+      "path": "/v1/jobs/{job_id}/cancel",
+      "request_body": {
+        "content": {
+          "application/json": {
+            "examples": {
+              "reason": {
+                "value": {
+                  "reason": "wrong scope"
+                }
+              }
+            },
+            "schema": {
+              "$ref": "common.yaml#/components/schemas/JobCancelRequest"
+            }
+          }
+        },
+        "required": false
+      },
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "failed": {
+                  "$ref": "common.yaml#/components/examples/JobFailed"
+                }
+              },
+              "schema": {
+                "$ref": "common.yaml#/components/schemas/Job"
+              }
+            }
+          },
+          "description": "Job уже завершено; стан не змінено."
+        },
+        "202": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "cancelling": {
+                  "$ref": "common.yaml#/components/examples/JobCancelling"
+                }
+              },
+              "schema": {
+                "$ref": "common.yaml#/components/schemas/Job"
+              }
+            }
+          },
+          "description": "Скасування прийнято."
+        },
+        "401": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "unauthenticated": {
+                  "value": {
+                    "code": "unauthenticated",
+                    "status": 401,
+                    "title": "Unauthenticated",
+                    "type": "urn:jane:problem:unauthenticated"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Немає або недійсний токен (`unauthenticated`)."
+        },
+        "404": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "notFound": {
+                  "$ref": "#/components/examples/ProblemNotFound"
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Ресурс не знайдено (`not_found`)."
+        }
+      },
+      "schema_links": [
+        {
+          "file": "contracts/schemas/common/defs.schema.json",
+          "pointer": "/$defs/Id"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/schemas/JobCancelRequest"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/schemas/Job"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/JobFailed"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/JobCancelling"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/schemas/Problem"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/ProblemNotFound"
+        }
+      ],
+      "scope": [
+        "handler:invoke",
+        "handler:test",
+        "connections:write"
+      ],
+      "security": [
+        {
+          "bearerAuth": []
+        }
+      ],
+      "source": "contracts/openapi/storage.v1.yaml",
+      "summary": "Запит на скасування job (ідемпотентний)",
+      "tags": [
+        "jobs"
+      ]
+    },
+    {
+      "component": "storage",
+      "definition_source": "contracts/openapi/storage.v1.yaml",
+      "description": null,
       "document": "docs/components/storage/reference/api/generated/listObjects.md",
       "errors": [
         "401",
@@ -16367,6 +17337,328 @@
       ],
       "source": "contracts/openapi/storage.v1.yaml",
       "summary": "Вміст збереженого об'єкта (байти в оригінальному медіатипі)",
+      "tags": [
+        "objects"
+      ]
+    },
+    {
+      "component": "storage",
+      "definition_source": "contracts/openapi/storage.v1.yaml",
+      "description": "GET не відкриває адаптер і не обходить сховище. POST /v1/storage-status/checks запускає Job для health та статистики, оновлює process-local snapshot. Connection test перевіряє лише health. Зміна визначення та рестарт скидають snapshot. Статистика охоплює лише об’єкти namespace підключення: payload bytes, не зайнятий диск або сутності. Непідтримувані агрегати мають null і причину. Час фіксує свіжість, запис нових об’єктів не оновлює snapshot.",
+      "document": "docs/components/storage/reference/api/generated/getStorageStatus.md",
+      "errors": [
+        "401",
+        "404"
+      ],
+      "extensions": {
+        "x-jane-scope": "storage:read"
+      },
+      "method": "GET",
+      "operation_id": "getStorageStatus",
+      "parameters": [
+        {
+          "in": "query",
+          "name": "connection_id",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/common/defs.schema.json#/$defs/Slug"
+          }
+        }
+      ],
+      "path": "/v1/storage-status",
+      "request_body": {},
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "available": {
+                  "value": {
+                    "availability": "available",
+                    "checked_at": "2026-10-11T08:00:00Z",
+                    "connection_id": "raw-files",
+                    "kind": "filesystem",
+                    "message": null,
+                    "statistics": {
+                      "checked_at": "2026-10-11T08:00:00Z",
+                      "object_count": 1,
+                      "scope": "connection_objects",
+                      "total_size_bytes": 151,
+                      "unavailable_reason": null
+                    }
+                  }
+                },
+                "unavailable": {
+                  "value": {
+                    "availability": "unavailable",
+                    "checked_at": "2026-10-11T08:00:00Z",
+                    "connection_id": "results-pg",
+                    "kind": "postgresql",
+                    "message": "connection check failed",
+                    "statistics": {
+                      "checked_at": null,
+                      "object_count": null,
+                      "scope": "connection_objects",
+                      "total_size_bytes": null,
+                      "unavailable_reason": "check_failed"
+                    }
+                  }
+                },
+                "unknown": {
+                  "value": {
+                    "availability": "unknown",
+                    "checked_at": null,
+                    "connection_id": "raw-files",
+                    "kind": "filesystem",
+                    "message": null,
+                    "statistics": {
+                      "checked_at": null,
+                      "object_count": null,
+                      "scope": "connection_objects",
+                      "total_size_bytes": null,
+                      "unavailable_reason": "not_checked"
+                    }
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/StorageStatus"
+              }
+            }
+          },
+          "description": "Останній стан або unknown до перевірки."
+        },
+        "401": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "unauthenticated": {
+                  "value": {
+                    "code": "unauthenticated",
+                    "status": 401,
+                    "title": "Unauthenticated",
+                    "type": "urn:jane:problem:unauthenticated"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Немає або недійсний токен (`unauthenticated`)."
+        },
+        "404": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "notFound": {
+                  "$ref": "#/components/examples/ProblemNotFound"
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Ресурс не знайдено (`not_found`)."
+        }
+      },
+      "schema_links": [
+        {
+          "file": "contracts/schemas/common/defs.schema.json",
+          "pointer": "/$defs/Slug"
+        },
+        {
+          "file": "contracts/openapi/storage.v1.yaml",
+          "pointer": "/components/schemas/StorageStatus"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/schemas/Problem"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/ProblemNotFound"
+        }
+      ],
+      "scope": "storage:read",
+      "security": [
+        {
+          "bearerAuth": []
+        }
+      ],
+      "source": "contracts/openapi/storage.v1.yaml",
+      "summary": "Остання явна перевірка сховища та статистика об’єктів",
+      "tags": [
+        "objects"
+      ]
+    },
+    {
+      "component": "storage",
+      "definition_source": "contracts/openapi/storage.v1.yaml",
+      "description": null,
+      "document": "docs/components/storage/reference/api/generated/checkStorageStatus.md",
+      "errors": [
+        "401",
+        "404",
+        "422"
+      ],
+      "extensions": {
+        "x-jane-scope": "connections:write"
+      },
+      "method": "POST",
+      "operation_id": "checkStorageStatus",
+      "parameters": [
+        {
+          "description": "Ключ ідемпотентності (1–255 друкованих ASCII-символів; рекомендовано UUID або детермінований\nключ доставки). Повтор із тим самим ключем і тим самим тілом повертає збережену відповідь\n(заголовок `Idempotency-Replayed: true`) без повторного ефекту. Той самий ключ з іншим тілом —\n422 `idempotency_key_reused`. Запит ще виконується — 409 `idempotency_in_progress`\n(retryable). Сервіс пам'ятає ключ щонайменше `limits.transfer.idempotency_ttl_seconds`.\n",
+          "example": "0b7d5c1e-3f7e-4a53-9d0e-5a0f5c0a9b11",
+          "in": "header",
+          "name": "Idempotency-Key",
+          "required": true,
+          "schema": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[\\x21-\\x7E]+$",
+            "type": "string"
+          }
+        }
+      ],
+      "path": "/v1/storage-status/checks",
+      "request_body": {
+        "content": {
+          "application/json": {
+            "example": {
+              "connection_id": "raw-files"
+            },
+            "schema": {
+              "additionalProperties": false,
+              "properties": {
+                "connection_id": {
+                  "$ref": "../schemas/common/defs.schema.json#/$defs/Slug"
+                }
+              },
+              "required": [
+                "connection_id"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        "required": true
+      },
+      "responses": {
+        "202": {
+          "content": {
+            "application/json": {
+              "example": {
+                "created_at": "2026-10-11T08:00:00Z",
+                "job_id": "job_status_check",
+                "kind": "storage_status_check",
+                "status": "queued"
+              },
+              "schema": {
+                "$ref": "../schemas/common/job.schema.json"
+              }
+            }
+          },
+          "description": "Job; при succeeded result містить StorageStatus. Помилка статистики не означає недоступність підключення.",
+          "headers": {
+            "Location": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "401": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "unauthenticated": {
+                  "value": {
+                    "code": "unauthenticated",
+                    "status": 401,
+                    "title": "Unauthenticated",
+                    "type": "urn:jane:problem:unauthenticated"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Немає або недійсний токен (`unauthenticated`)."
+        },
+        "404": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "notFound": {
+                  "$ref": "#/components/examples/ProblemNotFound"
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Ресурс не знайдено (`not_found`)."
+        },
+        "422": {
+          "content": {
+            "application/problem+json": {
+              "examples": {
+                "idempotencyReused": {
+                  "$ref": "#/components/examples/ProblemIdempotencyReused"
+                },
+                "validation": {
+                  "$ref": "#/components/examples/ProblemValidation"
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            }
+          },
+          "description": "Семантична помилка (`validation_failed`, `idempotency_key_reused`, `limit_exceeded`, `secret_detected`, `schema_mismatch` тощо)."
+        }
+      },
+      "schema_links": [
+        {
+          "file": "contracts/schemas/common/defs.schema.json",
+          "pointer": "/$defs/Slug"
+        },
+        {
+          "file": "contracts/schemas/common/job.schema.json",
+          "pointer": ""
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/schemas/Problem"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/ProblemNotFound"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/ProblemValidation"
+        },
+        {
+          "file": "contracts/openapi/common.yaml",
+          "pointer": "/components/examples/ProblemIdempotencyReused"
+        }
+      ],
+      "scope": "connections:write",
+      "security": [
+        {
+          "bearerAuth": []
+        }
+      ],
+      "source": "contracts/openapi/storage.v1.yaml",
+      "summary": "Фонова перевірка доступності та інвентаризація сховища",
       "tags": [
         "objects"
       ]

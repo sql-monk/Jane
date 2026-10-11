@@ -44,6 +44,12 @@ export const NAV_GROUPS: Array<{
         description: "Зібрані оригінали та шлях кожного матеріалу через етапи обробки.",
       },
       {
+        to: "/storages",
+        label: "Сховища",
+        icon: "packages",
+        description: "Стан сховищ, кількість збережених об’єктів і результати перевірок.",
+      },
+      {
         to: "/results",
         label: "Результати",
         icon: "results",

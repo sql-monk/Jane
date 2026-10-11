@@ -53,6 +53,12 @@ NAV_GROUPS: { label: string; items: Array<{ to: string; label: string; icon: Ico
         description: "Зібрані оригінали та шлях кожного матеріалу через етапи обробки.",
       },
       {
+        to: "/storages",
+        label: "Сховища",
+        icon: "packages",
+        description: "Стан сховищ, кількість збережених об’єктів і результати перевірок.",
+      },
+      {
         to: "/results",
         label: "Результати",
         icon: "results",
@@ -115,7 +121,7 @@ NAV_GROUPS: { label: string; items: Array<{ to: string; label: string; icon: Ico
 
 ## admin.lib.navigation.navigationFor
 
-**Функція.** Код: [web/admin/src/lib/navigation.ts:104](../../../../../../web/admin/src/lib/navigation.ts#L104).
+**Функція.** Код: [web/admin/src/lib/navigation.ts:110](../../../../../../web/admin/src/lib/navigation.ts#L110).
 
 ```typescript
 function navigationFor(pathname: string): { to: string; label: string; icon: IconName; description: string; } | undefined

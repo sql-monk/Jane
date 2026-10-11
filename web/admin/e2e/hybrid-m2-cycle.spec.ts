@@ -223,7 +223,7 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
 
   // materials: the stored RAW as text, its trace (original run and the reprocessing), reprocessing of it alone
   await admin.goto(`/materials?connection_id=raw-files&source_id=${sourceId}`);
-  const materials = admin.getByRole("table", { name: "Збережені матеріали" });
+  const materials = admin.getByRole("table", { name: "Матеріали raw-files", exact: true });
   await expect(materials).toContainText(`${site}/product/phone-alpha`);
   await expect(materials.getByRole("row")).toHaveCount(2);
   await materials.getByRole("button", { name: "Переглянути" }).click();
@@ -380,7 +380,7 @@ test("reprocessing one stored material takes only RAW of the task's source (WP-0
   );
 
   await admin.goto(`/materials?connection_id=raw-files&source_id=${ownSource}`);
-  const materials = admin.getByRole("table", { name: "Збережені матеріали" });
+  const materials = admin.getByRole("table", { name: "Матеріали raw-files", exact: true });
   await expect(materials.getByRole("row")).toHaveCount(2);
   await materials.getByRole("button", { name: "Повторно обробити" }).click();
   const form = admin.getByRole("form", { name: "Повторна обробка" });

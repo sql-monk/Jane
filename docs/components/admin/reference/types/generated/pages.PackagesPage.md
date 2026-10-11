@@ -13,27 +13,27 @@
 **Функція.** Код: [web/admin/src/pages/PackagesPage.tsx:37](../../../../../../web/admin/src/pages/PackagesPage.tsx#L37).
 
 ```typescript
-function PackagesPage(): JSX.Element
+function PackagesPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.pages.PackagesPage.PackagePage
 
 **Функція.** Код: [web/admin/src/pages/PackagesPage.tsx:169](../../../../../../web/admin/src/pages/PackagesPage.tsx#L169).
 
 ```typescript
-function PackagePage(): JSX.Element
+function PackagePage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.pages.PackagesPage.DiffView
 
 **Функція.** Код: [web/admin/src/pages/PackagesPage.tsx:578](../../../../../../web/admin/src/pages/PackagesPage.tsx#L578).
 
 ```typescript
-function DiffView({ diff }: { diff: import("../api/types").PackageDiff; }): JSX.Element
+function DiffView({ diff }: { diff: import("../api/types").PackageDiff; }): any
 ```
 
 ### Параметри
@@ -42,4 +42,4 @@ function DiffView({ diff }: { diff: import("../api/types").PackageDiff; }): JSX.
 |---|---|---|---|
 | `__0` | `{ diff: import("../api/types").PackageDiff; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.

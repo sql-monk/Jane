@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/pages/DashboardPage.tsx:46](../../../../../../web/admin/src/pages/DashboardPage.tsx#L46).
 
 ```typescript
-function DashboardPage(): JSX.Element
+function DashboardPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

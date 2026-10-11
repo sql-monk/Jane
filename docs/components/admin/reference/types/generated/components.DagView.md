@@ -11,16 +11,16 @@
 **Функція.** Код: [web/admin/src/components/DagView.tsx:10](../../../../../../web/admin/src/components/DagView.tsx#L10).
 
 ```typescript
-function DagView({ stages }: { stages: readonly Stage[]; }): JSX.Element
+function DagView({ stages, selected, onSelect, requireCollect, }: { stages: readonly Stage[]; selected?: string; onSelect?: (id: string) => void; requireCollect?: boolean; }): any
 ```
 
 ### Параметри
 
 | Ім’я | Тип | Типове значення | Спосіб передавання |
 |---|---|---|---|
-| `__0` | `{ stages: readonly Stage[]; }` | `—` | required |
+| `__0` | `{ stages: readonly Stage[]; selected?: string; onSelect?: (id: string) => void; requireCollect?: boolean; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ### Опис із вихідного коду
 

@@ -20,23 +20,8 @@
 **Змінна.** Код: [web/admin/src/api/generated/validators.d.ts:4](../../../../../../web/admin/src/api/generated/validators.d.ts#L4).
 
 ```typescript
-source: ValidateFunction<unknown>
+source: ValidateFunction
 ```
-
-Сигнатури виклику:
-
-```typescript
-source(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unknown
-```
-
-### Параметри
-
-| Ім’я | Тип | Типове значення | Спосіб передавання |
-|---|---|---|---|
-| `data` | `any` | `—` | required |
-| `dataCxt` | `DataValidationCxt<string \| number> \| undefined` | `—` | required |
-
-Результат: `boolean`.
 
 Доступ: читання — так; запис — так.
 
@@ -45,23 +30,8 @@ source(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unknown
 **Змінна.** Код: [web/admin/src/api/generated/validators.d.ts:5](../../../../../../web/admin/src/api/generated/validators.d.ts#L5).
 
 ```typescript
-task: ValidateFunction<unknown>
+task: ValidateFunction
 ```
-
-Сигнатури виклику:
-
-```typescript
-task(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unknown
-```
-
-### Параметри
-
-| Ім’я | Тип | Типове значення | Спосіб передавання |
-|---|---|---|---|
-| `data` | `any` | `—` | required |
-| `dataCxt` | `DataValidationCxt<string \| number> \| undefined` | `—` | required |
-
-Результат: `boolean`.
 
 Доступ: читання — так; запис — так.
 
@@ -70,23 +40,8 @@ task(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unknown
 **Змінна.** Код: [web/admin/src/api/generated/validators.d.ts:6](../../../../../../web/admin/src/api/generated/validators.d.ts#L6).
 
 ```typescript
-schedule: ValidateFunction<unknown>
+schedule: ValidateFunction
 ```
-
-Сигнатури виклику:
-
-```typescript
-schedule(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unknown
-```
-
-### Параметри
-
-| Ім’я | Тип | Типове значення | Спосіб передавання |
-|---|---|---|---|
-| `data` | `any` | `—` | required |
-| `dataCxt` | `DataValidationCxt<string \| number> \| undefined` | `—` | required |
-
-Результат: `boolean`.
 
 Доступ: читання — так; запис — так.
 
@@ -95,23 +50,8 @@ schedule(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unkno
 **Змінна.** Код: [web/admin/src/api/generated/validators.d.ts:7](../../../../../../web/admin/src/api/generated/validators.d.ts#L7).
 
 ```typescript
-stage: ValidateFunction<unknown>
+stage: ValidateFunction
 ```
-
-Сигнатури виклику:
-
-```typescript
-stage(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unknown
-```
-
-### Параметри
-
-| Ім’я | Тип | Типове значення | Спосіб передавання |
-|---|---|---|---|
-| `data` | `any` | `—` | required |
-| `dataCxt` | `DataValidationCxt<string \| number> \| undefined` | `—` | required |
-
-Результат: `boolean`.
 
 Доступ: читання — так; запис — так.
 
@@ -120,23 +60,8 @@ stage(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unknown
 **Змінна.** Код: [web/admin/src/api/generated/validators.d.ts:8](../../../../../../web/admin/src/api/generated/validators.d.ts#L8).
 
 ```typescript
-collectorRules: ValidateFunction<unknown>
+collectorRules: ValidateFunction
 ```
-
-Сигнатури виклику:
-
-```typescript
-collectorRules(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unknown
-```
-
-### Параметри
-
-| Ім’я | Тип | Типове значення | Спосіб передавання |
-|---|---|---|---|
-| `data` | `any` | `—` | required |
-| `dataCxt` | `DataValidationCxt<string \| number> \| undefined` | `—` | required |
-
-Результат: `boolean`.
 
 Доступ: читання — так; запис — так.
 
@@ -145,23 +70,8 @@ collectorRules(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is
 **Змінна.** Код: [web/admin/src/api/generated/validators.d.ts:9](../../../../../../web/admin/src/api/generated/validators.d.ts#L9).
 
 ```typescript
-strategy: ValidateFunction<unknown>
+strategy: ValidateFunction
 ```
-
-Сигнатури виклику:
-
-```typescript
-strategy(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unknown
-```
-
-### Параметри
-
-| Ім’я | Тип | Типове значення | Спосіб передавання |
-|---|---|---|---|
-| `data` | `any` | `—` | required |
-| `dataCxt` | `DataValidationCxt<string \| number> \| undefined` | `—` | required |
-
-Результат: `boolean`.
 
 Доступ: читання — так; запис — так.
 
@@ -170,23 +80,8 @@ strategy(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unkno
 **Змінна.** Код: [web/admin/src/api/generated/validators.d.ts:10](../../../../../../web/admin/src/api/generated/validators.d.ts#L10).
 
 ```typescript
-limits: ValidateFunction<unknown>
+limits: ValidateFunction
 ```
-
-Сигнатури виклику:
-
-```typescript
-limits(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unknown
-```
-
-### Параметри
-
-| Ім’я | Тип | Типове значення | Спосіб передавання |
-|---|---|---|---|
-| `data` | `any` | `—` | required |
-| `dataCxt` | `DataValidationCxt<string \| number> \| undefined` | `—` | required |
-
-Результат: `boolean`.
 
 Доступ: читання — так; запис — так.
 
@@ -195,23 +90,8 @@ limits(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unknown
 **Змінна.** Код: [web/admin/src/api/generated/validators.d.ts:11](../../../../../../web/admin/src/api/generated/validators.d.ts#L11).
 
 ```typescript
-platformLimits: ValidateFunction<unknown>
+platformLimits: ValidateFunction
 ```
-
-Сигнатури виклику:
-
-```typescript
-platformLimits(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unknown
-```
-
-### Параметри
-
-| Ім’я | Тип | Типове значення | Спосіб передавання |
-|---|---|---|---|
-| `data` | `any` | `—` | required |
-| `dataCxt` | `DataValidationCxt<string \| number> \| undefined` | `—` | required |
-
-Результат: `boolean`.
 
 Доступ: читання — так; запис — так.
 
@@ -220,23 +100,8 @@ platformLimits(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is
 **Змінна.** Код: [web/admin/src/api/generated/validators.d.ts:12](../../../../../../web/admin/src/api/generated/validators.d.ts#L12).
 
 ```typescript
-connection: ValidateFunction<unknown>
+connection: ValidateFunction
 ```
-
-Сигнатури виклику:
-
-```typescript
-connection(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unknown
-```
-
-### Параметри
-
-| Ім’я | Тип | Типове значення | Спосіб передавання |
-|---|---|---|---|
-| `data` | `any` | `—` | required |
-| `dataCxt` | `DataValidationCxt<string \| number> \| undefined` | `—` | required |
-
-Результат: `boolean`.
 
 Доступ: читання — так; запис — так.
 
@@ -245,22 +110,7 @@ connection(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unk
 **Змінна.** Код: [web/admin/src/api/generated/validators.d.ts:13](../../../../../../web/admin/src/api/generated/validators.d.ts#L13).
 
 ```typescript
-manifest: ValidateFunction<unknown>
+manifest: ValidateFunction
 ```
-
-Сигнатури виклику:
-
-```typescript
-manifest(this: Ajv | any, data: any, dataCxt?: DataValidationCxt): data is unknown
-```
-
-### Параметри
-
-| Ім’я | Тип | Типове значення | Спосіб передавання |
-|---|---|---|---|
-| `data` | `any` | `—` | required |
-| `dataCxt` | `DataValidationCxt<string \| number> \| undefined` | `—` | required |
-
-Результат: `boolean`.
 
 Доступ: читання — так; запис — так.

@@ -21,7 +21,7 @@
 | [jane_storage.policy](jane_storage.policy.md) | 27 |
 | [jane_storage.registry_packages](jane_storage.registry_packages.md) | 8 |
 | [jane_storage.settings](jane_storage.settings.md) | 66 |
-| [jane_storage_files](jane_storage_files.md) | 22 |
+| [jane_storage_files](jane_storage_files.md) | 23 |
 | [jane_storage_minio](jane_storage_minio.md) | 4 |
 | [jane_storage_mongodb](jane_storage_mongodb.md) | 20 |
 | [jane_storage_postgres](jane_storage_postgres.md) | 21 |

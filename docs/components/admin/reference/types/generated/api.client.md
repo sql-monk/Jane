@@ -50,7 +50,7 @@ interface ApiClients {}
 **Поле.** Код: [web/admin/src/api/client.ts:15](../../../../../../web/admin/src/api/client.ts#L15).
 
 ```typescript
-orchestrator: Client<OrchestratorPaths, `${string}/${string}`>
+orchestrator: Client<OrchestratorPaths>
 ```
 
 Доступ: читання — так; запис — так.
@@ -60,7 +60,7 @@ orchestrator: Client<OrchestratorPaths, `${string}/${string}`>
 **Поле.** Код: [web/admin/src/api/client.ts:16](../../../../../../web/admin/src/api/client.ts#L16).
 
 ```typescript
-registry: Client<RegistryPaths, `${string}/${string}`>
+registry: Client<RegistryPaths>
 ```
 
 Доступ: читання — так; запис — так.
@@ -70,7 +70,7 @@ registry: Client<RegistryPaths, `${string}/${string}`>
 **Поле.** Код: [web/admin/src/api/client.ts:17](../../../../../../web/admin/src/api/client.ts#L17).
 
 ```typescript
-storage: Client<StoragePaths, `${string}/${string}`>
+storage: Client<StoragePaths>
 ```
 
 Доступ: читання — так; запис — так.
@@ -80,7 +80,7 @@ storage: Client<StoragePaths, `${string}/${string}`>
 **Поле.** Код: [web/admin/src/api/client.ts:18](../../../../../../web/admin/src/api/client.ts#L18).
 
 ```typescript
-llm: Client<LlmPaths, `${string}/${string}`>
+llm: Client<LlmPaths>
 ```
 
 Доступ: читання — так; запис — так.
@@ -90,7 +90,7 @@ llm: Client<LlmPaths, `${string}/${string}`>
 **Поле.** Код: [web/admin/src/api/client.ts:19](../../../../../../web/admin/src/api/client.ts#L19).
 
 ```typescript
-handler: Client<HandlerPaths, `${string}/${string}`>
+handler: Client<HandlerPaths>
 ```
 
 Доступ: читання — так; запис — так.
@@ -100,7 +100,7 @@ handler: Client<HandlerPaths, `${string}/${string}`>
 **Поле.** Код: [web/admin/src/api/client.ts:20](../../../../../../web/admin/src/api/client.ts#L20).
 
 ```typescript
-assistant: Client<AssistantPaths, `${string}/${string}`>
+assistant: Client<AssistantPaths>
 ```
 
 Доступ: читання — так; запис — так.
@@ -110,7 +110,7 @@ assistant: Client<AssistantPaths, `${string}/${string}`>
 **Поле.** Код: [web/admin/src/api/client.ts:21](../../../../../../web/admin/src/api/client.ts#L21).
 
 ```typescript
-collector: Client<CollectorPaths, `${string}/${string}`>
+collector: Client<CollectorPaths>
 ```
 
 Доступ: читання — так; запис — так.
@@ -135,7 +135,7 @@ executor(name: string): Client<HandlerPaths>
 |---|---|---|---|
 | `name` | `string` | `—` | required |
 
-Результат: `Client<HandlerPaths, `${string}/${string}`>`.
+Результат: `Client<HandlerPaths>`.
 
 Доступ: читання — так; запис — так.
 
@@ -165,7 +165,7 @@ collectorExecutor(name: string): Client<CollectorPaths>
 |---|---|---|---|
 | `name` | `string` | `—` | required |
 
-Результат: `Client<CollectorPaths, `${string}/${string}`>`.
+Результат: `Client<CollectorPaths>`.
 
 Доступ: читання — так; запис — так.
 

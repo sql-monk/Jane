@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/pages/LimitsPage.tsx:12](../../../../../../web/admin/src/pages/LimitsPage.tsx#L12).
 
 ```typescript
-function LimitsPage(): JSX.Element
+function LimitsPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

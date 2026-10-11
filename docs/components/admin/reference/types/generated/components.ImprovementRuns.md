@@ -73,7 +73,7 @@ status?: "failed" | "cancelled" | "queued" | "running" | "cancelling" | "succeed
 **Функція.** Код: [web/admin/src/components/ImprovementRuns.tsx:24](../../../../../../web/admin/src/components/ImprovementRuns.tsx#L24).
 
 ```typescript
-function ImprovementRunList({ filter, label, selected, onOpen, }: { filter: ImprovementRunFilter; label: string; selected?: string | null; onOpen: (jobId: string) => void; }): JSX.Element
+function ImprovementRunList({ filter, label, selected, onOpen, }: { filter: ImprovementRunFilter; label: string; selected?: string | null; onOpen: (jobId: string) => void; }): any
 ```
 
 ### Параметри
@@ -82,4 +82,4 @@ function ImprovementRunList({ filter, label, selected, onOpen, }: { filter: Impr
 |---|---|---|---|
 | `__0` | `{ filter: ImprovementRunFilter; label: string; selected?: string \| null; onOpen: (jobId: string) => void; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.

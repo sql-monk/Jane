@@ -44,6 +44,8 @@
 - [admin.api.types.TestResultsRecord](#adminapitypestestresultsrecord)
 - [admin.api.types.TestReport](#adminapitypestestreport)
 - [admin.api.types.TestSummary](#adminapitypestestsummary)
+- [admin.api.types.StorageConnection](#adminapitypesstorageconnection)
+- [admin.api.types.StorageStatus](#adminapitypesstoragestatus)
 - [admin.api.types.StoredObject](#adminapitypesstoredobject)
 - [admin.api.types.StoredObjectDetail](#adminapitypesstoredobjectdetail)
 - [admin.api.types.EntityState](#adminapitypesentitystate)
@@ -391,9 +393,25 @@ export type TestReport = TestResultsRecord["report"];
 export type TestSummary = NonNullable<PackageVersion["test_summary"]>;
 ```
 
-## admin.api.types.StoredObject
+## admin.api.types.StorageConnection
 
 **Тип.** Код: [web/admin/src/api/types.ts:72](../../../../../../web/admin/src/api/types.ts#L72).
+
+```typescript
+export type StorageConnection = ItemOf<Ok<Sto["/v1/connections"]["get"]>>;
+```
+
+## admin.api.types.StorageStatus
+
+**Тип.** Код: [web/admin/src/api/types.ts:73](../../../../../../web/admin/src/api/types.ts#L73).
+
+```typescript
+export type StorageStatus = Ok<Sto["/v1/storage-status"]["get"]>;
+```
+
+## admin.api.types.StoredObject
+
+**Тип.** Код: [web/admin/src/api/types.ts:74](../../../../../../web/admin/src/api/types.ts#L74).
 
 ```typescript
 export type StoredObject = ItemOf<Ok<Sto["/v1/objects"]["get"]>>;
@@ -401,7 +419,7 @@ export type StoredObject = ItemOf<Ok<Sto["/v1/objects"]["get"]>>;
 
 ## admin.api.types.StoredObjectDetail
 
-**Тип.** Код: [web/admin/src/api/types.ts:73](../../../../../../web/admin/src/api/types.ts#L73).
+**Тип.** Код: [web/admin/src/api/types.ts:75](../../../../../../web/admin/src/api/types.ts#L75).
 
 ```typescript
 export type StoredObjectDetail = Ok<Sto["/v1/objects/{object_id}"]["get"]>;
@@ -409,7 +427,7 @@ export type StoredObjectDetail = Ok<Sto["/v1/objects/{object_id}"]["get"]>;
 
 ## admin.api.types.EntityState
 
-**Тип.** Код: [web/admin/src/api/types.ts:74](../../../../../../web/admin/src/api/types.ts#L74).
+**Тип.** Код: [web/admin/src/api/types.ts:76](../../../../../../web/admin/src/api/types.ts#L76).
 
 ```typescript
 export type EntityState = ItemOf<Ok<Sto["/v1/entities"]["get"]>>;
@@ -417,7 +435,7 @@ export type EntityState = ItemOf<Ok<Sto["/v1/entities"]["get"]>>;
 
 ## admin.api.types.EntityHistoryEntry
 
-**Тип.** Код: [web/admin/src/api/types.ts:75](../../../../../../web/admin/src/api/types.ts#L75).
+**Тип.** Код: [web/admin/src/api/types.ts:77](../../../../../../web/admin/src/api/types.ts#L77).
 
 ```typescript
 export type EntityHistoryEntry = ItemOf<Ok<Sto["/v1/entity-history"]["get"]>>;
@@ -425,7 +443,7 @@ export type EntityHistoryEntry = ItemOf<Ok<Sto["/v1/entity-history"]["get"]>>;
 
 ## admin.api.types.Provider
 
-**Тип.** Код: [web/admin/src/api/types.ts:78](../../../../../../web/admin/src/api/types.ts#L78).
+**Тип.** Код: [web/admin/src/api/types.ts:80](../../../../../../web/admin/src/api/types.ts#L80).
 
 ```typescript
 export type Provider = Ok<Llm["/v1/providers/{provider_id}"]["get"]>;
@@ -433,7 +451,7 @@ export type Provider = Ok<Llm["/v1/providers/{provider_id}"]["get"]>;
 
 ## admin.api.types.ModelAlias
 
-**Тип.** Код: [web/admin/src/api/types.ts:79](../../../../../../web/admin/src/api/types.ts#L79).
+**Тип.** Код: [web/admin/src/api/types.ts:81](../../../../../../web/admin/src/api/types.ts#L81).
 
 ```typescript
 export type ModelAlias = ItemOf<Ok<Llm["/v1/model-aliases"]["get"]>>;
@@ -441,7 +459,7 @@ export type ModelAlias = ItemOf<Ok<Llm["/v1/model-aliases"]["get"]>>;
 
 ## admin.api.types.BudgetDefinition
 
-**Тип.** Код: [web/admin/src/api/types.ts:80](../../../../../../web/admin/src/api/types.ts#L80).
+**Тип.** Код: [web/admin/src/api/types.ts:82](../../../../../../web/admin/src/api/types.ts#L82).
 
 ```typescript
 export type BudgetDefinition = ItemOf<Ok<Llm["/v1/budgets"]["get"]>>;
@@ -449,7 +467,7 @@ export type BudgetDefinition = ItemOf<Ok<Llm["/v1/budgets"]["get"]>>;
 
 ## admin.api.types.UsageReport
 
-**Тип.** Код: [web/admin/src/api/types.ts:81](../../../../../../web/admin/src/api/types.ts#L81).
+**Тип.** Код: [web/admin/src/api/types.ts:83](../../../../../../web/admin/src/api/types.ts#L83).
 
 ```typescript
 export type UsageReport = Ok<Llm["/v1/usage"]["get"]>;
@@ -457,7 +475,7 @@ export type UsageReport = Ok<Llm["/v1/usage"]["get"]>;
 
 ## admin.api.types.Money
 
-**Тип.** Код: [web/admin/src/api/types.ts:82](../../../../../../web/admin/src/api/types.ts#L82).
+**Тип.** Код: [web/admin/src/api/types.ts:84](../../../../../../web/admin/src/api/types.ts#L84).
 
 ```typescript
 export type Money = NonNullable<Run["costs"]>["llm"];
@@ -465,7 +483,7 @@ export type Money = NonNullable<Run["costs"]>["llm"];
 
 ## admin.api.types.TestRunRequest
 
-**Тип.** Код: [web/admin/src/api/types.ts:85](../../../../../../web/admin/src/api/types.ts#L85).
+**Тип.** Код: [web/admin/src/api/types.ts:87](../../../../../../web/admin/src/api/types.ts#L87).
 
 ```typescript
 export type TestRunRequest = Body<Hdl["/v1/test-runs"]["post"]>;
@@ -473,7 +491,7 @@ export type TestRunRequest = Body<Hdl["/v1/test-runs"]["post"]>;
 
 ## admin.api.types.ConnectionTestResult
 
-**Тип.** Код: [web/admin/src/api/types.ts:86](../../../../../../web/admin/src/api/types.ts#L86).
+**Тип.** Код: [web/admin/src/api/types.ts:88](../../../../../../web/admin/src/api/types.ts#L88).
 
 ```typescript
 export type ConnectionTestResult = Ok<Hdl["/v1/connections/{connection_id}/test"]["post"]>;
@@ -481,7 +499,7 @@ export type ConnectionTestResult = Ok<Hdl["/v1/connections/{connection_id}/test"
 
 ## admin.api.types.OnboardingRequest
 
-**Тип.** Код: [web/admin/src/api/types.ts:89](../../../../../../web/admin/src/api/types.ts#L89).
+**Тип.** Код: [web/admin/src/api/types.ts:91](../../../../../../web/admin/src/api/types.ts#L91).
 
 ```typescript
 export type OnboardingRequest = Body<Asst["/v1/onboarding-sessions"]["post"]>;
@@ -489,7 +507,7 @@ export type OnboardingRequest = Body<Asst["/v1/onboarding-sessions"]["post"]>;
 
 ## admin.api.types.OnboardingSession
 
-**Тип.** Код: [web/admin/src/api/types.ts:90](../../../../../../web/admin/src/api/types.ts#L90).
+**Тип.** Код: [web/admin/src/api/types.ts:92](../../../../../../web/admin/src/api/types.ts#L92).
 
 ```typescript
 export type OnboardingSession = Ok<Asst["/v1/onboarding-sessions/{session_id}"]["get"]>;
@@ -497,7 +515,7 @@ export type OnboardingSession = Ok<Asst["/v1/onboarding-sessions/{session_id}"][
 
 ## admin.api.types.OnboardingSessionSummary
 
-**Тип.** Код: [web/admin/src/api/types.ts:91](../../../../../../web/admin/src/api/types.ts#L91).
+**Тип.** Код: [web/admin/src/api/types.ts:93](../../../../../../web/admin/src/api/types.ts#L93).
 
 ```typescript
 export type OnboardingSessionSummary = ItemOf<Ok<Asst["/v1/onboarding-sessions"]["get"]>>;
@@ -505,7 +523,7 @@ export type OnboardingSessionSummary = ItemOf<Ok<Asst["/v1/onboarding-sessions"]
 
 ## admin.api.types.OnboardingStatus
 
-**Тип.** Код: [web/admin/src/api/types.ts:92](../../../../../../web/admin/src/api/types.ts#L92).
+**Тип.** Код: [web/admin/src/api/types.ts:94](../../../../../../web/admin/src/api/types.ts#L94).
 
 ```typescript
 export type OnboardingStatus = OnboardingSession["status"];
@@ -513,7 +531,7 @@ export type OnboardingStatus = OnboardingSession["status"];
 
 ## admin.api.types.Proposal
 
-**Тип.** Код: [web/admin/src/api/types.ts:93](../../../../../../web/admin/src/api/types.ts#L93).
+**Тип.** Код: [web/admin/src/api/types.ts:95](../../../../../../web/admin/src/api/types.ts#L95).
 
 ```typescript
 export type Proposal = NonNullable<OnboardingSession["proposals"]>[number];
@@ -521,7 +539,7 @@ export type Proposal = NonNullable<OnboardingSession["proposals"]>[number];
 
 ## admin.api.types.ImprovementRequest
 
-**Тип.** Код: [web/admin/src/api/types.ts:94](../../../../../../web/admin/src/api/types.ts#L94).
+**Тип.** Код: [web/admin/src/api/types.ts:96](../../../../../../web/admin/src/api/types.ts#L96).
 
 ```typescript
 export type ImprovementRequest = Body<Asst["/v1/improvement-runs"]["post"]>;
@@ -529,7 +547,7 @@ export type ImprovementRequest = Body<Asst["/v1/improvement-runs"]["post"]>;
 
 ## admin.api.types.ImprovementRun
 
-**Тип.** Код: [web/admin/src/api/types.ts:95](../../../../../../web/admin/src/api/types.ts#L95).
+**Тип.** Код: [web/admin/src/api/types.ts:97](../../../../../../web/admin/src/api/types.ts#L97).
 
 ```typescript
 export type ImprovementRun = ItemOf<Ok<Asst["/v1/improvement-runs"]["get"]>>;
@@ -537,7 +555,7 @@ export type ImprovementRun = ItemOf<Ok<Asst["/v1/improvement-runs"]["get"]>>;
 
 ## admin.api.types.AssistantInfo
 
-**Тип.** Код: [web/admin/src/api/types.ts:96](../../../../../../web/admin/src/api/types.ts#L96).
+**Тип.** Код: [web/admin/src/api/types.ts:98](../../../../../../web/admin/src/api/types.ts#L98).
 
 ```typescript
 export type AssistantInfo = Ok<Asst["/v1/info"]["get"]>;
@@ -545,7 +563,7 @@ export type AssistantInfo = Ok<Asst["/v1/info"]["get"]>;
 
 ## admin.api.types.ImprovementResult
 
-**Тип.** Код: [web/admin/src/api/types.ts:98](../../../../../../web/admin/src/api/types.ts#L98).
+**Тип.** Код: [web/admin/src/api/types.ts:100](../../../../../../web/admin/src/api/types.ts#L100).
 
 ```typescript
 export type ImprovementResult = AsstComponents["schemas"]["ImprovementResult"];
@@ -553,7 +571,7 @@ export type ImprovementResult = AsstComponents["schemas"]["ImprovementResult"];
 
 ## admin.api.types.ImprovementProposal
 
-**Тип.** Код: [web/admin/src/api/types.ts:99](../../../../../../web/admin/src/api/types.ts#L99).
+**Тип.** Код: [web/admin/src/api/types.ts:101](../../../../../../web/admin/src/api/types.ts#L101).
 
 ```typescript
 export type ImprovementProposal = AsstComponents["schemas"]["ImprovementProposal"];
@@ -561,7 +579,7 @@ export type ImprovementProposal = AsstComponents["schemas"]["ImprovementProposal
 
 ## admin.api.types.AcceptanceResult
 
-**Тип.** Код: [web/admin/src/api/types.ts:100](../../../../../../web/admin/src/api/types.ts#L100).
+**Тип.** Код: [web/admin/src/api/types.ts:102](../../../../../../web/admin/src/api/types.ts#L102).
 
 ```typescript
 export type AcceptanceResult = AsstComponents["schemas"]["AcceptanceResult"];
@@ -569,7 +587,7 @@ export type AcceptanceResult = AsstComponents["schemas"]["AcceptanceResult"];
 
 ## admin.api.types.CollectionErrors
 
-**Тип.** Код: [web/admin/src/api/types.ts:103](../../../../../../web/admin/src/api/types.ts#L103).
+**Тип.** Код: [web/admin/src/api/types.ts:105](../../../../../../web/admin/src/api/types.ts#L105).
 
 ```typescript
 export type CollectionErrors = Ok<Col["/v1/collections/{collection_id}/errors"]["get"]>;

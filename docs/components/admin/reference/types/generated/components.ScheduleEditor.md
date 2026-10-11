@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/components/ScheduleEditor.tsx:5](../../../../../../web/admin/src/components/ScheduleEditor.tsx#L5).
 
 ```typescript
-function ScheduleEditor({ value, onChange, }: { value: Schedule | undefined; onChange: (s: Schedule | undefined) => void; }): JSX.Element
+function ScheduleEditor({ value, onChange, }: { value: Schedule | undefined; onChange: (s: Schedule | undefined) => void; }): any
 ```
 
 ### Параметри
@@ -20,7 +20,7 @@ function ScheduleEditor({ value, onChange, }: { value: Schedule | undefined; onC
 |---|---|---|---|
 | `__0` | `{ value: Schedule \| undefined; onChange: (s: Schedule \| undefined) => void; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ### Опис із вихідного коду
 

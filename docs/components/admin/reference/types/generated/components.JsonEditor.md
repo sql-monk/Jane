@@ -92,7 +92,7 @@ function checkJson(text: string, schema?: SchemaRef): JsonCheck
 **Функція.** Код: [web/admin/src/components/JsonEditor.tsx:29](../../../../../../web/admin/src/components/JsonEditor.tsx#L29).
 
 ```typescript
-function JsonEditor({ text, onChange, schema, label, minHeight, }: { text: string; onChange: (text: string) => void; schema?: SchemaRef; label: string; minHeight?: string; }): JSX.Element
+function JsonEditor({ text, onChange, schema, label, minHeight, }: { text: string; onChange: (text: string) => void; schema?: SchemaRef; label: string; minHeight?: string; }): any
 ```
 
 ### Параметри
@@ -101,7 +101,7 @@ function JsonEditor({ text, onChange, schema, label, minHeight, }: { text: strin
 |---|---|---|---|
 | `__0` | `{ text: string; onChange: (text: string) => void; schema?: SchemaRef; label: string; minHeight?: string; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ### Опис із вихідного коду
 

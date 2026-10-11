@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/pages/PackageEditorPage.tsx:20](../../../../../../web/admin/src/pages/PackageEditorPage.tsx#L20).
 
 ```typescript
-function PackageEditorPage(): JSX.Element
+function PackageEditorPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

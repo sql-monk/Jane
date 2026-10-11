@@ -232,7 +232,7 @@ function stageLabel(stage: Stage): string
 **Функція.** Код: [web/admin/src/lib/dag.ts:33](../../../../../../web/admin/src/lib/dag.ts#L33).
 
 ```typescript
-function buildDag(stages: readonly Stage[]): Dag
+function buildDag(stages: readonly Stage[], options?: { requireCollect?: boolean; }): Dag
 ```
 
 ### Параметри
@@ -240,5 +240,6 @@ function buildDag(stages: readonly Stage[]): Dag
 | Ім’я | Тип | Типове значення | Спосіб передавання |
 |---|---|---|---|
 | `stages` | `readonly { stage_id: components["schemas"]["Slug"]; kind: "collect" \| "handler"; title?: string; collector?: components["schemas"]["CollectorStage"]; handler?: components["schemas"]["package-ref.schema"]; params?: Record<string, unknown>; connections?: { [key: string]: components["schemas"]["Slug"]; }; inputs?: components["schemas"]["StageInput"][]; bindings?: components["schemas"]["Binding"][]; limits?: components["schemas"]["limits.schema"]; retries?: components["schemas"]["RetryPolicy"]; on_failure?: "continue" \| "fail_run"; }[]` | `—` | required |
+| `options` | `{ requireCollect?: boolean; }` | `{}` | required |
 
 Результат: `Dag`.

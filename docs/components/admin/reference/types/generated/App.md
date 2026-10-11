@@ -8,10 +8,10 @@
 
 ## admin.App.App
 
-**Функція.** Код: [web/admin/src/App.tsx:147](../../../../../../web/admin/src/App.tsx#L147).
+**Функція.** Код: [web/admin/src/App.tsx:152](../../../../../../web/admin/src/App.tsx#L152).
 
 ```typescript
-function App(): JSX.Element
+function App(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

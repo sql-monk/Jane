@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/components/UnifiedDiff.tsx:2](../../../../../../web/admin/src/components/UnifiedDiff.tsx#L2).
 
 ```typescript
-function UnifiedDiff({ diff, label }: { diff: string; label: string; }): JSX.Element
+function UnifiedDiff({ diff, label }: { diff: string; label: string; }): any
 ```
 
 ### Параметри
@@ -20,7 +20,7 @@ function UnifiedDiff({ diff, label }: { diff: string; label: string; }): JSX.Ele
 |---|---|---|---|
 | `__0` | `{ diff: string; label: string; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ### Опис із вихідного коду
 

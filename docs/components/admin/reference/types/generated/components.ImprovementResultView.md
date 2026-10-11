@@ -12,7 +12,7 @@
 **Функція.** Код: [web/admin/src/components/ImprovementResultView.tsx:9](../../../../../../web/admin/src/components/ImprovementResultView.tsx#L9).
 
 ```typescript
-function ImprovementResultView({ result }: { result: Record<string, unknown>; }): JSX.Element
+function ImprovementResultView({ result }: { result: Record<string, unknown>; }): any
 ```
 
 ### Параметри
@@ -21,7 +21,7 @@ function ImprovementResultView({ result }: { result: Record<string, unknown>; })
 |---|---|---|---|
 | `__0` | `{ result: Record<string, unknown>; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ### Опис із вихідного коду
 
@@ -34,7 +34,7 @@ Job.result of assistant startImprovement (assistant.v1 ImprovementResult).
 **Функція.** Код: [web/admin/src/components/ImprovementResultView.tsx:83](../../../../../../web/admin/src/components/ImprovementResultView.tsx#L83).
 
 ```typescript
-function ProposalView({ proposal }: { proposal: ImprovementProposal; }): JSX.Element
+function ProposalView({ proposal }: { proposal: ImprovementProposal; }): any
 ```
 
 ### Параметри
@@ -43,7 +43,7 @@ function ProposalView({ proposal }: { proposal: ImprovementProposal; }): JSX.Ele
 |---|---|---|---|
 | `__0` | `{ proposal: ImprovementProposal; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ### Опис із вихідного коду
 

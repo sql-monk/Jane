@@ -174,7 +174,7 @@ logout(): void
 **Функція.** Код: [web/admin/src/app/context.tsx:38](../../../../../../web/admin/src/app/context.tsx#L38).
 
 ```typescript
-function AppProvider({ config, children }: { config: AdminConfig; children: ReactNode; }): JSX.Element
+function AppProvider({ config, children }: { config: AdminConfig; children: ReactNode; }): any
 ```
 
 ### Параметри
@@ -183,7 +183,7 @@ function AppProvider({ config, children }: { config: AdminConfig; children: Reac
 |---|---|---|---|
 | `__0` | `{ config: AdminConfig; children: ReactNode; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.app.context.useApi
 

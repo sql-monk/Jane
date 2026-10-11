@@ -9,20 +9,20 @@
 
 ## admin.pages.TasksPage.TasksPage
 
-**Функція.** Код: [web/admin/src/pages/TasksPage.tsx:37](../../../../../../web/admin/src/pages/TasksPage.tsx#L37).
+**Функція.** Код: [web/admin/src/pages/TasksPage.tsx:38](../../../../../../web/admin/src/pages/TasksPage.tsx#L38).
 
 ```typescript
-function TasksPage(): JSX.Element
+function TasksPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.pages.TasksPage.TaskPage
 
-**Функція.** Код: [web/admin/src/pages/TasksPage.tsx:201](../../../../../../web/admin/src/pages/TasksPage.tsx#L201).
+**Функція.** Код: [web/admin/src/pages/TasksPage.tsx:202](../../../../../../web/admin/src/pages/TasksPage.tsx#L202).
 
 ```typescript
-function TaskPage(): JSX.Element
+function TaskPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

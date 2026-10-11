@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/pages/AuditPage.tsx:11](../../../../../../web/admin/src/pages/AuditPage.tsx#L11).
 
 ```typescript
-function AuditPage(): JSX.Element
+function AuditPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

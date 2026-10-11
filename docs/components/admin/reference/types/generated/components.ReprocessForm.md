@@ -67,7 +67,7 @@ observation_id?: string | undefined
 **Функція.** Код: [web/admin/src/components/ReprocessForm.tsx:34](../../../../../../web/admin/src/components/ReprocessForm.tsx#L34).
 
 ```typescript
-function ReprocessForm({ taskId, storageConnectionId, materialIds, objectIds, stored, }: { taskId?: string; storageConnectionId?: string; materialIds?: string[]; objectIds?: string[]; stored?: StoredSelection; }): JSX.Element
+function ReprocessForm({ taskId, storageConnectionId, materialIds, objectIds, stored, }: { taskId?: string; storageConnectionId?: string; materialIds?: string[]; objectIds?: string[]; stored?: StoredSelection; }): any
 ```
 
 ### Параметри
@@ -76,4 +76,4 @@ function ReprocessForm({ taskId, storageConnectionId, materialIds, objectIds, st
 |---|---|---|---|
 | `__0` | `{ taskId?: string; storageConnectionId?: string; materialIds?: string[]; objectIds?: string[]; stored?: StoredSelection; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.

@@ -20,7 +20,7 @@ export type IconName = keyof typeof paths;
 **Функція.** Код: [web/admin/src/components/Icon.tsx:29](../../../../../../web/admin/src/components/Icon.tsx#L29).
 
 ```typescript
-function Icon({ name, size }: { name: IconName; size?: number; }): JSX.Element
+function Icon({ name, size }: { name: IconName; size?: number; }): any
 ```
 
 ### Параметри
@@ -29,4 +29,4 @@ function Icon({ name, size }: { name: IconName; size?: number; }): JSX.Element
 |---|---|---|---|
 | `__0` | `{ name: IconName; size?: number; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.

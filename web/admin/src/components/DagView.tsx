@@ -7,8 +7,18 @@ const GAP_X = 70;
 const GAP_Y = 22;
 
 /** Processing chain of a task: stages as boxes, `inputs[].from` as arrows labelled with `select` (ТЗ §2). */
-export function DagView({ stages }: { stages: readonly Stage[] }) {
-  const dag = buildDag(stages);
+export function DagView({
+  stages,
+  selected,
+  onSelect,
+  requireCollect = true,
+}: {
+  stages: readonly Stage[];
+  selected?: string;
+  onSelect?: (id: string) => void;
+  requireCollect?: boolean;
+}) {
+  const dag = buildDag(stages, { requireCollect });
   const layers = Math.max(1, ...dag.nodes.map((n) => n.layer + 1));
   const rows = Math.max(1, ...dag.nodes.map((n) => n.order + 1));
   const width = layers * (W + GAP_X);
@@ -61,7 +71,22 @@ export function DagView({ stages }: { stages: readonly Stage[] }) {
           const p = pos.get(n.id);
           if (!p) return null;
           return (
-            <g key={n.id} transform={`translate(${p.x},${p.y})`} data-testid={`dag-node-${n.id}`}>
+            <g
+              key={n.id}
+              transform={`translate(${p.x},${p.y})`}
+              data-testid={`dag-node-${n.id}`}
+              role={onSelect ? "button" : undefined}
+              tabIndex={onSelect ? 0 : undefined}
+              aria-label={onSelect ? `Етап ${n.id}` : undefined}
+              aria-pressed={onSelect ? selected === n.id : undefined}
+              onClick={() => onSelect?.(n.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelect?.(n.id);
+                }
+              }}
+            >
               <rect
                 width={W}
                 height={H}

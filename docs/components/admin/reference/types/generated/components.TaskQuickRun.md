@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/components/TaskQuickRun.tsx:9](../../../../../../web/admin/src/components/TaskQuickRun.tsx#L9).
 
 ```typescript
-function TaskQuickRun({ taskId }: { taskId: string; }): JSX.Element
+function TaskQuickRun({ taskId }: { taskId: string; }): any
 ```
 
 ### Параметри
@@ -20,4 +20,4 @@ function TaskQuickRun({ taskId }: { taskId: string; }): JSX.Element
 |---|---|---|---|
 | `__0` | `{ taskId: string; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.

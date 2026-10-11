@@ -12,17 +12,17 @@
 **Функція.** Код: [web/admin/src/pages/LoginPage.tsx:7](../../../../../../web/admin/src/pages/LoginPage.tsx#L7).
 
 ```typescript
-function LoginPage(): JSX.Element
+function LoginPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.pages.LoginPage.OidcCallbackPage
 
 **Функція.** Код: [web/admin/src/pages/LoginPage.tsx:69](../../../../../../web/admin/src/pages/LoginPage.tsx#L69).
 
 ```typescript
-function OidcCallbackPage(): JSX.Element
+function OidcCallbackPage(): any
 ```
 
-Результат: `JSX.Element`.
+Результат: `any`.

@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/components/AttemptHistory.tsx:8](../../../../../../web/admin/src/components/AttemptHistory.tsx#L8).
 
 ```typescript
-function AttemptHistory({ history, label }: { history: AttemptEvent[] | undefined; label: string; }): JSX.Element
+function AttemptHistory({ history, label }: { history: AttemptEvent[] | undefined; label: string; }): any
 ```
 
 ### Параметри
@@ -20,4 +20,4 @@ function AttemptHistory({ history, label }: { history: AttemptEvent[] | undefine
 |---|---|---|---|
 | `__0` | `{ history: AttemptEvent[] \| undefined; label: string; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.

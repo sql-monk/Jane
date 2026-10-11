@@ -28,7 +28,7 @@
 **Функція.** Код: [web/admin/src/components/ui.tsx:8](../../../../../../web/admin/src/components/ui.tsx#L8).
 
 ```typescript
-function Page({ title, actions, children, }: { title: string; actions?: ReactNode; children: ReactNode; }): JSX.Element
+function Page({ title, actions, children, }: { title: string; actions?: ReactNode; children: ReactNode; }): any
 ```
 
 ### Параметри
@@ -37,14 +37,14 @@ function Page({ title, actions, children, }: { title: string; actions?: ReactNod
 |---|---|---|---|
 | `__0` | `{ title: string; actions?: ReactNode; children: ReactNode; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.components.ui.Section
 
 **Функція.** Код: [web/admin/src/components/ui.tsx:33](../../../../../../web/admin/src/components/ui.tsx#L33).
 
 ```typescript
-function Section({ title, actions, children, }: { title: string; actions?: ReactNode; children: ReactNode; }): JSX.Element
+function Section({ title, actions, children, }: { title: string; actions?: ReactNode; children: ReactNode; }): any
 ```
 
 ### Параметри
@@ -53,14 +53,14 @@ function Section({ title, actions, children, }: { title: string; actions?: React
 |---|---|---|---|
 | `__0` | `{ title: string; actions?: ReactNode; children: ReactNode; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.components.ui.Loading
 
 **Функція.** Код: [web/admin/src/components/ui.tsx:53](../../../../../../web/admin/src/components/ui.tsx#L53).
 
 ```typescript
-function Loading({ what }: { what?: string; }): JSX.Element
+function Loading({ what }: { what?: string; }): any
 ```
 
 ### Параметри
@@ -69,14 +69,14 @@ function Loading({ what }: { what?: string; }): JSX.Element
 |---|---|---|---|
 | `__0` | `{ what?: string; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.components.ui.ErrorBox
 
 **Функція.** Код: [web/admin/src/components/ui.tsx:61](../../../../../../web/admin/src/components/ui.tsx#L61).
 
 ```typescript
-function ErrorBox({ error, title }: { error: unknown; title?: string; }): JSX.Element | null
+function ErrorBox({ error, title }: { error: unknown; title?: string; }): any
 ```
 
 ### Параметри
@@ -85,14 +85,14 @@ function ErrorBox({ error, title }: { error: unknown; title?: string; }): JSX.El
 |---|---|---|---|
 | `__0` | `{ error: unknown; title?: string; }` | `—` | required |
 
-Результат: `JSX.Element | null`.
+Результат: `any`.
 
 ## admin.components.ui.Status
 
 **Функція.** Код: [web/admin/src/components/ui.tsx:127](../../../../../../web/admin/src/components/ui.tsx#L127).
 
 ```typescript
-function Status({ value }: { value: string | null | undefined; }): JSX.Element
+function Status({ value }: { value: string | null | undefined; }): any
 ```
 
 ### Параметри
@@ -101,14 +101,14 @@ function Status({ value }: { value: string | null | undefined; }): JSX.Element
 |---|---|---|---|
 | `__0` | `{ value: string \| null \| undefined; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.components.ui.JsonView
 
 **Функція.** Код: [web/admin/src/components/ui.tsx:133](../../../../../../web/admin/src/components/ui.tsx#L133).
 
 ```typescript
-function JsonView({ value, compact }: { value: unknown; compact?: boolean; }): JSX.Element
+function JsonView({ value, compact }: { value: unknown; compact?: boolean; }): any
 ```
 
 ### Параметри
@@ -117,7 +117,7 @@ function JsonView({ value, compact }: { value: unknown; compact?: boolean; }): J
 |---|---|---|---|
 | `__0` | `{ value: unknown; compact?: boolean; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ### Опис із вихідного коду
 
@@ -130,7 +130,7 @@ Pretty JSON of API data; secret-looking values are always masked (ТЗ §11).
 **Функція.** Код: [web/admin/src/components/ui.tsx:141](../../../../../../web/admin/src/components/ui.tsx#L141).
 
 ```typescript
-function KeyValue({ rows }: { rows: Array<[string, ReactNode]>; }): JSX.Element
+function KeyValue({ rows }: { rows: Array<[string, ReactNode]>; }): any
 ```
 
 ### Параметри
@@ -139,7 +139,7 @@ function KeyValue({ rows }: { rows: Array<[string, ReactNode]>; }): JSX.Element
 |---|---|---|---|
 | `__0` | `{ rows: Array<[string, ReactNode]>; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.components.ui.Column
 
@@ -206,7 +206,7 @@ className?: string | undefined
 **Функція.** Код: [web/admin/src/components/ui.tsx:170](../../../../../../web/admin/src/components/ui.tsx#L170).
 
 ```typescript
-function Table<T>({ rows, columns, rowKey, empty, label, }: { rows: readonly T[]; columns: ReadonlyArray<Column<T>>; rowKey: (row: T, index: number) => string; empty?: string; label?: string; }): JSX.Element
+function Table<T>({ rows, columns, rowKey, empty, label, }: { rows: readonly T[]; columns: ReadonlyArray<Column<T>>; rowKey: (row: T, index: number) => string; empty?: string; label?: string; }): any
 ```
 
 ### Параметри
@@ -215,14 +215,14 @@ function Table<T>({ rows, columns, rowKey, empty, label, }: { rows: readonly T[]
 |---|---|---|---|
 | `__0` | `{ rows: readonly T[]; columns: ReadonlyArray<Column<T>>; rowKey: (row: T, index: number) => string; empty?: string; label?: string; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.components.ui.LoadMore
 
 **Функція.** Код: [web/admin/src/components/ui.tsx:212](../../../../../../web/admin/src/components/ui.tsx#L212).
 
 ```typescript
-function LoadMore({ hasMore, loading, onClick, }: { hasMore: boolean; loading: boolean; onClick: () => void; }): JSX.Element | null
+function LoadMore({ hasMore, loading, onClick, }: { hasMore: boolean; loading: boolean; onClick: () => void; }): any
 ```
 
 ### Параметри
@@ -231,14 +231,14 @@ function LoadMore({ hasMore, loading, onClick, }: { hasMore: boolean; loading: b
 |---|---|---|---|
 | `__0` | `{ hasMore: boolean; loading: boolean; onClick: () => void; }` | `—` | required |
 
-Результат: `JSX.Element | null`.
+Результат: `any`.
 
 ## admin.components.ui.Tabs
 
 **Функція.** Код: [web/admin/src/components/ui.tsx:229](../../../../../../web/admin/src/components/ui.tsx#L229).
 
 ```typescript
-function Tabs<K extends string>({ tabs, active, onChange, }: { tabs: ReadonlyArray<[K, string]>; active: K; onChange: (key: K) => void; }): JSX.Element
+function Tabs<K extends string>({ tabs, active, onChange, }: { tabs: ReadonlyArray<[K, string]>; active: K; onChange: (key: K) => void; }): any
 ```
 
 ### Параметри
@@ -247,14 +247,14 @@ function Tabs<K extends string>({ tabs, active, onChange, }: { tabs: ReadonlyArr
 |---|---|---|---|
 | `__0` | `{ tabs: ReadonlyArray<[K, string]>; active: K; onChange: (key: K) => void; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.components.ui.Field
 
 **Функція.** Код: [web/admin/src/components/ui.tsx:256](../../../../../../web/admin/src/components/ui.tsx#L256).
 
 ```typescript
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode; }): JSX.Element
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode; }): any
 ```
 
 ### Параметри
@@ -263,14 +263,14 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 |---|---|---|---|
 | `__0` | `{ label: string; hint?: string; children: ReactNode; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ## admin.components.ui.ActionDialog
 
 **Функція.** Код: [web/admin/src/components/ui.tsx:267](../../../../../../web/admin/src/components/ui.tsx#L267).
 
 ```typescript
-function ActionDialog({ title, onClose, children, }: { title: string; onClose: () => void; children: ReactNode; }): ReactPortal
+function ActionDialog({ title, onClose, children, }: { title: string; onClose: () => void; children: ReactNode; }): any
 ```
 
 ### Параметри
@@ -279,7 +279,7 @@ function ActionDialog({ title, onClose, children, }: { title: string; onClose: (
 |---|---|---|---|
 | `__0` | `{ title: string; onClose: () => void; children: ReactNode; }` | `—` | required |
 
-Результат: `ReactPortal`.
+Результат: `any`.
 
 ### Опис із вихідного коду
 
@@ -292,7 +292,7 @@ Native modal: focus stays inside it and table rows keep their compact layout.
 **Функція.** Код: [web/admin/src/components/ui.tsx:305](../../../../../../web/admin/src/components/ui.tsx#L305).
 
 ```typescript
-function ReasonAction({ label, confirmLabel, onConfirm, busy, danger, requireReason, modal, }: { label: string; confirmLabel?: string; onConfirm: (reason: string) => void; busy?: boolean; danger?: boolean; requireReason?: boolean; modal?: boolean; }): JSX.Element
+function ReasonAction({ label, confirmLabel, onConfirm, busy, danger, requireReason, modal, }: { label: string; confirmLabel?: string; onConfirm: (reason: string) => void; busy?: boolean; danger?: boolean; requireReason?: boolean; modal?: boolean; }): any
 ```
 
 ### Параметри
@@ -301,7 +301,7 @@ function ReasonAction({ label, confirmLabel, onConfirm, busy, danger, requireRea
 |---|---|---|---|
 | `__0` | `{ label: string; confirmLabel?: string; onConfirm: (reason: string) => void; busy?: boolean; danger?: boolean; requireReason?: boolean; modal?: boolean; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.
 
 ### Опис із вихідного коду
 
@@ -314,7 +314,7 @@ A button that asks for a reason (audit) before running a destructive or auditabl
 **Функція.** Код: [web/admin/src/components/ui.tsx:378](../../../../../../web/admin/src/components/ui.tsx#L378).
 
 ```typescript
-function Notice({ tone, children }: { tone?: "info" | "ok" | "warn"; children: ReactNode; }): JSX.Element
+function Notice({ tone, children }: { tone?: "info" | "ok" | "warn"; children: ReactNode; }): any
 ```
 
 ### Параметри
@@ -323,4 +323,4 @@ function Notice({ tone, children }: { tone?: "info" | "ok" | "warn"; children: R
 |---|---|---|---|
 | `__0` | `{ tone?: "info" \| "ok" \| "warn"; children: ReactNode; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.

@@ -11,7 +11,7 @@
 **Функція.** Код: [web/admin/src/components/StageVersions.tsx:13](../../../../../../web/admin/src/components/StageVersions.tsx#L13).
 
 ```typescript
-function StageVersions({ task }: { task: TaskConfig; }): JSX.Element
+function StageVersions({ task }: { task: TaskConfig; }): any
 ```
 
 ### Параметри
@@ -20,4 +20,4 @@ function StageVersions({ task }: { task: TaskConfig; }): JSX.Element
 |---|---|---|---|
 | `__0` | `{ task: TaskConfig; }` | `—` | required |
 
-Результат: `JSX.Element`.
+Результат: `any`.

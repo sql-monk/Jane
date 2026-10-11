@@ -18,7 +18,7 @@
 
 ## jane_storage.app.log
 
-**Змінна.** Код: [services/storage/src/jane_storage/app.py:64](../../../../../../services/storage/src/jane_storage/app.py#L64).
+**Змінна.** Код: [services/storage/src/jane_storage/app.py:65](../../../../../../services/storage/src/jane_storage/app.py#L65).
 
 ```python
 log = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 
 ## jane_storage.app.REQUEST_LIMIT_PATHS
 
-**Константа.** Код: [services/storage/src/jane_storage/app.py:66](../../../../../../services/storage/src/jane_storage/app.py#L66).
+**Константа.** Код: [services/storage/src/jane_storage/app.py:67](../../../../../../services/storage/src/jane_storage/app.py#L67).
 
 ```python
 REQUEST_LIMIT_PATHS = {'timeouts.sync_response_max_ms', 'timeouts.request_timeout_ms'}
@@ -42,7 +42,7 @@ own ``CONFLICT`` retries come from ``limits.conflict_retries`` of the service co
 
 ## jane_storage.app.entity_state
 
-**Функція.** Код: [services/storage/src/jane_storage/app.py:147](../../../../../../services/storage/src/jane_storage/app.py#L147).
+**Функція.** Код: [services/storage/src/jane_storage/app.py:148](../../../../../../services/storage/src/jane_storage/app.py#L148).
 
 ```python
 def entity_state(snap: EntitySnapshot) -> dict[str, Any]:
@@ -58,7 +58,7 @@ def entity_state(snap: EntitySnapshot) -> dict[str, Any]:
 
 ## jane_storage.app.history_entry
 
-**Функція.** Код: [services/storage/src/jane_storage/app.py:153](../../../../../../services/storage/src/jane_storage/app.py#L153).
+**Функція.** Код: [services/storage/src/jane_storage/app.py:154](../../../../../../services/storage/src/jane_storage/app.py#L154).
 
 ```python
 def history_entry(event: HistoryEvent) -> dict[str, Any]:
@@ -74,7 +74,7 @@ def history_entry(event: HistoryEvent) -> dict[str, Any]:
 
 ## jane_storage.app.InvocationResults
 
-**Клас.** Код: [services/storage/src/jane_storage/app.py:163](../../../../../../services/storage/src/jane_storage/app.py#L163).
+**Клас.** Код: [services/storage/src/jane_storage/app.py:164](../../../../../../services/storage/src/jane_storage/app.py#L164).
 
 ```python
 class InvocationResults:
@@ -97,7 +97,7 @@ Recent HandlerResults of this instance (``GET /v1/invocations/{id}``).
 
 ## jane_storage.app.InvocationResults.__init__
 
-**Конструктор.** Код: [services/storage/src/jane_storage/app.py:166](../../../../../../services/storage/src/jane_storage/app.py#L166).
+**Конструктор.** Код: [services/storage/src/jane_storage/app.py:167](../../../../../../services/storage/src/jane_storage/app.py#L167).
 
 ```python
 def __init__(self, max_entries: int) -> None:
@@ -114,7 +114,7 @@ def __init__(self, max_entries: int) -> None:
 
 ## jane_storage.app.InvocationResults.max_entries
 
-**Поле екземпляра.** Код: [services/storage/src/jane_storage/app.py:167](../../../../../../services/storage/src/jane_storage/app.py#L167).
+**Поле екземпляра.** Код: [services/storage/src/jane_storage/app.py:168](../../../../../../services/storage/src/jane_storage/app.py#L168).
 
 ```python
 self.max_entries = max_entries
@@ -122,7 +122,7 @@ self.max_entries = max_entries
 
 ## jane_storage.app.InvocationResults.put
 
-**Метод.** Код: [services/storage/src/jane_storage/app.py:170](../../../../../../services/storage/src/jane_storage/app.py#L170).
+**Метод.** Код: [services/storage/src/jane_storage/app.py:171](../../../../../../services/storage/src/jane_storage/app.py#L171).
 
 ```python
 def put(self, result: dict[str, Any]) -> None:
@@ -139,7 +139,7 @@ def put(self, result: dict[str, Any]) -> None:
 
 ## jane_storage.app.InvocationResults.get
 
-**Метод.** Код: [services/storage/src/jane_storage/app.py:175](../../../../../../services/storage/src/jane_storage/app.py#L175).
+**Метод.** Код: [services/storage/src/jane_storage/app.py:176](../../../../../../services/storage/src/jane_storage/app.py#L176).
 
 ```python
 def get(self, invocation_id: str) -> dict[str, Any]:
@@ -158,7 +158,7 @@ def get(self, invocation_id: str) -> dict[str, Any]:
 
 ## jane_storage.app.build_app
 
-**Функція.** Код: [services/storage/src/jane_storage/app.py:219](../../../../../../services/storage/src/jane_storage/app.py#L219).
+**Функція.** Код: [services/storage/src/jane_storage/app.py:220](../../../../../../services/storage/src/jane_storage/app.py#L220).
 
 ```python
 def build_app(settings: Settings | None=None, *, registry_transport: httpx.AsyncBaseTransport | None=None) -> FastAPI:
@@ -176,7 +176,7 @@ def build_app(settings: Settings | None=None, *, registry_transport: httpx.Async
 ### Опис із вихідного коду
 
 ```text
-The storage service. ``registry_transport`` — HTTP transport to the registry (tests).
+The storage service. ``registry_transport`` Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎСљ HTTP transport to the registry (tests).
 ```
 
 ### Приклади з тестів
@@ -195,7 +195,7 @@ build_app(Settings(log_format="console", connections_file=conns))
 
 ## jane_storage.app.manifest_test_cases
 
-**Функція.** Код: [services/storage/src/jane_storage/app.py:839](../../../../../../services/storage/src/jane_storage/app.py#L839).
+**Функція.** Код: [services/storage/src/jane_storage/app.py:972](../../../../../../services/storage/src/jane_storage/app.py#L972).
 
 ```python
 def manifest_test_cases(pkg: StoragePackage, body: Mapping[str, Any]) -> list[tuple[str, dict[str, Any], str]]:

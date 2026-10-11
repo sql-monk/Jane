@@ -24123,7 +24123,7 @@
     },
     {
       "path": "services/storage/adapters/files/src/jane_storage_files/__init__.py",
-      "sha256": "931b1516141ac145cc2bfcb3ced2f5c950d6c9c9ab38da0f80fcfc0585aaf413"
+      "sha256": "844050e4967b05d8603e7f3eb1b3d172e096bf5591dfd00e6966b45d0e779561"
     },
     {
       "path": "services/storage/adapters/minio/src/jane_storage_minio/__init__.py",
@@ -24159,7 +24159,7 @@
     },
     {
       "path": "services/storage/src/jane_storage/app.py",
-      "sha256": "a608fe150099dc45e14481aed2104eb0e8eae21d8b0a4c3e59355dc08dc6127c"
+      "sha256": "a810f188485950fa5bdfe7c3415a136ecac3724ceb4c250ed92adf3bd03b81ab"
     },
     {
       "path": "services/storage/src/jane_storage/codec.py",
@@ -24423,7 +24423,7 @@
     },
     {
       "path": "libs/jane-kit/src/jane_kit/auth_scopes.py",
-      "sha256": "1e9a6d235419f97e3963d5a01f22d88ed72a2c9bb593586620e9c567fa49a7f7"
+      "sha256": "20f90458a9426e28b95c9b8679bae656855ffed69f14ad6b06a29344c7c9036b"
     },
     {
       "path": "libs/jane-kit/src/jane_kit/clients.py",

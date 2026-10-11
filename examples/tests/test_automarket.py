@@ -41,7 +41,7 @@ def test_generated_upload_restores_registry_policy(upload_fails: bool) -> None:
             return httpx.Response(
                 409,
                 headers={"Content-Type": "application/problem+json"},
-                json={"type": "about:blank", "title": "Conflict", "status": 409},
+                json={"type": "about:blank", "title": "Conflict", "status": 409, "code": "conflict"},
             )
         return httpx.Response(
             200,

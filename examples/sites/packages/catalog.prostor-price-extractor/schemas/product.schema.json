@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "product (ціна й наявність зі сторінки категорії prostor.ua)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "shop",
+    "product_id"
+  ],
+  "anyOf": [
+    {"required": ["price", "currency"]},
+    {"required": ["availability"], "properties": {"availability": {"const": "out_of_stock"}}}
+  ],
+  "properties": {
+    "shop": {
+      "type": "string",
+      "minLength": 1
+    },
+    "product_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Поточна ціна, грн."
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "old_price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Ціна до знижки, грн."
+    },
+    "availability": {
+      "type": "string",
+      "enum": [
+        "in_stock",
+        "out_of_stock",
+        "preorder",
+        "unknown"
+      ]
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "collector": "web",
+  "scope": {"allowed_domains": ["shop.example.test"], "allowed_schemes": ["https"]},
+  "strategies": [{
+    "type": "api_feed",
+    "strategy_id": "all-categories",
+    "url": "https://shop.example.test/api/graphql",
+    "method": "POST",
+    "body": {"query": "query Products($id: ID!, $page: Int!) { category(id: $id) { children { id } products(page: $page) { items { url name price } } } }", "variables": {"id": "root", "page": 1}},
+    "items_path": "$.data.category.products.items[*]",
+    "url_path": "$.url",
+    "item_url_base": "https://shop.example.test/",
+    "emit_items_as_materials": true,
+    "pagination": {"type": "page", "page_param": "page", "body_page_path": "$.variables.page"},
+    "partitions": {"items_path": "$.data.category.children[*].id", "body_path": "$.variables.id", "url_param": "category"}
+  }],
+  "robots": {"mode": "respect"},
+  "limits": {"crawl": {"max_depth": 100, "max_pages_per_run": 10}}
+}

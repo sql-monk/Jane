@@ -1,0 +1,111 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "726782",
+        "price": 151.0,
+        "currency": "UAH",
+        "old_price": 168.0,
+        "availability": "in_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "726782"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "690379",
+        "price": 239.0,
+        "currency": "UAH",
+        "old_price": 299.0,
+        "availability": "in_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "690379"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1502251",
+        "price": 319.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1502251"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1500151",
+        "availability": "out_of_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1500151"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "981890",
+        "availability": "out_of_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "981890"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1518126",
+        "availability": "out_of_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1518126"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+# Add after the stack's local wiring; values remain overridable at deployment.
+services:
+  orchestrator:
+    environment:
+      JANE_ORCHESTRATOR_LIMITS__ENGINE__WORKERS: "${JANE_CATALOG_WORKERS:-12}"
+  handler-runtime:
+    environment:
+      JANE_HANDLER_RUNTIME_LIMITS__CONCURRENCY__MAX_PARALLEL_INVOCATIONS: "${JANE_CATALOG_SANDBOXES:-8}"
+      JANE_HANDLER_RUNTIME_LIMITS__JOBS__MAX_CONCURRENT_JOBS: "${JANE_CATALOG_SANDBOXES:-8}"
+  web-collector:
+    environment:
+      JANE_WEB_COLLECTOR_LIMITS__JOBS__MAX_CONCURRENT_JOBS: "32"
+      JANE_WEB_COLLECTOR_LIMITS__JOBS__JOB_TIMEOUT_MS: "14400000"

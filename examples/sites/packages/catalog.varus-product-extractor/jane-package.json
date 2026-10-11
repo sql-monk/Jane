@@ -1,0 +1,192 @@
+{
+  "schema_version": "1",
+  "package_id": "catalog.varus-product-extractor",
+  "version": "1.1.1",
+  "kind": "extractor",
+  "title": "varus.ua: full product cards from the catalog API",
+  "description": "Повні картки всього асортименту з публічного GraphQL API, головна категорія та динамічне дерево категорій. Усі властивості товару через attributes(keys: []), ціни регіону 0, базові й акційні ціни, одиниця продажу, вага, обʼєм, країна та шлях категорій. Реальні контрольні приклади: овочі, вагові фрукти, випічка, молочні товари, напої й побутова хімія. Ціна відсутня у наявного товару — unrecognized.",
+  "tags": [
+    "catalog",
+    "varus",
+    "supermarket",
+    "products"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_varus_product.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "application/json"
+    ],
+    "content_kinds": [
+      "json"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "product",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару varus.ua"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "yogurt-on-sale",
+      "input": {
+        "file": "tests/yogurt-sale/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/yogurt-1-5-persik-yagotinskiy-ppl-750g"
+      },
+      "expected_status": "success",
+      "expected": "tests/yogurt-sale/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "juice-regular-price",
+      "input": {
+        "file": "tests/juice-regular-price/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/nektar-sandora-granatovij-200-ml"
+      },
+      "expected_status": "success",
+      "expected": "tests/juice-regular-price/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "dish-gel-on-sale",
+      "input": {
+        "file": "tests/dish-gel-sale/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/gel-dlya-mittya-posudu-sarmix-ultra-golden-yuzu-500-ml"
+      },
+      "expected_status": "success",
+      "expected": "tests/dish-gel-sale/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "pasta-out-of-stock-without-price",
+      "input": {
+        "file": "tests/pasta-out-of-stock/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/vyroby-makaronni-origin-tofe-500-h"
+      },
+      "expected_status": "success",
+      "expected": "tests/pasta-out-of-stock/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "api-error-document-empty",
+      "input": {
+        "file": "tests/api-error/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/graphql"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "item-without-name-unrecognized",
+      "input": {
+        "file": "tests/item-without-name/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/makaronni-virobi-golden-pasta-farfalle-400-g"
+      },
+      "expected_status": "unrecognized",
+      "origin": "human"
+    },
+    {
+      "name": "whole-assortment-fresh-vegetables",
+      "input": {
+        "file": "tests/whole-assortment-fresh-vegetables/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/tomat-green-agro-cherry-time-90-h"
+      },
+      "expected_status": "success",
+      "expected": "tests/whole-assortment-fresh-vegetables/expected.json",
+      "compare": "subset",
+      "origin": "llm"
+    },
+    {
+      "name": "whole-assortment-weighted-fruit",
+      "input": {
+        "file": "tests/whole-assortment-weighted-fruit/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/yabluko-baia-marisa-vahove"
+      },
+      "expected_status": "success",
+      "expected": "tests/whole-assortment-weighted-fruit/expected.json",
+      "compare": "subset",
+      "origin": "llm"
+    },
+    {
+      "name": "whole-assortment-bakery-sale",
+      "input": {
+        "file": "tests/whole-assortment-bakery-sale/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/prianyk-khlibodar-na-khodu-na-medu-30-h"
+      },
+      "expected_status": "success",
+      "expected": "tests/whole-assortment-bakery-sale/expected.json",
+      "compare": "subset",
+      "origin": "llm"
+    },
+    {
+      "name": "in-stock-without-price",
+      "input": {
+        "file": "tests/in-stock-without-price/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/tomat-green-agro-cherry-time-90-h"
+      },
+      "expected_status": "unrecognized",
+      "origin": "problem_sample"
+    }
+  ],
+  "provenance": {
+    "created_by": "llm",
+    "authors": [
+      "Claude (examples/sites: varus)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Verify whole-assortment GraphQL items with all attributes: vegetables, weighted fruit, bakery discounts and missing-price boundary. Reproducible Git LF bytes: normalize CRLF to LF without behavior changes.",
+    "based_on": {
+      "package_id": "catalog.varus-product-extractor",
+      "version": "1.1.0"
+    },
+    "llm": {
+      "provider": "OpenAI",
+      "model": "Codex",
+      "reason": "improvement"
+    }
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "url_patterns": [
+      "/api/*"
+    ]
+  }
+}

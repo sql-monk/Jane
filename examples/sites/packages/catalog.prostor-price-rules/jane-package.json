@@ -1,0 +1,26 @@
+{
+  "schema_version": "1",
+  "package_id": "catalog.prostor-price-rules",
+  "version": "1.0.0",
+  "kind": "collector-rules",
+  "title": "prostor.ua: category pages only (prices)",
+  "description": "Правила Web Collector для оновлення цін prostor.ua: лише сторінки категорій із пагінацією (ті самі три категорії); картки товарів поза межами (scope.exclude), тож вони не завантажуються. robots.txt дотримується.",
+  "tags": [
+    "catalog",
+    "prostor",
+    "prices"
+  ],
+  "entry": {
+    "collector": "web",
+    "rules": "rules.json"
+  },
+  "tests": [],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (examples/sites: prostor)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Category listings with pagination of three prostor.ua categories; product cards are out of scope."
+  }
+}

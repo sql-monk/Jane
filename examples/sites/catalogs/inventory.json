@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "observed_on": "2026-10-11",
+  "description": "Метадані публічного discovery. Кількість URL у sitemap не є кількістю вже збережених сутностей або підтвердженням завершення живого сканування.",
+  "sites": {
+    "bi": {
+      "source_id": "bi-ua",
+      "status": "sitemap_inventory_complete",
+      "unique_ua_product_urls": 118580,
+      "product_sitemap_files": 6,
+      "roots": [
+        "https://bi.ua/sitemap-index.xml"
+      ],
+      "product_url_pattern": "^https://bi\\.ua/ukr/product/[^/?#]+\\.html$",
+      "method": "Усі шість product sitemap; primary url/loc; дедуплікація українських URL; російські дублікати виключено."
+    },
+    "prostor": {
+      "source_id": "prostor",
+      "status": "sitemap_inventory_complete",
+      "unique_ua_product_urls": 9339,
+      "product_sitemap_files": 1,
+      "roots": [
+        "https://prostor.ua/sitemap.xml"
+      ],
+      "product_url_pattern": "^https://prostor\\.ua/ua/product/[^/?#]+/$",
+      "method": "Повний sitemap; primary url/loc; дедуплікація українських товарів; категорії, блог і російські URL виключено."
+    },
+    "epicentrk": {
+      "source_id": "epicentrk",
+      "status": "sitemap_inventory_complete",
+      "unique_ua_product_urls": 5110671,
+      "product_sitemap_files": 103,
+      "direct_product_urls": 639091,
+      "marketplace_product_urls": 4471580,
+      "roots": [
+        "https://epicentrk.ua/upload/sitemap/new/products_ep/products_main_ua.xml",
+        "https://epicentrk.ua/upload/sitemap/new/products_mp/products_merchant_ua.xml"
+      ],
+      "product_url_pattern": "^https://epicentrk\\.ua/ua/shop/[^/?#]+\\.html$",
+      "largest_sitemap_bytes": 9237536,
+      "all_sitemap_bytes": 880151284,
+      "method": "Усі 13 direct + 90 marketplace UA product sitemap з актуальних advertised robots.txt roots; локальний streaming XML і SQLite TEXT PRIMARY KEY дедуплікація. Старий /sitemap.xml містить застарілі 410 посилання; регіональні SEO-сторінки не включено."
+    },
+    "varus": {
+      "source_id": "varus",
+      "status": "api_partition_inventory_complete_product_count_unverified",
+      "category_partition_count": 6724,
+      "reported_root_product_total": 32055,
+      "reported_root_total_pages": 208,
+      "configured_page_size": 48,
+      "root_category_id": "2",
+      "roots": [
+        "https://varus.ua/api/graphql"
+      ],
+      "unique_product_count": null,
+      "method": "Discovery усіх дочірніх категорій і бренд-підрозділів від root ID 2. API root повідомляє 32 055 товарів, але totalPages=208 при pageSize=48 відповідає вікну близько 10 000 результатів; один лише root pagination не доводить повноту. Обхід 6 724 категорій/бренд-підрозділів з окремою пагінацією потрібен для решти асортименту; точний deduplicated SKU inventory не виміряно."
+    },
+    "yakaboo": {
+      "source_id": "yakaboo",
+      "status": "sitemap_index_discovered_product_count_unknown",
+      "sitemap_shard_count": 977,
+      "unique_ua_product_urls": null,
+      "roots": [
+        "https://static.yakaboo.ua/media/sitemap/sitemap.xml"
+      ],
+      "product_url_pattern": "^https://www\\.yakaboo\\.ua/ua/[^/?]+\\.html$",
+      "method": "Index містить 977 shard sitemap; частина має категорії, фільтри, мовні дублікати й не є product inventory. Досліджено вибірку shard, але всі 977 для exact product count не підраховані; екстраполяція не застосовується."
+    }
+  }
+}

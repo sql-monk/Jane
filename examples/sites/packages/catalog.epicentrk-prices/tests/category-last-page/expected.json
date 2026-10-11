@@ -1,0 +1,68 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "-makita-m1902",
+        "availability": "out_of_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "-makita-m1902"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-sparky-p-3180",
+        "availability": "out_of_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-sparky-p-3180"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-sparky-p-82-30",
+        "availability": "out_of_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-sparky-p-82-30"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-hitachi-p-20-st",
+        "availability": "out_of_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-hitachi-p-20-st"
+        }
+      }
+    }
+  ]
+}

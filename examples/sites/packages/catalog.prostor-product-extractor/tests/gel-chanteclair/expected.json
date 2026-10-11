@@ -1,0 +1,49 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "58519",
+        "title": "Гель для прання ChanteClair з ароматом білого мускусу 35 циклів прання 1.575 л",
+        "price": 421.0,
+        "currency": "UAH",
+        "url": "https://prostor.ua/ua/product/chanteclair-gel-dlja-prannja-aromat-bilij-muskus-35-doz-1-575l/",
+        "completeness": "full",
+        "brand": "ChanteClair",
+        "category": "Гелі для прання",
+        "category_path": [
+          "Побутова хімія",
+          "Засоби для прання",
+          "Гелі для прання"
+        ],
+        "old_price": 489.0,
+        "availability": "in_stock",
+        "image": "https://media.prostor.ua/catalog/product/8/0/8015194533182.png?store=ua&image-type=image",
+        "sku": "216521",
+        "volume": 1.575,
+        "unit": "л",
+        "rating": 4.77,
+        "reviews_count": 13,
+        "attributes": {
+          "Країна-виготовлення товару": "Італія",
+          "Brand": "ChanteClair",
+          "Is 18+": "Ні",
+          "Вид прання": "Автоматичне",
+          "Тип білизни": "Для всіх типів білизни",
+          "Об'єм": "1.575 л",
+          "Кількість циклів прання": "35",
+          "Аромат": "Мускус"
+        }
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "58519"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "427375",
+        "title": "Самокат Nixor Sports Professional",
+        "price": 1999.0,
+        "currency": "UAH",
+        "url": "https://bi.ua/ukr/product/samokat-nixor-sports-professional-na01081.html",
+        "availability": "out_of_stock",
+        "old_price": 2750.0,
+        "brand": "Nixor Sports",
+        "category": "Самокати",
+        "category_path": [
+          "Дитячий транспорт",
+          "Самокати"
+        ],
+        "image": "https://bi.ua/uploaded-images/products/427375_1.jpg",
+        "sku": "NA 01081",
+        "rating": 5.0,
+        "reviews_count": 2,
+        "attributes": {
+          "Артикул": "NA 01081",
+          "Колір": "Зелений, Чорний",
+          "Конструкція": "Регульоване кермо, Двоколісний",
+          "Тип товару": "Самокати",
+          "Країна-виробник": "Китай",
+          "Розмір пакунку": "0.12x0.298x0.75",
+          "Вік": "5 - 12 років",
+          "Стать": "Для хлопчиків"
+        }
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "427375"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,166 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1511066",
+        "price": 678.0,
+        "currency": "UAH"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1511066"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1518265",
+        "price": 230.0,
+        "currency": "UAH"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1518265"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1517811",
+        "price": 380.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1517811"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1517720",
+        "price": 420.0,
+        "currency": "UAH",
+        "availability": "preorder"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1517720"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1516392",
+        "price": 490.0,
+        "currency": "UAH",
+        "availability": "preorder"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1516392"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1515876",
+        "price": 399.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1515876"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1514750",
+        "price": 415.0,
+        "currency": "UAH",
+        "old_price": 519.0,
+        "availability": "in_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1514750"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1511915",
+        "price": 374.0,
+        "currency": "UAH",
+        "old_price": 399.0,
+        "availability": "in_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1511915"
+        }
+      }
+    }
+  ]
+}

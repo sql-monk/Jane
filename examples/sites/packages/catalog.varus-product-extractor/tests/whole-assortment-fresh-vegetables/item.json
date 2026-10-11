@@ -1,0 +1,105 @@
+{
+  "id": "102977",
+  "sku": "2665366",
+  "name": "Томат Green Agro Cherry time 90 г",
+  "urlKey": "tomat-green-agro-cherry-time-90-h",
+  "weight": 90,
+  "volume": "0",
+  "regionalPriceInfo": {
+    "price": 69.9,
+    "specialPrice": null,
+    "specialFrom": null,
+    "specialTo": null
+  },
+  "regionalAvailability": {
+    "inStock": true,
+    "available": true
+  },
+  "qtyStep": {
+    "isDecimal": false
+  },
+  "brand": {
+    "name": "Green Agro"
+  },
+  "primaryCategory": {
+    "name": "Овочі свіжі",
+    "urlKey": "ovochi-svizhi"
+  },
+  "categories": [
+    {
+      "name": "Головна",
+      "urlKey": "glavnaja",
+      "level": 1,
+      "isProductCategory": true
+    },
+    {
+      "name": "Фрукти, овочі, горіхи",
+      "urlKey": "frukti-ovochi-gorihi",
+      "level": 2,
+      "isProductCategory": true
+    },
+    {
+      "name": "Овочі свіжі",
+      "urlKey": "ovochi-svizhi",
+      "level": 3,
+      "isProductCategory": true
+    }
+  ],
+  "gallery": {
+    "mainImageTimestamp": 1791308739
+  },
+  "attributes": [
+    {
+      "code": "pim_brand_id",
+      "label": "Бренд",
+      "option": {
+        "label": "Green Agro"
+      }
+    },
+    {
+      "code": "countrymanufacturerforsite",
+      "label": "Країна виробництва",
+      "option": {
+        "label": "Україна"
+      }
+    },
+    {
+      "code": "forvegetables_typesentencevegetables",
+      "label": "Тип пропозиції",
+      "option": {
+        "label": "фасовані"
+      }
+    },
+    {
+      "code": "forvegetables_typevegetables",
+      "label": "Вид овочів",
+      "option": {
+        "label": "помідори"
+      }
+    },
+    {
+      "code": "forvegetables_processingvegetables",
+      "label": "Обробка",
+      "option": {
+        "label": "миті"
+      }
+    },
+    {
+      "code": "weight",
+      "label": "Вага",
+      "numberValue": 90
+    },
+    {
+      "code": "forvegetables_packagingvegetables",
+      "label": "Тип пакування",
+      "option": {
+        "label": "пластиковий стакан"
+      }
+    },
+    {
+      "code": "ageWms",
+      "label": "Термін зберігання товару",
+      "textValue": "5"
+    }
+  ]
+}

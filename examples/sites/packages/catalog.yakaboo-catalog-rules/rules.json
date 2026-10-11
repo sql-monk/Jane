@@ -1,0 +1,55 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "www.yakaboo.ua",
+      "static.yakaboo.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "include": [
+      {
+        "type": "regex",
+        "value": "^https://www\\.yakaboo\\.ua/ua/[^/?]+\\.html$"
+      },
+      {
+        "type": "regex",
+        "value": "^https://static\\.yakaboo\\.ua/media/sitemap/[^/?]+\\.xml(?:\\.gz)?$"
+      }
+    ]
+  },
+  "strategies": [
+    {
+      "type": "sitemap",
+      "strategy_id": "whole-assortment",
+      "urls": [
+        "https://static.yakaboo.ua/media/sitemap/sitemap.xml"
+      ],
+      "use_robots_txt": true,
+      "use_lastmod_for_revisit": false
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "revisit": {
+    "mode": "interval"
+  },
+  "dedup": {
+    "key": "canonical_url",
+    "use_link_rel_canonical": true
+  },
+  "sections": [
+    {
+      "section_id": "books",
+      "title": "Усі товарні картки українською (книжки та інші товари)",
+      "patterns": [
+        {
+          "type": "regex",
+          "value": "^https://www\\.yakaboo\\.ua/ua/[^/?]+\\.html$"
+        }
+      ]
+    }
+  ]
+}

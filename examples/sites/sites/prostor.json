@@ -1,0 +1,246 @@
+{
+  "site": "prostor",
+  "group": "catalog",
+  "title": "PROSTOR: весь асортимент, властивості товарів і періодичні ціни",
+  "url": "https://prostor.ua/",
+  "sources": [
+    {
+      "source_id": "prostor",
+      "kind": "web",
+      "title": "PROSTOR — інтернет-магазин косметики й побутової хімії",
+      "description": "Весь асортимент: косметика, парфумерія, догляд, гігієна, побутова хімія та всі інші товарні розділи. Discovery: 9 339 унікальних українських товарних URL у sitemap станом на 11.10.2026. Звичайний HTTP, robots.txt дотримується, не частіше одного запиту за секунду та один одночасний запит до хоста. Картки товарів містять ціни й усі доступні характеристики.",
+      "locator": {
+        "url": "https://prostor.ua/"
+      },
+      "collector_rules": "@pkg:catalog.prostor-catalog-rules",
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        },
+        "crawl": {
+          "max_links_per_page": 60000,
+          "max_frontier_size": 20000,
+          "max_material_bytes": 33554432,
+          "revisit_interval_seconds": 86400
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "expected_entity_types": [
+        "product"
+      ],
+      "labels": {
+        "group": "catalog",
+        "site": "prostor"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "catalog-prostor",
+      "title": "PROSTOR: весь асортимент і періодичне оновлення цін",
+      "description": "Кожні 15 хв продовжується збережена черга всіх українських товарних URL із sitemap, до 400 сторінок за запуск. Нові картки збираються до завершення первинного обходу; відомі повторно перевіряються після 24 год, фактична свіжість залежить від довжини черги. Повний обхід великого асортименту може тривати від діб до місяців; завершення визначається станом усієї черги, а не успіхом окремого запуску. Ціна, наявність і всі доступні властивості оновлюються з картки, Сутності товарів та історія змін зберігаються у PostgreSQL; повний HTML кожного циклу не накопичується. Ліміти черги й sitemap перевищують виміряний каталог; досягнення лімітів не є повнотою каталогу.",
+      "input": {
+        "source_id": "prostor"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental",
+            "rules": "@pkg:catalog.prostor-catalog-rules"
+          }
+        },
+        {
+          "stage_id": "extract-products",
+          "kind": "handler",
+          "handler": "@pkg:catalog.prostor-product-extractor",
+          "params": {
+            "shop": "prostor"
+          },
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "text/html"
+              }
+            }
+          ],
+          "bindings": [
+            {
+              "sections": [
+                "products"
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "store-products",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-products",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 900,
+        "timezone": "Europe/Kyiv",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_links_per_page": 60000,
+          "max_frontier_size": 20000,
+          "max_material_bytes": 33554432,
+          "revisit_interval_seconds": 86400,
+          "max_depth": 40,
+          "max_pages_per_run": 400,
+          "max_bytes_per_run": 536870912
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "catalog",
+        "site": "prostor",
+        "kind": "catalog"
+      }
+    },
+    {
+      "task_id": "prices-prostor",
+      "title": "PROSTOR: ручна перевірка цін попередньої добірки",
+      "description": "Попереднє завдання для обмеженої добірки категорій залишено лише для ручної діагностики. Автоматичне оновлення цін усього асортименту виконує catalog-завдання із повними product sitemap та повторними відвідуваннями карток.",
+      "input": {
+        "source_id": "prostor"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "rules": "@pkg:catalog.prostor-price-rules",
+            "mode": "full"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-files",
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "extract-prices",
+          "kind": "handler",
+          "handler": "@pkg:catalog.prostor-price-extractor",
+          "params": {
+            "shop": "prostor"
+          },
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "text/html"
+              }
+            }
+          ],
+          "bindings": [
+            {
+              "url_patterns": [
+                {
+                  "value": "prostor.ua/ua/ukhod-za-litsom/uvlazhnenie-i-pitanie/**"
+                },
+                {
+                  "value": "prostor.ua/ua/pobutova-himija/sredstva-dlya-stirki/**"
+                },
+                {
+                  "value": "prostor.ua/ua/volosy/shampuni/**"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "store-prices",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-prices",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "manual",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 30,
+          "max_pages_per_run": 100
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "catalog",
+        "site": "prostor",
+        "kind": "prices"
+      }
+    }
+  ],
+  "verify": {
+    "prostor": {
+      "product": {
+        "min": 600,
+        "required": [
+          "shop",
+          "product_id",
+          "title",
+          "price",
+          "currency",
+          "url",
+          "completeness"
+        ]
+      }
+    }
+  }
+}

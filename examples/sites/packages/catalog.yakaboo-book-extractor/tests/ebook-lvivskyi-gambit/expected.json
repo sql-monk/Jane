@@ -1,0 +1,49 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1518265",
+        "title": "Львівський ґамбіт. Книга 4",
+        "price": 230.0,
+        "currency": "UAH",
+        "url": "https://www.yakaboo.ua/ua/l-vivs-kij-gambit-kniga-4-3452504.html",
+        "brand": "Видавництво Старого Лева",
+        "category": "Історичний детектив",
+        "category_path": [
+          "Книжки",
+          "Художня література",
+          "Детективи",
+          "Історичний детектив"
+        ],
+        "availability": "in_stock",
+        "image": "https://static.yakaboo.ua/media/cloudflare/product/webp/600x840/9/7/978-966-448-727-3_02_1.jpg",
+        "sku": "1518265",
+        "barcode": "9789664487273",
+        "attributes": {
+          "Автор": "Богдан Коломійчук",
+          "Видавництво": "Видавництво Старого Лева",
+          "Кількість сторінок": "280",
+          "Рік видання": "2026",
+          "Мова": "Українська",
+          "Тип": "Електронна",
+          "Номер серії": "4",
+          "ISBN": "978-966-448-727-3"
+        },
+        "completeness": "full"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1518265"
+        }
+      }
+    }
+  ]
+}

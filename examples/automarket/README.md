@@ -11,11 +11,13 @@
 ```powershell
 uv sync --all-packages --frozen
 uv run --all-packages python examples/automarket/setup_automarket.py check
-uv run --all-packages python examples/automarket/setup_automarket.py apply --stack-file .jane/stack-jane-demo.json --cancel-active
+uv run --all-packages python examples/automarket/setup_automarket.py apply --stack-file .jane/stack-jane-demo.json --cancel-active --allow-generated-packages
 uv run --all-packages python examples/automarket/setup_automarket.py run --stack-file .jane/stack-jane-demo.json --receipt .jane/automarket-runtime.json
 ```
 
 `apply --cancel-active` скасовує незавершені попередні запуски лише `ads-autoria`, `ads-rst` та `ads-avtobazar`; збережені дані залишаються. Нові версії екстракторів проходять тести у справжньому runtime перед затвердженням. Підключення сховищ зберігаються без перезапису. Оновлення конфігурацій використовує ETag та `If-Match`.
+
+`--allow-generated-packages` — явний дозвіл опублікувати нові LLM-версії. Якщо пакет забороняє автоматичні зміни, драйвер дозволяє їх лише на час upload та відновлює попередню заборону в `finally`, зокрема при помилці. Походження залишається `llm`; вже опубліковані версії не переписуються. `--http-timeout` задає HTTP timeout у секундах (типово 120), окремо від очікування job (`--timeout`).
 
 ## Обхід і розклад
 

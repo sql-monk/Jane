@@ -11,13 +11,20 @@ from pathlib import Path
 from typing import Any
 
 
-def ensure_workers(stack_file: Path, compose_root: Path, workers: int) -> dict[str, Any]:
+def ensure_workers(
+    stack_file: Path,
+    compose_root: Path,
+    workers: int,
+    *,
+    task_ids: tuple[str, ...] = (),
+    image: str | None = None,
+) -> dict[str, Any]:
     docker = shutil.which("docker")
     if docker is None:
         raise RuntimeError("Docker CLI is not installed")
     stack = json.loads(stack_file.read_text(encoding="utf-8"))
     project = stack.get("project") or stack_file.stem.removeprefix("stack-")
-    name = f"{project}-automarket-worker"
+    name = f"{project}-automarket-{'priority-' if task_ids else ''}worker"
     result = subprocess.run(  # noqa: S603 - trusted local stack; argv only
         [docker, "container", "inspect", name], capture_output=True, text=True, check=False
     )
@@ -32,12 +39,18 @@ def ensure_workers(stack_file: Path, compose_root: Path, workers: int) -> dict[s
             raise RuntimeError(
                 f"{name}: another worker count is already configured; review active work before replacing"
             )
+        if tuple(json.loads(settings.get("JANE_ORCHESTRATOR_LIMITS__ENGINE__TASK_IDS", "[]"))) != task_ids:
+            raise RuntimeError(f"{name}: existing worker has another task filter")
+        if image and container["Config"]["Image"] != image:
+            raise RuntimeError(f"{name}: existing worker uses another image")
         if not container["State"]["Running"]:
             subprocess.run([docker, "start", name], check=True)  # noqa: S603 - verified project container
     else:
-        override = stack_file.parent / "automarket-worker.compose.yaml"
+        override = stack_file.parent / f"{name}.compose.yaml"
         override.write_text(
-            "services:\n  orchestrator:\n    healthcheck:\n      disable: true\n", encoding="utf-8"
+            "services:\n  orchestrator:\n    healthcheck:\n      disable: true\n"
+            + (f"    image: {json.dumps(image)}\n" if image else ""),
+            encoding="utf-8",
         )
         command = [
             docker,
@@ -61,6 +74,8 @@ def ensure_workers(stack_file: Path, compose_root: Path, workers: int) -> dict[s
             f"JANE_ORCHESTRATOR_LIMITS__ENGINE__WORKERS={workers}",
             "-e",
             "JANE_ORCHESTRATOR_SCHEDULER_ENABLED=false",
+            "-e",
+            f"JANE_ORCHESTRATOR_LIMITS__ENGINE__TASK_IDS={json.dumps(task_ids)}",
             "orchestrator",
             "python",
             "-m",
@@ -69,7 +84,14 @@ def ensure_workers(stack_file: Path, compose_root: Path, workers: int) -> dict[s
         ]
         subprocess.run(command, env={**os.environ, **stack["env"]}, check=True)  # noqa: S603 - local operator configuration; argv only
     subprocess.run([docker, "update", "--restart", "unless-stopped", name], check=True, capture_output=True)  # noqa: S603 - verified project container
-    receipt = {"container": name, "workers": workers, "scheduler": False, "restart_policy": "unless-stopped"}
+    receipt = {
+        "container": name,
+        "workers": workers,
+        "scheduler": False,
+        "restart_policy": "unless-stopped",
+        "task_ids": list(task_ids),
+        "image": image,
+    }
     print(json.dumps(receipt), flush=True)
     return receipt
 
@@ -79,10 +101,16 @@ def main() -> int:
     parser.add_argument("--stack-file", required=True, type=Path)
     parser.add_argument("--compose-root", required=True, type=Path)
     parser.add_argument("--workers", type=int, default=6)
+    parser.add_argument("--task-id", action="append", default=[])
+    parser.add_argument("--image", help="prebuilt orchestrator image with the optional task filter")
     args = parser.parse_args()
     if args.workers < 1:
         parser.error("--workers must be positive")
-    ensure_workers(args.stack_file, args.compose_root, args.workers)
+    if args.task_id and not args.image:
+        parser.error("--task-id requires a prebuilt --image with task-filter support")
+    ensure_workers(
+        args.stack_file, args.compose_root, args.workers, task_ids=tuple(args.task_id), image=args.image
+    )
     return 0
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,65 @@ SPEC.loader.exec_module(automarket)
 
 def test_all_archives_documents_and_fixture_entity_fields() -> None:
     assert automarket.check_offline() == []
+
+
+@pytest.mark.parametrize("upload_fails", [False, True])
+def test_generated_upload_restores_registry_policy(upload_fails: bool) -> None:
+    policies: list[bool] = []
+    allowed = False
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        nonlocal allowed
+        if request.method == "PATCH":
+            assert request.headers["if-match"] == '"policy"'
+            allowed = json.loads(request.content)["auto_changes_allowed"]
+            policies.append(allowed)
+        if request.url.path.endswith("/versions"):
+            assert allowed
+            if upload_fails:
+                raise httpx.RemoteProtocolError("upload interrupted")
+            return httpx.Response(
+                409,
+                headers={"Content-Type": "application/problem+json"},
+                json={"type": "about:blank", "title": "Conflict", "status": 409},
+            )
+        return httpx.Response(
+            200,
+            headers={"ETag": '"policy"'},
+            json={
+                "package_id": "autos.rst-car-ads",
+                "kind": "extractor",
+                "title": "RST",
+                "auto_changes_allowed": allowed,
+                "deprecated": False,
+                "created_at": "2026-10-11T00:00:00Z",
+                "updated_at": "2026-10-11T00:00:00Z",
+            },
+        )
+
+    api = automarket.ex.Api("http://registry.test", "registry", token=None)
+    api.http.close()
+    api.http = httpx.Client(base_url="http://registry.test", transport=httpx.MockTransport(respond))
+    api.client = ContractClient(automarket.ex.spec("registry"), api.http)
+    try:
+        directory = automarket.package_dirs()["autos.rst-car-ads"]
+        with pytest.raises(RuntimeError, match="explicit --allow-generated-packages"):
+            automarket.upload_version(api, "autos.rst-car-ads", directory)
+        assert policies == []
+        if upload_fails:
+            with pytest.raises(httpx.RemoteProtocolError):
+                automarket.upload_version(api, "autos.rst-car-ads", directory, allow_generated=True)
+        else:
+            assert (
+                automarket.upload_version(
+                    api, "autos.rst-car-ads", directory, allow_generated=True
+                ).status_code
+                == 409
+            )
+        assert policies == [True, False]
+        assert not allowed
+    finally:
+        api.close()
 
 
 @pytest.mark.parametrize("site", ["autoria", "rst"])

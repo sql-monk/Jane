@@ -2,9 +2,9 @@
   "source": "auto.ria.com",
   "entity_type": "car_ad",
   "package_versions": {
-    "autos.autoria-ad-page": "1.1.0",
+    "autos.autoria-ad-page": "1.1.1",
     "autos.autoria-search-page": "1.0.0",
-    "autos.autoria-rules": "1.1.0"
+    "autos.autoria-rules": "1.1.1"
   },
   "verification": "Manually compare explicitly observed structured fields on three HTTP200 detail pages, then run extraction and JSON Schema validation. No credentials or seller contacts included.",
   "samples": [

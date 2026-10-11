@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "package_id": "autos.autoria-ad-page",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "kind": "extractor",
   "title": "AUTO.RIA: car ad page -> car_ad",
   "description": "Повне оголошення з картки auto.ria.com (/uk/auto_<марка>_<модель>_<id>.html): JSON-LD Vehicle (марка, модель, рік, ціна у валюті продавця, стан, продано) і серверний стан сторінки window.__PINIA__ (ціни в USD/UAH, пробіг, паливо й об'єм, коробка, кузов, привід, колір, регіон і місто, тип продавця, дата створення, фото). Без імен, телефонів, VIN і номерів; телефони, e-mail і вулиці в описі приховано. Додатково: двері, місця, покоління, модифікація, комплектація, потужність з одиницями й джерелом, екостандарт, стан фарби та технічний стан, витрати пального, опції за категоріями. Суперечності потужності не приховуються.",
@@ -159,7 +159,7 @@
     }
   ],
   "provenance": {
-    "created_by": "human",
+    "created_by": "llm",
     "authors": [
       "Claude (subagent: examples/sites autoria)",
       "Codex (AUTO.RIA detailed vehicle catalog)"

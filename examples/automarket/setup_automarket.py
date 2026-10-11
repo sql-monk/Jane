@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import shutil
 import subprocess
 import sys
@@ -43,12 +44,21 @@ STORAGE = ("jane.storage-files", "jane.storage-postgresql")
 class StackApi(ex.Api):
     """Contract client with bounded retry of a stale connection, preserving the same idempotency key."""
 
-    def __init__(self, base_url: str, api: str, *, token: str | None, retries: int, keepalive: float) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        api: str,
+        *,
+        token: str | None,
+        retries: int,
+        keepalive: float,
+        http_timeout: float = 120,
+    ) -> None:
         super().__init__(base_url, api, token=token)
         self.http.close()
         self.http = httpx.Client(
             base_url=base_url,
-            timeout=120,
+            timeout=http_timeout,
             headers={"Authorization": f"Bearer {token}"} if token else None,
             limits=httpx.Limits(keepalive_expiry=keepalive),
         )
@@ -222,7 +232,9 @@ def check_offline() -> list[str]:
     return problems
 
 
-def connect(stack_file: Path, *, retries: int = 2, keepalive: float = 2) -> tuple[ex.Services, ex.Api]:
+def connect(
+    stack_file: Path, *, retries: int = 2, keepalive: float = 2, http_timeout: float = 120
+) -> tuple[ex.Services, ex.Api]:
     stack = ex.read_json(stack_file)
     token = stack.get("env", {}).get("JANE_API_KEY_ADMIN")
     urls = {name: service["url"] for name, service in stack["services"].items() if "url" in service}
@@ -246,10 +258,38 @@ def connect(stack_file: Path, *, retries: int = 2, keepalive: float = 2) -> tupl
                 if address:
                     urls[name] = f"http://{address}"
     return ex.Services(
-        StackApi(urls["registry"], "registry", token=token, retries=retries, keepalive=keepalive),
-        StackApi(urls["orchestrator"], "orchestrator", token=token, retries=retries, keepalive=keepalive),
-        StackApi(urls["storage"], "storage", token=token, retries=retries, keepalive=keepalive),
-    ), StackApi(urls["handler-runtime"], "handler", token=token, retries=retries, keepalive=keepalive)
+        StackApi(
+            urls["registry"],
+            "registry",
+            token=token,
+            retries=retries,
+            keepalive=keepalive,
+            http_timeout=http_timeout,
+        ),
+        StackApi(
+            urls["orchestrator"],
+            "orchestrator",
+            token=token,
+            retries=retries,
+            keepalive=keepalive,
+            http_timeout=http_timeout,
+        ),
+        StackApi(
+            urls["storage"],
+            "storage",
+            token=token,
+            retries=retries,
+            keepalive=keepalive,
+            http_timeout=http_timeout,
+        ),
+    ), StackApi(
+        urls["handler-runtime"],
+        "handler",
+        token=token,
+        retries=retries,
+        keepalive=keepalive,
+        http_timeout=http_timeout,
+    )
 
 
 def wait_job(api: ex.Api, job: dict[str, Any], timeout: float, poll: float) -> dict[str, Any]:
@@ -264,7 +304,46 @@ def wait_job(api: ex.Api, job: dict[str, Any], timeout: float, poll: float) -> d
     return job
 
 
-def publish(svc: ex.Services, handler: ex.Api, timeout: float, poll: float) -> dict[str, dict[str, str]]:
+def upload_version(
+    registry: ex.Api, pid: str, directory: Path, *, allow_generated: bool = False
+) -> httpx.Response:
+    """Temporarily permit an explicitly authorized LLM upload, restoring the package policy."""
+    path = f"/v1/packages/{pid}"
+    manifest = ex.read_json(directory / "jane-package.json")
+
+    def policy_patch(allowed: bool, etag: str) -> None:
+        body = {"auto_changes_allowed": allowed}
+        registry.client.spec.validate_request("PATCH", path, body, "application/merge-patch+json")
+        registry.call(
+            "PATCH",
+            path,
+            content=json.dumps(body).encode(),
+            headers={"If-Match": etag, "Content-Type": "application/merge-patch+json"},
+        )
+
+    current = registry.call("GET", path)
+    changed = manifest["provenance"]["created_by"] == "llm" and not current.json()["auto_changes_allowed"]
+    if changed and not allow_generated:
+        raise RuntimeError(f"{pid}: publication requires explicit --allow-generated-packages authorization")
+    if changed:
+        policy_patch(True, current.headers["ETag"])
+    try:
+        return registry.call(
+            "POST",
+            f"{path}/versions",
+            ok=(201, 409),
+            content=bytes(canonical_archive(files_from_dir(directory))),
+            headers={"Content-Type": "application/zip", "Idempotency-Key": ex.key()},
+        )
+    finally:
+        if changed:
+            latest = registry.call("GET", path)
+            policy_patch(False, latest.headers["ETag"])
+
+
+def publish(
+    svc: ex.Services, handler: ex.Api, timeout: float, poll: float, *, allow_generated: bool = False
+) -> dict[str, dict[str, str]]:
     refs = local_refs()
     for pid, directory in package_dirs().items():
         manifest, ref = ex.read_json(directory / "jane-package.json"), refs[pid]
@@ -282,14 +361,12 @@ def publish(svc: ex.Services, handler: ex.Api, timeout: float, poll: float) -> d
             headers={"Idempotency-Key": ex.key()},
         )
         path = f"/v1/packages/{pid}/versions/{ref['version']}"
-        response = svc.registry.call(
-            "POST",
-            f"/v1/packages/{pid}/versions",
-            ok=(201, 409),
-            content=bytes(canonical_archive(files_from_dir(directory))),
-            headers={"Content-Type": "application/zip", "Idempotency-Key": ex.key()},
+        response = svc.registry.call("GET", path, ok=(200, 404))
+        if response.status_code == 404:
+            response = upload_version(svc.registry, pid, directory, allow_generated=allow_generated)
+        version = (
+            response.json() if response.status_code in (200, 201) else svc.registry.call("GET", path).json()
         )
-        version = response.json() if response.status_code == 201 else svc.registry.call("GET", path).json()
         if version["digest"] != ref["digest"]:
             raise RuntimeError(f"{pid}: immutable registry version differs; bump version")
         if manifest["kind"] == "extractor":
@@ -537,6 +614,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--poll", type=float, default=2)
     parser.add_argument("--transport-retries", type=int, default=2)
     parser.add_argument("--keepalive", type=float, default=2)
+    parser.add_argument("--http-timeout", type=float, default=120)
+    parser.add_argument(
+        "--allow-generated-packages",
+        action="store_true",
+        help="authorize LLM version upload with temporary package policy permission and immediate restoration",
+    )
     parser.add_argument(
         "--cancel-active",
         action="store_true",
@@ -544,7 +627,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--receipt", type=Path, default=HERE / "evidence" / "runtime.json")
     args = parser.parse_args(argv)
-    if min(args.pages, args.validation_pages, args.timeout, args.poll) <= 0:
+    if min(args.pages, args.validation_pages, args.timeout, args.poll, args.http_timeout) <= 0:
         parser.error("page counts, timeout and poll must be positive")
     if problems := check_offline():
         print("\n".join(problems), file=sys.stderr)
@@ -554,10 +637,17 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.transport_retries < 0 or args.keepalive < 0:
         parser.error("transport retry count and keepalive must not be negative")
-    svc, handler = connect(args.stack_file, retries=args.transport_retries, keepalive=args.keepalive)
+    svc, handler = connect(
+        args.stack_file,
+        retries=args.transport_retries,
+        keepalive=args.keepalive,
+        http_timeout=args.http_timeout,
+    )
     try:
         if args.command == "apply":
-            refs = publish(svc, handler, args.timeout, args.poll)
+            refs = publish(
+                svc, handler, args.timeout, args.poll, allow_generated=args.allow_generated_packages
+            )
             for connection in ("raw-files", "results-pg"):
                 svc.orchestrator.call("GET", f"/v1/connections/{connection}")
             disable_unavailable(svc.orchestrator)

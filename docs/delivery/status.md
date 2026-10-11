@@ -12,7 +12,7 @@
 | 29 | Безпечні форми, грід JSON/масивів, редактор ланцюжків | accepted | `b037d49`: 36 unit / 20 Chromium, незалежне приймання; merge `052d98d` |
 | 30 | Підсумки запусків, діагностика, точне повторне опрацювання та походження | accepted R2 | `d480831`: секрет відсутній у всій події аудиту, міграція 7→8 збережена; merge `e2e62d2` |
 | 31 | Налаштування, аудит, адаптивність, зрозумілі стани | accepted R2 | `e9dcac2`: pending форми, застарілий provider GET і вкладені підписи виправлено; merge `3efe64f` |
-| 32 | Інтеграція, повний CI, робочий стек, GitHub main | active | [Звіт WP32](WP-32.md); exact `7441431`: CI `38122549484` 14/14, deployment і main FF виконані; 8/8 Operations збережено, 6 active run IDs не скасовано; живий 4-stage run: RAW2, products2, 899/999 UAH; реальний HP 54999 UAH у UI. Handler label fix accepted; required connections help/validation, остаточний follow-up CI/release/main ще очікуються |
+| 32 | Інтеграція, повний CI, робочий стек, GitHub main | active | [Звіт WP32](WP-32.md); exact `7441431`: CI `38122549484` 14/14, deployment і main FF виконані; 8/8 Operations збережено, 6 active run IDs не скасовано; живий 4-stage run: RAW2, products2, 899/999 UAH; реальний HP 54999 UAH у UI. Handler label та required connections help/validation accepted (9 Chromium + незалежні 3); остаточний follow-up CI/release/main ще очікуються |
 
 Спільний `jane-demo` також використовується перевіркою новин. Оновлення бекенду цього продовження відбудеться після CI з актуальним `origin/main` і збереженням чинних налаштувань, портів, підключень та даних.
 

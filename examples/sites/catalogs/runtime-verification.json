@@ -1,0 +1,1202 @@
+{
+  "captured_at": "2026-10-11T07:22:39.165343+00:00",
+  "completed_at": "2026-10-11T07:27:23.225979+00:00",
+  "deployed_commit": "e68352ec9326c59d7f0e7af196b04ceabbeb33cc",
+  "runtime": {
+    "image_sha256": "sha256:560bda29114a0e96ffc030bbb9eb82bc0a32ef15f1107a35f9c64b1472843251",
+    "image_tag": "jane-catalog-offload:e68352ec9326",
+    "started_at": "2026-10-11T07:21:14.622802307Z",
+    "same_image_during_audit": true,
+    "builtin_docker_health": {
+      "status": "healthy",
+      "failing_streak": 0,
+      "recent_checks": [
+        {
+          "started_at": "2026-10-11T07:25:34.790223711Z",
+          "finished_at": "2026-10-11T07:25:36.193250106Z",
+          "exit_code": 0
+        },
+        {
+          "started_at": "2026-10-11T07:25:46.19244477Z",
+          "finished_at": "2026-10-11T07:25:46.780743204Z",
+          "exit_code": 0
+        },
+        {
+          "started_at": "2026-10-11T07:25:56.781527795Z",
+          "finished_at": "2026-10-11T07:25:58.805264709Z",
+          "exit_code": 0
+        }
+      ]
+    },
+    "effective_jobs": {
+      "max_concurrent_jobs": 32,
+      "max_queued_jobs": 1000,
+      "job_timeout_ms": 14400000,
+      "job_retention_seconds": 86400,
+      "queue_full_retry_after_seconds": 1
+    },
+    "effective_settings": {
+      "lease_seconds": 30,
+      "heartbeat_interval_ms": 500,
+      "state_busy_timeout_ms": 10000
+    },
+    "sniffio_version": "1.3.1"
+  },
+  "preservation_flags": {
+    "applied": true,
+    "configuration_preserved": true,
+    "other_source_bytes_preserved": true,
+    "deployed_changes_match": true,
+    "dependency_matches_lock": true,
+    "current_preserved_files_match": true,
+    "current_deployed_changes_match": true,
+    "current_sniffio_1_3_1": true
+  },
+  "source_sha256": [
+    {
+      "file": "crawler.py",
+      "sha256": "31a8f0fb05c1e7b54c993be33a12221abb20fb0824c98fbdee215a931695757f"
+    },
+    {
+      "file": "state.py",
+      "sha256": "fad0f2d5968ad761aee22cd31eb64c03c7ea378c2b4f9040c08e4f3f0784c458"
+    },
+    {
+      "file": "engine.py",
+      "sha256": "b6990911d1fe95998232df77544f9a2e0b4f3431d647d74345a5ea87fd68c263"
+    },
+    {
+      "file": "fetcher.py",
+      "sha256": "78499a210f6d59cfedf9f172261edcf38da9f64f7a382f8a35749a64a4a6e6fe"
+    },
+    {
+      "file": "render.py",
+      "sha256": "3b23561722395d1e2678da99767cdc91082f2b643c348fc0526e97e44b107e39"
+    },
+    {
+      "file": "sitemap.py",
+      "sha256": "c7dda6480d00d5232afce3b6b0eac9bbed30668f26ec3c43c6249925dfe4a401"
+    },
+    {
+      "file": "api_feed.py",
+      "sha256": "8c53e57ac11d14464a0ff5feb66873bb8ecd9bb9d586cdce2b09da9fdd6916f2"
+    },
+    {
+      "file": "kit-auth.py",
+      "sha256": "3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6"
+    },
+    {
+      "file": "kit-config.py",
+      "sha256": "50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3"
+    },
+    {
+      "file": "kit-operations.py",
+      "sha256": "40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e"
+    },
+    {
+      "file": "kit-service.py",
+      "sha256": "950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+    },
+    {
+      "file": "collector-rules.schema.json",
+      "sha256": "0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695"
+    }
+  ],
+  "health_probes": [
+    {
+      "sample": 1,
+      "captured_at": "2026-10-11T07:24:02.510116+00:00",
+      "status_code": 200,
+      "latency_ms": 1109.0,
+      "health": "ok",
+      "builtin_docker_health": "healthy"
+    },
+    {
+      "sample": 2,
+      "captured_at": "2026-10-11T07:24:33.361648+00:00",
+      "status_code": 200,
+      "latency_ms": 641.0,
+      "health": "ok",
+      "builtin_docker_health": "healthy"
+    },
+    {
+      "sample": 3,
+      "captured_at": "2026-10-11T07:25:04.472919+00:00",
+      "status_code": 200,
+      "latency_ms": 875.0,
+      "health": "ok",
+      "builtin_docker_health": "healthy"
+    },
+    {
+      "sample": 4,
+      "captured_at": "2026-10-11T07:25:35.521194+00:00",
+      "status_code": 200,
+      "latency_ms": 844.0,
+      "health": "ok",
+      "builtin_docker_health": "healthy"
+    },
+    {
+      "sample": 5,
+      "captured_at": "2026-10-11T07:26:06.320551+00:00",
+      "status_code": 200,
+      "latency_ms": 594.0,
+      "health": "ok",
+      "builtin_docker_health": "healthy"
+    }
+  ],
+  "health_summary": {
+    "median_ms": 844.0,
+    "max_ms": 1109.0
+  },
+  "lease_truncation": {
+    "since": "2026-10-11T07:21:14.622802307Z",
+    "checked_at": "2026-10-11T07:26:08.561183+00:00",
+    "lines_checked": 1252,
+    "lease_lost_count": 0,
+    "resuming_count": 0,
+    "truncation_related_count": 0
+  },
+  "sites": [
+    {
+      "site": "bi",
+      "source_id": "bi-ua",
+      "task_id": "catalog-bi",
+      "native_schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 900
+      },
+      "source_state": {
+        "state_key": "bi-ua",
+        "known_urls": 2053,
+        "frontier_size": 116534,
+        "updated_at": "2026-10-11T07:23:59Z"
+      },
+      "current_and_prior_runs": [
+        {
+          "run": {
+            "run_id": "run_01M4MXF144ZWPTE2NKZFGMZ30R",
+            "status": "running",
+            "trigger": "schedule",
+            "test_mode": false,
+            "created_at": "2026-10-11T07:22:32.450Z",
+            "started_at": "2026-10-11T07:22:32.460Z",
+            "collection_id": "job_4d018124eaa14d25bd82bc951b344bd6",
+            "counters": {
+              "materials": 49,
+              "unknown_materials": 0
+            },
+            "backpressure": false
+          },
+          "job": {
+            "job_id": "job_4d018124eaa14d25bd82bc951b344bd6",
+            "status": "running",
+            "progress": {
+              "completed": 51,
+              "total": 400,
+              "unit": "urls",
+              "counters": {
+                "discovered": 400,
+                "fetched": 51,
+                "emitted": 51,
+                "acknowledged": 0,
+                "unacked": 0,
+                "duplicates": 0,
+                "skipped_out_of_scope": 0,
+                "skipped_robots": 0,
+                "not_modified": 0,
+                "errors": 0,
+                "frontier_size": 0,
+                "bytes_fetched": 12120646,
+                "overflow_pending": 0,
+                "continued_urls": 400
+              },
+              "updated_at": "2026-10-11T07:23:56.758207Z"
+            },
+            "updated_at": "2026-10-11T07:23:56.853631Z"
+          },
+          "collection": {
+            "collection_id": "job_4d018124eaa14d25bd82bc951b344bd6",
+            "status": "running",
+            "mode": "incremental",
+            "rules": {
+              "digest": "sha256:271eb2f85e858773094c79d910f085172e2373e70d3c096170b322bcfd2ce084",
+              "package_id": "catalog.bi-catalog-rules",
+              "version": "1.1.1"
+            },
+            "stats": {
+              "discovered": 400,
+              "fetched": 51,
+              "emitted": 51,
+              "acknowledged": 50,
+              "unacked": 1,
+              "duplicates": 0,
+              "skipped_out_of_scope": 0,
+              "skipped_robots": 0,
+              "not_modified": 0,
+              "errors": 0,
+              "frontier_size": 349,
+              "bytes_fetched": 12120646,
+              "by_strategy": {},
+              "overflow_pending": 0
+            },
+            "paused_by_backpressure": false,
+            "created_at": "2026-10-11T07:22:32Z"
+          },
+          "continued_urls": 400,
+          "budget_result": {},
+          "errors": {
+            "count_from_stats": 0,
+            "count_returned": 0,
+            "has_more": false,
+            "codes": []
+          }
+        },
+        {
+          "run": {
+            "run_id": "run_01M4MWKJ747T602JHQG67FA9PN",
+            "status": "succeeded",
+            "trigger": "schedule",
+            "test_mode": false,
+            "created_at": "2026-10-11T07:07:32.449Z",
+            "started_at": "2026-10-11T07:07:32.474Z",
+            "finished_at": "2026-10-11T07:17:50.153Z",
+            "collection_id": "job_459d47fd896047979e89e386adeb24f7",
+            "counters": {
+              "materials": 400,
+              "unknown_materials": 0
+            },
+            "backpressure": false
+          },
+          "job": {
+            "job_id": "job_459d47fd896047979e89e386adeb24f7",
+            "status": "succeeded",
+            "progress": {
+              "completed": 399,
+              "total": 400,
+              "unit": "urls",
+              "counters": {
+                "discovered": 400,
+                "fetched": 399,
+                "emitted": 399,
+                "acknowledged": 0,
+                "unacked": 0,
+                "duplicates": 0,
+                "skipped_out_of_scope": 0,
+                "skipped_robots": 0,
+                "not_modified": 0,
+                "errors": 0,
+                "frontier_size": 0,
+                "bytes_fetched": 99852066,
+                "overflow_pending": 0,
+                "continued_urls": 400
+              },
+              "updated_at": "2026-10-11T07:17:48.225139Z"
+            },
+            "updated_at": "2026-10-11T07:17:48.722736Z",
+            "finished_at": "2026-10-11T07:17:48.712462Z"
+          },
+          "collection": {
+            "collection_id": "job_459d47fd896047979e89e386adeb24f7",
+            "status": "succeeded",
+            "mode": "incremental",
+            "rules": {
+              "digest": "sha256:271eb2f85e858773094c79d910f085172e2373e70d3c096170b322bcfd2ce084",
+              "package_id": "catalog.bi-catalog-rules",
+              "version": "1.1.1"
+            },
+            "stats": {
+              "discovered": 400,
+              "fetched": 400,
+              "emitted": 400,
+              "acknowledged": 400,
+              "unacked": 0,
+              "duplicates": 0,
+              "skipped_out_of_scope": 0,
+              "skipped_robots": 0,
+              "not_modified": 0,
+              "errors": 0,
+              "frontier_size": 0,
+              "bytes_fetched": 100099630,
+              "by_strategy": {},
+              "continuation_pending": 116587,
+              "overflow_pending": 0
+            },
+            "paused_by_backpressure": false,
+            "created_at": "2026-10-11T07:07:33Z",
+            "finished_at": "2026-10-11T07:17:48Z"
+          },
+          "continued_urls": 400,
+          "budget_result": {
+            "collection_id": "job_459d47fd896047979e89e386adeb24f7",
+            "stats": {
+              "discovered": 400,
+              "fetched": 400,
+              "emitted": 400,
+              "acknowledged": 0,
+              "unacked": 0,
+              "duplicates": 0,
+              "skipped_out_of_scope": 0,
+              "skipped_robots": 0,
+              "not_modified": 0,
+              "errors": 0,
+              "frontier_size": 0,
+              "bytes_fetched": 100099630,
+              "by_strategy": {},
+              "overflow_pending": 0,
+              "continuation_pending": 116587
+            },
+            "stopped_by": "crawl.max_pages_per_run",
+            "continuation_pending": 116587
+          },
+          "errors": {
+            "count_from_stats": 0,
+            "count_returned": 0,
+            "has_more": false,
+            "codes": []
+          }
+        }
+      ],
+      "current_progress": {
+        "captured_at": "2026-10-11T07:26:06.640031+00:00",
+        "collection": {
+          "collection_id": "job_4d018124eaa14d25bd82bc951b344bd6",
+          "status": "running",
+          "stats": {
+            "discovered": 400,
+            "fetched": 143,
+            "emitted": 143,
+            "acknowledged": 142,
+            "unacked": 1,
+            "duplicates": 0,
+            "skipped_out_of_scope": 0,
+            "skipped_robots": 0,
+            "not_modified": 0,
+            "errors": 0,
+            "frontier_size": 257,
+            "bytes_fetched": 35255863,
+            "by_strategy": {},
+            "overflow_pending": 0
+          },
+          "paused_by_backpressure": false
+        },
+        "source_state": {
+          "state_key": "bi-ua",
+          "known_urls": 2143,
+          "frontier_size": 116444,
+          "updated_at": "2026-10-11T07:26:06Z"
+        },
+        "delta": {
+          "discovered": 0,
+          "fetched": 92,
+          "emitted": 92,
+          "acknowledged": 92,
+          "duplicates": 0,
+          "skipped_out_of_scope": 0,
+          "errors": 0
+        }
+      }
+    },
+    {
+      "site": "epicentrk",
+      "source_id": "epicentrk",
+      "task_id": "catalog-epicentrk",
+      "native_schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 900
+      },
+      "source_state": {
+        "state_key": "epicentrk",
+        "known_urls": 445,
+        "frontier_size": 5045770,
+        "updated_at": "2026-10-11T07:23:57Z"
+      },
+      "current_and_prior_runs": [
+        {
+          "run": {
+            "run_id": "run_01M4MXF3E850G6B1J29AQFHN2T",
+            "status": "running",
+            "trigger": "schedule",
+            "test_mode": false,
+            "created_at": "2026-10-11T07:22:34.819Z",
+            "started_at": "2026-10-11T07:22:34.840Z",
+            "collection_id": "job_c2cc92f9de2b402fb227e49a12eca51a",
+            "counters": {
+              "materials": 43,
+              "unknown_materials": 0
+            },
+            "backpressure": false
+          },
+          "job": {
+            "job_id": "job_c2cc92f9de2b402fb227e49a12eca51a",
+            "status": "running",
+            "progress": {
+              "completed": 43,
+              "total": 400,
+              "unit": "urls",
+              "counters": {
+                "discovered": 400,
+                "fetched": 43,
+                "emitted": 43,
+                "acknowledged": 0,
+                "unacked": 0,
+                "duplicates": 0,
+                "skipped_out_of_scope": 0,
+                "skipped_robots": 0,
+                "not_modified": 0,
+                "errors": 0,
+                "frontier_size": 0,
+                "bytes_fetched": 10194199,
+                "overflow_pending": 0,
+                "continued_urls": 400
+              },
+              "updated_at": "2026-10-11T07:23:55.551990Z"
+            },
+            "updated_at": "2026-10-11T07:23:55.645551Z"
+          },
+          "collection": {
+            "collection_id": "job_c2cc92f9de2b402fb227e49a12eca51a",
+            "status": "running",
+            "mode": "incremental",
+            "rules": {
+              "digest": "sha256:4597bac06168ff7463b2d85895347ffc624d2bb594a67bce2409df682bd268b3",
+              "package_id": "catalog.epicentrk-catalog-rules",
+              "version": "1.1.1"
+            },
+            "stats": {
+              "discovered": 400,
+              "fetched": 44,
+              "emitted": 44,
+              "acknowledged": 43,
+              "unacked": 1,
+              "duplicates": 0,
+              "skipped_out_of_scope": 0,
+              "skipped_robots": 0,
+              "not_modified": 0,
+              "errors": 0,
+              "frontier_size": 356,
+              "bytes_fetched": 10418154,
+              "by_strategy": {},
+              "overflow_pending": 0
+            },
+            "paused_by_backpressure": false,
+            "created_at": "2026-10-11T07:22:34Z"
+          },
+          "continued_urls": 400,
+          "budget_result": {},
+          "errors": {
+            "count_from_stats": 0,
+            "count_returned": 0,
+            "has_more": false,
+            "codes": []
+          }
+        }
+      ],
+      "current_progress": {
+        "captured_at": "2026-10-11T07:26:06.640031+00:00",
+        "collection": {
+          "collection_id": "job_c2cc92f9de2b402fb227e49a12eca51a",
+          "status": "running",
+          "stats": {
+            "discovered": 400,
+            "fetched": 123,
+            "emitted": 123,
+            "acknowledged": 122,
+            "unacked": 1,
+            "duplicates": 0,
+            "skipped_out_of_scope": 0,
+            "skipped_robots": 0,
+            "not_modified": 0,
+            "errors": 0,
+            "frontier_size": 277,
+            "bytes_fetched": 29107460,
+            "by_strategy": {},
+            "overflow_pending": 0
+          },
+          "paused_by_backpressure": false
+        },
+        "source_state": {
+          "state_key": "epicentrk",
+          "known_urls": 523,
+          "frontier_size": 5045692,
+          "updated_at": "2026-10-11T07:26:05Z"
+        },
+        "delta": {
+          "discovered": 0,
+          "fetched": 79,
+          "emitted": 79,
+          "acknowledged": 79,
+          "duplicates": 0,
+          "skipped_out_of_scope": 0,
+          "errors": 0
+        }
+      }
+    },
+    {
+      "site": "prostor",
+      "source_id": "prostor",
+      "task_id": "catalog-prostor",
+      "native_schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 900
+      },
+      "source_state": {
+        "state_key": "prostor",
+        "known_urls": 2039,
+        "frontier_size": 7277,
+        "updated_at": "2026-10-11T07:23:59Z"
+      },
+      "current_and_prior_runs": [
+        {
+          "run": {
+            "run_id": "run_01M4MXF66B5EG0GKWNQ11HM12E",
+            "status": "running",
+            "trigger": "schedule",
+            "test_mode": false,
+            "created_at": "2026-10-11T07:22:37.633Z",
+            "started_at": "2026-10-11T07:22:37.675Z",
+            "collection_id": "job_bf467240feb94bd9a56250ebdcb67c25",
+            "counters": {
+              "materials": 53,
+              "unknown_materials": 0
+            },
+            "backpressure": false
+          },
+          "job": {
+            "job_id": "job_bf467240feb94bd9a56250ebdcb67c25",
+            "status": "running",
+            "progress": {
+              "completed": 56,
+              "total": 401,
+              "unit": "urls",
+              "counters": {
+                "discovered": 400,
+                "fetched": 55,
+                "emitted": 54,
+                "acknowledged": 0,
+                "unacked": 0,
+                "duplicates": 0,
+                "skipped_out_of_scope": 0,
+                "skipped_robots": 0,
+                "not_modified": 0,
+                "errors": 1,
+                "frontier_size": 0,
+                "bytes_fetched": 14036759,
+                "overflow_pending": 0,
+                "continued_urls": 400
+              },
+              "updated_at": "2026-10-11T07:23:55.552388Z"
+            },
+            "updated_at": "2026-10-11T07:23:55.646318Z"
+          },
+          "collection": {
+            "collection_id": "job_bf467240feb94bd9a56250ebdcb67c25",
+            "status": "running",
+            "mode": "incremental",
+            "rules": {
+              "digest": "sha256:4faff513c7fff4766f73996422668fae4c0451f65c2dcf8e46b17cd1b0ff926a",
+              "package_id": "catalog.prostor-catalog-rules",
+              "version": "1.1.1"
+            },
+            "stats": {
+              "discovered": 400,
+              "fetched": 55,
+              "emitted": 54,
+              "acknowledged": 53,
+              "unacked": 1,
+              "duplicates": 0,
+              "skipped_out_of_scope": 0,
+              "skipped_robots": 0,
+              "not_modified": 0,
+              "errors": 1,
+              "frontier_size": 345,
+              "bytes_fetched": 14036759,
+              "by_strategy": {},
+              "overflow_pending": 0
+            },
+            "paused_by_backpressure": false,
+            "created_at": "2026-10-11T07:22:37Z"
+          },
+          "continued_urls": 400,
+          "budget_result": {},
+          "errors": {
+            "count_from_stats": 1,
+            "count_returned": 1,
+            "has_more": false,
+            "codes": [
+              "not_found"
+            ]
+          }
+        },
+        {
+          "run": {
+            "run_id": "run_01M4MWKQ91F8YVEWD5907HK0DT",
+            "status": "succeeded",
+            "trigger": "schedule",
+            "test_mode": false,
+            "created_at": "2026-10-11T07:07:37.631Z",
+            "started_at": "2026-10-11T07:07:37.653Z",
+            "finished_at": "2026-10-11T07:17:02.550Z",
+            "collection_id": "job_8e22eb3806f3447ebb8af96cd4310cb9",
+            "counters": {
+              "materials": 387,
+              "unknown_materials": 0
+            },
+            "backpressure": false
+          },
+          "job": {
+            "job_id": "job_8e22eb3806f3447ebb8af96cd4310cb9",
+            "status": "succeeded",
+            "progress": {
+              "completed": 418,
+              "total": 419,
+              "unit": "urls",
+              "counters": {
+                "discovered": 400,
+                "fetched": 391,
+                "emitted": 386,
+                "acknowledged": 0,
+                "unacked": 0,
+                "duplicates": 0,
+                "skipped_out_of_scope": 8,
+                "skipped_robots": 0,
+                "not_modified": 0,
+                "errors": 13,
+                "frontier_size": 0,
+                "bytes_fetched": 100502651,
+                "overflow_pending": 0,
+                "continued_urls": 400
+              },
+              "updated_at": "2026-10-11T07:17:00.829371Z"
+            },
+            "updated_at": "2026-10-11T07:17:00.954471Z",
+            "finished_at": "2026-10-11T07:17:00.889564Z"
+          },
+          "collection": {
+            "collection_id": "job_8e22eb3806f3447ebb8af96cd4310cb9",
+            "status": "succeeded",
+            "mode": "incremental",
+            "rules": {
+              "digest": "sha256:4faff513c7fff4766f73996422668fae4c0451f65c2dcf8e46b17cd1b0ff926a",
+              "package_id": "catalog.prostor-catalog-rules",
+              "version": "1.1.1"
+            },
+            "stats": {
+              "discovered": 400,
+              "fetched": 392,
+              "emitted": 387,
+              "acknowledged": 387,
+              "unacked": 0,
+              "duplicates": 0,
+              "skipped_out_of_scope": 8,
+              "skipped_robots": 0,
+              "not_modified": 0,
+              "errors": 13,
+              "frontier_size": 0,
+              "bytes_fetched": 100761979,
+              "by_strategy": {},
+              "continuation_pending": 7336,
+              "overflow_pending": 0
+            },
+            "paused_by_backpressure": false,
+            "created_at": "2026-10-11T07:07:37Z",
+            "finished_at": "2026-10-11T07:17:00Z"
+          },
+          "continued_urls": 400,
+          "budget_result": {
+            "collection_id": "job_8e22eb3806f3447ebb8af96cd4310cb9",
+            "stats": {
+              "discovered": 400,
+              "fetched": 392,
+              "emitted": 387,
+              "acknowledged": 0,
+              "unacked": 0,
+              "duplicates": 0,
+              "skipped_out_of_scope": 8,
+              "skipped_robots": 0,
+              "not_modified": 0,
+              "errors": 13,
+              "frontier_size": 0,
+              "bytes_fetched": 100761979,
+              "by_strategy": {},
+              "overflow_pending": 0,
+              "continuation_pending": 7336
+            },
+            "continuation_pending": 7336
+          },
+          "errors": {
+            "count_from_stats": 13,
+            "count_returned": 5,
+            "has_more": true,
+            "codes": [
+              "not_found",
+              "not_found",
+              "not_found",
+              "out_of_scope",
+              "out_of_scope"
+            ]
+          }
+        }
+      ],
+      "current_progress": {
+        "captured_at": "2026-10-11T07:26:07.346881+00:00",
+        "collection": {
+          "collection_id": "job_bf467240feb94bd9a56250ebdcb67c25",
+          "status": "running",
+          "stats": {
+            "discovered": 400,
+            "fetched": 164,
+            "emitted": 162,
+            "acknowledged": 161,
+            "unacked": 1,
+            "duplicates": 0,
+            "skipped_out_of_scope": 2,
+            "skipped_robots": 0,
+            "not_modified": 0,
+            "errors": 4,
+            "frontier_size": 234,
+            "bytes_fetched": 41957719,
+            "by_strategy": {},
+            "overflow_pending": 0
+          },
+          "paused_by_backpressure": false
+        },
+        "source_state": {
+          "state_key": "prostor",
+          "known_urls": 2145,
+          "frontier_size": 7169,
+          "updated_at": "2026-10-11T07:26:06Z"
+        },
+        "delta": {
+          "discovered": 0,
+          "fetched": 109,
+          "emitted": 108,
+          "acknowledged": 108,
+          "duplicates": 0,
+          "skipped_out_of_scope": 2,
+          "errors": 3
+        },
+        "errors": {
+          "captured_at": "2026-10-11T07:27:23.225979+00:00",
+          "count_returned": 5,
+          "has_more": false,
+          "codes": [
+            "not_found",
+            "not_found",
+            "out_of_scope",
+            "out_of_scope",
+            "not_found"
+          ]
+        }
+      }
+    },
+    {
+      "site": "varus",
+      "source_id": "varus",
+      "task_id": "catalog-varus",
+      "native_schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "interval_seconds": 900
+      },
+      "source_state": {
+        "state_key": "varus",
+        "known_urls": 11480,
+        "frontier_size": 0,
+        "updated_at": "2026-10-11T07:23:22Z"
+      },
+      "current_and_prior_runs": [
+        {
+          "run": {
+            "run_id": "run_01M4MXF86HKVZP12DFNP3BN410",
+            "status": "running",
+            "trigger": "schedule",
+            "test_mode": false,
+            "created_at": "2026-10-11T07:22:39.695Z",
+            "started_at": "2026-10-11T07:22:39.712Z",
+            "collection_id": "job_8fa425ccd4e54e91aa7351215ae4f658",
+            "counters": {
+              "materials": 503,
+              "unknown_materials": 0
+            },
+            "backpressure": true
+          },
+          "job": {
+            "job_id": "job_8fa425ccd4e54e91aa7351215ae4f658",
+            "status": "running",
+            "progress": {
+              "completed": 11180,
+              "total": 11180,
+              "unit": "urls",
+              "counters": {
+                "discovered": 11160,
+                "fetched": 21,
+                "emitted": 1003,
+                "acknowledged": 0,
+                "unacked": 0,
+                "duplicates": 4196,
+                "skipped_out_of_scope": 0,
+                "skipped_robots": 0,
+                "not_modified": 10156,
+                "errors": 0,
+                "frontier_size": 0,
+                "bytes_fetched": 3894890,
+                "overflow_pending": 0,
+                "continued_urls": 1
+              },
+              "updated_at": "2026-10-11T07:23:57.761915Z"
+            },
+            "updated_at": "2026-10-11T07:23:57.838449Z"
+          },
+          "collection": {
+            "collection_id": "job_8fa425ccd4e54e91aa7351215ae4f658",
+            "status": "running",
+            "mode": "incremental",
+            "rules": {
+              "digest": "sha256:fe5a778bf6891344aac44cdf09a31d5afb26555823531e3b4327777569a8dac3",
+              "package_id": "catalog.varus-catalog-rules",
+              "version": "1.1.1"
+            },
+            "stats": {
+              "discovered": 11160,
+              "fetched": 21,
+              "emitted": 1003,
+              "acknowledged": 503,
+              "unacked": 500,
+              "duplicates": 4196,
+              "skipped_out_of_scope": 0,
+              "skipped_robots": 0,
+              "not_modified": 10156,
+              "errors": 0,
+              "frontier_size": 0,
+              "bytes_fetched": 3894890,
+              "by_strategy": {
+                "all-products": 11159
+              },
+              "overflow_pending": 0
+            },
+            "paused_by_backpressure": true,
+            "created_at": "2026-10-11T07:22:39Z"
+          },
+          "continued_urls": 1,
+          "budget_result": {},
+          "errors": {
+            "count_from_stats": 0,
+            "count_returned": 0,
+            "has_more": false,
+            "codes": []
+          }
+        },
+        {
+          "run": {
+            "run_id": "run_01M4MWKSDJQSYTKNRERN7KP9YD",
+            "status": "succeeded",
+            "trigger": "schedule",
+            "test_mode": false,
+            "created_at": "2026-10-11T07:07:39.824Z",
+            "started_at": "2026-10-11T07:07:39.844Z",
+            "finished_at": "2026-10-11T07:15:05.897Z",
+            "collection_id": "job_b919e6cfb18d43fa9b272d61265ebcaa",
+            "counters": {
+              "materials": 556,
+              "unknown_materials": 0
+            },
+            "backpressure": false
+          },
+          "job": {
+            "job_id": "job_b919e6cfb18d43fa9b272d61265ebcaa",
+            "status": "succeeded",
+            "progress": {
+              "completed": 10207,
+              "total": 10208,
+              "unit": "urls",
+              "counters": {
+                "discovered": 10109,
+                "fetched": 99,
+                "emitted": 508,
+                "acknowledged": 0,
+                "unacked": 0,
+                "duplicates": 4196,
+                "skipped_out_of_scope": 0,
+                "skipped_robots": 0,
+                "not_modified": 9600,
+                "errors": 0,
+                "frontier_size": 0,
+                "bytes_fetched": 20060146,
+                "overflow_pending": 0,
+                "continued_urls": 1
+              },
+              "updated_at": "2026-10-11T07:10:09.291464Z"
+            },
+            "updated_at": "2026-10-11T07:10:12.529807Z",
+            "finished_at": "2026-10-11T07:10:09.691827Z"
+          },
+          "collection": {
+            "collection_id": "job_b919e6cfb18d43fa9b272d61265ebcaa",
+            "status": "succeeded",
+            "mode": "incremental",
+            "rules": {
+              "digest": "sha256:fe5a778bf6891344aac44cdf09a31d5afb26555823531e3b4327777569a8dac3",
+              "package_id": "catalog.varus-catalog-rules",
+              "version": "1.1.1"
+            },
+            "stats": {
+              "discovered": 10158,
+              "fetched": 100,
+              "emitted": 556,
+              "acknowledged": 556,
+              "unacked": 0,
+              "duplicates": 4196,
+              "skipped_out_of_scope": 0,
+              "skipped_robots": 0,
+              "not_modified": 9600,
+              "errors": 0,
+              "frontier_size": 0,
+              "bytes_fetched": 20283647,
+              "by_strategy": {
+                "all-products": 10157
+              },
+              "continuation_pending": 1,
+              "overflow_pending": 0
+            },
+            "paused_by_backpressure": false,
+            "created_at": "2026-10-11T07:07:40Z",
+            "finished_at": "2026-10-11T07:10:09Z"
+          },
+          "continued_urls": 1,
+          "budget_result": {
+            "collection_id": "job_b919e6cfb18d43fa9b272d61265ebcaa",
+            "stats": {
+              "discovered": 10158,
+              "fetched": 100,
+              "emitted": 556,
+              "acknowledged": 0,
+              "unacked": 0,
+              "duplicates": 4196,
+              "skipped_out_of_scope": 0,
+              "skipped_robots": 0,
+              "not_modified": 9600,
+              "errors": 0,
+              "frontier_size": 0,
+              "bytes_fetched": 20283647,
+              "by_strategy": {
+                "all-products": 10157
+              },
+              "overflow_pending": 0,
+              "continuation_pending": 1
+            },
+            "stopped_by": "crawl.max_pages_per_run",
+            "continuation_pending": 1
+          },
+          "errors": {
+            "count_from_stats": 0,
+            "count_returned": 0,
+            "has_more": false,
+            "codes": []
+          }
+        }
+      ],
+      "current_progress": {
+        "captured_at": "2026-10-11T07:26:07.347986+00:00",
+        "collection": {
+          "collection_id": "job_8fa425ccd4e54e91aa7351215ae4f658",
+          "status": "running",
+          "stats": {
+            "discovered": 11170,
+            "fetched": 22,
+            "emitted": 1013,
+            "acknowledged": 513,
+            "unacked": 500,
+            "duplicates": 4196,
+            "skipped_out_of_scope": 0,
+            "skipped_robots": 0,
+            "not_modified": 10156,
+            "errors": 0,
+            "frontier_size": 0,
+            "bytes_fetched": 4062128,
+            "by_strategy": {
+              "all-products": 11169
+            },
+            "overflow_pending": 0
+          },
+          "paused_by_backpressure": true
+        },
+        "source_state": {
+          "state_key": "varus",
+          "known_urls": 11491,
+          "frontier_size": 0,
+          "updated_at": "2026-10-11T07:25:56Z"
+        },
+        "delta": {
+          "discovered": 10,
+          "fetched": 1,
+          "emitted": 10,
+          "acknowledged": 10,
+          "duplicates": 0,
+          "skipped_out_of_scope": 0,
+          "errors": 0
+        }
+      }
+    },
+    {
+      "site": "yakaboo",
+      "source_id": "yakaboo",
+      "task_id": "catalog-yakaboo",
+      "native_schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "interval_seconds": 900
+      },
+      "source_state": {
+        "state_key": "yakaboo",
+        "known_urls": 400,
+        "frontier_size": 1,
+        "updated_at": "2026-10-11T07:19:38Z"
+      },
+      "current_and_prior_runs": [
+        {
+          "run": {
+            "run_id": "run_01M4MXFBVCYQF2R8QBJ118G09S",
+            "status": "running",
+            "trigger": "schedule",
+            "test_mode": false,
+            "created_at": "2026-10-11T07:22:43.434Z",
+            "started_at": "2026-10-11T07:22:43.444Z",
+            "collection_id": "job_3c45cfe56c5b42c098b433471f53579f",
+            "counters": {
+              "materials": 0,
+              "unknown_materials": 0
+            },
+            "backpressure": false
+          },
+          "job": {
+            "job_id": "job_3c45cfe56c5b42c098b433471f53579f",
+            "status": "running",
+            "progress": {
+              "completed": 0,
+              "total": 1,
+              "unit": "urls",
+              "counters": {
+                "discovered": 1,
+                "fetched": 0,
+                "emitted": 0,
+                "acknowledged": 0,
+                "unacked": 0,
+                "duplicates": 0,
+                "skipped_out_of_scope": 292586,
+                "skipped_robots": 0,
+                "not_modified": 0,
+                "errors": 0,
+                "frontier_size": 0,
+                "bytes_fetched": 0,
+                "overflow_pending": 0,
+                "continued_urls": 1
+              },
+              "updated_at": "2026-10-11T07:23:56.757831Z"
+            },
+            "updated_at": "2026-10-11T07:23:56.771343Z"
+          },
+          "collection": {
+            "collection_id": "job_3c45cfe56c5b42c098b433471f53579f",
+            "status": "running",
+            "mode": "incremental",
+            "rules": {
+              "digest": "sha256:755806333f0cc283296ed25194799fba6334a34cf31d5d37b0bbffb4dfd7c21d",
+              "package_id": "catalog.yakaboo-catalog-rules",
+              "version": "1.1.1"
+            },
+            "stats": {
+              "discovered": 1,
+              "fetched": 0,
+              "emitted": 0,
+              "acknowledged": 0,
+              "unacked": 0,
+              "duplicates": 0,
+              "skipped_out_of_scope": 292586,
+              "skipped_robots": 0,
+              "not_modified": 0,
+              "errors": 0,
+              "frontier_size": 1,
+              "bytes_fetched": 0,
+              "by_strategy": {},
+              "overflow_pending": 0
+            },
+            "paused_by_backpressure": false,
+            "created_at": "2026-10-11T07:22:47Z"
+          },
+          "continued_urls": 1,
+          "budget_result": {},
+          "errors": {
+            "count_from_stats": 0,
+            "count_returned": 0,
+            "has_more": false,
+            "codes": []
+          }
+        }
+      ],
+      "current_progress": {
+        "captured_at": "2026-10-11T07:26:08.260982+00:00",
+        "collection": {
+          "collection_id": "job_3c45cfe56c5b42c098b433471f53579f",
+          "status": "running",
+          "stats": {
+            "discovered": 1,
+            "fetched": 0,
+            "emitted": 0,
+            "acknowledged": 0,
+            "unacked": 0,
+            "duplicates": 0,
+            "skipped_out_of_scope": 945234,
+            "skipped_robots": 0,
+            "not_modified": 0,
+            "errors": 0,
+            "frontier_size": 1,
+            "bytes_fetched": 0,
+            "by_strategy": {},
+            "overflow_pending": 0
+          },
+          "paused_by_backpressure": false
+        },
+        "source_state": {
+          "state_key": "yakaboo",
+          "known_urls": 400,
+          "frontier_size": 1,
+          "updated_at": "2026-10-11T07:19:38Z"
+        },
+        "delta": {
+          "discovered": 0,
+          "fetched": 0,
+          "emitted": 0,
+          "acknowledged": 0,
+          "duplicates": 0,
+          "skipped_out_of_scope": 652648,
+          "errors": 0
+        }
+      }
+    }
+  ],
+  "assessment": {
+    "five_probes_complete": true,
+    "health_all_http200": true,
+    "health_latency_ms": [
+      1109.0,
+      641.0,
+      875.0,
+      844.0,
+      594.0
+    ],
+    "health_median_ms": 844.0,
+    "health_max_ms": 1109.0,
+    "all_tasks_interval900_skip": true,
+    "preservation_all_true": true,
+    "image_unchanged": true,
+    "lease_lost_count": 0,
+    "truncation_log_signal_count": 0
+  },
+  "snapshot_note": "Public API observations are sequential and timestamped; live counters and error counts can increase between progress and error-page samples."
+}

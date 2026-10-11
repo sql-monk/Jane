@@ -85,7 +85,60 @@ All checks passed!
 Колектор і storage — замінники сусідів, які перевіряють запити та відповіді за контрактами.
 Нове налаштування не перевірено на реальному сервісі в поточному стеку; запуск контейнера,
 інтеграцію пакетів і даних автобазарів виконує координатор. Main і поточні контейнери не змінювалися.
-Повний `just check` не запускався для цього вузького доповнення. Незалежне рев’ю очікується.
+Повний `just check` не запускався для цього вузького доповнення. Незалежне рев’ю прийняло зміну;
+фактичні результати й початкові падіння наведені нижче.
+
+## Незалежне рев’ю 1 і діагностика
+
+Рев’юер підтвердив `10 passed in 113.41s` для нових тестів, mypy, ruff, форматування та
+`WP-09: 5 changed file(s), 0 outside ownership`. Його ширший запуск дав
+`1 failed, 46 passed, 62 deselected in 149.03s`: у `test_every_operation_matches_contract`
+запуск не досяг `succeeded` за незмінні 30 секунд (`test_contract.py:53`). Окремий повтор
+також дав `1 failed in 64.46s`. Початковий вердикт — changes requested до діагностики.
+
+Автор перевірив точний сценарій на базі `0b554fc` в окремому checkout і на `e595c1c`.
+Обидва пройшли; тайм-аут і перевірки не змінювалися. Тимчасовий read-only діагностичний
+hook лише мав читати статуси й помилки тестової черги при падінні; сценарій на зміні пройшов.
+Причинність попередніх тайм-аутів не доведена. Ці результати не замінюють записаних падінь.
+
+```powershell
+uv run --group dev --package jane-orchestrator pytest services/orchestrator/tests/test_contract.py::test_every_operation_matches_contract -q
+```
+
+```text
+# База 0b554fc, окремий checkout
+1 passed in 146.84s (0:02:26)
+# Зміна e595c1c, із read-only diagnostic hook
+1 passed in 104.57s (0:01:44)
+```
+
+Незалежний рев’юер повторив точний сценарій на незміненому `e595c1c` із `login=false`:
+
+```text
+1 passed in 47.64s
+```
+
+Вердикт щодо фільтра `task_ids` — **accepted**: блокуюче зауваження закрите успішним
+повтором без skip, зміни тайм-ауту чи послаблення перевірок. Попередні падіння збережено в цьому звіті.
+
+## Складання окремого образу
+
+За дорученням координатора образ зібрано з чистого checkout `e595c1c`:
+
+```powershell
+docker build -f services/orchestrator/Dockerfile -t jane-automarket-orchestrator:e595c1c .
+docker image inspect jane-automarket-orchestrator:e595c1c --format '{{.Id}}'
+```
+
+```text
+#22 naming to docker.io/library/jane-automarket-orchestrator:e595c1c 1.0s done
+#22 unpacking to docker.io/library/jane-automarket-orchestrator:e595c1c 8.8s done
+#22 DONE 22.1s
+sha256:6ed92b88115eb6ef03480473f37e1fcba599d9c23aa78453dfac98a5f500dec2
+```
+
+Поточні контейнери й порти не змінювалися. Для worker-only контейнера координатор має
+вимкнути HTTP health-check образу: команда `python -m jane_orchestrator worker` не відкриває HTTP.
 
 ## Запити до координатора
 

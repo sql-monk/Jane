@@ -199,6 +199,70 @@ def test_location_from_other_dom_card_is_rejected() -> None:
     assert not setup.raw_field_check(entity, raw, "https://www.ria.com/uk/")["verified"]
 
 
+def ria_fields() -> dict[str, Any]:
+    return {
+        "site": "ria.com",
+        "listing_id": "239975708",
+        "title": "Мобільний телефон Unihertz Tank Mini 1 8/256gb Black",
+        "url": "https://www.ria.com/uk/mobylnyy-telefon-unihertz-tank-mini-1-8-239975708.html",
+        "location": "Київ",
+        "price": {"amount": 13039, "currency": "UAH"},
+    }
+
+
+def ria_card(description: str, monetary_slot: str) -> bytes:
+    entity = ria_fields()
+    return (
+        f'<div class="ticket-clean" id="adv_{entity["listing_id"]}">'
+        f'<a class="ticket-title" href="{entity["url"]}">{entity["title"]}</a>'
+        f'<div class="descriptions-ticket">{description}</div>'
+        f'<span class="price js-price green">{monetary_slot}</span>'
+        '<div class="address js-state-city">Київ</div></div>'
+    ).encode()
+
+
+def test_ria_price_slot_does_not_merge_numeric_model_with_grouped_amount() -> None:
+    # The live card ended its description with "13" just before the grouped price;
+    # flattening the whole card had incorrectly treated "13 13 039 грн" as 1313039 UAH.
+    raw = ria_card("Модель 13", '<strong class="size22">13 039</strong><span>грн</span>')
+    check = setup.raw_field_check(ria_fields(), raw, "https://www.ria.com/uk/c/mobile/")
+    assert check["verified"]
+    assert set(check["checked_fields"]) == set(ria_fields())
+
+
+@pytest.mark.parametrize("change", ["title", "url", "location", "amount", "currency"])
+def test_ria_structural_price_verification_preserves_other_field_checks(change: str) -> None:
+    entity = ria_fields()
+    raw = ria_card("Модель 13", '<strong class="size22">13 039</strong><span>грн</span>')
+    if change == "amount":
+        entity["price"]["amount"] = 999
+    elif change == "currency":
+        entity["price"]["currency"] = "USD"
+    elif change == "url":
+        entity["url"] = "https://www.ria.com/uk/different-239975708.html"
+    else:
+        entity[change] = "Інше значення"
+    assert not setup.raw_field_check(entity, raw, "https://www.ria.com/uk/c/mobile/")["verified"]
+
+
+@pytest.mark.parametrize(
+    "monetary_slot", ["<strong>999</strong><span>грн</span>", "<strong>13 039</strong><span>USD</span>"]
+)
+def test_ria_description_price_cannot_override_own_monetary_slot(monetary_slot: str) -> None:
+    raw = ria_card("Попередня ціна 13 039 грн", monetary_slot)
+    assert not setup.raw_field_check(ria_fields(), raw, "https://www.ria.com/uk/c/mobile/")["verified"]
+
+
+def test_ria_price_slot_from_another_card_cannot_corroborate_own_price() -> None:
+    raw = ria_card("Модель 13", "<strong>999</strong><span>грн</span>")
+    raw += (
+        '<div class="ticket-clean" id="adv_238060287">'
+        '<a href="/uk/other-238060287.html">Інший телефон</a>'
+        '<span class="price js-price">13 039 грн</span></div>'
+    ).encode()
+    assert not setup.raw_field_check(ria_fields(), raw, "https://www.ria.com/uk/c/mobile/")["verified"]
+
+
 def test_olx_numeric_dom_id_and_timestamp_location_are_corroborated() -> None:
     entity = {
         "site": "olx",

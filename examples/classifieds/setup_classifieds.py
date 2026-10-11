@@ -528,6 +528,29 @@ def json_price_matches(candidate: dict[str, Any], expected: dict[str, Any], host
     return amount(price) == expected_amount and currency == expected_currency
 
 
+def ria_price_matches(candidate: RawNode, expected: dict[str, Any], listing_id: str) -> bool:
+    """Compare RIA's monetary slot within its own card, without adjacent description/model numbers."""
+    for slot in candidate.nodes("span"):
+        if not {"price", "js-price"} <= set(slot.attributes.get("class", "").split()):
+            continue
+        owner = slot.parent
+        while owner is not None and not owner.attributes.get("id", "").startswith("adv_"):
+            owner = owner.parent
+        if owner is None or owner.attributes.get("id") != f"adv_{listing_id}":
+            continue
+        match = re.fullmatch(
+            r"(\d(?:[\d\s.,]*\d)?)\s*(uah|грн\.?|₴|usd|\$|дол\.?|eur|€|євро)",
+            normalize(slot.text(separator=" ")),
+        )
+        if (
+            match is not None
+            and amount(match.group(1)) == amount(expected["amount"])
+            and currency_code(match.group(2).rstrip(".")) == expected["currency"]
+        ):
+            return True
+    return False
+
+
 def location_matches(candidate: Any, kind: str, location: str, host: str) -> bool:
     expected = normalize(location)
     if kind == "json":
@@ -689,6 +712,8 @@ def raw_field_check(fields: dict[str, Any], content: bytes, url: str) -> dict[st
             }.get(price["currency"], [price["currency"].casefold()])
             if kind == "json":
                 price_ok = json_price_matches(candidate, price, host)
+            elif host == "ria.com":
+                price_ok = ria_price_matches(candidate, price, listing_id)
             else:
                 compact = normalize(evidence)
                 pattern = (

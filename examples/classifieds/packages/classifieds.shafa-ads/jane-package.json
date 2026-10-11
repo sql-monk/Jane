@@ -1,0 +1,84 @@
+{
+  "schema_version": "1",
+  "package_id": "classifieds.shafa-ads",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "Shafa: public classified listing cards",
+  "description": "Публічні картки оголошень головної сторінки Shafa. Дані з HTML, мережі в екстракторі немає. Ціна лише за прямо вказаною валютою; контакти не витягаються.",
+  "entry": {
+    "runtime": "python",
+    "module": "jane_classifieds_shafa.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "classified_ad",
+        "schema": "schemas/ad.schema.json",
+        "key_fields": [
+          "site",
+          "listing_id"
+        ]
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "public-home-real-cards",
+      "input": {
+        "file": "tests/public-home/page.html",
+        "media_type": "text/html",
+        "url": "https://shafa.ua/uk/"
+      },
+      "expected_status": "success",
+      "expected": "tests/public-home/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "no-product-cards",
+      "input": {
+        "file": "tests/no-cards/page.html",
+        "media_type": "text/html",
+        "url": "https://shafa.ua/uk/"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "llm",
+    "authors": [
+      "Codex"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Public Shafa SSR cards: preserve directly present listing identity, title, URL and current price."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "domains": [
+      "shafa.ua"
+    ]
+  }
+}

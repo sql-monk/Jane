@@ -7,7 +7,7 @@
 ### Компонент `AppProvider`
 
 ```typescript
-function AppProvider({ config, children }: { config: import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src/config").AdminConfig; children: React.ReactNode; }): React.JSX.Element
+function AppProvider({ config, children }: { config: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/config").AdminConfig; children: React.ReactNode; }): React.JSX.Element
 ```
 
 Код: [context.tsx:38](../../../../../web/admin/src/app/context.tsx#L38).
@@ -17,7 +17,7 @@ function AppProvider({ config, children }: { config: import("C:/repos/Jane/.clau
 ### Функція `useApi`
 
 ```typescript
-function useApi(): import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src/api/client").ApiClients
+function useApi(): import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/api/client").ApiClients
 ```
 
 Код: [context.tsx:125](../../../../../web/admin/src/app/context.tsx#L125).
@@ -25,7 +25,7 @@ function useApi(): import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src/ap
 ### Функція `useConfig`
 
 ```typescript
-function useConfig(): import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src/config").AdminConfig
+function useConfig(): import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/config").AdminConfig
 ```
 
 Код: [context.tsx:126](../../../../../web/admin/src/app/context.tsx#L126).
@@ -33,7 +33,7 @@ function useConfig(): import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src
 ### Функція `useAuth`
 
 ```typescript
-function useAuth(): import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src/app/context").AuthState
+function useAuth(): import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/app/context").AuthState
 ```
 
 Код: [context.tsx:127](../../../../../web/admin/src/app/context.tsx#L127).

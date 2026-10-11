@@ -2,6 +2,22 @@
 
 Веде координатор. Статуси: `ready → active → review → accepted` або `blocked` (з причиною). Див. [plan.md](../../plan.md) §1, §6.
 
+## Продовження адмінки: візуальне рев’ю 2026-10-11
+
+Погоджений обсяг — [план виправлень адмінки](admin-visual-review-plan.md). Ці пакети мають окреме приймання після M3; вони не змінюють історичний результат M3.
+
+| WP | Обсяг | Стан | Доказ / наступний крок |
+|---|---|---|---|
+| 28 | Каталог фактичних результатів, серверний пошук, статистика сутностей | accepted R2 | `4f1fcf9`: configured timeout та припинення файлового обходу перевірені незалежно; merge `cece3f7` |
+| 29 | Безпечні форми, грід JSON/масивів, редактор ланцюжків | accepted | `b037d49`: 36 unit / 20 Chromium; merge `052d98d`. Handler version label `1217732` і required connections help/validation `e930be28` прийняті незалежно та інтегровані; фінальний exact CI `e0fb0ff` 14/14 |
+| 30 | Підсумки запусків, діагностика, точне повторне опрацювання та походження | accepted R2 | `d480831`: секрет відсутній у всій події аудиту, міграція 7→8 збережена; merge `e2e62d2` |
+| 31 | Налаштування, аудит, адаптивність, зрозумілі стани | accepted R2 | `e9dcac2`: pending форми, застарілий provider GET і вкладені підписи виправлено; merge `3efe64f` |
+| 32 | Інтеграція, повний CI, робочий стек, GitHub main | accepted; full CI; deployed | [Звіт WP32](WP-32.md); exact `e0fb0ff`: CI `38126884255` 14/14, deployed `c10bd326`, remote main підтверджено; незалежне приймання accepted. 8/8 Operations збережено, 5 durable IDs не скасовано; final UI run RAW2/products2, 899/999 UAH, JSON/масиви/target guard, HP 54999 UAH. Фінальний суфікс docs-only. Попередній Prostor runtime-ризик описано окремо |
+
+Спільний `jane-demo` також використовується перевіркою новин. Оновлення бекенду цього продовження відбудеться після CI з актуальним `origin/main` і збереженням чинних налаштувань, портів, підключень та даних.
+
+## Попередні пакети та M3
+
 Поточне приймання M3: [передача потоку A](HANDOFF-2026-10-09-stream-a.md),
 [фінальне рев'ю](M3/final-review.md), [матриця приймання](../acceptance/matrix.md).
 
@@ -909,3 +925,28 @@ r1 → виправлення на `origin/wp/01g2-service-auth`, CI 37857870977
   main і push main виконує людина. Завершення вимикає лише heartbeat A `jane-a-ci-b-c`.
   Попередні pending записи — історичні зрізи; зовнішні сервіси та browser real22 не оголошено перевіреними,
   dev-laptop/single-node виключені з обсягу.
+
+
+## Адмінка: матеріали, сховища та ланцюжки (2026-10-11)
+
+Погоджено користувачем; [план](admin-materials-chains-plan.md). Інтеграція в `codex/admin-materials-chains`, базова ревізія `1eb6dbd`.
+
+| WP | Назва | Статус | Гілка |
+|---|---|---|---|
+| 24 | Стан і статистика сховищ | accepted (R2) | wp/24-storage-observability |
+| 25 | Матеріали й браузер сховищ | accepted (R2) | wp/25-materials-storage-browser |
+| 26 | Візуальний редактор ланцюжків | accepted (R2) | wp/26-visual-chain-editor |
+| 27 | Інтеграція та приймання | accepted; full CI; deployed | codex/admin-materials-chains |
+
+Інтеграція: 74 unit passed, typecheck/lint/build exit 0, реальний filesystem browser smoke 1 passed. Незалежні WP-reviewer прийняли всі три WP; контрактний guardian підтвердив сумісність. [Підсумковий звіт і межі перевірки](WP-27.md). Повний CI `38096339188`: 14/14 success, mandatory e2e 79 passed. Перевірений код `ada3586` розгорнуто в jane-demo; реальний browser smoke пройшов. [CI, виправлення, розгортання й межі](WP-27-ci-deployment.md).
+
+## Каталог авторинку (2026-10-11)
+
+Користувач доручив налаштувати поточний `jane-demo` та зберегти зміни в GitHub main. AUTO.RIA і RST.ua мають активний інтервал 21600 секунд; Avtobazar.ua позначено недоступним, його скан вимкнено. Початкові 10+10 детальних оголошень збережено в `results-pg`, RAW — у `raw-files`.
+
+| Доповнення | Статус | Докази |
+|---|---|---|
+| WP-14: детальні пакети, конфігурації та каталог | accepted, незалежне live-приймання | 21 unit; 23 runtime package tests; 20/20 сутностей і RAW SHA/full-field replay |
+| WP-09: окремий consumer за task allowlist | accepted, застосований | 10 targeted PostgreSQL tests; 47 unit/contract; незалежний повтор contract 1 passed |
+
+[Звіт WP-14 та межі](WP-14/automarket.md), [звіт WP-09](WP-09/automarket-worker.md), [поточні сутності й RAW](../../examples/automarket/evidence/runtime.json). Незалежний reviewer прийняв код `13294ee`; фінальний commit додає лише цей запис приймання. Контракти, чужі завдання та незавершена перебудова документації основного checkout не змінювалися.

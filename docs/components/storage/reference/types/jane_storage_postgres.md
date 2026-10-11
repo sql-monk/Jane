@@ -157,6 +157,53 @@ async def list_entities(
 
 Код: [__init__.py:445](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L445).
 
+#### Метод `PostgresAdapter.search_entities`
+
+```python
+async def search_entities(
+    self,
+    entity_type: str,
+    *,
+    search: str,
+    scope: str | None = None,
+    updated_since: datetime | None = None,
+    cursor: str | None = None,
+    limit: int,
+) -> tuple[Sequence[EntitySnapshot], str | None]: ...
+```
+
+Код: [__init__.py:458](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L458).
+
+#### Метод `PostgresAdapter.list_entity_types`
+
+```python
+async def list_entity_types(
+    self,
+    *,
+    scope: str | None = None,
+    cursor: str | None = None,
+    limit: int,
+) -> tuple[Sequence[Mapping[str, Any]], str | None]: ...
+```
+
+Код: [__init__.py:472](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L472).
+
+#### Метод `PostgresAdapter.object_statistics`
+
+```python
+async def object_statistics(self) -> dict[str, int]: ...
+```
+
+Код: [__init__.py:491](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L491).
+
+#### Метод `PostgresAdapter.entity_statistics`
+
+```python
+async def entity_statistics(self) -> dict[str, Any]: ...
+```
+
+Код: [__init__.py:498](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L498).
+
 #### Метод `PostgresAdapter.list_history`
 
 ```python
@@ -170,7 +217,7 @@ async def list_history(
 ) -> tuple[Sequence[HistoryEvent], str | None]: ...
 ```
 
-Код: [__init__.py:475](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L475).
+Код: [__init__.py:548](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L548).
 
 #### Метод `PostgresAdapter.get_delivery`
 
@@ -178,7 +225,7 @@ async def list_history(
 async def get_delivery(self, delivery_key: str) -> DeliveryRecord | None: ...
 ```
 
-Код: [__init__.py:506](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L506).
+Код: [__init__.py:579](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L579).
 
 #### Метод `PostgresAdapter.record_delivery`
 
@@ -186,7 +233,7 @@ async def get_delivery(self, delivery_key: str) -> DeliveryRecord | None: ...
 async def record_delivery(self, record: DeliveryRecord) -> bool: ...
 ```
 
-Код: [__init__.py:518](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L518).
+Код: [__init__.py:591](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L591).
 
 ## Функції
 

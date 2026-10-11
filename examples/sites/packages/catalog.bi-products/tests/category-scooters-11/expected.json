@@ -1,0 +1,471 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "563146",
+        "price": 2999.0,
+        "currency": "UAH",
+        "availability": "out_of_stock",
+        "old_price": 4495.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "563146"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "563145",
+        "price": 2999.0,
+        "currency": "UAH",
+        "availability": "out_of_stock",
+        "old_price": 4495.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "563145"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "575773",
+        "price": 3699.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "575773"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "561356",
+        "price": 3099.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "561356"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "596512",
+        "price": 4099.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "596512"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "596510",
+        "price": 3099.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "596510"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "596511",
+        "price": 4099.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "596511"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "581969",
+        "price": 29999.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "581969"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "581967",
+        "price": 16000.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "581967"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "589378",
+        "price": 49999.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "589378"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "427375",
+        "price": 1999.0,
+        "currency": "UAH",
+        "availability": "out_of_stock",
+        "old_price": 2750.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "427375"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "636277",
+        "price": 8340.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "636277"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "621930",
+        "price": 3189.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "621930"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "621929",
+        "price": 3189.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "621929"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "621928",
+        "price": 3189.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "621928"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "642570",
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "642570"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "551926",
+        "price": 3779.0,
+        "currency": "UAH",
+        "availability": "out_of_stock",
+        "old_price": 4729.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "551926"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "594788",
+        "price": 3989.0,
+        "currency": "UAH",
+        "availability": "out_of_stock",
+        "old_price": 4999.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "594788"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "631674",
+        "price": 2260.0,
+        "currency": "UAH",
+        "availability": "out_of_stock",
+        "old_price": 2659.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "631674"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "632183",
+        "price": 1419.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "632183"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "632186",
+        "price": 1419.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "632186"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "632164",
+        "price": 2459.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "632164"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "574630",
+        "price": 7349.0,
+        "currency": "UAH",
+        "availability": "out_of_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "574630"
+        }
+      }
+    }
+  ]
+}

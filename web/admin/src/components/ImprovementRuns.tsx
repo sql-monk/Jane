@@ -59,6 +59,8 @@ export function ImprovementRunList({
       <ErrorBox error={list.error} />
       <Table
         label={label}
+        loading={list.isLoading}
+        error={list.error}
         rows={list.items}
         rowKey={(run) => run.job_id}
         empty="Запусків ще не було"

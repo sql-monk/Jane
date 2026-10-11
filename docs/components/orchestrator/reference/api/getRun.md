@@ -35,6 +35,20 @@
 | `run_id` | `string` | так | Непрозорий ідентифікатор, згенерований сервісом-власником (наприклад 'mat_01J9Z...'). Клієнти не розбирають його структуру.; шаблон `"^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"` |
 | `task_id` | `string` | так | Ідентифікатор, який обирає користувач (source_id, task_id, package_id, connection_id). Нижній регістр, цифри, '.', '_', '-'.; шаблон `"^[a-z0-9](?:[a-z0-9._-]{0,98}[a-z0-9])?$"` |
 | `task_etag` | `string` | ні | Версія конфігурації завдання, з якою виконується запуск. |
+| `source_id` | `string` | ні | Джерело з незмінного знімка конфігурації запуску. |
+| `collector_kind` | `string` | ні | Тип колектора з незмінного знімка конфігурації (наприклад web або telegram). |
+| `updated_at` | `string` (date-time) | ні | Остання зміна стану запуску або його елементів; не лише початок збору. |
+| `summary` | `RunOutputSummary` | ні | Унікальні сутності з фактичних виходів обробників цього запуску. Не статистика таблиць сховища. Історичне обрізане трасування має complete=false, legacy_trace=true, кількості недоступні. Для entities_ref без inline-сутностей complete=false; зафіксовані кількості є нижньою межею. Записи у двох різних підключеннях рахуються окремо. Імітовані записи тестового режиму не включено до saved_records. |
+| `summary.basis` | `string` | ні |  |
+| `summary.complete` | `boolean` | ні |  |
+| `summary.legacy_trace` | `boolean` | ні |  |
+| `summary.extracted_entities` | `integer` | ні | мін. `0` |
+| `summary.saved_records` | `integer` | ні | мін. `0` |
+| `summary.result_groups` | array of `object` | ні | Актуальні результати за підтвердженими типом, scope та сховищем; не фільтр за запуском. |
+| `summary.result_groups[].connection_id` | `string` | ні |  |
+| `summary.result_groups[].entity_type` | `string` | ні |  |
+| `summary.result_groups[].scope` | `string` | ні |  |
+| `summary.result_groups[].count` | `integer` | ні | мін. `0` |
 | `status` | enum: `queued`, `running`, `cancelling`, `succeeded`, `failed`, `cancelled` | так |  |
 | `trigger` | enum: `manual`, `schedule`, `reprocess`, `assistant`, `api` | так |  |
 | `test_mode` | `boolean` | ні |  |
@@ -84,6 +98,15 @@
   "test_mode": false,
   "created_at": "2026-09-27T10:00:00Z",
   "started_at": "2026-09-27T10:00:01Z",
+  "source_id": "shop-example",
+  "collector_kind": "web",
+  "updated_at": "2026-09-27T10:03:00Z",
+  "summary": {
+    "basis": "recorded_handler_outputs",
+    "complete": false,
+    "legacy_trace": true,
+    "result_groups": []
+  },
   "collection_id": "job_01J9ZQ3F8W2N4K7T5B6C1D0E9F",
   "backpressure": false,
   "stages": [

@@ -1,6 +1,10 @@
-"""JavaScript rendering of pages (``fetch.render_js`` of the collector rules) in headless Chromium (Playwright).
+"""Browser document transport and JavaScript rendering in headless Chromium (Playwright).
 
-The page itself is never requested by the browser. :class:`~.fetcher.Fetcher` fetches it first, with every guarantee
+``fetch.transport=browser`` fetches each document with Chromium's network stack and JavaScript disabled.
+Response-stage interception prevents automatic redirects, so the outer Fetcher checks every next hop.
+Subresources are blocked; the material contains the original response bytes. Connections use EgressProxy.
+
+For ``fetch.render_js`` the page has already been fetched. :class:`~.fetcher.Fetcher` fetches it first, with every guarantee
 of a plain fetch: scope and robots.txt before, each redirect hop re-checked, the outbound address policy, per-host
 limits, retries, ``crawl.max_material_bytes``, the User-Agent and the credentials of a managed connection. Only a
 2xx HTML answer is rendered: the first navigation of the browser page is answered with the fetched body
@@ -34,19 +38,22 @@ import contextlib
 import importlib.util
 import logging
 import time
+from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlsplit
 
+import httpx
+
 from .egress import EgressDenied, EgressPolicy, Resolver, system_resolve
 from .fetcher import FetchError, HttpResult
-from .settings import Collector, ServiceLimits
+from .settings import Collector, ServiceLimits, Timeouts
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from playwright.async_api import Browser, BrowserContext, Page, Playwright, Route
+    from playwright.async_api import Browser, BrowserContext, Page, Playwright, Response, Route
 
 __all__ = ["EgressProxy", "RenderOptions", "Renderer", "renderable"]
 
@@ -464,6 +471,171 @@ class Renderer:
             log.info("headless browser started", extra={"browser_version": self._browser.version})
             return self._browser
 
+    @contextlib.asynccontextmanager
+    async def _fetch_page_slot(self, host: str, request_timeout_ms: int) -> AsyncIterator[None]:
+        """Bound document requests waiting for the shared pool without cancelling the browser driver."""
+        try:
+            async with asyncio.timeout(request_timeout_ms / 1000):
+                await self._pages.acquire()
+        except TimeoutError:
+            log.warning(
+                "browser page pool timeout",
+                extra={"host": host, "request_timeout_ms": request_timeout_ms},
+            )
+            raise httpx.ReadTimeout(
+                f"browser page pool timeout after request_timeout_ms={request_timeout_ms}"
+            ) from None
+        try:
+            yield
+        finally:
+            self._pages.release()
+
+    async def fetch(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str],
+        max_bytes: int,
+        limits: ServiceLimits,
+        timeouts: Timeouts | None = None,
+    ) -> tuple[int, dict[str, str], bytes, bool, int]:
+        """Fetch one GET document with Chromium's network stack, without JavaScript.
+
+        Redirect targets and subresources never reach the network in this context. The outer Fetcher
+        handles each redirect as a separate request after checking scope, robots and host limits.
+        Every network connection uses the existing proxy with checked, pinned DNS addresses.
+        """
+        request_limits = timeouts or limits.timeouts
+        host = (urlsplit(url).hostname or "").lower().rstrip(".")
+        async with self._fetch_page_slot(host, request_limits.request_timeout_ms):
+            browser = await self._get_browser()
+            from playwright.async_api import Error as PlaywrightError
+            from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
+            proxy = EgressProxy(
+                self.policy,
+                resolver=self.resolver,
+                connect_timeout_s=request_limits.connect_timeout_ms / 1000,
+                max_bytes=limits.collector.render_max_transfer_bytes,
+                private_allowed=(lambda target: target.lower().rstrip(".") == host)
+                if self.options.deny_private
+                else None,
+            )
+            await proxy.start()
+            context: BrowserContext | None = None
+            try:
+                context = await browser.new_context(
+                    user_agent=next(
+                        (value for key, value in headers.items() if key.lower() == "user-agent"), None
+                    ),
+                    extra_http_headers={
+                        key: value for key, value in headers.items() if key.lower() != "user-agent"
+                    },
+                    proxy={"server": proxy.url, "bypass": "<-loopback>"},
+                    java_script_enabled=False,
+                    service_workers="block",
+                    accept_downloads=False,
+                )
+                page = await context.new_page()
+                responses: list[Response] = []
+                original_empty_response: list[tuple[int, dict[str, str]]] = []
+                initial_request_seen = False
+
+                # Playwright routes intercept only the first request in a redirect chain. Stop redirects
+                # at Chromium's response stage, before its network stack can request the Location URL.
+                cdp = await context.new_cdp_session(page)
+
+                async def intercept_response(event: dict[str, Any]) -> None:
+                    request_id = event["requestId"]
+                    status = event.get("responseStatusCode")
+                    if event["request"]["url"] == url and status in {204, 205, 301, 302, 303, 304, 307, 308}:
+                        original_empty_response.append(
+                            (
+                                status,
+                                {
+                                    item["name"].lower(): item["value"]
+                                    for item in event.get("responseHeaders", [])
+                                },
+                            )
+                        )
+                        await cdp.send(
+                            "Fetch.fulfillRequest",
+                            {"requestId": request_id, "responseCode": 200, "body": ""},
+                        )
+                    else:
+                        await cdp.send("Fetch.continueResponse", {"requestId": request_id})
+
+                cdp.on("Fetch.requestPaused", intercept_response)
+                await cdp.send(
+                    "Fetch.enable", {"patterns": [{"urlPattern": "*", "requestStage": "Response"}]}
+                )
+
+                def response_seen(response: Response) -> None:
+                    request = response.request
+                    if request.is_navigation_request() and request.redirected_from is None:
+                        responses.append(response)
+
+                page.on("response", response_seen)
+
+                async def route_one(route: Route) -> None:
+                    nonlocal initial_request_seen
+                    request = route.request
+                    if (
+                        not initial_request_seen
+                        and request.is_navigation_request()
+                        and request.frame == page.main_frame
+                        and request.redirected_from is None
+                        and request.url == url
+                    ):
+                        initial_request_seen = True
+                        reason = await proxy.precheck(request.url)
+                        if reason is None:
+                            await route.continue_()
+                            return
+                        proxy.denied.append(reason)
+                    await route.abort("blockedbyclient")
+
+                await context.route("**/*", route_one)
+                async with asyncio.timeout(request_limits.request_timeout_ms / 1000):
+                    try:
+                        await page.goto(
+                            url, wait_until="domcontentloaded", timeout=request_limits.request_timeout_ms
+                        )
+                    except PlaywrightError:
+                        if not original_empty_response:
+                            raise
+                    if original_empty_response:
+                        status, hdrs = original_empty_response[0]
+                        return status, hdrs, b"", False, proxy.transferred
+                    if not responses:
+                        raise httpx.TransportError("browser transport returned no document response")
+                    response = responses[0]
+                    body = b"" if response.status in {301, 302, 303, 304, 307, 308} else await response.body()
+                    hdrs = {key.lower(): value for key, value in (await response.all_headers()).items()}
+                    return (
+                        response.status,
+                        hdrs,
+                        body[:max_bytes],
+                        len(body) > max_bytes,
+                        max(len(body), proxy.transferred),
+                    )
+            except (TimeoutError, PlaywrightTimeoutError):
+                raise httpx.ReadTimeout("browser document timeout") from None
+            except PlaywrightError:
+                if proxy.denied:
+                    raise EgressDenied(
+                        host, "", "browser document rejected by outbound address policy"
+                    ) from None
+                if proxy.budget_exceeded:
+                    raise FetchError(
+                        "limit_exceeded", "browser document exceeded collector.render_max_transfer_bytes"
+                    ) from None
+                raise httpx.TransportError("browser document transport failed") from None
+            finally:
+                if context is not None:
+                    await self._close(context)
+                await proxy.aclose()
+
     async def render(
         self,
         result: HttpResult,
@@ -682,7 +854,8 @@ class Renderer:
             headers=headers,
             truncated=truncated,
             diagnostics=[*result.diagnostics, *diagnostics],
-            network_bytes=len(result.body) + proxy.transferred,
+            network_bytes=(len(result.body) if result.network_bytes is None else result.network_bytes)
+            + proxy.transferred,
         )
 
 

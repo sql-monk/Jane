@@ -18,7 +18,7 @@ Atomicity on Windows and Linux: every document is written to a temporary file in
 |---|---|
 | Вид | клас |
 | Модуль | `jane_storage_files` |
-| Код | [__init__.py:552](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L552) |
+| Код | [__init__.py:642](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L642) |
 
 ```python
 class FilesystemAdapter: ...
@@ -40,7 +40,7 @@ class FilesystemAdapter: ...
 def __init__(self) -> None: ...
 ```
 
-Код: [__init__.py:558](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L558).
+Код: [__init__.py:648](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L648).
 
 #### Метод `FilesystemAdapter.open`
 
@@ -50,7 +50,7 @@ async def open(self, connection: ResolvedConnection, options: Mapping[str, Any])
 
 Винятки в коді методу: `AdapterError`.
 
-Код: [__init__.py:575](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L575).
+Код: [__init__.py:673](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L673).
 
 #### Метод `FilesystemAdapter.close`
 
@@ -58,7 +58,7 @@ async def open(self, connection: ResolvedConnection, options: Mapping[str, Any])
 async def close(self) -> None: ...
 ```
 
-Код: [__init__.py:593](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L593).
+Код: [__init__.py:691](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L691).
 
 #### Метод `FilesystemAdapter.content_uri`
 
@@ -68,7 +68,7 @@ def content_uri(self, rec: ObjectRecord) -> str | None: ...
 
 Persistent ``file://`` URI of a stored object (``ContentRef`` blob, single-node deployments).
 
-Код: [__init__.py:596](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L596).
+Код: [__init__.py:694](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L694).
 
 #### Метод `FilesystemAdapter.health`
 
@@ -76,7 +76,7 @@ Persistent ``file://`` URI of a stored object (``ContentRef`` blob, single-node 
 async def health(self) -> bool: ...
 ```
 
-Код: [__init__.py:600](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L600).
+Код: [__init__.py:698](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L698).
 
 #### Метод `FilesystemAdapter.ensure_schema`
 
@@ -84,7 +84,7 @@ async def health(self) -> bool: ...
 async def ensure_schema(self, entity_types: Sequence[str]) -> None: ...
 ```
 
-Код: [__init__.py:606](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L606).
+Код: [__init__.py:704](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L704).
 
 #### Метод `FilesystemAdapter.put_object`
 
@@ -92,7 +92,7 @@ async def ensure_schema(self, entity_types: Sequence[str]) -> None: ...
 async def put_object(self, obj: RawObject) -> ObjectRecord: ...
 ```
 
-Код: [__init__.py:609](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L609).
+Код: [__init__.py:707](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L707).
 
 #### Метод `FilesystemAdapter.get_object`
 
@@ -100,7 +100,7 @@ async def put_object(self, obj: RawObject) -> ObjectRecord: ...
 async def get_object(self, object_id: str) -> ObjectRecord | None: ...
 ```
 
-Код: [__init__.py:612](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L612).
+Код: [__init__.py:710](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L710).
 
 #### Метод `FilesystemAdapter.read_object_content`
 
@@ -108,7 +108,15 @@ async def get_object(self, object_id: str) -> ObjectRecord | None: ...
 async def read_object_content(self, object_id: str) -> bytes: ...
 ```
 
-Код: [__init__.py:615](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L615).
+Код: [__init__.py:713](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L713).
+
+#### Метод `FilesystemAdapter.object_statistics`
+
+```python
+async def object_statistics(self) -> dict[str, int]: ...
+```
+
+Код: [__init__.py:716](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L716).
 
 #### Метод `FilesystemAdapter.list_objects`
 
@@ -125,7 +133,7 @@ async def list_objects(
 ) -> tuple[Sequence[ObjectRecord], str | None]: ...
 ```
 
-Код: [__init__.py:618](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L618).
+Код: [__init__.py:724](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L724).
 
 #### Метод `FilesystemAdapter.read_entity`
 
@@ -133,7 +141,7 @@ async def list_objects(
 async def read_entity(self, entity_type: str, canonical_key: str) -> EntitySnapshot | None: ...
 ```
 
-Код: [__init__.py:630](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L630).
+Код: [__init__.py:736](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L736).
 
 #### Метод `FilesystemAdapter.commit_entity`
 
@@ -147,7 +155,7 @@ async def commit_entity(
 ) -> CommitResult: ...
 ```
 
-Код: [__init__.py:633](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L633).
+Код: [__init__.py:739](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L739).
 
 #### Метод `FilesystemAdapter.list_entities`
 
@@ -163,7 +171,46 @@ async def list_entities(
 ) -> tuple[Sequence[EntitySnapshot], str | None]: ...
 ```
 
-Код: [__init__.py:638](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L638).
+Код: [__init__.py:744](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L744).
+
+#### Метод `FilesystemAdapter.search_entities`
+
+```python
+async def search_entities(
+    self,
+    entity_type: str,
+    *,
+    search: str,
+    scope: str | None = None,
+    updated_since: datetime | None = None,
+    cursor: str | None = None,
+    limit: int,
+) -> tuple[Sequence[EntitySnapshot], str | None]: ...
+```
+
+Код: [__init__.py:755](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L755).
+
+#### Метод `FilesystemAdapter.list_entity_types`
+
+```python
+async def list_entity_types(
+    self,
+    *,
+    scope: str | None = None,
+    cursor: str | None = None,
+    limit: int,
+) -> tuple[Sequence[Mapping[str, Any]], str | None]: ...
+```
+
+Код: [__init__.py:769](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L769).
+
+#### Метод `FilesystemAdapter.entity_statistics`
+
+```python
+async def entity_statistics(self) -> dict[str, Any]: ...
+```
+
+Код: [__init__.py:774](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L774).
 
 #### Метод `FilesystemAdapter.list_history`
 
@@ -178,7 +225,7 @@ async def list_history(
 ) -> tuple[Sequence[HistoryEvent], str | None]: ...
 ```
 
-Код: [__init__.py:649](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L649).
+Код: [__init__.py:781](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L781).
 
 #### Метод `FilesystemAdapter.get_delivery`
 
@@ -186,7 +233,7 @@ async def list_history(
 async def get_delivery(self, delivery_key: str) -> DeliveryRecord | None: ...
 ```
 
-Код: [__init__.py:654](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L654).
+Код: [__init__.py:786](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L786).
 
 #### Метод `FilesystemAdapter.record_delivery`
 
@@ -194,7 +241,7 @@ async def get_delivery(self, delivery_key: str) -> DeliveryRecord | None: ...
 async def record_delivery(self, record: DeliveryRecord) -> bool: ...
 ```
 
-Код: [__init__.py:657](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L657).
+Код: [__init__.py:789](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L789).
 
 ## Функції
 
@@ -206,7 +253,7 @@ def package_dir() -> Path: ...
 
 Directory of the ``jane.storage-files`` storage package (entry point ``jane.storage.packages``).
 
-Код: [__init__.py:81](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L81).
+Код: [__init__.py:82](../../../../../services/storage/adapters/files/src/jane_storage_files/__init__.py#L82).
 
 ## Константи й змінні модуля
 

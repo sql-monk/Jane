@@ -1,0 +1,55 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "auto.ria.com"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/uk/search/"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "seed_list",
+      "strategy_id": "public-catalog",
+      "urls": [
+        "https://auto.ria.com/uk/search/?indexName=auto&sort[0].order=dates.created.desc"
+      ]
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "dedup": {
+    "use_link_rel_canonical": false
+  },
+  "revisit": {
+    "mode": "interval"
+  },
+  "limits": {
+    "concurrency": {
+      "max_parallel_fetches_per_host": 1
+    },
+    "rate": {
+      "requests_per_second_per_host": 1,
+      "min_delay_ms_per_host": 1000,
+      "respect_crawl_delay": true
+    },
+    "crawl": {
+      "max_pages_per_run": 1
+    }
+  },
+  "sections": [
+    {
+      "section_id": "catalog",
+      "patterns": [
+        {
+          "value": "auto.ria.com/uk/search/**"
+        }
+      ]
+    }
+  ]
+}

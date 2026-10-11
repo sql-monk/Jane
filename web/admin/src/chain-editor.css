@@ -1,0 +1,209 @@
+.chain-editor .chain-layout {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+  gap: 1rem;
+}
+.chain-editor nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.chain-editor [aria-pressed="true"] {
+  outline: 2px solid var(--accent, #4b89e0);
+}
+.chain-editor .property-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin: 1rem 0;
+}
+.chain-editor .property-grid th,
+.chain-editor .property-grid td {
+  border: 1px solid var(--border, #aaa);
+  padding: 0.4rem;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.chain-editor .property-grid th:nth-child(1) {
+  width: 30%;
+}
+.chain-editor .property-grid th:nth-child(2) {
+  width: 18%;
+}
+.chain-editor .property-grid input:not([type="checkbox"]),
+.chain-editor .property-grid textarea,
+.chain-editor .property-grid select {
+  width: 100%;
+  min-width: 0;
+}
+.chain-editor .chain-link {
+  padding: 0.7rem;
+  border: 1px solid var(--border, #aaa);
+  margin-bottom: 0.6rem;
+}
+.dag [role="button"] {
+  cursor: pointer;
+}
+.dag [aria-pressed="true"] rect {
+  stroke: var(--accent, #4b89e0);
+  stroke-width: 3px;
+}
+@media (max-width: 760px) {
+  .chain-editor .chain-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.chain-editor .chain-stage-identity {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.chain-editor .chain-stage-identity > .btn {
+  justify-self: start;
+}
+.chain-editor .chain-package-fields {
+  border: 0;
+  padding: 0;
+  margin: 0 0 1rem;
+  min-width: 0;
+}
+.chain-editor .property-grid-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.chain-editor .property-grid {
+  min-width: 520px;
+}
+.chain-editor .property-name-controls,
+.chain-editor .property-value-controls,
+.chain-editor .property-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.chain-editor .property-name-controls > input,
+.chain-editor .property-value {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.chain-editor .property-name-controls > .btn,
+.chain-editor .property-actions {
+  flex: 0 0 auto;
+}
+.chain-editor .property-actions > .btn,
+.chain-editor .property-name-controls > .btn {
+  padding: 0.35rem 0.5rem;
+  white-space: nowrap;
+}
+.chain-editor .property-value > textarea {
+  display: block;
+  resize: vertical;
+  min-height: 2rem;
+}
+.chain-editor .property-description {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  margin: 0.4rem 0 0;
+}
+
+.chain-editor,
+.chain-editor .chain-layout > section {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.form-save-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem;
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface, var(--bg));
+}
+.form-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.form-advanced {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+.form-advanced > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.entity-picker-options {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+@media (max-width: 600px) {
+  .chain-editor .property-grid-wrap {
+    overflow: visible;
+  }
+  .chain-editor .property-grid {
+    min-width: 0;
+    table-layout: auto;
+  }
+  .chain-editor .property-grid thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .chain-editor .property-grid tbody {
+    display: block;
+  }
+  .chain-editor .property-grid tr:not([hidden]) {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    margin-bottom: 0.65rem;
+  }
+  .chain-editor .property-grid tr[hidden] {
+    display: none;
+  }
+  .chain-editor .property-grid td {
+    display: block;
+    border: 0;
+    padding: 0.5rem;
+  }
+  .chain-editor .property-grid td::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+  }
+  .chain-editor .property-value-controls {
+    flex-wrap: wrap;
+  }
+  .chain-editor .property-value {
+    flex-basis: 100%;
+  }
+  .chain-editor .property-actions {
+    flex-wrap: wrap;
+  }
+  .chain-editor nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 0.2rem;
+  }
+  .chain-editor nav .btn {
+    flex: 0 0 auto;
+  }
+}

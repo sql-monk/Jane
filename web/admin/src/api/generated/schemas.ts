@@ -72,6 +72,13 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
             type: "object",
             additionalProperties: false,
             properties: {
+              transport: {
+                type: "string",
+                enum: ["http", "browser"],
+                default: "http",
+                description:
+                  "Транспорт початкового GET-запиту: http — звичайний HTTP-клієнт; browser — мережевий стек Chromium через контрольований egress proxy. Для browser повертаються оригінальні байти відповіді, JavaScript під час завантаження вимкнено; render_js окремо визначає потребу рендерингу. Межі, robots.txt, переадресації, ліміти, тайм-аути та перевірки вихідних адрес залишаються обов'язковими. Потрібна збірка Web Collector з Chromium; за відсутності підтримки — not_implemented. POST та автентифіковані запити через цей транспорт не підтримуються.",
+              },
               user_agent: { type: "string", maxLength: 300 },
               headers: {
                 description:
@@ -411,12 +418,19 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
           },
           body: {
             description:
-              "JSON-тіло для method: POST (будь-яке JSON-значення), однакове для всіх сторінок; для GET не використовується.",
+              "JSON-тіло для method: POST; для GET не використовується. Однакове для всіх сторінок, крім полів, явно заданих pagination.body_page_path та partitions.body_path.",
           },
           items_path: { type: "string", description: "JSONPath до масиву елементів, наприклад '$.items'." },
           url_path: {
             type: "string",
             description: "JSONPath до URL матеріалу в елементі, наприклад '$.url'.",
+          },
+          item_url_base: {
+            type: "string",
+            format: "uri",
+            pattern: "^https?://",
+            description:
+              "Базовий URL для відносних URL товарів (наприклад https://shop.example.test/ для API під /api/). Якщо не задано — URL сторінки API. Результат проходить normalization і scope; robots перевіряється при HTTP-завантаженні, включно з навігацією API. Для emit_items_as_materials URL товару не завантажується.",
           },
           lastmod_path: { type: "string" },
           emit_items_as_materials: {
@@ -424,6 +438,21 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
             default: false,
             description:
               "true — кожен елемент items_path видається як окремий Material: media_type application/json (елемент, серіалізований як JSON), content_kind json, material_id — від канонічного URL з url_path (той самий об'єкт, що й сторінка за цим URL), edited_at — з lastmod_path, discovery.parent_url — сторінка API, без http і locator.final_url. URL елементів не завантажуються; ядро закріплює їх у зборі, тож інша стратегія не завантажує той самий URL у цьому зборі (один матеріал на канонічний URL). У mode=incremental елементи підлягають revisit і dedup так само, як сторінки (if_changed — за зміною вмісту елемента).",
+          },
+          partitions: {
+            type: "object",
+            additionalProperties: false,
+            required: ["items_path", "body_path", "url_param"],
+            description:
+              "Для POST: рекурсивний обхід розділів API (наприклад категорій). Початковий ідентифікатор береться з body_path; кожна відповідь може містити дочірні ідентифікатори за items_path. Кожен розділ має власну пагінацію, body змінюється лише у копії; ідентифікатор також записується в url_param для унікального ключа навігації. Повтори й цикли усуваються; кількість і глибина розділів обмежуються crawl.max_frontier_size і crawl.max_depth.",
+            properties: {
+              items_path: { type: "string", minLength: 1 },
+              body_path: {
+                type: "string",
+                pattern: "^\\$\\.[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+              },
+              url_param: { type: "string", minLength: 1 },
+            },
           },
           pagination: {
             type: "object",
@@ -434,6 +463,12 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
               cursor_path: { type: "string" },
               cursor_param: { type: "string" },
               page_param: { type: "string" },
+              body_page_path: {
+                type: "string",
+                pattern: "^\\$\\.[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+                description:
+                  "Для POST із pagination.type=page: шлях до наявного цілого додатного номера сторінки у JSON body, наприклад $.variables.page. Колектор копіює body для кожного запиту й записує поточний номер сторінки. page_param також лишається в URL для унікального ключа навігаційної сторінки; початкове значення береться з body, якщо його немає в URL.",
+              },
             },
           },
         },
@@ -1126,6 +1161,112 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
               "Для кожного листового поля (шлях через крапку, наприклад 'rate.requests_per_second_per_host') — рівень, з якого взято значення.",
             type: "object",
             additionalProperties: { $ref: "#/$defs/LimitLevel" },
+          },
+        },
+      },
+    },
+  },
+  "common/module-configuration.schema.json": {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    title: "ModuleConfiguration",
+    type: "object",
+    required: ["service", "instance_id", "revision", "fields", "overrides", "pending_restart"],
+    properties: {
+      service: { type: "string" },
+      instance_id: { type: "string" },
+      revision: { type: "integer", minimum: 0 },
+      updated_at: { type: ["string", "null"], format: "date-time" },
+      fields: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["path", "value", "type", "requires_restart", "origin"],
+          properties: {
+            path: { type: "string" },
+            value: {
+              type: ["string", "number", "boolean"],
+              description: "Значення, яке використовує поточний процес.",
+            },
+            configured_value: {
+              type: ["string", "number", "boolean"],
+              description:
+                "Збережене перевизначення для наступного старту; відсутнє, якщо параметр успадковується.",
+            },
+            type: { type: "string", enum: ["string", "number", "boolean"] },
+            integer: { type: "boolean" },
+            description: { type: "string" },
+            requires_restart: { type: "boolean" },
+            origin: { type: "string" },
+            minimum: { type: "number" },
+            maximum: { type: "number" },
+            exclusive_minimum: { type: "number" },
+            choices: { type: "array", items: { type: ["string", "number", "boolean"] } },
+            inherited_value: {
+              type: ["string", "number", "boolean"],
+              description: "Ефективне початкове значення без перевизначення цього модуля.",
+            },
+          },
+        },
+      },
+      overrides: { type: "object", additionalProperties: { type: ["string", "number", "boolean"] } },
+      pending_restart: {
+        type: "boolean",
+        description: "Активна конфігурація відрізняється від бажаної, включно з видаленими перевизначеннями.",
+      },
+    },
+    $defs: {
+      Update: {
+        type: "object",
+        additionalProperties: false,
+        required: ["values"],
+        properties: {
+          values: { type: "object", additionalProperties: { type: ["string", "number", "boolean"] } },
+        },
+        description:
+          "Повна заміна збережених перевизначень модуля. Відсутній ключ успадковує початкову конфігурацію після перезапуску; values={} скидає всі перевизначення.",
+      },
+    },
+  },
+  "common/module-telemetry.schema.json": {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    title: "ModuleTelemetry",
+    type: "object",
+    required: [
+      "service",
+      "instance_id",
+      "sample_interval_seconds",
+      "retention_seconds",
+      "metrics",
+      "samples",
+    ],
+    properties: {
+      service: { type: "string" },
+      instance_id: { type: "string" },
+      sample_interval_seconds: { type: "number", minimum: 1 },
+      retention_seconds: { type: "integer", minimum: 60 },
+      resolution_seconds: {
+        type: "number",
+        minimum: 1,
+        description:
+          "Nominal spacing after bounded downsampling; source sampling frequency remains sample_interval_seconds.",
+      },
+      metrics: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["key", "label", "unit"],
+          properties: { key: { type: "string" }, label: { type: "string" }, unit: { type: "string" } },
+        },
+      },
+      samples: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["at", "instance_id", "values"],
+          properties: {
+            at: { type: "string", format: "date-time" },
+            instance_id: { type: "string" },
+            values: { type: "object", additionalProperties: { type: ["number", "null"] } },
           },
         },
       },

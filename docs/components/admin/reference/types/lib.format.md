@@ -20,7 +20,33 @@ function formatInstant(value: string | null | undefined): string
 
 Like formatDate, but keeps milliseconds (attempt diagnostics: a retry must start after its backoff).
 
-Код: [format.ts:14](../../../../../web/admin/src/lib/format.ts#L14).
+Код: [format.ts:11](../../../../../web/admin/src/lib/format.ts#L11).
+
+### Функція `formatDuration`
+
+```typescript
+function formatDuration(start: string | null | undefined, end?: string | null | undefined): string
+```
+
+Код: [format.ts:18](../../../../../web/admin/src/lib/format.ts#L18).
+
+### Функція `inputInstant`
+
+```typescript
+function inputInstant(value: string): string | undefined
+```
+
+datetime-local uses the browser's timezone; transmit an explicit RFC 3339 instant.
+
+Код: [format.ts:29](../../../../../web/admin/src/lib/format.ts#L29).
+
+### Функція `statusLabel`
+
+```typescript
+function statusLabel(value: string): string
+```
+
+Код: [format.ts:97](../../../../../web/admin/src/lib/format.ts#L97).
 
 ### Функція `formatMoney`
 
@@ -28,7 +54,7 @@ Like formatDate, but keeps milliseconds (attempt diagnostics: a retry must start
 function formatMoney(money: { amount: number; currency: string; } | null | undefined): string
 ```
 
-Код: [format.ts:21](../../../../../web/admin/src/lib/format.ts#L21).
+Код: [format.ts:101](../../../../../web/admin/src/lib/format.ts#L101).
 
 ### Функція `formatBytes`
 
@@ -36,7 +62,7 @@ function formatMoney(money: { amount: number; currency: string; } | null | undef
 function formatBytes(bytes: number | null | undefined): string
 ```
 
-Код: [format.ts:29](../../../../../web/admin/src/lib/format.ts#L29).
+Код: [format.ts:109](../../../../../web/admin/src/lib/format.ts#L109).
 
 ### Функція `refLabel`
 
@@ -44,7 +70,7 @@ function formatBytes(bytes: number | null | undefined): string
 function refLabel(ref: { package_id: string; version: string; } | null | undefined): string
 ```
 
-Код: [format.ts:42](../../../../../web/admin/src/lib/format.ts#L42).
+Код: [format.ts:122](../../../../../web/admin/src/lib/format.ts#L122).
 
 ### Функція `bumpVersion`
 
@@ -54,9 +80,25 @@ function bumpVersion(version: string, part?: "patch" | "minor" | "major"): strin
 
 Next patch/minor/major of an exact SemVer (pre-release and build metadata are dropped).
 
-Код: [format.ts:47](../../../../../web/admin/src/lib/format.ts#L47).
+Код: [format.ts:127](../../../../../web/admin/src/lib/format.ts#L127).
 
 ## Константи
+
+### Константа `SCOPE_LABELS`
+
+```typescript
+const SCOPE_LABELS: Record<string, string>
+```
+
+Код: [format.ts:35](../../../../../web/admin/src/lib/format.ts#L35).
+
+### Константа `PERIOD_LABELS`
+
+```typescript
+const PERIOD_LABELS: Record<string, string>
+```
+
+Код: [format.ts:44](../../../../../web/admin/src/lib/format.ts#L44).
 
 ### Константа `SEMVER_PATTERN`
 
@@ -64,7 +106,7 @@ Next patch/minor/major of an exact SemVer (pre-release and build metadata are dr
 const SEMVER_PATTERN: RegExp
 ```
 
-Код: [format.ts:56](../../../../../web/admin/src/lib/format.ts#L56).
+Код: [format.ts:136](../../../../../web/admin/src/lib/format.ts#L136).
 
 ### Константа `SLUG_PATTERN`
 
@@ -72,4 +114,4 @@ const SEMVER_PATTERN: RegExp
 const SLUG_PATTERN: RegExp
 ```
 
-Код: [format.ts:58](../../../../../web/admin/src/lib/format.ts#L58).
+Код: [format.ts:138](../../../../../web/admin/src/lib/format.ts#L138).

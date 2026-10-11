@@ -1,6 +1,6 @@
 # GET /v1/connections/{connection_id}
 
-> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1211). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1217). Не редагуйте вручну.
 
 **Підключення і стан синхронізації з виконавцями**
 
@@ -44,6 +44,23 @@
 | `executors[].sync_status` | enum: `pending`, `synced`, `failed` | так |  |
 | `executors[].synced_at` | `string` (date-time) | ні | Момент часу RFC 3339 з часовою зоною; сервіси повертають UTC із суфіксом 'Z'. |
 | `executors[].message` | `string` | ні |  |
+| `executors[].attempts` | `integer` | ні | мін. `0` |
+| `executors[].next_retry_at` | `string` (date-time) | ні | Момент часу RFC 3339 з часовою зоною; сервіси повертають UTC із суфіксом 'Z'. |
+| `executors[].error` | `problem` | ні | Єдина модель помилки всіх API Jane: RFC 9457 (application/problem+json) з розширеннями 'code', 'retryable', 'errors', 'trace_id'. Клієнт приймає рішення за 'code' (стабільний машинний код), а не за 'title'/'detail'. Невідомий 'code' обробляється за HTTP-статусом і 'retryable'. |
+| `executors[].error.type` | `string` (uri-reference) | так | URI типу проблеми: 'urn:jane:problem:&lt;code>'. |
+| `executors[].error.title` | `string` | так | Короткий людський опис типу проблеми. |
+| `executors[].error.status` | `integer` | так | мін. `400`; макс. `599` |
+| `executors[].error.detail` | `string` | ні | Пояснення конкретного випадку. Без секретів і без вмісту матеріалів. |
+| `executors[].error.instance` | `string` (uri-reference) | ні |  |
+| `executors[].error.code` | `string` | так | Стабільний машинний код у snake_case. Відомі коди — $defs/KnownErrorCode. Сервіс може додати власний код лише разом з оновленням каталогу в contracts/.; шаблон `"^[a-z][a-z0-9_]{1,63}$"` |
+| `executors[].error.retryable` | `boolean` | ні | true — ту саму операцію (з тим самим Idempotency-Key) можна безпечно повторити пізніше. |
+| `executors[].error.retry_after_seconds` | `integer` | ні | Дублює заголовок Retry-After для клієнтів, які читають лише тіло.; мін. `0` |
+| `executors[].error.errors` | array of `FieldError` | ні | Помилки окремих полів або параметрів (для validation_failed). |
+| `executors[].error.trace_id` | `string` | ні |  |
+| `executors[].error.details` | `object` | ні | Додаткові структуровані дані, специфічні для коду (наприклад 'limit', 'actual' для limit_exceeded). |
+| `unsupported_executors` | array of `object` | ні | Виконавці з 501 not_implemented для керованих підключень; це не збій синхронізації. |
+| `unsupported_executors[].executor` | `string` | ні |  |
+| `unsupported_executors[].reason` | `string` | ні |  |
 
 Приклад `pg`:
 

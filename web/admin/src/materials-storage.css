@@ -1,0 +1,87 @@
+.materials-filters {
+  align-items: end;
+}
+.materials-filters select {
+  min-width: 12rem;
+}
+.storage-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
+  gap: 1rem;
+}
+.storage-cards .section {
+  min-width: 0;
+}
+.storage-cards .button-row {
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.content-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 32rem;
+  overflow: auto;
+}
+
+.storage-workspace .kv-row {
+  min-width: 0;
+}
+.storage-workspace .kv dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.storage-workspace .section h2 {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .layout:has(> .storage-workspace) {
+    flex-direction: column;
+  }
+  .layout:has(> .storage-workspace) .sidebar {
+    width: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    align-items: center;
+  }
+  .layout:has(> .storage-workspace) .sidebar .nav {
+    white-space: nowrap;
+  }
+  .layout:has(> .storage-workspace) .sidebar .brand {
+    padding: 4px 10px;
+  }
+  .layout:has(> .storage-workspace) .sidebar-foot {
+    margin-top: 0;
+    flex-direction: row;
+    flex-shrink: 0;
+  }
+  .storage-workspace {
+    padding: 16px;
+  }
+  .storage-workspace .filters > .field {
+    width: 100%;
+  }
+  .storage-workspace table {
+    min-width: 850px;
+  }
+  .storage-workspace .kv {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .storage-workspace .kv dt {
+    min-width: 0;
+    flex: 0 0 42%;
+  }
+}
+.trace-outputs {
+  min-width: 12rem;
+  max-width: 32rem;
+  overflow-wrap: anywhere;
+}
+.trace-outputs ul {
+  padding-left: 1.2rem;
+}
+.trace-outputs li {
+  margin-block: 0.5rem;
+}
+.trace-outputs details {
+  margin-block: 0.5rem;
+}

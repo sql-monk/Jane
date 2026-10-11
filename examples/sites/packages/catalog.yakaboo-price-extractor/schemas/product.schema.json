@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "product (ціна й наявність з картки сторінки розділу yakaboo.ua)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "shop",
+    "product_id"
+  ],
+  "properties": {
+    "shop": {
+      "type": "string",
+      "minLength": 1
+    },
+    "product_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Код товару в магазині (той самий ключ, що в повній картці)."
+    },
+    "price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Поточна ціна, грн (немає в картці книжки, якої немає в наявності)."
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "old_price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Ціна до знижки, грн."
+    },
+    "availability": {
+      "type": "string",
+      "enum": [
+        "in_stock",
+        "out_of_stock",
+        "preorder",
+        "unknown"
+      ]
+    }
+  }
+}

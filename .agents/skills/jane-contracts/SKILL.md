@@ -65,6 +65,12 @@ description: Конвенції API й контрактів Jane — /v1, мод
 11. **Простежуваність**: приймай і передавай `traceparent`; `trace_id` — у журналах і Problem.
 12. **Кожен сервіс** має `/v1/health`, `/v1/info` (`common.yaml#/components/pathItems/Health|Info`),
     і `/metrics` (Prometheus, поза контрактом).
+12a. **Керування модулями**: додатковий спільний контракт `operations.v1.yaml` описує
+     `GET/PUT /v1/configuration` та `GET /v1/telemetry` у кожному сервісі.
+     Читання — `modules:read` або `modules:write`, запис — `modules:write` і `If-Match`.
+     PUT повністю замінює локальні перевизначення; порожні `values` повертають успадкування.
+     Активні та збережені значення відрізняються до перезапуску; секрети не входять у форму.
+     Метрики й журнал належать модулю; подробиці — `contracts/docs/module-operations.md`.
 
 ## 3. Команди
 ```text

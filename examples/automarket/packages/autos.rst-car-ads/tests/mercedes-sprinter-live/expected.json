@@ -1,0 +1,19 @@
+{
+  "entities": [{
+    "entity_type": "car_ad",
+    "key": {"scope": "local", "natural": {"site": "rst.ua", "ad_id": "15307308"}},
+    "fields": {
+      "site": "rst.ua", "ad_id": "15307308",
+      "url": "https://rst.ua/ukr/oldcars/mercedes/sprinter/mercedes_sprinter_15307308.html",
+      "title": "MERCEDES Sprinter", "make": "MERCEDES", "model": "Sprinter",
+      "price": 37000, "currency": "USD", "price_uah": 1666900,
+      "year": 2021, "mileage_km": 521000, "engine_l": 2.0,
+      "fuel": "diesel", "transmission": "automatic", "drive": "rear",
+      "body_type": "minibus", "color": "білий", "city": "Харків",
+      "region": "Харківська область", "vin_masked": "W1V*****352202",
+      "description_full": "Легковой 8 + 1 все в полном порядке два климата по роботе коробке двигателя ходовой идеально, любое ваше сто любые проверки",
+      "registration_history": ["В Україні з 01.03.2024", "2-й власник в Укр.", "2 роки у власника"],
+      "raw_specs": {"двигун": "2.0 • Дизель", "КПП": "Автомат • Задній пр.", "кузов": "Мікробус пасажир Білий"}
+    }
+  }]
+}

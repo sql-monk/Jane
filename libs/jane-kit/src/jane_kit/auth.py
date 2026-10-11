@@ -88,6 +88,9 @@ SCOPE_RE = re.compile(r"^[a-z][a-z0-9-]*:[a-z][a-z0-9_-]*$")
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
 OPEN_PATHS = frozenset({"/v1/health"})
 BUILTIN_SCOPES: dict[str, tuple[str, ...]] = {
+    "GET /v1/configuration": ("modules:read", "modules:write"),
+    "PUT /v1/configuration": ("modules:write",),
+    "GET /v1/telemetry": ("modules:read", "modules:write"),
     "GET /v1/info": AUTHENTICATED,  # common.yaml Info: bearerAuth, 401 - any valid token
     "GET /metrics": AUTHENTICATED,  # only when metrics_public=false
     "GET /openapi.json": AUTHENTICATED,

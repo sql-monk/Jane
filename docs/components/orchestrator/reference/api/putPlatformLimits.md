@@ -1,6 +1,6 @@
 # PUT /v1/limits/platform
 
-> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1317). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1323). Не редагуйте вручну.
 
 **Змінити ліміти платформи без зміни коду**
 

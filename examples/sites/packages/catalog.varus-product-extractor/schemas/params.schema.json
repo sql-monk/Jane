@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "catalog.varus-product-extractor params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "shop": {
+      "description": "Ідентифікатор магазину в ключі сутності (shop + product_id).",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "default": "varus"
+    },
+    "currency": {
+      "description": "Валюта цін API (гривня).",
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "default": "UAH"
+    },
+    "product_url": {
+      "description": "Адреса сторінки товару; {url_key} — urlKey елемента API.",
+      "type": "string",
+      "pattern": "\\{url_key\\}",
+      "default": "https://varus.ua/{url_key}"
+    },
+    "image_url": {
+      "description": "Адреса головного зображення товару; {sku} — SKU.",
+      "type": "string",
+      "pattern": "\\{sku\\}",
+      "default": "https://varus.ua/img/product/1140/1140/{sku}"
+    }
+  }
+}

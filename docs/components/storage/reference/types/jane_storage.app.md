@@ -26,7 +26,7 @@ Idempotency: ``Idempotency-Key`` must equal ``delivery.delivery_key``. The durab
 |---|---|
 | Вид | клас |
 | Модуль | `jane_storage.app` |
-| Код | [app.py:163](../../../../../services/storage/src/jane_storage/app.py#L163) |
+| Код | [app.py:164](../../../../../services/storage/src/jane_storage/app.py#L164) |
 
 ```python
 class InvocationResults: ...
@@ -40,7 +40,7 @@ Recent HandlerResults of this instance (``GET /v1/invocations/{id}``).
 def __init__(self, max_entries: int) -> None: ...
 ```
 
-Код: [app.py:166](../../../../../services/storage/src/jane_storage/app.py#L166).
+Код: [app.py:167](../../../../../services/storage/src/jane_storage/app.py#L167).
 
 #### Метод `InvocationResults.put`
 
@@ -48,7 +48,7 @@ def __init__(self, max_entries: int) -> None: ...
 def put(self, result: dict[str, Any]) -> None: ...
 ```
 
-Код: [app.py:170](../../../../../services/storage/src/jane_storage/app.py#L170).
+Код: [app.py:171](../../../../../services/storage/src/jane_storage/app.py#L171).
 
 #### Метод `InvocationResults.get`
 
@@ -58,7 +58,7 @@ def get(self, invocation_id: str) -> dict[str, Any]: ...
 
 Винятки в коді методу: `NotFound`.
 
-Код: [app.py:175](../../../../../services/storage/src/jane_storage/app.py#L175).
+Код: [app.py:176](../../../../../services/storage/src/jane_storage/app.py#L176).
 
 ## Функції
 
@@ -68,7 +68,7 @@ def get(self, invocation_id: str) -> dict[str, Any]: ...
 def entity_state(snap: EntitySnapshot) -> dict[str, Any]: ...
 ```
 
-Код: [app.py:147](../../../../../services/storage/src/jane_storage/app.py#L147).
+Код: [app.py:148](../../../../../services/storage/src/jane_storage/app.py#L148).
 
 ### Функція `history_entry`
 
@@ -76,7 +76,7 @@ def entity_state(snap: EntitySnapshot) -> dict[str, Any]: ...
 def history_entry(event: HistoryEvent) -> dict[str, Any]: ...
 ```
 
-Код: [app.py:153](../../../../../services/storage/src/jane_storage/app.py#L153).
+Код: [app.py:154](../../../../../services/storage/src/jane_storage/app.py#L154).
 
 ### Функція `build_app`
 
@@ -88,11 +88,11 @@ def build_app(
 ) -> FastAPI: ...
 ```
 
-The storage service. ``registry_transport`` — HTTP transport to the registry (tests).
+The storage service. ``registry_transport`` Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎСљ HTTP transport to the registry (tests).
 
-Винятки в коді функції: `JaneError`, `ValidationFailed`, `NotFound`, `IdempotencyKeyReused`, `IdempotencyInProgress`.
+Винятки в коді функції: `JaneError`, `ValidationFailed`, `NotFound`, `IdempotencyKeyReused`, `IdempotencyInProgress`, `Timeout`.
 
-Код: [app.py:219](../../../../../services/storage/src/jane_storage/app.py#L219).
+Код: [app.py:220](../../../../../services/storage/src/jane_storage/app.py#L220).
 
 ### Функція `manifest_test_cases`
 
@@ -105,7 +105,7 @@ def manifest_test_cases(
 
 Invocations (``test_mode``) for the package's manifest tests and extra cases of a test run.
 
-Код: [app.py:839](../../../../../services/storage/src/jane_storage/app.py#L839).
+Код: [app.py:1050](../../../../../services/storage/src/jane_storage/app.py#L1050).
 
 ## Константи й змінні модуля
 

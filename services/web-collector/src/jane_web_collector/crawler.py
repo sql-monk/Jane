@@ -15,10 +15,10 @@ import hashlib
 import json
 import logging
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -34,6 +34,7 @@ from jane_contracts.discovery import (
     UrlKind,
 )
 from jane_kit.config import LimitLayer, ResolvedLimits
+from jane_kit.errors import FieldError, ValidationFailed
 from jane_kit.jobs import JobCancelledError, JobContext
 
 from .connections import ConnectionPolicy, auth_headers
@@ -182,6 +183,14 @@ class CrawlRun:
         self.rules_ref: dict[str, Any] | None = record.get("rules_ref")
         self.source_id: str | None = self.request.get("source_id")
         self.mode: str = self.request.get("mode", "full")
+        self.continuation_fingerprint = resource_sha(
+            json.dumps(
+                {"rules": self.rules, "source_id": self.source_id, "urls": self.request.get("urls") or []},
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            ).encode("utf-8")
+        )
         self.meta: dict[str, Any] = dict(record.get("meta") or {})
         self.stats: dict[str, Any] = {**new_stats(), **(record.get("stats") or {})}
         self.counters: dict[str, int] = dict(self.meta.get("counters") or {})
@@ -222,13 +231,28 @@ class CrawlRun:
             headers.setdefault("Accept", ", ".join(self.accept))
         creds: dict[str, str] = {}
         if fetch_cfg.get("connection_id"):
+            if fetch_cfg.get("transport") == "browser":
+                raise ValidationFailed(
+                    "browser transport does not support managed connection credentials",
+                    errors=[
+                        FieldError(
+                            pointer="/rules/fetch/connection_id", message="unsupported with browser transport"
+                        )
+                    ],
+                )
             found = self.state.get_connection(fetch_cfg["connection_id"])
             if found is not None:
                 creds = auth_headers(found[0], deps.connection_policy)
         # per-host limits are shared with every other collection and fetch of this process (WP-02c)
         self.host_session = deps.host_limiter.session(self.limits)
         self.robots_fetcher = Fetcher(
-            deps.client, self.limits, self.host_session, user_agent=user_agent, headers=headers
+            deps.client,
+            self.limits,
+            self.host_session,
+            user_agent=user_agent,
+            headers=headers,
+            transport=fetch_cfg.get("transport", "http"),
+            browser_fetch=deps.renderer.fetch if deps.renderer is not None else None,
         )
         self.robots = RobotsCache(self._fetch_robots, token, self.limits.collector.robots_cache_ttl_seconds)
         self.fetcher = Fetcher(
@@ -240,6 +264,8 @@ class CrawlRun:
             auth_headers=creds,
             connection_policy=deps.connection_policy,
             crawl_delay_for=None if self.owner_policy else self._crawl_delay,
+            transport=fetch_cfg.get("transport", "http"),
+            browser_fetch=deps.renderer.fetch if deps.renderer is not None else None,
         )
         self.strategies: list[tuple[str, DiscoveryStrategy, StrategyContext, int]] = []
         self.cancelled = False
@@ -252,6 +278,8 @@ class CrawlRun:
         self._last_progress = 0.0
         self._material_commit_lock = asyncio.Lock()
         self._backpressure_waiters = 0
+        self._seeding: str | None = None
+        self._seed_interrupted = False
 
     # ------------------------------------------------------------------ helpers for strategies
     def _tx(self) -> Any:
@@ -352,9 +380,8 @@ class CrawlRun:
         return 0, None
 
     def admit(self, candidates: Sequence[DiscoveredUrl], parent_depth: int | None) -> list[FrontierRow]:
-        """Normalize and filter candidates (scope, depth, frontier size); dedup happens on insert."""
+        """Normalize and filter candidates (scope, depth); insert bounds the queue and spools its overflow."""
         rows: list[FrontierRow] = []
-        pending = self.state.frontier_counts(self.collection_id).get("pending", 0)
         seen: set[str] = set()
         for cand in candidates:
             url = self.normalizer.normalize(cand.url, cand.parent_url)
@@ -371,9 +398,6 @@ class CrawlRun:
             if depth > self._strategy_depth(cand.strategy_id):
                 self.counters["skipped_depth"] = self.counters.get("skipped_depth", 0) + 1
                 continue
-            if pending + len(rows) >= self.limits.crawl.max_frontier_size:
-                self.counters["dropped_frontier_full"] = self.counters.get("dropped_frontier_full", 0) + 1
-                continue
             strat_priority, forced_section = self._strategy_priority(cand.strategy_id)
             rows.append(
                 FrontierRow(
@@ -389,9 +413,29 @@ class CrawlRun:
             )
         return rows
 
-    def insert_rows(self, db: Any, rows: Sequence[FrontierRow]) -> None:
+    def insert_rows(self, db: Any, rows: Iterable[FrontierRow], *, immediate: bool = False) -> None:
+        counts = self.state.frontier_counts(self.collection_id)
+        queued = counts.get("pending", 0) + counts.get("inflight", 0)
         for row in rows:
-            added = self.state.add_urls(db, self.collection_id, [row])
+            if self.state.known(self.collection_id, row.url):
+                self.stats["duplicates"] += 1
+                continue
+            if self.mode == "incremental" and self.state.has_deferred_url(
+                self.state_key, self.continuation_fingerprint, row.url
+            ):
+                self.stats["duplicates"] += 1
+                continue
+            if not immediate and self.mode == "incremental" and queued >= self.limits.crawl.max_frontier_size:
+                previous = self.state.url_state(self.state_key, row.url)
+                unseen = previous is None or not 200 <= (previous.get("status") or 0) < 400
+                if unseen and self.state.spool_known_pending(db, self.collection_id):
+                    queued -= 1
+            if not immediate and queued >= self.limits.crawl.max_frontier_size:
+                added = self.state.add_overflow(db, self.collection_id, row)
+                self.counters["spooled_frontier_full"] = self.counters.get("spooled_frontier_full", 0) + added
+            else:
+                added = self.state.add_urls(db, self.collection_id, [row])
+                queued += added
             if added:
                 self.stats["discovered"] += 1
                 by = self.stats["by_strategy"]
@@ -399,6 +443,24 @@ class CrawlRun:
                 by[key] = by.get(key, 0) + 1
             else:
                 self.stats["duplicates"] += 1
+
+    def _admit_continuation(self, row: FrontierRow) -> FrontierRow | None:
+        """Re-apply current admission without increasing an already recorded depth/priority."""
+        if row.strategy_id not in {sid for sid, _, _, _ in self.strategies}:
+            return None
+        priority, _ = self._strategy_priority(row.strategy_id)
+        candidate = DiscoveredUrl(
+            url=row.url,
+            strategy_id=row.strategy_id,
+            kind=cast(UrlKind, row.kind),
+            priority=row.priority - self.rule_priority(row.url) - priority,
+            depth=row.depth,
+            parent_url=row.parent_url,
+            section=row.section,
+            lastmod=datetime.fromisoformat(row.lastmod) if row.lastmod else None,
+        )
+        admitted = self.admit([candidate], None)
+        return admitted[0] if admitted else None
 
     # ------------------------------------------------------------------ errors and persistence
     def _error(
@@ -434,6 +496,7 @@ class CrawlRun:
         self.state.save_strategy_states(db, self.collection_id, snapshots)
         self.state.save_cursors(db, self.state_key, {k: v for k, v in snapshots.items() if v}, _now_iso())
         self.meta["counters"] = self.counters
+        self.stats["overflow_pending"] = self.state.overflow_count(self.collection_id)
         self.state.save_stats(db, self.collection_id, self.stats)
         db.execute(
             "UPDATE collections SET meta = ? WHERE collection_id = ?",
@@ -520,7 +583,7 @@ class CrawlRun:
         """Fetch and process one admitted URL. Returns the resource (for ``ctx.fetch``) or ``None``."""
         url = row.url
         with self._tx() as db:
-            if self.state.known(self.collection_id, url):
+            if self.state.frontier_row(self.collection_id, url) is not None:
                 self.state.mark_url(db, self.collection_id, url, "inflight")
             else:
                 self.state.add_urls(db, self.collection_id, [row], status="inflight")
@@ -873,16 +936,61 @@ class CrawlRun:
             and existing["status"] in ("done", "unchanged")
         ):
             return None
-        if budget := self._budget_left():
-            raise FetchRejected("limit_exceeded", f"{budget} reached")
         row = FrontierRow(canonical, 0, 0, kind, caller, None, self.section_for(canonical))
-        return await self.handle(
+        if self._seeding == caller and kind == "navigation":
+            cached = self.state.seed_navigation(
+                self.collection_id,
+                caller,
+                canonical,
+                state_key=self.state_key,
+                fingerprint=self.continuation_fingerprint,
+            )
+            if cached is not None:
+                metadata, cached_body = cached
+                metadata["fetched_at"] = datetime.fromisoformat(metadata["fetched_at"])
+                self.fetched_here.add(canonical)
+                with self._tx() as db:
+                    self.state.mark_url(db, self.collection_id, canonical, "done")
+                return FetchedResource(body=cached_body, **metadata)
+        if budget := self._budget_left():
+            # Strategies may catch the refusal and discard their local navigation queue. Save
+            # the refused URL and replay earlier navigation bodies to reconstruct the tail.
+            if self._seeding == caller:
+                self._seed_interrupted = True
+                with self._tx() as db:
+                    self.insert_rows(db, [row])
+                    self._persist(db)
+            raise FetchRejected("limit_exceeded", f"{budget} reached")
+        resource = await self.handle(
             row,
             caller=caller,
             conditional=conditional and method == "GET",
             method=method,
             json_body=json_body,
         )
+        if (
+            self._seeding == caller
+            and kind == "navigation"
+            and resource is not None
+            and 200 <= resource.status < 300
+        ):
+            metadata = {
+                "url": resource.url,
+                "final_url": resource.final_url,
+                "status": resource.status,
+                "media_type": resource.media_type,
+                "headers": dict(resource.headers),
+                "fetched_at": resource.fetched_at.isoformat(),
+                "depth": resource.depth,
+                "strategy_id": resource.strategy_id,
+                "kind": resource.kind,
+                "truncated": resource.truncated,
+            }
+            with self._tx() as db:
+                self.state.save_seed_navigation(
+                    db, self.collection_id, caller, canonical, metadata, resource.body
+                )
+        return resource
 
     async def emit_for_strategy(self, item: DiscoveredMaterial, *, caller: str) -> bool:
         """``DiscoveryContext.emit_material``: content a strategy already has (an API item) as a Material, under
@@ -954,7 +1062,7 @@ class CrawlRun:
                     self._persist(db)
                     return False
                 if existing is None:
-                    self.insert_rows(db, [row])
+                    self.insert_rows(db, [row], immediate=True)
                 done = material is not None or error is not None
                 self.state.mark_url(db, self.collection_id, url, "done" if done else "unchanged")
                 if error is not None:
@@ -1008,30 +1116,75 @@ class CrawlRun:
 
     async def _seed(self) -> None:
         seeded: list[str] = list(self.meta.get("seeded") or [])
+        batch_limit = max(1, min(self.limits.crawl.max_links_per_page, self.limits.crawl.max_pages_per_run))
+        # Parsing limits may admit a whole sitemap; they must not also become one long SQLite write.
+        quantum = self.deps.heartbeat_seconds / 4
         for sid, strategy, ctx, _ in self.strategies:
             if sid in seeded:
                 continue
             batch: list[DiscoveredUrl] = []
-            async for cand in strategy.seeds(ctx):
-                batch.append(cand)
-                if len(batch) >= max(1, self.limits.crawl.max_links_per_page):
-                    self._commit_seeds(batch)
-                    batch = []
-                if self.cancelled:
-                    return
-            self._commit_seeds(batch)
+            self._seeding = sid
+            self._seed_interrupted = False
+            flush_at = time.monotonic() + quantum
+            candidates: AsyncIterator[DiscoveredUrl] | None = None
+            try:
+                candidates = strategy.seeds(ctx)
+                async for cand in candidates:
+                    batch.append(cand)
+                    if len(batch) >= batch_limit or time.monotonic() >= flush_at:
+                        await self._commit_seeds(batch)
+                        batch = []
+                        flush_at = time.monotonic() + quantum
+                    if self.cancelled:
+                        return
+            finally:
+                self._seeding = None
+                # SDK iterators need not expose aclose; generators that own resources do.
+                close = getattr(candidates, "aclose", None)
+                if callable(close):
+                    await close()
+            await self._commit_seeds(batch)
+            if self._seed_interrupted:
+                break
             seeded.append(sid)
             self.meta["seeded"] = seeded
             with self._tx() as db:
+                self.state.clear_seed_navigation(
+                    db, self.collection_id, sid, self.state_key, self.continuation_fingerprint, seeded
+                )
                 self._persist(db)
 
-    def _commit_seeds(self, batch: Sequence[DiscoveredUrl]) -> None:
+    async def _commit_seeds(self, batch: Sequence[DiscoveredUrl]) -> None:
         if not batch:
             return
-        rows = self.admit(batch, None)
-        with self._tx() as db:
-            self.insert_rows(db, rows)
-            self._persist(db)
+        candidates = iter(batch)
+        exhausted = False
+        while not exhausted:
+            deadline = time.monotonic() + self.deps.heartbeat_seconds / 4
+
+            def admitted(deadline: float) -> Iterator[FrontierRow]:
+                nonlocal exhausted
+                # Include rejected candidates in the time slice: a large filtered sitemap must
+                # leave the heartbeat and API runnable too. Never yield control inside a transaction.
+                while time.monotonic() < deadline:
+                    try:
+                        candidate = next(candidates)
+                    except StopIteration:
+                        exhausted = True
+                        return
+                    for row in self.admit([candidate], None):
+                        if self.counters.get("continued_urls"):
+                            # Replay must not revisit materials observed earlier in this crawl cycle.
+                            previous = self.state.url_state(self.state_key, row.url)
+                            if previous is not None and 200 <= (previous.get("status") or 0) < 400:
+                                self.stats["duplicates"] += 1
+                                continue
+                        yield row
+
+            with self._tx() as db:
+                self.insert_rows(db, admitted(deadline))
+                self._persist(db)
+            await asyncio.sleep(0)
 
     async def _beat(self) -> None:
         """Renew the lease; detect cancellation requested through another instance; report progress."""
@@ -1043,10 +1196,10 @@ class CrawlRun:
             raise JobCancelledError(self.collection_id)
         if self._job is not None:
             counts = self.state.frontier_counts(self.collection_id)
-            done = sum(v for k, v in counts.items() if k not in ("pending", "inflight"))
+            done = sum(v for k, v in counts.items() if k not in ("pending", "inflight", "overflow", "loaned"))
             await self._job.progress(
                 done,
-                done + counts.get("pending", 0) + counts.get("inflight", 0),
+                done + counts.get("pending", 0) + counts.get("inflight", 0) + counts.get("overflow", 0),
                 unit="urls",
                 counters={k: int(v) for k, v in self.stats.items() if isinstance(v, int)} | self.counters,
             )
@@ -1088,12 +1241,34 @@ class CrawlRun:
         # URLs left in flight by a previous owner (killed or stalled instance) go back to the queue
         self.state.reset_inflight(self.collection_id, self.fence)
         self._build_strategies()
-        await self._seed()
+        if self.mode == "incremental" and not self.meta.get("continuation_adopted"):
+            with self._tx() as db:
+                rows, seeded, snapshots = self.state.adopt_deferred(
+                    db,
+                    self.collection_id,
+                    self.state_key,
+                    self.continuation_fingerprint,
+                    min(self.limits.crawl.max_frontier_size, self.limits.crawl.max_pages_per_run),
+                    self._admit_continuation,
+                )
+                if rows:
+                    self.meta["seeded"] = seeded
+                    for sid, strategy, _, _ in self.strategies:
+                        if sid in snapshots:
+                            strategy.restore(snapshots[sid])
+                    self.stats["discovered"] += len(rows)
+                    self.counters["continued_urls"] = self.counters.get("continued_urls", 0) + len(rows)
+                self.meta["continuation_adopted"] = True
+                self._persist(db)
+        if self.counters.get("continued_urls"):
+            # Spend this run's budget on the old material tail before doing any fresh discovery.
+            # Navigation checkpoints are consumed by their strategy's seeds(), with replay.
+            await self._loop(materials_only=True)
+        if self.stop_reason is None:
+            await self._seed()
         while True:
             await self._loop()
             if self.stop_reason:
-                dropped = self.state.drop_pending(self.collection_id, self.fence)
-                self.counters["dropped_by_budget"] = self.counters.get("dropped_by_budget", 0) + dropped
                 break
             counts = self.state.frontier_counts(self.collection_id)
             if not counts.get("pending") and not counts.get("inflight"):
@@ -1104,16 +1279,36 @@ class CrawlRun:
         if self.stop_reason:
             result["stopped_by"] = self.stop_reason
         with self._tx() as db:
-            open_rows = db.execute(
-                "SELECT COUNT(*) FROM frontier WHERE collection_id = ? AND status IN ('pending', 'inflight')",
-                (self.collection_id,),
-            ).fetchone()[0]
-            if open_rows:  # cannot happen after the loop above; never report success with open URLs
-                raise RuntimeError(f"{open_rows} URLs still open at the end of the run")
             job_row = db.execute("SELECT body FROM jobs WHERE job_id = ?", (self.collection_id,)).fetchone()
             if job_row is not None and json.loads(job_row[0]).get("status") == "cancelling":
                 self.cancelled = True
-                raise JobCancelledError(self.collection_id)  # cancellation never ends as "succeeded"
+                raise JobCancelledError(self.collection_id)  # cancellation never checkpoints or succeeds
+            if self.stop_reason:
+                self.state.defer_pending(
+                    db,
+                    self.collection_id,
+                    self.state_key,
+                    self.continuation_fingerprint,
+                    self.meta.get("seeded") or [],
+                )
+            self.state.settle_loans(db, borrower_id=self.collection_id)
+            self.state.complete_discovery(
+                db, self.state_key, self.continuation_fingerprint, self.meta.get("seeded") or []
+            )
+            pending = self.state.continuation_size(self.state_key, self.continuation_fingerprint)
+            if not pending:
+                self.state.clear_continuation(db, self.state_key, self.continuation_fingerprint)
+            self.stats["continuation_pending"] = pending
+            result["continuation_pending"] = pending
+            counts = self.state.frontier_counts(self.collection_id)
+            open_rows = counts.get("pending", 0) + counts.get("inflight", 0)
+            checkpoint = db.execute(
+                "SELECT 1 FROM deferred_crawls WHERE collection_id = ?", (self.collection_id,)
+            ).fetchone()
+            if open_rows and not (self.stop_reason and checkpoint):
+                # Open rows may belong only to the atomically checkpointed budget stop. A normal
+                # successful run must have exhausted its queue; running rows stay visible as pending.
+                raise RuntimeError(f"{open_rows} URLs still open at the end of the run")
             self._persist(db)
             self.state.set_status(self.collection_id, "succeeded", finished_at=_now_iso(), db=db)
             db.execute(
@@ -1121,7 +1316,7 @@ class CrawlRun:
             )
         return result
 
-    async def _loop(self) -> None:
+    async def _loop(self, *, materials_only: bool = False) -> None:
         running: set[asyncio.Task[Any]] = set()
         interval = self.deps.heartbeat_seconds
         try:
@@ -1134,11 +1329,23 @@ class CrawlRun:
                         free, self.limits.crawl.max_pages_per_run - self.stats["fetched"] - len(running)
                     )
                     if free > 0:
-                        for row in self.state.take_pending(self.collection_id, free, self.fence):
+                        counts = self.state.frontier_counts(self.collection_id)
+                        slots = (
+                            self.limits.crawl.max_frontier_size
+                            - counts.get("pending", 0)
+                            - counts.get("inflight", 0)
+                        )
+                        with self._tx() as db:
+                            self.state.promote_overflow(
+                                db, self.collection_id, slots, materials_only=materials_only
+                            )
+                        for row in self.state.take_pending(
+                            self.collection_id, free, self.fence, materials_only=materials_only
+                        ):
                             running.add(asyncio.create_task(self.handle(row), name=f"fetch {row.url}"))
                 if not running:
-                    if self.stop_reason is not None or not self.state.frontier_counts(self.collection_id).get(
-                        "pending"
+                    if self.stop_reason is not None or not self.state.pending_count(
+                        self.collection_id, materials_only=materials_only
                     ):
                         return
                     continue

@@ -10,4 +10,4 @@
 function App(): React.JSX.Element
 ```
 
-Код: [App.tsx:147](../../../../../web/admin/src/App.tsx#L147).
+Код: [App.tsx:172](../../../../../web/admin/src/App.tsx#L172).

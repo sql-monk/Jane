@@ -1,0 +1,11 @@
+{
+  "project": "jane-demo",
+  "mode": "docker",
+  "verified": true,
+  "urls": {
+    "handler-runtime": "http://127.0.0.1:62130",
+    "storage": "http://127.0.0.1:54345",
+    "orchestrator": "http://127.0.0.1:52310",
+    "registry": "http://127.0.0.1:62129"
+  }
+}

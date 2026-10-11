@@ -55,7 +55,7 @@ test.describe("real registry: rules package, approval and independent fork @hybr
       admin.getByRole("button", { name: "Погодити версію" }).click(),
     );
     expect(approved.body).toEqual({ status: "approved", reason: "E2E review of rules" });
-    await expect(admin.getByRole("table", { name: "Версії", exact: true })).toContainText("approved");
+    await expect(admin.getByRole("table", { name: "Версії", exact: true })).toContainText("Схвалено");
 
     await admin.getByRole("tab", { name: "Створити форк" }).click();
     await admin.getByLabel("Новий package_id").fill(forkId);
@@ -98,7 +98,7 @@ test.describe("real registry: rules package, approval and independent fork @hybr
     expect(port.request.headers()["idempotency-key"]).toBeTruthy();
     expect(port.body).toEqual({ parent_version: "1.1.0", new_version: "1.1.0", base_version: "1.0.0" });
     const panel = admin.getByLabel("Перенесення змін батька");
-    await expect(panel.locator(".job-head .badge")).toHaveText("succeeded", { timeout: 120_000 });
+    await expect(panel.locator(".job-head .badge")).toHaveText("Успішно", { timeout: 120_000 });
     await expect
       .poll(async () => {
         const response = await request.get(`${base}/v1/packages/${forkId}/versions/1.1.0`, { headers });
@@ -111,8 +111,8 @@ test.describe("real registry: rules package, approval and independent fork @hybr
     expect(ported.manifest?.provenance?.upstream_port?.parent_version).toBe("1.1.0");
     await admin.goto(`/packages/${forkId}`);
     await admin.getByRole("tab", { name: "Відмінності" }).click();
-    await admin.getByLabel("Від (версія або parent:<версія>)").fill("1.0.0");
-    await admin.getByLabel("До версії").fill("1.1.0");
+    await admin.getByLabel("Від (версія або parent:<версія>)", { exact: true }).selectOption("1.0.0");
+    await admin.getByLabel("До версії", { exact: true }).selectOption("1.1.0");
     await admin.getByRole("button", { name: "Порівняти" }).click();
     await expect(admin.getByLabel("Відмінності версій")).toContainText("feed");
   });

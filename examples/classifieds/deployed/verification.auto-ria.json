@@ -1,0 +1,172 @@
+{
+  "site": "auto-ria",
+  "source_id": "classified-auto-ria",
+  "run": {
+    "run_id": "run_01M4MRQXDASCK15AMVRNCHV8XK",
+    "task_id": "classifieds-auto-ria",
+    "trigger": "schedule",
+    "status": "succeeded",
+    "started_at": "2026-10-11T06:00:02.617Z",
+    "finished_at": "2026-10-11T06:00:28.875Z",
+    "counters": {
+      "materials": 1,
+      "unknown_materials": 0
+    },
+    "stages": {
+      "collect": {
+        "counts": {
+          "completed": 1
+        }
+      },
+      "store-raw": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+          "version": "1.0.0",
+          "package_id": "jane.storage-files"
+        }
+      },
+      "extract-ads": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:fc71c59913047e058bb3cf383947e8dcbe1f44a48e81ec36fb12f7beb710ef45",
+          "version": "1.0.0",
+          "package_id": "classifieds.auto-ria-ads"
+        }
+      },
+      "store-ads": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+          "version": "1.0.0",
+          "package_id": "jane.storage-postgresql"
+        }
+      }
+    }
+  },
+  "verified": true,
+  "errors": [],
+  "samples": [
+    {
+      "fields": {
+        "url": "https://auto.ria.com/uk/auto_kia_ceed_40233084.html",
+        "site": "auto.ria.com",
+        "price": {
+          "amount": 6700.0,
+          "currency": "USD"
+        },
+        "title": "Kia Ceed 2011",
+        "location": "Рівне (Рівненська)",
+        "listing_id": "40233084"
+      },
+      "observation": {
+        "material_id": "web:2db910af476feab3e29785b040569740",
+        "observed_at": "2026-10-11T06:00:18Z",
+        "content_sha256": "b9c336f330275c31e7c7ed5fe9b004ada2df27c098373824207ddbf42d9c046b",
+        "observation_id": "obs_01a1298c39a00000fc0d8006"
+      },
+      "raw_object_id": "obj_caea74a330224a3a5fc5fa72439bc917",
+      "verified": true,
+      "evidence_kind": "json",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price",
+        "location"
+      ]
+    },
+    {
+      "fields": {
+        "url": "https://auto.ria.com/uk/auto_kia_sportage_40547693.html",
+        "site": "auto.ria.com",
+        "price": {
+          "amount": 15800.0,
+          "currency": "USD"
+        },
+        "title": "Kia Sportage 2016",
+        "location": "Умань",
+        "listing_id": "40547693"
+      },
+      "observation": {
+        "material_id": "web:2db910af476feab3e29785b040569740",
+        "observed_at": "2026-10-11T06:00:18Z",
+        "content_sha256": "b9c336f330275c31e7c7ed5fe9b004ada2df27c098373824207ddbf42d9c046b",
+        "observation_id": "obs_01a1298c39a00000fc0d8006"
+      },
+      "raw_object_id": "obj_caea74a330224a3a5fc5fa72439bc917",
+      "verified": true,
+      "evidence_kind": "json",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price",
+        "location"
+      ]
+    },
+    {
+      "fields": {
+        "url": "https://auto.ria.com/uk/auto_land-rover_range-rover-sport_40423584.html",
+        "site": "auto.ria.com",
+        "price": {
+          "amount": 38500.0,
+          "currency": "USD"
+        },
+        "title": "Land Rover Range Rover Sport 2019",
+        "location": "Харків",
+        "listing_id": "40423584"
+      },
+      "observation": {
+        "material_id": "web:2db910af476feab3e29785b040569740",
+        "observed_at": "2026-10-11T06:00:18Z",
+        "content_sha256": "b9c336f330275c31e7c7ed5fe9b004ada2df27c098373824207ddbf42d9c046b",
+        "observation_id": "obs_01a1298c39a00000fc0d8006"
+      },
+      "raw_object_id": "obj_caea74a330224a3a5fc5fa72439bc917",
+      "verified": true,
+      "evidence_kind": "json",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price",
+        "location"
+      ]
+    }
+  ],
+  "packages": {
+    "store-raw": {
+      "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+      "version": "1.0.0",
+      "package_id": "jane.storage-files"
+    },
+    "extract-ads": {
+      "digest": "sha256:fc71c59913047e058bb3cf383947e8dcbe1f44a48e81ec36fb12f7beb710ef45",
+      "version": "1.0.0",
+      "package_id": "classifieds.auto-ria-ads"
+    },
+    "store-ads": {
+      "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+      "version": "1.0.0",
+      "package_id": "jane.storage-postgresql"
+    }
+  },
+  "raw_objects": 2,
+  "persisted_entities": 41,
+  "extraction_items": 1,
+  "checked_entities": 21,
+  "checked_raw_objects": 1
+}

@@ -111,7 +111,7 @@ def collection_view(self, cid: str) -> dict[str, Any]: ...
 def acked(self, cid: str) -> None: ...
 ```
 
-Код: [engine.py:390](../../../../../services/web-collector/src/jane_web_collector/engine.py#L390).
+Код: [engine.py:392](../../../../../services/web-collector/src/jane_web_collector/engine.py#L392).
 
 #### Метод `Engine.fetch_one`
 
@@ -121,7 +121,7 @@ async def fetch_one(self, payload: dict[str, Any]) -> dict[str, Any]: ...
 
 Винятки в коді методу: `ValidationFailed`, `JaneError`, `Forbidden`, `LimitExceeded`.
 
-Код: [engine.py:396](../../../../../services/web-collector/src/jane_web_collector/engine.py#L396).
+Код: [engine.py:398](../../../../../services/web-collector/src/jane_web_collector/engine.py#L398).
 
 #### Метод `Engine.capabilities`
 
@@ -129,4 +129,4 @@ async def fetch_one(self, payload: dict[str, Any]) -> dict[str, Any]: ...
 def capabilities(self) -> dict[str, Any]: ...
 ```
 
-Код: [engine.py:532](../../../../../services/web-collector/src/jane_web_collector/engine.py#L532).
+Код: [engine.py:553](../../../../../services/web-collector/src/jane_web_collector/engine.py#L553).

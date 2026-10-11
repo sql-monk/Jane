@@ -1,0 +1,172 @@
+{
+  "schema_version": "1",
+  "package_id": "catalog.prostor-product-extractor",
+  "version": "1.1.1",
+  "kind": "extractor",
+  "title": "prostor.ua: full product cards",
+  "description": "Повні картки товарів prostor.ua (косметика й побутова хімія) зі сторінок /ua/product/: назва, ціна й ціна до знижки, наявність, бренд, категорія й шлях категорій, артикул, зображення, об'єм/вага, рейтинг, кількість відгуків, характеристики (completeness: full). Ключ — shop + product_id (Magento product id). Відгуки покупців (імена) не читаються. Товар без ціни з відомим статусом «немає в наявності» зберігає метадані/наявність частково; відсутність ціни не очищує попередню ціну чи знижку.",
+  "tags": [
+    "catalog",
+    "prostor",
+    "cosmetics",
+    "household",
+    "products"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_prostor_card.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "product",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару prostor.ua"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "laundry-gel-discount",
+      "input": {
+        "file": "tests/gel-chanteclair/page.html",
+        "media_type": "text/html",
+        "url": "https://prostor.ua/ua/product/chanteclair-gel-dlja-prannja-aromat-bilij-muskus-35-doz-1-575l/"
+      },
+      "expected_status": "success",
+      "expected": "tests/gel-chanteclair/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "face-cream-no-discount",
+      "input": {
+        "file": "tests/cream-loreal/page.html",
+        "media_type": "text/html",
+        "url": "https://prostor.ua/ua/product/antivozrastnoy-krem-loreal-paris-skin-expert-vozrast-ekspert-dnevnoy-ukhod-dlya-vsekh-tipov-kozhi-55-50-ml/"
+      },
+      "expected_status": "success",
+      "expected": "tests/cream-loreal/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "shampoo-discount",
+      "input": {
+        "file": "tests/shampoo-garnier/page.html",
+        "media_type": "text/html",
+        "url": "https://prostor.ua/ua/product/shampun-garnier-fructis-zarjad-svizhosti-dlja-normal-nogo-volossja-shil-nogo-do-zhirnosti-400-ml/"
+      },
+      "expected_status": "success",
+      "expected": "tests/shampoo-garnier/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "face-mask-weight",
+      "input": {
+        "file": "tests/mask-via-beauty/page.html",
+        "media_type": "text/html",
+        "url": "https://prostor.ua/ua/product/maska-i-krem-dlya-litsa-via-beauty-b-tox-30-g-6-g/"
+      },
+      "expected_status": "success",
+      "expected": "tests/mask-via-beauty/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "category-page-empty",
+      "input": {
+        "file": "tests/category-page/page.html",
+        "media_type": "text/html",
+        "url": "https://prostor.ua/ua/volosy/shampuni/?p=11"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "contacts-page-empty",
+      "input": {
+        "file": "tests/contacts-page/page.html",
+        "media_type": "text/html",
+        "url": "https://prostor.ua/ua/kontakty/"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "card-without-price-unrecognized",
+      "input": {
+        "file": "tests/card-without-price/page.html",
+        "media_type": "text/html",
+        "url": "https://prostor.ua/ua/product/sukhoy-shampun-syoss-dlya-sklonnykh-k-zhirnosti-volos-200-ml/"
+      },
+      "expected_status": "unrecognized",
+      "origin": "problem_sample"
+    },
+    {
+      "name": "out-of-stock-without-price-preserves-metadata",
+      "input": {
+        "file": "tests/out-of-stock-without-price/page.html",
+        "media_type": "text/html",
+        "url": "https://prostor.ua/ua/product/sukhoy-shampun-syoss-dlya-sklonnykh-k-zhirnosti-volos-200-ml/"
+      },
+      "expected_status": "success",
+      "expected": "tests/out-of-stock-without-price/expected.json",
+      "compare": "subset",
+      "origin": "problem_sample"
+    }
+  ],
+  "provenance": {
+    "created_by": "llm",
+    "authors": [
+      "Claude (examples/sites: prostor)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Preserve known out-of-stock metadata/availability when the source has no price; omit price/currency and leave their last observations intact. Keep explicit old_price clearing for priced products without a discount. Reproducible Git LF bytes: normalize CRLF to LF without behavior changes.",
+    "based_on": {
+      "package_id": "catalog.prostor-product-extractor",
+      "version": "1.1.0"
+    },
+    "llm": {
+      "provider": "OpenAI",
+      "model": "Codex",
+      "reason": "improvement"
+    }
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "domains": [
+      "prostor.ua"
+    ],
+    "url_patterns": [
+      "prostor.ua/ua/product/**"
+    ]
+  }
+}

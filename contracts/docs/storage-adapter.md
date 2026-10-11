@@ -166,3 +166,32 @@ sqlserver — за `key_hash`, mongodb — за `_id`, minio/s3 — за клю�
 
 Тести сумісності запускаються на локальних сервісах із docker compose (WP-01); S3 — на
 S3-сумісному замінникові, про що пишеться у звіті (критерій 12).
+
+
+## Спостереження за станом (WP-24)
+
+Storage Read API містить discovery підключень та `GET /v1/storage-status?connection_id=…`.
+Це snapshot фонового `POST /v1/storage-status/checks` (202 Job, Idempotency-Key), локальний процесу; restart і зміна визначення
+роблять його unknown. GET ніколи не обходить backend. `checked_at` показує свіжість,
+`statistics.checked_at` — час останнього агрегату; null числові поля з `unavailable_reason` означають
+невідоме значення. `scope=connection_objects` означає лише збережені об’єкти namespace цього connection,
+а `total_size_bytes` — payload bytes з metadata, не disk usage. Filesystem підтримує explicit inventory
+індексу metadata, зовнішні адаптери поки не підтримують aggregate. Інвентаризація не змінює StorageAdapter
+Protocol: необов’язкова локальна capability `object_statistics` не є вимогою до сторонніх адаптерів.
+API не приписує стан обробки матеріалу: це власність оркестратора.
+
+
+Звичайний ConnectionTest не виконує inventory; його ok залишається результатом health.
+Фонова statistics_check_failed зберігає успішну availability available та null counts.
+Job read/cancel доступні handler:invoke, handler:test або connections:write; створення status check —
+connections:write. JobRunner застосовує concurrency/queue/timeout/retention budgets.
+
+Звичайний `POST /v1/connections/{id}/test` також оновлює availability/checked_at у cached snapshot, але скидає statistics до `null` із причиною `not_checked`, оскільки не виконує inventory. Щоб знову отримати counts/bytes, запускайте `POST /v1/storage-status/checks`.
+
+## Необов’язкове виявлення результатів і статистика
+
+Основний протокол `StorageAdapter` залишається зворотно сумісним. `EntityDiscoveryAdapter` додає `list_entity_types(scope, cursor, limit)` і `search_entities(entity_type, search, scope, updated_since, cursor, limit)`. PostgreSQL і файловий адаптер реалізують їх; інші адаптери не оголошують ці можливості. API повертає `501 not_implemented` для відсутньої можливості; клієнт може переглядати відомий тип звичайним `list_entities`.
+
+Каталог містить лише реально наявні актуальні стани, кількість — усі стани цього типу у вибраній області. Пошук буквального підрядка виконується в адаптері до пагінації у `canonical_key`, `key`, `fields`, без урахування регістру. `scope` ніколи автоматично не виводиться з ідентифікатора джерела або запуску. Курсор використовується лише з тими самими фільтрами.
+
+Необов’язковий `StorageStatisticsAdapter` описує `object_statistics` й `entity_statistics`. Фонова перевірка розділяє об’єкти та сутності. Байти об’єктів — розмір вмісту; байти сутностей мають `size_basis`: фізична таблиця PostgreSQL з індексами або файли документів станів. Історія, доставки й загальний розмір диска не підмінюють ці величини. Непідтримувані чи недоступні значення — `null` із `unavailable_reason`.

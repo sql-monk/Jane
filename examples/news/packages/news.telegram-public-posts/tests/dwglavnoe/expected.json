@@ -1,0 +1,20 @@
+{
+  "entities": [
+    {
+      "entity_type": "article",
+      "fields": {
+        "channel": "dwglavnoe",
+        "message_id": 69500,
+        "url": "https://t.me/dwglavnoe/69500",
+        "title": "📣 Трамп призвал к уходу Зеленского с поста президента Украины. Первые реакции: 🔹 Андрей Сибига, глава МИД Украины:",
+        "text": "📣 Трамп призвал к уходу Зеленского с поста президента Украины. Первые реакции: 🔹 Андрей Сибига, глава МИД Украины:",
+        "source_name": "DW Главное",
+        "source_kind": "telegram",
+        "transport": "telegram_public_web",
+        "region": "europe",
+        "language": "ru",
+        "published_at": "2026-10-10T19:50:10Z"
+      }
+    }
+  ]
+}

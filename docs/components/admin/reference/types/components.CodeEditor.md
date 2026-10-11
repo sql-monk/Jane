@@ -7,7 +7,7 @@
 ### Компонент `CodeEditor`
 
 ```typescript
-function CodeEditor({ value, onChange, language, label, readOnly, minHeight, }: { value: string; onChange?: (value: string) => void; language: import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src/components/CodeEditor").EditorLanguage; label: string; readOnly?: boolean; minHeight?: string; }): React.JSX.Element
+function CodeEditor({ value, onChange, language, label, readOnly, minHeight, }: { value: string; onChange?: (value: string) => void; language: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/components/CodeEditor").EditorLanguage; label: string; readOnly?: boolean; minHeight?: string; }): React.JSX.Element
 ```
 
 CodeMirror 6 editor. Uncontrolled inside, synchronised from `value` when it changes from outside (e.g. another file is opened). `label` becomes the accessible name of the editing surface.
@@ -19,7 +19,7 @@ CodeMirror 6 editor. Uncontrolled inside, synchronised from `value` when it chan
 ### Функція `languageOfPath`
 
 ```typescript
-function languageOfPath(path: string): import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src/components/CodeEditor").EditorLanguage
+function languageOfPath(path: string): import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/components/CodeEditor").EditorLanguage
 ```
 
 Код: [CodeEditor.tsx:58](../../../../../web/admin/src/components/CodeEditor.tsx#L58).

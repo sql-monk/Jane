@@ -1,0 +1,35 @@
+{
+  "schema_version": "1",
+  "package_id": "catalog.yakaboo-catalog-rules",
+  "version": "1.1.1",
+  "kind": "collector-rules",
+  "title": "yakaboo.ua: full assortment from sitemap",
+  "description": "Повний асортимент із динамічного sitemap index, оголошеного в robots.txt; усі вкладені sitemap, лише українські товарні URL без category/filter/author/brand сторінок. Жодного фіксованого списку розділів чи номерів sitemap. Обхід продовжується між обмеженими запусками; ціна й характеристики повторно читаються після інтервалу revisit.",
+  "tags": [
+    "catalog",
+    "yakaboo",
+    "books"
+  ],
+  "entry": {
+    "collector": "web",
+    "rules": "rules.json"
+  },
+  "tests": [],
+  "provenance": {
+    "created_by": "llm",
+    "authors": [
+      "Claude (examples/sites: yakaboo)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Повний асортимент із динамічного sitemap index, оголошеного в robots.txt; усі вкладені sitemap, лише українські товарні URL без category/filter/author/brand сторінок. Жодного фіксованого списку розділів чи номерів sitemap. Обхід продовжується між обмеженими запусками; ціна й характеристики повторно читаються після інтервалу revisit. Reproducible Git LF bytes: normalize CRLF to LF without behavior changes.",
+    "based_on": {
+      "package_id": "catalog.yakaboo-catalog-rules",
+      "version": "1.1.0"
+    },
+    "llm": {
+      "provider": "OpenAI",
+      "model": "Codex",
+      "reason": "improvement"
+    }
+  }
+}

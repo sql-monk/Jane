@@ -10,7 +10,7 @@
 |---|---|---|---|
 | [`jane_contracts`](jane_contracts.md) | 0 | 0 | Jane internal interface contracts (plan.md WP-00). |
 | [`jane_contracts.discovery`](jane_contracts.discovery.md) | 9 | 0 | Material discovery strategy contract for the Web Collector. |
-| [`jane_contracts.storage_adapter`](jane_contracts.storage_adapter.md) | 11 | 1 | Storage adapter contract for the storage handler. |
+| [`jane_contracts.storage_adapter`](jane_contracts.storage_adapter.md) | 13 | 1 | Storage adapter contract for the storage handler. |
 
 ## Покажчик
 
@@ -24,6 +24,7 @@
 | [`DiscoveredUrl`](jane_contracts.discovery.md#клас-discoveredurl) | dataclass (незмінний) | `jane_contracts.discovery` |
 | [`DiscoveryContext`](jane_contracts.discovery.md#клас-discoverycontext) | протокол | `jane_contracts.discovery` |
 | [`DiscoveryStrategy`](jane_contracts.discovery.md#клас-discoverystrategy) | протокол | `jane_contracts.discovery` |
+| [`EntityDiscoveryAdapter`](jane_contracts.storage_adapter.md#клас-entitydiscoveryadapter) | протокол | `jane_contracts.storage_adapter` |
 | [`EntitySnapshot`](jane_contracts.storage_adapter.md#клас-entitysnapshot) | dataclass (незмінний) | `jane_contracts.storage_adapter` |
 | [`FetchedResource`](jane_contracts.discovery.md#клас-fetchedresource) | dataclass (незмінний) | `jane_contracts.discovery` |
 | [`FetchRejected`](jane_contracts.discovery.md#клас-fetchrejected) | виняток | `jane_contracts.discovery` |
@@ -36,4 +37,5 @@
 | [`RefreshingStrategy`](jane_contracts.discovery.md#клас-refreshingstrategy) | протокол | `jane_contracts.discovery` |
 | [`ResolvedConnection`](jane_contracts.storage_adapter.md#клас-resolvedconnection) | dataclass (незмінний) | `jane_contracts.storage_adapter` |
 | [`StorageAdapter`](jane_contracts.storage_adapter.md#клас-storageadapter) | протокол | `jane_contracts.storage_adapter` |
+| [`StorageStatisticsAdapter`](jane_contracts.storage_adapter.md#клас-storagestatisticsadapter) | протокол | `jane_contracts.storage_adapter` |
 | [`StrategyRegistry`](jane_contracts.discovery.md#клас-strategyregistry) | протокол | `jane_contracts.discovery` |

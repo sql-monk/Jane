@@ -1,0 +1,262 @@
+{
+  "site": "rst.ua",
+  "status": "verified",
+  "package": {
+    "package_id": "autos.rst-car-ads",
+    "version": "1.1.0"
+  },
+  "rules": {
+    "package_id": "autos.rst-rules",
+    "version": "1.1.0"
+  },
+  "checks": {
+    "local_sdk_cases_passed": 11,
+    "entity_schema_errors": 0,
+    "verified_live_entities": 3,
+    "sha256_checked": true,
+    "manifest_and_rules_valid": true,
+    "legacy_exact_cases_preserved": true,
+    "omitted_unavailable_fields": true,
+    "configured_limits_checked": true
+  },
+  "samples": [
+    {
+      "source": {
+        "requested_url": "https://rst.ua/ukr/oldcars/gmc/acadia/gmc_acadia_15481914.html",
+        "fetched_at": "2026-10-11T03:46:45.730356+00:00",
+        "status": 200,
+        "final_url": "https://rst.ua/ukr/oldcars/gmc/acadia/gmc_acadia_15481914.html",
+        "redirect_history": [],
+        "content_type": "text/html; charset=CP1251",
+        "encoding": "cp1251",
+        "bytes": 37673,
+        "sha256": "5a933dc21d68c701a4706f975691d7f012361221576158a6e694b8a3a84a2b6d",
+        "title": "Продаю GMC Acadia Denali з пробігом на RST. Авто базар на РСТ. Київ Володимир, 15481914"
+      },
+      "fields": {
+        "site": "rst.ua",
+        "ad_id": "15481914",
+        "url": "https://rst.ua/ukr/oldcars/gmc/acadia/gmc_acadia_15481914.html",
+        "title": "GMC Acadia Denali",
+        "price": 43000,
+        "currency": "USD",
+        "price_usd": 43000,
+        "price_uah": 1937200,
+        "make": "GMC",
+        "model": "Acadia",
+        "status": "active",
+        "condition": "used",
+        "year": 2025,
+        "mileage_km": 33000,
+        "region": "Київська область",
+        "city": "Київ",
+        "engine_l": 2.5,
+        "fuel": "petrol",
+        "transmission": "automatic",
+        "drive": "awd",
+        "body_type": "suv",
+        "color": "білий",
+        "description": "GMC Acadia Denali 2025 | AWD | 2.5 Turbo | 35 тис. км | Максимальна комплектація • Продається GMC Acadia Denali 2025 року нового покоління — великий, потужний та технологічний преміальний SUV. Максимальна комплектація Denali, повний привід AWD, 2.5 Turbo • VIN: 1GKENRRS5SJ150638 — відкритий для будь-яких перевірок • Оснащення Denali • повний привід AWD • 2.5-літровий турбодвигун • автоматична коробка передач • преміальний шкіряний салон Denali • перфорована шкіра та фірмова прострочка • електро…",
+        "raw_specs": {
+          "рік": "2025",
+          "пробiг": "33'000 km",
+          "двигун": "2.5 • Бензин",
+          "КПП": "Автомат • Повний пр.",
+          "кузов": "Позашляховик Білий"
+        },
+        "trim": "Denali",
+        "description_full": "GMC Acadia Denali 2025 | AWD | 2.5 Turbo | 35 тис. км | Максимальна комплектація • Продається GMC Acadia Denali 2025 року нового покоління — великий, потужний та технологічний преміальний SUV. Максимальна комплектація Denali, повний привід AWD, 2.5 Turbo • VIN: 1GKENRRS5SJ150638 — відкритий для будь-яких перевірок • Оснащення Denali • повний привід AWD • 2.5-літровий турбодвигун • автоматична коробка передач • преміальний шкіряний салон Denali • перфорована шкіра та фірмова прострочка • електрорегулювання передніх сидінь • підігрів та вентиляція передніх сидінь • підігрів керма • чорна стеля • великий вертикальний мультимедійний дисплей • цифрова панель приладів • навігація / Google Maps • Apple CarPlay / Android Auto • бездротова зарядка • багатозонний клімат-контроль • адаптивний круїз-контроль • камери кругового огляду • контроль сліпих зон • утримання в смузі руху • системи попередження та запобігання зіткненням • парктроніки • безключовий доступ • запуск двигуна кнопкою • електропривід кришки багажника • LED-оптика • оригінальні багатоспицеві диски Denali 20 • три ряди сидінь • трансформація задніх сидінь та великий багажний відсік.",
+        "vin": "1GKENRRS5SJ150638",
+        "equipment": [
+          "повний привід AWD",
+          "2.5-літровий турбодвигун",
+          "автоматична коробка передач",
+          "преміальний шкіряний салон Denali",
+          "перфорована шкіра та фірмова прострочка",
+          "електрорегулювання передніх сидінь",
+          "підігрів та вентиляція передніх сидінь",
+          "підігрів керма",
+          "чорна стеля",
+          "великий вертикальний мультимедійний дисплей",
+          "цифрова панель приладів",
+          "навігація / Google Maps",
+          "Apple CarPlay / Android Auto",
+          "бездротова зарядка",
+          "багатозонний клімат-контроль",
+          "адаптивний круїз-контроль",
+          "камери кругового огляду",
+          "контроль сліпих зон",
+          "утримання в смузі руху",
+          "системи попередження та запобігання зіткненням",
+          "парктроніки",
+          "безключовий доступ",
+          "запуск двигуна кнопкою",
+          "електропривід кришки багажника",
+          "LED-оптика",
+          "оригінальні багатоспицеві диски Denali 20",
+          "три ряди сидінь",
+          "трансформація задніх сидінь та великий багажний відсік."
+        ],
+        "photos": [
+          "https://i2.rst.ua/oldcars/gmc/acadia/15481914-14.jpg",
+          "https://i2.rst.ua/oldcars/gmc/acadia/15481914-23.jpg",
+          "https://i2.rst.ua/oldcars/gmc/acadia/15481914-15.jpg",
+          "https://i2.rst.ua/oldcars/gmc/acadia/15481914-16.jpg",
+          "https://i2.rst.ua/oldcars/gmc/acadia/15481914-17.jpg",
+          "https://i2.rst.ua/oldcars/gmc/acadia/15481914-18.jpg",
+          "https://i2.rst.ua/oldcars/gmc/acadia/15481914-19.jpg",
+          "https://i2.rst.ua/oldcars/gmc/acadia/15481914-20.jpg",
+          "https://i2.rst.ua/oldcars/gmc/acadia/15481914-21.jpg",
+          "https://i2.rst.ua/oldcars/gmc/acadia/15481914-22.jpg",
+          "https://i2.rst.ua/oldcars/gmc/acadia/15481914-24.jpg"
+        ],
+        "image": "https://i2.rst.ua/oldcars/gmc/acadia/15481914-14.jpg"
+      }
+    },
+    {
+      "source": {
+        "requested_url": "https://rst.ua/ukr/oldcars/mercedes/sprinter/mercedes_sprinter_15307308.html",
+        "fetched_at": "2026-10-11T03:46:45.750754+00:00",
+        "status": 200,
+        "final_url": "https://rst.ua/ukr/oldcars/mercedes/sprinter/mercedes_sprinter_15307308.html",
+        "redirect_history": [],
+        "content_type": "text/html; charset=CP1251",
+        "encoding": "cp1251",
+        "bytes": 34218,
+        "sha256": "da789efbccdaeb8e596089af5ef8f092e26742c57ab586d6a7faef489d86d1cb",
+        "title": "Продам MERCEDES Sprinter  в Харкові на RST. Оголошення авто базару Харкова на РСТ Миха, 15307308"
+      },
+      "fields": {
+        "site": "rst.ua",
+        "ad_id": "15307308",
+        "url": "https://rst.ua/ukr/oldcars/mercedes/sprinter/mercedes_sprinter_15307308.html",
+        "title": "MERCEDES Sprinter",
+        "price": 37000,
+        "currency": "USD",
+        "price_usd": 37000,
+        "price_uah": 1666900,
+        "make": "MERCEDES",
+        "model": "Sprinter",
+        "status": "active",
+        "condition": "used",
+        "year": 2021,
+        "mileage_km": 521000,
+        "region": "Харківська область",
+        "city": "Харків",
+        "engine_l": 2.0,
+        "fuel": "diesel",
+        "transmission": "automatic",
+        "drive": "rear",
+        "body_type": "minibus",
+        "color": "білий",
+        "description": "Легковой 8 + 1 все в полном порядке два климата по роботе коробке двигателя ходовой идеально, любое ваше сто любые проверки",
+        "raw_specs": {
+          "рік": "2021 • 5 років",
+          "пробiг": "521'000 km • 104 тис/рік",
+          "двигун": "2.0 • Дизель",
+          "КПП": "Автомат • Задній пр.",
+          "кузов": "Мікробус пасажир Білий"
+        },
+        "description_full": "Легковой 8 + 1 все в полном порядке два климата по роботе коробке двигателя ходовой идеально, любое ваше сто любые проверки",
+        "photos": [
+          "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-18.jpg",
+          "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-14.jpg",
+          "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-7.jpg",
+          "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-13.jpg",
+          "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-15.jpg",
+          "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-8.jpg",
+          "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-9.jpg",
+          "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-10.jpg",
+          "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-16.jpg",
+          "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-17.jpg",
+          "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-19.jpg"
+        ],
+        "image": "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-18.jpg",
+        "vin_masked": "W1V*****352202",
+        "registration_history": [
+          "В Україні з 01.03.2024",
+          "2-й власник в Укр.",
+          "2 роки у власника"
+        ]
+      }
+    },
+    {
+      "source": {
+        "requested_url": "https://rst.ua/ukr/oldcars/nissan/qashqai/nissan_qashqai_15487251.html",
+        "fetched_at": "2026-10-11T03:46:45.793252+00:00",
+        "status": 200,
+        "final_url": "https://rst.ua/ukr/oldcars/nissan/qashqai/nissan_qashqai_15487251.html",
+        "redirect_history": [],
+        "content_type": "text/html; charset=CP1251",
+        "encoding": "cp1251",
+        "bytes": 35142,
+        "sha256": "c188611017c64d84f0de52001d54f619ff75595093df851b991b5f8a372a03ec",
+        "title": "Продам б.в. автомобіль NISSAN Qashqai  на RST. Ціна NISSAN Qashqai , купити б/у авто на РСТ. Охтирка 0503345848, 15487251"
+      },
+      "fields": {
+        "site": "rst.ua",
+        "ad_id": "15487251",
+        "url": "https://rst.ua/ukr/oldcars/nissan/qashqai/nissan_qashqai_15487251.html",
+        "title": "NISSAN Qashqai",
+        "price": 6950,
+        "currency": "USD",
+        "price_usd": 6950,
+        "price_uah": 313100,
+        "make": "NISSAN",
+        "model": "Qashqai",
+        "status": "active",
+        "condition": "used",
+        "year": 2007,
+        "mileage_km": 255000,
+        "region": "Сумська область",
+        "city": "Охтирка",
+        "engine_l": 2.0,
+        "fuel": "petrol_gas",
+        "transmission": "manual",
+        "drive": "front",
+        "body_type": "suv",
+        "color": "чорний",
+        "description": "Продам Nissan Qashqai 2007 року • Надійний та комфортний кросовер для міста і поїздок за місто. Двигун 2.0 бензин + газ — гарне поєднання потужності та економічності. Передній привід, механічна 6-ступенева коробка передач. Максимальна комплектація, є все необхідне для комфортної їзди • Автомобіль на новій зимовій гумі. Двигун працює добре, коробка перемикає чітко. Хороший варіант для тих, хто шукає практичний та місткий автомобіль • Телефонуйте та приїжджайте на огляд!",
+        "raw_specs": {
+          "рік": "2007 • 19 років",
+          "пробiг": "255'000 km • 13 тис/рік",
+          "двигун": "2.0 • Газ/Бензин",
+          "КПП": "Механіка • Передній пр.",
+          "кузов": "Позашляховик Чорний"
+        },
+        "description_full": "Продам Nissan Qashqai 2007 року • Надійний та комфортний кросовер для міста і поїздок за місто. Двигун 2.0 бензин + газ — гарне поєднання потужності та економічності. Передній привід, механічна 6-ступенева коробка передач. Максимальна комплектація, є все необхідне для комфортної їзди • Автомобіль на новій зимовій гумі. Двигун працює добре, коробка перемикає чітко. Хороший варіант для тих, хто шукає практичний та місткий автомобіль • Телефонуйте та приїжджайте на огляд!",
+        "photos": [
+          "https://i1.rst.ua/oldcars/nissan/qashqai/15487251-1.jpg",
+          "https://i1.rst.ua/oldcars/nissan/qashqai/15487251-2.jpg",
+          "https://i1.rst.ua/oldcars/nissan/qashqai/15487251-3.jpg",
+          "https://i1.rst.ua/oldcars/nissan/qashqai/15487251-4.jpg",
+          "https://i1.rst.ua/oldcars/nissan/qashqai/15487251-5.jpg",
+          "https://i1.rst.ua/oldcars/nissan/qashqai/15487251-6.jpg",
+          "https://i1.rst.ua/oldcars/nissan/qashqai/15487251-7.jpg",
+          "https://i1.rst.ua/oldcars/nissan/qashqai/15487251-8.jpg",
+          "https://i1.rst.ua/oldcars/nissan/qashqai/15487251-9.jpg",
+          "https://i1.rst.ua/oldcars/nissan/qashqai/15487251-10.jpg",
+          "https://i1.rst.ua/oldcars/nissan/qashqai/15487251-11.jpg",
+          "https://i1.rst.ua/oldcars/nissan/qashqai/15487251-12.jpg",
+          "https://i1.rst.ua/oldcars/nissan/qashqai/15487251-13.jpg"
+        ],
+        "image": "https://i1.rst.ua/oldcars/nissan/qashqai/15487251-1.jpg"
+      }
+    }
+  ],
+  "limitations": [
+    "Оснащення, опис та історія реєстрації є твердженнями продавця/сайту, а не незалежною перевіркою автомобіля.",
+    "Прихований VIN не відновлюється. Платні або приховані звіти й телефони не отримуються.",
+    "GMC: структурований пробіг 33000 км, опис продавця містить 35 тис. км; обидва значення збережені без підміни."
+  ],
+  "runtime_cli_test": {
+    "passed": 11,
+    "failed": 0,
+    "package": {
+      "package_id": "autos.rst-car-ads",
+      "version": "1.1.0",
+      "digest": "sha256:604aa3b772b859a30c4296b27802db527734de8cff3ac348b6616109719db7ea"
+    },
+    "backend": "subprocess, local trusted-code validation"
+  }
+}

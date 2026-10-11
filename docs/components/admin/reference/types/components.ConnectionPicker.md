@@ -12,4 +12,4 @@ function ConnectionPicker({ label, value, onChange, }: { label: string; value: s
 
 Picks a platform connection (orchestrator registry) by id; free text is allowed as well.
 
-Код: [ConnectionPicker.tsx:7](../../../../../web/admin/src/components/ConnectionPicker.tsx#L7).
+Код: [ConnectionPicker.tsx:8](../../../../../web/admin/src/components/ConnectionPicker.tsx#L8).

@@ -2,9 +2,11 @@
 
 > Згенеровано `scripts/docs_reference.py` з [services/web-collector/src/jane_web_collector/render.py](../../../../../services/web-collector/src/jane_web_collector/render.py). Не редагуйте вручну.
 
-JavaScript rendering of pages (``fetch.render_js`` of the collector rules) in headless Chromium (Playwright).
+Browser document transport and JavaScript rendering in headless Chromium (Playwright).
 
-The page itself is never requested by the browser. :class:`~.fetcher.Fetcher` fetches it first, with every guarantee of a plain fetch: scope and robots.txt before, each redirect hop re-checked, the outbound address policy, per-host limits, retries, ``crawl.max_material_bytes``, the User-Agent and the credentials of a managed connection. Only a 2xx HTML answer is rendered: the first navigation of the browser page is answered with the fetched body (``route.fulfill``), any later navigation of a top-level frame (a script redirect, a meta refresh, a reload, a popup) is answered ``204 No Content`` - the navigation does not happen and the document stays - so the DOM is the DOM of the URL that passed the checks.
+``fetch.transport=browser`` fetches each document with Chromium's network stack and JavaScript disabled. Response-stage interception prevents automatic redirects, so the outer Fetcher checks every next hop. Subresources are blocked; the material contains the original response bytes. Connections use EgressProxy.
+
+For ``fetch.render_js`` the page has already been fetched. :class:`~.fetcher.Fetcher` fetches it first, with every guarantee of a plain fetch: scope and robots.txt before, each redirect hop re-checked, the outbound address policy, per-host limits, retries, ``crawl.max_material_bytes``, the User-Agent and the credentials of a managed connection. Only a 2xx HTML answer is rendered: the first navigation of the browser page is answered with the fetched body (``route.fulfill``), any later navigation of a top-level frame (a script redirect, a meta refresh, a reload, a popup) is answered ``204 No Content`` - the navigation does not happen and the document stays - so the DOM is the DOM of the URL that passed the checks.
 
 Everything else the browser loads (scripts, XHR/fetch, styles, frames, WebSockets) goes through :class:`EgressProxy` - an HTTP proxy on 127.0.0.1, one per page - which applies the fetch client's :class:`~.egress.EgressPolicy` to every connection the same way :class:`~.egress.GuardedBackend` does: the host is resolved once, every address is checked, the connection is opened to a checked address (no DNS rebinding). On top of that (``RENDER_DENY_PRIVATE``, default on) a non-public address is refused unless the host is the page's own or in the rules' ``scope.allowed_domains``: a page script cannot reach internal services the caller did not choose. Playwright sends loopback through the proxy as well (``<-loopback>``), service workers are blocked and WebRTC may use proxied traffic only. Requests of the resource types in ``RENDER_BLOCK_RESOURCE_TYPES`` are not made at all. One page may download ``collector.render_max_transfer_bytes``; the browser sends the collector's User-Agent and never the connection credentials.
 
@@ -25,7 +27,7 @@ The material is the serialized DOM (doctype + ``document.documentElement.outerHT
 |---|---|
 | Вид | клас |
 | Модуль | `jane_web_collector.render` |
-| Код | [render.py:121](../../../../../services/web-collector/src/jane_web_collector/render.py#L121) |
+| Код | [render.py:128](../../../../../services/web-collector/src/jane_web_collector/render.py#L128) |
 
 ```python
 class EgressProxy: ...
@@ -51,7 +53,7 @@ def __init__(
 
 ``private_allowed``: with it, a non-public address is refused unless this says yes for the host (the page's own host and ``scope.allowed_domains``, ``RENDER_DENY_PRIVATE``); ``policy`` applies to every host.
 
-Код: [render.py:129](../../../../../services/web-collector/src/jane_web_collector/render.py#L129).
+Код: [render.py:136](../../../../../services/web-collector/src/jane_web_collector/render.py#L136).
 
 #### Метод `EgressProxy.start`
 
@@ -59,7 +61,7 @@ def __init__(
 async def start(self) -> str: ...
 ```
 
-Код: [render.py:155](../../../../../services/web-collector/src/jane_web_collector/render.py#L155).
+Код: [render.py:162](../../../../../services/web-collector/src/jane_web_collector/render.py#L162).
 
 #### Метод `EgressProxy.aclose`
 
@@ -67,7 +69,7 @@ async def start(self) -> str: ...
 async def aclose(self) -> None: ...
 ```
 
-Код: [render.py:161](../../../../../services/web-collector/src/jane_web_collector/render.py#L161).
+Код: [render.py:168](../../../../../services/web-collector/src/jane_web_collector/render.py#L168).
 
 #### Метод `EgressProxy.precheck`
 
@@ -77,7 +79,7 @@ async def precheck(self, url: str) -> str | None: ...
 
 Why the outbound policy refuses ``url`` (``None``: allowed, or left to the proxy). The page router aborts a refused request with its URL before the browser connects; the proxy still checks every connection, so a DNS answer that changes after this check changes nothing. One resolution per host and port of a page.
 
-Код: [render.py:173](../../../../../services/web-collector/src/jane_web_collector/render.py#L173).
+Код: [render.py:180](../../../../../services/web-collector/src/jane_web_collector/render.py#L180).
 
 #### Метод `EgressProxy.check`
 
@@ -89,7 +91,7 @@ The policy of the fetch client, then (``RENDER_DENY_PRIVATE``) no non-public add
 
 Винятки в коді методу: `EgressDenied`.
 
-Код: [render.py:198](../../../../../services/web-collector/src/jane_web_collector/render.py#L198).
+Код: [render.py:205](../../../../../services/web-collector/src/jane_web_collector/render.py#L205).
 
 ### Клас `RenderOptions`
 
@@ -97,7 +99,7 @@ The policy of the fetch client, then (``RENDER_DENY_PRIVATE``) no non-public add
 |---|---|
 | Вид | dataclass (незмінний) |
 | Модуль | `jane_web_collector.render` |
-| Код | [render.py:349](../../../../../services/web-collector/src/jane_web_collector/render.py#L349) |
+| Код | [render.py:356](../../../../../services/web-collector/src/jane_web_collector/render.py#L356) |
 
 ```python
 @dataclass(frozen=True)
@@ -124,7 +126,7 @@ Service-level rendering settings (``JANE_WEB_COLLECTOR_RENDER_*``).
 |---|---|
 | Вид | клас |
 | Модуль | `jane_web_collector.render` |
-| Код | [render.py:371](../../../../../services/web-collector/src/jane_web_collector/render.py#L371) |
+| Код | [render.py:378](../../../../../services/web-collector/src/jane_web_collector/render.py#L378) |
 
 ```python
 class Renderer: ...
@@ -149,7 +151,7 @@ def __init__(
 
 ``launch_timeout_ms`` / ``close_timeout_ms``: ``collector.render_launch_timeout_ms`` / ``collector.render_close_timeout_ms`` (their defaults when not given).
 
-Код: [render.py:374](../../../../../services/web-collector/src/jane_web_collector/render.py#L374).
+Код: [render.py:381](../../../../../services/web-collector/src/jane_web_collector/render.py#L381).
 
 #### Метод `Renderer.unavailable_reason`
 
@@ -159,7 +161,7 @@ def unavailable_reason(self) -> str | None: ...
 
 Why rendering cannot work here, known without starting the browser.
 
-Код: [render.py:401](../../../../../services/web-collector/src/jane_web_collector/render.py#L401).
+Код: [render.py:408](../../../../../services/web-collector/src/jane_web_collector/render.py#L408).
 
 #### Метод `Renderer.capabilities`
 
@@ -169,7 +171,7 @@ def capabilities(self) -> dict[str, Any]: ...
 
 ``/v1/info`` capabilities: ``render_js`` and, when it is false, why.
 
-Код: [render.py:409](../../../../../services/web-collector/src/jane_web_collector/render.py#L409).
+Код: [render.py:416](../../../../../services/web-collector/src/jane_web_collector/render.py#L416).
 
 #### Метод `Renderer.aclose`
 
@@ -177,7 +179,29 @@ def capabilities(self) -> dict[str, Any]: ...
 async def aclose(self) -> None: ...
 ```
 
-Код: [render.py:414](../../../../../services/web-collector/src/jane_web_collector/render.py#L414).
+Код: [render.py:421](../../../../../services/web-collector/src/jane_web_collector/render.py#L421).
+
+#### Метод `Renderer.fetch`
+
+```python
+async def fetch(
+    self,
+    url: str,
+    *,
+    headers: Mapping[str, str],
+    max_bytes: int,
+    limits: ServiceLimits,
+    timeouts: Timeouts | None = None,
+) -> tuple[int, dict[str, str], bytes, bool, int]: ...
+```
+
+Fetch one GET document with Chromium's network stack, without JavaScript.
+
+Redirect targets and subresources never reach the network in this context. The outer Fetcher handles each redirect as a separate request after checking scope, robots and host limits. Every network connection uses the existing proxy with checked, pinned DNS addresses.
+
+Винятки в коді методу: `EgressDenied`, `FetchError`.
+
+Код: [render.py:493](../../../../../services/web-collector/src/jane_web_collector/render.py#L493).
 
 #### Метод `Renderer.render`
 
@@ -197,7 +221,7 @@ The fetched HTML ``result`` rendered by the browser: the same result with the se
 
 ``allowed_hosts``: hosts of ``scope.allowed_domains`` - with the page's own host the only ones the browser may reach at a non-public address (``RENDER_DENY_PRIVATE``). Raises :class:`~.fetcher.FetchError`: ``not_implemented`` (no browser), ``timeout`` (the DOM could not be taken in time), ``internal_error`` (the browser failed).
 
-Код: [render.py:467](../../../../../services/web-collector/src/jane_web_collector/render.py#L467).
+Код: [render.py:639](../../../../../services/web-collector/src/jane_web_collector/render.py#L639).
 
 ## Функції
 
@@ -209,4 +233,4 @@ def renderable(result: HttpResult) -> bool: ...
 
 A 2xx HTML answer: the only kind of fetched document that is rendered.
 
-Код: [render.py:96](../../../../../services/web-collector/src/jane_web_collector/render.py#L96).
+Код: [render.py:103](../../../../../services/web-collector/src/jane_web_collector/render.py#L103).

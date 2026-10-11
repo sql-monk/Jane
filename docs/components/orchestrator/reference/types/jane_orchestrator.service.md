@@ -12,7 +12,7 @@ Management operations behind ``orchestrator.v1``: sources, tasks, runs, connecti
 |---|---|
 | Вид | клас |
 | Модуль | `jane_orchestrator.service` |
-| Код | [service.py:63](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L63) |
+| Код | [service.py:102](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L102) |
 
 ```python
 class Admin: ...
@@ -24,7 +24,7 @@ class Admin: ...
 def __init__(self, core: Core) -> None: ...
 ```
 
-Код: [service.py:64](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L64).
+Код: [service.py:103](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L103).
 
 #### Метод `Admin.create_source`
 
@@ -34,7 +34,7 @@ def create_source(self, doc: Mapping[str, Any], actor: str) -> tuple[dict[str, A
 
 Винятки в коді методу: `Conflict`.
 
-Код: [service.py:110](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L110).
+Код: [service.py:149](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L149).
 
 #### Метод `Admin.get_source`
 
@@ -44,7 +44,7 @@ def get_source(self, source_id: str) -> tuple[dict[str, Any], int]: ...
 
 Винятки в коді методу: `NotFound`.
 
-Код: [service.py:123](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L123).
+Код: [service.py:162](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L162).
 
 #### Метод `Admin.replace_source`
 
@@ -60,7 +60,7 @@ def replace_source(
 
 Винятки в коді методу: `ValidationFailed`, `NotFound`.
 
-Код: [service.py:130](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L130).
+Код: [service.py:169](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L169).
 
 #### Метод `Admin.delete_source`
 
@@ -70,7 +70,7 @@ def delete_source(self, source_id: str, actor: str) -> None: ...
 
 Винятки в коді методу: `NotFound`, `Conflict`.
 
-Код: [service.py:155](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L155).
+Код: [service.py:195](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L195).
 
 #### Метод `Admin.list_sources`
 
@@ -83,7 +83,7 @@ def list_sources(
 ) -> tuple[list[dict[str, Any]], str | None]: ...
 ```
 
-Код: [service.py:168](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L168).
+Код: [service.py:208](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L208).
 
 #### Метод `Admin.validate_task`
 
@@ -93,7 +93,7 @@ def validate_task(self, doc: Any) -> dict[str, Any]: ...
 
 ``TaskValidation``: schema + DAG + references (never raises for an invalid config).
 
-Код: [service.py:191](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L191).
+Код: [service.py:231](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L231).
 
 #### Метод `Admin.create_task`
 
@@ -103,7 +103,7 @@ def create_task(self, doc: Mapping[str, Any], actor: str) -> tuple[dict[str, Any
 
 Винятки в коді методу: `Conflict`.
 
-Код: [service.py:247](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L247).
+Код: [service.py:287](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L287).
 
 #### Метод `Admin.get_task_row`
 
@@ -113,7 +113,7 @@ def get_task_row(self, conn: Any, task_id: str, lock: bool = False) -> dict[str,
 
 Винятки в коді методу: `NotFound`.
 
-Код: [service.py:261](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L261).
+Код: [service.py:301](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L301).
 
 #### Метод `Admin.get_task`
 
@@ -121,7 +121,7 @@ def get_task_row(self, conn: Any, task_id: str, lock: bool = False) -> dict[str,
 def get_task(self, task_id: str) -> tuple[dict[str, Any], int]: ...
 ```
 
-Код: [service.py:272](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L272).
+Код: [service.py:312](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L312).
 
 #### Метод `Admin.replace_task`
 
@@ -137,7 +137,7 @@ def replace_task(
 
 Винятки в коді методу: `ValidationFailed`.
 
-Код: [service.py:277](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L277).
+Код: [service.py:317](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L317).
 
 #### Метод `Admin.delete_task`
 
@@ -147,7 +147,7 @@ def delete_task(self, task_id: str, actor: str) -> None: ...
 
 Винятки в коді методу: `Conflict`.
 
-Код: [service.py:304](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L304).
+Код: [service.py:343](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L343).
 
 #### Метод `Admin.list_tasks`
 
@@ -164,7 +164,7 @@ def list_tasks(
 
 Винятки в коді методу: `ValidationFailed`.
 
-Код: [service.py:336](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L336).
+Код: [service.py:375](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L375).
 
 #### Метод `Admin.start_run`
 
@@ -178,7 +178,7 @@ def start_run(
 ) -> dict[str, Any]: ...
 ```
 
-Код: [service.py:408](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L408).
+Код: [service.py:447](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L447).
 
 #### Метод `Admin.start_reprocessing`
 
@@ -193,7 +193,7 @@ def start_reprocessing(
 
 Винятки в коді методу: `ValidationFailed`, `ServiceUnavailable`.
 
-Код: [service.py:431](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L431).
+Код: [service.py:470](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L470).
 
 #### Метод `Admin.list_activations`
 
@@ -209,7 +209,7 @@ def list_activations(
 
 Винятки в коді методу: `NotFound`.
 
-Код: [service.py:479](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L479).
+Код: [service.py:518](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L518).
 
 #### Метод `Admin.activate`
 
@@ -227,7 +227,7 @@ Read → check in the registry (no DB lock held during network calls) → write 
 
 Винятки в коді методу: `ValidationFailed`, `AccessDeniedByPolicy`, `Conflict`, `JaneError`, `NotFound`.
 
-Код: [service.py:510](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L510).
+Код: [service.py:549](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L549).
 
 #### Метод `Admin.list_problem_groups`
 
@@ -238,10 +238,11 @@ def list_problem_groups(
     status: str | None,
     cursor: str | None,
     limit: int,
+    group_id: str | None = None,
 ) -> tuple[list[dict[str, Any]], str | None]: ...
 ```
 
-Код: [service.py:678](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L678).
+Код: [service.py:720](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L720).
 
 #### Метод `Admin.update_problem_group`
 
@@ -256,7 +257,7 @@ def update_problem_group(
 
 Винятки в коді методу: `NotFound`.
 
-Код: [service.py:700](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L700).
+Код: [service.py:750](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L750).
 
 #### Метод `Admin.list_unknown`
 
@@ -270,7 +271,7 @@ def list_unknown(
 ) -> tuple[list[dict[str, Any]], str | None]: ...
 ```
 
-Код: [service.py:716](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L716).
+Код: [service.py:773](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L773).
 
 #### Метод `Admin.list_connections`
 
@@ -283,7 +284,7 @@ def list_connections(
 ) -> tuple[list[dict[str, Any]], str | None]: ...
 ```
 
-Код: [service.py:792](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L792).
+Код: [service.py:865](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L865).
 
 #### Метод `Admin.get_connection`
 
@@ -293,7 +294,7 @@ def get_connection(self, connection_id: str) -> tuple[dict[str, Any], int]: ...
 
 Винятки в коді методу: `NotFound`.
 
-Код: [service.py:811](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L811).
+Код: [service.py:884](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L884).
 
 #### Метод `Admin.put_connection`
 
@@ -309,7 +310,7 @@ def put_connection(
 
 Винятки в коді методу: `ValidationFailed`, `JaneError`, `PreconditionFailed`.
 
-Код: [service.py:820](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L820).
+Код: [service.py:893](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L893).
 
 #### Метод `Admin.delete_connection`
 
@@ -319,7 +320,7 @@ def delete_connection(self, connection_id: str, actor: str) -> None: ...
 
 Винятки в коді методу: `NotFound`, `Conflict`.
 
-Код: [service.py:868](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L868).
+Код: [service.py:949](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L949).
 
 #### Метод `Admin.get_platform_limits`
 
@@ -327,7 +328,7 @@ def delete_connection(self, connection_id: str, actor: str) -> None: ...
 def get_platform_limits(self) -> tuple[dict[str, Any], int]: ...
 ```
 
-Код: [service.py:898](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L898).
+Код: [service.py:980](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L980).
 
 #### Метод `Admin.put_platform_limits`
 
@@ -340,7 +341,7 @@ def put_platform_limits(
 ) -> tuple[dict[str, Any], int]: ...
 ```
 
-Код: [service.py:902](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L902).
+Код: [service.py:984](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L984).
 
 #### Метод `Admin.effective_limits`
 
@@ -355,7 +356,7 @@ def effective_limits(
 
 Винятки в коді методу: `ValidationFailed`, `NotFound`.
 
-Код: [service.py:925](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L925).
+Код: [service.py:1007](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L1007).
 
 #### Метод `Admin.list_executors`
 
@@ -363,7 +364,7 @@ def effective_limits(
 def list_executors(self) -> list[dict[str, Any]]: ...
 ```
 
-Код: [service.py:960](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L960).
+Код: [service.py:1042](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L1042).
 
 #### Метод `Admin.list_audit`
 
@@ -374,10 +375,12 @@ def list_audit(
     subject_id: str | None,
     cursor: str | None,
     limit: int,
+    since: datetime | None = None,
+    until: datetime | None = None,
 ) -> tuple[list[dict[str, Any]], str | None]: ...
 ```
 
-Код: [service.py:974](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L974).
+Код: [service.py:1056](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L1056).
 
 ### Клас `PreconditionFailed`
 
@@ -386,7 +389,7 @@ def list_audit(
 | Вид | виняток |
 | Модуль | `jane_orchestrator.service` |
 | Успадкування | `JaneError` |
-| Код | [service.py:36](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L36) |
+| Код | [service.py:75](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L75) |
 
 ```python
 class PreconditionFailed(JaneError): ...

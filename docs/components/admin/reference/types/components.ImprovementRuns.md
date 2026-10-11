@@ -7,7 +7,7 @@
 ### Компонент `ImprovementRunList`
 
 ```typescript
-function ImprovementRunList({ filter, label, selected, onOpen, }: { filter: import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src/components/ImprovementRuns").ImprovementRunFilter; label: string; selected?: string | null; onOpen: (jobId: string) => void; }): React.JSX.Element
+function ImprovementRunList({ filter, label, selected, onOpen, }: { filter: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/components/ImprovementRuns").ImprovementRunFilter; label: string; selected?: string | null; onOpen: (jobId: string) => void; }): React.JSX.Element
 ```
 
 Код: [ImprovementRuns.tsx:24](../../../../../web/admin/src/components/ImprovementRuns.tsx#L24).

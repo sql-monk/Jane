@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SCHEMAS, validateAgainst } from "./schema";
+import { SCHEMAS, schemaIssueLabel, validateAgainst } from "./schema";
 import { openapiExample } from "../test/contracts";
 
 describe("contract schema validation", () => {
@@ -40,5 +40,25 @@ describe("contract schema validation", () => {
     for (const template of Object.values(STRATEGY_TEMPLATES)) {
       expect(validateAgainst(SCHEMAS.strategy, template)).toEqual([]);
     }
+  });
+
+  it("explains empty source fields and slug constraints in Ukrainian with technical details kept separate", () => {
+    const issues = validateAgainst(SCHEMAS.source, {
+      source_id: "Invalid Source",
+      kind: "web",
+      title: "",
+      locator: {},
+    });
+    const summary = issues.map(schemaIssueLabel).join(" ");
+    expect(summary).toContain("малі латинські літери");
+    expect(summary).toContain("Назва: Заповніть поле");
+    expect(summary).not.toContain("must");
+    expect(issues.find((issue) => issue.pointer === "/source_id")?.technical).toContain("must match pattern");
+  });
+
+  it("identifies a required schedule field and hides conditional-schema noise", () => {
+    const issues = validateAgainst(SCHEMAS.schedule, { type: "interval" });
+    expect(issues.map(schemaIssueLabel)).toContain("Інтервал у секундах: Заповніть обов’язкове поле");
+    expect(issues.map((issue) => issue.message).join(" ")).not.toContain("then");
   });
 });

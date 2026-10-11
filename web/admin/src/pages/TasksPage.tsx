@@ -5,7 +5,8 @@ import { useApi } from "../app/context";
 import { ifMatch, newIdempotencyKey, unwrap, unwrapWithEtag } from "../api/client";
 import { useCursorList } from "../api/hooks";
 import type { Job, RunRequest, Stage, TaskConfig, TaskValidation } from "../api/types";
-import { DagView } from "../components/DagView";
+import { ChainEditor } from "../components/ChainEditor";
+import { buildDag } from "../lib/dag";
 import { EffectiveLimitsView } from "../components/EffectiveLimitsView";
 import { JsonEditor, checkJson, toJsonText } from "../components/JsonEditor";
 import { ScheduleEditor } from "../components/ScheduleEditor";
@@ -17,6 +18,7 @@ import {
   Loading,
   LoadMore,
   Notice,
+  JsonView,
   Page,
   ReasonAction,
   Section,
@@ -26,6 +28,11 @@ import {
 } from "../components/ui";
 import { SCHEMAS, validateAgainst } from "../lib/schema";
 import { formatDate, refLabel } from "../lib/format";
+import { useUnsavedChanges } from "../components/UnsavedChanges";
+import { EntityPicker } from "../components/EntityPicker";
+import { schemaIssueLabel } from "../lib/schema";
+import { useSourceOptions } from "../lib/pickers";
+import { resultsHref } from "../lib/results-context";
 
 function scheduleLabel(schedule: TaskConfig["schedule"]): string {
   if (!schedule || schedule.type === "manual") return "вручну";
@@ -36,6 +43,7 @@ function scheduleLabel(schedule: TaskConfig["schedule"]): string {
 
 export function TasksPage() {
   const api = useApi();
+  const sources = useSourceOptions();
   const [params, setParams] = useSearchParams();
   const sourceId = params.get("source_id") ?? "";
   const packageId = params.get("package_id") ?? "";
@@ -86,17 +94,20 @@ export function TasksPage() {
             <option value="off">Призупинені</option>
           </select>
         </Field>
-        <Field label="Джерело">
-          <input
-            value={sourceId}
-            onChange={(e) => {
-              const next = new URLSearchParams(params);
-              if (e.target.value) next.set("source_id", e.target.value);
-              else next.delete("source_id");
-              setParams(next);
-            }}
-          />
-        </Field>
+        <EntityPicker
+          label="Джерело"
+          value={sourceId}
+          options={sources.options}
+          loading={sources.isLoading}
+          error={sources.error}
+          onChange={(value) => {
+            const next = new URLSearchParams(params);
+            if (value) next.set("source_id", value);
+            else next.delete("source_id");
+            setParams(next);
+          }}
+        />
+        <LoadMore hasMore={sources.hasMore} loading={sources.loadingMore} onClick={sources.loadMore} />
         {packageId ? (
           <span>
             Прив'язки пакета <code>{packageId}</code>{" "}
@@ -222,23 +233,56 @@ export function TaskPage() {
   const [urlsText, setUrlsText] = useState("");
   const [validation, setValidation] = useState<TaskValidation | null>(null);
   const [saved, setSaved] = useState(false);
+  const [chainValid, setChainValid] = useState(true);
+  const [modified, setDirty] = useState(false);
+  const [baseline, setBaseline] = useState(
+    JSON.stringify([NEW_TASK, toJsonText(NEW_TASK.stages), "", "", ""]),
+  );
+  const snapshot = JSON.stringify([draft, stagesText, limitsText, retriesText, urlsText]);
+  const dirty = modified && snapshot !== baseline;
+  const [submitted, setSubmitted] = useState(false);
+  const sources = useCursorList(["source-options"], (cursor, limit) =>
+    unwrap(
+      api.orchestrator.GET("/v1/sources", { params: { query: { limit, ...(cursor ? { cursor } : {}) } } }),
+    ),
+  );
+  const selectedSource = useQuery({
+    queryKey: ["source", draft.input.source_id],
+    enabled: Boolean(draft.input.source_id),
+    queryFn: () =>
+      unwrapWithEtag(
+        api.orchestrator.GET("/v1/sources/{source_id}", {
+          params: { path: { source_id: draft.input.source_id } },
+        }),
+      ),
+  });
 
   useEffect(() => {
     const task = loaded.data?.data;
-    if (!task) return;
+    if (!task || dirty) return;
     setDraft(task);
     setStagesText(toJsonText(task.stages));
     setLimitsText(toJsonText(task.limits));
     setRetriesText(toJsonText(task.retries));
     setUrlsText((task.input.urls ?? []).join("\n"));
-  }, [loaded.data]);
+    setBaseline(
+      JSON.stringify([
+        task,
+        toJsonText(task.stages),
+        toJsonText(task.limits),
+        toJsonText(task.retries),
+        (task.input.urls ?? []).join("\n"),
+      ]),
+    );
+  }, [loaded.data, dirty]);
 
   const assembled = useMemo(() => {
     const stages = checkJson(stagesText);
     const limits = checkJson(limitsText, SCHEMAS.limits);
     const retries = checkJson(retriesText);
     const errors = [stages, limits, retries].filter((c) => c.parseError).map((c) => c.parseError as string);
-    if (errors.length) return { task: null as TaskConfig | null, issues: errors.map((e) => `JSON: ${e}`) };
+    if (errors.length)
+      return { task: null as TaskConfig | null, issues: errors.map((e) => `JSON: ${e}`), fieldIssues: [] };
     const urls = urlsText
       .split(/\s+/)
       .map((u) => u.trim())
@@ -253,8 +297,19 @@ export function TaskPage() {
     else delete task.limits;
     if (retries.value !== undefined) task.retries = retries.value as NonNullable<TaskConfig["retries"]>;
     else delete task.retries;
-    const issues = validateAgainst(SCHEMAS.task, task).map((i) => `${i.pointer} ${i.message}`);
-    return { task, issues };
+    const fieldIssues = validateAgainst(SCHEMAS.task, task);
+    const issues = fieldIssues.map(schemaIssueLabel);
+    if (
+      Array.isArray(task.stages) &&
+      task.stages.every(
+        (s) =>
+          s &&
+          typeof s.stage_id === "string" &&
+          (!s.inputs || (Array.isArray(s.inputs) && s.inputs.every((i) => i && typeof i.from === "string"))),
+      )
+    )
+      issues.push(...buildDag(task.stages).issues);
+    return { task, issues, fieldIssues };
   }, [draft, stagesText, limitsText, retriesText, urlsText]);
 
   const validate = useMutation({
@@ -278,6 +333,9 @@ export function TaskPage() {
             }),
           ),
     onSuccess: (result) => {
+      guard.markSaved();
+      setDirty(false);
+      setSubmitted(false);
       setSaved(true);
       void queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.setQueryData(["task", result.data.task_id], result);
@@ -290,34 +348,66 @@ export function TaskPage() {
       unwrap(
         api.orchestrator.DELETE("/v1/tasks/{task_id}", { params: { path: { task_id: taskId as string } } }),
       ),
-    onSuccess: () => navigate("/tasks"),
+    onSuccess: () => {
+      guard.markSaved();
+      navigate("/tasks");
+    },
   });
 
   const set = (patch: Partial<TaskConfig>) => {
     setSaved(false);
+    setDirty(true);
     setDraft((d) => ({ ...d, ...patch }));
   };
+  const guard = useUnsavedChanges({
+    dirty: dirty || !chainValid,
+    label: draft.title || "Завдання",
+    onDiscard: () => {
+      setDirty(false);
+      setChainValid(true);
+    },
+    onSave: async () => {
+      setSubmitted(true);
+      if (!chainValid || !assembled.task || assembled.issues.length) return false;
+      await save.mutateAsync(assembled.task);
+      return true;
+    },
+  });
 
   if (!isNew && loaded.isLoading) return <Loading />;
-  const currentStages = (checkJson(stagesText).value as Stage[] | undefined) ?? draft.stages;
+
+  const fieldError = (pointer: string) =>
+    submitted ? assembled.fieldIssues.find((issue) => issue.pointer === pointer)?.message : undefined;
 
   return (
     <Page
       title={isNew ? "Нове завдання" : `Завдання ${taskId}`}
       actions={
         !isNew ? (
-          <ReasonAction
-            label="Видалити"
-            confirmLabel="Видалити завдання"
-            danger
-            requireReason={false}
-            onConfirm={() => remove.mutate()}
-          />
+          <>
+            <Link className="btn" to="/results">
+              Каталог результатів
+            </Link>
+            <ReasonAction
+              label="Видалити"
+              confirmLabel="Видалити завдання"
+              danger
+              busy={save.isPending || remove.isPending}
+              requireReason={false}
+              onConfirm={() => remove.mutate()}
+            />
+          </>
         ) : null
       }
     >
       <ErrorBox error={loaded.error} />
       <ErrorBox error={remove.error} title="Не вдалося видалити" />
+      {!isNew && loaded.data ? <TaskResultsLinks task={loaded.data.data} /> : null}
+      {dirty || !chainValid ? (
+        <Notice tone="warn">
+          Є незбережені зміни конфігурації. Вони залишаються у чернетці між вкладками.
+        </Notice>
+      ) : null}
       <Tabs<TabKey>
         tabs={
           isNew
@@ -334,191 +424,263 @@ export function TaskPage() {
               ]
         }
         active={tab}
-        onChange={setTab}
+        onChange={(next) => {
+          if (chainValid && !save.isPending) setTab(next);
+        }}
       />
       {tab === "config" || tab === "chain" ? (
         <form
           className="form"
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
-            if (assembled.task && !assembled.issues.length) save.mutate(assembled.task);
+            setSubmitted(true);
+            if (chainValid && assembled.task && !assembled.issues.length) save.mutate(assembled.task);
           }}
         >
-          {tab === "config" ? (
-            <>
-              <div className="grid-2">
-                <Field label="Ідентифікатор (task_id)">
-                  <input
-                    value={draft.task_id}
-                    disabled={!isNew}
-                    onChange={(e) => set({ task_id: e.target.value })}
-                    required
+          <fieldset className="form-fields" disabled={save.isPending}>
+            {tab === "config" ? (
+              <>
+                <div className="grid-2">
+                  <Field label="Ідентифікатор (task_id)" error={fieldError("/task_id")}>
+                    <input
+                      value={draft.task_id}
+                      disabled={!isNew}
+                      onChange={(e) => set({ task_id: e.target.value })}
+                      required
+                    />
+                  </Field>
+                  <Field label="Назва" error={fieldError("/title")}>
+                    <input
+                      value={draft.title}
+                      onChange={(e) => set({ title: e.target.value })}
+                      required
+                      maxLength={200}
+                    />
+                  </Field>
+                  <div>
+                    <EntityPicker
+                      label="Джерело (source_id)"
+                      value={draft.input.source_id}
+                      onChange={(source_id) => set({ input: { ...draft.input, source_id } })}
+                      options={sources.items.map((source) => ({
+                        value: source.source_id,
+                        label: source.title,
+                        description: source.locator.url ?? source.locator.telegram_username ?? source.kind,
+                      }))}
+                      loading={sources.isLoading}
+                      error={sources.error}
+                      validationError={fieldError("/input/source_id")}
+                      required
+                    />
+                    <LoadMore
+                      hasMore={sources.hasMore}
+                      loading={sources.loadingMore}
+                      onClick={sources.loadMore}
+                    />
+                  </div>
+                  <Field label="Передавати в LLM невідомі сторінки">
+                    <select
+                      value={
+                        draft.forward_unknown_to_llm === undefined
+                          ? "inherit"
+                          : draft.forward_unknown_to_llm
+                            ? "on"
+                            : "off"
+                      }
+                      onChange={(e) => {
+                        const next = { ...draft };
+                        if (e.target.value === "inherit") delete next.forward_unknown_to_llm;
+                        else next.forward_unknown_to_llm = e.target.value === "on";
+                        setSaved(false);
+                        setDirty(true);
+                        setDraft(next);
+                      }}
+                    >
+                      <option value="inherit">як у джерела</option>
+                      <option value="on">увімкнено</option>
+                      <option value="off">вимкнено</option>
+                    </select>
+                  </Field>
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      checked={draft.enabled !== false}
+                      onChange={(e) => set({ enabled: e.target.checked })}
+                    />
+                    Завдання увімкнено
+                  </label>
+                </div>
+                <Field label="Явний перелік URL (замість правил джерела; по одному в рядку)">
+                  <textarea
+                    rows={3}
+                    value={urlsText}
+                    onChange={(e) => (setSaved(false), setDirty(true), setUrlsText(e.target.value))}
                   />
                 </Field>
-                <Field label="Назва">
-                  <input
-                    value={draft.title}
-                    onChange={(e) => set({ title: e.target.value })}
-                    required
-                    maxLength={200}
-                  />
-                </Field>
-                <Field label="Джерело (source_id)">
-                  <input
-                    value={draft.input.source_id}
-                    onChange={(e) => set({ input: { ...draft.input, source_id: e.target.value } })}
-                    required
-                  />
-                </Field>
-                <Field label="Передавати в LLM невідомі сторінки">
-                  <select
-                    value={
-                      draft.forward_unknown_to_llm === undefined
-                        ? "inherit"
-                        : draft.forward_unknown_to_llm
-                          ? "on"
-                          : "off"
-                    }
-                    onChange={(e) => {
+                <Section title="Розклад">
+                  <ScheduleEditor
+                    value={draft.schedule}
+                    issues={submitted ? assembled.fieldIssues : []}
+                    onChange={(schedule) => {
                       const next = { ...draft };
-                      if (e.target.value === "inherit") delete next.forward_unknown_to_llm;
-                      else next.forward_unknown_to_llm = e.target.value === "on";
+                      if (schedule) next.schedule = schedule;
+                      else delete next.schedule;
                       setSaved(false);
+                      setDirty(true);
                       setDraft(next);
                     }}
-                  >
-                    <option value="inherit">як у джерела</option>
-                    <option value="on">увімкнено</option>
-                    <option value="off">вимкнено</option>
-                  </select>
-                </Field>
-                <label className="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={draft.enabled !== false}
-                    onChange={(e) => set({ enabled: e.target.checked })}
                   />
-                  Завдання увімкнено
-                </label>
-              </div>
-              <Field label="Явний перелік URL (замість правил джерела; по одному в рядку)">
-                <textarea
-                  rows={3}
-                  value={urlsText}
-                  onChange={(e) => (setSaved(false), setUrlsText(e.target.value))}
-                />
-              </Field>
-              <Section title="Розклад">
-                <ScheduleEditor
-                  value={draft.schedule}
-                  onChange={(schedule) => {
-                    const next = { ...draft };
-                    if (schedule) next.schedule = schedule;
-                    else delete next.schedule;
+                </Section>
+                <details className="form-advanced">
+                  <summary>Додатково: ліміти та повторні спроби</summary>
+                  <div className="grid-2">
+                    <Section title="Ліміти рівня завдання">
+                      <JsonEditor
+                        text={limitsText}
+                        onChange={(t) => (setSaved(false), setDirty(true), setLimitsText(t))}
+                        schema={SCHEMAS.limits}
+                        label="Ліміти завдання"
+                        minHeight="8rem"
+                        readOnly={save.isPending}
+                      />
+                    </Section>
+                    <Section title="Повторні спроби">
+                      <JsonEditor
+                        text={retriesText}
+                        onChange={(t) => (setSaved(false), setDirty(true), setRetriesText(t))}
+                        label="Повторні спроби"
+                        minHeight="8rem"
+                        readOnly={save.isPending}
+                      />
+                    </Section>
+                  </div>
+                </details>
+              </>
+            ) : null}
+            {tab === "chain" ? (
+              <>
+                <ChainEditor
+                  onValidityChange={setChainValid}
+                  text={stagesText}
+                  source={selectedSource.data?.data}
+                  readOnly={save.isPending}
+                  onChange={(t) => {
                     setSaved(false);
-                    setDraft(next);
+                    setDirty(true);
+                    setStagesText(t);
                   }}
                 />
-              </Section>
-              <div className="grid-2">
-                <Section title="Ліміти рівня завдання">
-                  <JsonEditor
-                    text={limitsText}
-                    onChange={(t) => (setSaved(false), setLimitsText(t))}
-                    schema={SCHEMAS.limits}
-                    label="Ліміти завдання"
-                    minHeight="8rem"
-                  />
-                </Section>
-                <Section title="Повторні спроби">
-                  <JsonEditor
-                    text={retriesText}
-                    onChange={(t) => (setSaved(false), setRetriesText(t))}
-                    label="Повторні спроби"
-                    minHeight="8rem"
-                  />
-                </Section>
-              </div>
-            </>
-          ) : null}
-          {tab === "chain" ? (
-            <>
-              <Section title="Ланцюжок обробки (етапи й переходи)">
-                <DagView stages={currentStages} />
-              </Section>
-              <Section
-                title="Етапи (TaskConfig.stages)"
-                actions={
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => {
-                      const stages = (checkJson(stagesText).value as Stage[] | undefined) ?? [];
-                      const from = stages[stages.length - 1]?.stage_id ?? "collect";
-                      const stage: Stage = {
-                        stage_id: `stage-${stages.length + 1}`,
-                        kind: "handler",
-                        handler: { package_id: "", version: "" },
-                        inputs: [{ from }],
-                      };
-                      setSaved(false);
-                      setStagesText(toJsonText([...stages, stage]));
-                    }}
-                  >
-                    Додати етап-обробник
-                  </button>
+              </>
+            ) : null}
+            {(submitted || (tab === "chain" && dirty)) && assembled.issues.length ? (
+              <ul className="error-inline" role="alert" aria-label="Помилки конфігурації">
+                {assembled.issues.map((i) => (
+                  <li key={i}>{i}</li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="button-row form-save-bar">
+              {dirty ? <span role="status">Є незбережені зміни</span> : null}
+              <button
+                type="button"
+                className="btn"
+                disabled={!chainValid || !assembled.task || validate.isPending}
+                onClick={() => {
+                  setSubmitted(true);
+                  if (chainValid && assembled.task) validate.mutate(assembled.task);
+                }}
+              >
+                Перевірити в оркестраторі
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={
+                  !chainValid ||
+                  save.isPending ||
+                  (tab === "chain" && (!assembled.task || assembled.issues.length > 0))
                 }
               >
-                <p className="muted">
-                  Кожен етап посилається на точну версію пакета. Розгалуження — кілька етапів з тим самим{" "}
-                  <code>inputs[].from</code>; умови — <code>when</code>; вибірка — <code>select</code>{" "}
-                  (output, input_material, problems, unmatched_materials).
-                </p>
-                <JsonEditor
-                  text={stagesText}
-                  onChange={(t) => (setSaved(false), setStagesText(t))}
-                  label="Етапи завдання"
-                  minHeight="20rem"
-                />
-              </Section>
-            </>
-          ) : null}
-          {assembled.issues.length ? (
-            <ul className="error-inline" role="alert" aria-label="Помилки конфігурації">
-              {assembled.issues.map((i) => (
-                <li key={i}>{i}</li>
-              ))}
-            </ul>
-          ) : null}
-          <div className="button-row">
-            <button
-              type="button"
-              className="btn"
-              disabled={!assembled.task || validate.isPending}
-              onClick={() => assembled.task && validate.mutate(assembled.task)}
-            >
-              Перевірити в оркестраторі
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={save.isPending || !assembled.task || assembled.issues.length > 0}
-            >
-              {isNew ? "Створити завдання" : "Зберегти"}
-            </button>
-          </div>
-          <ErrorBox error={validate.error} title="Перевірка не вдалася" />
-          <ErrorBox error={save.error} title="Не вдалося зберегти" />
-          {saved ? (
-            <Notice tone="ok">Збережено. Поточні запуски продовжуються зі старою конфігурацією.</Notice>
-          ) : null}
-          {validation ? <ValidationView validation={validation} /> : null}
+                {isNew ? "Створити завдання" : "Зберегти"}
+              </button>
+            </div>
+            <ErrorBox error={validate.error} title="Перевірка не вдалася" />
+            <ErrorBox error={save.error} title="Не вдалося зберегти" />
+            {saved ? (
+              <Notice tone="ok">Збережено. Поточні запуски продовжуються зі старою конфігурацією.</Notice>
+            ) : null}
+            {validation ? <ValidationView validation={validation} /> : null}
+          </fieldset>
         </form>
       ) : null}
       {tab === "runs" && taskId ? <TaskRuns taskId={taskId} /> : null}
       {tab === "versions" && loaded.data ? <StageVersions task={loaded.data.data} /> : null}
       {tab === "limits" && taskId ? <EffectiveLimitsView query={{ task_id: taskId }} /> : null}
     </Page>
+  );
+}
+
+/** Storage scope comes only from explicit stage parameters, never from a source identifier. */
+function TaskResultsLinks({ task }: { task: TaskConfig }) {
+  const api = useApi();
+  const candidates = task.stages.filter(
+    (stage) =>
+      stage.handler &&
+      stage.connections?.target &&
+      stage.inputs?.some(
+        (input) =>
+          (input.select ?? "output") === "output" &&
+          task.stages.some((upstream) => upstream.stage_id === input.from && upstream.kind === "handler"),
+      ),
+  );
+  const destinations = useQuery({
+    queryKey: ["task-result-destinations", candidates],
+    enabled: candidates.length > 0,
+    queryFn: async () => {
+      const details = await Promise.all(
+        candidates.map(async (stage) => {
+          const reference = stage.handler!;
+          const detail = await unwrap(
+            api.registry.GET("/v1/packages/{package_id}/versions/{version}", {
+              params: { path: { package_id: reference.package_id, version: reference.version } },
+            }),
+          );
+          if (detail.manifest?.kind !== "storage") return null;
+          const scope = stage.params?.["scope"];
+          return {
+            stageId: stage.stage_id,
+            label: stage.title || stage.stage_id,
+            href: resultsHref({
+              connectionId: stage.connections!.target!,
+              ...(typeof scope === "string" && scope ? { scope } : {}),
+            }),
+          };
+        }),
+      );
+      return details.filter((detail) => detail !== null);
+    },
+  });
+  if (destinations.isLoading) return <p className="muted">Визначення сховищ результатів…</p>;
+  if (destinations.error)
+    return <ErrorBox error={destinations.error} title="Не вдалося визначити сховища результатів" />;
+  if (!destinations.data?.length)
+    return (
+      <p className="muted">
+        Етап збереження результатів обробки ще не визначено. Доступний каталог результатів.
+      </p>
+    );
+  return (
+    <div aria-label="Сховища результатів завдання">
+      <div className="button-row">
+        {destinations.data.map((destination) => (
+          <Link key={destination.stageId} className="btn" to={destination.href}>
+            Розібрані дані: {destination.label}
+          </Link>
+        ))}
+      </div>
+      <p className="muted">Перегляд за підключенням етапу. Сховище може містити результати інших завдань.</p>
+    </div>
   );
 }
 
@@ -537,11 +699,18 @@ function ValidationView({ validation }: { validation: TaskValidation }) {
       {[
         ...validation.errors.map((e) => ["error", e] as const),
         ...(validation.warnings ?? []).map((w) => ["warning", w] as const),
-      ].map(([level], i) => (
+      ].map(([level, issue], i) => (
         <p key={i} className={level === "error" ? "error-inline" : "warn-inline"}>
           {level === "error" ? "Помилка" : "Попередження"}: Перевірте конфігурацію завдання.
+          {issue.pointer ? ` Поле: ${issue.pointer}.` : null}
         </p>
       ))}
+      {validation.errors.length || validation.warnings?.length ? (
+        <details>
+          <summary>Подробиці перевірки</summary>
+          <JsonView value={{ errors: validation.errors, warnings: validation.warnings ?? [] }} compact />
+        </details>
+      ) : null}
     </div>
   );
 }

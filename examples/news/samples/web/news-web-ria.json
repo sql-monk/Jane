@@ -1,0 +1,13 @@
+{
+  "source_id": "news-web-ria",
+  "feed_url": "https://ria.ru/export/rss2/archive/index.xml",
+  "article_url": "https://ria.ru/20261011/opasnost-2123756148.html",
+  "fetched_at": "2026-10-11T03:56:55.18569Z",
+  "feed_http_status": 200,
+  "article_http_status": 200,
+  "robots_allowed": true,
+  "feed_entries": 100,
+  "title": "В Крыму отменили беспилотную опасность",
+  "excerpt": "Беспилотная опасность отменена в Крыму, сообщило ГУ МЧС по региону. РИА Новости, 11.10.2026",
+  "capture_method": "live HTTP in running Linux web-collector container; normal TLS verification; metadata excerpt only"
+}

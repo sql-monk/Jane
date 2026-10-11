@@ -68,7 +68,7 @@ test.describe("real storage: materials and results @hybrid", () => {
     );
 
     await admin.goto(`/materials?connection_id=${rawConnectionId}&source_id=${sourceId}`);
-    const table = admin.getByRole("table", { name: "Збережені матеріали" });
+    const table = admin.getByRole("table", { name: `Матеріали ${rawConnectionId}`, exact: true });
     await expect(table).toContainText(url);
     await expect(table.getByRole("row")).toHaveCount(2); // header + the seeded object only (source filter)
     await table.getByRole("button", { name: "Переглянути" }).click();

@@ -7,7 +7,7 @@
 ### Компонент `JsonEditor`
 
 ```typescript
-function JsonEditor({ text, onChange, schema, label, minHeight, }: { text: string; onChange: (text: string) => void; schema?: string; label: string; minHeight?: string; }): React.JSX.Element
+function JsonEditor({ text, onChange, schema, label, minHeight, readOnly, }: { text: string; onChange: (text: string) => void; schema?: string; label: string; minHeight?: string; readOnly?: boolean; }): React.JSX.Element
 ```
 
 JSON editor validated against a contract JSON Schema (early feedback; the service validates again).
@@ -19,7 +19,7 @@ JSON editor validated against a contract JSON Schema (early feedback; the servic
 ### Функція `checkJson`
 
 ```typescript
-function checkJson(text: string, schema?: string | undefined): import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src/components/JsonEditor").JsonCheck
+function checkJson(text: string, schema?: string | undefined): import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/components/JsonEditor").JsonCheck
 ```
 
 Код: [JsonEditor.tsx:12](../../../../../web/admin/src/components/JsonEditor.tsx#L12).
@@ -30,7 +30,7 @@ function checkJson(text: string, schema?: string | undefined): import("C:/repos/
 function toJsonText(value: unknown): string
 ```
 
-Код: [JsonEditor.tsx:73](../../../../../web/admin/src/components/JsonEditor.tsx#L73).
+Код: [JsonEditor.tsx:84](../../../../../web/admin/src/components/JsonEditor.tsx#L84).
 
 ## Інтерфейси
 

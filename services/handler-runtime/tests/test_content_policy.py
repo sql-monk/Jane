@@ -6,12 +6,14 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import shutil
 import threading
 import time
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import pytest
@@ -212,3 +214,134 @@ def test_download_size_comes_from_package_limits(
 def test_download_host_allowlist_is_validated_at_start() -> None:
     with pytest.raises(ValueError, match="hostname"):
         Settings(download_host_allowlist=["http://registry:8000"])
+
+
+@pytest.fixture
+def entities_package(tmp_path: Path, h: Any) -> Path:
+    """Real transform whose result proves that the SDK received the original material bytes."""
+    package = tmp_path / "entities-package"
+    shutil.copytree(h.probe, package)
+    manifest_path = package / "jane-package.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["input"]["accepts"] = ["entities"]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    (package / "src" / "probe" / "main.py").write_text(
+        "def extract(item, params, ctx):\n"
+        "    return {'status': 'success', 'data': {\n"
+        "        'content_hex': ctx.bytes().hex(),\n"
+        "        'entities_resolved': isinstance(item.get('entities'), list),\n"
+        "    }}\n",
+        encoding="utf-8",
+    )
+    return package
+
+
+def invoke_entities(
+    client: TestClient,
+    h: Any,
+    package: Path,
+    content: dict[str, Any],
+    key: str,
+    *,
+    use_ref: bool = False,
+) -> httpx.Response:
+    material = h.product_material()
+    material["content"] = content
+    body = h.invocation(package, material, key=key)
+    item: dict[str, Any] = {"kind": "entities", "material": material}
+    if use_ref:
+        item["entities_ref"] = {
+            "kind": "inline",
+            "media_type": "application/json",
+            "encoding": "utf-8",
+            "data": "[]",
+        }
+    else:
+        item["entities"] = []
+    body["inputs"] = [item]
+    return cast(httpx.Response, client.post("/v1/invocations", json=body, headers={"Idempotency-Key": key}))
+
+
+@pytest.mark.parametrize("use_ref", [False, True], ids=["inline-entities", "entities-ref"])
+def test_entities_attached_blob_reaches_sdk_as_original_bytes(
+    subprocess_settings: Settings,
+    h: Any,
+    tree: dict[str, Path],
+    entities_package: Path,
+    use_ref: bool,
+) -> None:
+    data = page_bytes(h)
+    with app(subprocess_settings, blob_roots=[tree["root"]]) as c:
+        response = invoke_entities(
+            c,
+            h,
+            entities_package,
+            blob((tree["root"] / "page.html").as_uri(), data),
+            f"entities-allowed-{use_ref}",
+            use_ref=use_ref,
+        )
+        assert response.status_code == 200, response.text
+        result = response.json()
+        assert result["status"] == "success", result
+        assert result["output"]["data"] == {"content_hex": data.hex(), "entities_resolved": True}
+
+
+@pytest.mark.parametrize("violation", ["sha256", "size_bytes", "outside_root", "input_limit"])
+def test_entities_attached_blob_policy_is_checked_before_sandbox(
+    subprocess_settings: Settings,
+    h: Any,
+    tree: dict[str, Path],
+    entities_package: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    violation: str,
+) -> None:
+    data = page_bytes(h)
+    content = blob((tree["root"] / "page.html").as_uri(), data)
+    expected_code = "validation_failed"
+    if violation == "sha256":
+        content["sha256"] = "0" * 64
+    elif violation == "size_bytes":
+        content["size_bytes"] += 1
+    elif violation == "outside_root":
+        content = blob((tree["outside"] / "secret.env").as_uri(), SECRET)
+    else:
+        monkeypatch.setenv("JANE_HANDLER_RUNTIME_LIMITS__PACKAGES__MAX_INPUT_BYTES", str(len(data) - 1))
+        expected_code = "limit_exceeded"
+    with app(subprocess_settings, blob_roots=[tree["root"]]) as c:
+        backend = cast(Starlette, c.app).state.runtime.backend
+        real_run = backend.run
+        starts: list[bool] = []
+
+        def observe_run(*args: Any, **kwargs: Any) -> Any:
+            starts.append(True)
+            return real_run(*args, **kwargs)
+
+        monkeypatch.setattr(backend, "run", observe_run)
+        response = invoke_entities(c, h, entities_package, content, f"entities-refused-{violation}")
+        assert (response.status_code, response.json().get("code")) == (422, expected_code), response.text
+        assert "do-not-return" not in response.text
+        assert starts == []
+
+
+def test_entities_attached_download_uses_existing_host_policy(
+    subprocess_settings: Settings,
+    h: Any,
+    entities_package: Path,
+    servers: tuple[str, str, list[str]],
+) -> None:
+    first, _, hits = servers
+    data = page_bytes(h)
+    content = blob("s3://original/page", data, download_url=f"{first}/page")
+    with app(subprocess_settings) as c:
+        refused_response = invoke_entities(c, h, entities_package, content, "entities-host-refused")
+        assert (refused_response.status_code, refused_response.json().get("code")) == (
+            422,
+            "validation_failed",
+        ), refused_response.text
+        assert hits == []
+    with app(subprocess_settings, download_host_allowlist=[first.removeprefix("http://")]) as c:
+        accepted = invoke_entities(c, h, entities_package, content, "entities-host-allowed")
+        assert accepted.status_code == 200, accepted.text
+        assert accepted.json()["status"] == "success", accepted.text
+        assert accepted.json()["output"]["data"]["content_hex"] == data.hex()
+        assert len(hits) == 1

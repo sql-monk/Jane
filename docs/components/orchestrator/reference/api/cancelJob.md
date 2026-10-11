@@ -1,6 +1,6 @@
 # POST /v1/jobs/{job_id}/cancel
 
-> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1509). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1533). Не редагуйте вручну.
 
 **Запит на скасування job (ідемпотентний)**
 

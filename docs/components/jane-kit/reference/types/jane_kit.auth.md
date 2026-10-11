@@ -42,7 +42,7 @@ Paths: ``/v1/health`` needs no token, and ``/metrics`` neither unless ``metrics_
 | Вид | модель Pydantic |
 | Модуль | `jane_kit.auth` |
 | Успадкування | `BaseModel` |
-| Код | [auth.py:151](../../../../../libs/jane-kit/src/jane_kit/auth.py#L151) |
+| Код | [auth.py:154](../../../../../libs/jane-kit/src/jane_kit/auth.py#L154) |
 
 ```python
 class ApiKeyConfig(BaseModel): ...
@@ -75,7 +75,7 @@ One configured API key. Extra fields (e.g. ``actor``) are kept as :attr:`Princip
 | Вид | виняток |
 | Модуль | `jane_kit.auth` |
 | Успадкування | `ValueError` |
-| Код | [auth.py:104](../../../../../libs/jane-kit/src/jane_kit/auth.py#L104) |
+| Код | [auth.py:107](../../../../../libs/jane-kit/src/jane_kit/auth.py#L107) |
 
 ```python
 class AuthConfigError(ValueError): ...
@@ -90,7 +90,7 @@ Authentication is configured incompletely or wrongly; the service must not start
 | Вид | модель Pydantic |
 | Модуль | `jane_kit.auth` |
 | Успадкування | `BaseModel` |
-| Код | [auth.py:113](../../../../../libs/jane-kit/src/jane_kit/auth.py#L113) |
+| Код | [auth.py:116](../../../../../libs/jane-kit/src/jane_kit/auth.py#L116) |
 
 ```python
 class AuthSettings(BaseModel): ...
@@ -127,7 +127,7 @@ Authentication knobs; part of every service's settings (``JaneSettings``), env `
 |---|---|
 | Вид | клас |
 | Модуль | `jane_kit.auth` |
-| Код | [auth.py:535](../../../../../libs/jane-kit/src/jane_kit/auth.py#L535) |
+| Код | [auth.py:538](../../../../../libs/jane-kit/src/jane_kit/auth.py#L538) |
 
 ```python
 class Authenticator: ...
@@ -150,7 +150,7 @@ def __init__(
 
 Винятки в коді методу: `AuthConfigError`.
 
-Код: [auth.py:538](../../../../../libs/jane-kit/src/jane_kit/auth.py#L538).
+Код: [auth.py:541](../../../../../libs/jane-kit/src/jane_kit/auth.py#L541).
 
 #### Метод `Authenticator.from_settings`
 
@@ -170,7 +170,7 @@ Fail-closed construction: raises :class:`AuthConfigError` for an incomplete conf
 
 Винятки в коді методу: `AuthConfigError`.
 
-Код: [auth.py:556](../../../../../libs/jane-kit/src/jane_kit/auth.py#L556).
+Код: [auth.py:559](../../../../../libs/jane-kit/src/jane_kit/auth.py#L559).
 
 #### Метод `Authenticator.describe`
 
@@ -180,7 +180,7 @@ def describe(self) -> dict[str, Any]: ...
 
 For the start log: mode, key names or the JWT issuer (never key values).
 
-Код: [auth.py:614](../../../../../libs/jane-kit/src/jane_kit/auth.py#L614).
+Код: [auth.py:617](../../../../../libs/jane-kit/src/jane_kit/auth.py#L617).
 
 #### Метод `Authenticator.authenticate`
 
@@ -190,7 +190,7 @@ async def authenticate(self, authorization: str | None) -> Principal: ...
 
 Principal of an ``Authorization`` header value; 401 ``unauthenticated`` when it is not valid.
 
-Код: [auth.py:623](../../../../../libs/jane-kit/src/jane_kit/auth.py#L623).
+Код: [auth.py:626](../../../../../libs/jane-kit/src/jane_kit/auth.py#L626).
 
 ### Клас `JwksCache`
 
@@ -198,7 +198,7 @@ Principal of an ``Authorization`` header value; 401 ``unauthenticated`` when it 
 |---|---|
 | Вид | клас |
 | Модуль | `jane_kit.auth` |
-| Код | [auth.py:335](../../../../../libs/jane-kit/src/jane_kit/auth.py#L335) |
+| Код | [auth.py:338](../../../../../libs/jane-kit/src/jane_kit/auth.py#L338) |
 
 ```python
 class JwksCache: ...
@@ -228,7 +228,7 @@ def __init__(
 ) -> None: ...
 ```
 
-Код: [auth.py:349](../../../../../libs/jane-kit/src/jane_kit/auth.py#L349).
+Код: [auth.py:352](../../../../../libs/jane-kit/src/jane_kit/auth.py#L352).
 
 #### Метод `JwksCache.key`
 
@@ -238,7 +238,7 @@ async def key(self, kid: str | None) -> dict[str, Any] | None: ...
 
 The JWK for ``kid`` (``None`` - unknown key, 401); raises 503 when no keys are available.
 
-Код: [auth.py:448](../../../../../libs/jane-kit/src/jane_kit/auth.py#L448).
+Код: [auth.py:451](../../../../../libs/jane-kit/src/jane_kit/auth.py#L451).
 
 ### Клас `Principal`
 
@@ -246,7 +246,7 @@ The JWK for ``kid`` (``None`` - unknown key, 401); raises 503 when no keys are a
 |---|---|
 | Вид | dataclass (незмінний) |
 | Модуль | `jane_kit.auth` |
-| Код | [auth.py:229](../../../../../libs/jane-kit/src/jane_kit/auth.py#L229) |
+| Код | [auth.py:232](../../../../../libs/jane-kit/src/jane_kit/auth.py#L232) |
 
 ```python
 @dataclass(frozen=True)
@@ -272,7 +272,7 @@ The authenticated caller: key name / JWT subject, its scopes and extra attribute
 def has(self, scope: str) -> bool: ...
 ```
 
-Код: [auth.py:238](../../../../../libs/jane-kit/src/jane_kit/auth.py#L238).
+Код: [auth.py:241](../../../../../libs/jane-kit/src/jane_kit/auth.py#L241).
 
 #### Метод `Principal.require`
 
@@ -284,7 +284,7 @@ def require(self, *any_of: str) -> None: ...
 
 Винятки в коді методу: `Forbidden`.
 
-Код: [auth.py:241](../../../../../libs/jane-kit/src/jane_kit/auth.py#L241).
+Код: [auth.py:244](../../../../../libs/jane-kit/src/jane_kit/auth.py#L244).
 
 ### Клас `SecretRefError`
 
@@ -293,7 +293,7 @@ def require(self, *any_of: str) -> None: ...
 | Вид | виняток |
 | Модуль | `jane_kit.auth` |
 | Успадкування | `AuthConfigError` |
-| Код | [auth.py:108](../../../../../libs/jane-kit/src/jane_kit/auth.py#L108) |
+| Код | [auth.py:111](../../../../../libs/jane-kit/src/jane_kit/auth.py#L111) |
 
 ```python
 class SecretRefError(AuthConfigError): ...
@@ -313,7 +313,7 @@ Application-wide dependency of ``create_app``: the scope of the matched operatio
 
 Винятки в коді функції: `Forbidden`.
 
-Код: [auth.py:712](../../../../../libs/jane-kit/src/jane_kit/auth.py#L712).
+Код: [auth.py:715](../../../../../libs/jane-kit/src/jane_kit/auth.py#L715).
 
 ### Функція `bearer_header`
 
@@ -323,7 +323,7 @@ def bearer_header(token: str | None) -> dict[str, str]: ...
 
 ``{"Authorization": "Bearer <token>"}`` or ``{}`` - for clients of other Jane services.
 
-Код: [auth.py:186](../../../../../libs/jane-kit/src/jane_kit/auth.py#L186).
+Код: [auth.py:189](../../../../../libs/jane-kit/src/jane_kit/auth.py#L189).
 
 ### Функція `check_scopes`
 
@@ -335,7 +335,7 @@ At start: every route of ``app`` must be in its scope table (fail closed); logs 
 
 Винятки в коді функції: `AuthConfigError`.
 
-Код: [auth.py:763](../../../../../libs/jane-kit/src/jane_kit/auth.py#L763).
+Код: [auth.py:766](../../../../../libs/jane-kit/src/jane_kit/auth.py#L766).
 
 ### Функція `install_auth`
 
@@ -355,7 +355,7 @@ Raises :class:`AuthConfigError` for an incomplete configuration. ``scopes=None``
 
 Винятки в коді функції: `AuthConfigError`.
 
-Код: [auth.py:734](../../../../../libs/jane-kit/src/jane_kit/auth.py#L734).
+Код: [auth.py:737](../../../../../libs/jane-kit/src/jane_kit/auth.py#L737).
 
 ### Функція `principal_of`
 
@@ -365,7 +365,7 @@ def principal_of(request: Request) -> Principal: ...
 
 The caller authenticated by the middleware; 401 if there is none (authentication not installed).
 
-Код: [auth.py:780](../../../../../libs/jane-kit/src/jane_kit/auth.py#L780).
+Код: [auth.py:783](../../../../../libs/jane-kit/src/jane_kit/auth.py#L783).
 
 ### Функція `require`
 
@@ -375,7 +375,7 @@ def require(*any_of: str) -> Callable[[Request], Principal]: ...
 
 FastAPI dependency: the caller must have one of ``any_of``; returns the :class:`Principal`.
 
-Код: [auth.py:788](../../../../../libs/jane-kit/src/jane_kit/auth.py#L788).
+Код: [auth.py:791](../../../../../libs/jane-kit/src/jane_kit/auth.py#L791).
 
 ### Функція `resolve_secret_ref`
 
@@ -387,7 +387,7 @@ Value of ``env:VAR`` or ``file:/path`` (surrounding whitespace stripped). ``vaul
 
 Винятки в коді функції: `SecretRefError`.
 
-Код: [auth.py:191](../../../../../libs/jane-kit/src/jane_kit/auth.py#L191).
+Код: [auth.py:194](../../../../../libs/jane-kit/src/jane_kit/auth.py#L194).
 
 ### Функція `sha256_hex`
 
@@ -397,7 +397,7 @@ def sha256_hex(value: str) -> str: ...
 
 Hex SHA-256 of a key, the form ``api_keys[].sha256`` stores.
 
-Код: [auth.py:181](../../../../../libs/jane-kit/src/jane_kit/auth.py#L181).
+Код: [auth.py:184](../../../../../libs/jane-kit/src/jane_kit/auth.py#L184).
 
 ### Функція `unmapped_routes`
 
@@ -412,13 +412,13 @@ def unmapped_routes(
 
 ``"METHOD /path"`` of routes that the scope table (plus :data:`BUILTIN_SCOPES`) does not cover.
 
-Код: [auth.py:680](../../../../../libs/jane-kit/src/jane_kit/auth.py#L680).
+Код: [auth.py:683](../../../../../libs/jane-kit/src/jane_kit/auth.py#L683).
 
 ## Константи й змінні модуля
 
 | Назва | Тип | Значення | Опис |
 |---|---|---|---|
 | `AUTHENTICATED` | `tuple[str, ...]` | `()` | Table value for operations that need a valid token but no particular scope. |
-| `BUILTIN_SCOPES` | `dict[str, tuple[str, ...]]` | `{'GET /v1/info': AUTHENTICATED, 'GET /metrics': AUTHENTICATED, 'GET /openapi.jso` | Routes every service has (jane-kit, FastAPI); a service's table may override them. |
+| `BUILTIN_SCOPES` | `dict[str, tuple[str, ...]]` | `{'GET /v1/configuration': ('modules:read', 'modules:write'), 'PUT /v1/configurat` | Routes every service has (jane-kit, FastAPI); a service's table may override them. |
 | `JWT_ALGORITHMS` | — | `frozenset({'RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512', 'ES256', 'ES384` | Asymmetric algorithms ``jwt_algorithms`` may list; ``none`` and ``HS*`` are rejected. |
 | `ScopeTable` | — | `Mapping[str, str \| Sequence[str]]` | ``"METHOD /path/template"`` (as registered in FastAPI) -> scope, or any-of scopes (empty = any valid token). |

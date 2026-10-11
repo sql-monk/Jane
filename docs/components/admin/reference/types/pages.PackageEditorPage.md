@@ -10,4 +10,4 @@
 function PackageEditorPage(): React.JSX.Element
 ```
 
-Код: [PackageEditorPage.tsx:20](../../../../../web/admin/src/pages/PackageEditorPage.tsx#L20).
+Код: [PackageEditorPage.tsx:22](../../../../../web/admin/src/pages/PackageEditorPage.tsx#L22).

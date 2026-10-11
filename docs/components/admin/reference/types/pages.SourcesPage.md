@@ -10,7 +10,7 @@
 function SourcesPage(): React.JSX.Element
 ```
 
-Код: [SourcesPage.tsx:26](../../../../../web/admin/src/pages/SourcesPage.tsx#L26).
+Код: [SourcesPage.tsx:30](../../../../../web/admin/src/pages/SourcesPage.tsx#L30).
 
 ### Компонент `SourcePage`
 
@@ -18,4 +18,4 @@ function SourcesPage(): React.JSX.Element
 function SourcePage(): React.JSX.Element
 ```
 
-Код: [SourcesPage.tsx:148](../../../../../web/admin/src/pages/SourcesPage.tsx#L148).
+Код: [SourcesPage.tsx:155](../../../../../web/admin/src/pages/SourcesPage.tsx#L155).

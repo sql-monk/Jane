@@ -1,0 +1,172 @@
+{
+  "site": "dim-ria",
+  "source_id": "classified-dim-ria",
+  "run": {
+    "run_id": "run_01M4MVGDHY3QBDPNYTNYBMGSZP",
+    "task_id": "classifieds-dim-ria",
+    "trigger": "manual",
+    "status": "succeeded",
+    "started_at": "2026-10-11T06:48:20.846Z",
+    "finished_at": "2026-10-11T06:48:37.668Z",
+    "counters": {
+      "materials": 1,
+      "unknown_materials": 0
+    },
+    "stages": {
+      "collect": {
+        "counts": {
+          "completed": 1
+        }
+      },
+      "store-raw": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+          "version": "1.0.0",
+          "package_id": "jane.storage-files"
+        }
+      },
+      "extract-ads": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+          "version": "1.0.1",
+          "package_id": "classifieds.dim-ria-ads"
+        }
+      },
+      "store-ads": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+          "version": "1.0.0",
+          "package_id": "jane.storage-postgresql"
+        }
+      }
+    }
+  },
+  "verified": true,
+  "errors": [],
+  "samples": [
+    {
+      "fields": {
+        "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-borispolskaya-ulitsa-33683279.html",
+        "site": "dom.ria.com",
+        "price": {
+          "amount": 9000.0,
+          "currency": "UAH"
+        },
+        "title": "Здається в оренду 1-кімнатна квартира 27 кв. м у Києві",
+        "location": "Київ",
+        "listing_id": "33683279"
+      },
+      "observation": {
+        "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+        "observed_at": "2026-10-11T06:48:32Z",
+        "content_sha256": "8aeeccdda48ead1a7837c9a002062b2eccf2bc8510fa7a5b3d9c2e2614167522",
+        "observation_id": "obs_01a129b8642f00007e066107"
+      },
+      "raw_object_id": "obj_3d7d3bd078a4b72ea5d767fc6a98a3f2",
+      "verified": true,
+      "evidence_kind": "json",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price",
+        "location"
+      ]
+    },
+    {
+      "fields": {
+        "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-prichalnaya-ulitsa-35018017.html",
+        "site": "dom.ria.com",
+        "price": {
+          "amount": 36000.0,
+          "currency": "UAH"
+        },
+        "title": "Здається в оренду 1-кімнатна квартира 55 кв. м у Києві",
+        "location": "Київ",
+        "listing_id": "35018017"
+      },
+      "observation": {
+        "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+        "observed_at": "2026-10-11T06:48:32Z",
+        "content_sha256": "8aeeccdda48ead1a7837c9a002062b2eccf2bc8510fa7a5b3d9c2e2614167522",
+        "observation_id": "obs_01a129b8642f00007e066107"
+      },
+      "raw_object_id": "obj_3d7d3bd078a4b72ea5d767fc6a98a3f2",
+      "verified": true,
+      "evidence_kind": "json",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price",
+        "location"
+      ]
+    },
+    {
+      "fields": {
+        "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-solomyanka-vozdushnyh-sil-vozduhoflotskiy-prospekt-34133293.html",
+        "site": "dom.ria.com",
+        "price": {
+          "amount": 27000.0,
+          "currency": "UAH"
+        },
+        "title": "Здається в оренду 1-кімнатна квартира 43 кв. м у Києві",
+        "location": "Київ",
+        "listing_id": "34133293"
+      },
+      "observation": {
+        "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+        "observed_at": "2026-10-11T06:48:32Z",
+        "content_sha256": "8aeeccdda48ead1a7837c9a002062b2eccf2bc8510fa7a5b3d9c2e2614167522",
+        "observation_id": "obs_01a129b8642f00007e066107"
+      },
+      "raw_object_id": "obj_3d7d3bd078a4b72ea5d767fc6a98a3f2",
+      "verified": true,
+      "evidence_kind": "json",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price",
+        "location"
+      ]
+    }
+  ],
+  "packages": {
+    "store-raw": {
+      "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+      "version": "1.0.0",
+      "package_id": "jane.storage-files"
+    },
+    "extract-ads": {
+      "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+      "version": "1.0.1",
+      "package_id": "classifieds.dim-ria-ads"
+    },
+    "store-ads": {
+      "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+      "version": "1.0.0",
+      "package_id": "jane.storage-postgresql"
+    }
+  },
+  "raw_objects": 3,
+  "persisted_entities": 26,
+  "extraction_items": 1,
+  "checked_entities": 22,
+  "checked_raw_objects": 1
+}

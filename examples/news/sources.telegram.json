@@ -1,0 +1,42 @@
+[
+  {
+    "source_id": "news-tg-suspilnenews",
+    "title": "Суспільне Новини",
+    "region": "ukraine",
+    "url": "https://t.me/s/suspilnenews",
+    "language": "uk",
+    "transport": "telegram_public_web",
+    "rules_package_id": "news.telegram-public-suspilnenews-rules",
+    "extractor_package_id": "news.telegram-public-posts"
+  },
+  {
+    "source_id": "news-tg-dwglavnoe",
+    "title": "DW Главное",
+    "region": "europe",
+    "url": "https://t.me/s/dwglavnoe",
+    "language": "ru",
+    "transport": "telegram_public_web",
+    "rules_package_id": "news.telegram-public-dwglavnoe-rules",
+    "extractor_package_id": "news.telegram-public-posts"
+  },
+  {
+    "source_id": "news-tg-golosameriki",
+    "title": "Голос Америки (VOA)",
+    "region": "usa",
+    "url": "https://t.me/s/golosameriki",
+    "language": "ru",
+    "transport": "telegram_public_web",
+    "rules_package_id": "news.telegram-public-golosameriki-rules",
+    "extractor_package_id": "news.telegram-public-posts"
+  },
+  {
+    "source_id": "news-tg-tass-agency",
+    "title": "ТАСС",
+    "region": "russia",
+    "url": "https://t.me/s/tass_agency",
+    "language": "ru",
+    "transport": "telegram_public_web",
+    "rules_package_id": "news.telegram-public-tass-agency-rules",
+    "extractor_package_id": "news.telegram-public-posts"
+  }
+]

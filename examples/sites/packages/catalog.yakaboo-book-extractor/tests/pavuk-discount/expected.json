@@ -1,0 +1,53 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1514750",
+        "title": "Павук",
+        "price": 415.0,
+        "currency": "UAH",
+        "url": "https://www.yakaboo.ua/ua/pavuk.html",
+        "brand": "Темпора",
+        "category": "Український детектив",
+        "category_path": [
+          "Книжки",
+          "Художня література",
+          "Детективи",
+          "Український детектив"
+        ],
+        "old_price": 519.0,
+        "availability": "in_stock",
+        "image": "https://static.yakaboo.ua/media/cloudflare/product/webp/600x840/_/_/____2026-05-20___12.48.44.png",
+        "sku": "1514750",
+        "barcode": "9786175697566",
+        "rating": 5.0,
+        "reviews_count": 1,
+        "attributes": {
+          "Автор": "Олександра Ковенько",
+          "Видавництво": "Темпора",
+          "Кількість сторінок": "432",
+          "Рік видання": "2025",
+          "Мова": "Українська",
+          "Ілюстрації": "Немає ілюстрацій",
+          "Тип": "Паперова",
+          "Тип обкладинки": "Тверда",
+          "Вага": "422",
+          "ISBN": "978-617-569-756-6",
+          "Формат": "135х205х30 мм",
+          "Папір": "Офсетний"
+        },
+        "completeness": "full"
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1514750"
+        }
+      }
+    }
+  ]
+}

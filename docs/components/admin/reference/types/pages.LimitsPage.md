@@ -10,4 +10,4 @@
 function LimitsPage(): React.JSX.Element
 ```
 
-Код: [LimitsPage.tsx:12](../../../../../web/admin/src/pages/LimitsPage.tsx#L12).
+Код: [LimitsPage.tsx:23](../../../../../web/admin/src/pages/LimitsPage.tsx#L23).

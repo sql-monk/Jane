@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "product (ціна й наявність varus.ua)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "shop",
+    "product_id",
+    "availability"
+  ],
+  "properties": {
+    "shop": {
+      "type": "string",
+      "minLength": 1
+    },
+    "product_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "SKU товару в магазині (як sku у JSON-LD сторінки товару)."
+    },
+    "price": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Поточна ціна (з урахуванням акції), грн."
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "old_price": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Звичайна ціна, якщо діє акційна (ціна без акції), грн."
+    },
+    "availability": {
+      "type": "string",
+      "enum": [
+        "in_stock",
+        "out_of_stock",
+        "preorder",
+        "unknown"
+      ]
+    }
+  }
+}

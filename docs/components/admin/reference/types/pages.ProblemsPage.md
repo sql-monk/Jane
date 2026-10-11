@@ -10,4 +10,4 @@
 function ProblemsPage(): React.JSX.Element
 ```
 
-Код: [ProblemsPage.tsx:32](../../../../../web/admin/src/pages/ProblemsPage.tsx#L32).
+Код: [ProblemsPage.tsx:34](../../../../../web/admin/src/pages/ProblemsPage.tsx#L34).

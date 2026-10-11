@@ -1,0 +1,276 @@
+{
+  "entities": [
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "40065331",
+        "url": "https://auto.ria.com/uk/auto_bmw_x5_40065331.html",
+        "title": "BMW X5 2016",
+        "year": 2016,
+        "price_usd": 23900.0,
+        "price_uah": 1075500.0,
+        "mileage_km": 165000,
+        "transmission": "Автомат",
+        "fuel": "Бензин",
+        "engine_l": 2.98,
+        "body_type": "Позашляховик / Кросовер",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/bmw_x5__647758418fx.webp",
+        "vin_checked": true,
+        "status": "active"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "40065331"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_f1c013130b95c53c58a68c32",
+        "observed_at": "2026-10-11T02:50:06Z",
+        "material_id": "web:a9b32b7b3691f1575deca2a9f7f2840a",
+        "content_sha256": "f1c013130b95c53c58a68c326216c07cdb8c8c9c80993e758857eaefa5d37f11"
+      }
+    },
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "39597444",
+        "url": "https://auto.ria.com/uk/auto_skoda_octavia_39597444.html",
+        "title": "Skoda Octavia 2013",
+        "year": 2013,
+        "price_usd": 8300.0,
+        "price_uah": 373500.0,
+        "mileage_km": 201000,
+        "transmission": "Ручна / Механіка",
+        "fuel": "Дизель",
+        "engine_l": 1.6,
+        "body_type": "Універсал",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/skoda_octavia__634688934fx.webp",
+        "vin_checked": true,
+        "status": "active"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "39597444"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_f1c013130b95c53c58a68c32",
+        "observed_at": "2026-10-11T02:50:06Z",
+        "material_id": "web:a9b32b7b3691f1575deca2a9f7f2840a",
+        "content_sha256": "f1c013130b95c53c58a68c326216c07cdb8c8c9c80993e758857eaefa5d37f11"
+      }
+    },
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "40423584",
+        "url": "https://auto.ria.com/uk/auto_land-rover_range-rover-sport_40423584.html",
+        "title": "Land Rover Range Rover Sport 2019",
+        "year": 2019,
+        "price_usd": 38500.0,
+        "price_uah": 1732500.0,
+        "mileage_km": 145000,
+        "transmission": "Автомат",
+        "fuel": "Дизель",
+        "engine_l": 2.99,
+        "body_type": "Позашляховик / Кросовер",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/land-rover_range-rover-sport__657492400fx.webp",
+        "vin_checked": false,
+        "status": "active"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "40423584"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_f1c013130b95c53c58a68c32",
+        "observed_at": "2026-10-11T02:50:06Z",
+        "material_id": "web:a9b32b7b3691f1575deca2a9f7f2840a",
+        "content_sha256": "f1c013130b95c53c58a68c326216c07cdb8c8c9c80993e758857eaefa5d37f11"
+      }
+    },
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "39641387",
+        "url": "https://auto.ria.com/uk/auto_jeep_grand-cherokee_39641387.html",
+        "title": "Jeep Grand Cherokee 1994",
+        "year": 1994,
+        "price_usd": 3650.0,
+        "price_uah": 164250.0,
+        "mileage_km": 214000,
+        "transmission": "Автомат",
+        "fuel": "Газ/Бензин",
+        "engine_l": 4.0,
+        "body_type": "Позашляховик / Кросовер",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/jeep_grand-cherokee__635978489fx.webp",
+        "vin_checked": true,
+        "status": "active"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "39641387"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_f1c013130b95c53c58a68c32",
+        "observed_at": "2026-10-11T02:50:06Z",
+        "material_id": "web:a9b32b7b3691f1575deca2a9f7f2840a",
+        "content_sha256": "f1c013130b95c53c58a68c326216c07cdb8c8c9c80993e758857eaefa5d37f11"
+      }
+    },
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "40053575",
+        "url": "https://auto.ria.com/uk/auto_volkswagen_golf_40053575.html",
+        "title": "Volkswagen Golf 2005",
+        "year": 2005,
+        "price_usd": 4999.0,
+        "price_uah": 224955.0,
+        "mileage_km": 202000,
+        "transmission": "Ручна / Механіка",
+        "fuel": "Бензин",
+        "engine_l": 1.39,
+        "body_type": "Хетчбек",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/volkswagen_golf__647939712fx.webp",
+        "vin_checked": true,
+        "status": "active"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "40053575"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_f1c013130b95c53c58a68c32",
+        "observed_at": "2026-10-11T02:50:06Z",
+        "material_id": "web:a9b32b7b3691f1575deca2a9f7f2840a",
+        "content_sha256": "f1c013130b95c53c58a68c326216c07cdb8c8c9c80993e758857eaefa5d37f11"
+      }
+    },
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "39876571",
+        "url": "https://auto.ria.com/uk/auto_renault_megane_39876571.html",
+        "title": "Renault Megane 2011",
+        "year": 2011,
+        "price_usd": 6550.0,
+        "price_uah": 294750.0,
+        "mileage_km": 259000,
+        "transmission": "Ручна / Механіка",
+        "fuel": "Дизель",
+        "engine_l": 1.46,
+        "body_type": "Хетчбек",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/renault_megane__642574635fx.webp",
+        "vin_checked": true,
+        "status": "active"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "39876571"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_f1c013130b95c53c58a68c32",
+        "observed_at": "2026-10-11T02:50:06Z",
+        "material_id": "web:a9b32b7b3691f1575deca2a9f7f2840a",
+        "content_sha256": "f1c013130b95c53c58a68c326216c07cdb8c8c9c80993e758857eaefa5d37f11"
+      }
+    },
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "39876608",
+        "url": "https://auto.ria.com/uk/auto_volkswagen_tiguan_39876608.html",
+        "title": "Volkswagen Tiguan 2015",
+        "year": 2015,
+        "price_usd": 12300.0,
+        "price_uah": 553500.0,
+        "mileage_km": 176000,
+        "transmission": "Автомат",
+        "fuel": "Бензин",
+        "engine_l": 1.98,
+        "body_type": "Позашляховик / Кросовер",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/volkswagen_tiguan__642583832fx.webp",
+        "vin_checked": false,
+        "status": "active"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "39876608"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_f1c013130b95c53c58a68c32",
+        "observed_at": "2026-10-11T02:50:06Z",
+        "material_id": "web:a9b32b7b3691f1575deca2a9f7f2840a",
+        "content_sha256": "f1c013130b95c53c58a68c326216c07cdb8c8c9c80993e758857eaefa5d37f11"
+      }
+    },
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "39595672",
+        "url": "https://auto.ria.com/uk/auto_mercedes-benz_a-class_39595672.html",
+        "title": "Mercedes-Benz A-Class 2012",
+        "year": 2012,
+        "price_usd": 8900.0,
+        "price_uah": 400500.0,
+        "mileage_km": 120000,
+        "transmission": "Автомат",
+        "fuel": "Дизель",
+        "engine_l": 2.0,
+        "body_type": "Хетчбек",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/mercedes-benz_a-class__634637054fx.webp",
+        "vin_checked": true,
+        "status": "active"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "39595672"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_f1c013130b95c53c58a68c32",
+        "observed_at": "2026-10-11T02:50:06Z",
+        "material_id": "web:a9b32b7b3691f1575deca2a9f7f2840a",
+        "content_sha256": "f1c013130b95c53c58a68c326216c07cdb8c8c9c80993e758857eaefa5d37f11"
+      }
+    }
+  ]
+}

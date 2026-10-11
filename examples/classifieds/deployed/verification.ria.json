@@ -1,0 +1,172 @@
+{
+  "site": "ria",
+  "source_id": "classified-ria",
+  "run": {
+    "run_id": "run_01M4MRQXE1Z4SXDZ25SZ3YGDYS",
+    "task_id": "classifieds-ria",
+    "trigger": "schedule",
+    "status": "succeeded",
+    "started_at": "2026-10-11T06:00:03.845Z",
+    "finished_at": "2026-10-11T06:00:28.825Z",
+    "counters": {
+      "materials": 1,
+      "unknown_materials": 0
+    },
+    "stages": {
+      "collect": {
+        "counts": {
+          "completed": 1
+        }
+      },
+      "store-raw": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+          "version": "1.0.0",
+          "package_id": "jane.storage-files"
+        }
+      },
+      "extract-ads": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:74d8b3e1b40d00ab3f2af721d10592b0a86b86272435fea182fbd632d765d3b2",
+          "version": "1.0.0",
+          "package_id": "classifieds.ria-ads"
+        }
+      },
+      "store-ads": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+          "version": "1.0.0",
+          "package_id": "jane.storage-postgresql"
+        }
+      }
+    }
+  },
+  "verified": true,
+  "errors": [],
+  "samples": [
+    {
+      "fields": {
+        "url": "https://www.ria.com/uk/portatyvna-zaryadna-stantsiya-brevia-epower-96k-307-240175109.html",
+        "site": "ria.com",
+        "price": {
+          "amount": 7899.0,
+          "currency": "UAH"
+        },
+        "title": "Портативна зарядна станція Brevia ePower 96k (307.2 Вт·год / 96000 мА·год)",
+        "location": "Хмельницький",
+        "listing_id": "240175109"
+      },
+      "observation": {
+        "material_id": "web:ade6d46fea98e93aeb1de84876865aa8",
+        "observed_at": "2026-10-11T06:00:18Z",
+        "content_sha256": "a4215f3ee94077d1156babacc36b990b3edb6279822cfc1c66d22bec15db1cf1",
+        "observation_id": "obs_01a1298c3c000000e81f145e"
+      },
+      "raw_object_id": "obj_8c79225ba5ad25d96f025d994d40ef78",
+      "verified": true,
+      "evidence_kind": "html",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price",
+        "location"
+      ]
+    },
+    {
+      "fields": {
+        "url": "https://www.ria.com/uk/garnitura-igrova-asus-rog-strix-go-core-238060287.html",
+        "site": "ria.com",
+        "price": {
+          "amount": 2650.0,
+          "currency": "UAH"
+        },
+        "title": "Гарнітура ігрова ASUS ROG Strix Go Core 3.5 mm (90YH02R1-B1UA00) чорна",
+        "location": "Київ",
+        "listing_id": "238060287"
+      },
+      "observation": {
+        "material_id": "web:ade6d46fea98e93aeb1de84876865aa8",
+        "observed_at": "2026-10-11T06:00:18Z",
+        "content_sha256": "a4215f3ee94077d1156babacc36b990b3edb6279822cfc1c66d22bec15db1cf1",
+        "observation_id": "obs_01a1298c3c000000e81f145e"
+      },
+      "raw_object_id": "obj_8c79225ba5ad25d96f025d994d40ef78",
+      "verified": true,
+      "evidence_kind": "html",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price",
+        "location"
+      ]
+    },
+    {
+      "fields": {
+        "url": "https://www.ria.com/uk/bluetooth-garnitura-proove-logic-tws-app-white-238361542.html",
+        "site": "ria.com",
+        "price": {
+          "amount": 799.0,
+          "currency": "UAH"
+        },
+        "title": "Bluetooth-гарнітура Proove Logic TWS APP White (TWLT54002202)",
+        "location": "Харків",
+        "listing_id": "238361542"
+      },
+      "observation": {
+        "material_id": "web:ade6d46fea98e93aeb1de84876865aa8",
+        "observed_at": "2026-10-11T06:00:18Z",
+        "content_sha256": "a4215f3ee94077d1156babacc36b990b3edb6279822cfc1c66d22bec15db1cf1",
+        "observation_id": "obs_01a1298c3c000000e81f145e"
+      },
+      "raw_object_id": "obj_8c79225ba5ad25d96f025d994d40ef78",
+      "verified": true,
+      "evidence_kind": "html",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price",
+        "location"
+      ]
+    }
+  ],
+  "packages": {
+    "store-raw": {
+      "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+      "version": "1.0.0",
+      "package_id": "jane.storage-files"
+    },
+    "extract-ads": {
+      "digest": "sha256:74d8b3e1b40d00ab3f2af721d10592b0a86b86272435fea182fbd632d765d3b2",
+      "version": "1.0.0",
+      "package_id": "classifieds.ria-ads"
+    },
+    "store-ads": {
+      "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+      "version": "1.0.0",
+      "package_id": "jane.storage-postgresql"
+    }
+  },
+  "raw_objects": 2,
+  "persisted_entities": 20,
+  "extraction_items": 1,
+  "checked_entities": 20,
+  "checked_raw_objects": 1
+}

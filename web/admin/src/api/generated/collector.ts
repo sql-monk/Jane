@@ -790,18 +790,29 @@ export interface components {
        * @enum {string}
        */
       method?: "GET" | "POST";
-      /** @description JSON-тіло для method: POST (будь-яке JSON-значення), однакове для всіх сторінок; для GET не використовується. */
+      /** @description JSON-тіло для method: POST; для GET не використовується. Однакове для всіх сторінок, крім полів, явно заданих pagination.body_page_path та partitions.body_path. */
       body?: unknown;
       /** @description JSONPath до масиву елементів, наприклад '$.items'. */
       items_path: string;
       /** @description JSONPath до URL матеріалу в елементі, наприклад '$.url'. */
       url_path: string;
+      /**
+       * Format: uri
+       * @description Базовий URL для відносних URL товарів (наприклад https://shop.example.test/ для API під /api/). Якщо не задано — URL сторінки API. Результат проходить normalization і scope; robots перевіряється при HTTP-завантаженні, включно з навігацією API. Для emit_items_as_materials URL товару не завантажується.
+       */
+      item_url_base?: string;
       lastmod_path?: string;
       /**
        * @description true — кожен елемент items_path видається як окремий Material: media_type application/json (елемент, серіалізований як JSON), content_kind json, material_id — від канонічного URL з url_path (той самий об'єкт, що й сторінка за цим URL), edited_at — з lastmod_path, discovery.parent_url — сторінка API, без http і locator.final_url. URL елементів не завантажуються; ядро закріплює їх у зборі, тож інша стратегія не завантажує той самий URL у цьому зборі (один матеріал на канонічний URL). У mode=incremental елементи підлягають revisit і dedup так само, як сторінки (if_changed — за зміною вмісту елемента).
        * @default false
        */
       emit_items_as_materials?: boolean;
+      /** @description Для POST: рекурсивний обхід розділів API (наприклад категорій). Початковий ідентифікатор береться з body_path; кожна відповідь може містити дочірні ідентифікатори за items_path. Кожен розділ має власну пагінацію, body змінюється лише у копії; ідентифікатор також записується в url_param для унікального ключа навігації. Повтори й цикли усуваються; кількість і глибина розділів обмежуються crawl.max_frontier_size і crawl.max_depth. */
+      partitions?: {
+        items_path: string;
+        body_path: string;
+        url_param: string;
+      };
       pagination?: {
         /**
          * @default none
@@ -812,6 +823,8 @@ export interface components {
         cursor_path?: string;
         cursor_param?: string;
         page_param?: string;
+        /** @description Для POST із pagination.type=page: шлях до наявного цілого додатного номера сторінки у JSON body, наприклад $.variables.page. Колектор копіює body для кожного запиту й записує поточний номер сторінки. page_param також лишається в URL для унікального ключа навігаційної сторінки; початкове значення береться з body, якщо його немає в URL. */
+        body_page_path?: string;
       };
     } & (components["schemas"]["StrategyCommon"] & {
       /** @constant */
@@ -899,6 +912,12 @@ export interface components {
         patterns: components["schemas"]["UrlPattern"][];
       }[];
       fetch?: {
+        /**
+         * @description Транспорт початкового GET-запиту: http — звичайний HTTP-клієнт; browser — мережевий стек Chromium через контрольований egress proxy. Для browser повертаються оригінальні байти відповіді, JavaScript під час завантаження вимкнено; render_js окремо визначає потребу рендерингу. Межі, robots.txt, переадресації, ліміти, тайм-аути та перевірки вихідних адрес залишаються обов'язковими. Потрібна збірка Web Collector з Chromium; за відсутності підтримки — not_implemented. POST та автентифіковані запити через цей транспорт не підтримуються.
+         * @default http
+         * @enum {string}
+         */
+        transport?: "http" | "browser";
         user_agent?: string;
         /** @description Додаткові несекретні заголовки. Автентифікація до сайту — лише через connection_id. */
         headers?: {

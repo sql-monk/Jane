@@ -1,6 +1,17 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
-import { ApiError, errorMessage, safeProblemCode } from "../api/problem";
+import { ApiError, errorMessage, safeProblemCode, problemFrom } from "../api/problem";
+import { statusLabel } from "../lib/format";
 import { redactSecrets } from "../lib/secrets";
 import { useLocation } from "react-router-dom";
 import { navigationFor } from "../lib/navigation";
@@ -9,13 +20,15 @@ export function Page({
   title,
   actions,
   children,
+  description: pageDescription,
 }: {
   title: string;
+  description?: string;
   actions?: ReactNode;
   children: ReactNode;
 }) {
   const location = useLocation();
-  const description = navigationFor(location.pathname)?.description;
+  const description = pageDescription ?? navigationFor(location.pathname)?.description;
   return (
     <section className="page">
       <header className="page-header">
@@ -60,11 +73,13 @@ export function Loading({ what = "Завантаження" }: { what?: string }
 
 export function ErrorBox({ error, title }: { error: unknown; title?: string }) {
   if (!error) return null;
-  const problem = error instanceof ApiError ? error.problem : null;
+  const problem = problemFrom(error);
   const httpStatus =
     error instanceof ApiError && Number.isInteger(error.status) && error.status >= 400 && error.status <= 599
       ? error.status
-      : null;
+      : problem?.status && problem.status >= 400 && problem.status <= 599
+        ? problem.status
+        : null;
   return (
     <div className="error-box" role="alert">
       <strong>{title ?? "Помилка"}</strong>
@@ -74,13 +89,26 @@ export function ErrorBox({ error, title }: { error: unknown; title?: string }) {
           {" "}
           (<code>{safeProblemCode(problem.code)}</code>
           {httpStatus ? `, HTTP ${httpStatus}` : ""})
+          {typeof problem.retryable === "boolean"
+            ? problem.retryable
+              ? " · Можна повторити"
+              : " · Спершу виправте причину"
+            : ""}
         </span>
+      ) : null}
+      {problem?.trace_id && /^[a-f0-9]{32}$/.test(problem.trace_id) ? (
+        <small className="muted">
+          Ідентифікатор діагностики: <code>{problem.trace_id}</code>
+        </small>
       ) : null}
     </div>
   );
 }
 
 const STATUS_TONE: Record<string, string> = {
+  available: "ok",
+  unavailable: "bad",
+  unsupported: "muted",
   succeeded: "ok",
   success: "ok",
   completed: "ok",
@@ -126,7 +154,11 @@ const STATUS_TONE: Record<string, string> = {
 
 export function Status({ value }: { value: string | null | undefined }) {
   if (!value) return <span className="muted">—</span>;
-  return <span className={`badge badge-${STATUS_TONE[value] ?? "muted"}`}>{value}</span>;
+  return (
+    <span className={`badge badge-${STATUS_TONE[value] ?? "muted"}`} title={value} data-status={value}>
+      {statusLabel(value)}
+    </span>
+  );
 }
 
 /** Pretty JSON of API data; secret-looking values are always masked (ТЗ §11). */
@@ -173,13 +205,19 @@ export function Table<T>({
   rowKey,
   empty = "Немає даних",
   label,
+  loading = false,
+  error,
 }: {
   rows: readonly T[];
   columns: ReadonlyArray<Column<T>>;
   rowKey: (row: T, index: number) => string;
   empty?: string;
   label?: string;
+  loading?: boolean;
+  error?: unknown;
 }) {
+  if (rows.length === 0 && loading) return <Loading />;
+  if (rows.length === 0 && error) return null;
   if (rows.length === 0) return <p className="muted">{empty}</p>;
   return (
     <div className="table-wrap">
@@ -197,7 +235,7 @@ export function Table<T>({
           {rows.map((row, i) => (
             <tr key={rowKey(row, i)}>
               {columns.map((c) => (
-                <td key={c.header} className={c.className}>
+                <td key={c.header} className={c.className} data-label={c.header}>
                   <TableValue value={c.cell(row)} />
                 </td>
               ))}
@@ -253,13 +291,78 @@ export function Tabs<K extends string>({
   );
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function Field({
+  label,
+  hint,
+  error,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  error?: string | undefined;
+  children: ReactNode;
+}) {
+  const id = useId();
+  let controlId: string | undefined;
+  let controlCount = 0;
+  const decorate = (nodes: ReactNode): ReactNode =>
+    Children.map(nodes, (child) => {
+      if (
+        !isValidElement(child) ||
+        typeof child.type !== "string" ||
+        !["input", "select", "textarea"].includes(child.type)
+      )
+        return isValidElement(child) && typeof child.type === "string"
+          ? cloneElement(child as ReactElement<{ children?: ReactNode }>, {
+              children: decorate((child.props as { children?: ReactNode }).children),
+            })
+          : child;
+      const control = child as ReactElement<{
+        id?: string;
+        "aria-describedby"?: string;
+        "aria-invalid"?: boolean;
+      }>;
+      const assignedId = control.props.id ?? (controlCount ? `${id}-${controlCount}` : id);
+      controlCount += 1;
+      controlId ??= assignedId;
+      return cloneElement(control, {
+        id: assignedId,
+        ...(hint || error
+          ? {
+              "aria-describedby": [
+                control.props["aria-describedby"],
+                hint ? `${id}-hint` : null,
+                error ? `${id}-error` : null,
+              ]
+                .filter(Boolean)
+                .join(" "),
+            }
+          : {}),
+        ...(error ? { "aria-invalid": true } : {}),
+      });
+    });
+  const controls = decorate(children);
   return (
-    <label className="field">
-      <span className="field-label">{label}</span>
-      {children}
-      {hint ? <span className="field-hint">{hint}</span> : null}
-    </label>
+    <div className="field">
+      {controlId ? (
+        <label className="field-label" htmlFor={controlId}>
+          {label}
+        </label>
+      ) : (
+        <span className="field-label">{label}</span>
+      )}
+      {controls}
+      {hint ? (
+        <span className="field-hint" id={`${id}-hint`}>
+          {hint}
+        </span>
+      ) : null}
+      {error ? (
+        <span className="error-inline" id={`${id}-error`} role="alert">
+          {error}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -309,7 +412,8 @@ export function ReasonAction({
   busy,
   danger = false,
   requireReason = true,
-  modal = false,
+  modal = true,
+  impact,
 }: {
   label: string;
   confirmLabel?: string;
@@ -318,6 +422,7 @@ export function ReasonAction({
   danger?: boolean;
   requireReason?: boolean;
   modal?: boolean;
+  impact?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -367,6 +472,7 @@ export function ReasonAction({
           if (!busy) setOpen(false);
         }}
       >
+        {impact ? <p>{impact}</p> : null}
         {confirmation}
       </ActionDialog>
     </>

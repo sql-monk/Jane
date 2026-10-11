@@ -1,0 +1,130 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "liika-sadova-lemira-10-l",
+        "price": 216.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "liika-sadova-lemira-10-l"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "leyka-dlya-tsvetov-mm-plast-2-5-l-dlinnyy-nosik",
+        "price": 77.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "leyka-dlya-tsvetov-mm-plast-2-5-l-dlinnyy-nosik"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "liika-aleana-olyvkova-1-5-l",
+        "price": 65.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "liika-aleana-olyvkova-1-5-l"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "liika-sadova-lemira-7-l",
+        "price": 199.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "liika-sadova-lemira-7-l"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "liika-sadova-spring-4-5-l",
+        "price": 229.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "liika-sadova-spring-4-5-l"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "leyka-dlya-tsvetov-2-5-l-seraya",
+        "price": 103.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "leyka-dlya-tsvetov-2-5-l-seraya"
+        }
+      }
+    }
+  ]
+}

@@ -109,6 +109,9 @@ SECTION_PAGES = (
     "/catalog/laptops/",
     "/product/laptop-one",
     "/news/2026/holiday-hours",
+    # Sampling honors seed_list as a discovery boundary. Include a second news
+    # listing so each intended material type has two independent examples.
+    "/news/page/2/",
 )
 
 
@@ -229,7 +232,8 @@ def test_s_m2_06_name_and_crawl_hints_to_extractor_source_task_and_entities(
     check_sample_and_proposals(session)
     assert session["sample"]["distinct_types"] >= 4, session["sample"]
     counts = {t["type"]: t["count"] for t in session["analysis"]["material_types"]}
-    assert all(counts.get(kind, 0) >= 2 for kind in ("product", "category", "article")), counts
+    assert all(counts.get(kind, 0) >= 2 for kind in ("product", "category", "article", "news_list")), counts
+    assert session["sample"]["materials"] == len(SECTION_PAGES), session["sample"]
     proposals = session["proposals"]
     assert by_purpose(llm).get("onboarding", 0) > onboarding_before
 

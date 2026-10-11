@@ -327,13 +327,29 @@ type TestSummary = NonNullable<PackageVersion["test_summary"]>;
 
 Код: [types.ts:69](../../../../../web/admin/src/api/types.ts#L69).
 
+### Тип `StorageConnection`
+
+```typescript
+type StorageConnection = ItemOf<Ok<Sto["/v1/connections"]["get"]>>;
+```
+
+Код: [types.ts:72](../../../../../web/admin/src/api/types.ts#L72).
+
+### Тип `StorageStatus`
+
+```typescript
+type StorageStatus = Ok<Sto["/v1/storage-status"]["get"]>;
+```
+
+Код: [types.ts:73](../../../../../web/admin/src/api/types.ts#L73).
+
 ### Тип `StoredObject`
 
 ```typescript
 type StoredObject = ItemOf<Ok<Sto["/v1/objects"]["get"]>>;
 ```
 
-Код: [types.ts:72](../../../../../web/admin/src/api/types.ts#L72).
+Код: [types.ts:74](../../../../../web/admin/src/api/types.ts#L74).
 
 ### Тип `StoredObjectDetail`
 
@@ -341,7 +357,7 @@ type StoredObject = ItemOf<Ok<Sto["/v1/objects"]["get"]>>;
 type StoredObjectDetail = Ok<Sto["/v1/objects/{object_id}"]["get"]>;
 ```
 
-Код: [types.ts:73](../../../../../web/admin/src/api/types.ts#L73).
+Код: [types.ts:75](../../../../../web/admin/src/api/types.ts#L75).
 
 ### Тип `EntityState`
 
@@ -349,7 +365,7 @@ type StoredObjectDetail = Ok<Sto["/v1/objects/{object_id}"]["get"]>;
 type EntityState = ItemOf<Ok<Sto["/v1/entities"]["get"]>>;
 ```
 
-Код: [types.ts:74](../../../../../web/admin/src/api/types.ts#L74).
+Код: [types.ts:76](../../../../../web/admin/src/api/types.ts#L76).
 
 ### Тип `EntityHistoryEntry`
 
@@ -357,7 +373,7 @@ type EntityState = ItemOf<Ok<Sto["/v1/entities"]["get"]>>;
 type EntityHistoryEntry = ItemOf<Ok<Sto["/v1/entity-history"]["get"]>>;
 ```
 
-Код: [types.ts:75](../../../../../web/admin/src/api/types.ts#L75).
+Код: [types.ts:77](../../../../../web/admin/src/api/types.ts#L77).
 
 ### Тип `Provider`
 
@@ -365,7 +381,7 @@ type EntityHistoryEntry = ItemOf<Ok<Sto["/v1/entity-history"]["get"]>>;
 type Provider = Ok<Llm["/v1/providers/{provider_id}"]["get"]>;
 ```
 
-Код: [types.ts:78](../../../../../web/admin/src/api/types.ts#L78).
+Код: [types.ts:80](../../../../../web/admin/src/api/types.ts#L80).
 
 ### Тип `ModelAlias`
 
@@ -373,7 +389,7 @@ type Provider = Ok<Llm["/v1/providers/{provider_id}"]["get"]>;
 type ModelAlias = ItemOf<Ok<Llm["/v1/model-aliases"]["get"]>>;
 ```
 
-Код: [types.ts:79](../../../../../web/admin/src/api/types.ts#L79).
+Код: [types.ts:81](../../../../../web/admin/src/api/types.ts#L81).
 
 ### Тип `BudgetDefinition`
 
@@ -381,7 +397,7 @@ type ModelAlias = ItemOf<Ok<Llm["/v1/model-aliases"]["get"]>>;
 type BudgetDefinition = ItemOf<Ok<Llm["/v1/budgets"]["get"]>>;
 ```
 
-Код: [types.ts:80](../../../../../web/admin/src/api/types.ts#L80).
+Код: [types.ts:82](../../../../../web/admin/src/api/types.ts#L82).
 
 ### Тип `UsageReport`
 
@@ -389,7 +405,7 @@ type BudgetDefinition = ItemOf<Ok<Llm["/v1/budgets"]["get"]>>;
 type UsageReport = Ok<Llm["/v1/usage"]["get"]>;
 ```
 
-Код: [types.ts:81](../../../../../web/admin/src/api/types.ts#L81).
+Код: [types.ts:83](../../../../../web/admin/src/api/types.ts#L83).
 
 ### Тип `Money`
 
@@ -397,7 +413,7 @@ type UsageReport = Ok<Llm["/v1/usage"]["get"]>;
 type Money = NonNullable<Run["costs"]>["llm"];
 ```
 
-Код: [types.ts:82](../../../../../web/admin/src/api/types.ts#L82).
+Код: [types.ts:84](../../../../../web/admin/src/api/types.ts#L84).
 
 ### Тип `TestRunRequest`
 
@@ -405,7 +421,7 @@ type Money = NonNullable<Run["costs"]>["llm"];
 type TestRunRequest = Body<Hdl["/v1/test-runs"]["post"]>;
 ```
 
-Код: [types.ts:85](../../../../../web/admin/src/api/types.ts#L85).
+Код: [types.ts:87](../../../../../web/admin/src/api/types.ts#L87).
 
 ### Тип `ConnectionTestResult`
 
@@ -413,7 +429,7 @@ type TestRunRequest = Body<Hdl["/v1/test-runs"]["post"]>;
 type ConnectionTestResult = Ok<Hdl["/v1/connections/{connection_id}/test"]["post"]>;
 ```
 
-Код: [types.ts:86](../../../../../web/admin/src/api/types.ts#L86).
+Код: [types.ts:88](../../../../../web/admin/src/api/types.ts#L88).
 
 ### Тип `OnboardingRequest`
 
@@ -421,7 +437,7 @@ type ConnectionTestResult = Ok<Hdl["/v1/connections/{connection_id}/test"]["post
 type OnboardingRequest = Body<Asst["/v1/onboarding-sessions"]["post"]>;
 ```
 
-Код: [types.ts:89](../../../../../web/admin/src/api/types.ts#L89).
+Код: [types.ts:91](../../../../../web/admin/src/api/types.ts#L91).
 
 ### Тип `OnboardingSession`
 
@@ -429,7 +445,7 @@ type OnboardingRequest = Body<Asst["/v1/onboarding-sessions"]["post"]>;
 type OnboardingSession = Ok<Asst["/v1/onboarding-sessions/{session_id}"]["get"]>;
 ```
 
-Код: [types.ts:90](../../../../../web/admin/src/api/types.ts#L90).
+Код: [types.ts:92](../../../../../web/admin/src/api/types.ts#L92).
 
 ### Тип `OnboardingSessionSummary`
 
@@ -437,7 +453,7 @@ type OnboardingSession = Ok<Asst["/v1/onboarding-sessions/{session_id}"]["get"]>
 type OnboardingSessionSummary = ItemOf<Ok<Asst["/v1/onboarding-sessions"]["get"]>>;
 ```
 
-Код: [types.ts:91](../../../../../web/admin/src/api/types.ts#L91).
+Код: [types.ts:93](../../../../../web/admin/src/api/types.ts#L93).
 
 ### Тип `OnboardingStatus`
 
@@ -445,7 +461,7 @@ type OnboardingSessionSummary = ItemOf<Ok<Asst["/v1/onboarding-sessions"]["get"]
 type OnboardingStatus = OnboardingSession["status"];
 ```
 
-Код: [types.ts:92](../../../../../web/admin/src/api/types.ts#L92).
+Код: [types.ts:94](../../../../../web/admin/src/api/types.ts#L94).
 
 ### Тип `Proposal`
 
@@ -453,7 +469,7 @@ type OnboardingStatus = OnboardingSession["status"];
 type Proposal = NonNullable<OnboardingSession["proposals"]>[number];
 ```
 
-Код: [types.ts:93](../../../../../web/admin/src/api/types.ts#L93).
+Код: [types.ts:95](../../../../../web/admin/src/api/types.ts#L95).
 
 ### Тип `ImprovementRequest`
 
@@ -461,7 +477,7 @@ type Proposal = NonNullable<OnboardingSession["proposals"]>[number];
 type ImprovementRequest = Body<Asst["/v1/improvement-runs"]["post"]>;
 ```
 
-Код: [types.ts:94](../../../../../web/admin/src/api/types.ts#L94).
+Код: [types.ts:96](../../../../../web/admin/src/api/types.ts#L96).
 
 ### Тип `ImprovementRun`
 
@@ -469,7 +485,7 @@ type ImprovementRequest = Body<Asst["/v1/improvement-runs"]["post"]>;
 type ImprovementRun = ItemOf<Ok<Asst["/v1/improvement-runs"]["get"]>>;
 ```
 
-Код: [types.ts:95](../../../../../web/admin/src/api/types.ts#L95).
+Код: [types.ts:97](../../../../../web/admin/src/api/types.ts#L97).
 
 ### Тип `AssistantInfo`
 
@@ -477,7 +493,7 @@ type ImprovementRun = ItemOf<Ok<Asst["/v1/improvement-runs"]["get"]>>;
 type AssistantInfo = Ok<Asst["/v1/info"]["get"]>;
 ```
 
-Код: [types.ts:96](../../../../../web/admin/src/api/types.ts#L96).
+Код: [types.ts:98](../../../../../web/admin/src/api/types.ts#L98).
 
 ### Тип `ImprovementResult`
 
@@ -485,7 +501,7 @@ type AssistantInfo = Ok<Asst["/v1/info"]["get"]>;
 type ImprovementResult = AsstComponents["schemas"]["ImprovementResult"];
 ```
 
-Код: [types.ts:98](../../../../../web/admin/src/api/types.ts#L98).
+Код: [types.ts:100](../../../../../web/admin/src/api/types.ts#L100).
 
 ### Тип `ImprovementProposal`
 
@@ -493,7 +509,7 @@ type ImprovementResult = AsstComponents["schemas"]["ImprovementResult"];
 type ImprovementProposal = AsstComponents["schemas"]["ImprovementProposal"];
 ```
 
-Код: [types.ts:99](../../../../../web/admin/src/api/types.ts#L99).
+Код: [types.ts:101](../../../../../web/admin/src/api/types.ts#L101).
 
 ### Тип `AcceptanceResult`
 
@@ -501,7 +517,7 @@ type ImprovementProposal = AsstComponents["schemas"]["ImprovementProposal"];
 type AcceptanceResult = AsstComponents["schemas"]["AcceptanceResult"];
 ```
 
-Код: [types.ts:100](../../../../../web/admin/src/api/types.ts#L100).
+Код: [types.ts:102](../../../../../web/admin/src/api/types.ts#L102).
 
 ### Тип `CollectionErrors`
 
@@ -509,4 +525,4 @@ type AcceptanceResult = AsstComponents["schemas"]["AcceptanceResult"];
 type CollectionErrors = Ok<Col["/v1/collections/{collection_id}/errors"]["get"]>;
 ```
 
-Код: [types.ts:103](../../../../../web/admin/src/api/types.ts#L103).
+Код: [types.ts:105](../../../../../web/admin/src/api/types.ts#L105).

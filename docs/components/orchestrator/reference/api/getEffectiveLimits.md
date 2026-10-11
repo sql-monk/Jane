@@ -1,6 +1,6 @@
 # GET /v1/limits/effective
 
-> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1355). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1361). Не редагуйте вручну.
 
 **Ефективні ліміти для контексту з походженням кожного значення**
 

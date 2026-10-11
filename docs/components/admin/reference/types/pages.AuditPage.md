@@ -10,4 +10,4 @@
 function AuditPage(): React.JSX.Element
 ```
 
-Код: [AuditPage.tsx:11](../../../../../web/admin/src/pages/AuditPage.tsx#L11).
+Код: [AuditPage.tsx:13](../../../../../web/admin/src/pages/AuditPage.tsx#L13).

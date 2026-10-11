@@ -1,4 +1,4 @@
-import { captureRequest, expect, test } from "./fixtures";
+import { captureRequest, expect, fillInstant, test } from "./fixtures";
 
 const RUN = "run_01J9ZQ3F8W2N4K7T5B6C1D0E9F";
 
@@ -11,7 +11,7 @@ test.describe("runs, progress, costs, cancellation, reprocessing, materials, res
     const progress = admin.getByRole("table", { name: "Прогрес етапів" });
     await expect(progress).toContainText("extract-products");
     await expect(progress).toContainText("shop-example.product-extractor@1.2.0");
-    await expect(progress.getByRole("columnheader", { name: "unrecognized" })).toBeVisible();
+    await expect(progress.getByRole("columnheader", { name: "Не розпізнано" })).toBeVisible();
 
     await admin.getByRole("button", { name: "Скасувати запуск" }).click();
     await admin.getByLabel("Причина: Скасувати запуск").fill("wrong limits");
@@ -25,7 +25,7 @@ test.describe("runs, progress, costs, cancellation, reprocessing, materials, res
     await admin.goto(`/runs/${RUN}`);
     await admin.getByRole("tab", { name: "Елементи й помилки" }).click();
     const items = admin.getByRole("table", { name: "Елементи запуску" });
-    await expect(items).toContainText("unrecognized");
+    await expect(items).toContainText("Не розпізнано");
     await items.getByRole("link", { name: "web:9b1f0c1d2e3f40516273849a0b1c2d3e" }).click();
     await expect(admin.getByRole("heading", { name: /Простежуваність/ })).toBeVisible();
     await expect(admin.getByRole("table", { name: /Етапи obs_/ })).toContainText(
@@ -35,23 +35,25 @@ test.describe("runs, progress, costs, cancellation, reprocessing, materials, res
     await admin.goto(`/runs/${RUN}`);
     await admin.getByRole("tab", { name: "Помилки колектора" }).click();
     const errors = admin.getByRole("table", { name: "Помилки колектора" });
-    await expect(errors).toContainText("Помилка збору");
+    await expect(errors).toContainText("Джерело недоступне. Перевірте адресу, доступ і налаштування збору.");
     await expect(errors).toContainText("source_unavailable");
   });
 
   test("reprocessing of stored RAW from a stage", async ({ admin }) => {
     await admin.goto(`/runs/${RUN}`);
     await admin.getByRole("tab", { name: "Повторна обробка" }).click();
-    await admin.getByLabel("Сховище RAW (connection_id)").fill("raw-files");
-    await admin.getByLabel("Почати з етапу").fill("extract-products");
-    await admin.getByLabel("Збережені з (RFC 3339)").fill("2026-09-20T00:00:00Z");
+    await admin.getByLabel("Сховище RAW", { exact: true }).fill("raw-files");
+    await admin.getByLabel("Почати з етапу").selectOption("extract-products");
+    await fillInstant(admin, admin.getByLabel("Збережені з", { exact: true }), "2026-09-20T00:00:00Z");
+    await expect(admin.getByRole("button", { name: "Обробити повторно" })).toBeDisabled();
+    await admin.getByLabel("Підтверджую обробку всієї цієї вибірки").check();
     const { request, body } = await captureRequest(admin, "POST", "/api/orchestrator/v1/reprocessing", () =>
       admin.getByRole("button", { name: "Обробити повторно" }).click(),
     );
     expect(request.headers()["idempotency-key"]).toBeTruthy();
     expect(body).toEqual({
       task_id: "shop-catalog",
-      stored_materials: { storage_connection_id: "raw-files", since: "2026-09-20T00:00:00Z" },
+      stored_materials: { storage_connection_id: "raw-files", since: "2026-09-20T00:00:00.000Z" },
       from_stage: "extract-products",
     });
     await expect(admin).toHaveURL(/\/runs\/job_/);
@@ -60,16 +62,38 @@ test.describe("runs, progress, costs, cancellation, reprocessing, materials, res
   test("materials: stored RAW shown as text (data, not markup), trace, reprocess one material", async ({
     admin,
   }) => {
+    // The default connection list example contains results-pg; include a schema-valid RAW connection.
+    await admin.route("**/api/storage/v1/connections?**", async (route) => {
+      const response = await route.fetch();
+      const listed = (await response.json()) as { items: unknown[]; next_cursor: string | null };
+      await route.fulfill({
+        json: {
+          ...listed,
+          items: [
+            ...listed.items,
+            {
+              connection_id: "raw-files",
+              kind: "filesystem",
+              params: { base_path: "/var/lib/jane/storage/raw" },
+            },
+          ],
+        },
+      });
+    });
     await admin.goto("/materials");
-    await admin.getByLabel("Сховище (connection_id)").fill("raw-files");
-    const table = admin.getByRole("table", { name: "Збережені матеріали" });
+    await admin.getByRole("combobox", { name: "Сховище", exact: true }).selectOption("raw-files");
+    const table = admin.getByRole("table", { name: "Матеріали raw-files", exact: true });
     await expect(table).toContainText("https://shop.example.test/product/a-100");
     await table.getByRole("button", { name: "Переглянути" }).click();
     const preview = admin.getByTestId("content-preview");
     await expect(preview).toContainText("<title>Kettle A-100</title>");
     expect(await admin.locator("title", { hasText: "Kettle A-100" }).count()).toBe(0);
     await table.getByRole("button", { name: "Повторно обробити" }).click();
-    await admin.getByLabel("Завдання").fill("shop-catalog");
+    await admin.getByLabel("Завдання", { exact: true }).selectOption("shop-catalog");
+    await expect(admin.getByLabel("Що обробити")).toHaveValue("object");
+    await admin.getByLabel("Що обробити").selectOption("material");
+    await expect(admin.getByRole("button", { name: "Обробити повторно" })).toBeDisabled();
+    await admin.getByLabel("Підтверджую обробку всієї цієї вибірки").check();
     const { body } = await captureRequest(admin, "POST", "/api/orchestrator/v1/reprocessing", () =>
       admin.getByRole("button", { name: "Обробити повторно" }).click(),
     );
@@ -92,7 +116,7 @@ test.describe("runs, progress, costs, cancellation, reprocessing, materials, res
   test("dashboard: executors, recent runs, costs", async ({ admin }) => {
     await admin.goto("/");
     await expect(admin.getByRole("table", { name: "Виконавці" })).toContainText("handler-runtime");
-    await expect(admin.getByRole("table", { name: "Виконавці" })).toContainText("degraded");
+    await expect(admin.getByRole("table", { name: "Виконавці" })).toContainText("Частково доступно");
     await expect(admin.getByTestId("usage-total")).toHaveText("0.42 USD");
     await expect(admin.getByRole("table", { name: "Останні запуски" })).toContainText(RUN);
   });

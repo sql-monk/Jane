@@ -19,7 +19,7 @@ Four kinds of work, all claimed with a lease so several workers (threads, proces
 |---|---|
 | Вид | клас |
 | Модуль | `jane_orchestrator.engine` |
-| Код | [engine.py:205](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L205) |
+| Код | [engine.py:267](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L267) |
 
 ```python
 class Engine: ...
@@ -39,7 +39,7 @@ The work-claiming operations; stateless apart from ``core`` (safe to share betwe
 def __init__(self, core: Core) -> None: ...
 ```
 
-Код: [engine.py:208](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L208).
+Код: [engine.py:270](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L270).
 
 #### Метод `Engine.claim_item`
 
@@ -47,7 +47,7 @@ def __init__(self, core: Core) -> None: ...
 def claim_item(self, worker: str) -> dict[str, Any] | None: ...
 ```
 
-Код: [engine.py:217](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L217).
+Код: [engine.py:279](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L279).
 
 #### Метод `Engine.process_item`
 
@@ -57,7 +57,7 @@ def process_item(self, item: dict[str, Any], worker: str) -> str: ...
 
 Invoke the handler for a claimed item and record the outcome. Returns the outcome label.
 
-Код: [engine.py:236](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L236).
+Код: [engine.py:311](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L311).
 
 #### Метод `Engine.claim_feed`
 
@@ -65,7 +65,7 @@ Invoke the handler for a claimed item and record the outcome. Returns the outcom
 def claim_feed(self, worker: str) -> dict[str, Any] | None: ...
 ```
 
-Код: [engine.py:708](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L708).
+Код: [engine.py:856](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L856).
 
 #### Метод `Engine.process_feed`
 
@@ -73,7 +73,7 @@ def claim_feed(self, worker: str) -> dict[str, Any] | None: ...
 def process_feed(self, run: dict[str, Any], worker: str) -> str: ...
 ```
 
-Код: [engine.py:744](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L744).
+Код: [engine.py:894](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L894).
 
 #### Метод `Engine.schedule_due`
 
@@ -83,7 +83,7 @@ def schedule_due(self) -> int: ...
 
 Create runs for due tasks (row lock per task: one run per tick across all instances).
 
-Код: [engine.py:1259](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1259).
+Код: [engine.py:1409](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1409).
 
 #### Метод `Engine.reap`
 
@@ -95,7 +95,7 @@ Close runs nobody else will close: a cancelling or drained run whose last worker
 
 Only runs that need action are selected, so busy runs never crowd out the ones to close (a batch of ``reap_batch`` always makes progress). Several reapers may pick the same run: state changes are conditional and only the reaper that changed the state counts it and calls the collector.
 
-Код: [engine.py:1289](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1289).
+Код: [engine.py:1441](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1441).
 
 #### Метод `Engine.sync_budgets`
 
@@ -105,7 +105,7 @@ def sync_budgets(self, worker: str) -> int: ...
 
 Push ``limits.llm.budget`` / ``max_requests_per_minute`` of sources and tasks to the LLM gateway (``llm.v1 PUT/DELETE /v1/budgets/{scope_type}/{scope_id}``), idempotently, with retries.
 
-Код: [engine.py:1364](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1364).
+Код: [engine.py:1518](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1518).
 
 #### Метод `Engine.sync_connections`
 
@@ -113,7 +113,7 @@ Push ``limits.llm.budget`` / ``max_requests_per_minute`` of sources and tasks to
 def sync_connections(self, worker: str) -> int: ...
 ```
 
-Код: [engine.py:1425](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1425).
+Код: [engine.py:1579](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1579).
 
 ### Клас `Worker`
 
@@ -121,7 +121,7 @@ def sync_connections(self, worker: str) -> int: ...
 |---|---|
 | Вид | клас |
 | Модуль | `jane_orchestrator.engine` |
-| Код | [engine.py:1508](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1508) |
+| Код | [engine.py:1683](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1683) |
 
 ```python
 class Worker: ...
@@ -135,7 +135,7 @@ A thread that repeatedly claims and processes work (feeds first, then items, sch
 def __init__(self, engine: Engine, name: str, *, scheduler: bool = True) -> None: ...
 ```
 
-Код: [engine.py:1511](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1511).
+Код: [engine.py:1686](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1686).
 
 #### Метод `Worker.start`
 
@@ -143,7 +143,7 @@ def __init__(self, engine: Engine, name: str, *, scheduler: bool = True) -> None
 def start(self) -> None: ...
 ```
 
-Код: [engine.py:1519](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1519).
+Код: [engine.py:1694](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1694).
 
 #### Метод `Worker.stop`
 
@@ -151,7 +151,7 @@ def start(self) -> None: ...
 def stop(self, timeout: float | None = None) -> None: ...
 ```
 
-Код: [engine.py:1522](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1522).
+Код: [engine.py:1697](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1697).
 
 #### Метод `Worker.step`
 
@@ -161,4 +161,4 @@ def step(self) -> bool: ...
 
 One unit of work; ``False`` when there was nothing to do.
 
-Код: [engine.py:1526](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1526).
+Код: [engine.py:1701](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1701).

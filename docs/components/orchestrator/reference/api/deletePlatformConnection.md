@@ -1,6 +1,6 @@
 # DELETE /v1/connections/{connection_id}
 
-> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1284). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1290). Не редагуйте вручну.
 
 **Видалити підключення (заборонено, якщо на нього посилаються етапи)**
 

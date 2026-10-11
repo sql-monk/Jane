@@ -1,0 +1,46 @@
+{
+  "entities": [
+    {
+      "entity_type": "classified_ad",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "ria.com",
+          "listing_id": "238399796"
+        }
+      },
+      "fields": {
+        "site": "ria.com",
+        "listing_id": "238399796",
+        "title": "Повербанк Solar Power Bank F33W",
+        "url": "https://www.ria.com/uk/poverbank-solar-power-bank-f33w-238399796.html",
+        "price": {
+          "amount": 2900.0,
+          "currency": "UAH"
+        },
+        "location": "Шаповалівка"
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "ria.com",
+          "listing_id": "237984070"
+        }
+      },
+      "fields": {
+        "site": "ria.com",
+        "listing_id": "237984070",
+        "title": "Смартфон Realme C85 Pro 8/256GB Peacock Green (RMX5555) UA",
+        "url": "https://www.ria.com/uk/smartfon-realme-c85-pro-8-256gb-peacock-237984070.html",
+        "price": {
+          "amount": 11320.0,
+          "currency": "UAH"
+        },
+        "location": "Харків"
+      }
+    }
+  ]
+}

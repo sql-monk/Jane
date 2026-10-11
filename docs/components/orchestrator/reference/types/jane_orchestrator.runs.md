@@ -12,7 +12,7 @@ Runs: creation (with a snapshot of the task, source and effective limits), state
 |---|---|
 | Вид | клас |
 | Модуль | `jane_orchestrator.runs` |
-| Код | [runs.py:41](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L41) |
+| Код | [runs.py:55](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L55) |
 
 ```python
 class Runs: ...
@@ -24,7 +24,7 @@ class Runs: ...
 def __init__(self, core: Core) -> None: ...
 ```
 
-Код: [runs.py:42](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L42).
+Код: [runs.py:56](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L56).
 
 #### Метод `Runs.create`
 
@@ -51,7 +51,7 @@ Insert a queued run. Returns the run row, or ``None`` when a scheduled run is sk
 
 Винятки в коді методу: `ValidationFailed`, `Conflict`, `LimitExceeded`.
 
-Код: [runs.py:46](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L46).
+Код: [runs.py:60](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L60).
 
 #### Метод `Runs.get_row`
 
@@ -61,15 +61,34 @@ def get_row(self, conn: Any, run_id: str) -> dict[str, Any]: ...
 
 Винятки в коді методу: `NotFound`.
 
-Код: [runs.py:148](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L148).
+Код: [runs.py:162](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L162).
 
 #### Метод `Runs.run_view`
 
 ```python
-def run_view(self, conn: Any, row: Mapping[str, Any]) -> dict[str, Any]: ...
+def run_view(
+    self,
+    conn: Any,
+    row: Mapping[str, Any],
+    *,
+    include_summary: bool = True,
+) -> dict[str, Any]: ...
 ```
 
-Код: [runs.py:169](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L169).
+Код: [runs.py:191](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L191).
+
+#### Метод `Runs.output_summary`
+
+```python
+@staticmethod
+def output_summary(conn: Any, run: Mapping[str, Any]) -> dict[str, Any]: ...
+```
+
+Unique entity identities recorded by this run; never query a storage database.
+
+Legacy traces were capped, so their identities are a lower bound and labelled as such.
+
+Код: [runs.py:241](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L241).
 
 #### Метод `Runs.job_view`
 
@@ -77,7 +96,7 @@ def run_view(self, conn: Any, row: Mapping[str, Any]) -> dict[str, Any]: ...
 def job_view(self, conn: Any, row: Mapping[str, Any]) -> dict[str, Any]: ...
 ```
 
-Код: [runs.py:213](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L213).
+Код: [runs.py:318](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L318).
 
 #### Метод `Runs.list_runs`
 
@@ -94,7 +113,7 @@ def list_runs(
 ) -> tuple[list[dict[str, Any]], str | None]: ...
 ```
 
-Код: [runs.py:259](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L259).
+Код: [runs.py:364](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L364).
 
 #### Метод `Runs.item_view`
 
@@ -103,7 +122,7 @@ def list_runs(
 def item_view(r: Mapping[str, Any]) -> dict[str, Any]: ...
 ```
 
-Код: [runs.py:293](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L293).
+Код: [runs.py:398](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L398).
 
 #### Метод `Runs.list_items`
 
@@ -120,7 +139,7 @@ def list_items(
 ) -> tuple[list[dict[str, Any]], str | None]: ...
 ```
 
-Код: [runs.py:313](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L313).
+Код: [runs.py:418](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L418).
 
 #### Метод `Runs.trace`
 
@@ -130,7 +149,7 @@ def trace(self, conn: Any, material_id: str) -> dict[str, Any]: ...
 
 Винятки в коді методу: `NotFound`.
 
-Код: [runs.py:342](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L342).
+Код: [runs.py:447](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L447).
 
 #### Метод `Runs.request_cancel`
 
@@ -147,7 +166,7 @@ Returns ``(job, accepted)``; ``accepted=False`` when the run was already termina
 
 Винятки в коді методу: `NotFound`.
 
-Код: [runs.py:396](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L396).
+Код: [runs.py:501](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L501).
 
 #### Метод `Runs.fail_run`
 
@@ -159,7 +178,7 @@ Mark a run failed (``on_failure: fail_run``, collector failure, run timeout). Ca
 
 Returns ``True`` only for the caller that actually changed the state (several workers or reapers may race for the same run): only that caller counts the metric and cancels the collection.
 
-Код: [runs.py:425](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L425).
+Код: [runs.py:530](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L530).
 
 #### Метод `Runs.maybe_finish`
 
@@ -169,7 +188,7 @@ def maybe_finish(self, run_id: str) -> str | None: ...
 
 Close the run when the feed is exhausted and no item is active. Returns the new status.
 
-Код: [runs.py:447](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L447).
+Код: [runs.py:552](../../../../../services/orchestrator/src/jane_orchestrator/runs.py#L552).
 
 ## Константи й змінні модуля
 

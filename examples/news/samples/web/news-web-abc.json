@@ -1,0 +1,13 @@
+{
+  "source_id": "news-web-abc",
+  "feed_url": "https://abcnews.go.com/abcnews/internationalheadlines",
+  "article_url": "https://abcnews.com/International/wireStory/ethiopia-tells-acting-defense-eritrea-137153814",
+  "fetched_at": "2026-10-11T03:56:55.338316Z",
+  "feed_http_status": 200,
+  "article_http_status": 200,
+  "robots_allowed": true,
+  "feed_entries": 25,
+  "title": "Ethiopia tells UN it is acting in self-defense against Eritrea",
+  "excerpt": "Ethiopia has told the United Nations Security Council it is taking self-defense measures against Eritrea",
+  "capture_method": "live HTTP in running Linux web-collector container; normal TLS verification; metadata excerpt only"
+}

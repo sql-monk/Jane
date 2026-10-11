@@ -5,3 +5,6 @@ src/api/generated
 playwright-report
 test-results
 pnpm-lock.yaml
+
+# Isolated reviewer/test artifacts, never source.
+.jane/

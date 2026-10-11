@@ -365,7 +365,7 @@ def check_mock_routes(report: Report) -> None:
 
 # 6b. Autonomy -----------------------------------------------------------------------------------
 
-AUTONOMOUS_APIS = ("collector", "handler", "storage", "registry", "llm")
+AUTONOMOUS_APIS = ("collector", "handler", "storage", "registry", "llm", "operations")
 INTEGRATION_APIS = ("orchestrator.v1.yaml", "assistant.v1.yaml")
 
 

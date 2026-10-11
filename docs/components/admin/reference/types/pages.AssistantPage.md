@@ -10,7 +10,7 @@
 function AssistantPage(): React.JSX.Element
 ```
 
-Код: [AssistantPage.tsx:76](../../../../../web/admin/src/pages/AssistantPage.tsx#L76).
+Код: [AssistantPage.tsx:78](../../../../../web/admin/src/pages/AssistantPage.tsx#L78).
 
 ## Функції
 
@@ -22,4 +22,4 @@ function sessionIdFromJob(job: { job_id: string; kind: string; status: "queued" 
 
 The session of an onboarding Job: `labels.session_id`, or its `links.session` (/v1/onboarding-sessions/{id}).
 
-Код: [AssistantPage.tsx:62](../../../../../web/admin/src/pages/AssistantPage.tsx#L62).
+Код: [AssistantPage.tsx:64](../../../../../web/admin/src/pages/AssistantPage.tsx#L64).

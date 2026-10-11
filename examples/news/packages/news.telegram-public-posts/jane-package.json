@@ -1,0 +1,170 @@
+{
+  "schema_version": "1",
+  "package_id": "news.telegram-public-posts",
+  "version": "1.0.1",
+  "kind": "extractor",
+  "title": "Public Telegram news posts",
+  "description": "Готує окремі видимі повідомлення t.me/s до аналізу новин: точне посилання, джерело, текст, час; відкидає службові блоки, відповіді, превʼю та повідомлення без тексту.",
+  "tags": [
+    "news",
+    "telegram",
+    "public-web"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_news_telegram_public.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "article",
+        "schema": "schemas/article.schema.json",
+        "key_fields": [
+          "url"
+        ]
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "tass-reply-excerpt-is-not-own-body",
+      "input": {
+        "file": "tests/tass-reply/message.html",
+        "media_type": "text/html",
+        "url": "https://t.me/s/tass_agency"
+      },
+      "params": {
+        "max_posts": 1,
+        "source_name": "ТАСС",
+        "region": "russia",
+        "language": "ru"
+      },
+      "expected_status": "success",
+      "expected": "tests/tass-reply/expected.json",
+      "compare": "subset",
+      "origin": "problem_sample"
+    },
+    {
+      "name": "suspilnenews-real-excerpt",
+      "input": {
+        "file": "tests/suspilnenews/message.html",
+        "media_type": "text/html",
+        "url": "https://t.me/s/suspilnenews"
+      },
+      "params": {
+        "max_posts": 1,
+        "source_name": "Суспільне Новини",
+        "region": "ukraine",
+        "language": "uk"
+      },
+      "expected_status": "success",
+      "expected": "tests/suspilnenews/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "dwglavnoe-real-excerpt",
+      "input": {
+        "file": "tests/dwglavnoe/message.html",
+        "media_type": "text/html",
+        "url": "https://t.me/s/dwglavnoe"
+      },
+      "params": {
+        "max_posts": 1,
+        "source_name": "DW Главное",
+        "region": "europe",
+        "language": "ru"
+      },
+      "expected_status": "success",
+      "expected": "tests/dwglavnoe/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "golosameriki-real-excerpt",
+      "input": {
+        "file": "tests/golosameriki/message.html",
+        "media_type": "text/html",
+        "url": "https://t.me/s/golosameriki"
+      },
+      "params": {
+        "max_posts": 1,
+        "source_name": "Голос Америки (VOA)",
+        "region": "usa",
+        "language": "ru"
+      },
+      "expected_status": "success",
+      "expected": "tests/golosameriki/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "tass_agency-real-excerpt",
+      "input": {
+        "file": "tests/tass_agency/message.html",
+        "media_type": "text/html",
+        "url": "https://t.me/s/tass_agency"
+      },
+      "params": {
+        "max_posts": 1,
+        "source_name": "ТАСС",
+        "region": "russia",
+        "language": "ru"
+      },
+      "expected_status": "success",
+      "expected": "tests/tass_agency/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "media-only-empty",
+      "input": {
+        "file": "tests/media-only/page.html",
+        "media_type": "text/html",
+        "url": "https://t.me/s/media"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Codex"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "based_on": {
+      "package_id": "news.telegram-public-posts",
+      "version": "1.0.0"
+    },
+    "change_summary": "Exclude reply, preview, author and footer subtrees even when they contain message_text; preserve only the exact post body."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "domains": [
+      "t.me"
+    ]
+  }
+}

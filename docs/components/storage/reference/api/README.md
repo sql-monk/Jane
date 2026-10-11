@@ -16,6 +16,16 @@
 |---|---|---|---|---|
 | GET | `/v1/health` | [getHealth](getHealth.md) | без автентифікації | Стан сервісу (liveness/readiness) |
 | GET | `/v1/info` | [getServiceInfo](getServiceInfo.md) | без автентифікації | Версія, підтримувані версії API й можливості сервісу |
+| GET | `/v1/connections` | [listConnections](listConnections.md) | `connections:write`, `handler:invoke`, `storage:read` | Підключення, відомі цьому виконавцю |
+| GET | `/v1/connections/{connection_id}` | [getConnection](getConnection.md) | `connections:write`, `handler:invoke`, `storage:read` | Прочитати підключення |
+| PUT | `/v1/connections/{connection_id}` | [putConnection](putConnection.md) | `connections:write` | Створити або замінити підключення (секрети — лише посиланнями) |
+| DELETE | `/v1/connections/{connection_id}` | [deleteConnection](deleteConnection.md) | `connections:write` | Видалити підключення |
+| POST | `/v1/connections/{connection_id}/test` | [testConnection](testConnection.md) | `connections:write` | Перевірити підключення й розв'язання секретів |
+| POST | `/v1/storage-status/checks` | [checkStorageStatus](checkStorageStatus.md) | `connections:write` | Фонова перевірка доступності та інвентаризація сховища |
+| GET | `/v1/jobs/{job_id}` | [getJob](getJob.md) | `handler:invoke`, `handler:test`, `connections:write` | Стан, прогрес і результат тривалої операції |
+| POST | `/v1/jobs/{job_id}/cancel` | [cancelJob](cancelJob.md) | `handler:invoke`, `handler:test`, `connections:write` | Запит на скасування job (ідемпотентний) |
+| GET | `/v1/storage-status` | [getStorageStatus](getStorageStatus.md) | `storage:read` | Остання явна перевірка сховища та статистика об’єктів |
+| GET | `/v1/entity-types` | [listEntityTypes](listEntityTypes.md) | `storage:read` | Типи фактично збережених сутностей і їх кількість |
 | GET | `/v1/entities` | [listEntities](listEntities.md) | `storage:read` | Актуальний стан сутностей |
 | GET | `/v1/entity-history` | [listEntityHistory](listEntityHistory.md) | `storage:read` | Історія оновлень однієї сутності (включно із запізнілими) |
 | GET | `/v1/objects` | [listObjects](listObjects.md) | `storage:read` | Збережені об'єкти (RAW, документи результатів) — для перегляду й повторної обробки |

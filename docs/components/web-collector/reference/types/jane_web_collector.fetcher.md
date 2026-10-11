@@ -22,7 +22,7 @@ Every hop of a redirect chain goes through ``check_hop`` (scope, exclusions, rob
 | Вид | виняток |
 | Модуль | `jane_web_collector.fetcher` |
 | Успадкування | `Exception` |
-| Код | [fetcher.py:45](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L45) |
+| Код | [fetcher.py:46](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L46) |
 
 ```python
 class FetchError(Exception): ...
@@ -44,7 +44,7 @@ def __init__(
 ) -> None: ...
 ```
 
-Код: [fetcher.py:48](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L48).
+Код: [fetcher.py:49](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L49).
 
 ### Клас `Fetcher`
 
@@ -52,7 +52,7 @@ def __init__(
 |---|---|
 | Вид | клас |
 | Модуль | `jane_web_collector.fetcher` |
-| Код | [fetcher.py:124](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L124) |
+| Код | [fetcher.py:137](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L137) |
 
 ```python
 class Fetcher: ...
@@ -72,12 +72,14 @@ def __init__(
     auth_headers: Mapping[str, str] | None = None,
     connection_policy: ConnectionPolicy | None = None,
     crawl_delay_for: DelayFor | None = None,
+    transport: str = 'http',
+    browser_fetch: BrowserFetch | None = None,
 ) -> None: ...
 ```
 
 Винятки в коді методу: `ValidationFailed`.
 
-Код: [fetcher.py:125](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L125).
+Код: [fetcher.py:138](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L138).
 
 #### Метод `Fetcher.get`
 
@@ -99,7 +101,7 @@ GET (or a POST of ``json_body`` with ``Content-Type: application/json``) with re
 
 Винятки в коді методу: `FetchError`.
 
-Код: [fetcher.py:208](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L208).
+Код: [fetcher.py:240](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L240).
 
 #### Метод `Fetcher.auth_headers_for`
 
@@ -111,7 +113,7 @@ Credentials only for the original host (never leak them to a redirect target on 
 
 Винятки в коді методу: `FetchError`.
 
-Код: [fetcher.py:265](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L265).
+Код: [fetcher.py:310](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L310).
 
 ### Клас `HttpResult`
 
@@ -119,7 +121,7 @@ Credentials only for the original host (never leak them to a redirect target on 
 |---|---|
 | Вид | dataclass |
 | Модуль | `jane_web_collector.fetcher` |
-| Код | [fetcher.py:66](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L66) |
+| Код | [fetcher.py:67](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L67) |
 
 ```python
 @dataclass
@@ -161,4 +163,4 @@ def build_client(
 
 The fetch client; every connection is checked by ``egress`` (default: link-local denied).
 
-Код: [fetcher.py:95](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L95).
+Код: [fetcher.py:96](../../../../../services/web-collector/src/jane_web_collector/fetcher.py#L96).

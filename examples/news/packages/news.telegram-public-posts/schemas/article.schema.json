@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "url",
+    "title",
+    "text",
+    "source_id",
+    "source_name",
+    "source_kind",
+    "transport",
+    "region",
+    "language",
+    "channel",
+    "message_id"
+  ],
+  "properties": {
+    "url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "title": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    },
+    "source_id": {
+      "type": "string"
+    },
+    "source_name": {
+      "type": "string"
+    },
+    "source_kind": {
+      "type": "string"
+    },
+    "transport": {
+      "type": "string"
+    },
+    "region": {
+      "type": "string"
+    },
+    "language": {
+      "type": "string"
+    },
+    "channel": {
+      "type": "string"
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "message_id": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

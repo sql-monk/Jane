@@ -1,6 +1,6 @@
 # GET /v1/connections
 
-> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1155). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1161). Не редагуйте вручну.
 
 **Реєстр підключень платформи (без значень секретів)**
 
@@ -46,6 +46,12 @@
 | `items[].executors[].sync_status` | enum: `pending`, `synced`, `failed` | так |  |
 | `items[].executors[].synced_at` | `string` (date-time) | ні | Момент часу RFC 3339 з часовою зоною; сервіси повертають UTC із суфіксом 'Z'. |
 | `items[].executors[].message` | `string` | ні |  |
+| `items[].executors[].attempts` | `integer` | ні | мін. `0` |
+| `items[].executors[].next_retry_at` | `string` (date-time) | ні | Момент часу RFC 3339 з часовою зоною; сервіси повертають UTC із суфіксом 'Z'. |
+| `items[].executors[].error` | `problem` | ні | Єдина модель помилки всіх API Jane: RFC 9457 (application/problem+json) з розширеннями 'code', 'retryable', 'errors', 'trace_id'. Клієнт приймає рішення за 'code' (стабільний машинний код), а не за 'title'/'detail'. Невідомий 'code' обробляється за HTTP-статусом і 'retryable'. |
+| `items[].unsupported_executors` | array of `object` | ні | Виконавці з 501 not_implemented для керованих підключень; це не збій синхронізації. |
+| `items[].unsupported_executors[].executor` | `string` | ні |  |
+| `items[].unsupported_executors[].reason` | `string` | ні |  |
 | `next_cursor` | `string \| null` | так | макс. довжина `2048` |
 
 Приклад `list`:

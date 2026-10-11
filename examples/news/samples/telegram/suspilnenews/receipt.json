@@ -1,0 +1,20 @@
+{
+  "source_url": "https://t.me/s/suspilnenews",
+  "post_url": "https://t.me/suspilnenews/77204",
+  "captured_at": "2026-10-11T03:54:37.070906Z",
+  "http_status": 200,
+  "observed_text_posts": 18,
+  "excerpt_words": 8,
+  "published_at": "2026-10-10T22:36:53Z",
+  "snippet_is_partial": true,
+  "live_prep_validation": {
+    "checked_at": "2026-10-11T03:57:53.137725Z",
+    "entity_count": 3,
+    "schema_valid": true,
+    "message_urls": [
+      "https://t.me/suspilnenews/77200",
+      "https://t.me/suspilnenews/77203",
+      "https://t.me/suspilnenews/77204"
+    ]
+  }
+}

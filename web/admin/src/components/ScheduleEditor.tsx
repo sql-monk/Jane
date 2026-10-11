@@ -1,16 +1,20 @@
 import type { Schedule } from "../api/types";
+import type { SchemaIssue } from "../lib/schema";
 import { Field } from "./ui";
 
 /** Editor of TaskConfig.schedule (manual | once | cron | interval), fields from task-config.schema.json. */
 export function ScheduleEditor({
   value,
   onChange,
+  issues = [],
 }: {
   value: Schedule | undefined;
   onChange: (s: Schedule | undefined) => void;
+  issues?: SchemaIssue[];
 }) {
   const schedule: Schedule = value ?? { type: "manual" };
   const set = (patch: Partial<Schedule>) => onChange({ ...schedule, ...patch });
+  const error = (field: string) => issues.find((issue) => issue.pointer === `/schedule/${field}`)?.message;
   return (
     <div className="grid-3" aria-label="Розклад">
       <Field label="Тип розкладу">
@@ -31,16 +35,25 @@ export function ScheduleEditor({
         </select>
       </Field>
       {schedule.type === "once" ? (
-        <Field label="Час запуску (RFC 3339)">
+        <Field
+          label="Час запуску"
+          hint={`Часовий пояс пристрою: ${Intl.DateTimeFormat().resolvedOptions().timeZone}.`}
+          error={error("at")}
+        >
           <input
-            value={schedule.at ?? ""}
-            placeholder="2026-10-01T02:00:00Z"
-            onChange={(e) => set({ at: e.target.value })}
+            type="datetime-local"
+            value={localDateTime(schedule.at)}
+            onChange={(e) => {
+              const next = { ...schedule };
+              if (e.target.value) next.at = new Date(e.target.value).toISOString();
+              else delete next.at;
+              onChange(next);
+            }}
           />
         </Field>
       ) : null}
       {schedule.type === "cron" ? (
-        <Field label="Cron (5 полів)">
+        <Field label="Cron (5 полів)" error={error("cron")}>
           <input
             value={schedule.cron ?? ""}
             placeholder="0 2 * * 0"
@@ -49,19 +62,32 @@ export function ScheduleEditor({
         </Field>
       ) : null}
       {schedule.type === "interval" ? (
-        <Field label="Інтервал, секунд">
+        <Field label="Інтервал, секунд" error={error("interval_seconds")}>
           <input
             type="number"
             min={1}
             value={schedule.interval_seconds ?? ""}
-            onChange={(e) => set({ interval_seconds: Number.parseInt(e.target.value, 10) || 1 })}
+            onChange={(e) => {
+              const next = { ...schedule };
+              if (e.target.value === "") delete next.interval_seconds;
+              else next.interval_seconds = Number(e.target.value);
+              onChange(next);
+            }}
           />
         </Field>
       ) : null}
       {schedule.type !== "manual" ? (
         <>
-          <Field label="Часовий пояс">
-            <input value={schedule.timezone ?? "UTC"} onChange={(e) => set({ timezone: e.target.value })} />
+          <Field label="Часовий пояс" error={error("timezone")}>
+            <input
+              list="schedule-timezones"
+              value={schedule.timezone ?? "UTC"}
+              onChange={(e) => set({ timezone: e.target.value })}
+            />
+            <datalist id="schedule-timezones">
+              <option value="Europe/Kyiv" />
+              <option value="UTC" />
+            </datalist>
           </Field>
           <Field label="Якщо попередній запуск ще йде">
             <select
@@ -85,4 +111,12 @@ export function ScheduleEditor({
       ) : null}
     </div>
   );
+}
+
+function localDateTime(value: string | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  const pad = (number: number) => String(number).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }

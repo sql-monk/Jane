@@ -1,0 +1,38 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "13450",
+        "title": "Маска VIA Beauty для обличчя та шиї B-Tox з колагеновим філером та заповнювачем зморшок 36 г",
+        "price": 33.5,
+        "currency": "UAH",
+        "url": "https://prostor.ua/ua/product/maska-i-krem-dlya-litsa-via-beauty-b-tox-30-g-6-g/",
+        "completeness": "full",
+        "brand": "Via Beauty",
+        "category": "Маски для обличчя",
+        "category_path": [
+          "Обличчя",
+          "Догляд за обличчям",
+          "Маски для обличчя"
+        ],
+        "availability": "in_stock",
+        "sku": "085254",
+        "volume": 36.0,
+        "unit": "г"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "13450"
+        }
+      }
+    }
+  ]
+}

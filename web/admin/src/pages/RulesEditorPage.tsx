@@ -16,6 +16,9 @@ import { JsonEditor, checkJson, toJsonText } from "../components/JsonEditor";
 import { ErrorBox, Field, JsonView, Loading, Notice, Page, Section, Table } from "../components/ui";
 import { SCHEMAS, validateAgainst } from "../lib/schema";
 import { SEMVER_PATTERN, bumpVersion } from "../lib/format";
+import { useUnsavedChanges } from "../components/UnsavedChanges";
+import { schemaIssueLabel } from "../lib/schema";
+import "../chain-editor.css";
 
 type Json = Record<string, unknown>;
 
@@ -128,15 +131,26 @@ export function RulesEditorPage() {
   const [newVersion, setNewVersion] = useState("");
   const [summary, setSummary] = useState("");
   const [addType, setAddType] = useState("sitemap");
+  const [baseline, setBaseline] = useState("");
+  const snapshot = JSON.stringify([strategyTexts, restText, newVersion, summary]);
+  const dirty = Boolean(baseline && snapshot !== baseline);
 
   useEffect(() => {
     const doc = rules.data?.rules;
-    if (!doc) return;
+    if (!doc || dirty) return;
     const { strategies, ...rest } = doc;
     setStrategyTexts(Array.isArray(strategies) ? strategies.map((s) => toJsonText(s)) : []);
     setRestText(toJsonText(rest));
     setNewVersion(bumpVersion(version, "minor"));
-  }, [rules.data, version]);
+    setBaseline(
+      JSON.stringify([
+        Array.isArray(strategies) ? strategies.map((s) => toJsonText(s)) : [],
+        toJsonText(rest),
+        bumpVersion(version, "minor"),
+        "",
+      ]),
+    );
+  }, [rules.data, version, dirty]);
 
   const isWeb = rules.data?.rules?.["collector"] === "web";
 
@@ -147,7 +161,7 @@ export function RulesEditorPage() {
       return { doc: null, issues: ["JSON містить синтаксичні помилки"] };
     const doc: Json = { ...((rest.value as Json | undefined) ?? {}) };
     if (isWeb || strategies.length) doc["strategies"] = strategies.map((s) => s.value);
-    const issues = validateAgainst(SCHEMAS.collectorRules, doc).map((i) => `${i.pointer} ${i.message}`);
+    const issues = validateAgainst(SCHEMAS.collectorRules, doc).map(schemaIssueLabel);
     return { doc, issues };
   }, [restText, strategyTexts, isWeb]);
 
@@ -165,8 +179,21 @@ export function RulesEditorPage() {
         files,
       );
     },
-    onSuccess: (published) =>
-      navigate(`/packages/${encodeURIComponent(packageId)}?version=${encodeURIComponent(published.version)}`),
+    onSuccess: (published) => {
+      guard.markSaved();
+      setBaseline(snapshot);
+      navigate(`/packages/${encodeURIComponent(packageId)}?version=${encodeURIComponent(published.version)}`);
+    },
+  });
+  const guard = useUnsavedChanges({
+    dirty,
+    label: `Правила ${packageId}`,
+    onDiscard: () => setBaseline(snapshot),
+    onSave: async () => {
+      if (!assembled.doc || assembled.issues.length || !SEMVER_PATTERN.test(newVersion)) return false;
+      await publish.mutateAsync();
+      return true;
+    },
   });
 
   if (rules.isLoading) return <Loading />;
@@ -177,136 +204,155 @@ export function RulesEditorPage() {
 
   return (
     <Page title={`Правила колектора ${packageId}@${version}`}>
-      <ErrorBox error={rules.error} />
-      {rules.data && !rules.data.rules ? (
-        <Notice tone="warn">Файл правил відсутній або не є JSON.</Notice>
-      ) : null}
-      <Notice>
-        Зміни зберігаються як нова незмінна версія пакета (статус draft). Її можна протестувати, погодити й
-        активувати для джерела чи етапу збору; попередня версія лишається для відкату.
-      </Notice>
-      {isWeb ? (
-        <Section
-          title={`Стратегії обходу (${strategyTexts.length})`}
-          actions={
-            <span className="inline-form">
-              <select
-                aria-label="Тип нової стратегії"
-                value={addType}
-                onChange={(e) => setAddType(e.target.value)}
-              >
-                {Object.keys(STRATEGY_TEMPLATES).map((t) => (
-                  <option key={t} value={t}>
-                    {STRATEGY_LABELS[t]}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="btn"
-                onClick={() =>
-                  setStrategyTexts((list) => [
-                    ...list,
-                    toJsonText({
-                      ...STRATEGY_TEMPLATES[addType],
-                      strategy_id: `${addType.replace(/_/g, "-")}-${list.length + 1}`,
-                    }),
-                  ])
-                }
-              >
-                Додати стратегію
-              </button>
-            </span>
-          }
-        >
-          <p className="muted">
-            Режими комбінуються: наприклад Sitemap дає початкові URL, а рекурсивний обхід знаходить пов'язані
-            матеріали.
-          </p>
-          {strategyTexts.map((text, index) => (
-            <div key={index} className="card" data-testid={`strategy-${index}`}>
-              <div className="card-head">
-                <strong>
-                  {index + 1}. {STRATEGY_LABELS[typeCounts[index] ?? ""] ?? typeCounts[index]}
-                </strong>
-                <span>
-                  <button
-                    type="button"
-                    className="btn btn-small"
-                    disabled={index === 0}
-                    onClick={() =>
-                      setStrategyTexts((list) => {
-                        const copy = [...list];
-                        [copy[index - 1], copy[index]] = [copy[index] as string, copy[index - 1] as string];
-                        return copy;
-                      })
-                    }
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-small btn-danger"
-                    onClick={() => setStrategyTexts((list) => list.filter((_, i) => i !== index))}
-                  >
-                    Видалити
-                  </button>
-                </span>
+      <fieldset className="form-fields" disabled={publish.isPending}>
+        <ErrorBox error={rules.error} />
+        {dirty ? (
+          <Notice tone="warn">Є незбережені зміни правил. Публікація збереже їх як нову версію.</Notice>
+        ) : null}
+        {rules.data && !rules.data.rules ? (
+          <Notice tone="warn">Файл правил відсутній або не є JSON.</Notice>
+        ) : null}
+        <Notice>
+          Зміни зберігаються як нова незмінна версія пакета (статус draft). Її можна протестувати, погодити й
+          активувати для джерела чи етапу збору; попередня версія лишається для відкату.
+        </Notice>
+        {isWeb ? (
+          <Section
+            title={`Стратегії обходу (${strategyTexts.length})`}
+            actions={
+              <span className="inline-form">
+                <select
+                  aria-label="Тип нової стратегії"
+                  value={addType}
+                  onChange={(e) => setAddType(e.target.value)}
+                >
+                  {Object.keys(STRATEGY_TEMPLATES).map((t) => (
+                    <option key={t} value={t}>
+                      {STRATEGY_LABELS[t]}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() =>
+                    setStrategyTexts((list) => [
+                      ...list,
+                      toJsonText({
+                        ...STRATEGY_TEMPLATES[addType],
+                        strategy_id: `${addType.replace(/_/g, "-")}-${list.length + 1}`,
+                      }),
+                    ])
+                  }
+                >
+                  Додати стратегію
+                </button>
+              </span>
+            }
+          >
+            <p className="muted">
+              Режими комбінуються: наприклад Sitemap дає початкові URL, а рекурсивний обхід знаходить
+              пов'язані матеріали.
+            </p>
+            {strategyTexts.map((text, index) => (
+              <div key={index} className="card" data-testid={`strategy-${index}`}>
+                <div className="card-head">
+                  <strong>
+                    {index + 1}. {STRATEGY_LABELS[typeCounts[index] ?? ""] ?? typeCounts[index]}
+                  </strong>
+                  <span>
+                    <button
+                      type="button"
+                      className="btn btn-small"
+                      disabled={index === 0}
+                      onClick={() =>
+                        setStrategyTexts((list) => {
+                          const copy = [...list];
+                          [copy[index - 1], copy[index]] = [copy[index] as string, copy[index - 1] as string];
+                          return copy;
+                        })
+                      }
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-small btn-danger"
+                      onClick={() => setStrategyTexts((list) => list.filter((_, i) => i !== index))}
+                    >
+                      Видалити
+                    </button>
+                  </span>
+                </div>
+                <JsonEditor
+                  text={text}
+                  onChange={(t) => setStrategyTexts((list) => list.map((old, i) => (i === index ? t : old)))}
+                  schema={SCHEMAS.strategy}
+                  label={`Стратегія ${index + 1}`}
+                  minHeight="6rem"
+                  readOnly={publish.isPending}
+                />
               </div>
-              <JsonEditor
-                text={text}
-                onChange={(t) => setStrategyTexts((list) => list.map((old, i) => (i === index ? t : old)))}
-                schema={SCHEMAS.strategy}
-                label={`Стратегія ${index + 1}`}
-                minHeight="6rem"
-              />
-            </div>
-          ))}
-        </Section>
-      ) : null}
-      <Section
-        title={
-          isWeb ? "Область обходу, robots.txt, нормалізація, дедуплікація, пріоритети, ліміти" : "Правила"
-        }
-      >
-        <JsonEditor text={restText} onChange={setRestText} label="Інші правила" minHeight="12rem" />
-      </Section>
-      <Section title="Перевірка за схемою контракту">
-        {assembled.issues.length ? (
-          <ul className="error-inline" role="alert" aria-label="Помилки правил">
-            {assembled.issues.map((i) => (
-              <li key={i}>{i}</li>
             ))}
-          </ul>
-        ) : (
-          <p className="ok-inline">Правила відповідають collector-rules.schema.json</p>
-        )}
-        {assembled.doc ? <JsonView value={assembled.doc} compact /> : null}
-      </Section>
-      <Section title="Опублікувати нову версію">
-        <div className="grid-2">
-          <Field label="Нова версія">
-            <input value={newVersion} onChange={(e) => setNewVersion(e.target.value)} />
-          </Field>
-          <Field label="Опис змін">
-            <input value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={4000} />
-          </Field>
-        </div>
-        <ErrorBox error={publish.error} title="Не вдалося опублікувати" />
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={
-            publish.isPending ||
-            !assembled.doc ||
-            assembled.issues.length > 0 ||
-            !SEMVER_PATTERN.test(newVersion)
+          </Section>
+        ) : null}
+        <Section
+          title={
+            isWeb ? "Область обходу, robots.txt, нормалізація, дедуплікація, пріоритети, ліміти" : "Правила"
           }
-          onClick={() => publish.mutate()}
         >
-          Опублікувати версію правил
-        </button>
-      </Section>
+          <JsonEditor
+            text={restText}
+            onChange={setRestText}
+            label="Інші правила"
+            minHeight="12rem"
+            readOnly={publish.isPending}
+          />
+        </Section>
+        <Section title="Перевірка за схемою контракту">
+          {assembled.issues.length ? (
+            <ul className="error-inline" role="alert" aria-label="Помилки правил">
+              {assembled.issues.map((i) => (
+                <li key={i}>{i}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="ok-inline">Правила відповідають collector-rules.schema.json</p>
+          )}
+          {assembled.doc ? <JsonView value={assembled.doc} compact /> : null}
+        </Section>
+        <Section title="Опублікувати нову версію">
+          <div className="grid-2">
+            <Field label="Нова версія">
+              <input value={newVersion} onChange={(e) => setNewVersion(e.target.value)} />
+            </Field>
+            <Field label="Опис змін">
+              <textarea
+                rows={3}
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                maxLength={4000}
+              />
+            </Field>
+          </div>
+          <ErrorBox error={publish.error} title="Не вдалося опублікувати" />
+          <div className="form-save-bar">
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={
+                publish.isPending ||
+                !assembled.doc ||
+                assembled.issues.length > 0 ||
+                !SEMVER_PATTERN.test(newVersion)
+              }
+              onClick={() => publish.mutate()}
+            >
+              Опублікувати версію правил
+            </button>
+          </div>
+        </Section>
+      </fieldset>
     </Page>
   );
 }

@@ -94,7 +94,7 @@ Validate everything that must be right before the sandbox starts.
 
 Винятки в коді методу: `ValidationFailed`.
 
-Код: [executor.py:194](../../../../../services/handler-runtime/src/jane_handler_runtime/executor.py#L194).
+Код: [executor.py:199](../../../../../services/handler-runtime/src/jane_handler_runtime/executor.py#L199).
 
 #### Метод `Executor.bundle`
 
@@ -102,7 +102,7 @@ Validate everything that must be right before the sandbox starts.
 def bundle(self, prep: PreparedInvocation) -> Bundle: ...
 ```
 
-Код: [executor.py:236](../../../../../services/handler-runtime/src/jane_handler_runtime/executor.py#L236).
+Код: [executor.py:241](../../../../../services/handler-runtime/src/jane_handler_runtime/executor.py#L241).
 
 #### Метод `Executor.labels`
 
@@ -110,7 +110,7 @@ def bundle(self, prep: PreparedInvocation) -> Bundle: ...
 def labels(self, prep: PreparedInvocation) -> dict[str, str]: ...
 ```
 
-Код: [executor.py:258](../../../../../services/handler-runtime/src/jane_handler_runtime/executor.py#L258).
+Код: [executor.py:263](../../../../../services/handler-runtime/src/jane_handler_runtime/executor.py#L263).
 
 #### Метод `Executor.run`
 
@@ -120,7 +120,7 @@ async def run(self, prep: PreparedInvocation) -> dict[str, Any]: ...
 
 Винятки в коді методу: `ServiceUnavailable`.
 
-Код: [executor.py:264](../../../../../services/handler-runtime/src/jane_handler_runtime/executor.py#L264).
+Код: [executor.py:269](../../../../../services/handler-runtime/src/jane_handler_runtime/executor.py#L269).
 
 #### Метод `Executor.interpret`
 
@@ -135,7 +135,7 @@ def interpret(
 
 Винятки в коді методу: `ValueError`.
 
-Код: [executor.py:323](../../../../../services/handler-runtime/src/jane_handler_runtime/executor.py#L323).
+Код: [executor.py:328](../../../../../services/handler-runtime/src/jane_handler_runtime/executor.py#L328).
 
 ### Клас `PreparedInvocation`
 

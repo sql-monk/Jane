@@ -1,0 +1,32 @@
+{
+  "source_id": "classified-auto-ria",
+  "kind": "web",
+  "title": "AUTO.RIA — оголошення автомобілів",
+  "description": "Публічні оголошення https://auto.ria.com/uk/search/?indexName=auto&sort[0].order=dates.created.desc; ліміти у examples/classifieds/sites.json.",
+  "locator": {
+    "url": "https://auto.ria.com/uk/search/?indexName=auto&sort[0].order=dates.created.desc"
+  },
+  "collector_rules": {
+    "package_id": "classifieds.auto-ria-rules",
+    "version": "1.0.0",
+    "digest": "sha256:2154cb22e6d287685541f48e04e6452e4a5a794dabb9b11d13377ccf09d8cddf"
+  },
+  "limits": {
+    "rate": {
+      "requests_per_second_per_host": 0.5,
+      "min_delay_ms_per_host": 2000,
+      "respect_crawl_delay": true
+    },
+    "concurrency": {
+      "max_parallel_fetches_per_host": 1
+    }
+  },
+  "forward_unknown_to_llm": false,
+  "expected_entity_types": [
+    "classified_ad"
+  ],
+  "labels": {
+    "group": "classifieds",
+    "site": "auto-ria"
+  }
+}

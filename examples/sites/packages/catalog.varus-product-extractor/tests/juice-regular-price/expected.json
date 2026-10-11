@@ -1,0 +1,50 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "varus",
+        "product_id": "2662715",
+        "title": "Нектар Sandora Гранатовий 200 мл",
+        "url": "https://varus.ua/nektar-sandora-granatovij-200-ml",
+        "price": 27.9,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "brand": "Sandora",
+        "category": "Соки та нектари",
+        "category_path": [
+          "Вода, соки, напої",
+          "Соки та нектари"
+        ],
+        "image": "https://varus.ua/img/product/1140/1140/2662715",
+        "sku": "2662715",
+        "unit": "шт",
+        "volume": "200 мл",
+        "country": "Україна",
+        "attributes": {
+          "З м'якоттю": "ні",
+          "За способом приготування": "відновлений",
+          "Вміст цукру": "з цукром",
+          "Жири": "0 г/100 мл",
+          "Вуглеводи": "13 г/100 мл",
+          "Білки": "0 г/100 мл",
+          "Калорійність ккал": "52 ккал/100 мл",
+          "Термін зберігання товару": "365",
+          "Температура зберігання": "0..+25 ºC"
+        },
+        "completeness": "full"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "varus",
+          "product_id": "2662715"
+        }
+      }
+    }
+  ]
+}

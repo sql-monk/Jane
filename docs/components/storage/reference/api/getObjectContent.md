@@ -1,6 +1,6 @@
 # GET /v1/objects/{object_id}/content
 
-> Згенеровано `scripts/docs_reference.py` з [storage.v1.yaml](../../../../../contracts/openapi/storage.v1.yaml#L333). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [storage.v1.yaml](../../../../../contracts/openapi/storage.v1.yaml#L768). Не редагуйте вручну.
 
 **Вміст збереженого об'єкта (байти в оригінальному медіатипі)**
 

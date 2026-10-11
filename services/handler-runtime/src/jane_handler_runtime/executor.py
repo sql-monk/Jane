@@ -189,6 +189,11 @@ class Executor:
                     resolved[value_key] = json.loads(raw)
                 except ValueError as exc:
                     raise ValidationFailed(f"{ref_key} is not JSON: {exc}") from exc
+        material = resolved.get("material")
+        if resolved.get("kind") == "entities" and isinstance(material, dict):
+            content = material.get("content")
+            if isinstance(content, dict) and content.get("kind") == "blob":
+                return resolved, await self.fetcher.read(content, limit)
         return resolved, None
 
     async def prepare(

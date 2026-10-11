@@ -51,7 +51,7 @@ def as_problem(self) -> dict[str, Any]: ...
 |---|---|
 | Вид | клас |
 | Модуль | `jane_orchestrator.executors` |
-| Код | [executors.py:89](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L89) |
+| Код | [executors.py:91](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L91) |
 
 ```python
 class Executors: ...
@@ -71,7 +71,7 @@ def __init__(
 ) -> None: ...
 ```
 
-Код: [executors.py:90](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L90).
+Код: [executors.py:92](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L92).
 
 #### Метод `Executors.close`
 
@@ -79,7 +79,7 @@ def __init__(
 def close(self) -> None: ...
 ```
 
-Код: [executors.py:108](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L108).
+Код: [executors.py:110](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L110).
 
 #### Метод `Executors.by_role`
 
@@ -87,7 +87,7 @@ def close(self) -> None: ...
 def by_role(self, role: str) -> list[ExecutorConfig]: ...
 ```
 
-Код: [executors.py:129](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L129).
+Код: [executors.py:131](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L131).
 
 #### Метод `Executors.first`
 
@@ -95,7 +95,7 @@ def by_role(self, role: str) -> list[ExecutorConfig]: ...
 def first(self, role: str) -> ExecutorConfig | None: ...
 ```
 
-Код: [executors.py:132](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L132).
+Код: [executors.py:134](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L134).
 
 #### Метод `Executors.collector`
 
@@ -103,7 +103,7 @@ def first(self, role: str) -> ExecutorConfig | None: ...
 def collector(self, name: str) -> ExecutorConfig | None: ...
 ```
 
-Код: [executors.py:136](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L136).
+Код: [executors.py:138](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L138).
 
 #### Метод `Executors.handler_for`
 
@@ -111,7 +111,7 @@ def collector(self, name: str) -> ExecutorConfig | None: ...
 def handler_for(self, package_id: str) -> ExecutorConfig | None: ...
 ```
 
-Код: [executors.py:144](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L144).
+Код: [executors.py:146](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L146).
 
 #### Метод `Executors.call`
 
@@ -133,7 +133,7 @@ def call(
 
 Винятки в коді методу: `ExecutorError`.
 
-Код: [executors.py:176](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L176).
+Код: [executors.py:178](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L178).
 
 #### Метод `Executors.health`
 
@@ -141,4 +141,4 @@ def call(
 def health(self, executor: ExecutorConfig, timeout_ms: int) -> str: ...
 ```
 
-Код: [executors.py:235](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L235).
+Код: [executors.py:237](../../../../../services/orchestrator/src/jane_orchestrator/executors.py#L237).

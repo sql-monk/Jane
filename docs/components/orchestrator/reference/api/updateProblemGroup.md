@@ -1,6 +1,6 @@
 # PATCH /v1/problem-groups/{group_id}
 
-> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1058). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1064). Не редагуйте вручну.
 
 **Змінити статус групи (ignored, resolved) або прив'язати job вдосконалення**
 

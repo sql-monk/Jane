@@ -28,9 +28,11 @@ package's entity schema; the summary goes to ``.jane/sites-<project>.json``.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -172,7 +174,45 @@ def cmd_check(ns: argparse.Namespace) -> int:
     return 1 if problems else 0
 
 
-def publish(svc: ex.Services, directories: Mapping[str, Path]) -> dict[str, dict[str, str]]:
+@contextmanager
+def reviewed_publication(
+    registry: ex.Api, package_id: str, manifest: dict[str, Any], authorized: bool
+) -> Iterator[None]:
+    """Allow one operator-reviewed LLM upload, restoring the original policy even on failure."""
+    path = f"/v1/packages/{package_id}"
+    current = registry.call("GET", path)
+    locked = (
+        manifest.get("provenance", {}).get("created_by") == "llm"
+        and not current.json()["auto_changes_allowed"]
+    )
+    if locked and not authorized:
+        raise RuntimeError(
+            f"{package_id}: use --reviewed-package-updates for this checked operator-approved version"
+        )
+    if locked:
+        registry.call(
+            "PATCH",
+            path,
+            content=json.dumps({"auto_changes_allowed": True}).encode(),
+            headers={"If-Match": current.headers["ETag"], "Content-Type": "application/merge-patch+json"},
+        )
+    try:
+        yield
+    finally:
+        if locked:
+            current = registry.call("GET", path)
+            registry.call(
+                "PATCH",
+                path,
+                content=json.dumps({"auto_changes_allowed": False}).encode(),
+                headers={"If-Match": current.headers["ETag"], "Content-Type": "application/merge-patch+json"},
+            )
+            ex.log(f"registry: {package_id} automatic-change prohibition restored")
+
+
+def publish(
+    svc: ex.Services, directories: Mapping[str, Path], *, reviewed_updates: bool = False
+) -> dict[str, dict[str, str]]:
     """Create, publish and approve each package; a changed package needs a new version."""
     from jane_registry.archive import canonical_archive, files_from_dir
 
@@ -194,14 +234,19 @@ def publish(svc: ex.Services, directories: Mapping[str, Path]) -> dict[str, dict
             headers={"Idempotency-Key": ex.key()},
         )
         path = f"/v1/packages/{pid}/versions/{manifest['version']}"
-        r = svc.registry.call(
-            "POST",
-            f"/v1/packages/{pid}/versions",
-            ok=(201, 409),
-            content=bytes(canonical_archive(files_from_dir(directory))),
-            headers={"Content-Type": "application/zip", "Idempotency-Key": ex.key()},
-        )
-        version = r.json() if r.status_code == 201 else svc.registry.call("GET", path).json()
+        existing = svc.registry.call("GET", path, ok=(200, 404))
+        if existing.status_code == 200:
+            version = existing.json()
+        else:
+            with reviewed_publication(svc.registry, pid, manifest, reviewed_updates):
+                r = svc.registry.call(
+                    "POST",
+                    f"/v1/packages/{pid}/versions",
+                    ok=(201, 409),
+                    content=bytes(canonical_archive(files_from_dir(directory))),
+                    headers={"Content-Type": "application/zip", "Idempotency-Key": ex.key()},
+                )
+                version = r.json() if r.status_code == 201 else svc.registry.call("GET", path).json()
         if version["digest"] != ref["digest"]:
             raise RuntimeError(f"{pid}@{manifest['version']}: registry has another digest; bump the version")
         if version["status"] == "draft":
@@ -269,12 +314,14 @@ def task_sources(sites: Sequence[Mapping[str, Any]]) -> dict[str, str]:
 
 
 def cmd_apply(ns: argparse.Namespace) -> int:
+    if ns.reviewed_package_updates and cmd_check(ns):
+        return 1
     dirs = package_dirs()
     sites = [ex.read_json(p) for p in site_files(ns.sites)]
     used = sorted({pid for site in sites for pid in refs_in(site)})
     svc = ex.Services.of_project(ns.project)
     try:
-        refs = publish(svc, {pid: dirs[pid] for pid in used})
+        refs = publish(svc, {pid: dirs[pid] for pid in used}, reviewed_updates=ns.reviewed_package_updates)
         for conn in ex.read_json(HERE.parent / "documents" / "connections.json")["connections"]:
             svc.orchestrator.call("PUT", f"/v1/connections/{conn['connection_id']}", ok=(200, 201), json=conn)
         for site in sites:
@@ -374,6 +421,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     p = sub.add_parser("apply")
     p.add_argument("--project", required=True)
     p.add_argument("--run", action="store_true", help="start every task of the sites once")
+    p.add_argument(
+        "--reviewed-package-updates",
+        action="store_true",
+        help="operator authorizes checked versions; restore package auto-change policy after each upload",
+    )
     p.add_argument("--timeout", type=float, default=1800)
     p.add_argument("sites", nargs="*")
     p.set_defaults(fn=cmd_apply)

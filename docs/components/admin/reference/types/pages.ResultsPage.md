@@ -10,4 +10,4 @@
 function ResultsPage(): React.JSX.Element
 ```
 
-Код: [ResultsPage.tsx:11](../../../../../web/admin/src/pages/ResultsPage.tsx#L11).
+Код: [ResultsPage.tsx:29](../../../../../web/admin/src/pages/ResultsPage.tsx#L29).

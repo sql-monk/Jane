@@ -186,6 +186,8 @@ Internal knobs of the queue engine (not part of ``limits.schema.json``).
 | Член | Тип | Типове значення | Доступ | Опис |
 |---|---|---|---|---|
 | `workers` | `int` | `Field(default=2, ge=0)` | читання й запис | Worker threads per process (0 — API only). |
+| `item_queue_ordering` | `Literal['fifo', 'run_round_robin']` | `'fifo'` | читання й запис | Item claims: global FIFO by default; opt-in rotation by a run's last activity. Fair claims touch ``runs.updated_at``; collection/status writes also count as activity. Within a run items stay FIFO. |
+| `task_ids` | `list[str]` | `Field(default_factory=list)` | читання й запис | Optional task allowlist for this process's workers, schedules and run housekeeping. Empty means all tasks. Env accepts a JSON array or CSV; the shared queue's leases and delivery keys stay unchanged. |
 | `lease_ms` | `int` | `Field(default=30000, ge=100)` | читання й запис | Lease of a claimed item / collection feed; extended by heartbeats while a call runs. |
 | `heartbeat_ms` | `int` | `Field(default=10000, ge=50)` | читання й запис |  |
 | `poll_interval_ms` | `int` | `Field(default=500, ge=10)` | читання й запис | Idle sleep of a worker when there is nothing to claim. |
@@ -219,7 +221,7 @@ Internal knobs of the queue engine (not part of ``limits.schema.json``).
 | Вид | клас |
 | Модуль | `jane_orchestrator.settings` |
 | Успадкування | `Limits` |
-| Код | [settings.py:167](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L167) |
+| Код | [settings.py:185](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L185) |
 
 ```python
 class ServiceLimits(Limits): ...
@@ -242,7 +244,7 @@ class ServiceLimits(Limits): ...
 | Вид | модель Pydantic |
 | Модуль | `jane_orchestrator.settings` |
 | Успадкування | `JaneSettings` |
-| Код | [settings.py:176](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L176) |
+| Код | [settings.py:194](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L194) |
 
 ```python
 class Settings(JaneSettings): ...
@@ -278,7 +280,7 @@ def executor_configs(self) -> list[ExecutorConfig]: ...
 
 Executors as configured (tokens not resolved).
 
-Код: [settings.py:197](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L197).
+Код: [settings.py:215](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L215).
 
 #### Метод `Settings.all_executors`
 
@@ -288,7 +290,7 @@ def all_executors(self) -> list[ExecutorConfig]: ...
 
 Executors with ``token`` = the bearer token to send: ``token_ref``, else the deprecated plain ``token``, else ``service_token_ref``. An unresolvable reference raises (the service must not start).
 
-Код: [settings.py:205](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L205).
+Код: [settings.py:223](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L223).
 
 ## Функції
 
@@ -305,7 +307,7 @@ Defaults &lt;- ``JANE_ORCHESTRATOR_LIMITS__*`` env &lt;- ``extra``.
 
 The platform limits *file* (``JANE_ORCHESTRATOR_LIMITS_FILE``, ``PlatformLimits``) seeds the platform document in the DB instead (see :mod:`jane_orchestrator.limits`), because it has the contract shape.
 
-Код: [settings.py:227](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L227).
+Код: [settings.py:245](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L245).
 
 ## Константи й змінні модуля
 

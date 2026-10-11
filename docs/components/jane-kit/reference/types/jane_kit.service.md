@@ -33,7 +33,7 @@ Build a FastAPI app. ``app.state.health`` and ``app.state.metrics`` are ready to
 
 Authentication follows ``settings.auth_mode`` (:func:`jane_kit.auth.install_auth`; an incomplete configuration raises :class:`~jane_kit.auth.AuthConfigError` here). ``auth_scopes`` maps every route ``"METHOD /path"`` to its scope (checked at start); without it handlers check scopes themselves (:func:`jane_kit.auth.require`). ``authenticator`` replaces the one built from settings (tests).
 
-Код: [service.py:38](../../../../../libs/jane-kit/src/jane_kit/service.py#L38).
+Код: [service.py:39](../../../../../libs/jane-kit/src/jane_kit/service.py#L39).
 
 ### Функція `run`
 
@@ -43,7 +43,7 @@ def run(app: FastAPI | str, settings: JaneSettings, **uvicorn_kwargs: Any) -> No
 
 Run with uvicorn using host/port from settings (logging stays ours).
 
-Код: [service.py:143](../../../../../libs/jane-kit/src/jane_kit/service.py#L143).
+Код: [service.py:146](../../../../../libs/jane-kit/src/jane_kit/service.py#L146).
 
 ## Константи й змінні модуля
 

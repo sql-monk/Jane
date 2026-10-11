@@ -27,6 +27,8 @@ RUN set -eu; \
 FROM ${PYTHON_IMAGE}
 RUN useradd --system --uid 10001 --no-create-home jane \
     && mkdir -p /var/lib/jane/storage && chown jane /var/lib/jane/storage
+RUN mkdir -p /var/lib/jane-operations && chown jane /var/lib/jane-operations
+ENV JANE_STORAGE_OPERATIONS_DIR=/var/lib/jane-operations
 COPY --from=build /app/.venv /app/.venv
 # Contracts are used to validate HandlerInvocation and Connection documents at runtime.
 COPY contracts/openapi/ /app/contracts/openapi/

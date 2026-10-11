@@ -36,7 +36,7 @@ A platform file is one profile shared by all services (ТЗ §12, criterion 13),
 | Вид | модель Pydantic |
 | Модуль | `jane_kit.config` |
 | Успадкування | `BaseSettings`, `AuthSettings` |
-| Код | [config.py:487](../../../../../libs/jane-kit/src/jane_kit/config.py#L487) |
+| Код | [config.py:497](../../../../../libs/jane-kit/src/jane_kit/config.py#L497) |
 
 ```python
 class JaneSettings(BaseSettings, AuthSettings): ...
@@ -59,6 +59,10 @@ Only process-level knobs live here; operational limits belong in a :class:`Limit
 | `metrics_enabled` | `bool` | `True` | читання й запис |  |
 | `health_check_timeout_ms` | `int` | `Field(default=2000, ge=1)` | читання й запис | Time box of every ``/v1/health`` check (env ``<PREFIX>HEALTH_CHECK_TIMEOUT_MS``). |
 | `limits_file` | `Path \| None` | `None` | читання й запис | Platform limits file (``PlatformLimits`` shape, e.g. a whole ``deploy/profiles/<profile>.json``: limits this service does not have are ignored, typos are errors); env ``<PREFIX>LIMITS__*`` overrides it. |
+| `operations_dir` | `Path \| None` | `None` | читання й запис | Own durable telemetry/configuration directory; default .jane/operations/&lt;service>. |
+| `operations_sample_interval_seconds` | `float` | `Field(default=5, ge=1, le=300)` | читання й запис |  |
+| `operations_retention_seconds` | `int` | `Field(default=86400, ge=60, le=604800)` | читання й запис |  |
+| `operations_max_points` | `int` | `Field(default=720, ge=2, le=10000)` | читання й запис |  |
 
 Поля без типового значення — обов'язкові аргументи конструктора; решта — необов'язкові іменовані.
 
@@ -68,6 +72,22 @@ Only process-level knobs live here; operational limits belong in a :class:`Limit
 |---|---|---|
 | `model_config` | `SettingsConfigDict(env_prefix='JANE_', extra='ignore', env_nested_delimiter='__'` |  |
 
+#### Метод `JaneSettings.model_post_init`
+
+```python
+def model_post_init(self, context: Any) -> None: ...
+```
+
+Код: [config.py:529](../../../../../libs/jane-kit/src/jane_kit/config.py#L529).
+
+#### Метод `JaneSettings.validate_configuration`
+
+```python
+def validate_configuration(self, values: dict[str, Any]) -> Self: ...
+```
+
+Код: [config.py:545](../../../../../libs/jane-kit/src/jane_kit/config.py#L545).
+
 #### Метод `JaneSettings.platform_layers`
 
 ```python
@@ -76,7 +96,7 @@ def platform_layers(self, env_prefix: str = 'JANE_LIMITS__') -> list[LimitLayer]
 
 Platform layers in order: limits file, then environment overrides.
 
-Код: [config.py:513](../../../../../libs/jane-kit/src/jane_kit/config.py#L513).
+Код: [config.py:552](../../../../../libs/jane-kit/src/jane_kit/config.py#L552).
 
 #### Метод `JaneSettings.with_overrides`
 
@@ -84,7 +104,7 @@ Platform layers in order: limits file, then environment overrides.
 def with_overrides(self, **values: Any) -> Self: ...
 ```
 
-Код: [config.py:523](../../../../../libs/jane-kit/src/jane_kit/config.py#L523).
+Код: [config.py:567](../../../../../libs/jane-kit/src/jane_kit/config.py#L567).
 
 ### Клас `LimitError`
 
@@ -93,7 +113,7 @@ def with_overrides(self, **values: Any) -> Self: ...
 | Вид | виняток |
 | Модуль | `jane_kit.config` |
 | Успадкування | `ValueError` |
-| Код | [config.py:125](../../../../../libs/jane-kit/src/jane_kit/config.py#L125) |
+| Код | [config.py:127](../../../../../libs/jane-kit/src/jane_kit/config.py#L127) |
 
 ```python
 class LimitError(ValueError): ...
@@ -107,7 +127,7 @@ Invalid limit configuration (unknown field, wrong type, loosened hard cap).
 |---|---|
 | Вид | dataclass (незмінний) |
 | Модуль | `jane_kit.config` |
-| Код | [config.py:150](../../../../../libs/jane-kit/src/jane_kit/config.py#L150) |
+| Код | [config.py:152](../../../../../libs/jane-kit/src/jane_kit/config.py#L152) |
 
 ```python
 @dataclass(frozen=True)
@@ -137,7 +157,7 @@ One level of configuration (platform, source ``shop``, task ``prices``, stage ``
 | Вид | модель Pydantic |
 | Модуль | `jane_kit.config` |
 | Успадкування | `BaseModel` |
-| Код | [config.py:129](../../../../../libs/jane-kit/src/jane_kit/config.py#L129) |
+| Код | [config.py:131](../../../../../libs/jane-kit/src/jane_kit/config.py#L131) |
 
 ```python
 class Limits(BaseModel): ...
@@ -159,7 +179,7 @@ Use the field names of ``limits.schema.json`` where the limit exists there (``ti
 |---|---|
 | Вид | dataclass (незмінний) |
 | Модуль | `jane_kit.config` |
-| Код | [config.py:169](../../../../../libs/jane-kit/src/jane_kit/config.py#L169) |
+| Код | [config.py:171](../../../../../libs/jane-kit/src/jane_kit/config.py#L171) |
 
 ```python
 @dataclass(frozen=True)
@@ -176,7 +196,8 @@ class ResolvedLimits: ...
 | `hard_caps` | `dict[str, Any]` | `field(default_factory=dict)` | читання | Dotted leaf path -> effective hard cap (the tightest one of all layers). |
 | `profile` | `str \| None` | `None` | читання | Name of the platform limits profile, if a PlatformLimits file declared one. |
 | `ignored` | `dict[str, str]` | `field(default_factory=dict)` | читання | Contract path -> label of the shared layer whose value was not applied: this service has no such limit. |
-| `ignored_hard_caps` | `dict[str, str]` | `field(default_factory=dict)` | читання | Same for ``hard_caps`` of shared layers. |
+| `ignored_hard_caps` | `dict[str, str]` | `field(default_factory=dict)` | читання |  |
+| `module_baseline` | `dict[str, Any]` | `field(default_factory=dict)` | читання | Same for ``hard_caps`` of shared layers. |
 
 Поля без типового значення — обов'язкові аргументи конструктора; решта — необов'язкові іменовані.
 
@@ -190,7 +211,7 @@ def platform_limits(self) -> dict[str, Any]: ...
 
 Only fields that map to ``limits.schema.json`` (declared with :func:`contract_field` or nested under a group with a contract path) are included; service-specific limits stay internal because the contract schema is strict (``additionalProperties: false``).
 
-Код: [config.py:184](../../../../../libs/jane-kit/src/jane_kit/config.py#L184).
+Код: [config.py:187](../../../../../libs/jane-kit/src/jane_kit/config.py#L187).
 
 #### Метод `ResolvedLimits.provenance`
 
@@ -200,7 +221,7 @@ def provenance(self) -> dict[str, str]: ...
 
 Leaf path -> contract ``LimitLevel`` (model defaults count as ``platform``).
 
-Код: [config.py:202](../../../../../libs/jane-kit/src/jane_kit/config.py#L202).
+Код: [config.py:205](../../../../../libs/jane-kit/src/jane_kit/config.py#L205).
 
 #### Метод `ResolvedLimits.effective`
 
@@ -210,7 +231,7 @@ def effective(self) -> dict[str, Any]: ...
 
 ``EffectiveLimits`` document: ``{"limits": {...}, "provenance": {...}}``.
 
-Код: [config.py:214](../../../../../libs/jane-kit/src/jane_kit/config.py#L214).
+Код: [config.py:217](../../../../../libs/jane-kit/src/jane_kit/config.py#L217).
 
 #### Метод `ResolvedLimits.explain`
 
@@ -220,7 +241,7 @@ def explain(self) -> list[tuple[str, Any, str]]: ...
 
 Rows ``(path, value, origin)`` for logs and diagnostics.
 
-Код: [config.py:218](../../../../../libs/jane-kit/src/jane_kit/config.py#L218).
+Код: [config.py:221](../../../../../libs/jane-kit/src/jane_kit/config.py#L221).
 
 ## Функції
 
@@ -232,7 +253,7 @@ def contract_field(path: str, default: Any, **kwargs: Any) -> Any: ...
 
 ``Field`` for a limit that exists in ``limits.schema.json`` under dotted ``path`` (e.g. ``"transfer.idempotency_ttl_seconds"``). For a nested group, ``path`` is the group (``"retries"``) and its fields map to ``retries.<name>``.
 
-Код: [config.py:255](../../../../../libs/jane-kit/src/jane_kit/config.py#L255).
+Код: [config.py:258](../../../../../libs/jane-kit/src/jane_kit/config.py#L258).
 
 ### Функція `layer_from_env`
 
@@ -248,7 +269,7 @@ Layer from environment variables; ``__`` separates nesting, ``HARD_CAPS__`` mark
 
 Values stay strings; pydantic coerces them to the declared types.
 
-Код: [config.py:463](../../../../../libs/jane-kit/src/jane_kit/config.py#L463).
+Код: [config.py:473](../../../../../libs/jane-kit/src/jane_kit/config.py#L473).
 
 ### Функція `load_layer`
 
@@ -265,7 +286,7 @@ Read a layer file. ``level='platform'`` expects ``PlatformLimits`` (``defaults``
 
 Винятки в коді функції: `LimitError`.
 
-Код: [config.py:442](../../../../../libs/jane-kit/src/jane_kit/config.py#L442).
+Код: [config.py:452](../../../../../libs/jane-kit/src/jane_kit/config.py#L452).
 
 ### Функція `resolve_limits`
 
@@ -285,11 +306,11 @@ A ``shared`` layer (platform file) may carry limits of other services: see :attr
 
 Винятки в коді функції: `LimitError`.
 
-Код: [config.py:344](../../../../../libs/jane-kit/src/jane_kit/config.py#L344).
+Код: [config.py:347](../../../../../libs/jane-kit/src/jane_kit/config.py#L347).
 
 ## Константи й змінні модуля
 
 | Назва | Тип | Значення | Опис |
 |---|---|---|---|
 | `CONTRACT_LIMIT_PATHS` | `frozenset[str]` | `frozenset((f'{group}.{name}' for group, names in _CONTRACT_LIMITS.items() for na` | Leaf paths of ``limits.schema.json`` (``Limits``). A copy, because services run without ``contracts/``; ``tests/test_wp00_contracts.py`` keeps it equal to the schema. |
-| `LEVELS` | `tuple[str, ...]` | `('platform', 'source', 'task', 'stage', 'request')` | Levels of ``LimitLevel`` in the contract, least specific first (plus ``hard_cap`` in provenance). |
+| `LEVELS` | `tuple[str, ...]` | `('platform', 'source', 'task', 'stage', 'request')` |  |

@@ -1,0 +1,17 @@
+{
+  "summary": "Фактично збережені типи сутностей",
+  "value": {
+    "items": [
+      {
+        "entity_type": "offer",
+        "entity_count": 1172
+      },
+      {
+        "entity_type": "product",
+        "entity_count": 30
+      }
+    ],
+    "next_cursor": null,
+    "search_supported": true
+  }
+}

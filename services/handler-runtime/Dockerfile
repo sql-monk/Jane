@@ -19,6 +19,8 @@ RUN uv sync --frozen --no-dev --no-editable --package jane-handler-runtime
 
 FROM ${PYTHON_IMAGE}
 RUN useradd --system --uid 10001 --no-create-home jane
+RUN mkdir -p /var/lib/jane-operations && chown jane /var/lib/jane-operations
+ENV JANE_HANDLER_RUNTIME_OPERATIONS_DIR=/var/lib/jane-operations
 COPY --from=build /app/.venv /app/.venv
 # JSON Schemas / OpenAPI of the contracts: results and requests are validated against them.
 COPY contracts/schemas /app/contracts/schemas

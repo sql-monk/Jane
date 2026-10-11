@@ -1,0 +1,9 @@
+services:
+  web-collector:
+    build:
+      args:
+        EXTRAS: --extra render
+    environment:
+      JANE_WEB_COLLECTOR_RENDER_ENABLED: "true"
+      # Seeding yields every quarter heartbeat; short slices keep API/leases responsive under shared load.
+      JANE_WEB_COLLECTOR_HEARTBEAT_INTERVAL_MS: "500"

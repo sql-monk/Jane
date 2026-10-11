@@ -1,0 +1,413 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "car_ad (оголошення про продаж легкового авто)",
+  "description": "Оголошення авторинку зі сторінки оголошення: ціна продавця в його валюті, перерахунок сайту в USD/UAH, характеристики, регіон, тип продавця, статус. Без імен, телефонів, VIN і номерних знаків.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "site",
+    "ad_id",
+    "url",
+    "title",
+    "price",
+    "currency"
+  ],
+  "properties": {
+    "site": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Хост сайту, наприклад auto.ria.com"
+    },
+    "ad_id": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "description": "Номер оголошення на сайті"
+    },
+    "url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Марка, модель і рік, як на сайті"
+    },
+    "price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Ціна продавця у валюті currency"
+    },
+    "currency": {
+      "type": "string",
+      "enum": [
+        "USD",
+        "UAH",
+        "EUR"
+      ]
+    },
+    "make": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "year": {
+      "type": "integer",
+      "minimum": 1900,
+      "maximum": 2100
+    },
+    "price_usd": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Ціна, перерахована сайтом у USD"
+    },
+    "price_uah": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Ціна, перерахована сайтом у UAH"
+    },
+    "mileage_km": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fuel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "transmission": {
+      "type": "string",
+      "minLength": 1
+    },
+    "engine_l": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "body_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "drive": {
+      "type": "string",
+      "minLength": 1
+    },
+    "color": {
+      "type": "string",
+      "minLength": 1
+    },
+    "region": {
+      "type": "string",
+      "minLength": 1
+    },
+    "city": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seller_type": {
+      "type": "string",
+      "enum": [
+        "private",
+        "dealer",
+        "unknown"
+      ]
+    },
+    "vin_checked": {
+      "type": "boolean",
+      "description": "Сайт перевірив VIN-код за державними даними"
+    },
+    "condition": {
+      "type": "string",
+      "enum": [
+        "used",
+        "new",
+        "damaged"
+      ]
+    },
+    "published_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}",
+      "description": "Дата створення оголошення (ISO 8601)"
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}"
+    },
+    "image": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "sold",
+        "unknown"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Опис продавця: стиснуті пробіли, приховані телефони, e-mail і вулиці"
+    },
+    "generation": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Покоління зі структурованого блоку моделі"
+    },
+    "modification": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Модифікація зі структурованого блоку моделі"
+    },
+    "trim": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Комплектація зі структурованого блоку моделі"
+    },
+    "emission_standard": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Екологічний стандарт"
+    },
+    "technical_state": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Заявлений продавцем технічний стан"
+    },
+    "paint_condition": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Заявлений стан лакофарбового покриття"
+    },
+    "doors": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Кількість дверей з блоку характеристик"
+    },
+    "seats": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Кількість місць з блоку характеристик"
+    },
+    "power_hp": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Потужність з опису двигуна; якщо відсутня — з модифікації, без перерахунку"
+    },
+    "power_kw": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Потужність кВт, явно вказана в описі двигуна, без перерахунку"
+    },
+    "modification_power_hp": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Потужність к.с., явно вказана в назві модифікації; може відрізнятися від даних продавця"
+    },
+    "inspection_ready": {
+      "type": "boolean",
+      "description": "Продавець явно заявив готовність до перевірки на СТО"
+    },
+    "condition_options": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Заявлені властивості стану й історії, без інтерпретації"
+    },
+    "fuel_consumption_l_per_100km": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "city": {
+          "type": "number",
+          "minimum": 0
+        },
+        "highway": {
+          "type": "number",
+          "minimum": 0
+        },
+        "combined": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "description": "Заявлені витрати пального: місто, траса, змішаний цикл"
+    },
+    "equipment": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "comfort": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "safety": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "multimedia": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "headlights": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "interior_materials": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "interior_color": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "seat_adjustment": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "heated_seats": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "seat_memory": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "electric_windows": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "climate_control": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "power_steering": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "steering_adjustment": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "spare_wheel": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "lighting": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "body_and_interior": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "parking_assistance": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "airbags": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "description": "Опції за категоріями сайту; точні назви й порядок, без дублів"
+    }
+  }
+}

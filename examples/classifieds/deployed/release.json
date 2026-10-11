@@ -1,0 +1,1893 @@
+{
+  "packages": {
+    "jane.storage-files": {
+      "package_id": "jane.storage-files",
+      "version": "1.0.0",
+      "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+    },
+    "jane.storage-postgresql": {
+      "package_id": "jane.storage-postgresql",
+      "version": "1.0.0",
+      "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+    },
+    "classifieds.olx-ads": {
+      "package_id": "classifieds.olx-ads",
+      "version": "1.0.0",
+      "digest": "sha256:5ee4eeed59693e72cfd4379bffadca3686d1c6a7f004291ad7a02716df36b16d"
+    },
+    "classifieds.olx-rules": {
+      "package_id": "classifieds.olx-rules",
+      "version": "1.0.0",
+      "digest": "sha256:da668ec03843cc1330d9608f9a623ea7cf8d4a4afe61f4b4722ce2740b2621e6"
+    },
+    "classifieds.auto-ria-ads": {
+      "package_id": "classifieds.auto-ria-ads",
+      "version": "1.0.0",
+      "digest": "sha256:fc71c59913047e058bb3cf383947e8dcbe1f44a48e81ec36fb12f7beb710ef45"
+    },
+    "classifieds.auto-ria-rules": {
+      "package_id": "classifieds.auto-ria-rules",
+      "version": "1.0.0",
+      "digest": "sha256:2154cb22e6d287685541f48e04e6452e4a5a794dabb9b11d13377ccf09d8cddf"
+    },
+    "classifieds.dim-ria-ads": {
+      "package_id": "classifieds.dim-ria-ads",
+      "version": "1.0.1",
+      "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d"
+    },
+    "classifieds.dim-ria-rules": {
+      "package_id": "classifieds.dim-ria-rules",
+      "version": "1.0.0",
+      "digest": "sha256:5ded59fd6e212b07586e91ca5db70399cc78470fff7134036c2573d784e1df29"
+    },
+    "classifieds.ria-ads": {
+      "package_id": "classifieds.ria-ads",
+      "version": "1.0.0",
+      "digest": "sha256:74d8b3e1b40d00ab3f2af721d10592b0a86b86272435fea182fbd632d765d3b2"
+    },
+    "classifieds.ria-rules": {
+      "package_id": "classifieds.ria-rules",
+      "version": "1.0.0",
+      "digest": "sha256:5e4eaf9d597082178caabccdd6a9bb0d64578a35ebdf0a3228c50de798a77bbf"
+    },
+    "classifieds.shafa-ads": {
+      "package_id": "classifieds.shafa-ads",
+      "version": "1.0.0",
+      "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce"
+    },
+    "classifieds.shafa-rules": {
+      "package_id": "classifieds.shafa-rules",
+      "version": "1.0.1",
+      "digest": "sha256:1d4788e6cffa86cbe5052479e4bc3c13d6ab65185ce8f962bbc035bc7ccd296c"
+    }
+  },
+  "package_checks": {
+    "classifieds.olx-ads": {
+      "package": {
+        "package_id": "classifieds.olx-ads",
+        "version": "1.0.0",
+        "digest": "sha256:5ee4eeed59693e72cfd4379bffadca3686d1c6a7f004291ad7a02716df36b16d"
+      },
+      "reused_runtime_test_report": true,
+      "runtime_test_report": {
+        "cases": [
+          {
+            "name": "public-notebooks-real-cards",
+            "passed": true,
+            "result": {
+              "inputs": [
+                {
+                  "kind": "material",
+                  "material_id": "web:ad1f0724cbde62df24983b185c297379",
+                  "content_sha256": "d389f537d322d7f215feae40a45035b06250ae52830f3610834a5abe65d280ad",
+                  "observation_id": "obs_local_d389f537d322d7f215feae40"
+                }
+              ],
+              "output": {
+                "entities": [
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "olx",
+                        "listing_id": "916346980"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://www.olx.ua/d/uk/obyavlenie/noutbuk-14-hp-x360-1040-g8-i5-1145g7-16gb-256-win-11-pro-garantya-ID100TI0.html",
+                      "site": "olx",
+                      "price": {
+                        "amount": 22700.0,
+                        "currency": "UAH"
+                      },
+                      "title": "Ноутбук 14\" HP X360 1040 G8/ i5-1145G7, 16GB, 256/Win 11 Pro, Гарантія",
+                      "location": "Львів, Шевченківський",
+                      "listing_id": "916346980"
+                    },
+                    "schema": "classifieds.olx-ads@1.0.0#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:5ee4eeed59693e72cfd4379bffadca3686d1c6a7f004291ad7a02716df36b16d",
+                        "version": "1.0.0",
+                        "package_id": "classifieds.olx-ads"
+                      },
+                      "invocation_id": "inv_60c9ca5f5b6a48868026ff35be8c1b22"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:ad1f0724cbde62df24983b185c297379",
+                      "observed_at": "2026-10-11T04:25:53Z",
+                      "content_sha256": "d389f537d322d7f215feae40a45035b06250ae52830f3610834a5abe65d280ad",
+                      "observation_id": "obs_local_d389f537d322d7f215feae40"
+                    }
+                  },
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "olx",
+                        "listing_id": "936776985"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://www.olx.ua/d/uk/obyavlenie/hp-zbook-studio-g7-i7-10850h-32-ddr4-t1000-with-max-q-design-4gb-1tb-nvme-ID11oCud.html",
+                      "site": "olx",
+                      "price": {
+                        "amount": 20400.0,
+                        "currency": "UAH"
+                      },
+                      "title": "Hp zbook Studio G7 i7 10850H 32 ddr4 T1000 with Max-Q Design 4gb 1tb Nvme",
+                      "location": "Миколаїв, Iнгульський",
+                      "listing_id": "936776985"
+                    },
+                    "schema": "classifieds.olx-ads@1.0.0#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:5ee4eeed59693e72cfd4379bffadca3686d1c6a7f004291ad7a02716df36b16d",
+                        "version": "1.0.0",
+                        "package_id": "classifieds.olx-ads"
+                      },
+                      "invocation_id": "inv_60c9ca5f5b6a48868026ff35be8c1b22"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:ad1f0724cbde62df24983b185c297379",
+                      "observed_at": "2026-10-11T04:25:53Z",
+                      "content_sha256": "d389f537d322d7f215feae40a45035b06250ae52830f3610834a5abe65d280ad",
+                      "observation_id": "obs_local_d389f537d322d7f215feae40"
+                    }
+                  }
+                ]
+              },
+              "status": "success",
+              "handler": {
+                "digest": "sha256:5ee4eeed59693e72cfd4379bffadca3686d1c6a7f004291ad7a02716df36b16d",
+                "version": "1.0.0",
+                "package_id": "classifieds.olx-ads"
+              },
+              "duplicate": false,
+              "test_mode": true,
+              "started_at": "2026-10-11T04:26:13.345Z",
+              "diagnostics": {
+                "metrics": {
+                  "cpu_ms": 408,
+                  "duration_ms": 1760,
+                  "output_bytes": 1146,
+                  "peak_memory_mb": 14.3
+                }
+              },
+              "finished_at": "2026-10-11T04:26:19.581Z",
+              "delivery_key": "test:public-notebooks-real-cards",
+              "handler_kind": "extractor",
+              "invocation_id": "inv_60c9ca5f5b6a48868026ff35be8c1b22"
+            },
+            "actual_status": "success",
+            "expected_status": "success"
+          },
+          {
+            "name": "no-product-cards",
+            "passed": true,
+            "result": {
+              "inputs": [
+                {
+                  "kind": "material",
+                  "material_id": "web:7d8fad7eaf68b26f255fb1eee34d43ef",
+                  "content_sha256": "1fd4e629274a0873f15c8d22109f07ef1ff6ae1afa13881179f5f3f84b8773e4",
+                  "observation_id": "obs_local_1fd4e629274a0873f15c8d22"
+                }
+              ],
+              "output": {
+                "entities": []
+              },
+              "status": "empty",
+              "handler": {
+                "digest": "sha256:5ee4eeed59693e72cfd4379bffadca3686d1c6a7f004291ad7a02716df36b16d",
+                "version": "1.0.0",
+                "package_id": "classifieds.olx-ads"
+              },
+              "duplicate": false,
+              "test_mode": true,
+              "started_at": "2026-10-11T04:26:19.612Z",
+              "diagnostics": {
+                "metrics": {
+                  "cpu_ms": 442,
+                  "duration_ms": 2539,
+                  "output_bytes": 154,
+                  "peak_memory_mb": 15.8
+                }
+              },
+              "finished_at": "2026-10-11T04:26:27.148Z",
+              "delivery_key": "test:no-product-cards",
+              "handler_kind": "extractor",
+              "invocation_id": "inv_862c635e828d4a0fb32e2bd062eb0cd3"
+            },
+            "actual_status": "empty",
+            "expected_status": "empty"
+          }
+        ],
+        "failed": 0,
+        "passed": 2,
+        "package": {
+          "digest": "sha256:5ee4eeed59693e72cfd4379bffadca3686d1c6a7f004291ad7a02716df36b16d",
+          "version": "1.0.0",
+          "package_id": "classifieds.olx-ads"
+        },
+        "started_at": "2026-10-11T04:26:13.334Z",
+        "finished_at": "2026-10-11T04:26:27.148Z"
+      }
+    },
+    "classifieds.olx-rules": {
+      "package": {
+        "package_id": "classifieds.olx-rules",
+        "version": "1.0.0",
+        "digest": "sha256:da668ec03843cc1330d9608f9a623ea7cf8d4a4afe61f4b4722ce2740b2621e6"
+      },
+      "rules_schema_valid": true
+    },
+    "classifieds.auto-ria-ads": {
+      "package": {
+        "package_id": "classifieds.auto-ria-ads",
+        "version": "1.0.0",
+        "digest": "sha256:fc71c59913047e058bb3cf383947e8dcbe1f44a48e81ec36fb12f7beb710ef45"
+      },
+      "reused_runtime_test_report": true,
+      "runtime_test_report": {
+        "cases": [
+          {
+            "name": "real-catalog-excerpt",
+            "passed": true,
+            "result": {
+              "inputs": [
+                {
+                  "kind": "material",
+                  "material_id": "web:659659b4ec2e18bd65d17adb504b4f1b",
+                  "content_sha256": "e02d54a1eb5c8a72c71c09a19c0ffb7a32b3aceceec36f81a154a57e838508a8",
+                  "observation_id": "obs_local_e02d54a1eb5c8a72c71c09a1"
+                }
+              ],
+              "output": {
+                "entities": [
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "auto.ria.com",
+                        "listing_id": "39999975"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://auto.ria.com/uk/auto_volkswagen_golf-r_39999975.html",
+                      "site": "auto.ria.com",
+                      "price": {
+                        "amount": 21500.0,
+                        "currency": "USD"
+                      },
+                      "title": "Volkswagen Golf R 2017",
+                      "location": "Мукачево",
+                      "listing_id": "39999975"
+                    },
+                    "schema": "classifieds.auto-ria-ads@1.0.0#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:fc71c59913047e058bb3cf383947e8dcbe1f44a48e81ec36fb12f7beb710ef45",
+                        "version": "1.0.0",
+                        "package_id": "classifieds.auto-ria-ads"
+                      },
+                      "invocation_id": "inv_0a9c417b83b447f19172afcc3e55b2b9"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:659659b4ec2e18bd65d17adb504b4f1b",
+                      "observed_at": "2026-10-11T04:26:29Z",
+                      "content_sha256": "e02d54a1eb5c8a72c71c09a19c0ffb7a32b3aceceec36f81a154a57e838508a8",
+                      "observation_id": "obs_local_e02d54a1eb5c8a72c71c09a1"
+                    }
+                  },
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "auto.ria.com",
+                        "listing_id": "40547538"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://auto.ria.com/uk/auto_skoda_octavia_40547538.html",
+                      "site": "auto.ria.com",
+                      "price": {
+                        "amount": 6500.0,
+                        "currency": "USD"
+                      },
+                      "title": "Skoda Octavia 2011",
+                      "location": "Чернігів",
+                      "listing_id": "40547538"
+                    },
+                    "schema": "classifieds.auto-ria-ads@1.0.0#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:fc71c59913047e058bb3cf383947e8dcbe1f44a48e81ec36fb12f7beb710ef45",
+                        "version": "1.0.0",
+                        "package_id": "classifieds.auto-ria-ads"
+                      },
+                      "invocation_id": "inv_0a9c417b83b447f19172afcc3e55b2b9"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:659659b4ec2e18bd65d17adb504b4f1b",
+                      "observed_at": "2026-10-11T04:26:29Z",
+                      "content_sha256": "e02d54a1eb5c8a72c71c09a19c0ffb7a32b3aceceec36f81a154a57e838508a8",
+                      "observation_id": "obs_local_e02d54a1eb5c8a72c71c09a1"
+                    }
+                  }
+                ]
+              },
+              "status": "success",
+              "handler": {
+                "digest": "sha256:fc71c59913047e058bb3cf383947e8dcbe1f44a48e81ec36fb12f7beb710ef45",
+                "version": "1.0.0",
+                "package_id": "classifieds.auto-ria-ads"
+              },
+              "duplicate": false,
+              "test_mode": true,
+              "started_at": "2026-10-11T04:26:54.972Z",
+              "diagnostics": {
+                "metrics": {
+                  "cpu_ms": 387,
+                  "duration_ms": 1452,
+                  "output_bytes": 890,
+                  "peak_memory_mb": 12.3
+                }
+              },
+              "finished_at": "2026-10-11T04:26:59.894Z",
+              "delivery_key": "test:real-catalog-excerpt",
+              "handler_kind": "extractor",
+              "invocation_id": "inv_0a9c417b83b447f19172afcc3e55b2b9"
+            },
+            "actual_status": "success",
+            "expected_status": "success"
+          },
+          {
+            "name": "page-without-advertisements",
+            "passed": true,
+            "result": {
+              "inputs": [
+                {
+                  "kind": "material",
+                  "material_id": "web:659659b4ec2e18bd65d17adb504b4f1b",
+                  "content_sha256": "4120cddb12d27fb866196195966708dd96fc544188c3b96f1e60470362d5d604",
+                  "observation_id": "obs_local_4120cddb12d27fb866196195"
+                }
+              ],
+              "output": {
+                "entities": []
+              },
+              "status": "empty",
+              "handler": {
+                "digest": "sha256:fc71c59913047e058bb3cf383947e8dcbe1f44a48e81ec36fb12f7beb710ef45",
+                "version": "1.0.0",
+                "package_id": "classifieds.auto-ria-ads"
+              },
+              "duplicate": false,
+              "test_mode": true,
+              "started_at": "2026-10-11T04:26:59.924Z",
+              "diagnostics": {
+                "metrics": {
+                  "cpu_ms": 296,
+                  "duration_ms": 1521,
+                  "output_bytes": 153,
+                  "peak_memory_mb": 12.0
+                }
+              },
+              "finished_at": "2026-10-11T04:27:03.973Z",
+              "delivery_key": "test:page-without-advertisements",
+              "handler_kind": "extractor",
+              "invocation_id": "inv_b65b02f294b54dd8b15323565d0d8655"
+            },
+            "actual_status": "empty",
+            "expected_status": "empty"
+          }
+        ],
+        "failed": 0,
+        "passed": 2,
+        "package": {
+          "digest": "sha256:fc71c59913047e058bb3cf383947e8dcbe1f44a48e81ec36fb12f7beb710ef45",
+          "version": "1.0.0",
+          "package_id": "classifieds.auto-ria-ads"
+        },
+        "started_at": "2026-10-11T04:26:54.961Z",
+        "finished_at": "2026-10-11T04:27:03.974Z"
+      }
+    },
+    "classifieds.auto-ria-rules": {
+      "package": {
+        "package_id": "classifieds.auto-ria-rules",
+        "version": "1.0.0",
+        "digest": "sha256:2154cb22e6d287685541f48e04e6452e4a5a794dabb9b11d13377ccf09d8cddf"
+      },
+      "rules_schema_valid": true
+    },
+    "classifieds.dim-ria-ads": {
+      "package": {
+        "package_id": "classifieds.dim-ria-ads",
+        "version": "1.0.1",
+        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d"
+      },
+      "runtime_test_report": {
+        "cases": [
+          {
+            "name": "real-catalog-excerpt",
+            "passed": true,
+            "result": {
+              "inputs": [
+                {
+                  "kind": "material",
+                  "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                  "content_sha256": "dd3ea29dd92deacdc41aed4ce979ef97a960202587d293ea6a08a4b4b1cd3af8",
+                  "observation_id": "obs_local_dd3ea29dd92deacdc41aed4c"
+                }
+              ],
+              "output": {
+                "entities": [
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "dom.ria.com",
+                        "listing_id": "33683279"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-borispolskaya-ulitsa-33683279.html",
+                      "site": "dom.ria.com",
+                      "price": {
+                        "amount": 9000.0,
+                        "currency": "UAH"
+                      },
+                      "title": "Здається в оренду 1-кімнатна квартира 27 кв. м у Києві",
+                      "location": "Київ",
+                      "listing_id": "33683279"
+                    },
+                    "schema": "classifieds.dim-ria-ads@1.0.1#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                        "version": "1.0.1",
+                        "package_id": "classifieds.dim-ria-ads"
+                      },
+                      "invocation_id": "inv_f0d9a3da29ff4ea582638d6591aa9317"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                      "observed_at": "2026-10-11T06:47:51Z",
+                      "content_sha256": "dd3ea29dd92deacdc41aed4ce979ef97a960202587d293ea6a08a4b4b1cd3af8",
+                      "observation_id": "obs_local_dd3ea29dd92deacdc41aed4c"
+                    }
+                  },
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "dom.ria.com",
+                        "listing_id": "35018017"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-prichalnaya-ulitsa-35018017.html",
+                      "site": "dom.ria.com",
+                      "price": {
+                        "amount": 36000.0,
+                        "currency": "UAH"
+                      },
+                      "title": "Здається в оренду 1-кімнатна квартира 55 кв. м у Києві",
+                      "location": "Київ",
+                      "listing_id": "35018017"
+                    },
+                    "schema": "classifieds.dim-ria-ads@1.0.1#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                        "version": "1.0.1",
+                        "package_id": "classifieds.dim-ria-ads"
+                      },
+                      "invocation_id": "inv_f0d9a3da29ff4ea582638d6591aa9317"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                      "observed_at": "2026-10-11T06:47:51Z",
+                      "content_sha256": "dd3ea29dd92deacdc41aed4ce979ef97a960202587d293ea6a08a4b4b1cd3af8",
+                      "observation_id": "obs_local_dd3ea29dd92deacdc41aed4c"
+                    }
+                  }
+                ]
+              },
+              "status": "success",
+              "handler": {
+                "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                "version": "1.0.1",
+                "package_id": "classifieds.dim-ria-ads"
+              },
+              "duplicate": false,
+              "test_mode": true,
+              "started_at": "2026-10-11T06:47:52.148Z",
+              "diagnostics": {
+                "metrics": {
+                  "cpu_ms": 175,
+                  "duration_ms": 739,
+                  "output_bytes": 1122,
+                  "peak_memory_mb": 12.2
+                }
+              },
+              "finished_at": "2026-10-11T06:47:53.315Z",
+              "delivery_key": "test:real-catalog-excerpt",
+              "handler_kind": "extractor",
+              "invocation_id": "inv_f0d9a3da29ff4ea582638d6591aa9317"
+            },
+            "actual_status": "success",
+            "expected_status": "success"
+          },
+          {
+            "name": "page-without-advertisements",
+            "passed": true,
+            "result": {
+              "inputs": [
+                {
+                  "kind": "material",
+                  "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                  "content_sha256": "5b97c48ebf7d0f403840381914afaf7a1d0d54415a3fbbe15011b99a19b7b20b",
+                  "observation_id": "obs_local_5b97c48ebf7d0f4038403819"
+                }
+              ],
+              "output": {
+                "entities": []
+              },
+              "status": "empty",
+              "handler": {
+                "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                "version": "1.0.1",
+                "package_id": "classifieds.dim-ria-ads"
+              },
+              "duplicate": false,
+              "test_mode": true,
+              "started_at": "2026-10-11T06:47:53.383Z",
+              "diagnostics": {
+                "metrics": {
+                  "cpu_ms": 197,
+                  "duration_ms": 652,
+                  "output_bytes": 153,
+                  "peak_memory_mb": 12.9
+                }
+              },
+              "finished_at": "2026-10-11T06:47:54.477Z",
+              "delivery_key": "test:page-without-advertisements",
+              "handler_kind": "extractor",
+              "invocation_id": "inv_a04edd741e6841f38c3116cb5388e38d"
+            },
+            "actual_status": "empty",
+            "expected_status": "empty"
+          },
+          {
+            "name": "currency-id-fallback",
+            "passed": true,
+            "result": {
+              "inputs": [
+                {
+                  "kind": "material",
+                  "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                  "content_sha256": "3dd4916ca1111c8629fac92c16aa1230c23c926ed303573279b28f5f746c8232",
+                  "observation_id": "obs_local_3dd4916ca1111c8629fac92c"
+                }
+              ],
+              "output": {
+                "entities": [
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "dom.ria.com",
+                        "listing_id": "33683279"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-borispolskaya-ulitsa-33683279.html",
+                      "site": "dom.ria.com",
+                      "price": {
+                        "amount": 9000.0,
+                        "currency": "UAH"
+                      },
+                      "title": "Здається в оренду 1-кімнатна квартира 27 кв. м у Києві",
+                      "location": "Київ",
+                      "listing_id": "33683279"
+                    },
+                    "schema": "classifieds.dim-ria-ads@1.0.1#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                        "version": "1.0.1",
+                        "package_id": "classifieds.dim-ria-ads"
+                      },
+                      "invocation_id": "inv_1f96d5244dc74fc786ee3f8edca516fb"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                      "observed_at": "2026-10-11T06:47:52Z",
+                      "content_sha256": "3dd4916ca1111c8629fac92c16aa1230c23c926ed303573279b28f5f746c8232",
+                      "observation_id": "obs_local_3dd4916ca1111c8629fac92c"
+                    }
+                  },
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "dom.ria.com",
+                        "listing_id": "35018017"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-prichalnaya-ulitsa-35018017.html",
+                      "site": "dom.ria.com",
+                      "price": {
+                        "amount": 36000.0,
+                        "currency": "UAH"
+                      },
+                      "title": "Здається в оренду 1-кімнатна квартира 55 кв. м у Києві",
+                      "location": "Київ",
+                      "listing_id": "35018017"
+                    },
+                    "schema": "classifieds.dim-ria-ads@1.0.1#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                        "version": "1.0.1",
+                        "package_id": "classifieds.dim-ria-ads"
+                      },
+                      "invocation_id": "inv_1f96d5244dc74fc786ee3f8edca516fb"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                      "observed_at": "2026-10-11T06:47:52Z",
+                      "content_sha256": "3dd4916ca1111c8629fac92c16aa1230c23c926ed303573279b28f5f746c8232",
+                      "observation_id": "obs_local_3dd4916ca1111c8629fac92c"
+                    }
+                  }
+                ]
+              },
+              "status": "success",
+              "handler": {
+                "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                "version": "1.0.1",
+                "package_id": "classifieds.dim-ria-ads"
+              },
+              "duplicate": false,
+              "test_mode": true,
+              "started_at": "2026-10-11T06:47:54.504Z",
+              "diagnostics": {
+                "metrics": {
+                  "cpu_ms": 206,
+                  "duration_ms": 965,
+                  "output_bytes": 1123,
+                  "peak_memory_mb": 12.2
+                }
+              },
+              "finished_at": "2026-10-11T06:47:55.920Z",
+              "delivery_key": "test:currency-id-fallback",
+              "handler_kind": "extractor",
+              "invocation_id": "inv_1f96d5244dc74fc786ee3f8edca516fb"
+            },
+            "actual_status": "success",
+            "expected_status": "success"
+          },
+          {
+            "name": "missing-or-unsupported-currency",
+            "passed": true,
+            "result": {
+              "inputs": [
+                {
+                  "kind": "material",
+                  "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                  "content_sha256": "e2a426bfcdd896892b8a89a220588dc7386dee51cc2f67dbfe4913abb42bc11b",
+                  "observation_id": "obs_local_e2a426bfcdd896892b8a89a2"
+                }
+              ],
+              "output": {
+                "entities": [
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "dom.ria.com",
+                        "listing_id": "33683279"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-borispolskaya-ulitsa-33683279.html",
+                      "site": "dom.ria.com",
+                      "title": "Здається в оренду 1-кімнатна квартира 27 кв. м у Києві",
+                      "location": "Київ",
+                      "listing_id": "33683279"
+                    },
+                    "schema": "classifieds.dim-ria-ads@1.0.1#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                        "version": "1.0.1",
+                        "package_id": "classifieds.dim-ria-ads"
+                      },
+                      "invocation_id": "inv_005c6fa441114f89a6b547f34c1b8ea0"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                      "observed_at": "2026-10-11T06:47:52Z",
+                      "content_sha256": "e2a426bfcdd896892b8a89a220588dc7386dee51cc2f67dbfe4913abb42bc11b",
+                      "observation_id": "obs_local_e2a426bfcdd896892b8a89a2"
+                    }
+                  },
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "dom.ria.com",
+                        "listing_id": "35018017"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-prichalnaya-ulitsa-35018017.html",
+                      "site": "dom.ria.com",
+                      "title": "Здається в оренду 1-кімнатна квартира 55 кв. м у Києві",
+                      "location": "Київ",
+                      "listing_id": "35018017"
+                    },
+                    "schema": "classifieds.dim-ria-ads@1.0.1#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                        "version": "1.0.1",
+                        "package_id": "classifieds.dim-ria-ads"
+                      },
+                      "invocation_id": "inv_005c6fa441114f89a6b547f34c1b8ea0"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:98c4873f5d96b72d4cf64c16a3e26d8f",
+                      "observed_at": "2026-10-11T06:47:52Z",
+                      "content_sha256": "e2a426bfcdd896892b8a89a220588dc7386dee51cc2f67dbfe4913abb42bc11b",
+                      "observation_id": "obs_local_e2a426bfcdd896892b8a89a2"
+                    }
+                  }
+                ]
+              },
+              "status": "success",
+              "handler": {
+                "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+                "version": "1.0.1",
+                "package_id": "classifieds.dim-ria-ads"
+              },
+              "duplicate": false,
+              "test_mode": true,
+              "started_at": "2026-10-11T06:47:55.929Z",
+              "diagnostics": {
+                "metrics": {
+                  "cpu_ms": 191,
+                  "duration_ms": 671,
+                  "output_bytes": 1025,
+                  "peak_memory_mb": 12.1
+                }
+              },
+              "finished_at": "2026-10-11T06:47:57.080Z",
+              "delivery_key": "test:missing-or-unsupported-currency",
+              "handler_kind": "extractor",
+              "invocation_id": "inv_005c6fa441114f89a6b547f34c1b8ea0"
+            },
+            "actual_status": "success",
+            "expected_status": "success"
+          }
+        ],
+        "failed": 0,
+        "passed": 4,
+        "package": {
+          "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d",
+          "version": "1.0.1",
+          "package_id": "classifieds.dim-ria-ads"
+        },
+        "started_at": "2026-10-11T06:47:52.129Z",
+        "finished_at": "2026-10-11T06:47:57.080Z"
+      }
+    },
+    "classifieds.dim-ria-rules": {
+      "package": {
+        "package_id": "classifieds.dim-ria-rules",
+        "version": "1.0.0",
+        "digest": "sha256:5ded59fd6e212b07586e91ca5db70399cc78470fff7134036c2573d784e1df29"
+      },
+      "rules_schema_valid": true
+    },
+    "classifieds.ria-ads": {
+      "package": {
+        "package_id": "classifieds.ria-ads",
+        "version": "1.0.0",
+        "digest": "sha256:74d8b3e1b40d00ab3f2af721d10592b0a86b86272435fea182fbd632d765d3b2"
+      },
+      "reused_runtime_test_report": true,
+      "runtime_test_report": {
+        "cases": [
+          {
+            "name": "real-catalog-excerpt",
+            "passed": true,
+            "result": {
+              "inputs": [
+                {
+                  "kind": "material",
+                  "material_id": "web:ade6d46fea98e93aeb1de84876865aa8",
+                  "content_sha256": "686b23ca4ef048cd17f0928d8c1a695cf65e9ee648c650abdfa6353cbfddf368",
+                  "observation_id": "obs_local_686b23ca4ef048cd17f0928d"
+                }
+              ],
+              "output": {
+                "entities": [
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "ria.com",
+                        "listing_id": "238399796"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://www.ria.com/uk/poverbank-solar-power-bank-f33w-238399796.html",
+                      "site": "ria.com",
+                      "price": {
+                        "amount": 2900.0,
+                        "currency": "UAH"
+                      },
+                      "title": "Повербанк Solar Power Bank F33W",
+                      "location": "Шаповалівка",
+                      "listing_id": "238399796"
+                    },
+                    "schema": "classifieds.ria-ads@1.0.0#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:74d8b3e1b40d00ab3f2af721d10592b0a86b86272435fea182fbd632d765d3b2",
+                        "version": "1.0.0",
+                        "package_id": "classifieds.ria-ads"
+                      },
+                      "invocation_id": "inv_9f8beaf3cdeb41feb34d66e7ec313bc3"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:ade6d46fea98e93aeb1de84876865aa8",
+                      "observed_at": "2026-10-11T04:28:06Z",
+                      "content_sha256": "686b23ca4ef048cd17f0928d8c1a695cf65e9ee648c650abdfa6353cbfddf368",
+                      "observation_id": "obs_local_686b23ca4ef048cd17f0928d"
+                    }
+                  },
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "ria.com",
+                        "listing_id": "237984070"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://www.ria.com/uk/smartfon-realme-c85-pro-8-256gb-peacock-237984070.html",
+                      "site": "ria.com",
+                      "price": {
+                        "amount": 11320.0,
+                        "currency": "UAH"
+                      },
+                      "title": "Смартфон Realme C85 Pro 8/256GB Peacock Green (RMX5555) UA",
+                      "location": "Харків",
+                      "listing_id": "237984070"
+                    },
+                    "schema": "classifieds.ria-ads@1.0.0#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:74d8b3e1b40d00ab3f2af721d10592b0a86b86272435fea182fbd632d765d3b2",
+                        "version": "1.0.0",
+                        "package_id": "classifieds.ria-ads"
+                      },
+                      "invocation_id": "inv_9f8beaf3cdeb41feb34d66e7ec313bc3"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:ade6d46fea98e93aeb1de84876865aa8",
+                      "observed_at": "2026-10-11T04:28:06Z",
+                      "content_sha256": "686b23ca4ef048cd17f0928d8c1a695cf65e9ee648c650abdfa6353cbfddf368",
+                      "observation_id": "obs_local_686b23ca4ef048cd17f0928d"
+                    }
+                  }
+                ]
+              },
+              "status": "success",
+              "handler": {
+                "digest": "sha256:74d8b3e1b40d00ab3f2af721d10592b0a86b86272435fea182fbd632d765d3b2",
+                "version": "1.0.0",
+                "package_id": "classifieds.ria-ads"
+              },
+              "duplicate": false,
+              "test_mode": true,
+              "started_at": "2026-10-11T04:28:22.599Z",
+              "diagnostics": {
+                "metrics": {
+                  "cpu_ms": 251,
+                  "duration_ms": 985,
+                  "output_bytes": 973,
+                  "peak_memory_mb": 14.4
+                }
+              },
+              "finished_at": "2026-10-11T04:28:25.463Z",
+              "delivery_key": "test:real-catalog-excerpt",
+              "handler_kind": "extractor",
+              "invocation_id": "inv_9f8beaf3cdeb41feb34d66e7ec313bc3"
+            },
+            "actual_status": "success",
+            "expected_status": "success"
+          },
+          {
+            "name": "page-without-advertisements",
+            "passed": true,
+            "result": {
+              "inputs": [
+                {
+                  "kind": "material",
+                  "material_id": "web:ade6d46fea98e93aeb1de84876865aa8",
+                  "content_sha256": "934b7e9ba3a33f942dfc2fa8ec03f4d2ac85535b4d3970da12476c70173b6d3c",
+                  "observation_id": "obs_local_934b7e9ba3a33f942dfc2fa8"
+                }
+              ],
+              "output": {
+                "entities": []
+              },
+              "status": "empty",
+              "handler": {
+                "digest": "sha256:74d8b3e1b40d00ab3f2af721d10592b0a86b86272435fea182fbd632d765d3b2",
+                "version": "1.0.0",
+                "package_id": "classifieds.ria-ads"
+              },
+              "duplicate": false,
+              "test_mode": true,
+              "started_at": "2026-10-11T04:28:25.512Z",
+              "diagnostics": {
+                "metrics": {
+                  "cpu_ms": 253,
+                  "duration_ms": 948,
+                  "output_bytes": 154,
+                  "peak_memory_mb": 14.6
+                }
+              },
+              "finished_at": "2026-10-11T04:28:28.299Z",
+              "delivery_key": "test:page-without-advertisements",
+              "handler_kind": "extractor",
+              "invocation_id": "inv_10c023b3e4b64a92814f5d9b43c2a97e"
+            },
+            "actual_status": "empty",
+            "expected_status": "empty"
+          }
+        ],
+        "failed": 0,
+        "passed": 2,
+        "package": {
+          "digest": "sha256:74d8b3e1b40d00ab3f2af721d10592b0a86b86272435fea182fbd632d765d3b2",
+          "version": "1.0.0",
+          "package_id": "classifieds.ria-ads"
+        },
+        "started_at": "2026-10-11T04:28:22.587Z",
+        "finished_at": "2026-10-11T04:28:28.300Z"
+      }
+    },
+    "classifieds.ria-rules": {
+      "package": {
+        "package_id": "classifieds.ria-rules",
+        "version": "1.0.0",
+        "digest": "sha256:5e4eaf9d597082178caabccdd6a9bb0d64578a35ebdf0a3228c50de798a77bbf"
+      },
+      "rules_schema_valid": true
+    },
+    "classifieds.shafa-ads": {
+      "package": {
+        "package_id": "classifieds.shafa-ads",
+        "version": "1.0.0",
+        "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce"
+      },
+      "reused_runtime_test_report": true,
+      "runtime_test_report": {
+        "cases": [
+          {
+            "name": "public-home-real-cards",
+            "passed": true,
+            "result": {
+              "inputs": [
+                {
+                  "kind": "material",
+                  "material_id": "web:df43f99d79e5c943c2bdbaa2fd924e12",
+                  "content_sha256": "183ff4e091daea0f5eb9f79df261ee2815fec683686a72f221ba3388ecc9f6cb",
+                  "observation_id": "obs_local_183ff4e091daea0f5eb9f79d"
+                }
+              ],
+              "output": {
+                "entities": [
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "shafa",
+                        "listing_id": "174879913"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://shafa.ua/uk/cosmetics/parfyumeriya/duhi/174879913-trussardi-_-passeggiata-in-galleria-vittorio-emanuele-ii-_-original",
+                      "site": "shafa",
+                      "price": {
+                        "amount": 60.0,
+                        "currency": "UAH"
+                      },
+                      "title": "Trussardi 🌰 passeggiata in galleria vittorio emanuele ii 💯% оригінал",
+                      "listing_id": "174879913"
+                    },
+                    "schema": "classifieds.shafa-ads@1.0.0#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce",
+                        "version": "1.0.0",
+                        "package_id": "classifieds.shafa-ads"
+                      },
+                      "invocation_id": "inv_e0b9c5ac29d040c59fe992f28fd5f5fb"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:df43f99d79e5c943c2bdbaa2fd924e12",
+                      "observed_at": "2026-10-11T04:28:31Z",
+                      "content_sha256": "183ff4e091daea0f5eb9f79df261ee2815fec683686a72f221ba3388ecc9f6cb",
+                      "observation_id": "obs_local_183ff4e091daea0f5eb9f79d"
+                    }
+                  },
+                  {
+                    "key": {
+                      "scope": "local",
+                      "natural": {
+                        "site": "shafa",
+                        "listing_id": "175398588"
+                      }
+                    },
+                    "fields": {
+                      "url": "https://shafa.ua/uk/women/sport-otdyh/shorty/175398588-shorti-workout",
+                      "site": "shafa",
+                      "price": {
+                        "amount": 280.0,
+                        "currency": "UAH"
+                      },
+                      "title": "Шорти лосіни для спорту workout знову в наявності в кольорах",
+                      "listing_id": "175398588"
+                    },
+                    "schema": "classifieds.shafa-ads@1.0.0#classified_ad",
+                    "provenance": {
+                      "package": {
+                        "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce",
+                        "version": "1.0.0",
+                        "package_id": "classifieds.shafa-ads"
+                      },
+                      "invocation_id": "inv_e0b9c5ac29d040c59fe992f28fd5f5fb"
+                    },
+                    "entity_type": "classified_ad",
+                    "observation": {
+                      "material_id": "web:df43f99d79e5c943c2bdbaa2fd924e12",
+                      "observed_at": "2026-10-11T04:28:31Z",
+                      "content_sha256": "183ff4e091daea0f5eb9f79df261ee2815fec683686a72f221ba3388ecc9f6cb",
+                      "observation_id": "obs_local_183ff4e091daea0f5eb9f79d"
+                    }
+                  }
+                ]
+              },
+              "status": "success",
+              "handler": {
+                "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce",
+                "version": "1.0.0",
+                "package_id": "classifieds.shafa-ads"
+              },
+              "duplicate": false,
+              "test_mode": true,
+              "started_at": "2026-10-11T04:28:44.600Z",
+              "diagnostics": {
+                "metrics": {
+                  "cpu_ms": 337,
+                  "duration_ms": 978,
+                  "output_bytes": 1023,
+                  "peak_memory_mb": 14.6
+                }
+              },
+              "finished_at": "2026-10-11T04:28:47.815Z",
+              "delivery_key": "test:public-home-real-cards",
+              "handler_kind": "extractor",
+              "invocation_id": "inv_e0b9c5ac29d040c59fe992f28fd5f5fb"
+            },
+            "actual_status": "success",
+            "expected_status": "success"
+          },
+          {
+            "name": "no-product-cards",
+            "passed": true,
+            "result": {
+              "inputs": [
+                {
+                  "kind": "material",
+                  "material_id": "web:df43f99d79e5c943c2bdbaa2fd924e12",
+                  "content_sha256": "79bbdfe7d0c8900d520e929ac41b89fe38ae4c1052d68c43584cd2b1d2415119",
+                  "observation_id": "obs_local_79bbdfe7d0c8900d520e929a"
+                }
+              ],
+              "output": {
+                "entities": []
+              },
+              "status": "empty",
+              "handler": {
+                "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce",
+                "version": "1.0.0",
+                "package_id": "classifieds.shafa-ads"
+              },
+              "duplicate": false,
+              "test_mode": true,
+              "started_at": "2026-10-11T04:28:47.828Z",
+              "diagnostics": {
+                "metrics": {
+                  "cpu_ms": 305,
+                  "duration_ms": 1653,
+                  "output_bytes": 154,
+                  "peak_memory_mb": 14.7
+                }
+              },
+              "finished_at": "2026-10-11T04:28:51.715Z",
+              "delivery_key": "test:no-product-cards",
+              "handler_kind": "extractor",
+              "invocation_id": "inv_d9da0e9362a0486ea3023a6fb8bd2d4a"
+            },
+            "actual_status": "empty",
+            "expected_status": "empty"
+          }
+        ],
+        "failed": 0,
+        "passed": 2,
+        "package": {
+          "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce",
+          "version": "1.0.0",
+          "package_id": "classifieds.shafa-ads"
+        },
+        "started_at": "2026-10-11T04:28:44.549Z",
+        "finished_at": "2026-10-11T04:28:51.715Z"
+      }
+    },
+    "classifieds.shafa-rules": {
+      "package": {
+        "package_id": "classifieds.shafa-rules",
+        "version": "1.0.1",
+        "digest": "sha256:1d4788e6cffa86cbe5052479e4bc3c13d6ab65185ce8f962bbc035bc7ccd296c"
+      },
+      "rules_schema_valid": true
+    }
+  },
+  "sites": {
+    "olx": {
+      "source": {
+        "source_id": "classified-olx",
+        "kind": "web",
+        "title": "OLX.ua — оголошення ноутбуків",
+        "description": "Публічні оголошення https://www.olx.ua/uk/elektronika/noutbuki-i-aksesuary/noutbuki/; ліміти у examples/classifieds/sites.json.",
+        "locator": {
+          "url": "https://www.olx.ua/uk/elektronika/noutbuki-i-aksesuary/noutbuki/"
+        },
+        "collector_rules": {
+          "package_id": "classifieds.olx-rules",
+          "version": "1.0.0",
+          "digest": "sha256:da668ec03843cc1330d9608f9a623ea7cf8d4a4afe61f4b4722ce2740b2621e6"
+        },
+        "limits": {
+          "rate": {
+            "requests_per_second_per_host": 0.5,
+            "min_delay_ms_per_host": 2000,
+            "respect_crawl_delay": true
+          },
+          "concurrency": {
+            "max_parallel_fetches_per_host": 1
+          }
+        },
+        "forward_unknown_to_llm": false,
+        "expected_entity_types": [
+          "classified_ad"
+        ],
+        "labels": {
+          "group": "classifieds",
+          "site": "olx"
+        }
+      },
+      "task": {
+        "task_id": "classifieds-olx",
+        "title": "OLX.ua — оголошення ноутбуків: збір оголошень",
+        "enabled": true,
+        "description": "Збір → RAW у файлах → classified_ad у PostgreSQL. Публічні сторінки, обмежений обхід.",
+        "input": {
+          "source_id": "classified-olx"
+        },
+        "stages": [
+          {
+            "stage_id": "collect",
+            "kind": "collect",
+            "collector": {
+              "collector": "web",
+              "mode": "full"
+            }
+          },
+          {
+            "stage_id": "store-raw",
+            "kind": "handler",
+            "handler": {
+              "package_id": "jane.storage-files",
+              "version": "1.0.0",
+              "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+            },
+            "connections": {
+              "target": "raw-files"
+            },
+            "inputs": [
+              {
+                "from": "collect"
+              }
+            ]
+          },
+          {
+            "stage_id": "extract-ads",
+            "kind": "handler",
+            "handler": {
+              "package_id": "classifieds.olx-ads",
+              "version": "1.0.0",
+              "digest": "sha256:5ee4eeed59693e72cfd4379bffadca3686d1c6a7f004291ad7a02716df36b16d"
+            },
+            "inputs": [
+              {
+                "from": "collect",
+                "when": {
+                  "field": "material.format.media_type",
+                  "op": "eq",
+                  "value": "text/html"
+                }
+              }
+            ]
+          },
+          {
+            "stage_id": "store-ads",
+            "kind": "handler",
+            "handler": {
+              "package_id": "jane.storage-postgresql",
+              "version": "1.0.0",
+              "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+            },
+            "connections": {
+              "target": "results-pg"
+            },
+            "inputs": [
+              {
+                "from": "extract-ads",
+                "select": "output",
+                "when": {
+                  "field": "result.status",
+                  "op": "eq",
+                  "value": "success"
+                }
+              }
+            ]
+          }
+        ],
+        "schedule": {
+          "type": "cron",
+          "cron": "0 9,21 * * *",
+          "timezone": "Europe/Kyiv",
+          "overlap": "skip"
+        },
+        "limits": {
+          "crawl": {
+            "max_depth": 1,
+            "max_pages_per_run": 5,
+            "max_bytes_per_run": 20971520,
+            "max_material_bytes": 5242880
+          },
+          "timeouts": {
+            "request_timeout_ms": 30000,
+            "invocation_timeout_ms": 60000,
+            "stage_timeout_ms": 180000,
+            "run_timeout_ms": 300000
+          }
+        },
+        "forward_unknown_to_llm": false,
+        "labels": {
+          "group": "classifieds",
+          "site": "olx"
+        }
+      },
+      "source_applied": true,
+      "task_applied": true,
+      "blocked_reason": null
+    },
+    "auto-ria": {
+      "source": {
+        "source_id": "classified-auto-ria",
+        "kind": "web",
+        "title": "AUTO.RIA — оголошення автомобілів",
+        "description": "Публічні оголошення https://auto.ria.com/uk/search/?indexName=auto&sort[0].order=dates.created.desc; ліміти у examples/classifieds/sites.json.",
+        "locator": {
+          "url": "https://auto.ria.com/uk/search/?indexName=auto&sort[0].order=dates.created.desc"
+        },
+        "collector_rules": {
+          "package_id": "classifieds.auto-ria-rules",
+          "version": "1.0.0",
+          "digest": "sha256:2154cb22e6d287685541f48e04e6452e4a5a794dabb9b11d13377ccf09d8cddf"
+        },
+        "limits": {
+          "rate": {
+            "requests_per_second_per_host": 0.5,
+            "min_delay_ms_per_host": 2000,
+            "respect_crawl_delay": true
+          },
+          "concurrency": {
+            "max_parallel_fetches_per_host": 1
+          }
+        },
+        "forward_unknown_to_llm": false,
+        "expected_entity_types": [
+          "classified_ad"
+        ],
+        "labels": {
+          "group": "classifieds",
+          "site": "auto-ria"
+        }
+      },
+      "task": {
+        "task_id": "classifieds-auto-ria",
+        "title": "AUTO.RIA — оголошення автомобілів: збір оголошень",
+        "enabled": true,
+        "description": "Збір → RAW у файлах → classified_ad у PostgreSQL. Публічні сторінки, обмежений обхід.",
+        "input": {
+          "source_id": "classified-auto-ria"
+        },
+        "stages": [
+          {
+            "stage_id": "collect",
+            "kind": "collect",
+            "collector": {
+              "collector": "web",
+              "mode": "full"
+            }
+          },
+          {
+            "stage_id": "store-raw",
+            "kind": "handler",
+            "handler": {
+              "package_id": "jane.storage-files",
+              "version": "1.0.0",
+              "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+            },
+            "connections": {
+              "target": "raw-files"
+            },
+            "inputs": [
+              {
+                "from": "collect"
+              }
+            ]
+          },
+          {
+            "stage_id": "extract-ads",
+            "kind": "handler",
+            "handler": {
+              "package_id": "classifieds.auto-ria-ads",
+              "version": "1.0.0",
+              "digest": "sha256:fc71c59913047e058bb3cf383947e8dcbe1f44a48e81ec36fb12f7beb710ef45"
+            },
+            "inputs": [
+              {
+                "from": "collect",
+                "when": {
+                  "field": "material.format.media_type",
+                  "op": "eq",
+                  "value": "text/html"
+                }
+              }
+            ]
+          },
+          {
+            "stage_id": "store-ads",
+            "kind": "handler",
+            "handler": {
+              "package_id": "jane.storage-postgresql",
+              "version": "1.0.0",
+              "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+            },
+            "connections": {
+              "target": "results-pg"
+            },
+            "inputs": [
+              {
+                "from": "extract-ads",
+                "select": "output",
+                "when": {
+                  "field": "result.status",
+                  "op": "eq",
+                  "value": "success"
+                }
+              }
+            ]
+          }
+        ],
+        "schedule": {
+          "type": "cron",
+          "cron": "0 9,21 * * *",
+          "timezone": "Europe/Kyiv",
+          "overlap": "skip"
+        },
+        "limits": {
+          "crawl": {
+            "max_depth": 1,
+            "max_pages_per_run": 5,
+            "max_bytes_per_run": 20971520,
+            "max_material_bytes": 5242880
+          },
+          "timeouts": {
+            "request_timeout_ms": 30000,
+            "invocation_timeout_ms": 60000,
+            "stage_timeout_ms": 180000,
+            "run_timeout_ms": 300000
+          }
+        },
+        "forward_unknown_to_llm": false,
+        "labels": {
+          "group": "classifieds",
+          "site": "auto-ria"
+        }
+      },
+      "source_applied": true,
+      "task_applied": true,
+      "blocked_reason": null
+    },
+    "dim-ria": {
+      "source": {
+        "source_id": "classified-dim-ria",
+        "kind": "web",
+        "title": "DIM.RIA — оренда квартир у Києві",
+        "description": "Публічні оголошення https://dom.ria.com/uk/arenda-kvartir/kiev/; ліміти у examples/classifieds/sites.json.",
+        "locator": {
+          "url": "https://dom.ria.com/uk/arenda-kvartir/kiev/"
+        },
+        "collector_rules": {
+          "package_id": "classifieds.dim-ria-rules",
+          "version": "1.0.0",
+          "digest": "sha256:5ded59fd6e212b07586e91ca5db70399cc78470fff7134036c2573d784e1df29"
+        },
+        "limits": {
+          "rate": {
+            "requests_per_second_per_host": 0.5,
+            "min_delay_ms_per_host": 2000,
+            "respect_crawl_delay": true
+          },
+          "concurrency": {
+            "max_parallel_fetches_per_host": 1
+          }
+        },
+        "forward_unknown_to_llm": false,
+        "expected_entity_types": [
+          "classified_ad"
+        ],
+        "labels": {
+          "group": "classifieds",
+          "site": "dim-ria"
+        }
+      },
+      "task": {
+        "task_id": "classifieds-dim-ria",
+        "title": "DIM.RIA — оренда квартир у Києві: збір оголошень",
+        "enabled": true,
+        "description": "Збір → RAW у файлах → classified_ad у PostgreSQL. Публічні сторінки, обмежений обхід.",
+        "input": {
+          "source_id": "classified-dim-ria"
+        },
+        "stages": [
+          {
+            "stage_id": "collect",
+            "kind": "collect",
+            "collector": {
+              "collector": "web",
+              "mode": "full"
+            }
+          },
+          {
+            "stage_id": "store-raw",
+            "kind": "handler",
+            "handler": {
+              "package_id": "jane.storage-files",
+              "version": "1.0.0",
+              "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+            },
+            "connections": {
+              "target": "raw-files"
+            },
+            "inputs": [
+              {
+                "from": "collect"
+              }
+            ]
+          },
+          {
+            "stage_id": "extract-ads",
+            "kind": "handler",
+            "handler": {
+              "package_id": "classifieds.dim-ria-ads",
+              "version": "1.0.1",
+              "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d"
+            },
+            "inputs": [
+              {
+                "from": "collect",
+                "when": {
+                  "field": "material.format.media_type",
+                  "op": "eq",
+                  "value": "text/html"
+                }
+              }
+            ]
+          },
+          {
+            "stage_id": "store-ads",
+            "kind": "handler",
+            "handler": {
+              "package_id": "jane.storage-postgresql",
+              "version": "1.0.0",
+              "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+            },
+            "connections": {
+              "target": "results-pg"
+            },
+            "inputs": [
+              {
+                "from": "extract-ads",
+                "select": "output",
+                "when": {
+                  "field": "result.status",
+                  "op": "eq",
+                  "value": "success"
+                }
+              }
+            ]
+          }
+        ],
+        "schedule": {
+          "type": "cron",
+          "cron": "0 9,21 * * *",
+          "timezone": "Europe/Kyiv",
+          "overlap": "skip"
+        },
+        "limits": {
+          "crawl": {
+            "max_depth": 1,
+            "max_pages_per_run": 5,
+            "max_bytes_per_run": 20971520,
+            "max_material_bytes": 5242880
+          },
+          "timeouts": {
+            "request_timeout_ms": 30000,
+            "invocation_timeout_ms": 60000,
+            "stage_timeout_ms": 180000,
+            "run_timeout_ms": 300000
+          }
+        },
+        "forward_unknown_to_llm": false,
+        "labels": {
+          "group": "classifieds",
+          "site": "dim-ria"
+        }
+      },
+      "source_applied": true,
+      "task_applied": true,
+      "blocked_reason": null
+    },
+    "ria": {
+      "source": {
+        "source_id": "classified-ria",
+        "kind": "web",
+        "title": "RIA.com — телефони та смарттехніка",
+        "description": "Публічні оголошення https://www.ria.com/uk/c/mobile/; ліміти у examples/classifieds/sites.json.",
+        "locator": {
+          "url": "https://www.ria.com/uk/c/mobile/"
+        },
+        "collector_rules": {
+          "package_id": "classifieds.ria-rules",
+          "version": "1.0.0",
+          "digest": "sha256:5e4eaf9d597082178caabccdd6a9bb0d64578a35ebdf0a3228c50de798a77bbf"
+        },
+        "limits": {
+          "rate": {
+            "requests_per_second_per_host": 0.5,
+            "min_delay_ms_per_host": 2000,
+            "respect_crawl_delay": true
+          },
+          "concurrency": {
+            "max_parallel_fetches_per_host": 1
+          }
+        },
+        "forward_unknown_to_llm": false,
+        "expected_entity_types": [
+          "classified_ad"
+        ],
+        "labels": {
+          "group": "classifieds",
+          "site": "ria"
+        }
+      },
+      "task": {
+        "task_id": "classifieds-ria",
+        "title": "RIA.com — телефони та смарттехніка: збір оголошень",
+        "enabled": true,
+        "description": "Збір → RAW у файлах → classified_ad у PostgreSQL. Публічні сторінки, обмежений обхід.",
+        "input": {
+          "source_id": "classified-ria"
+        },
+        "stages": [
+          {
+            "stage_id": "collect",
+            "kind": "collect",
+            "collector": {
+              "collector": "web",
+              "mode": "full"
+            }
+          },
+          {
+            "stage_id": "store-raw",
+            "kind": "handler",
+            "handler": {
+              "package_id": "jane.storage-files",
+              "version": "1.0.0",
+              "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+            },
+            "connections": {
+              "target": "raw-files"
+            },
+            "inputs": [
+              {
+                "from": "collect"
+              }
+            ]
+          },
+          {
+            "stage_id": "extract-ads",
+            "kind": "handler",
+            "handler": {
+              "package_id": "classifieds.ria-ads",
+              "version": "1.0.0",
+              "digest": "sha256:74d8b3e1b40d00ab3f2af721d10592b0a86b86272435fea182fbd632d765d3b2"
+            },
+            "inputs": [
+              {
+                "from": "collect",
+                "when": {
+                  "field": "material.format.media_type",
+                  "op": "eq",
+                  "value": "text/html"
+                }
+              }
+            ]
+          },
+          {
+            "stage_id": "store-ads",
+            "kind": "handler",
+            "handler": {
+              "package_id": "jane.storage-postgresql",
+              "version": "1.0.0",
+              "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+            },
+            "connections": {
+              "target": "results-pg"
+            },
+            "inputs": [
+              {
+                "from": "extract-ads",
+                "select": "output",
+                "when": {
+                  "field": "result.status",
+                  "op": "eq",
+                  "value": "success"
+                }
+              }
+            ]
+          }
+        ],
+        "schedule": {
+          "type": "cron",
+          "cron": "0 9,21 * * *",
+          "timezone": "Europe/Kyiv",
+          "overlap": "skip"
+        },
+        "limits": {
+          "crawl": {
+            "max_depth": 1,
+            "max_pages_per_run": 5,
+            "max_bytes_per_run": 20971520,
+            "max_material_bytes": 5242880
+          },
+          "timeouts": {
+            "request_timeout_ms": 30000,
+            "invocation_timeout_ms": 60000,
+            "stage_timeout_ms": 180000,
+            "run_timeout_ms": 300000
+          }
+        },
+        "forward_unknown_to_llm": false,
+        "labels": {
+          "group": "classifieds",
+          "site": "ria"
+        }
+      },
+      "source_applied": true,
+      "task_applied": true,
+      "blocked_reason": null
+    },
+    "shafa": {
+      "source": {
+        "source_id": "classified-shafa",
+        "kind": "web",
+        "title": "Shafa — публічні оголошення головної сторінки",
+        "description": "Публічні оголошення https://shafa.ua/uk/; ліміти у examples/classifieds/sites.json.",
+        "locator": {
+          "url": "https://shafa.ua/uk/"
+        },
+        "collector_rules": {
+          "package_id": "classifieds.shafa-rules",
+          "version": "1.0.1",
+          "digest": "sha256:1d4788e6cffa86cbe5052479e4bc3c13d6ab65185ce8f962bbc035bc7ccd296c"
+        },
+        "limits": {
+          "rate": {
+            "requests_per_second_per_host": 0.5,
+            "min_delay_ms_per_host": 2000,
+            "respect_crawl_delay": true
+          },
+          "concurrency": {
+            "max_parallel_fetches_per_host": 1
+          }
+        },
+        "forward_unknown_to_llm": false,
+        "expected_entity_types": [
+          "classified_ad"
+        ],
+        "labels": {
+          "group": "classifieds",
+          "site": "shafa"
+        }
+      },
+      "task": {
+        "task_id": "classifieds-shafa",
+        "title": "Shafa — публічні оголошення головної сторінки: збір оголошень",
+        "enabled": true,
+        "description": "Збір → RAW у файлах → classified_ad у PostgreSQL. Публічні сторінки, обмежений обхід.",
+        "input": {
+          "source_id": "classified-shafa"
+        },
+        "stages": [
+          {
+            "stage_id": "collect",
+            "kind": "collect",
+            "collector": {
+              "collector": "web",
+              "mode": "full"
+            }
+          },
+          {
+            "stage_id": "store-raw",
+            "kind": "handler",
+            "handler": {
+              "package_id": "jane.storage-files",
+              "version": "1.0.0",
+              "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+            },
+            "connections": {
+              "target": "raw-files"
+            },
+            "inputs": [
+              {
+                "from": "collect"
+              }
+            ]
+          },
+          {
+            "stage_id": "extract-ads",
+            "kind": "handler",
+            "handler": {
+              "package_id": "classifieds.shafa-ads",
+              "version": "1.0.0",
+              "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce"
+            },
+            "inputs": [
+              {
+                "from": "collect",
+                "when": {
+                  "field": "material.format.media_type",
+                  "op": "eq",
+                  "value": "text/html"
+                }
+              }
+            ]
+          },
+          {
+            "stage_id": "store-ads",
+            "kind": "handler",
+            "handler": {
+              "package_id": "jane.storage-postgresql",
+              "version": "1.0.0",
+              "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+            },
+            "connections": {
+              "target": "results-pg"
+            },
+            "inputs": [
+              {
+                "from": "extract-ads",
+                "select": "output",
+                "when": {
+                  "field": "result.status",
+                  "op": "eq",
+                  "value": "success"
+                }
+              }
+            ]
+          }
+        ],
+        "schedule": {
+          "type": "cron",
+          "cron": "0 9,21 * * *",
+          "timezone": "Europe/Kyiv",
+          "overlap": "skip"
+        },
+        "limits": {
+          "crawl": {
+            "max_depth": 0,
+            "max_pages_per_run": 1,
+            "max_bytes_per_run": 20971520,
+            "max_material_bytes": 5242880
+          },
+          "timeouts": {
+            "request_timeout_ms": 30000,
+            "invocation_timeout_ms": 60000,
+            "stage_timeout_ms": 180000,
+            "run_timeout_ms": 300000
+          }
+        },
+        "forward_unknown_to_llm": false,
+        "labels": {
+          "group": "classifieds",
+          "site": "shafa"
+        }
+      },
+      "source_applied": true,
+      "task_applied": true,
+      "blocked_reason": null
+    }
+  }
+}

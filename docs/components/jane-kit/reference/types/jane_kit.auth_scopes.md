@@ -24,7 +24,7 @@ def merge(*tables: Mapping[str, str | Sequence[str]]) -> dict[str, tuple[str, ..
 
 Tables of several APIs one service implements; an operation present in several gets the union.
 
-Код: [auth_scopes.py:190](../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L190).
+Код: [auth_scopes.py:203](../../../../../libs/jane-kit/src/jane_kit/auth_scopes.py#L203).
 
 ## Константи й змінні модуля
 
@@ -34,7 +34,8 @@ Tables of several APIs one service implements; an operation present in several g
 | `COLLECTOR` | `dict[str, Scopes]` | `{'POST /v1/fetches': 'collector:run', 'POST /v1/collections': 'collector:run', '` |  |
 | `HANDLER` | `dict[str, Scopes]` | `{'POST /v1/invocations': 'handler:invoke', 'GET /v1/invocations/{invocation_id}'` |  |
 | `LLM` | `dict[str, Scopes]` | `{'GET /v1/providers': _LLM_READ, 'GET /v1/providers/{provider_id}': _LLM_READ, '` |  |
+| `OPERATIONS` | `dict[str, Scopes]` | `{'GET /v1/configuration': ('modules:read', 'modules:write'), 'PUT /v1/configurat` | Supplemental operations.v1 API, installed through BUILTIN_SCOPES in every service. |
 | `ORCHESTRATOR` | `dict[str, Scopes]` | `{'GET /v1/sources': _O_READ, 'POST /v1/sources': _O_WRITE, 'GET /v1/sources/{sou` |  |
 | `REGISTRY` | `dict[str, Scopes]` | `{'GET /v1/packages': 'registry:read', 'POST /v1/packages': 'registry:write', 'GE` |  |
-| `STORAGE` | `dict[str, Scopes]` | `{'GET /v1/entities': 'storage:read', 'GET /v1/entity-history': 'storage:read', '` |  |
+| `STORAGE` | `dict[str, Scopes]` | `{'POST /v1/storage-status/checks': 'connections:write', **_jobs((*_HANDLER_ANY,` |  |
 | `TABLES` | `dict[str, dict[str, Scopes]]` | `{'collector': COLLECTOR, 'handler': HANDLER, 'storage': STORAGE, 'llm': LLM, 'as` | Contract name (``contracts/openapi/<name>.v1.yaml``) -> its table. |

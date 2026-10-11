@@ -1,0 +1,14 @@
+{
+  "requested_url": "https://shafa.ua/uk/",
+  "final_url": "https://shafa.ua/uk/",
+  "http_status": 200,
+  "fetched_at": "2026-10-11T03:52:01.285926+00:00",
+  "user_agent": "JaneBot/1.0",
+  "sha256": "4dfced299c7b1904c6f98389106fe5bf57ee0e6134fc9a068fdd654d50fdbf62",
+  "bytes": 165838,
+  "product_cards": 21,
+  "fixture_derivation": "First two exact div[data-testid=productCard] subtrees from the public fetched page; trackers outside cards excluded.",
+  "robots_url": "https://shafa.ua/robots.txt",
+  "robots_http_status": 200,
+  "seed_scope": "Public home-page advertised listings; electronics category currently renders an empty SPA shell."
+}

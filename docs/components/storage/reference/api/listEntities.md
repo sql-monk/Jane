@@ -1,6 +1,6 @@
 # GET /v1/entities
 
-> Згенеровано `scripts/docs_reference.py` з [storage.v1.yaml](../../../../../contracts/openapi/storage.v1.yaml#L36). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [storage.v1.yaml](../../../../../contracts/openapi/storage.v1.yaml#L457). Не редагуйте вручну.
 
 **Актуальний стан сутностей**
 
@@ -12,6 +12,8 @@
 | Ідемпотентність | — |
 | Теги | entities |
 
+Необов’язковий search шукає без урахування регістру буквальний підрядок у canonical_key, key і fields по всьому сховищу перед пагінацією. Без search поведінка незмінна. Адаптер без можливості пошуку повертає 501 not_implemented. Курсор чинний для тих самих фільтрів. Приклад: GET /v1/entities?connection_id=results-pg&entity_type=product&search=Kettle.
+
 ## Параметри
 
 | Назва | Де | Тип | Обов'язковий | Опис |
@@ -20,6 +22,7 @@
 | `entity_type` | query | `string` | так |  |
 | `scope` | query | `string` | ні |  |
 | `key` | query | `string` | ні | Канонічний ключ (EntityState.canonical_key); тоді сторінка містить 0 або 1 елемент. |
+| `search` | query | `string` | ні | Буквальний підрядок; пробіли на початку й кінці ігноруються. |
 | `updated_since` | query | `string` (date-time) | ні |  |
 | `cursor` | query | `string` | ні | Непрозорий курсор з `next_cursor` попередньої сторінки. |
 | `limit` | query | `integer` | ні | Розмір сторінки. Значення понад максимум сервісу обрізається до максимуму. |
@@ -32,6 +35,8 @@
 | `401` | Немає або недійсний токен (`unauthenticated`). | `problem` |
 | `404` | Ресурс не знайдено (`not_found`). | `problem` |
 | `422` | Семантична помилка (`validation_failed`, `idempotency_key_reused`, `limit_exceeded`, `secret_detected`, `schema_mismatch` тощо). | `problem` |
+| `501` | Каталог або пошук сутностей не підтримується цим адаптером. | `problem` |
+| `504` | Перевищено налаштований timeouts.request_timeout_ms під час читання сховища. | `problem` |
 
 ### Відповідь 200
 
@@ -84,4 +89,4 @@
 
 ## Примітки
 
-- Помилки повертаються як `application/problem+json` ([модель помилок](../../../../../contracts/docs/errors.md)): `401`, `404`, `422`.
+- Помилки повертаються як `application/problem+json` ([модель помилок](../../../../../contracts/docs/errors.md)): `401`, `404`, `422`, `501`, `504`.

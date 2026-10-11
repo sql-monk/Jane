@@ -7,10 +7,10 @@
 ### Компонент `ReprocessForm`
 
 ```typescript
-function ReprocessForm({ taskId, storageConnectionId, materialIds, objectIds, stored, }: { taskId?: string; storageConnectionId?: string; materialIds?: string[]; objectIds?: string[]; stored?: import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src/components/ReprocessForm").StoredSelection; }): React.JSX.Element
+function ReprocessForm({ taskId, storageConnectionId, materialIds, objectIds, stored, }: { taskId?: string; storageConnectionId?: string; materialIds?: string[]; objectIds?: string[]; stored?: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/components/ReprocessForm").StoredSelection; }): React.JSX.Element
 ```
 
-Код: [ReprocessForm.tsx:34](../../../../../web/admin/src/components/ReprocessForm.tsx#L34).
+Код: [ReprocessForm.tsx:36](../../../../../web/admin/src/components/ReprocessForm.tsx#L36).
 
 ## Інтерфейси
 
@@ -28,4 +28,4 @@ One stored RAW object (storage.v1 StoredObject) the user picked, e.g. a row of t
 | `material_id` | `string \| undefined` | ні | читання й запис |  |
 | `observation_id` | `string \| undefined` | ні | читання й запис |  |
 
-Код: [ReprocessForm.tsx:13](../../../../../web/admin/src/components/ReprocessForm.tsx#L13).
+Код: [ReprocessForm.tsx:15](../../../../../web/admin/src/components/ReprocessForm.tsx#L15).

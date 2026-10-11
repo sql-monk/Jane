@@ -12,7 +12,7 @@
 | `llm.v1` | Jane LLM Gateway API | 15 | [../../components/llm/reference/api/README.md](../../components/llm/reference/api/README.md) |
 | `orchestrator.v1` | Jane Orchestrator API | 36 | [../../components/orchestrator/reference/api/README.md](../../components/orchestrator/reference/api/README.md) |
 | `registry.v1` | Jane Handler Registry API | 19 | [../../components/registry/reference/api/README.md](../../components/registry/reference/api/README.md) |
-| `storage.v1` | Jane Storage Read API | 7 | [../../components/storage/reference/api/README.md](../../components/storage/reference/api/README.md) |
+| `storage.v1` | Jane Storage Read API | 17 | [../../components/storage/reference/api/README.md](../../components/storage/reference/api/README.md) |
 
 | Модуль | Контракти |
 |---|---|

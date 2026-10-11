@@ -105,6 +105,11 @@ def test_storage_read_api_matches_contract(client: TestClient, h: SimpleNamespac
     key = 'shop-example|{"sku":"A-100"}'
     api.get("/v1/health")
     api.get("/v1/info")
+    api.get("/v1/entity-types", params={"connection_id": "raw-files"})
+    api.get("/v1/entity-types", params={"connection_id": "nope"})
+    api.get(
+        "/v1/entities", params={"connection_id": "raw-files", "entity_type": "product", "search": "Kettle"}
+    )
     api.get("/v1/entities", params={"connection_id": "raw-files", "entity_type": "product"})
     api.get("/v1/entities", params={"connection_id": "raw-files", "entity_type": "product", "key": key})
     api.get("/v1/entities", params={"connection_id": "nope", "entity_type": "product"})
@@ -121,6 +126,22 @@ def test_storage_read_api_matches_contract(client: TestClient, h: SimpleNamespac
     api.get("/v1/objects/obj_missing", params={"connection_id": "raw-files"})
     content = api.get(f"/v1/objects/{object_id}/content", params={"connection_id": "raw-files"})
     assert content.content == h.PAGE
+    api.get("/v1/connections")
+    api.get("/v1/connections/raw-files")
+    api.get("/v1/storage-status", params={"connection_id": "raw-files"})
+    api.post("/v1/connections/raw-files/test")
+    api.get("/v1/storage-status", params={"connection_id": "raw-files"})
+    doc = client.get("/v1/connections/raw-files").json()
+    doc["connection_id"] = "contract-status"
+    assert api.put("/v1/connections/contract-status", json=doc).status_code == 201
+    api.delete("/v1/connections/contract-status")
+    status_job = api.post(
+        "/v1/storage-status/checks",
+        json={"connection_id": "raw-files"},
+        headers={"Idempotency-Key": "contract-status-check"},
+    )
+    api.get(status_job.headers["Location"])
+    api.post(status_job.headers["Location"] + "/cancel")
     assert api.uncovered() == []
 
 

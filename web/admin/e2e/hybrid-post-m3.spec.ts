@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { APIRequestContext, Page } from "@playwright/test";
-import { captureRequest, expect, realServiceUrl, test } from "./fixtures";
+import { captureRequest, expect, realServiceUrl, selectCatalogOption, test } from "./fixtures";
 import { formatInstant } from "../src/lib/format";
 import {
   E2E_PACKAGES_DIR,
@@ -125,7 +125,7 @@ async function reprocess(
   selection: Record<string, unknown>,
 ) {
   const form = admin.getByRole("form", { name: "Повторна обробка" });
-  await form.getByLabel("Почати з етапу").fill("extract-products");
+  await form.getByLabel("Почати з етапу", { exact: true }).selectOption("extract-products");
   const [sent, response] = await Promise.all([
     captureRequest(admin, "POST", "/api/orchestrator/v1/reprocessing", () =>
       form.getByRole("button", { name: "Обробити повторно" }).click(),
@@ -208,8 +208,8 @@ test.describe("remaining post-M3 admin coverage @hybrid", () => {
       await admin.goto("/runs/" + data.runId);
       await admin.getByRole("tab", { name: "Повторна обробка" }).click();
       const form = admin.getByRole("form", { name: "Повторна обробка" });
-      await expect(form.getByLabel("Завдання")).toHaveValue(data.taskId);
-      await form.getByLabel("Сховище RAW (connection_id)").fill("raw-files");
+      await expect(form.getByLabel("Завдання", { exact: true })).toHaveValue(data.taskId);
+      await form.getByLabel("Сховище RAW", { exact: true }).fill("raw-files");
       await form
         .getByLabel("Точний вибір: " + (mode === "object" ? "RAW object_ids" : "observation_ids"))
         .fill(mode === "object" ? data.raw.object.object_id : data.raw.material.observation_id);
@@ -266,7 +266,11 @@ test.describe("remaining post-M3 admin coverage @hybrid", () => {
     }
     // A zero-attempt run needs no external LLM call; both jobs have real, completed assistant results.
     await admin.goto("/assistant?tab=improvement");
-    await admin.getByLabel("Джерело (source_id)").fill(data.sourceId);
+    await selectCatalogOption(
+      admin.getByRole("region", { name: "Запуски вдосконалення екстракторів", exact: true }),
+      admin.getByLabel("Джерело (source_id)", { exact: true }),
+      data.sourceId,
+    );
     const table = admin.getByRole("table", { name: "Запуски вдосконалення" });
     await expect(table.getByRole("row")).toHaveCount(3);
     const [packageQuery] = await Promise.all([
@@ -275,7 +279,11 @@ test.describe("remaining post-M3 admin coverage @hybrid", () => {
           new URL(r.url()).pathname === "/api/assistant/v1/improvement-runs" &&
           new URL(r.url()).searchParams.get("package_id") === data.extractor.package_id,
       ),
-      admin.getByLabel("Пакет (package_id)").fill(data.extractor.package_id),
+      selectCatalogOption(
+        admin.getByRole("region", { name: "Запуски вдосконалення екстракторів", exact: true }),
+        admin.getByLabel("Пакет (package_id)", { exact: true }),
+        data.extractor.package_id,
+      ),
     ]);
     expect(new URL(packageQuery.url()).searchParams.get("package_id")).toBe(data.extractor.package_id);
     await expect(table.getByRole("row")).toHaveCount(2);
@@ -401,7 +409,7 @@ test.describe("remaining post-M3 admin coverage @hybrid", () => {
     await expect(row).toContainText(formatInstant(item.available_at));
     await row.getByText(/^\d+ подій$/).click();
     const history = row.getByLabel("Історія спроб " + item.item_id);
-    await expect(history.getByRole("listitem").filter({ hasText: "retry_scheduled" })).toContainText(
+    await expect(history.getByRole("listitem").filter({ hasText: "Повтор заплановано" })).toContainText(
       "доступний з " + formatInstant(retry.available_at),
     );
     await expect(history).toContainText("затримка 1000 мс, код upstream_unavailable");

@@ -21,7 +21,7 @@ Pipeline for every URL (from the frontier or ``ctx.fetch``): scope/exclude (at a
 |---|---|
 | Вид | клас |
 | Модуль | `jane_web_collector.crawler` |
-| Код | [crawler.py:174](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L174) |
+| Код | [crawler.py:175](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L175) |
 
 ```python
 class CrawlRun: ...
@@ -33,7 +33,9 @@ class CrawlRun: ...
 def __init__(self, deps: RunDeps, record: Mapping[str, Any]) -> None: ...
 ```
 
-Код: [crawler.py:175](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L175).
+Винятки в коді методу: `ValidationFailed`.
+
+Код: [crawler.py:176](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L176).
 
 #### Метод `CrawlRun.scope_reason`
 
@@ -41,7 +43,7 @@ def __init__(self, deps: RunDeps, record: Mapping[str, Any]) -> None: ...
 def scope_reason(self, url: str) -> str | None: ...
 ```
 
-Код: [crawler.py:261](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L261).
+Код: [crawler.py:289](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L289).
 
 #### Метод `CrawlRun.section_for`
 
@@ -49,7 +51,7 @@ def scope_reason(self, url: str) -> str | None: ...
 def section_for(self, url: str) -> str | None: ...
 ```
 
-Код: [crawler.py:266](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L266).
+Код: [crawler.py:294](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L294).
 
 #### Метод `CrawlRun.rule_priority`
 
@@ -57,7 +59,7 @@ def section_for(self, url: str) -> str | None: ...
 def rule_priority(self, url: str) -> int: ...
 ```
 
-Код: [crawler.py:272](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L272).
+Код: [crawler.py:300](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L300).
 
 #### Метод `CrawlRun.extract_links`
 
@@ -70,7 +72,7 @@ def extract_links(
 ) -> list[str]: ...
 ```
 
-Код: [crawler.py:278](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L278).
+Код: [crawler.py:306](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L306).
 
 #### Метод `CrawlRun.robots_allowed`
 
@@ -78,7 +80,7 @@ def extract_links(
 async def robots_allowed(self, url: str) -> bool: ...
 ```
 
-Код: [crawler.py:325](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L325).
+Код: [crawler.py:353](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L353).
 
 #### Метод `CrawlRun.admit`
 
@@ -90,17 +92,17 @@ def admit(
 ) -> list[FrontierRow]: ...
 ```
 
-Normalize and filter candidates (scope, depth, frontier size); dedup happens on insert.
+Normalize and filter candidates (scope, depth); insert bounds the queue and spools its overflow.
 
-Код: [crawler.py:354](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L354).
+Код: [crawler.py:382](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L382).
 
 #### Метод `CrawlRun.insert_rows`
 
 ```python
-def insert_rows(self, db: Any, rows: Sequence[FrontierRow]) -> None: ...
+def insert_rows(self, db: Any, rows: Iterable[FrontierRow], *, immediate: bool = False) -> None: ...
 ```
 
-Код: [crawler.py:392](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L392).
+Код: [crawler.py:416](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L416).
 
 #### Метод `CrawlRun.handle`
 
@@ -120,7 +122,7 @@ Fetch and process one admitted URL. Returns the resource (for ``ctx.fetch``) or 
 
 Винятки в коді методу: `FetchRejected`, `RedirectDuplicate`.
 
-Код: [crawler.py:511](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L511).
+Код: [crawler.py:574](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L574).
 
 #### Метод `CrawlRun.fetch_for_strategy`
 
@@ -139,7 +141,7 @@ async def fetch_for_strategy(
 
 Винятки в коді методу: `ValueError`, `FetchRejected`.
 
-Код: [crawler.py:842](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L842).
+Код: [crawler.py:905](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L905).
 
 #### Метод `CrawlRun.emit_for_strategy`
 
@@ -151,7 +153,7 @@ async def emit_for_strategy(self, item: DiscoveredMaterial, *, caller: str) -> b
 
 Винятки в коді методу: `JobCancelledError`.
 
-Код: [crawler.py:887](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L887).
+Код: [crawler.py:995](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L995).
 
 #### Метод `CrawlRun.execute`
 
@@ -161,7 +163,7 @@ async def execute(self, job: JobContext | None = None) -> dict[str, Any]: ...
 
 Винятки в коді методу: `RuntimeError`.
 
-Код: [crawler.py:1068](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L1068).
+Код: [crawler.py:1221](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L1221).
 
 ### Клас `RunDeps`
 
@@ -169,7 +171,7 @@ async def execute(self, job: JobContext | None = None) -> dict[str, Any]: ...
 |---|---|
 | Вид | dataclass |
 | Модуль | `jane_web_collector.crawler` |
-| Код | [crawler.py:97](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L97) |
+| Код | [crawler.py:98](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L98) |
 
 ```python
 @dataclass
@@ -205,7 +207,7 @@ Service-level dependencies shared by all runs.
 |---|---|
 | Вид | клас |
 | Модуль | `jane_web_collector.crawler` |
-| Код | [crawler.py:122](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L122) |
+| Код | [crawler.py:123](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L123) |
 
 ```python
 class StrategyContext: ...
@@ -219,7 +221,7 @@ class StrategyContext: ...
 def __init__(self, run: CrawlRun, strategy_id: str, limits: Mapping[str, Any]) -> None: ...
 ```
 
-Код: [crawler.py:125](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L125).
+Код: [crawler.py:126](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L126).
 
 #### Метод `StrategyContext.fetch`
 
@@ -235,7 +237,7 @@ async def fetch(
 ) -> FetchedResource | None: ...
 ```
 
-Код: [crawler.py:134](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L134).
+Код: [crawler.py:135](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L135).
 
 #### Метод `StrategyContext.emit_material`
 
@@ -243,7 +245,7 @@ async def fetch(
 async def emit_material(self, item: DiscoveredMaterial) -> bool: ...
 ```
 
-Код: [crawler.py:147](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L147).
+Код: [crawler.py:148](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L148).
 
 #### Метод `StrategyContext.normalize`
 
@@ -253,7 +255,7 @@ def normalize(self, url: str, base: str | None = None) -> str: ...
 
 Винятки в коді методу: `ValueError`.
 
-Код: [crawler.py:150](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L150).
+Код: [crawler.py:151](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L151).
 
 #### Метод `StrategyContext.in_scope`
 
@@ -261,7 +263,7 @@ def normalize(self, url: str, base: str | None = None) -> str: ...
 def in_scope(self, url: str) -> bool: ...
 ```
 
-Код: [crawler.py:156](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L156).
+Код: [crawler.py:157](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L157).
 
 #### Метод `StrategyContext.section_for`
 
@@ -269,7 +271,7 @@ def in_scope(self, url: str) -> bool: ...
 def section_for(self, url: str) -> str | None: ...
 ```
 
-Код: [crawler.py:159](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L159).
+Код: [crawler.py:160](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L160).
 
 #### Метод `StrategyContext.extract_links`
 
@@ -281,7 +283,7 @@ def extract_links(
 ) -> list[str]: ...
 ```
 
-Код: [crawler.py:162](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L162).
+Код: [crawler.py:163](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L163).
 
 #### Метод `StrategyContext.extract_links_from`
 
@@ -293,7 +295,7 @@ def extract_links_from(
 ) -> list[str]: ...
 ```
 
-Код: [crawler.py:165](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L165).
+Код: [crawler.py:166](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L166).
 
 #### Метод `StrategyContext.is_cancelled`
 
@@ -301,7 +303,7 @@ def extract_links_from(
 def is_cancelled(self) -> bool: ...
 ```
 
-Код: [crawler.py:170](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L170).
+Код: [crawler.py:171](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L171).
 
 ## Функції
 
@@ -311,7 +313,7 @@ def is_cancelled(self) -> bool: ...
 def new_stats() -> dict[str, Any]: ...
 ```
 
-Код: [crawler.py:84](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L84).
+Код: [crawler.py:85](../../../../../services/web-collector/src/jane_web_collector/crawler.py#L85).
 
 ## Константи й змінні модуля
 

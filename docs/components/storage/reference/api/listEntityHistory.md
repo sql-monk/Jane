@@ -1,6 +1,6 @@
 # GET /v1/entity-history
 
-> Згенеровано `scripts/docs_reference.py` з [storage.v1.yaml](../../../../../contracts/openapi/storage.v1.yaml#L108). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [storage.v1.yaml](../../../../../contracts/openapi/storage.v1.yaml#L543). Не редагуйте вручну.
 
 **Історія оновлень однієї сутності (включно із запізнілими)**
 

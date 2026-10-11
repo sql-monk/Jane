@@ -1,0 +1,19 @@
+{
+  "schema_version": "1",
+  "package_id": "news.web-article",
+  "version": "1.0.2",
+  "kind": "extractor",
+  "title": "Readable news articles",
+  "description": "Витягує заголовок, текст і підтверджені метадані статті перед багатомовним аналізом.",
+  "entry": {"runtime": "python", "module": "jane_news_web.main", "callable": "extract"},
+  "input": {"accepts": ["material"], "media_types": ["text/html"]},
+  "params_schema": "schemas/params.schema.json",
+  "output": {"entities": [{"entity_type": "article", "schema": "schemas/article.schema.json", "key_fields": ["url"]}]},
+  "dependencies": {"runtime_profile": "python-extractor@1", "python": []},
+  "access": {"network": "none"},
+  "tests": [
+    {"name": "article", "input": {"file": "tests/article/page.html", "media_type": "text/html", "url": "https://news.example.test/article/1"}, "params": {"source_name": "Example", "region": "europe", "language": "en"}, "expected_status": "success"},
+    {"name": "empty", "input": {"file": "tests/empty/page.html", "media_type": "text/html", "url": "https://news.example.test/"}, "params": {"source_name": "Example", "region": "europe", "language": "en"}, "expected_status": "unrecognized"}
+  ],
+  "provenance": {"created_by": "human", "authors": ["Codex"], "created_at": "2026-10-11T00:00:00Z", "change_summary": "Prepare compact, source-backed multilingual news text."}
+}

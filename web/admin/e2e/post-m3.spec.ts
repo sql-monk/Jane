@@ -7,6 +7,7 @@ import {
   preferExample,
   test,
 } from "./fixtures";
+import { formatInstant } from "../src/lib/format";
 
 // WP-20 (post-M3) screens on the contract mocks: every neighbour answer is a contract example (served by
 // contracts/tools/mock.py, `Prefer: example=<name>` selects a named one) or a contract example file.
@@ -29,7 +30,7 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
     const sessions = admin.getByRole("table", { name: "Сесії підключення" });
     await expect(sessions).toContainText("https://tiny.example.test/");
     await expect(sessions.getByRole("row", { name: /tiny\.example\.test/ })).toContainText(
-      "insufficient_sample",
+      "Недостатня вибірка",
     );
     await expect(sessions.getByRole("row", { name: /Shop Example kettles/ })).toContainText("0.31 USD");
 
@@ -71,7 +72,7 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
     ]);
     expect(await info.json()).toEqual(openapiExample("assistant-info-ci"));
     await expect(admin.getByTestId("min-onboarding-confidence")).toHaveText("80%");
-    await expect(admin.getByRole("region", { name: "Ліміти дослідження" })).toContainText("0.01 USD / day");
+    await expect(admin.getByRole("region", { name: "Ліміти дослідження" })).toContainText("0.01 USD за добу");
 
     await admin.getByLabel("Назва або посилання").fill("Shop Example kettles");
     await admin.getByLabel("Поріг впевненості вибірки").fill("0.9");
@@ -104,7 +105,7 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
           new URL(r.url()).pathname === "/api/assistant/v1/improvement-runs" &&
           new URL(r.url()).searchParams.get("package_id") === "shop-example.product-extractor",
       ),
-      admin.getByLabel("Пакет (package_id)").fill("shop-example.product-extractor"),
+      admin.getByLabel("Пакет (package_id)", { exact: true }).selectOption("shop-example.product-extractor"),
     ]);
     expect(new URL(filtered.url()).searchParams.get("package_id")).toBe("shop-example.product-extractor");
     const [byStatus] = await Promise.all([
@@ -197,8 +198,8 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
     await admin.getByRole("button", { name: "Підготувати повторну обробку прикладів" }).click();
     const form = admin.getByRole("form", { name: "Повторна обробка" });
     await expect(form).toContainText("obj_01J9ZQ4C00000000000000D9");
-    await expect(form.getByLabel("Завдання")).toHaveValue("shop-catalog");
-    await form.getByLabel("Почати з етапу").fill("extract-products");
+    await expect(form.getByLabel("Завдання", { exact: true })).toHaveValue("shop-catalog");
+    await form.getByLabel("Почати з етапу", { exact: true }).selectOption("extract-products");
     await form.getByRole("checkbox", { name: /Тестовий режим/ }).check();
     const reprocess = await captureRequest(admin, "POST", "/api/orchestrator/v1/reprocessing", () =>
       form.getByRole("button", { name: "Обробити повторно" }).click(),
@@ -218,25 +219,26 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
     await admin.getByRole("tab", { name: "Елементи й помилки" }).click();
     const items = admin.getByRole("table", { name: "Елементи запуску" });
     const retrying = items.getByRole("row", { name: /web:0a1b2c3d4e5f60718293a4b5c6d7e8f9/ });
-    await expect(retrying).toContainText("retrying");
-    await expect(retrying).toContainText("2026-09-27 10:00:09.512Z");
-    await expect(retrying).toContainText("Помилка елемента (upstream_unavailable)");
+    await expect(retrying).toContainText("Повторна спроба");
+    await expect(retrying).toContainText(formatInstant("2026-09-27T10:00:09.512Z"));
+    await expect(retrying.getByRole("alert")).toContainText("Залежний сервіс недоступний");
+    await expect(retrying.getByRole("alert")).toContainText("upstream_unavailable, HTTP 502");
     await retrying.getByText("2 подій").click();
     const history = retrying.getByLabel("Історія спроб itm_01J9ZQ4B0000000000000002");
     await expect(history.getByRole("listitem")).toHaveCount(2);
     await expect(history.getByRole("listitem").nth(1)).toContainText(
-      "retry_scheduled 2026-09-27 10:00:06.512Z, спроба 1, доступний з 2026-09-27 10:00:09.512Z, затримка 3000 мс, код upstream_unavailable",
+      `Повтор заплановано ${formatInstant("2026-09-27T10:00:06.512Z")}, спроба 1, доступний з ${formatInstant("2026-09-27T10:00:09.512Z")}, затримка 3000 мс, код upstream_unavailable`,
     );
 
     await items.getByRole("link", { name: "web:9b1f0c1d2e3f40516273849a0b1c2d3e" }).click();
     const stages = admin.getByRole("table", { name: /Етапи obs_/ });
     const extract = stages.getByRole("row", { name: /extract-products/ });
-    await expect(extract).toContainText("completed");
+    await expect(extract).toContainText("Завершено");
     await extract.getByText("4 подій").click();
     const traced = extract.getByLabel("Історія спроб itm_01J9ZQ4B0000000000000001");
     await expect(traced.getByRole("listitem")).toHaveCount(4);
     await expect(traced.getByRole("listitem").nth(2)).toContainText(
-      "claimed 2026-09-27 10:00:09.530Z, спроба 2",
+      `Взято в роботу ${formatInstant("2026-09-27T10:00:09.530Z")}, спроба 2`,
     );
   });
 
@@ -253,7 +255,7 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
       material: { material_id: string; observation_id: string };
     };
     await admin.goto("/materials?connection_id=raw-files");
-    const table = admin.getByRole("table", { name: "Збережені матеріали" });
+    const table = admin.getByRole("table", { name: "Матеріали raw-files", exact: true });
     await table.getByRole("button", { name: "Повторно обробити" }).first().click();
     const form = admin.getByRole("form", { name: "Повторна обробка" });
     await expect(form.getByLabel("Що обробити").locator("option")).toHaveText([
@@ -261,7 +263,7 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
       "лише цей збережений RAW (object_ids)",
       "лише це спостереження матеріалу (observation_ids)",
     ]);
-    await form.getByLabel("Завдання").fill("shop-catalog");
+    await form.getByLabel("Завдання", { exact: true }).selectOption("shop-catalog");
     await form.getByLabel("Що обробити").selectOption("object");
     const exact = await captureRequest(admin, "POST", "/api/orchestrator/v1/reprocessing", () =>
       form.getByRole("button", { name: "Обробити повторно" }).click(),
@@ -273,7 +275,7 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
 
     await admin.goto("/materials?connection_id=raw-files");
     await table.getByRole("button", { name: "Повторно обробити" }).first().click();
-    await form.getByLabel("Завдання").fill("shop-catalog");
+    await form.getByLabel("Завдання", { exact: true }).selectOption("shop-catalog");
     await form.getByLabel("Що обробити").selectOption("observation");
     const observation = await captureRequest(admin, "POST", "/api/orchestrator/v1/reprocessing", () =>
       form.getByRole("button", { name: "Обробити повторно" }).click(),
@@ -289,7 +291,7 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
 
     await admin.goto(`/runs/${RUN}`);
     await admin.getByRole("tab", { name: "Повторна обробка" }).click();
-    await admin.getByLabel("Сховище RAW (connection_id)").fill("raw-files");
+    await admin.getByLabel("Сховище RAW", { exact: true }).fill("raw-files");
     await admin.getByLabel("Точний вибір: RAW object_ids").fill("obj_01J9ZQ4C00000000000000D1, obj_2");
     await admin.getByLabel("Точний вибір: observation_ids").fill("obs_01J9ZQ4A0000000000000001");
     const ids = await captureRequest(admin, "POST", "/api/orchestrator/v1/reprocessing", () =>
@@ -307,10 +309,10 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
 
   test("package version: test summary of every context (registry test_summary)", async ({ admin }) => {
     await admin.goto("/packages/shop-example.product-extractor?version=1.2.0");
-    await expect(admin.getByTestId("test-summary-status")).toHaveText("passed");
+    await expect(admin.getByTestId("test-summary-status")).toHaveText("Пройдено");
     const contexts = admin.getByRole("table", { name: "Тести за контекстами" });
     const binding = contexts.getByRole("row", { name: /bindings:shop-catalog\/extract-products/ });
-    await expect(binding).toContainText("passed");
+    await expect(binding).toContainText("Пройдено");
     await expect(binding).toContainText("assistant");
     await expect(contexts.getByRole("row", { name: /^tests/ })).toContainText("handler-runtime@0.1.0");
   });
@@ -338,12 +340,19 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
     );
     await card.getByLabel("Версія для collect").selectOption(rules.version);
     await card.getByRole("button", { name: "Активувати" }).click();
-    await card.getByLabel("Причина: Активувати").fill("rules with the feed strategy");
+    await admin
+      .getByRole("dialog", { name: "Активувати", exact: true })
+      .getByLabel("Причина: Активувати")
+      .fill("rules with the feed strategy");
     const activate = await captureRequest(
       admin,
       "POST",
       "/api/orchestrator/v1/tasks/shop-catalog/stages/collect/activations",
-      () => card.getByRole("button", { name: "Активувати версію" }).click(),
+      () =>
+        admin
+          .getByRole("dialog", { name: "Активувати", exact: true })
+          .getByRole("button", { name: "Активувати версію", exact: true })
+          .click(),
     );
     expect(activate.request.headers()["idempotency-key"]).toBeTruthy();
     expect(activate.body).toMatchObject({
@@ -352,12 +361,19 @@ test.describe("post-M3 admin (WP-20) @mock", () => {
       reason: "rules with the feed strategy",
     });
     await card.getByRole("button", { name: "Відкотити" }).click();
-    await card.getByLabel("Причина: Відкотити").fill("back to the previous rules");
+    await admin
+      .getByRole("dialog", { name: "Відкотити", exact: true })
+      .getByLabel("Причина: Відкотити")
+      .fill("back to the previous rules");
     const rollback = await captureRequest(
       admin,
       "POST",
       "/api/orchestrator/v1/tasks/shop-catalog/stages/collect/activations",
-      () => card.getByRole("button", { name: "Відкотити до попередньої" }).click(),
+      () =>
+        admin
+          .getByRole("dialog", { name: "Відкотити", exact: true })
+          .getByRole("button", { name: "Відкотити до попередньої", exact: true })
+          .click(),
     );
     expect(rollback.body).toEqual({ kind: "rollback", reason: "back to the previous rules" });
     await expect(card.getByRole("table", { name: "Історія активацій collect" })).toBeVisible();

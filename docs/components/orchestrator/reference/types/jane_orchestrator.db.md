@@ -14,7 +14,7 @@ The work queue uses ``SELECT … FOR UPDATE SKIP LOCKED`` (plan.md §2); no othe
 |---|---|
 | Вид | клас |
 | Модуль | `jane_orchestrator.db` |
-| Код | [db.py:278](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L278) |
+| Код | [db.py:297](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L297) |
 
 ```python
 class Database: ...
@@ -28,7 +28,7 @@ Connection pool over the orchestrator's DSN; rows are dicts.
 def __init__(self, dsn: str, *, max_size: int = 10, min_size: int = 1) -> None: ...
 ```
 
-Код: [db.py:281](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L281).
+Код: [db.py:300](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L300).
 
 #### Метод `Database.open`
 
@@ -36,7 +36,7 @@ def __init__(self, dsn: str, *, max_size: int = 10, min_size: int = 1) -> None: 
 def open(self) -> None: ...
 ```
 
-Код: [db.py:291](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L291).
+Код: [db.py:310](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L310).
 
 #### Метод `Database.close`
 
@@ -44,7 +44,7 @@ def open(self) -> None: ...
 def close(self) -> None: ...
 ```
 
-Код: [db.py:294](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L294).
+Код: [db.py:313](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L313).
 
 #### Метод `Database.tx`
 
@@ -55,7 +55,7 @@ def tx(self) -> Iterator[Any]: ...
 
 A connection inside one transaction (commit on success, rollback on error).
 
-Код: [db.py:298](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L298).
+Код: [db.py:317](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L317).
 
 #### Метод `Database.conn`
 
@@ -64,7 +64,7 @@ A connection inside one transaction (commit on success, rollback on error).
 def conn(self) -> Iterator[Any]: ...
 ```
 
-Код: [db.py:304](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L304).
+Код: [db.py:323](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L323).
 
 #### Метод `Database.migrate`
 
@@ -74,7 +74,7 @@ def migrate(self) -> int: ...
 
 Apply pending migrations; returns the schema version.
 
-Код: [db.py:308](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L308).
+Код: [db.py:327](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L327).
 
 #### Метод `Database.ping`
 
@@ -82,7 +82,7 @@ Apply pending migrations; returns the schema version.
 def ping(self) -> bool: ...
 ```
 
-Код: [db.py:326](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L326).
+Код: [db.py:345](../../../../../services/orchestrator/src/jane_orchestrator/db.py#L345).
 
 ## Реекспорт
 

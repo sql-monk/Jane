@@ -26,6 +26,8 @@ Scenarios every adapter must pass are listed in contracts/docs/storage-adapter.m
 - [Клас `CommitResult`](#клас-commitresult)
 - [Клас `AdapterError`](#клас-adaptererror)
 - [Клас `StorageAdapter`](#клас-storageadapter)
+- [Клас `EntityDiscoveryAdapter`](#клас-entitydiscoveryadapter)
+- [Клас `StorageStatisticsAdapter`](#клас-storagestatisticsadapter)
 - [Функція `order_tuple`](#функція-order_tuple)
 
 ## Класи
@@ -458,6 +460,85 @@ async def record_delivery(self, record: DeliveryRecord) -> bool: ...
 Insert-if-absent. Returns False if the key already exists (used for object-only writes).
 
 Код: [storage_adapter.py:217](../../../../../contracts/python/src/jane_contracts/storage_adapter.py#L217).
+
+### Клас `EntityDiscoveryAdapter`
+
+| Властивість | Значення |
+|---|---|
+| Вид | протокол |
+| Модуль | `jane_contracts.storage_adapter` |
+| Успадкування | `Protocol` |
+| Код | [storage_adapter.py:223](../../../../../contracts/python/src/jane_contracts/storage_adapter.py#L223) |
+
+```python
+@runtime_checkable
+class EntityDiscoveryAdapter(Protocol): ...
+```
+
+Optional catalog/search capability. Legacy adapters keep StorageAdapter unchanged.
+
+#### Метод `EntityDiscoveryAdapter.list_entity_types`
+
+```python
+async def list_entity_types(
+    self,
+    *,
+    scope: str | None = None,
+    cursor: str | None = None,
+    limit: int,
+) -> tuple[Sequence[Mapping[str, Any]], str | None]: ...
+```
+
+Код: [storage_adapter.py:226](../../../../../contracts/python/src/jane_contracts/storage_adapter.py#L226).
+
+#### Метод `EntityDiscoveryAdapter.search_entities`
+
+```python
+async def search_entities(
+    self,
+    entity_type: str,
+    *,
+    search: str,
+    scope: str | None = None,
+    updated_since: datetime | None = None,
+    cursor: str | None = None,
+    limit: int,
+) -> tuple[Sequence[EntitySnapshot], str | None]: ...
+```
+
+Код: [storage_adapter.py:230](../../../../../contracts/python/src/jane_contracts/storage_adapter.py#L230).
+
+### Клас `StorageStatisticsAdapter`
+
+| Властивість | Значення |
+|---|---|
+| Вид | протокол |
+| Модуль | `jane_contracts.storage_adapter` |
+| Успадкування | `Protocol` |
+| Код | [storage_adapter.py:243](../../../../../contracts/python/src/jane_contracts/storage_adapter.py#L243) |
+
+```python
+@runtime_checkable
+class StorageStatisticsAdapter(Protocol): ...
+```
+
+Optional inventory primitives over the connection's own namespace only.
+
+#### Метод `StorageStatisticsAdapter.object_statistics`
+
+```python
+async def object_statistics(self) -> Mapping[str, int]: ...
+```
+
+Код: [storage_adapter.py:246](../../../../../contracts/python/src/jane_contracts/storage_adapter.py#L246).
+
+#### Метод `StorageStatisticsAdapter.entity_statistics`
+
+```python
+async def entity_statistics(self) -> Mapping[str, Any]: ...
+```
+
+Код: [storage_adapter.py:248](../../../../../contracts/python/src/jane_contracts/storage_adapter.py#L248).
 
 ## Функції
 

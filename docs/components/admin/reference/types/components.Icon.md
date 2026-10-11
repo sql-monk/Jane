@@ -7,7 +7,7 @@
 ### Компонент `Icon`
 
 ```typescript
-function Icon({ name, size }: { name: "overview" | "sources" | "tasks" | "runs" | "materials" | "results" | "problems" | "packages" | "assistant" | "connections" | "llm" | "limits" | "audit" | "search" | "arrow" | "refresh" | "moon" | "sun" | "menu" | "close" | "check" | "plus"; size?: number; }): React.JSX.Element
+function Icon({ name, size }: { name: "llm" | "overview" | "sources" | "tasks" | "runs" | "materials" | "results" | "problems" | "packages" | "assistant" | "connections" | "limits" | "audit" | "search" | "arrow" | "refresh" | "moon" | "sun" | "menu" | "close" | "check" | "plus"; size?: number; }): React.JSX.Element
 ```
 
 Код: [Icon.tsx:29](../../../../../web/admin/src/components/Icon.tsx#L29).

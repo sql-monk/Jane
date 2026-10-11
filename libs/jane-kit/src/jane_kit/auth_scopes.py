@@ -28,6 +28,7 @@ __all__ = [
     "COLLECTOR",
     "HANDLER",
     "LLM",
+    "OPERATIONS",
     "ORCHESTRATOR",
     "REGISTRY",
     "STORAGE",
@@ -36,6 +37,13 @@ __all__ = [
 ]
 
 Scopes = str | tuple[str, ...]
+
+OPERATIONS: dict[str, Scopes] = {
+    "GET /v1/configuration": ("modules:read", "modules:write"),
+    "PUT /v1/configuration": "modules:write",
+    "GET /v1/telemetry": ("modules:read", "modules:write"),
+}
+"""Supplemental operations.v1 API, installed through BUILTIN_SCOPES in every service."""
 
 
 def _connections(*read: str) -> dict[str, Scopes]:
@@ -78,7 +86,12 @@ HANDLER: dict[str, Scopes] = {
 }
 
 STORAGE: dict[str, Scopes] = {
+    "POST /v1/storage-status/checks": "connections:write",
+    **_jobs((*_HANDLER_ANY, "connections:write"), (*_HANDLER_ANY, "connections:write")),
+    **_connections("handler:invoke", "storage:read"),
+    "GET /v1/storage-status": "storage:read",
     "GET /v1/entities": "storage:read",
+    "GET /v1/entity-types": "storage:read",
     "GET /v1/entity-history": "storage:read",
     "GET /v1/objects": "storage:read",
     "GET /v1/objects/{object_id}": "storage:read",

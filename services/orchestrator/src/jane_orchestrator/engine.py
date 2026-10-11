@@ -17,6 +17,9 @@ do the same work twice and a killed worker's work is taken over once its lease e
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import json
 import logging
 import math
 import random
@@ -49,6 +52,40 @@ it stays a visible ``failed`` sync, so a collector never starts without a connec
 
 def _ms(value: int) -> timedelta:
     return timedelta(milliseconds=value)
+
+
+def _jsonb_inputs(inputs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Persist NUL-containing inline content using the existing lossless ContentRef encoding.
+
+    PostgreSQL JSONB cannot represent U+0000 in a string. Base64 represents the exact UTF-8
+    content bytes; its digest, size and all material metadata remain unchanged. Ordinary text,
+    base64 and blob references pass through as received. Never mutate the collector's document.
+    """
+    persisted = []
+    for inp in inputs:
+        material = inp.get("material")
+        content = material.get("content") if isinstance(material, dict) else None
+        if (
+            isinstance(material, dict)
+            and isinstance(content, dict)
+            and content.get("kind") == "inline"
+            and content.get("encoding") == "utf-8"
+            and isinstance(data := content.get("data"), str)
+            and "\x00" in data
+        ):
+            inp = {
+                **inp,
+                "material": {
+                    **material,
+                    "content": {
+                        **content,
+                        "encoding": "base64",
+                        "data": base64.b64encode(data.encode()).decode("ascii"),
+                    },
+                },
+            }
+        persisted.append(inp)
+    return persisted
 
 
 def _utc(expr: str) -> str:
@@ -87,6 +124,7 @@ _CLAIM_ITEM_SQL = "".join(
         SELECT i.item_id, i.status AS old_status
         FROM items i JOIN runs r ON r.run_id = i.run_id
         WHERE r.status = 'running'
+          AND (%s::text[] IS NULL OR r.task_id = ANY(%s))
           AND ((i.status IN ('queued', 'retrying') AND i.available_at <= now())
                OR (i.status = 'running' AND i.lease_expires_at < now()))
           AND (SELECT count(*) FROM items x
@@ -113,7 +151,31 @@ _CLAIM_ITEM_SQL = "".join(
     """,
     )
 )
-"""Claim one item (placeholders: worker, lease interval, attempt history cap)."""
+"""Claim one item (placeholders: optional task allowlist twice, worker, lease interval, history cap)."""
+
+
+_CLAIM_RUN_ITEM_SQL = _CLAIM_ITEM_SQL.replace(
+    "WHERE r.status = 'running'", "WHERE r.status = 'running' AND i.run_id = %s", 1
+)
+"""The same FIFO item/attempt/lease rules, restricted to a run already locked by this transaction."""
+
+_CLAIM_FAIR_RUN_SQL = """
+    SELECT r.run_id FROM runs r
+    WHERE r.status = 'running'
+      AND (%s::text[] IS NULL OR r.task_id = ANY(%s))
+      AND EXISTS (
+        SELECT 1 FROM items i WHERE i.run_id = r.run_id
+          AND ((i.status IN ('queued', 'retrying') AND i.available_at <= now())
+               OR (i.status = 'running' AND i.lease_expires_at < now()))
+          AND (SELECT count(*) FROM items x
+               WHERE x.run_id = i.run_id AND x.stage_id = i.stage_id
+                 AND x.status = 'running' AND x.lease_expires_at >= now()) < i.parallel_limit
+      )
+    ORDER BY r.updated_at, r.seq
+    LIMIT 1 FOR UPDATE OF r SKIP LOCKED
+"""
+"""Lock one eligible run for a short claim transaction. Item eligibility is rechecked in a separate
+statement after this lock, with a fresh READ COMMITTED snapshot, so concurrent claims respect stage caps."""
 
 
 _RETRY_SQL = "".join(
@@ -215,10 +277,23 @@ class Engine:
 
     # ================================================================== items
     def claim_item(self, worker: str) -> dict[str, Any] | None:
+        task_ids = self.core.engine.task_ids or None
         with self.core.db.tx() as conn:
-            row = conn.execute(
-                _CLAIM_ITEM_SQL, (worker, self.lease, self.core.engine.attempt_history_max)
-            ).fetchone()
+            args = (task_ids, task_ids, worker, self.lease, self.core.engine.attempt_history_max)
+            if self.core.engine.item_queue_ordering == "run_round_robin":
+                run = conn.execute(_CLAIM_FAIR_RUN_SQL, (task_ids, task_ids)).fetchone()
+                row = (
+                    conn.execute(_CLAIM_RUN_ITEM_SQL, (run["run_id"], *args)).fetchone()
+                    if run is not None
+                    else None
+                )
+                if row is not None:
+                    conn.execute(
+                        "UPDATE runs SET updated_at = clock_timestamp() WHERE run_id = %s",
+                        (row["run_id"],),
+                    )
+            else:
+                row = conn.execute(_CLAIM_ITEM_SQL, args).fetchone()
         if row is not None and row["old_status"] == "running":
             self.core.metrics.inc("leases_expired")
             log.info("item lease reclaimed", extra={"item_id": row["item_id"], "worker": worker})
@@ -498,13 +573,69 @@ class Engine:
                 (Jsonb(err), *self._event("failed", item, None, err), item["item_id"]),
             )
             run_failed = stage.get("on_failure") == "fail_run" and self.runs.fail_run(
-                conn, run["run_id"], {**err, "details": {"stage_id": stage["stage_id"]}}
+                conn,
+                run["run_id"],
+                {**err, "details": {**(err.get("details") or {}), "stage_id": stage["stage_id"]}},
             )
         self.core.metrics.inc("items", outcome="failed")
         if run_failed:
             self._cancel_collection(run)
         self.runs.maybe_finish(run["run_id"])
         return "failed"
+
+    @staticmethod
+    def _record_output_identities(
+        conn: Any, run: Mapping[str, Any], item: Mapping[str, Any], result: Mapping[str, Any]
+    ) -> None:
+        """Keep exact compact business identities; the trace remains bounded by configuration.
+
+        Write confirmations, including duplicate/stale acknowledgements, prove a saved record exists.
+        Simulations do not. Referenced entity payloads cannot be counted without dereferencing them;
+        the summary explicitly reports incomplete evidence in that case.
+        """
+        output = result.get("output") or {}
+        identities: set[tuple[str, str, str, str, str]] = set()
+        complete = not bool(output.get("entities_ref"))
+        for entity in output.get("entities") or []:
+            key = canonical_key(entity)
+            kind = entity.get("entity_type")
+            if key and kind:
+                identities.add((run["run_id"], "extracted", "", str(kind), key))
+            else:
+                complete = False
+        for write in output.get("writes") or []:
+            if write.get("status") == "simulated" or run["test_mode"]:
+                continue
+            entity = write.get("entity")
+            if not entity:
+                continue  # RAW writes are materials, not saved business records.
+            key, kind = entity.get("canonical_key"), entity.get("entity_type")
+            if key and kind:
+                identities.add(
+                    (
+                        run["run_id"],
+                        "saved",
+                        str((write.get("target") or {}).get("connection_id") or ""),
+                        str(kind),
+                        str(key),
+                    )
+                )
+            else:
+                complete = False
+        if identities:
+            with conn.cursor() as cursor:
+                cursor.executemany(
+                    "INSERT INTO run_output_identities (run_id, category, connection_id, entity_type, canonical_key, key_digest)"
+                    " VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                    [
+                        (
+                            *identity,
+                            hashlib.sha256(json.dumps(identity[2:], ensure_ascii=False).encode()).hexdigest(),
+                        )
+                        for identity in sorted(identities)
+                    ],
+                )
+        conn.execute("UPDATE items SET outputs_complete = %s WHERE item_id = %s", (complete, item["item_id"]))
 
     def _outputs(self, result: Mapping[str, Any]) -> list[dict[str, Any]]:
         cap = self.core.engine.trace_outputs_max
@@ -528,6 +659,8 @@ class Engine:
                 ref = {"kind": "data"}
             if conn_id:
                 ref["connection_id"] = conn_id
+            if w.get("status"):
+                ref["write_status"] = w["status"]
             out.append(ref)
         if "data" in output or output.get("data_ref"):
             out.append({"kind": "data"})
@@ -563,11 +696,25 @@ class Engine:
                         "UPDATE items SET stored_object_id = %s WHERE item_id = %s",
                         (next(iter(objects)), item["item_id"]),
                     )
+            failure = result.get("failure") or {}
+            failure_code = {
+                "schema_mismatch": "schema_mismatch",
+                "timeout": "timeout",
+                "resource_exceeded": "limit_exceeded",
+                "budget_exhausted": "budget_exhausted",
+                "invalid_params": "validation_failed",
+                "dependency_error": "dependency_not_allowed",
+                "sandbox_violation": "access_denied_by_policy",
+                "connection_error": "upstream_unavailable",
+            }.get(str(failure.get("kind") or ""), "upstream_conflict")
             final_error = (
-                problem("upstream_conflict", str((result.get("failure") or {}).get("message", "")), 502)
+                problem(failure_code, str(failure.get("message", "")), 502, bool(failure.get("retryable")))
                 if final_failed
                 else None
             )
+            if final_error is not None:
+                final_error["details"] = {"stage_id": stage["stage_id"], "failure_kind": failure.get("kind")}
+                final_error["trace_id"] = run["trace_id"]
             conn.execute(
                 _COMPLETE_SQL,
                 (
@@ -583,6 +730,7 @@ class Engine:
                     item["item_id"],
                 ),
             )
+            self._record_output_identities(conn, run, item, result)
             if status in {"unrecognized", "failed"}:
                 self._record_problem(conn, run, item, stage, result)
             if locked["run_status"] == "running":
@@ -601,7 +749,7 @@ class Engine:
                 and self.runs.fail_run(
                     conn,
                     run["run_id"],
-                    problem("upstream_conflict", f"stage '{stage['stage_id']}' failed", 502),
+                    final_error or problem("upstream_conflict", f"stage '{stage['stage_id']}' failed", 502),
                 )
             )
         self.core.metrics.inc("items", outcome=str(status))
@@ -689,7 +837,7 @@ class Engine:
                     run["task_id"],
                     ni.stage_id,
                     ni.item_key,
-                    Jsonb(ni.inputs),
+                    Jsonb(_jsonb_inputs(ni.inputs)),
                     mat.get("material_id"),
                     mat.get("observation_id"),
                     (mat.get("source") or {}).get("source_id") or run["source_id"],
@@ -706,6 +854,7 @@ class Engine:
 
     # ================================================================== feed
     def claim_feed(self, worker: str) -> dict[str, Any] | None:
+        task_ids = self.core.engine.task_ids or None
         with self.core.db.tx() as conn:
             row = conn.execute(
                 """
@@ -713,13 +862,14 @@ class Engine:
                 WHERE run_id = (
                     SELECT run_id FROM runs
                     WHERE status IN ('queued', 'running', 'cancelling') AND NOT feed_done
+                      AND (%s::text[] IS NULL OR task_id = ANY(%s))
                       AND feed_available_at <= now()
                       AND (feed_lease_expires_at IS NULL OR feed_lease_expires_at < now())
                     ORDER BY feed_available_at LIMIT 1
                     FOR UPDATE SKIP LOCKED)
                 RETURNING *
                 """,
-                (worker, self.lease),
+                (worker, self.lease, task_ids, task_ids),
             ).fetchone()
         return dict(row) if row else None
 
@@ -1259,11 +1409,13 @@ class Engine:
     def schedule_due(self) -> int:
         """Create runs for due tasks (row lock per task: one run per tick across all instances)."""
         created = 0
+        task_ids = self.core.engine.task_ids or None
         with self.core.db.tx() as conn:
             rows = conn.execute(
                 "SELECT t.*, s.doc AS source_doc FROM tasks t JOIN sources s ON s.source_id = t.source_id"
-                " WHERE t.next_run_at <= now() ORDER BY t.next_run_at LIMIT %s FOR UPDATE OF t SKIP LOCKED",
-                (self.core.engine.schedule_batch,),
+                " WHERE t.next_run_at <= now() AND (%s::text[] IS NULL OR t.task_id = ANY(%s))"
+                " ORDER BY t.next_run_at LIMIT %s FOR UPDATE OF t SKIP LOCKED",
+                (task_ids, task_ids, self.core.engine.schedule_batch),
             ).fetchall()
             for row in rows:
                 doc = row["doc"]
@@ -1294,24 +1446,26 @@ class Engine:
         ``reap_batch`` always makes progress). Several reapers may pick the same run: state changes are
         conditional and only the reaper that changed the state counts it and calls the collector."""
         eng = self.core.engine
+        task_ids = eng.task_ids or None
         with self.core.db.conn() as conn:
             timed_out = conn.execute(
                 """
                 SELECT * FROM runs
                 WHERE status IN ('running', 'cancelling') AND started_at IS NOT NULL
+                  AND (%s::text[] IS NULL OR task_id = ANY(%s))
                   AND jsonb_typeof(limits->'task'->'timeouts'->'run_timeout_ms') = 'number'
                   AND started_at + ((limits->'task'->'timeouts'->>'run_timeout_ms')::bigint
                                     * interval '1 millisecond') < now()
                 ORDER BY started_at LIMIT %s
                 """,
-                (eng.reap_batch,),
+                (task_ids, task_ids, eng.reap_batch),
             ).fetchall()
             # candidates that maybe_finish will close: a drained running run with no active item, or a
             # cancelling run whose remaining items are not held by a live lease
             drained = conn.execute(
                 """
                 SELECT r.run_id FROM runs r
-                WHERE r.feed_done AND (
+                WHERE (%s::text[] IS NULL OR r.task_id = ANY(%s)) AND r.feed_done AND (
                     (r.status = 'running' AND NOT EXISTS (
                         SELECT 1 FROM items i WHERE i.run_id = r.run_id
                           AND i.status IN ('queued', 'retrying', 'leased', 'running')))
@@ -1320,7 +1474,7 @@ class Engine:
                           AND i.status IN ('leased', 'running') AND i.lease_expires_at >= now())))
                 ORDER BY r.seq LIMIT %s
                 """,
-                (eng.reap_batch,),
+                (task_ids, task_ids, eng.reap_batch),
             ).fetchall()
         closed = 0
         for run in timed_out:
@@ -1449,10 +1603,11 @@ class Engine:
             if row is None:
                 return done
             cfg = self.core.executors.configs.get(row["executor"])
-            status, message = "synced", None
+            status, message, diagnostic = "synced", None, None
             unused = False
             if cfg is None:
                 status, message = "failed", "executor is no longer configured"
+                diagnostic = problem("upstream_unavailable", "Executor is no longer configured", 503)
             else:
                 try:
                     if row["op"] == "delete":
@@ -1467,7 +1622,15 @@ class Engine:
                             cfg, "PUT", f"/v1/connections/{row['connection_id']}", json=doc_row["doc"]
                         )
                 except ExecutorError as exc:
-                    message = str(exc)
+                    message = f"{row['executor']}: HTTP {exc.status or 503} ({exc.code})"
+                    diagnostic = {
+                        "type": f"urn:jane:problem:{exc.code}",
+                        "title": "Connection synchronization failed",
+                        "status": exc.status or 503,
+                        "code": exc.code,
+                        "retryable": exc.retryable,
+                        "details": {"executor": row["executor"]},
+                    }
                     if exc.status in NO_CONNECTIONS_STATUSES and exc.code == "not_implemented":
                         # handler.v1: /v1/connections* are optional for an executor without managed
                         # connections (handler-runtime answers PUT with 501 not_implemented). Not a failed
@@ -1482,6 +1645,17 @@ class Engine:
                     else:
                         status = "failed"
             with self.core.db.tx() as conn:
+                if unused:
+                    conn.execute(
+                        "INSERT INTO connection_unsupported (connection_id, executor) VALUES (%s, %s)"
+                        " ON CONFLICT DO NOTHING",
+                        (row["connection_id"], row["executor"]),
+                    )
+                elif status == "synced":
+                    conn.execute(
+                        "DELETE FROM connection_unsupported WHERE connection_id = %s AND executor = %s",
+                        (row["connection_id"], row["executor"]),
+                    )
                 if unused or (row["op"] == "delete" and status == "synced"):
                     conn.execute(
                         "DELETE FROM connection_sync WHERE connection_id = %s AND executor = %s AND lease_owner = %s",
@@ -1489,12 +1663,13 @@ class Engine:
                     )
                 else:
                     conn.execute(
-                        "UPDATE connection_sync SET status = %s, message = %s, lease_owner = NULL, lease_expires_at = NULL,"
+                        "UPDATE connection_sync SET status = %s, message = %s, error = %s, lease_owner = NULL, lease_expires_at = NULL,"
                         " synced_at = CASE WHEN %s = 'synced' THEN now() ELSE synced_at END,"
                         " available_at = now() + %s WHERE connection_id = %s AND executor = %s AND lease_owner = %s",
                         (
                             status,
                             message,
+                            Jsonb(diagnostic) if diagnostic else None,
                             status,
                             _ms(eng.sync_retry_ms),
                             row["connection_id"],

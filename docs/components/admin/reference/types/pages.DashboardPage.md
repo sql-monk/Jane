@@ -10,4 +10,4 @@
 function DashboardPage(): React.JSX.Element
 ```
 
-Код: [DashboardPage.tsx:46](../../../../../web/admin/src/pages/DashboardPage.tsx#L46).
+Код: [DashboardPage.tsx:48](../../../../../web/admin/src/pages/DashboardPage.tsx#L48).

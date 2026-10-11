@@ -10,7 +10,7 @@
 function TasksPage(): React.JSX.Element
 ```
 
-Код: [TasksPage.tsx:37](../../../../../web/admin/src/pages/TasksPage.tsx#L37).
+Код: [TasksPage.tsx:44](../../../../../web/admin/src/pages/TasksPage.tsx#L44).
 
 ### Компонент `TaskPage`
 
@@ -18,4 +18,4 @@ function TasksPage(): React.JSX.Element
 function TaskPage(): React.JSX.Element
 ```
 
-Код: [TasksPage.tsx:201](../../../../../web/admin/src/pages/TasksPage.tsx#L201).
+Код: [TasksPage.tsx:212](../../../../../web/admin/src/pages/TasksPage.tsx#L212).

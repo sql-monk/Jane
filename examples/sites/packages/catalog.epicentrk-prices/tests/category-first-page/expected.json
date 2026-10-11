@@ -1,0 +1,158 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-zenit-zr-780-841510",
+        "price": 1350.0,
+        "currency": "UAH",
+        "old_price": 1589.0,
+        "availability": "in_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-zenit-zr-780-841510"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-zenit-zrp-1100-profi-841422",
+        "price": 2294.0,
+        "currency": "UAH",
+        "old_price": 2699.0,
+        "availability": "in_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-zenit-zrp-1100-profi-841422"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-tekhmann-tp-110-1400-s-851221",
+        "price": 5100.0,
+        "currency": "UAH",
+        "old_price": 5249.0,
+        "availability": "in_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-tekhmann-tp-110-1400-s-851221"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-vitals-master-re-110312sks-re-110312sks",
+        "price": 4346.0,
+        "currency": "UAH",
+        "old_price": 4829.0,
+        "availability": "in_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-vitals-master-re-110312sks-re-110312sks"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-vitals-professional-re-82391tms",
+        "price": 3471.0,
+        "currency": "UAH",
+        "old_price": 4959.0,
+        "availability": "in_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-vitals-professional-re-82391tms"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-einhell-tc-pl-750-4345310",
+        "price": 2430.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-einhell-tc-pl-750-4345310"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-felisatti-r-110-1100m-m-f60211",
+        "price": 4909.0,
+        "currency": "UAH",
+        "old_price": 5776.0,
+        "availability": "in_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-felisatti-r-110-1100m-m-f60211"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "epicentrk.ua",
+        "product_id": "elektrorubanok-cat-dx86",
+        "price": 5499.0,
+        "currency": "UAH",
+        "old_price": 5999.0,
+        "availability": "in_stock"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "epicentrk.ua",
+          "product_id": "elektrorubanok-cat-dx86"
+        }
+      }
+    }
+  ]
+}

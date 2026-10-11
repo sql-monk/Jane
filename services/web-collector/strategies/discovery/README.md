@@ -21,7 +21,9 @@ class DiscoveryStrategy(Protocol):
 
     def __init__(self, config: Mapping[str, Any], strategy_id: str) -> None: ...
     def seeds(self, ctx: DiscoveryContext) -> AsyncIterator[DiscoveredUrl]: ...
-    def on_fetched(self, resource: FetchedResource, ctx: DiscoveryContext) -> AsyncIterator[DiscoveredUrl]: ...
+    def on_fetched(
+        self, resource: FetchedResource, ctx: DiscoveryContext
+    ) -> AsyncIterator[DiscoveredUrl]: ...
     def snapshot(self) -> Mapping[str, Any]: ...
     def restore(self, state: Mapping[str, Any]) -> None: ...
 ```
@@ -113,12 +115,18 @@ class TextListStrategy:
                 for line in resource.body.decode("utf-8", errors="replace").splitlines():
                     line = line.strip()
                     if line and not line.startswith("#"):
-                        yield DiscoveredUrl(url=ctx.normalize(line, resource.final_url),
-                                            strategy_id=self.strategy_id, kind="material",
-                                            depth=resource.depth + 1, parent_url=resource.final_url)
+                        yield DiscoveredUrl(
+                            url=ctx.normalize(line, resource.final_url),
+                            strategy_id=self.strategy_id,
+                            kind="material",
+                            depth=resource.depth + 1,
+                            parent_url=resource.final_url,
+                        )
             self.done.append(list_url)
 
-    async def on_fetched(self, resource: FetchedResource, ctx: DiscoveryContext) -> AsyncIterator[DiscoveredUrl]:
+    async def on_fetched(
+        self, resource: FetchedResource, ctx: DiscoveryContext
+    ) -> AsyncIterator[DiscoveredUrl]:
         return
         yield
 

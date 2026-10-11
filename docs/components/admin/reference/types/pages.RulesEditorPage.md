@@ -12,7 +12,7 @@ function StrategiesSummary({ rules: ref }: { rules: { package_id: string; versio
 
 Read-only summary of the strategies a source uses (source page).
 
-Код: [RulesEditorPage.tsx:88](../../../../../web/admin/src/pages/RulesEditorPage.tsx#L88).
+Код: [RulesEditorPage.tsx:91](../../../../../web/admin/src/pages/RulesEditorPage.tsx#L91).
 
 ### Компонент `RulesEditorPage`
 
@@ -20,7 +20,7 @@ Read-only summary of the strategies a source uses (source page).
 function RulesEditorPage(): React.JSX.Element
 ```
 
-Код: [RulesEditorPage.tsx:121](../../../../../web/admin/src/pages/RulesEditorPage.tsx#L121).
+Код: [RulesEditorPage.tsx:124](../../../../../web/admin/src/pages/RulesEditorPage.tsx#L124).
 
 ## Константи
 
@@ -32,7 +32,7 @@ const STRATEGY_TEMPLATES: Record<string, Json>
 
 Templates for every strategy type of collector-rules.schema.json#/$defs/Strategy (required fields only).
 
-Код: [RulesEditorPage.tsx:23](../../../../../web/admin/src/pages/RulesEditorPage.tsx#L23).
+Код: [RulesEditorPage.tsx:26](../../../../../web/admin/src/pages/RulesEditorPage.tsx#L26).
 
 ### Константа `STRATEGY_LABELS`
 
@@ -40,4 +40,4 @@ Templates for every strategy type of collector-rules.schema.json#/$defs/Strategy
 const STRATEGY_LABELS: Record<string, string>
 ```
 
-Код: [RulesEditorPage.tsx:47](../../../../../web/admin/src/pages/RulesEditorPage.tsx#L47).
+Код: [RulesEditorPage.tsx:50](../../../../../web/admin/src/pages/RulesEditorPage.tsx#L50).

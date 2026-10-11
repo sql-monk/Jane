@@ -7,10 +7,10 @@
 ### Функція `createApiClients`
 
 ```typescript
-function createApiClients(config: import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src/config").AdminConfig, hooks: import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src/api/client").AuthHooks): import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src/api/client").ApiClients
+function createApiClients(config: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/config").AdminConfig, hooks: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/api/client").AuthHooks): import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/api/client").ApiClients
 ```
 
-Код: [client.ts:50](../../../../../web/admin/src/api/client.ts#L50).
+Код: [client.ts:52](../../../../../web/admin/src/api/client.ts#L52).
 
 ### Функція `unwrap`
 
@@ -20,7 +20,7 @@ function unwrap<T>(promise: Promise<FetchResult<T>>): Promise<T>
 
 Resolves to the response body or throws ApiError with the problem+json of the service.
 
-Код: [client.ts:103](../../../../../web/admin/src/api/client.ts#L103).
+Код: [client.ts:107](../../../../../web/admin/src/api/client.ts#L107).
 
 ### Функція `unwrapWithEtag`
 
@@ -30,7 +30,7 @@ function unwrapWithEtag<T>(promise: Promise<FetchResult<T>>): Promise<{ data: T;
 
 Same as unwrap, plus the ETag for a later PUT/PATCH with If-Match.
 
-Код: [client.ts:115](../../../../../web/admin/src/api/client.ts#L115).
+Код: [client.ts:119](../../../../../web/admin/src/api/client.ts#L119).
 
 ### Функція `newIdempotencyKey`
 
@@ -40,7 +40,7 @@ function newIdempotencyKey(): string
 
 A fresh Idempotency-Key for one user action (retries of that action reuse it).
 
-Код: [client.ts:129](../../../../../web/admin/src/api/client.ts#L129).
+Код: [client.ts:133](../../../../../web/admin/src/api/client.ts#L133).
 
 ### Функція `ifMatch`
 
@@ -50,7 +50,7 @@ function ifMatch(etag: string | null | undefined): { "If-Match"?: string; }
 
 `If-Match` header object, only when the ETag is known.
 
-Код: [client.ts:134](../../../../../web/admin/src/api/client.ts#L134).
+Код: [client.ts:138](../../../../../web/admin/src/api/client.ts#L138).
 
 ## Інтерфейси
 
@@ -62,6 +62,7 @@ interface ApiClients
 
 | Член | Тип | Обов'язковий | Доступ | Опис |
 |---|---|---|---|---|
+| `module` | `(name: string) => Client&lt;paths, `${string}/${string}`>` | так | читання й запис |  |
 | `orchestrator` | `Client&lt;paths, `${string}/${string}`>` | так | читання й запис |  |
 | `registry` | `Client&lt;paths, `${string}/${string}`>` | так | читання й запис |  |
 | `storage` | `Client&lt;paths, `${string}/${string}`>` | так | читання й запис |  |
@@ -72,7 +73,7 @@ interface ApiClients
 | `executor` | `(name: string) => Client&lt;paths, `${string}/${string}`>` | так | читання й запис | handler.v1 connection endpoints of a named executor (`/api/<executor>`), from GET /v1/executors. |
 | `collectorExecutor` | `(name: string) => Client&lt;paths, `${string}/${string}`>` | так | читання й запис | collector.v1 of a named collector executor. |
 
-Код: [client.ts:14](../../../../../web/admin/src/api/client.ts#L14).
+Код: [client.ts:15](../../../../../web/admin/src/api/client.ts#L15).
 
 ### Інтерфейс `AuthHooks`
 
@@ -85,4 +86,4 @@ interface AuthHooks
 | `getToken` | `() => string \| null` | так | читання й запис | Bearer token of the current user (API key in dev, OIDC access token in prod) or null. |
 | `onUnauthenticated` | `() => void` | так | читання й запис |  |
 
-Код: [client.ts:28](../../../../../web/admin/src/api/client.ts#L28).
+Код: [client.ts:30](../../../../../web/admin/src/api/client.ts#L30).

@@ -1,6 +1,6 @@
 # GET /v1/limits/platform
 
-> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1297). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1303). Не редагуйте вручну.
 
 **Ліміти рівня платформи (типові значення й жорсткі стелі)**
 

@@ -1,0 +1,21 @@
+{
+  "jane-demo-orchestrator-1": {
+    "running": true,
+    "image": "sha256:0458d32f60b6238ec689066939f7ea98ef11029f33d18e5ad84b9a8346c3cbdd",
+    "scheduler_enabled": "true",
+    "workers": "12",
+    "task_ids": [],
+    "restart_policy": "no"
+  },
+  "jane-demo-automarket-priority-worker": {
+    "running": true,
+    "image": "sha256:6ed92b88115eb6ef03480473f37e1fcba599d9c23aa78453dfac98a5f500dec2",
+    "scheduler_enabled": "false",
+    "workers": "2",
+    "task_ids": [
+      "ads-autoria",
+      "ads-rst"
+    ],
+    "restart_policy": "unless-stopped"
+  }
+}

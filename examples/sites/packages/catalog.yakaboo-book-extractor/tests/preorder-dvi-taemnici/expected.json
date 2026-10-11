@@ -1,0 +1,53 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1517720",
+        "title": "Дві таємниці одного літа",
+        "price": 420.0,
+        "currency": "UAH",
+        "url": "https://www.yakaboo.ua/ua/dvi-taemnici-odnogo-lita.html",
+        "brand": "Віхола",
+        "category": "Детективка",
+        "category_path": [
+          "Книжки",
+          "Художня література",
+          "Детективи",
+          "Детективка"
+        ],
+        "availability": "preorder",
+        "image": "https://static.yakaboo.ua/media/cloudflare/product/webp/600x840/d/v/dvi_taemnytsi_front.png",
+        "sku": "1517720",
+        "barcode": "9786178782993",
+        "attributes": {
+          "Автор": "Марія Столій",
+          "Видавництво": "Віхола",
+          "Кількість сторінок": "224",
+          "Рік видання": "2026",
+          "Мова": "Українська",
+          "Ілюстрації": "Немає ілюстрацій",
+          "Тип": "Паперова",
+          "Тип обкладинки": "Тверда",
+          "Вага": "300",
+          "ISBN": "978-617-8782-99-3",
+          "Формат": "130х200х15 мм",
+          "Папір": "Офсетний"
+        },
+        "completeness": "full"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1517720"
+        }
+      }
+    }
+  ]
+}

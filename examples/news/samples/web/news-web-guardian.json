@@ -1,0 +1,13 @@
+{
+  "source_id": "news-web-guardian",
+  "feed_url": "https://www.theguardian.com/world/rss",
+  "article_url": "https://www.theguardian.com/society/2026/oct/09/vaccine-trial-guinea-bissau-rfk-jr",
+  "fetched_at": "2026-10-11T03:56:53.666678Z",
+  "feed_http_status": 200,
+  "article_http_status": 200,
+  "robots_allowed": true,
+  "feed_entries": 45,
+  "title": "Controversial vaccine trial touted by RFK Jr gets go-ahead in Guinea-Bissau",
+  "excerpt": "Recommended dose of hepatitis B vaccine will be withheld from thousands of newborns by Danish researchers",
+  "capture_method": "live HTTP in running Linux web-collector container; normal TLS verification; metadata excerpt only"
+}

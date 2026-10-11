@@ -1,6 +1,6 @@
 # POST /v1/reprocessing
 
-> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1113). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1119). Не редагуйте вручну.
 
 **Повторно обробити збережені RAW етапами завдання**
 

@@ -16,9 +16,15 @@ Sitemap files are read in ``seeds()`` (re-read from scratch after a restart; the
 
 from __future__ import annotations
 
+import asyncio
+import functools
+import os
 import re
+import threading
 from collections import deque
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncGenerator, AsyncIterator, Mapping
+from concurrent.futures import Future, ThreadPoolExecutor
+from contextlib import AsyncExitStack, aclosing, asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, ClassVar
@@ -47,6 +53,135 @@ from .feed import parse_feed
 __all__ = ["SitemapDocument", "SitemapEntry", "SitemapStrategy", "parse_robots_sitemaps", "parse_sitemap"]
 
 _ROBOTS_SITEMAP = re.compile(r"^\s*sitemap\s*:\s*(\S+)", re.IGNORECASE | re.MULTILINE)
+
+
+@dataclass
+class _ParseWaiter:
+    loop: asyncio.AbstractEventLoop
+    ready: asyncio.Future[None]
+    granted: bool = False
+    cancelled: bool = False
+
+
+@dataclass
+class _ParseLease:
+    finished: bool = False
+    closed: bool = False
+    released: bool = False
+
+
+class _ParseExecutor:
+    """Bound document lifetimes across jobs and loops, retaining permits through consumption.
+
+    Cancelling an await cannot stop a running thread. Releasing its slot then would allow cancelled
+    jobs to accumulate unbounded work in the executor queue while new collections replace them.
+    Holding the completed result also bounds unconsumed documents and prevents the next CPU parse
+    competing for the GIL while the current consumer repeatedly enters SQLite.
+    """
+
+    def __init__(self, workers: int) -> None:
+        if workers < 1:
+            raise ValueError("JANE_WEB_COLLECTOR_SITEMAP_PARSE_WORKERS must be positive")
+        self.workers = workers
+        self._executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="sitemap-parse")
+        self._available = workers
+        self._lock = threading.Lock()
+        self._waiters: deque[_ParseWaiter] = deque()
+
+    @staticmethod
+    def _grant(waiter: _ParseWaiter) -> None:
+        if not waiter.cancelled and not waiter.ready.done():
+            waiter.ready.set_result(None)
+
+    def _release(self) -> None:
+        with self._lock:
+            while self._waiters:
+                waiter = self._waiters.popleft()
+                if waiter.cancelled or waiter.loop.is_closed():
+                    continue
+                waiter.granted = True
+                try:
+                    waiter.loop.call_soon_threadsafe(self._grant, waiter)
+                except RuntimeError:  # the loop closed between the check and delivery
+                    waiter.cancelled = True
+                    continue
+                return
+            self._available += 1
+
+    def _settle(self, lease: _ParseLease, *, finished: bool = False, closed: bool = False) -> None:
+        with self._lock:
+            lease.finished |= finished
+            lease.closed |= closed
+            release = lease.finished and lease.closed and not lease.released
+            if release:
+                lease.released = True
+        if release:
+            self._release()
+
+    def _finished(self, future: Future[SitemapDocument], lease: _ParseLease) -> None:
+        # Observe late errors; cancellation frees a slot only after its real CPU task has ended.
+        if not future.cancelled():
+            future.exception()
+        self._settle(lease, finished=True)
+
+    @asynccontextmanager
+    async def document(
+        self, body: bytes, base: str, *, max_bytes: int, max_entries: int
+    ) -> AsyncIterator[SitemapDocument]:
+        loop = asyncio.get_running_loop()
+        waiter = _ParseWaiter(loop, loop.create_future())
+        with self._lock:
+            if self._available:
+                self._available -= 1
+                waiter.granted = True
+                waiter.ready.set_result(None)
+            else:
+                self._waiters.append(waiter)
+        lease = _ParseLease()
+        try:
+            await asyncio.shield(waiter.ready)
+        except asyncio.CancelledError:
+            with self._lock:
+                waiter.cancelled = True
+                if not waiter.granted:
+                    self._waiters.remove(waiter)
+            if waiter.granted:
+                self._release()
+            raise
+        try:
+            future = self._executor.submit(
+                functools.partial(parse_sitemap, body, base, max_bytes=max_bytes, max_entries=max_entries)
+            )
+        except BaseException:
+            self._release()
+            raise
+        future.add_done_callback(lambda done: self._finished(done, lease))
+        try:
+            wrapped = asyncio.wrap_future(future, loop=loop)
+            # Consume a late parsing error after cancellation without touching strategy/context state.
+            wrapped.add_done_callback(lambda done: done.exception() if not done.cancelled() else None)
+            yield await asyncio.shield(wrapped)
+        finally:
+            self._settle(lease, closed=True)
+
+    async def parse(self, body: bytes, base: str, *, max_bytes: int, max_entries: int) -> SitemapDocument:
+        """Parse-only convenience; strategy consumption uses the longer document context."""
+        async with self.document(body, base, max_bytes=max_bytes, max_entries=max_entries) as doc:
+            return doc
+
+
+_PARSE_EXECUTOR: _ParseExecutor | None = None
+_PARSE_EXECUTOR_LOCK = threading.Lock()
+
+
+def _parse_executor() -> _ParseExecutor:
+    global _PARSE_EXECUTOR
+    with _PARSE_EXECUTOR_LOCK:
+        if _PARSE_EXECUTOR is None:
+            # Private runtime setting, separate from parsing/document limits in the public contract.
+            workers = int(os.environ.get("JANE_WEB_COLLECTOR_SITEMAP_PARSE_WORKERS", "1"))
+            _PARSE_EXECUTOR = _ParseExecutor(workers)
+        return _PARSE_EXECUTOR
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,12 +289,13 @@ class SitemapStrategy:
     async def seeds(self, ctx: DiscoveryContext) -> AsyncIterator[DiscoveredUrl]:
         self.stats = {}  # seeds are re-run from scratch after a restart
         try:
-            async for cand in self._walk(ctx):
-                yield cand
+            async with aclosing(self._walk(ctx)) as walk:
+                async for cand in walk:
+                    yield cand
         except BudgetExhausted as exc:
             ctx.log.warning("sitemap strategy stopped: budget exhausted", extra={"reason": str(exc)})
 
-    async def _walk(self, ctx: DiscoveryContext) -> AsyncIterator[DiscoveredUrl]:
+    async def _walk(self, ctx: DiscoveryContext) -> AsyncGenerator[DiscoveredUrl, None]:
         max_depth = limit(ctx, "crawl.max_depth")
         max_entries = limit(ctx, "crawl.max_links_per_page")
         max_bytes = limit(ctx, "crawl.max_material_bytes")
@@ -176,38 +312,49 @@ class SitemapStrategy:
             resource = await fetch_document(ctx, normalized)
             if resource is None or not is_success(resource):
                 continue
-            doc = self._parse(ctx, resource, max_bytes=max_bytes, max_entries=max_entries)
-            if doc is None:
-                continue
-            for child in doc.sitemaps:
-                if level + 2 > max_depth:  # the child's URLs (depth level + 2) could not be admitted
-                    bump(self.stats, "sitemaps_over_depth")
-                    ctx.log.warning(
-                        "sitemap index nesting stopped by crawl.max_depth",
-                        extra={"index": resource.final_url, "sitemap": child.loc, "max_depth": max_depth},
-                    )
-                    continue
-                queue.append((child.loc, level + 1))
-            for entry in doc.urls:
-                if self.lastmod_since and entry.lastmod and entry.lastmod < self.lastmod_since:
-                    bump(self.stats, "skipped_lastmod")
-                    continue
-                bump(self.stats, "urls")
-                yield DiscoveredUrl(
-                    url=entry.loc,
-                    strategy_id=self.strategy_id,
-                    kind="material",
-                    depth=level + 1,
-                    parent_url=resource.final_url,
-                    lastmod=entry.lastmod if self.pass_lastmod else None,
+            async with AsyncExitStack() as stack:
+                doc = await self._parse(
+                    ctx, resource, stack=stack, max_bytes=max_bytes, max_entries=max_entries
                 )
+                if doc is None:
+                    continue
+                for child in doc.sitemaps:
+                    if level + 2 > max_depth:  # the child's URLs (depth level + 2) could not be admitted
+                        bump(self.stats, "sitemaps_over_depth")
+                        ctx.log.warning(
+                            "sitemap index nesting stopped by crawl.max_depth",
+                            extra={"index": resource.final_url, "sitemap": child.loc, "max_depth": max_depth},
+                        )
+                        continue
+                    queue.append((child.loc, level + 1))
+                for entry in doc.urls:
+                    if self.lastmod_since and entry.lastmod and entry.lastmod < self.lastmod_since:
+                        bump(self.stats, "skipped_lastmod")
+                        continue
+                    bump(self.stats, "urls")
+                    yield DiscoveredUrl(
+                        url=entry.loc,
+                        strategy_id=self.strategy_id,
+                        kind="material",
+                        depth=level + 1,
+                        parent_url=resource.final_url,
+                        lastmod=entry.lastmod if self.pass_lastmod else None,
+                    )
 
-    def _parse(
-        self, ctx: DiscoveryContext, resource: FetchedResource, *, max_bytes: int, max_entries: int
+    async def _parse(
+        self,
+        ctx: DiscoveryContext,
+        resource: FetchedResource,
+        *,
+        stack: AsyncExitStack,
+        max_bytes: int,
+        max_entries: int,
     ) -> SitemapDocument | None:
         try:
-            doc = parse_sitemap(
-                resource.body, resource.final_url, max_bytes=max_bytes, max_entries=max_entries
+            doc = await stack.enter_async_context(
+                _parse_executor().document(
+                    resource.body, resource.final_url, max_bytes=max_bytes, max_entries=max_entries
+                )
             )
         except UnsafeDocument as exc:
             bump(self.stats, "documents_refused")

@@ -1,0 +1,20 @@
+{
+  "entities": [
+    {
+      "entity_type": "article",
+      "fields": {
+        "channel": "golosameriki",
+        "message_id": 44238,
+        "url": "https://t.me/golosameriki/44238",
+        "title": "Президент США Дональд Трамп заявил, что договорился с президентом РФ Владимиром Путиным о поставках дизельного топлива на американский",
+        "text": "Президент США Дональд Трамп заявил, что договорился с президентом РФ Владимиром Путиным о поставках дизельного топлива на американский",
+        "source_name": "Голос Америки (VOA)",
+        "source_kind": "telegram",
+        "transport": "telegram_public_web",
+        "region": "usa",
+        "language": "ru",
+        "published_at": "2026-10-09T20:39:27Z"
+      }
+    }
+  ]
+}

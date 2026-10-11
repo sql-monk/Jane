@@ -31,6 +31,45 @@ __all__ = ["Admin", "PreconditionFailed"]
 
 READ_ONLY_SOURCE = ("created_at", "updated_at")
 SECRET_NAME = re.compile(r"(pass(word|wd)?|secret|token|api[_-]?key|private[_-]?key|credential)", re.I)
+AUDIT_SECRET_NAME = re.compile(
+    r"pass(word|wd)?|secret|token|api[_-]?key|private[_-]?key|credential|authorization|cookie|dsn|connection[_-]?string",
+    re.I,
+)
+
+
+def audit_values(value: Any) -> Any:
+    """Redact secret names and URI credentials before persisting configuration differences."""
+    if isinstance(value, Mapping):
+        return {
+            str(k): "[redacted]" if AUDIT_SECRET_NAME.search(str(k)) else audit_values(v)
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [audit_values(v) for v in value]
+    if isinstance(value, str):
+        if re.search(
+            r"-----BEGIN [A-Z ]*PRIVATE KEY-----|\bBearer\s+\S{8,}|\b(?:sk|pk|rk)-[A-Za-z0-9_-]{16,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\b(?:AKIA|ASIA)[A-Z0-9]{16}\b",
+            value,
+            re.I,
+        ):
+            return "[redacted]"
+        value = re.sub(r"(\w+://)[^/\s@]+@", r"\1[redacted]@", value)
+        return re.sub(
+            r"([?&](?:pass(?:word|wd)?|secret|token|api[_-]?key|access[_-]?token|credential)=)[^&#\s]*",
+            r"\1[redacted]",
+            value,
+            flags=re.I,
+        )
+    return value
+
+
+def audit_changes(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict[str, Any]:
+    changed = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
+    return {
+        "changed": changed,
+        "before": audit_values({k: before.get(k) for k in changed}),
+        "after": audit_values({k: after.get(k) for k in changed}),
+    }
 
 
 class PreconditionFailed(JaneError):
@@ -147,9 +186,10 @@ class Admin:
                 "UPDATE sources SET doc = %s, version = version + 1, updated_at = now() WHERE source_id = %s RETURNING *",
                 (Jsonb(clean), source_id),
             ).fetchone()
-            changed = sorted(k for k in set(clean) | set(row["doc"]) if clean.get(k) != row["doc"].get(k))
             self._enqueue_budget(conn, "source", source_id, clean.get("limits"))
-            self.core.audit(conn, actor, "source.update", "source", source_id, {"changed": changed})
+            self.core.audit(
+                conn, actor, "source.update", "source", source_id, audit_changes(row["doc"], clean)
+            )
         return self._source_view(new), int(new["version"])
 
     def delete_source(self, source_id: str, actor: str) -> None:
@@ -296,9 +336,8 @@ class Admin:
                     task_id,
                 ),
             ).fetchone()
-            changed = sorted(k for k in set(doc) | set(row["doc"]) if doc.get(k) != row["doc"].get(k))
             self._enqueue_budget(conn, "task", task_id, doc.get("limits"))
-            self.core.audit(conn, actor, "task.update", "task", task_id, {"changed": changed})
+            self.core.audit(conn, actor, "task.update", "task", task_id, audit_changes(row["doc"], doc))
         return dict(new["doc"]), int(new["version"])
 
     def delete_task(self, task_id: str, actor: str) -> None:
@@ -636,6 +675,9 @@ class Admin:
                     "previous": (current or {}).get("version"),
                     "previous_package_id": (current or {}).get("package_id"),
                     "reason": body.get("reason"),
+                    "changed": ["package"],
+                    "before": {"package": current},
+                    "after": {"package": package},
                 },
             )
         return self._activation_view(act)
@@ -676,7 +718,12 @@ class Admin:
         return out
 
     def list_problem_groups(
-        self, source_id: str | None, status: str | None, cursor: str | None, limit: int
+        self,
+        source_id: str | None,
+        status: str | None,
+        cursor: str | None,
+        limit: int,
+        group_id: str | None = None,
     ) -> tuple[list[dict[str, Any]], str | None]:
         where: list[str] = ["TRUE"]
         params: list[Any] = []
@@ -686,6 +733,9 @@ class Admin:
         if status:
             where.append("status = %s")
             params.append(status)
+        if group_id:
+            where.append("group_id = %s")
+            params.append(group_id)
         if cursor:
             where.append("seq > %s")
             params.append(int(decode_cursor(cursor)))
@@ -710,7 +760,14 @@ class Admin:
                 " WHERE group_id = %s RETURNING *",
                 (patch.get("status"), patch.get("assistant_job_id"), patch.get("note"), group_id),
             ).fetchone()
-            self.core.audit(conn, actor, "problem_group.update", "problem_group", group_id, dict(patch))
+            self.core.audit(
+                conn,
+                actor,
+                "problem_group.update",
+                "problem_group",
+                group_id,
+                audit_changes({k: row.get(k) for k in patch}, {k: new.get(k) for k in patch}),
+            )
         return self._group_view(new)
 
     def list_unknown(
@@ -769,8 +826,24 @@ class Admin:
                 e["synced_at"] = rfc3339(s["synced_at"])
             if s["message"]:
                 e["message"] = s["message"]
+            if s.get("error"):
+                e["error"] = s["error"]
+            e["attempts"] = int(s["attempts"])
+            if s["status"] == "pending":
+                e["next_retry_at"] = rfc3339(s["available_at"])
             executors.append(e)
-        return {"connection": row["doc"], "executors": executors}
+        unsupported = conn.execute(
+            "SELECT executor FROM connection_unsupported WHERE connection_id = %s ORDER BY executor",
+            (row["connection_id"],),
+        ).fetchall()
+        return {
+            "connection": row["doc"],
+            "executors": executors,
+            "unsupported_executors": [
+                {"executor": s["executor"], "reason": "managed_connections_not_supported"}
+                for s in unsupported
+            ],
+        }
 
     @staticmethod
     def _secret_like_params(params: Mapping[str, Any], prefix: str = "/params") -> list[FieldError]:
@@ -850,9 +923,13 @@ class Admin:
             for cfg in self.core.executors.configs.values():
                 if cfg.syncs_connections:
                     conn.execute(
+                        "DELETE FROM connection_unsupported WHERE connection_id = %s AND executor = %s",
+                        (connection_id, cfg.executor),
+                    )
+                    conn.execute(
                         "INSERT INTO connection_sync (connection_id, executor, op, status) VALUES (%s, %s, 'put', 'pending')"
                         " ON CONFLICT (connection_id, executor) DO UPDATE SET op = 'put', status = 'pending',"
-                        " attempts = 0, available_at = now(), message = NULL",
+                        " attempts = 0, available_at = now(), message = NULL, error = NULL",
                         (connection_id, cfg.executor),
                     )
             self.core.audit(
@@ -861,7 +938,11 @@ class Admin:
                 "connection.update",
                 "connection",
                 connection_id,
-                {"kind": doc["kind"], "secret_refs": sorted((doc.get("secret_refs") or {}).keys())},
+                {
+                    "kind": doc["kind"],
+                    "secret_refs": sorted((doc.get("secret_refs") or {}).keys()),
+                    **audit_changes(row["doc"] if row else {}, doc),
+                },
             )
             return self._connection_view(conn, new), int(new["version"])
 
@@ -887,6 +968,7 @@ class Admin:
                 who = f"task '{refs['task_id']}'" if refs else f"source '{src_refs['source_id']}'"
                 raise Conflict(f"connection '{connection_id}' is referenced by {who}")
             conn.execute("DELETE FROM connections WHERE connection_id = %s", (connection_id,))
+            conn.execute("DELETE FROM connection_unsupported WHERE connection_id = %s", (connection_id,))
             conn.execute(
                 "UPDATE connection_sync SET op = 'delete', status = 'pending', attempts = 0, available_at = now()"
                 " WHERE connection_id = %s",
@@ -918,7 +1000,7 @@ class Admin:
                 "limits.update",
                 "limits",
                 "platform",
-                {"before": current, "after": dict(doc)},
+                audit_changes(current, doc),
             )
         return dict(row["doc"]), int(row["version"])
 
@@ -972,7 +1054,13 @@ class Admin:
         return out
 
     def list_audit(
-        self, subject_type: str | None, subject_id: str | None, cursor: str | None, limit: int
+        self,
+        subject_type: str | None,
+        subject_id: str | None,
+        cursor: str | None,
+        limit: int,
+        since: datetime | None = None,
+        until: datetime | None = None,
     ) -> tuple[list[dict[str, Any]], str | None]:
         where: list[str] = ["TRUE"]
         params: list[Any] = []
@@ -982,6 +1070,12 @@ class Admin:
         if subject_id:
             where.append("subject_id = %s")
             params.append(subject_id)
+        if since:
+            where.append("at >= %s")
+            params.append(since)
+        if until:
+            where.append("at < %s")
+            params.append(until)
         if cursor:
             where.append("seq < %s")
             params.append(int(decode_cursor(cursor)))

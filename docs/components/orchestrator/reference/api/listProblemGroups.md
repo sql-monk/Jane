@@ -16,6 +16,7 @@
 
 | Назва | Де | Тип | Обов'язковий | Опис |
 |---|---|---|---|---|
+| `group_id` | query | `string` | ні | Точний вибір групи, зокрема для посилання з журналу аудиту. |
 | `source_id` | query | `string` | ні |  |
 | `status` | query | enum: `open`, `in_progress`, `resolved`, `ignored`, `unresolved` | ні |  |
 | `cursor` | query | `string` | ні | Непрозорий курсор з `next_cursor` попередньої сторінки. |

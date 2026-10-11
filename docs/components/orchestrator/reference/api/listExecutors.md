@@ -1,6 +1,6 @@
 # GET /v1/executors
 
-> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1391). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1397). Не редагуйте вручну.
 
 **Сервіси-виконавці, відомі оркестратору (з конфігурації), і їхній стан**
 

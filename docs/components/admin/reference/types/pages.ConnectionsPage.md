@@ -10,4 +10,4 @@
 function ConnectionsPage(): React.JSX.Element
 ```
 
-Код: [ConnectionsPage.tsx:26](../../../../../web/admin/src/pages/ConnectionsPage.tsx#L26).
+Код: [ConnectionsPage.tsx:29](../../../../../web/admin/src/pages/ConnectionsPage.tsx#L29).

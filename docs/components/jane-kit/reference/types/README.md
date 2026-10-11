@@ -23,6 +23,7 @@
 | [`jane_kit.jobs`](jane_kit.jobs.md) | 11 | 5 | Long-running operations per WP-00 ``schemas/common/job.schema.json`` and ``common.yaml`` pathItems. |
 | [`jane_kit.logs`](jane_kit.logs.md) | 1 | 4 | Structured logging: one JSON object per line on stdout, with bound context. |
 | [`jane_kit.metrics`](jane_kit.metrics.md) | 1 | 1 | Prometheus metrics with a per-application registry (no global state between app instances). |
+| [`jane_kit.operations`](jane_kit.operations.md) | 2 | 5 | Per-module configuration and durable sampled telemetry; no neighbouring databases. |
 | [`jane_kit.pagination`](jane_kit.pagination.md) | 2 | 3 | Cursor pagination per WP-00 conventions: ``?limit=&cursor=`` -> ``{"items": [...], "next_cursor": ... \| null}``. |
 | [`jane_kit.rules`](jane_kit.rules.md) | 3 | 1 | Collector rules: schema validation and loading by ``rules_ref`` (shared by the collectors, R17). |
 | [`jane_kit.schemas`](jane_kit.schemas.md) | 2 | 1 | Validation against the JSON Schemas of the contracts (``contracts/schemas``, WP-00) - R17. |
@@ -55,6 +56,7 @@
 | [`clamp_limit`](jane_kit.pagination.md#функція-clamp_limit) | функція | `jane_kit.pagination` |
 | [`ClientLimits`](jane_kit.clients.md#клас-clientlimits) | клас | `jane_kit.clients` |
 | [`CollectorSchemas`](jane_kit.rules.md#клас-collectorschemas) | клас | `jane_kit.rules` |
+| [`ConfigurationUpdate`](jane_kit.operations.md#клас-configurationupdate) | модель Pydantic | `jane_kit.operations` |
 | [`configure_logging`](jane_kit.logs.md#функція-configure_logging) | функція | `jane_kit.logs` |
 | [`Conflict`](jane_kit.errors.md#клас-conflict) | виняток | `jane_kit.errors` |
 | [`ContentReader`](jane_kit.content.md#клас-contentreader) | клас | `jane_kit.content` |
@@ -78,6 +80,7 @@
 | [`find_repo_root`](jane_kit.devstack.md#функція-find_repo_root) | функція | `jane_kit.devstack` |
 | [`find_specs`](jane_kit.contracts.md#функція-find_specs) | функція | `jane_kit.contracts` |
 | [`fingerprint`](jane_kit.idempotency.md#функція-fingerprint) | функція | `jane_kit.idempotency` |
+| [`flatten`](jane_kit.operations.md#функція-flatten) | функція | `jane_kit.operations` |
 | [`Forbidden`](jane_kit.errors.md#клас-forbidden) | виняток | `jane_kit.errors` |
 | [`generate_client`](jane_kit.codegen.md#функція-generate_client) | функція | `jane_kit.codegen` |
 | [`generate_client_source`](jane_kit.codegen.md#функція-generate_client_source) | функція | `jane_kit.codegen` |
@@ -101,6 +104,7 @@
 | [`install_error_handlers`](jane_kit.errors.md#функція-install_error_handlers) | функція | `jane_kit.errors` |
 | [`install_health`](jane_kit.health.md#функція-install_health) | функція | `jane_kit.health` |
 | [`install_metrics`](jane_kit.metrics.md#функція-install_metrics) | функція | `jane_kit.metrics` |
+| [`install_operations`](jane_kit.operations.md#функція-install_operations) | функція | `jane_kit.operations` |
 | [`JaneError`](jane_kit.errors.md#клас-janeerror) | виняток | `jane_kit.errors` |
 | [`JaneSettings`](jane_kit.config.md#клас-janesettings) | модель Pydantic | `jane_kit.config` |
 | [`Job`](jane_kit.jobs.md#клас-job) | клас | `jane_kit.jobs` |
@@ -135,6 +139,8 @@
 | [`NotFound`](jane_kit.errors.md#клас-notfound) | виняток | `jane_kit.errors` |
 | [`OpenAPISpec`](jane_kit.contracts.md#клас-openapispec) | клас | `jane_kit.contracts` |
 | [`Operation`](jane_kit.contracts.md#клас-operation) | dataclass (незмінний) | `jane_kit.contracts` |
+| [`Operations`](jane_kit.operations.md#клас-operations) | клас | `jane_kit.operations` |
+| [`operations_path`](jane_kit.operations.md#функція-operations_path) | функція | `jane_kit.operations` |
 | [`OriginAllowlist`](jane_kit.secrets.md#клас-originallowlist) | dataclass (незмінний) | `jane_kit.secrets` |
 | [`orphaned`](jane_kit.jobs.md#функція-orphaned) | функція | `jane_kit.jobs` |
 | [`Page`](jane_kit.pagination.md#клас-page) | модель Pydantic | `jane_kit.pagination` |
@@ -151,6 +157,7 @@
 | [`Problem`](jane_kit.errors.md#клас-problem) | модель Pydantic | `jane_kit.errors` |
 | [`problem_response`](jane_kit.errors.md#функція-problem_response) | функція | `jane_kit.errors` |
 | [`RateLimited`](jane_kit.errors.md#клас-ratelimited) | виняток | `jane_kit.errors` |
+| [`read_overrides`](jane_kit.operations.md#функція-read_overrides) | функція | `jane_kit.operations` |
 | [`read_secret_file`](jane_kit.secrets.md#функція-read_secret_file) | функція | `jane_kit.secrets` |
 | [`RemoteError`](jane_kit.clients.md#клас-remoteerror) | виняток | `jane_kit.clients` |
 | [`require`](jane_kit.auth.md#функція-require) | функція | `jane_kit.auth` |
@@ -178,6 +185,7 @@
 | [`StoredResponse`](jane_kit.idempotency.md#клас-storedresponse) | dataclass (незмінний) | `jane_kit.idempotency` |
 | [`Timeout`](jane_kit.errors.md#клас-timeout) | виняток | `jane_kit.errors` |
 | [`Unauthenticated`](jane_kit.errors.md#клас-unauthenticated) | виняток | `jane_kit.errors` |
+| [`unflatten`](jane_kit.operations.md#функція-unflatten) | функція | `jane_kit.operations` |
 | [`unmapped_routes`](jane_kit.auth.md#функція-unmapped_routes) | функція | `jane_kit.auth` |
 | [`UpstreamUnavailable`](jane_kit.errors.md#клас-upstreamunavailable) | виняток | `jane_kit.errors` |
 | [`ValidationFailed`](jane_kit.errors.md#клас-validationfailed) | виняток | `jane_kit.errors` |

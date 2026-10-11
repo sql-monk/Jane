@@ -22,13 +22,21 @@ function errorMessage(error: unknown): string
 
 Код: [problem.ts:56](../../../../../web/admin/src/api/problem.ts#L56).
 
+### Функція `problemFrom`
+
+```typescript
+function problemFrom(error: unknown): { type: string; title: string; status: number; detail?: string; instance?: string; code: string; retryable?: boolean; retry_after_seconds?: number; errors?: { pointer?: string; parameter?: string; code?: string; message: string; }[]; trace_id?: string; details?: Record<string, unknown>; } | null
+```
+
+Код: [problem.ts:64](../../../../../web/admin/src/api/problem.ts#L64).
+
 ### Функція `safeProblemCode`
 
 ```typescript
 function safeProblemCode(value: unknown): string
 ```
 
-Код: [problem.ts:96](../../../../../web/admin/src/api/problem.ts#L96).
+Код: [problem.ts:130](../../../../../web/admin/src/api/problem.ts#L130).
 
 ## Класи
 

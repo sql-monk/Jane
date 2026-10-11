@@ -7,10 +7,10 @@
 ### Компонент `Page`
 
 ```typescript
-function Page({ title, actions, children, }: { title: string; actions?: React.ReactNode; children: React.ReactNode; }): React.JSX.Element
+function Page({ title, actions, children, description: pageDescription, }: { title: string; description?: string; actions?: React.ReactNode; children: React.ReactNode; }): React.JSX.Element
 ```
 
-Код: [ui.tsx:8](../../../../../web/admin/src/components/ui.tsx#L8).
+Код: [ui.tsx:19](../../../../../web/admin/src/components/ui.tsx#L19).
 
 ### Компонент `Section`
 
@@ -18,7 +18,7 @@ function Page({ title, actions, children, }: { title: string; actions?: React.Re
 function Section({ title, actions, children, }: { title: string; actions?: React.ReactNode; children: React.ReactNode; }): React.JSX.Element
 ```
 
-Код: [ui.tsx:33](../../../../../web/admin/src/components/ui.tsx#L33).
+Код: [ui.tsx:46](../../../../../web/admin/src/components/ui.tsx#L46).
 
 ### Компонент `Loading`
 
@@ -26,7 +26,7 @@ function Section({ title, actions, children, }: { title: string; actions?: React
 function Loading({ what }: { what?: string; }): React.JSX.Element
 ```
 
-Код: [ui.tsx:53](../../../../../web/admin/src/components/ui.tsx#L53).
+Код: [ui.tsx:66](../../../../../web/admin/src/components/ui.tsx#L66).
 
 ### Компонент `ErrorBox`
 
@@ -34,7 +34,7 @@ function Loading({ what }: { what?: string; }): React.JSX.Element
 function ErrorBox({ error, title }: { error: unknown; title?: string; }): React.JSX.Element | null
 ```
 
-Код: [ui.tsx:61](../../../../../web/admin/src/components/ui.tsx#L61).
+Код: [ui.tsx:74](../../../../../web/admin/src/components/ui.tsx#L74).
 
 ### Компонент `Status`
 
@@ -42,7 +42,7 @@ function ErrorBox({ error, title }: { error: unknown; title?: string; }): React.
 function Status({ value }: { value: string | null | undefined; }): React.JSX.Element
 ```
 
-Код: [ui.tsx:127](../../../../../web/admin/src/components/ui.tsx#L127).
+Код: [ui.tsx:155](../../../../../web/admin/src/components/ui.tsx#L155).
 
 ### Компонент `JsonView`
 
@@ -52,7 +52,7 @@ function JsonView({ value, compact }: { value: unknown; compact?: boolean; }): R
 
 Pretty JSON of API data; secret-looking values are always masked (ТЗ §11).
 
-Код: [ui.tsx:133](../../../../../web/admin/src/components/ui.tsx#L133).
+Код: [ui.tsx:165](../../../../../web/admin/src/components/ui.tsx#L165).
 
 ### Компонент `KeyValue`
 
@@ -60,15 +60,15 @@ Pretty JSON of API data; secret-looking values are always masked (ТЗ §11).
 function KeyValue({ rows }: { rows: [string, React.ReactNode][]; }): React.JSX.Element
 ```
 
-Код: [ui.tsx:141](../../../../../web/admin/src/components/ui.tsx#L141).
+Код: [ui.tsx:173](../../../../../web/admin/src/components/ui.tsx#L173).
 
 ### Компонент `Table`
 
 ```typescript
-function Table<T>({ rows, columns, rowKey, empty, label, }: { rows: readonly T[]; columns: readonly import("C:/repos/Jane/.claude/worktrees/docs/web/admin/src/components/ui").Column<T>[]; rowKey: (row: T, index: number) => string; empty?: string; label?: string; }): React.JSX.Element
+function Table<T>({ rows, columns, rowKey, empty, label, loading, error, }: { rows: readonly T[]; columns: readonly import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/components/ui").Column<T>[]; rowKey: (row: T, index: number) => string; empty?: string; label?: string; loading?: boolean; error?: unknown; }): React.JSX.Element | null
 ```
 
-Код: [ui.tsx:170](../../../../../web/admin/src/components/ui.tsx#L170).
+Код: [ui.tsx:202](../../../../../web/admin/src/components/ui.tsx#L202).
 
 ### Компонент `LoadMore`
 
@@ -76,7 +76,7 @@ function Table<T>({ rows, columns, rowKey, empty, label, }: { rows: readonly T[]
 function LoadMore({ hasMore, loading, onClick, }: { hasMore: boolean; loading: boolean; onClick: () => void; }): React.JSX.Element | null
 ```
 
-Код: [ui.tsx:212](../../../../../web/admin/src/components/ui.tsx#L212).
+Код: [ui.tsx:250](../../../../../web/admin/src/components/ui.tsx#L250).
 
 ### Компонент `Tabs`
 
@@ -84,15 +84,15 @@ function LoadMore({ hasMore, loading, onClick, }: { hasMore: boolean; loading: b
 function Tabs<K extends string>({ tabs, active, onChange, }: { tabs: readonly [K, string][]; active: K; onChange: (key: K) => void; }): React.JSX.Element
 ```
 
-Код: [ui.tsx:229](../../../../../web/admin/src/components/ui.tsx#L229).
+Код: [ui.tsx:267](../../../../../web/admin/src/components/ui.tsx#L267).
 
 ### Компонент `Field`
 
 ```typescript
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode; }): React.JSX.Element
+function Field({ label, hint, error, children, }: { label: string; hint?: string; error?: string | undefined; children: React.ReactNode; }): React.JSX.Element
 ```
 
-Код: [ui.tsx:256](../../../../../web/admin/src/components/ui.tsx#L256).
+Код: [ui.tsx:294](../../../../../web/admin/src/components/ui.tsx#L294).
 
 ### Компонент `ActionDialog`
 
@@ -102,17 +102,17 @@ function ActionDialog({ title, onClose, children, }: { title: string; onClose: (
 
 Native modal: focus stays inside it and table rows keep their compact layout.
 
-Код: [ui.tsx:267](../../../../../web/admin/src/components/ui.tsx#L267).
+Код: [ui.tsx:370](../../../../../web/admin/src/components/ui.tsx#L370).
 
 ### Компонент `ReasonAction`
 
 ```typescript
-function ReasonAction({ label, confirmLabel, onConfirm, busy, danger, requireReason, modal, }: { label: string; confirmLabel?: string; onConfirm: (reason: string) => void; busy?: boolean; danger?: boolean; requireReason?: boolean; modal?: boolean; }): React.JSX.Element
+function ReasonAction({ label, confirmLabel, onConfirm, busy, danger, requireReason, modal, impact, }: { label: string; confirmLabel?: string; onConfirm: (reason: string) => void; busy?: boolean; danger?: boolean; requireReason?: boolean; modal?: boolean; impact?: React.ReactNode; }): React.JSX.Element
 ```
 
 A button that asks for a reason (audit) before running a destructive or auditable action.
 
-Код: [ui.tsx:305](../../../../../web/admin/src/components/ui.tsx#L305).
+Код: [ui.tsx:408](../../../../../web/admin/src/components/ui.tsx#L408).
 
 ### Компонент `Notice`
 
@@ -120,7 +120,7 @@ A button that asks for a reason (audit) before running a destructive or auditabl
 function Notice({ tone, children }: { tone?: "info" | "ok" | "warn"; children: React.ReactNode; }): React.JSX.Element
 ```
 
-Код: [ui.tsx:378](../../../../../web/admin/src/components/ui.tsx#L378).
+Код: [ui.tsx:484](../../../../../web/admin/src/components/ui.tsx#L484).
 
 ## Інтерфейси
 
@@ -136,4 +136,4 @@ interface Column<T>
 | `cell` | `(row: T) => ReactNode` | так | читання й запис |  |
 | `className` | `string` | ні | читання й запис |  |
 
-Код: [ui.tsx:154](../../../../../web/admin/src/components/ui.tsx#L154).
+Код: [ui.tsx:186](../../../../../web/admin/src/components/ui.tsx#L186).

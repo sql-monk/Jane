@@ -1,8 +1,25 @@
 import path from "node:path";
 import { captureRequest, expect, fulfillJson, login, mockUrl, openapiExample, test } from "./fixtures";
+import type { Page } from "@playwright/test";
 import type { Run, Source, TaskSummary } from "../src/api/types";
 
 const evidence = path.resolve(import.meta.dirname, "../../../.jane");
+
+function overviewRefresh(page: Page) {
+  return page
+    .getByRole("main")
+    .locator("header")
+    .filter({ has: page.getByRole("heading", { name: "Огляд", level: 1, exact: true }) })
+    .getByRole("button", { name: "Оновити", exact: true });
+}
+
+async function expectOverviewTelemetry(page: Page): Promise<void> {
+  await expect(
+    page
+      .getByRole("region", { name: "Моніторинг платформи", exact: true })
+      .getByRole("img", { name: "API-запити, запитів/с", exact: true }),
+  ).toBeVisible();
+}
 
 test.describe("admin workspace", () => {
   test("list rows and action buttons stay compact while dialogs are open @mock", async ({ admin }) => {
@@ -93,15 +110,16 @@ test.describe("admin workspace", () => {
       items: list.items.map((run) => ({ ...run, status: "queued" })),
     });
     await admin.goto("/");
-    const metric = admin.locator(".metric").filter({ hasText: "Серед останніх запусків" });
+    const metric = admin.getByRole("link", { name: /^У роботі(?:\s|$)/ });
     await expect(metric.locator(".metric-value")).toHaveText(String(list.items.length));
     await expect(metric).toHaveAttribute("href", "/runs");
     await metric.click();
     await expect(admin).toHaveURL(/\/runs$/);
-    await expect(admin.getByRole("table", { name: "Запуски" })).toContainText("queued");
+    await expect(admin.getByRole("table", { name: "Запуски" })).toContainText("У черзі");
   });
   test("LLM reporting requests a rolling window and refreshes its upper bound @mock", async ({ admin }) => {
     await admin.goto("/");
+    await expectOverviewTelemetry(admin);
     await expect(admin.getByTestId("usage-total")).not.toHaveText("—");
     const selected = await captureRequest(admin, "GET", "/api/llm/v1/usage", () =>
       admin.getByLabel("Період витрат LLM").selectOption("7"),
@@ -110,9 +128,9 @@ test.describe("admin workspace", () => {
     expect(
       Date.parse(selectedUrl.searchParams.get("until")!) - Date.parse(selectedUrl.searchParams.get("since")!),
     ).toBe(7 * 86400000);
-    await expect(admin.getByRole("button", { name: "Оновити", exact: true })).toBeEnabled();
+    await expect(overviewRefresh(admin)).toBeEnabled();
     const updated = await captureRequest(admin, "GET", "/api/llm/v1/usage", () =>
-      admin.getByRole("button", { name: "Оновити", exact: true }).click(),
+      overviewRefresh(admin).click(),
     );
     expect(Date.parse(new URL(updated.request.url()).searchParams.get("until")!)).toBeGreaterThanOrEqual(
       Date.parse(selectedUrl.searchParams.get("until")!),
@@ -149,10 +167,11 @@ test.describe("admin workspace", () => {
     await expect(editor).not.toContainText("# theme-draft");
   });
   test("dark and light themes persist across reload and cover all screens", async ({ admin }) => {
+    await expectOverviewTelemetry(admin);
     await admin.getByLabel("Тема оформлення").selectOption("dark");
     await expect(admin.locator("html")).toHaveAttribute("data-theme", "dark");
     await expect(admin.getByRole("heading", { name: "Потребує уваги" })).toBeVisible();
-    await expect(admin.getByRole("button", { name: "Оновити", exact: true })).toBeEnabled();
+    await expect(overviewRefresh(admin)).toBeEnabled();
     await expect(admin.getByRole("alert")).toHaveCount(0);
     await admin.screenshot({ path: path.join(evidence, "wp12-admin-dark.png"), fullPage: true });
     await admin.reload();
@@ -166,7 +185,7 @@ test.describe("admin workspace", () => {
     await admin.goto("/");
     await expect(admin.getByLabel("Тема оформлення")).toHaveValue("light");
     await expect(admin.getByTestId("usage-total")).not.toHaveText("—");
-    await expect(admin.getByRole("button", { name: "Оновити", exact: true })).toBeEnabled();
+    await expect(overviewRefresh(admin)).toBeEnabled();
     await expect(admin.getByRole("alert")).toHaveCount(0);
     await admin.screenshot({ path: path.join(evidence, "wp12-admin-light.png"), fullPage: true });
   });
@@ -211,8 +230,9 @@ test.describe("admin workspace", () => {
     await expect(admin.getByRole("heading", { name: "Завдання", exact: true })).toBeVisible();
     await expect(admin.getByRole("navigation", { name: "Розділи" })).not.toBeVisible();
     await admin.goto("/");
+    await expectOverviewTelemetry(admin);
     await expect(admin.getByTestId("usage-total")).not.toHaveText("—");
-    await expect(admin.getByRole("button", { name: "Оновити", exact: true })).toBeEnabled();
+    await expect(overviewRefresh(admin)).toBeEnabled();
     await expect(admin.getByRole("alert")).toHaveCount(0);
     expect(await admin.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await admin.screenshot({ path: path.join(evidence, "wp12-admin-mobile.png"), fullPage: true });
@@ -229,6 +249,7 @@ test.describe("admin workspace", () => {
       503,
     );
     await admin.reload();
+    await expectOverviewTelemetry(admin);
     await expect(admin.locator(".metric").filter({ hasText: "Джерела" }).locator(".metric-value")).toHaveText(
       "1+",
     );

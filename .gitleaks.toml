@@ -21,3 +21,30 @@ condition = "AND"
 regexTarget = "match"
 regexes = ['''^delivery_key"?\s*[:=]\s*"?(?:[0-9a-f]{64}|[0-9a-f]{32})"?\s*$''']
 paths = ['''^contracts/''', '''^docs/reference/api/''', '''^docs/components/[^/]+/reference/api/''']
+
+# These eight VARUS fixtures contain public product URL slugs in the urlKey field.
+# generic-api-key matches the Key suffix of urlKey; the exact reviewed values are not credentials.
+# AND requires an exact fixture path and an exact public slug; other fields/values remain scanned.
+[[allowlists]]
+description = "VARUS exact public urlKey slugs in eight reviewed offline fixtures"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+regexes = [
+  '''^gel\-dlya\-mittya\-posudu\-sarmix\-ultra\-golden\-yuzu\-500\-ml$''',
+  '''^makaronni\-virobi\-golden\-pasta\-farfalle\-400\-g$''',
+  '''^napij\-sofik\-zi\-smakom\-persika\-200\-ml$''',
+  '''^nektar\-sandora\-granatovij\-200\-ml$''',
+  '''^prianyk\-khlibodar\-na\-khodu\-na\-medu\-30\-h$''',
+  '''^yogurt\-1\-5\-persik\-yagotinskiy\-ppl\-750g$''',
+]
+paths = [
+  '''^examples/sites/packages/catalog\.varus\-price\-extractor/tests/item\-without\-prices/item\.json$''',
+  '''^examples/sites/packages/catalog\.varus\-price\-extractor/tests/pasta\-regular\-price/item\.json$''',
+  '''^examples/sites/packages/catalog\.varus\-price\-extractor/tests/yogurt\-sale/item\.json$''',
+  '''^examples/sites/packages/catalog\.varus\-product\-extractor/tests/dish\-gel\-sale/item\.json$''',
+  '''^examples/sites/packages/catalog\.varus\-product\-extractor/tests/item\-without\-name/item\.json$''',
+  '''^examples/sites/packages/catalog\.varus\-product\-extractor/tests/juice\-regular\-price/item\.json$''',
+  '''^examples/sites/packages/catalog\.varus\-product\-extractor/tests/whole\-assortment\-bakery\-sale/item\.json$''',
+  '''^examples/sites/packages/catalog\.varus\-product\-extractor/tests/yogurt\-sale/item\.json$''',
+]

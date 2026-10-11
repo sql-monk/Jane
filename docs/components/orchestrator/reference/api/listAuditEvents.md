@@ -1,6 +1,6 @@
 # GET /v1/audit-events
 
-> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1432). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1438). Не редагуйте вручну.
 
 **Журнал аудиту (активації, відкати, зміни конфігурацій, підключень і лімітів)**
 
@@ -16,6 +16,8 @@
 
 | Назва | Де | Тип | Обов'язковий | Опис |
 |---|---|---|---|---|
+| `since` | query | `string` (date-time) | ні | Події від цього часу включно (UTC RFC 3339). |
+| `until` | query | `string` (date-time) | ні | Події до цього часу, не включно (UTC RFC 3339). |
 | `subject_type` | query | enum: `source`, `task`, `stage`, `connection`, `limits`, `problem_group` | ні |  |
 | `subject_id` | query | `string` | ні |  |
 | `cursor` | query | `string` | ні | Непрозорий курсор з `next_cursor` попередньої сторінки. |
@@ -26,6 +28,7 @@
 | Код | Опис | Схема |
 |---|---|---|
 | `200` | Сторінка подій. | `object` |
+| `400` | Некоректний синтаксис запиту (`bad_request`). | `problem` |
 | `401` | Немає або недійсний токен (`unauthenticated`). | `problem` |
 
 ### Відповідь 200
@@ -41,7 +44,7 @@
 | `items[].action` | `string` | так |  |
 | `items[].subject_type` | `string` | так |  |
 | `items[].subject_id` | `string` | так |  |
-| `items[].details` | `object` | ні |  |
+| `items[].details` | `object` | ні | Для оновлень changed містить змінені поля; before та after — їх фактичні значення із прихованими секретами. Старі події можуть містити лише назви полів. |
 | `next_cursor` | `string \| null` | так | макс. довжина `2048` |
 
 Приклад `events`:
@@ -58,7 +61,19 @@
       "subject_id": "shop-catalog/extract-products",
       "details": {
         "version": "1.2.0",
-        "previous": "1.1.0"
+        "previous": "1.1.0",
+        "before": {
+          "package": {
+            "package_id": "shop-example.product-extractor",
+            "version": "1.1.0"
+          }
+        },
+        "after": {
+          "package": {
+            "package_id": "shop-example.product-extractor",
+            "version": "1.2.0"
+          }
+        }
       }
     }
   ],
@@ -68,4 +83,4 @@
 
 ## Примітки
 
-- Помилки повертаються як `application/problem+json` ([модель помилок](../../../../../contracts/docs/errors.md)): `401`.
+- Помилки повертаються як `application/problem+json` ([модель помилок](../../../../../contracts/docs/errors.md)): `400`, `401`.

@@ -1,6 +1,6 @@
 # GET /v1/jobs/{job_id}
 
-> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1485). Не редагуйте вручну.
+> Згенеровано `scripts/docs_reference.py` з [orchestrator.v1.yaml](../../../../../contracts/openapi/orchestrator.v1.yaml#L1509). Не редагуйте вручну.
 
 **Стан, прогрес і результат тривалої операції**
 

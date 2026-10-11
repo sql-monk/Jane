@@ -94,6 +94,29 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.limits = resolved
 
+    def queue_probe() -> dict[str, float]:
+        core = holder["core"]
+        with core.db.conn() as conn:
+            row = conn.execute(
+                "SELECT count(*) FILTER (WHERE status IN ('queued','retrying')) AS queued, "
+                "count(*) FILTER (WHERE status IN ('leased','running')) AS active, "
+                "coalesce(max(extract(epoch FROM now()-created_at)) "
+                "FILTER (WHERE status IN ('queued','retrying')),0) AS oldest "
+                "FROM items WHERE status IN ('queued','retrying','leased','running')"
+            ).fetchone()
+        return {
+            "queue_depth": float(row["queued"]),
+            "active_items": float(row["active"]),
+            "oldest_queued_seconds": float(row["oldest"]),
+        }
+
+    app.state.operations_probe = queue_probe
+    app.state.operations_metric_definitions = [
+        {"key": "queue_depth", "label": "Черга елементів етапів", "unit": "елементів"},
+        {"key": "active_items", "label": "Елементи у виконанні", "unit": "елементів"},
+        {"key": "oldest_queued_seconds", "label": "Вік найстарішого елемента черги", "unit": "с"},
+    ]
+
     async def db_check() -> bool:
         core = holder.get("core")
         if core is None:
@@ -403,11 +426,14 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         request: Request,
         source_id: str | None = None,
         status: str | None = None,
+        group_id: str | None = None,
         cursor: str | None = None,
         limit: int | None = Query(None, ge=1),
     ) -> dict[str, Any]:
         principal(request, READ)
-        return page(*await threaded(admin().list_problem_groups, source_id, status, cursor, lim(limit)))
+        return page(
+            *await threaded(admin().list_problem_groups, source_id, status, cursor, lim(limit), group_id)
+        )
 
     @app.patch("/v1/problem-groups/{group_id}", tags=["problems"])
     async def update_problem_group(request: Request, group_id: str) -> dict[str, Any]:
@@ -490,10 +516,18 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         request: Request,
         subject_type: str | None = None,
         subject_id: str | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
         cursor: str | None = None,
         limit: int | None = Query(None, ge=1),
     ) -> dict[str, Any]:
         principal(request, READ)
-        return page(*await threaded(admin().list_audit, subject_type, subject_id, cursor, lim(limit)))
+        if (since and since.tzinfo is None) or (until and until.tzinfo is None):
+            raise BadRequest("audit timestamps require an explicit timezone")
+        if since and until and since >= until:
+            raise BadRequest("since must precede until")
+        return page(
+            *await threaded(admin().list_audit, subject_type, subject_id, cursor, lim(limit), since, until)
+        )
 
     return app

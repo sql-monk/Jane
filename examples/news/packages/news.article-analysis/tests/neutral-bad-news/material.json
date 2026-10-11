@@ -1,0 +1,32 @@
+{
+  "material_id": "web:neutral-news",
+  "observation_id": "obs-neutral-news",
+  "source": {
+    "kind": "web",
+    "source_id": "news-fixture",
+    "name": "Fixture News"
+  },
+  "locator": {
+    "url": "https://news.example.test/article"
+  },
+  "published_at": "2026-10-11T08:00:00Z",
+  "fetched_at": "2026-10-11T08:00:01Z",
+  "format": {
+    "media_type": "text/plain",
+    "language": "en"
+  },
+  "revision": {
+    "content_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "content": {
+    "kind": "inline",
+    "encoding": "utf-8",
+    "media_type": "text/plain",
+    "data": "A fire damaged a warehouse in London on 11 October 2026. The London Fire Brigade said there were no injuries.",
+    "size_bytes": 109
+  },
+  "collector": {
+    "name": "web-collector",
+    "version": "1.0.0"
+  }
+}

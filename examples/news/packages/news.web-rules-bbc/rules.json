@@ -1,0 +1,60 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "feeds.bbci.co.uk",
+      "www.bbc.co.uk",
+      "www.bbc.com"
+    ],
+    "allowed_schemes": [
+      "https"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "feed",
+      "strategy_id": "latest-news",
+      "urls": [
+        "https://feeds.bbci.co.uk/news/world/rss.xml"
+      ],
+      "autodiscover": false
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "normalization": {
+    "strip_query_params": [
+      "utm_*",
+      "at_medium",
+      "at_campaign"
+    ]
+  },
+  "dedup": {
+    "key": "canonical_url_and_content",
+    "use_link_rel_canonical": true
+  },
+  "revisit": {
+    "mode": "if_changed"
+  },
+  "fetch": {
+    "user_agent": "JaneNewsMonitor/1.0",
+    "accept_media_types": [
+      "text/html",
+      "application/rss+xml",
+      "application/atom+xml",
+      "application/xml",
+      "text/xml"
+    ]
+  },
+  "limits": {
+    "crawl": {
+      "max_pages_per_run": 5,
+      "max_depth": 1
+    },
+    "rate": {
+      "requests_per_second_per_host": 1,
+      "min_delay_ms_per_host": 1000
+    }
+  }
+}

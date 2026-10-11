@@ -1,0 +1,48 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "542342",
+        "title": "Самокат-біговел Scoot&Ride Highwaykick світло-сірий",
+        "price": 6999.0,
+        "currency": "UAH",
+        "url": "https://bi.ua/ukr/product/samokat-scootride-highwaykick-svetlo-seryy-sr-160629-ash.html",
+        "availability": "in_stock",
+        "brand": "Scoot & Ride",
+        "category": "Самокати",
+        "category_path": [
+          "Дитячий транспорт",
+          "Самокати"
+        ],
+        "image": "https://bi.ua/uploaded-images/products/542342_1.jpg",
+        "sku": "SR-160629-ASH",
+        "rating": 3.0,
+        "reviews_count": 2,
+        "attributes": {
+          "Артикул": "SR-160629-ASH",
+          "Колір": "Білий",
+          "Конструкція": "Регульоване сидіння, Регульоване кермо",
+          "Тип товару": "Самокати",
+          "Серія": "Highwaykick",
+          "Країна-виробник": "Китай",
+          "Розмір пакунку": "27 x 18 x 58 см",
+          "Вік": "1 - 3 роки",
+          "Стать": "Для хлопчиків"
+        }
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "542342"
+        }
+      }
+    }
+  ]
+}

@@ -7,9 +7,9 @@
 ### Компонент `ScheduleEditor`
 
 ```typescript
-function ScheduleEditor({ value, onChange, }: { value: { type: "manual" | "once" | "cron" | "interval"; at?: string; cron?: string; interval_seconds?: number; timezone?: string; start_at?: string; end_at?: string; enabled?: boolean; overlap?: "skip" | "queue" | "allow"; } | undefined; onChange: (s: { type: "manual" | "once" | "cron" | "interval"; at?: string; cron?: string; interval_seconds?: number; timezone?: string; start_at?: string; end_at?: string; enabled?: boolean; overlap?: "skip" | "queue" | "allow"; } | undefined) => void; }): React.JSX.Element
+function ScheduleEditor({ value, onChange, issues, }: { value: { type: "manual" | "once" | "cron" | "interval"; at?: string; cron?: string; interval_seconds?: number; timezone?: string; start_at?: string; end_at?: string; enabled?: boolean; overlap?: "skip" | "queue" | "allow"; } | undefined; onChange: (s: { type: "manual" | "once" | "cron" | "interval"; at?: string; cron?: string; interval_seconds?: number; timezone?: string; start_at?: string; end_at?: string; enabled?: boolean; overlap?: "skip" | "queue" | "allow"; } | undefined) => void; issues?: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/schema").SchemaIssue[]; }): React.JSX.Element
 ```
 
 Editor of TaskConfig.schedule (manual | once | cron | interval), fields from task-config.schema.json.
 
-Код: [ScheduleEditor.tsx:5](../../../../../web/admin/src/components/ScheduleEditor.tsx#L5).
+Код: [ScheduleEditor.tsx:6](../../../../../web/admin/src/components/ScheduleEditor.tsx#L6).

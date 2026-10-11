@@ -1,0 +1,13 @@
+{
+  "source_id": "news-web-pravda",
+  "feed_url": "https://www.pravda.com.ua/rss/",
+  "article_url": "https://www.pravda.com.ua/news/2026/10/11/8057417/",
+  "fetched_at": "2026-10-11T03:56:53.283627Z",
+  "feed_http_status": 200,
+  "article_http_status": 200,
+  "robots_allowed": true,
+  "feed_entries": 20,
+  "title": "У США чоловік застрелив 8 людей, серед яких діти, і наклав на себе руки",
+  "excerpt": "Чоловік убив вісім осіб, серед яких була вагітна жінка, діти та інші родичі, у своєму будинку в місті Ері штату Пенсильванія, після чого наклав на себе руки.",
+  "capture_method": "live HTTP in running Linux web-collector container; normal TLS verification; metadata excerpt only"
+}

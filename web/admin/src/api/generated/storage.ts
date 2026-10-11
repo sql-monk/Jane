@@ -35,6 +35,174 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/connections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Підключення, відомі цьому виконавцю
+     * @description Необов'язково для виконавця без керованих підключень (див. опис API).
+     */
+    get: operations["listConnections"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/connections/{connection_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: components["parameters"]["ConnectionId"];
+      };
+      cookie?: never;
+    };
+    /** Прочитати підключення */
+    get: operations["getConnection"];
+    /**
+     * Створити або замінити підключення (секрети — лише посиланнями)
+     * @description Викликає оркестратор, синхронізуючи реєстр підключень, або адміністратор автономного
+     *     виконавця. Значення, схожі на секрети, у `params` відхиляються (`secret_detected`).
+     *     Виконавець без керованих підключень відповідає 501 `not_implemented`; клієнт не вважає це збоєм
+     *     (див. опис API). 404/405 — збій синхронізації.
+     */
+    put: operations["putConnection"];
+    post?: never;
+    /** Видалити підключення */
+    delete: operations["deleteConnection"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/connections/{connection_id}/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: components["parameters"]["ConnectionId"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Перевірити підключення й розв'язання секретів */
+    post: operations["testConnection"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/storage-status/checks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Фонова перевірка доступності та інвентаризація сховища */
+    post: operations["checkStorageStatus"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/jobs/{job_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: components["parameters"]["JobId"];
+      };
+      cookie?: never;
+    };
+    /** Стан, прогрес і результат тривалої операції */
+    get: operations["getJob"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/jobs/{job_id}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: components["parameters"]["JobId"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Запит на скасування job (ідемпотентний)
+     * @description 202 — скасування прийнято, job переходить у `cancelling`, далі в `cancelled`.
+     *     200 — job уже в термінальному стані; повертається як є, без змін.
+     *     Повторний виклик безпечний, тому Idempotency-Key не потрібен.
+     */
+    post: operations["cancelJob"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/storage-status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Остання явна перевірка сховища та статистика об’єктів
+     * @description GET не відкриває адаптер і не обходить сховище. POST /v1/storage-status/checks запускає Job для health та статистики, оновлює process-local snapshot. Connection test перевіряє лише health. Зміна визначення та рестарт скидають snapshot. Статистика охоплює лише об’єкти namespace підключення: payload bytes, не зайнятий диск або сутності. Непідтримувані агрегати мають null і причину. Час фіксує свіжість, запис нових об’єктів не оновлює snapshot.
+     */
+    get: operations["getStorageStatus"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/entity-types": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Типи фактично збережених сутностей і їх кількість
+     * @description Каталог поточного простору підключення; не очікувані типи джерел. Порожній items означає
+     *     відсутність сутностей. Приклад запиту — GET /v1/entity-types?connection_id=results-pg&limit=50.
+     *     Необов'язкова можливість адаптера: 501 not_implemented означає недоступність каталогу.
+     */
+    get: operations["listEntityTypes"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/entities": {
     parameters: {
       query?: never;
@@ -42,7 +210,13 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Актуальний стан сутностей */
+    /**
+     * Актуальний стан сутностей
+     * @description Необов’язковий search шукає без урахування регістру буквальний підрядок у canonical_key,
+     *     key і fields по всьому сховищу перед пагінацією. Без search поведінка незмінна.
+     *     Адаптер без можливості пошуку повертає 501 not_implemented. Курсор чинний для тих самих фільтрів.
+     *     Приклад: GET /v1/entities?connection_id=results-pg&entity_type=product&search=Kettle.
+     */
     get: operations["listEntities"];
     put?: never;
     post?: never;
@@ -143,6 +317,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    EntityTypeSummary: {
+      entity_type: string;
+      entity_count: number;
+    };
+    EntityStatistics: {
+      entity_count: number | null;
+      total_size_bytes: number | null;
+      types: components["schemas"]["EntityTypeSummary"][] | null;
+      /** @description postgresql_relation_with_indexes — фізичний розмір таблиці актуальних станів з індексами; snapshot_documents — байти JSON-файлів станів. Не включає історію, RAW чи delivery. */
+      size_basis: string | null;
+      /** Format: date-time */
+      checked_at: string | null;
+      unavailable_reason: string | null;
+    };
     StoredObject: {
       object: components["schemas"]["StoredObjectRef"];
       /** @description Короткі метадані матеріалу, з якого збережено об'єкт. */
@@ -161,6 +349,25 @@ export interface components {
       stored_at: components["schemas"]["Timestamp"];
       /** @description Відновлений Material (лише для RAW і лише якщо його вміст можна віддати, див. опис операції). */
       material?: components["schemas"]["material.schema"];
+    };
+    StorageStatus: {
+      connection_id: string;
+      kind: string;
+      /** @enum {string} */
+      availability: "unknown" | "available" | "unavailable";
+      /** Format: date-time */
+      checked_at: string | null;
+      message: string | null;
+      entity_statistics?: components["schemas"]["EntityStatistics"];
+      statistics: {
+        object_count: number | null;
+        total_size_bytes: number | null;
+        /** Format: date-time */
+        checked_at: string | null;
+        /** @enum {string} */
+        scope: "connection_objects";
+        unavailable_reason: string | null;
+      };
     };
     Health: {
       /** @enum {string} */
@@ -352,8 +559,173 @@ export interface components {
       /** @description Додаткові структуровані дані, специфічні для коду (наприклад 'limit', 'actual' для limit_exceeded). */
       details?: Record<string, unknown>;
     };
+    /**
+     * @example postgresql
+     * @example sqlserver
+     * @example mongodb
+     * @example s3
+     * @example minio
+     * @example filesystem
+     * @example llm_provider
+     * @example telegram_account
+     * @example search_provider
+     * @example http
+     */
+    ConnectionKind: string;
+    /**
+     * Format: date-time
+     * @description Момент часу RFC 3339 з часовою зоною; сервіси повертають UTC із суфіксом 'Z'.
+     */
+    Timestamp: string;
     /** @description Ідентифікатор, який обирає користувач (source_id, task_id, package_id, connection_id). Нижній регістр, цифри, '.', '_', '-'. */
     Slug: string;
+    SecretRef: string;
+    /** @description Довільні мітки ключ-значення для фільтрації й пошуку. Не для секретів. */
+    Labels: {
+      [key: string]: string;
+    };
+    /**
+     * Connection
+     * @description Кероване підключення (ТЗ §11): іменоване підключення до сховища, провайдера LLM, облікового запису Telegram тощо. Містить лише несекретні параметри та посилання на секрети (secret_refs). Значення секретів ніколи не передаються через API, не зберігаються в пакетах і не копіюються під час форку. Сервіс-виконавець розв'язує secret_refs у власному середовищі. Див. docs/adr/0006-secrets-and-connections.md.
+     */
+    "connection.schema": {
+      connection_id: components["schemas"]["Slug"];
+      kind: components["schemas"]["ConnectionKind"];
+      title?: string;
+      /** @description Несекретні параметри: host, port, database, schema, bucket, endpoint, region, base_path, api_base, model_aliases тощо. Сервіс відхиляє params, схожі на секрети (secret_detected). */
+      params?: {
+        [key: string]: string | number | boolean | unknown[] | Record<string, unknown>;
+      };
+      /** @description Ім'я секрету → посилання на нього. Схеми: env:<VAR>, file:<шлях у контейнері>, vault:<шлях>#<ключ> (опційний провайдер). */
+      secret_refs?: {
+        [key: string]: components["schemas"]["SecretRef"];
+      };
+      labels?: components["schemas"]["Labels"];
+    };
+    NextCursor: string | null;
+    ConnectionList: {
+      items: components["schemas"]["connection.schema"][];
+      next_cursor: components["schemas"]["NextCursor"];
+    };
+    ConnectionTestResult: {
+      ok: boolean;
+      checked_at: components["schemas"]["Timestamp"];
+      latency_ms?: number;
+      /** @description Для кожного secret_ref — чи вдалося його розв'язати в середовищі виконавця (без значень). */
+      secrets_resolved?: {
+        [key: string]: boolean;
+      };
+      message?: string;
+    };
+    /**
+     * Job
+     * @description Стан тривалої операції. Будь-який API, що повертає 202 Accepted, повертає Job і заголовок Location: /v1/jobs/{job_id}. Стан читається GET /v1/jobs/{job_id}, скасування — POST /v1/jobs/{job_id}/cancel. Переходи: queued → running → (succeeded | failed); queued|running → cancelling → cancelled (або succeeded/failed, якщо операція завершилась раніше, ніж скасування набрало сили). Термінальні стани: succeeded, failed, cancelled — більше не змінюються. Job живе в сервісі, який його створив; зберігається щонайменше limits.transfer.job_retention_seconds після завершення.
+     */
+    "job.schema": {
+      job_id: components["schemas"]["Id"];
+      /** @description Вид операції в межах сервісу, наприклад 'collection', 'invocation', 'test_run', 'run', 'onboarding', 'improvement', 'upstream_port'. */
+      kind: string;
+      status: components["schemas"]["JobStatus"];
+      created_at: components["schemas"]["Timestamp"];
+      updated_at?: components["schemas"]["Timestamp"];
+      started_at?: components["schemas"]["Timestamp"];
+      finished_at?: components["schemas"]["Timestamp"];
+      progress?: components["schemas"]["JobProgress"];
+      /** @description Результат, коли status = succeeded. Форма залежить від 'kind' і описана в API відповідної операції. Великий результат передається як result_ref. */
+      result?: Record<string, unknown>;
+      result_ref?: components["schemas"]["content-ref.schema"];
+      /** @description Причина, коли status = failed. Для cancelled причина — у cancellation. */
+      error?: components["schemas"]["problem.schema"];
+      cancellation?: components["schemas"]["JobCancellation"];
+      idempotency_key?: string;
+      /** @description Пов'язані ресурси: self, cancel, result, run, collection тощо. */
+      links?: {
+        [key: string]: string;
+      };
+      labels?: components["schemas"]["Labels"];
+    };
+    /** @description Непрозорий ідентифікатор, згенерований сервісом-власником (наприклад 'mat_01J9Z...'). Клієнти не розбирають його структуру. */
+    Id: string;
+    /** @enum {string} */
+    JobStatus: "queued" | "running" | "cancelling" | "succeeded" | "failed" | "cancelled";
+    JobProgress: {
+      completed?: number;
+      /** @description Відома загальна кількість одиниць; null — невідома (наприклад під час рекурсивного обходу). */
+      total?: number | null;
+      /**
+       * @example materials
+       * @example pages
+       * @example tests
+       * @example stages
+       */
+      unit?: string;
+      message?: string;
+      /** @description Довільні лічильники, наприклад {"fetched": 10, "skipped_robots": 2}. */
+      counters?: {
+        [key: string]: number;
+      };
+      updated_at?: components["schemas"]["Timestamp"];
+    };
+    /** @description Медіатип RFC 6838, наприклад 'text/html' або 'application/json'. Параметри (charset) передаються окремо. */
+    MediaType: string;
+    Sha256Hex: string;
+    InlineContent: {
+      /** @constant */
+      kind: "inline";
+      media_type: components["schemas"]["MediaType"];
+      /** @description Кодування тексту в першоджерелі (після декодування data завжди UTF-8 для encoding=utf-8). */
+      charset?: string;
+      /**
+       * @description utf-8 — текст як є; base64 — двійкові дані (RFC 4648).
+       * @enum {string}
+       */
+      encoding: "utf-8" | "base64";
+      data: string;
+      /** @description Розмір декодованих байтів. */
+      size_bytes?: number;
+      sha256?: components["schemas"]["Sha256Hex"];
+    };
+    BlobContent: {
+      /** @constant */
+      kind: "blob";
+      /** @description Канонічна адреса об'єкта: 's3://<bucket>/<key>' (MinIO/S3) або 'file:///<abs-path>' (лише для одновузлового розгортання зі спільним томом). */
+      uri: string;
+      /**
+       * Format: uri
+       * @description Необов'язкове попередньо підписане HTTP(S)-посилання для читання без облікових даних сховища. Діє до download_url_expires_at.
+       */
+      download_url?: string;
+      download_url_expires_at?: components["schemas"]["Timestamp"];
+      media_type: components["schemas"]["MediaType"];
+      charset?: string;
+      size_bytes: number;
+      sha256: components["schemas"]["Sha256Hex"];
+      /**
+       * @description transit — тимчасовий об'єкт для передавання між етапами (видаляється після expires_at); persistent — збережений обробником збереження.
+       * @enum {string}
+       */
+      store?: "transit" | "persistent";
+      /**
+       * Format: date-time
+       * @description Коли транзитний об'єкт може бути видалено. null для persistent.
+       */
+      expires_at?: string | null;
+    };
+    /**
+     * ContentRef
+     * @description Вміст матеріалу або великого результату: або вбудований (kind=inline, до limits.transfer.inline_max_bytes), або посилання на blob-сховище (kind=blob). Кожен споживач зобов'язаний підтримувати обидва варіанти. Див. docs/adr/0004-large-materials.md.
+     */
+    "content-ref.schema": {} & (
+      components["schemas"]["InlineContent"] | components["schemas"]["BlobContent"]
+    );
+    JobCancellation: {
+      requested_at: components["schemas"]["Timestamp"];
+      requested_by?: string;
+      reason?: string;
+    };
+    JobCancelRequest: {
+      reason?: string;
+    };
     /** @description Ідентичність об'єкта. natural — значення ключових полів схеми (наприклад {"sku": "A-1"}); scope — простір імен (зазвичай source_id), щоб однакові SKU різних джерел не злилися. Сховище будує канонічний рядок ключа: scope + '|' + пари natural, відсортовані за іменем, серіалізовані як JSON без пробілів. */
     EntityKey: {
       scope: string;
@@ -361,14 +733,6 @@ export interface components {
         [key: string]: string | number | boolean;
       };
     };
-    /** @description Непрозорий ідентифікатор, згенерований сервісом-власником (наприклад 'mat_01J9Z...'). Клієнти не розбирають його структуру. */
-    Id: string;
-    /**
-     * Format: date-time
-     * @description Момент часу RFC 3339 з часовою зоною; сервіси повертають UTC із суфіксом 'Z'.
-     */
-    Timestamp: string;
-    Sha256Hex: string;
     /** @description Порядок спостережень. Порівняння: спочатку observed_at (час отримання матеріалу колектором), потім sequence (ревізія джерела, якщо є), потім observation_id лексикографічно. Більше — новіше. Час обробки чи доставки в порівнянні не бере участі. */
     ObservationOrder: {
       observation_id: components["schemas"]["Id"];
@@ -392,7 +756,6 @@ export interface components {
       version?: number;
       updated_at: components["schemas"]["Timestamp"];
     };
-    NextCursor: string | null;
     /** @description Точна версія Semantic Versioning 2.0.0. Діапазони версій у посиланнях на пакети заборонені. */
     SemVer: string;
     /** @description Дайджест вмісту: 'sha256:' і 64 шістнадцяткові символи в нижньому регістрі. */
@@ -446,57 +809,6 @@ export interface components {
       applied_fields: string[];
       stale_fields: string[];
     };
-    /** @description Медіатип RFC 6838, наприклад 'text/html' або 'application/json'. Параметри (charset) передаються окремо. */
-    MediaType: string;
-    InlineContent: {
-      /** @constant */
-      kind: "inline";
-      media_type: components["schemas"]["MediaType"];
-      /** @description Кодування тексту в першоджерелі (після декодування data завжди UTF-8 для encoding=utf-8). */
-      charset?: string;
-      /**
-       * @description utf-8 — текст як є; base64 — двійкові дані (RFC 4648).
-       * @enum {string}
-       */
-      encoding: "utf-8" | "base64";
-      data: string;
-      /** @description Розмір декодованих байтів. */
-      size_bytes?: number;
-      sha256?: components["schemas"]["Sha256Hex"];
-    };
-    BlobContent: {
-      /** @constant */
-      kind: "blob";
-      /** @description Канонічна адреса об'єкта: 's3://<bucket>/<key>' (MinIO/S3) або 'file:///<abs-path>' (лише для одновузлового розгортання зі спільним томом). */
-      uri: string;
-      /**
-       * Format: uri
-       * @description Необов'язкове попередньо підписане HTTP(S)-посилання для читання без облікових даних сховища. Діє до download_url_expires_at.
-       */
-      download_url?: string;
-      download_url_expires_at?: components["schemas"]["Timestamp"];
-      media_type: components["schemas"]["MediaType"];
-      charset?: string;
-      size_bytes: number;
-      sha256: components["schemas"]["Sha256Hex"];
-      /**
-       * @description transit — тимчасовий об'єкт для передавання між етапами (видаляється після expires_at); persistent — збережений обробником збереження.
-       * @enum {string}
-       */
-      store?: "transit" | "persistent";
-      /**
-       * Format: date-time
-       * @description Коли транзитний об'єкт може бути видалено. null для persistent.
-       */
-      expires_at?: string | null;
-    };
-    /**
-     * ContentRef
-     * @description Вміст матеріалу або великого результату: або вбудований (kind=inline, до limits.transfer.inline_max_bytes), або посилання на blob-сховище (kind=blob). Кожен споживач зобов'язаний підтримувати обидва варіанти. Див. docs/adr/0004-large-materials.md.
-     */
-    "content-ref.schema": {} & (
-      components["schemas"]["InlineContent"] | components["schemas"]["BlobContent"]
-    );
     /** @description Посилання на збережений об'єкт (RAW або документ результатів), за яким його можна прочитати через storage API або повторно обробити. */
     StoredObjectRef: {
       object_id: components["schemas"]["Id"];
@@ -659,6 +971,41 @@ export interface components {
     };
   };
   responses: {
+    /** @description Перевищено налаштований timeouts.request_timeout_ms під час читання сховища. */
+    EntityReadTimeout: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        /**
+         * @example {
+         *       "type": "urn:jane:problem:timeout",
+         *       "title": "Timeout",
+         *       "status": 504,
+         *       "code": "timeout",
+         *       "retryable": true
+         *     }
+         */
+        "application/problem+json": components["schemas"]["problem.schema"];
+      };
+    };
+    /** @description Каталог або пошук сутностей не підтримується цим адаптером. */
+    DiscoveryNotSupported: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        /**
+         * @example {
+         *       "type": "urn:jane:problem:not_implemented",
+         *       "title": "Not implemented",
+         *       "status": 501,
+         *       "code": "not_implemented"
+         *     }
+         */
+        "application/problem+json": components["schemas"]["problem.schema"];
+      };
+    };
     /** @description Немає або недійсний токен (`unauthenticated`). */
     Unauthenticated: {
       headers: {
@@ -670,6 +1017,15 @@ export interface components {
     };
     /** @description Ресурс не знайдено (`not_found`). */
     NotFound: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/problem+json": components["schemas"]["problem.schema"];
+      };
+    };
+    /** @description If-Match не збігається з поточним ETag (`precondition_failed`). */
+    PreconditionFailed: {
       headers: {
         [name: string]: unknown;
       };
@@ -693,9 +1049,28 @@ export interface components {
     Cursor: string;
     /** @description Розмір сторінки. Значення понад максимум сервісу обрізається до максимуму. */
     Limit: number;
+    ConnectionId: components["schemas"]["Slug"];
+    /**
+     * @description ETag ресурсу для оптимістичного блокування. Розбіжність — 412 `precondition_failed`.
+     * @example "v7"
+     */
+    IfMatch: string;
+    /**
+     * @description Ключ ідемпотентності (1–255 друкованих ASCII-символів; рекомендовано UUID або детермінований
+     *     ключ доставки). Повтор із тим самим ключем і тим самим тілом повертає збережену відповідь
+     *     (заголовок `Idempotency-Replayed: true`) без повторного ефекту. Той самий ключ з іншим тілом —
+     *     422 `idempotency_key_reused`. Запит ще виконується — 409 `idempotency_in_progress`
+     *     (retryable). Сервіс пам'ятає ключ щонайменше `limits.transfer.idempotency_ttl_seconds`.
+     * @example 0b7d5c1e-3f7e-4a53-9d0e-5a0f5c0a9b11
+     */
+    IdempotencyKey: string;
+    JobId: components["schemas"]["Id"];
   };
   requestBodies: never;
-  headers: never;
+  headers: {
+    /** @description Версія ресурсу для If-Match. */
+    ETag: string;
+  };
   pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -750,6 +1125,333 @@ export interface operations {
       401: components["responses"]["Unauthenticated"];
     };
   };
+  listConnections: {
+    parameters: {
+      query?: {
+        /** @description Непрозорий курсор з `next_cursor` попередньої сторінки. */
+        cursor?: components["parameters"]["Cursor"];
+        /** @description Розмір сторінки. Значення понад максимум сервісу обрізається до максимуму. */
+        limit?: components["parameters"]["Limit"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Сторінка підключень (без значень секретів). */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ConnectionList"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+    };
+  };
+  getConnection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: components["parameters"]["ConnectionId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Підключення. */
+      200: {
+        headers: {
+          ETag: components["headers"]["ETag"];
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["connection.schema"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+    };
+  };
+  putConnection: {
+    parameters: {
+      query?: never;
+      header?: {
+        /**
+         * @description ETag ресурсу для оптимістичного блокування. Розбіжність — 412 `precondition_failed`.
+         * @example "v7"
+         */
+        "If-Match"?: components["parameters"]["IfMatch"];
+      };
+      path: {
+        connection_id: components["parameters"]["ConnectionId"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["connection.schema"];
+      };
+    };
+    responses: {
+      /** @description Підключення замінено. */
+      200: {
+        headers: {
+          ETag: components["headers"]["ETag"];
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["connection.schema"];
+        };
+      };
+      /** @description Підключення створено. */
+      201: {
+        headers: {
+          ETag: components["headers"]["ETag"];
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["connection.schema"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      412: components["responses"]["PreconditionFailed"];
+      422: components["responses"]["UnprocessableEntity"];
+      /** @description Виконавець не використовує підключень (`not_implemented`). */
+      501: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["problem.schema"];
+        };
+      };
+    };
+  };
+  deleteConnection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: components["parameters"]["ConnectionId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Видалено. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+    };
+  };
+  testConnection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        connection_id: components["parameters"]["ConnectionId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Результат перевірки (невдала перевірка — теж 200 з ok=false). */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ConnectionTestResult"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+    };
+  };
+  checkStorageStatus: {
+    parameters: {
+      query?: never;
+      header: {
+        /**
+         * @description Ключ ідемпотентності (1–255 друкованих ASCII-символів; рекомендовано UUID або детермінований
+         *     ключ доставки). Повтор із тим самим ключем і тим самим тілом повертає збережену відповідь
+         *     (заголовок `Idempotency-Replayed: true`) без повторного ефекту. Той самий ключ з іншим тілом —
+         *     422 `idempotency_key_reused`. Запит ще виконується — 409 `idempotency_in_progress`
+         *     (retryable). Сервіс пам'ятає ключ щонайменше `limits.transfer.idempotency_ttl_seconds`.
+         * @example 0b7d5c1e-3f7e-4a53-9d0e-5a0f5c0a9b11
+         */
+        "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "connection_id": "raw-files"
+         *     }
+         */
+        "application/json": {
+          connection_id: components["schemas"]["Slug"];
+        };
+      };
+    };
+    responses: {
+      /** @description Job; при succeeded result містить StorageStatus. Помилка статистики не означає недоступність підключення. */
+      202: {
+        headers: {
+          Location?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "job_id": "job_status_check",
+           *       "kind": "storage_status_check",
+           *       "status": "queued",
+           *       "created_at": "2026-10-11T08:00:00Z"
+           *     }
+           */
+          "application/json": components["schemas"]["job.schema"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+      422: components["responses"]["UnprocessableEntity"];
+    };
+  };
+  getJob: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: components["parameters"]["JobId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Поточний стан job. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["job.schema"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+    };
+  };
+  cancelJob: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: components["parameters"]["JobId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["JobCancelRequest"];
+      };
+    };
+    responses: {
+      /** @description Job уже завершено; стан не змінено. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["job.schema"];
+        };
+      };
+      /** @description Скасування прийнято. */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["job.schema"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+    };
+  };
+  getStorageStatus: {
+    parameters: {
+      query: {
+        connection_id: components["parameters"]["ConnectionIdQuery"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Останній стан або unknown до перевірки. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["StorageStatus"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+    };
+  };
+  listEntityTypes: {
+    parameters: {
+      query: {
+        connection_id: components["parameters"]["ConnectionIdQuery"];
+        /** @description Фактична key.scope сутності, визначена обробником; не source_id. */
+        scope?: string;
+        /** @description Непрозорий курсор з `next_cursor` попередньої сторінки. */
+        cursor?: components["parameters"]["Cursor"];
+        /** @description Розмір сторінки. Значення понад максимум сервісу обрізається до максимуму. */
+        limit?: components["parameters"]["Limit"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Сторінка типів у лексикографічному порядку. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            items: components["schemas"]["EntityTypeSummary"][];
+            next_cursor: components["schemas"]["NextCursor"];
+            search_supported: boolean;
+          };
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      404: components["responses"]["NotFound"];
+      422: components["responses"]["UnprocessableEntity"];
+      501: components["responses"]["DiscoveryNotSupported"];
+      504: components["responses"]["EntityReadTimeout"];
+    };
+  };
   listEntities: {
     parameters: {
       query: {
@@ -758,6 +1460,8 @@ export interface operations {
         scope?: string;
         /** @description Канонічний ключ (EntityState.canonical_key); тоді сторінка містить 0 або 1 елемент. */
         key?: string;
+        /** @description Буквальний підрядок; пробіли на початку й кінці ігноруються. */
+        search?: string;
         updated_since?: string;
         /** @description Непрозорий курсор з `next_cursor` попередньої сторінки. */
         cursor?: components["parameters"]["Cursor"];
@@ -785,6 +1489,8 @@ export interface operations {
       401: components["responses"]["Unauthenticated"];
       404: components["responses"]["NotFound"];
       422: components["responses"]["UnprocessableEntity"];
+      501: components["responses"]["DiscoveryNotSupported"];
+      504: components["responses"]["EntityReadTimeout"];
     };
   };
   listEntityHistory: {

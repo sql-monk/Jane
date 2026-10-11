@@ -316,3 +316,57 @@ uv run --all-packages jane-storage-packages publish --registry http://localhost:
 `publish` робить `POST /v1/packages` (409 — уже є) і `POST /v1/packages/{id}/versions` з `PublishRequest`
 (registry.v1). Поки репозиторій (WP-05) не готовий, публікацію перевірено на моку з контракту
 (`tests/test_packages.py`).
+
+
+## Стан сховища (WP-24)
+
+`GET /v1/storage-status?connection_id=raw-files` потребує `storage:read` та повертає останню
+явну перевірку. `POST /v1/storage-status/checks` з тілом `{"connection_id":"raw-files"}`
+і `Idempotency-Key` потребує `connections:write`, негайно повертає 202 Job + Location.
+Опитуйте GET Location до succeeded; result містить StorageStatus. Job перевіряє health і статистику.
+Звичайний `POST /v1/connections/raw-files/test` перевіряє лише health, без інвентаризації. GET не відкриває адаптер, не читає payload та не обходить backend.
+GET `/v1/connections` і `/v1/connections/{id}` доступні також читачу `storage:read`.
+
+До перевірки, після рестарту, DELETE чи зміни визначення: availability `unknown`, checked_at null,
+невідомі числові показники null. Snapshot локальний процесу: за кількох реплік наступний GET може
+потрапити в іншу репліку і повернути unknown. Це відображається чесно; потрібна sticky routing,
+якщо оператор хоче бачити одну перевірку між репліками. Нові записи не оновлюють snapshot;
+використовуйте checked_at для оцінки свіжості та явну повторну перевірку.
+
+Filesystem під час явної перевірки рахує stored-object metadata у namespace підключення:
+`object_count` та суму payload `total_size_bytes`. Це не вільний/зайнятий диск, не кількість сутностей,
+не history або metadata overhead; файли поза індексом Jane не входять. Payload не читається.
+Інші адаптери наразі віддають null та `adapter_statistics_not_supported`; нулі лише для перевіреного
+порожнього файлового namespace. Причина помилки не містить resolved secrets.
+
+Фільтри матеріалів залишаються `source_id`, `material_id`/`material_ids`, `since`/`until` за `stored_at`
+(початок включно, кінець виключно), `connection_id`, cursor/limit. Стан обробки належить оркестратору;
+storage не читає його таблиці. Зовнішні сховища не обходяться заради статистики.
+
+Приклад для стороннього читача: `GET /v1/storage-status?connection_id=raw-files`
+з `Authorization: Bearer <ключ зі storage:read>`. Звичайна команда тестів:
+`uv run pytest services/storage/tests services/storage/adapters/files/tests -q`.
+
+
+Інвентаризація виконується в JobRunner з налаштованими `jobs.max_concurrent_jobs`, `jobs.max_queued_jobs`,
+`jobs.job_timeout_ms`; probe додатково обмежено `timeouts.request_timeout_ms` (типово 30000 ms).
+У filesystem cancel/timeout встановлює cooperative stop event; worker припиняє обходи між metadata records.
+Помилка статистики не скасовує успішний health: availability available, статистики null,
+причина statistics_check_failed. POST replay повертає той самий Job і Idempotency-Replayed=true.
+
+## Каталог, пошук і статистика результатів
+
+`GET /v1/entity-types?connection_id=results-pg` повертає фактичні типи сутностей, їх кількості та курсор; необов’язковий `scope` — саме область ключа, визначена обробником. `GET /v1/entities?connection_id=results-pg&entity_type=offer&search=Lenovo` шукає буквальний підрядок у ключі й полях до пагінації; регістр не враховується, `%` і `_` не є шаблонами. Без пошуку старі запити незмінні.
+
+Каталог і пошук реалізують PostgreSQL та файловий адаптер. Решта адаптерів повертають `501 not_implemented` для цих необов’язкових можливостей; звичайний перегляд за відомим типом лишається доступним. Основний `StorageAdapter` не змінено; розширення описує `EntityDiscoveryAdapter`.
+
+Фонова перевірка сховища окремо рахує RAW і документи (`statistics`) та актуальні сутності (`entity_statistics`). Для PostgreSQL обсяг сутностей — `pg_total_relation_size` таблиці станів з індексами, для файлів — байти документів станів. Історія та доставка не входять у ці показники. Відсутню можливість або невдалу перевірку повертаємо як `null` з причиною, а не нуль. Каталог і читання сутностей (включно з пошуком та exact key) мають спільний deadline `timeouts.request_timeout_ms`, який охоплює отримання адаптера й запит. Перевищення повертає `504 timeout` як `application/problem+json`, без даних запиту чи повідомлень драйвера. Скасування файлового обходу припиняє наступні читання; окремий уже розпочатий файловий системний виклик не переривається примусово. Фонова перевірка також обмежена налаштованим `timeouts.request_timeout_ms`; сторінки — `pages.default_page_size` і `pages.max_page_size` (поточні типові значення 50 і 500).
+
+Адресні перевірки з кореня checkout:
+
+```powershell
+uv run pytest services/storage/tests/test_entity_discovery.py services/storage/tests/test_storage_status.py -q
+uv run pytest services/storage/adapters/postgres/tests/test_compat.py -k discovery -m integration -q
+```
+
+Другій команді потрібен власний dev-стек PostgreSQL; кожен тест використовує окрему схему й прибирає її після завершення.

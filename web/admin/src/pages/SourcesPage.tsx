@@ -22,6 +22,10 @@ import {
 import { SCHEMAS, validateAgainst } from "../lib/schema";
 import { formatDate, refLabel } from "../lib/format";
 import { StrategiesSummary } from "./RulesEditorPage";
+import { useUnsavedChanges } from "../components/UnsavedChanges";
+import { ChainPackagePicker } from "../components/ChainEditor";
+import { schemaIssueLabel, type SchemaIssue } from "../lib/schema";
+import "../chain-editor.css";
 
 export function SourcesPage() {
   const api = useApi();
@@ -98,7 +102,10 @@ export function SourcesPage() {
             cell: (s) => <Link to={`/sources/${encodeURIComponent(s.source_id)}`}>{s.source_id}</Link>,
           },
           { header: "Назва", cell: (s) => s.title },
-          { header: "Тип", cell: (s) => s.kind },
+          {
+            header: "Тип",
+            cell: (s) => (s.kind === "web" ? "Вебсайт" : s.kind === "telegram" ? "Telegram" : s.kind),
+          },
           {
             header: "Адреса",
             cell: (s) => s.locator.url ?? s.locator.telegram_username ?? s.locator.telegram_channel_id ?? "—",
@@ -168,23 +175,36 @@ export function SourcePage() {
   const [connectionsText, setConnectionsText] = useState("");
   const [entityTypes, setEntityTypes] = useState("");
   const [saved, setSaved] = useState(false);
+  const [modified, setDirty] = useState(false);
+  const [baseline, setBaseline] = useState(JSON.stringify([EMPTY_SOURCE, "", "", ""]));
+  const snapshot = JSON.stringify([withoutReadOnly(draft), limitsText, connectionsText, entityTypes]);
+  const dirty = modified && snapshot !== baseline;
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     const source = loaded.data?.data;
-    if (!source) return;
+    if (!source || dirty) return;
     setDraft(source);
     setLimitsText(toJsonText(source.limits));
     setConnectionsText(toJsonText(source.connections));
     setEntityTypes((source.expected_entity_types ?? []).join(", "));
-  }, [loaded.data]);
+    setBaseline(
+      JSON.stringify([
+        withoutReadOnly(source),
+        toJsonText(source.limits),
+        toJsonText(source.connections),
+        (source.expected_entity_types ?? []).join(", "),
+      ]),
+    );
+  }, [loaded.data, dirty]);
 
-  const assembled = useMemo<{ source: Source | null; issues: string[] }>(() => {
+  const assembled = useMemo<{ source: Source | null; issues: string[]; fieldIssues: SchemaIssue[] }>(() => {
     const limits = checkJson(limitsText, SCHEMAS.limits);
     const connections = checkJson(connectionsText);
     const issues: string[] = [];
     if (limits.parseError) issues.push(`limits: ${limits.parseError}`);
     if (connections.parseError) issues.push(`connections: ${connections.parseError}`);
-    if (issues.length) return { source: null, issues };
+    if (issues.length) return { source: null, issues, fieldIssues: [] };
     const types = entityTypes
       .split(",")
       .map((t) => t.trim())
@@ -201,9 +221,9 @@ export function SourcePage() {
     if (limits.value === undefined) delete source.limits;
     if (connections.value === undefined) delete source.connections;
     if (!types.length) delete source.expected_entity_types;
-    for (const issue of validateAgainst(SCHEMAS.source, source))
-      issues.push(`${issue.pointer} ${issue.message}`);
-    return { source, issues };
+    const fieldIssues = validateAgainst(SCHEMAS.source, source);
+    for (const issue of fieldIssues) issues.push(schemaIssueLabel(issue));
+    return { source, issues, fieldIssues };
   }, [draft, limitsText, connectionsText, entityTypes]);
 
   const save = useMutation({
@@ -224,6 +244,9 @@ export function SourcePage() {
       );
     },
     onSuccess: (result) => {
+      guard.markSaved();
+      setDirty(false);
+      setSubmitted(false);
       setSaved(true);
       void queryClient.invalidateQueries({ queryKey: ["sources"] });
       queryClient.setQueryData(["source", result.data.source_id], result);
@@ -239,6 +262,7 @@ export function SourcePage() {
         }),
       ),
     onSuccess: () => {
+      guard.markSaved();
       void queryClient.invalidateQueries({ queryKey: ["sources"] });
       navigate("/sources");
     },
@@ -246,10 +270,26 @@ export function SourcePage() {
 
   const set = (patch: Partial<Source>) => {
     setSaved(false);
+    setDirty(true);
     setDraft((d) => ({ ...d, ...patch }));
   };
 
+  const guard = useUnsavedChanges({
+    dirty,
+    label: draft.title || "Джерело",
+    onDiscard: () => setDirty(false),
+    onSave: async () => {
+      setSubmitted(true);
+      if (!assembled.source || assembled.issues.length) return false;
+      await save.mutateAsync(assembled.source);
+      return true;
+    },
+  });
+
   if (!isNew && loaded.isLoading) return <Loading />;
+
+  const fieldError = (pointer: string) =>
+    submitted ? assembled.fieldIssues.find((issue) => issue.pointer === pointer)?.message : undefined;
 
   return (
     <Page
@@ -260,10 +300,14 @@ export function SourcePage() {
             <Link className="btn" to={`/tasks?source_id=${encodeURIComponent(sourceId)}`}>
               Завдання джерела
             </Link>
+            <Link className="btn" to="/results">
+              Розібрані дані
+            </Link>
             <ReasonAction
               label="Видалити"
               confirmLabel="Видалити джерело"
               danger
+              busy={save.isPending || remove.isPending}
               requireReason={false}
               onConfirm={() => remove.mutate()}
             />
@@ -275,177 +319,181 @@ export function SourcePage() {
       <ErrorBox error={remove.error} title="Не вдалося видалити" />
       <form
         className="form"
+        noValidate
         onSubmit={(e) => {
           e.preventDefault();
+          setSubmitted(true);
           if (assembled.source && !assembled.issues.length) save.mutate(assembled.source);
         }}
       >
-        <div className="grid-2">
-          <Field label="Ідентифікатор (source_id)" hint="нижній регістр, цифри, . _ -">
-            <input
-              value={draft.source_id}
-              disabled={!isNew}
-              onChange={(e) => set({ source_id: e.target.value })}
-              required
-            />
-          </Field>
-          <Field label="Тип (kind)">
-            <input
-              list="source-kinds"
-              value={draft.kind}
-              onChange={(e) => set({ kind: e.target.value })}
-              required
-            />
-            <datalist id="source-kinds">
-              <option value="web" />
-              <option value="telegram" />
-            </datalist>
-          </Field>
-          <Field label="Назва">
-            <input
-              value={draft.title}
-              onChange={(e) => set({ title: e.target.value })}
-              required
-              maxLength={200}
-            />
-          </Field>
-          <Field label="Опис">
-            <input
-              value={draft.description ?? ""}
-              onChange={(e) => set({ description: e.target.value })}
-              maxLength={4000}
-            />
-          </Field>
-          {draft.kind === "telegram" ? (
-            <>
-              <Field label="Telegram username">
-                <input
-                  value={draft.locator.telegram_username ?? ""}
-                  onChange={(e) => set({ locator: { ...draft.locator, telegram_username: e.target.value } })}
-                />
-              </Field>
-              <Field label="Telegram channel id">
-                <input
-                  value={draft.locator.telegram_channel_id ?? ""}
-                  onChange={(e) =>
-                    set({ locator: { ...draft.locator, telegram_channel_id: e.target.value } })
-                  }
-                />
-              </Field>
-            </>
-          ) : (
-            <Field label="URL">
-              <input
-                type="url"
-                value={draft.locator.url ?? ""}
-                onChange={(e) => set({ locator: { ...draft.locator, url: e.target.value } })}
-              />
-            </Field>
-          )}
-          <Field label="Очікувані типи даних" hint="через кому: product, price, event">
-            <input value={entityTypes} onChange={(e) => (setSaved(false), setEntityTypes(e.target.value))} />
-          </Field>
-          <Field label="Версії від LLM (change_policy)">
-            <select
-              value={draft.change_policy?.llm_versions ?? "manual_approval"}
-              onChange={(e) =>
-                set({
-                  change_policy: {
-                    llm_versions: e.target.value as NonNullable<
-                      NonNullable<Source["change_policy"]>["llm_versions"]
-                    >,
-                  },
-                })
-              }
-            >
-              <option value="manual_approval">ручне погодження</option>
-              <option value="auto_after_checks">автоактивація після перевірок</option>
-              <option value="forbidden">заборонено</option>
-            </select>
-          </Field>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={Boolean(draft.forward_unknown_to_llm)}
-              onChange={(e) => set({ forward_unknown_to_llm: e.target.checked })}
-            />
-            Передавати в LLM невідомі сторінки
-          </label>
-        </div>
-        <Section title="Правила колектора (стратегії обходу)">
+        <fieldset className="form-fields" disabled={save.isPending}>
           <div className="grid-2">
-            <Field label="Пакет правил (package_id)">
+            <Field
+              label="Ідентифікатор (source_id)"
+              hint="нижній регістр, цифри, . _ -"
+              error={fieldError("/source_id")}
+            >
               <input
-                value={draft.collector_rules?.package_id ?? ""}
-                onChange={(e) =>
-                  set({
-                    collector_rules: e.target.value
-                      ? { package_id: e.target.value, version: draft.collector_rules?.version ?? "" }
-                      : undefined,
-                  } as Partial<Source>)
-                }
+                value={draft.source_id}
+                disabled={!isNew}
+                onChange={(e) => set({ source_id: e.target.value })}
+                required
               />
             </Field>
-            <Field label="Версія">
+            <Field label="Тип джерела">
+              <select value={draft.kind} onChange={(e) => set({ kind: e.target.value })} required>
+                <option value="web">Вебсайт</option>
+                <option value="telegram">Telegram</option>
+                {!["web", "telegram"].includes(draft.kind) ? (
+                  <option value={draft.kind}>{draft.kind}</option>
+                ) : null}
+              </select>
+            </Field>
+            <Field label="Назва" error={fieldError("/title")}>
               <input
-                value={draft.collector_rules?.version ?? ""}
+                value={draft.title}
+                onChange={(e) => set({ title: e.target.value })}
+                required
+                maxLength={200}
+              />
+            </Field>
+            <Field label="Опис">
+              <textarea
+                rows={3}
+                value={draft.description ?? ""}
+                onChange={(e) => set({ description: e.target.value })}
+                maxLength={4000}
+              />
+            </Field>
+            {draft.kind === "telegram" ? (
+              <>
+                <Field label="Telegram username" error={fieldError("/locator/telegram_username")}>
+                  <input
+                    value={draft.locator.telegram_username ?? ""}
+                    onChange={(e) =>
+                      set({ locator: { ...draft.locator, telegram_username: e.target.value } })
+                    }
+                  />
+                </Field>
+                <Field label="Telegram channel id" error={fieldError("/locator/telegram_channel_id")}>
+                  <input
+                    value={draft.locator.telegram_channel_id ?? ""}
+                    onChange={(e) =>
+                      set({ locator: { ...draft.locator, telegram_channel_id: e.target.value } })
+                    }
+                  />
+                </Field>
+              </>
+            ) : (
+              <Field label="URL" error={fieldError("/locator/url") ?? fieldError("/locator")}>
+                <input
+                  type="url"
+                  value={draft.locator.url ?? ""}
+                  onChange={(e) => set({ locator: { ...draft.locator, url: e.target.value } })}
+                />
+              </Field>
+            )}
+            <Field label="Очікувані типи даних" hint="через кому: product, price, event">
+              <input
+                value={entityTypes}
+                onChange={(e) => (setSaved(false), setDirty(true), setEntityTypes(e.target.value))}
+              />
+            </Field>
+            <Field label="Версії від LLM (change_policy)">
+              <select
+                value={draft.change_policy?.llm_versions ?? "manual_approval"}
                 onChange={(e) =>
                   set({
-                    collector_rules: {
-                      package_id: draft.collector_rules?.package_id ?? "",
-                      version: e.target.value,
+                    change_policy: {
+                      llm_versions: e.target.value as NonNullable<
+                        NonNullable<Source["change_policy"]>["llm_versions"]
+                      >,
                     },
                   })
                 }
-              />
+              >
+                <option value="manual_approval">ручне погодження</option>
+                <option value="auto_after_checks">автоактивація після перевірок</option>
+                <option value="forbidden">заборонено</option>
+              </select>
             </Field>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={Boolean(draft.forward_unknown_to_llm)}
+                onChange={(e) => set({ forward_unknown_to_llm: e.target.checked })}
+              />
+              Передавати в LLM невідомі сторінки
+            </label>
           </div>
-          {draft.collector_rules?.package_id && draft.collector_rules.version ? (
-            <StrategiesSummary rules={draft.collector_rules} />
-          ) : (
-            <p className="muted">
-              Правила ще не прив'язано (їх готує асистент або створюється пакет collector-rules).
-            </p>
-          )}
-        </Section>
-        <div className="grid-2">
-          <Section title="Ліміти рівня джерела">
-            <JsonEditor
-              text={limitsText}
-              onChange={(t) => (setSaved(false), setLimitsText(t))}
-              schema={SCHEMAS.limits}
-              label="Ліміти джерела"
-              minHeight="8rem"
+          <Section title="Правила колектора (стратегії обходу)">
+            <ChainPackagePicker
+              inherit={false}
+              stage={{
+                stage_id: "collect",
+                kind: "collect",
+                collector: {
+                  collector: draft.kind,
+                  ...(draft.collector_rules ? { rules: draft.collector_rules } : {}),
+                },
+              }}
+              onChange={(stage) => set({ collector_rules: stage.collector?.rules } as Partial<Source>)}
             />
+            {draft.collector_rules?.package_id && draft.collector_rules.version ? (
+              <StrategiesSummary rules={draft.collector_rules} />
+            ) : (
+              <p className="muted">
+                Правила ще не прив'язано (їх готує асистент або створюється пакет collector-rules).
+              </p>
+            )}
           </Section>
-          <Section title="Підключення (логічне ім'я → connection_id)">
-            <JsonEditor
-              text={connectionsText}
-              onChange={(t) => (setSaved(false), setConnectionsText(t))}
-              label="Підключення джерела"
-              minHeight="8rem"
-            />
-          </Section>
-        </div>
-        {assembled.issues.length ? (
-          <ul className="error-inline" role="alert" aria-label="Помилки форми">
-            {assembled.issues.map((i) => (
-              <li key={i}>{i}</li>
-            ))}
-          </ul>
-        ) : null}
-        <ErrorBox error={save.error} title="Не вдалося зберегти" />
-        {saved ? <Notice tone="ok">Збережено</Notice> : null}
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={save.isPending || !assembled.source || assembled.issues.length > 0}
-        >
-          {isNew ? "Створити джерело" : "Зберегти"}
-        </button>
-        {!isNew && loaded.data?.data.updated_at ? (
-          <span className="muted"> Оновлено {formatDate(loaded.data.data.updated_at)}</span>
-        ) : null}
+          <details className="form-advanced">
+            <summary>Додатково: ліміти та підключення</summary>
+            <div className="grid-2">
+              <Section title="Ліміти рівня джерела">
+                <JsonEditor
+                  text={limitsText}
+                  onChange={(t) => (setSaved(false), setDirty(true), setLimitsText(t))}
+                  schema={SCHEMAS.limits}
+                  label="Ліміти джерела"
+                  minHeight="8rem"
+                  readOnly={save.isPending}
+                />
+              </Section>
+              <Section title="Підключення (логічне ім'я → connection_id)">
+                <JsonEditor
+                  text={connectionsText}
+                  onChange={(t) => (setSaved(false), setDirty(true), setConnectionsText(t))}
+                  label="Підключення джерела"
+                  minHeight="8rem"
+                  readOnly={save.isPending}
+                />
+              </Section>
+            </div>
+          </details>
+          {submitted && assembled.issues.length ? (
+            <ul className="error-inline" role="alert" aria-label="Помилки форми">
+              {assembled.issues.map((i) => (
+                <li key={i}>{i}</li>
+              ))}
+            </ul>
+          ) : null}
+          <ErrorBox error={save.error} title="Не вдалося зберегти" />
+          {saved ? <Notice tone="ok">Збережено</Notice> : null}
+          <div className="form-save-bar">
+            {dirty ? (
+              <span role="status">Є незбережені зміни</span>
+            ) : (
+              <span className="muted">{isNew ? "Нове джерело ще не записано" : "Змін немає"}</span>
+            )}
+            <button type="submit" className="btn btn-primary" disabled={save.isPending}>
+              {isNew ? "Створити джерело" : "Зберегти"}
+            </button>
+          </div>
+          {!isNew && loaded.data?.data.updated_at ? (
+            <span className="muted"> Оновлено {formatDate(loaded.data.data.updated_at)}</span>
+          ) : null}
+        </fieldset>
       </form>
       {!isNew ? (
         <Section title="Ефективні ліміти джерела">

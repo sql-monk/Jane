@@ -22,7 +22,7 @@
 | [`jane_web_collector.fetcher`](jane_web_collector.fetcher.md) | 3 | 1 | HTTP fetching with per-host limits, retries, manual redirects, size limits and conditional requests. |
 | [`jane_web_collector.host_limits`](jane_web_collector.host_limits.md) | 2 | 0 | Per-host politeness shared by every collection and one-shot fetch of one service process. |
 | [`jane_web_collector.materials`](jane_web_collector.materials.md) | 1 | 5 | Material documents (``material.schema.json``) and content delivery (inline / transit blob, ADR-0004). |
-| [`jane_web_collector.render`](jane_web_collector.render.md) | 3 | 1 | JavaScript rendering of pages (``fetch.render_js`` of the collector rules) in headless Chromium (Playwright). |
+| [`jane_web_collector.render`](jane_web_collector.render.md) | 3 | 1 | Browser document transport and JavaScript rendering in headless Chromium (Playwright). |
 | [`jane_web_collector.robots`](jane_web_collector.robots.md) | 2 | 1 | robots.txt (RFC 9309): parsing, matching and the per-host cache. |
 | [`jane_web_collector.rules`](jane_web_collector.rules.md) | 2 | 1 | Collector rules of the Web Collector: what this implementation supports, on top of the shared parts. |
 | [`jane_web_collector.settings`](jane_web_collector.settings.md) | 10 | 4 | Settings and limits of the Web Collector. Every limit has a safe default documented in README.md. |

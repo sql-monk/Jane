@@ -39,6 +39,16 @@
 | `items[].run_id` | `string` | так | Непрозорий ідентифікатор, згенерований сервісом-власником (наприклад 'mat_01J9Z...'). Клієнти не розбирають його структуру.; шаблон `"^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"` |
 | `items[].task_id` | `string` | так | Ідентифікатор, який обирає користувач (source_id, task_id, package_id, connection_id). Нижній регістр, цифри, '.', '_', '-'.; шаблон `"^[a-z0-9](?:[a-z0-9._-]{0,98}[a-z0-9])?$"` |
 | `items[].task_etag` | `string` | ні | Версія конфігурації завдання, з якою виконується запуск. |
+| `items[].source_id` | `string` | ні | Джерело з незмінного знімка конфігурації запуску. |
+| `items[].collector_kind` | `string` | ні | Тип колектора з незмінного знімка конфігурації (наприклад web або telegram). |
+| `items[].updated_at` | `string` (date-time) | ні | Остання зміна стану запуску або його елементів; не лише початок збору. |
+| `items[].summary` | `RunOutputSummary` | ні | Унікальні сутності з фактичних виходів обробників цього запуску. Не статистика таблиць сховища. Історичне обрізане трасування має complete=false, legacy_trace=true, кількості недоступні. Для entities_ref без inline-сутностей complete=false; зафіксовані кількості є нижньою межею. Записи у двох різних підключеннях рахуються окремо. Імітовані записи тестового режиму не включено до saved_records. |
+| `items[].summary.basis` | `string` | ні |  |
+| `items[].summary.complete` | `boolean` | ні |  |
+| `items[].summary.legacy_trace` | `boolean` | ні |  |
+| `items[].summary.extracted_entities` | `integer` | ні | мін. `0` |
+| `items[].summary.saved_records` | `integer` | ні | мін. `0` |
+| `items[].summary.result_groups` | array of `object` | ні | Актуальні результати за підтвердженими типом, scope та сховищем; не фільтр за запуском. |
 | `items[].status` | enum: `queued`, `running`, `cancelling`, `succeeded`, `failed`, `cancelled` | так |  |
 | `items[].trigger` | enum: `manual`, `schedule`, `reprocess`, `assistant`, `api` | так |  |
 | `items[].test_mode` | `boolean` | ні |  |

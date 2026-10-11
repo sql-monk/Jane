@@ -145,3 +145,31 @@ sha256:6ed92b88115eb6ef03480473f37e1fcba599d9c23aa78453dfac98a5f500dec2
 Зібрати окремий образ і запустити worker з указаним allowlist, налаштованими виконавцями та
 спільною службовою БД оркестратора. Синхронізація підключень і бюджетів лишилася спільною для
 процесу. Публічний API і контрактний документ платформи додаткового поля не потребують.
+
+## Виправлення після CI-рев’ю 2
+
+На `main` у ревізії `582cae3`, CI run `38113752875`, `just types` виявив
+`services/orchestrator/tests/test_task_workers.py:126: Need type annotation for "rows" [var-annotated]`.
+Початкова локальна перевірка mypy охопила лише `src` (20 файлів) і пропустила типи тестів,
+які CI перевіряє разом із кодом сервісу (34 файли).
+
+Додано `rows: dict[str, str]`: у цьому тесті SQL повертає пари `task_id` і `status`
+для двох створених задач; обидва значення — рядки. SQL, перевірки, параметри worker і runtime
+залишилися без змін. Тести PostgreSQL не повторювалися для анотації. Образ і контейнери
+не збиралися й не запускалися під час виправлення; freeze розгортання збережено.
+
+```powershell
+uv run --group dev --package jane-orchestrator mypy services/orchestrator/src services/orchestrator/tests
+uv run --group dev --package jane-orchestrator ruff check services/orchestrator/tests/test_task_workers.py
+uv run --group dev --package jane-orchestrator ruff format --check services/orchestrator/tests/test_task_workers.py
+```
+
+```text
+Success: no issues found in 34 source files
+All checks passed!
+1 file already formatted
+```
+
+Незалежний рев’юер підтвердив форму SQL-результату, незмінність SQL та перевірок і повторив
+повний mypy: `Success: no issues found in 34 source files`, exit code 0. Вердикт — **accepted**.
+Службовий код лишився на `e595c1c`; виправлення охоплює лише анотацію тесту й цей звіт.

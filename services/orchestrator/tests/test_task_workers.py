@@ -123,6 +123,6 @@ def test_targeted_scheduler_and_housekeeping_leave_other_tasks_for_general_worke
         conn.execute("UPDATE runs SET status = 'running', feed_done = true")
     assert targeted.reap() == 1
     with psycopg.connect(db_dsn) as conn:
-        rows = dict(conn.execute("SELECT task_id, status FROM runs").fetchall())
+        rows: dict[str, str] = dict(conn.execute("SELECT task_id, status FROM runs").fetchall())
     assert rows == {"other-catalog": "running", "ads-rst": "succeeded"}
     assert general.reap() == 1

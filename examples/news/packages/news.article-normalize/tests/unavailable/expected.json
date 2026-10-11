@@ -1,0 +1,13 @@
+{
+  "entities": [
+    {
+      "entity_type": "news_article",
+      "fields": {
+        "evidence_validation": "unavailable",
+        "event_grouping": {
+          "status": "ungrouped"
+        }
+      }
+    }
+  ]
+}

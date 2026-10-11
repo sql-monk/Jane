@@ -119,6 +119,30 @@ _CLAIM_ITEM_SQL = "".join(
 """Claim one item (placeholders: optional task allowlist twice, worker, lease interval, history cap)."""
 
 
+_CLAIM_RUN_ITEM_SQL = _CLAIM_ITEM_SQL.replace(
+    "WHERE r.status = 'running'", "WHERE r.status = 'running' AND i.run_id = %s", 1
+)
+"""The same FIFO item/attempt/lease rules, restricted to a run already locked by this transaction."""
+
+_CLAIM_FAIR_RUN_SQL = """
+    SELECT r.run_id FROM runs r
+    WHERE r.status = 'running'
+      AND (%s::text[] IS NULL OR r.task_id = ANY(%s))
+      AND EXISTS (
+        SELECT 1 FROM items i WHERE i.run_id = r.run_id
+          AND ((i.status IN ('queued', 'retrying') AND i.available_at <= now())
+               OR (i.status = 'running' AND i.lease_expires_at < now()))
+          AND (SELECT count(*) FROM items x
+               WHERE x.run_id = i.run_id AND x.stage_id = i.stage_id
+                 AND x.status = 'running' AND x.lease_expires_at >= now()) < i.parallel_limit
+      )
+    ORDER BY r.updated_at, r.seq
+    LIMIT 1 FOR UPDATE OF r SKIP LOCKED
+"""
+"""Lock one eligible run for a short claim transaction. Item eligibility is rechecked in a separate
+statement after this lock, with a fresh READ COMMITTED snapshot, so concurrent claims respect stage caps."""
+
+
 _RETRY_SQL = "".join(
     (
         "UPDATE items SET status = 'retrying', lease_owner = NULL, lease_expires_at = NULL,"
@@ -220,10 +244,21 @@ class Engine:
     def claim_item(self, worker: str) -> dict[str, Any] | None:
         task_ids = self.core.engine.task_ids or None
         with self.core.db.tx() as conn:
-            row = conn.execute(
-                _CLAIM_ITEM_SQL,
-                (task_ids, task_ids, worker, self.lease, self.core.engine.attempt_history_max),
-            ).fetchone()
+            args = (task_ids, task_ids, worker, self.lease, self.core.engine.attempt_history_max)
+            if self.core.engine.item_queue_ordering == "run_round_robin":
+                run = conn.execute(_CLAIM_FAIR_RUN_SQL, (task_ids, task_ids)).fetchone()
+                row = (
+                    conn.execute(_CLAIM_RUN_ITEM_SQL, (run["run_id"], *args)).fetchone()
+                    if run is not None
+                    else None
+                )
+                if row is not None:
+                    conn.execute(
+                        "UPDATE runs SET updated_at = clock_timestamp() WHERE run_id = %s",
+                        (row["run_id"],),
+                    )
+            else:
+                row = conn.execute(_CLAIM_ITEM_SQL, args).fetchone()
         if row is not None and row["old_status"] == "running":
             self.core.metrics.inc("leases_expired")
             log.info("item lease reclaimed", extra={"item_id": row["item_id"], "worker": worker})

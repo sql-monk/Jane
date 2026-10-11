@@ -1,0 +1,4 @@
+# Published package archives are immutable byte sequences. Preserve their exact
+# bytes across Windows/Linux checkouts, including existing mixed line endings.
+# Recognize their saved CRLF while still checking ordinary trailing whitespace.
+packages/** -text whitespace=trailing-space,space-before-tab,cr-at-eol

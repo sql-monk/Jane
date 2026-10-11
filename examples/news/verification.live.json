@@ -1,0 +1,2056 @@
+{
+  "run_id": "news-validation-1f8a14db97be434c9a36973783185508",
+  "created_at": "2026-10-11T04:27:35.940458+00:00",
+  "proxy_url": "http://127.0.0.1:54347",
+  "delivery": "autonomous API validation; scheduled task execution is checked separately",
+  "request_config": {
+    "max_posts": 1,
+    "max_material_bytes": 2000000,
+    "max_input_tokens": 40000,
+    "max_output_tokens": 8192,
+    "min_grouping_confidence": 0.75,
+    "analysis_profile": "cheap"
+  },
+  "verified_at": "2026-10-11T05:23:14.239998+00:00",
+  "requested_source_ids": [
+    "news-tg-dwglavnoe",
+    "news-tg-golosameriki",
+    "news-tg-suspilnenews",
+    "news-tg-tass-agency",
+    "news-web-abc",
+    "news-web-bbc",
+    "news-web-guardian",
+    "news-web-npr",
+    "news-web-pravda",
+    "news-web-ria",
+    "news-web-rt",
+    "news-web-ukrinform"
+  ],
+  "selected_sources": 12,
+  "completed_sources": 12,
+  "verified_sources": 12,
+  "all_verified": true,
+  "sources": [
+    {
+      "source_id": "news-web-pravda",
+      "title": "Українська правда",
+      "region": "ukraine",
+      "transport": "rss",
+      "status": "verified",
+      "material_id": "web:dc7fdb042bcd7a895586e0c1bd44a083",
+      "observation_id": "obs_01a1293763920000f0fcd30b",
+      "fetched_at": "2026-10-11T04:27:38Z",
+      "original": {
+        "url": "https://www.pravda.com.ua/news/2026/10/11/8057417/",
+        "final_url": "https://www.pravda.com.ua/news/2026/10/11/8057417/",
+        "sha256": "b4cdf72d55e19e87fcfceafff300254cf5e5ab6bc30fbcbbaf05b78a40251fc2",
+        "size_bytes": 185288,
+        "format": {
+          "media_type": "text/html",
+          "content_kind": "page",
+          "charset": "utf-8"
+        },
+        "http_status": 200
+      },
+      "prepared_articles": 1,
+      "verified_articles": 1,
+      "invocations": {
+        "store-raw": "inv_01a1293c925fe033614bf38aa8b2",
+        "prepare": "inv_7231decf48064b85bfff2cfbb7c4ca5f",
+        "analyse": "inv_7397654b554946ea888190cc039cb2cf",
+        "verify": "inv_77faebe6e2c0416a895f9dc0be323bee",
+        "store-news": "inv_01a1294f656f6d0d8f109d3475d6"
+      },
+      "packages": [
+        {
+          "package_id": "jane.storage-files",
+          "version": "1.0.0",
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+        },
+        {
+          "digest": "sha256:3014d03a8c7706deba272124d9f6dfbb25df79ed3c48d679703f776eb9c6966e",
+          "version": "1.0.1",
+          "package_id": "news.web-article"
+        },
+        {
+          "digest": "sha256:3cad58f3a57525bc4112a9f56502bfcf3eb8141f666401c7575c67cdb118d1f8",
+          "version": "1.0.0",
+          "package_id": "news.article-analysis"
+        },
+        {
+          "digest": "sha256:77f817d7327e1d4249ab6ad277fa6fa9884c287bbedbb543d7a5f83294a8b9a3",
+          "version": "1.1.0",
+          "package_id": "news.article-normalize"
+        },
+        {
+          "package_id": "jane.storage-postgresql",
+          "version": "1.0.0",
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+        }
+      ],
+      "raw_writes": [
+        {
+          "status": "written",
+          "target": {
+            "adapter": "filesystem",
+            "connection_id": "raw-files"
+          },
+          "object": {
+            "object_id": "obj_8feaf670af26cf8e67e221928dc34446",
+            "adapter": "filesystem",
+            "locator": {
+              "path": "objects/news-web-pravda/2026/10/11/web_dc7fdb042bcd7a895586e0c1bd44a083/obs_01a1293763920000f0fcd30b.html"
+            },
+            "media_type": "text/html",
+            "size_bytes": 185288,
+            "sha256": "b4cdf72d55e19e87fcfceafff300254cf5e5ab6bc30fbcbbaf05b78a40251fc2",
+            "connection_id": "raw-files"
+          }
+        }
+      ],
+      "llm_usage": {
+        "cost": {
+          "amount": 0.0043764,
+          "currency": "USD"
+        },
+        "model": "claude-haiku-5-5",
+        "provider": "anthropic",
+        "input_tokens": 12279,
+        "output_tokens": 6297
+      },
+      "jobs": {
+        "analyse": "job_0fe71a7b12cb44959c5b9345bf14c572",
+        "prepare": "job_6f40cbdd5be240d2be8a3f314dfc24d5",
+        "store-news": "job_d09aac9e027f49c183c5176c7d1be9dd",
+        "store-raw": "job_9b8d64aade98418d9aa9a47bab93333d",
+        "verify": "job_cd039d7f390643699df5b806c4d61d44"
+      },
+      "validation_run_id": "news-validation-1f8a14db97be434c9a36973783185508",
+      "storage_rechecked_at": "2026-10-11T05:23:13.543859+00:00",
+      "articles": [
+        {
+          "url": "https://www.pravda.com.ua/news/2026/10/11/8057417/",
+          "headline": "У США чоловік застрелив 8 людей, серед яких діти, і наклав на себе руки",
+          "headline_ukrainian": "У США чоловік застрелив 8 людей, серед яких діти, і наклав на себе руки",
+          "source_language": "uk",
+          "published_at": "2026-10-11T05:58:00+03:00",
+          "event_id": null,
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "evidence_validation": "verified",
+          "sentiment": {
+            "label": "neutral",
+            "confidence": 0.85
+          },
+          "entities": [
+            {
+              "name": "Рік Лора",
+              "canonical_name": "Rick Laura",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "Джош Шапіро",
+              "canonical_name": "Josh Shapiro",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            },
+            {
+              "name": "Дарія Девлін",
+              "canonical_name": "Daria Devlin",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            },
+            {
+              "name": "Елізабет Гірц",
+              "canonical_name": "Elizabeth Hirtz",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.75
+            },
+            {
+              "name": "ShotSpotter",
+              "canonical_name": "ShotSpotter",
+              "type": "product",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            },
+            {
+              "name": "Associated Press",
+              "canonical_name": "Associated Press",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.9
+            },
+            {
+              "name": "Ері",
+              "canonical_name": "Erie, Pennsylvania",
+              "type": "place",
+              "role": "object",
+              "attitude": "neutral",
+              "attitude_confidence": 0.9
+            }
+          ],
+          "event_identity_kind": "actor_action",
+          "event_identity_confidence": 0.5
+        }
+      ]
+    },
+    {
+      "source_id": "news-web-ukrinform",
+      "title": "Укрінформ",
+      "region": "ukraine",
+      "transport": "rss",
+      "status": "verified",
+      "material_id": "web:e1106c116aff9160965b5a8648933e72",
+      "observation_id": "obs_01a129394e2d000088aa7b18",
+      "fetched_at": "2026-10-11T04:29:43Z",
+      "original": {
+        "url": "https://www.ukrinform.ua/rubric-regions/4173138-zitelku-rivnensini-pidozruut-u-samovilnomu-zahoplenni-zemel-oboroni.html",
+        "final_url": "https://www.ukrinform.ua/rubric-regions/4173138-zitelku-rivnensini-pidozruut-u-samovilnomu-zahoplenni-zemel-oboroni.html",
+        "sha256": "28e51a3c444e2603189c4895f899e7f61fff1e4d5ef98ba4d695005afdf71db8",
+        "size_bytes": 60609,
+        "format": {
+          "media_type": "text/html",
+          "content_kind": "page",
+          "charset": "utf-8"
+        },
+        "http_status": 200
+      },
+      "prepared_articles": 1,
+      "verified_articles": 1,
+      "invocations": {
+        "store-raw": "inv_01a1293c92359947b7f4b8e7ca90",
+        "prepare": "inv_8224b791f5ec4ff5b1b227a0b4e94e95",
+        "analyse": "inv_ab95575fdb404bb9b0979d6003e6c7b6",
+        "verify": "inv_3588e4ef16cf4355aa2184b6cac7f8e8",
+        "store-news": "inv_01a1294f64e0d559bc798f937b34"
+      },
+      "packages": [
+        {
+          "package_id": "jane.storage-files",
+          "version": "1.0.0",
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+        },
+        {
+          "digest": "sha256:3014d03a8c7706deba272124d9f6dfbb25df79ed3c48d679703f776eb9c6966e",
+          "version": "1.0.1",
+          "package_id": "news.web-article"
+        },
+        {
+          "digest": "sha256:3cad58f3a57525bc4112a9f56502bfcf3eb8141f666401c7575c67cdb118d1f8",
+          "version": "1.0.0",
+          "package_id": "news.article-analysis"
+        },
+        {
+          "digest": "sha256:77f817d7327e1d4249ab6ad277fa6fa9884c287bbedbb543d7a5f83294a8b9a3",
+          "version": "1.1.0",
+          "package_id": "news.article-normalize"
+        },
+        {
+          "package_id": "jane.storage-postgresql",
+          "version": "1.0.0",
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+        }
+      ],
+      "raw_writes": [
+        {
+          "status": "written",
+          "target": {
+            "adapter": "filesystem",
+            "connection_id": "raw-files"
+          },
+          "object": {
+            "object_id": "obj_285f4246515cdbdcc48617187902e8f8",
+            "adapter": "filesystem",
+            "locator": {
+              "path": "objects/news-web-ukrinform/2026/10/11/web_e1106c116aff9160965b5a8648933e72/obs_01a129394e2d000088aa7b18.html"
+            },
+            "media_type": "text/html",
+            "size_bytes": 60609,
+            "sha256": "28e51a3c444e2603189c4895f899e7f61fff1e4d5ef98ba4d695005afdf71db8",
+            "connection_id": "raw-files"
+          }
+        }
+      ],
+      "llm_usage": {
+        "cost": {
+          "amount": 0.0041913,
+          "currency": "USD"
+        },
+        "model": "claude-haiku-5-5",
+        "provider": "anthropic",
+        "input_tokens": 11483,
+        "output_tokens": 6086
+      },
+      "jobs": {
+        "analyse": "job_a2d427c5092f480bb1e37dc7c70b1881",
+        "prepare": "job_afdccf4b3df447ca9f554ad4c5a297e4",
+        "store-news": "job_03bcdeed774f4a80ad8f28817cd989ba",
+        "store-raw": "job_4605c817a66f4209a081f9a6f50c413c",
+        "verify": "job_ed8d07969db944ffafe5d08b61eb46b9"
+      },
+      "validation_run_id": "news-validation-1f8a14db97be434c9a36973783185508",
+      "storage_rechecked_at": "2026-10-11T05:23:13.544595+00:00",
+      "articles": [
+        {
+          "url": "https://www.ukrinform.ua/rubric-regions/4173138-zitelku-rivnensini-pidozruut-u-samovilnomu-zahoplenni-zemel-oboroni.html",
+          "headline": "Жительку Рівненщини підозрюють у самовільному захопленні земель оборони",
+          "headline_ukrainian": "Жительку Рівненщини підозрюють у самовільному захопленні земель оборони",
+          "source_language": "uk",
+          "published_at": "2026-10-11T06:41:00+03:00",
+          "event_id": null,
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "evidence_validation": "verified",
+          "sentiment": {
+            "label": "neutral",
+            "confidence": 0.9
+          },
+          "entities": [
+            {
+              "name": "обласна поліція",
+              "canonical_name": "Rivne Regional Police",
+              "type": "organization",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.9
+            },
+            {
+              "name": "Укрінформ",
+              "canonical_name": "Ukrinform",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.9
+            },
+            {
+              "name": "45-річна жителька селища Оржів",
+              "canonical_name": "Unidentified 45-year-old woman from Orzhiv",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.9
+            },
+            {
+              "name": "квартирно-експлуатаційний відділ міста Рівне",
+              "canonical_name": "Military Housing and Operations Unit of Rivne",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "селище Оржів",
+              "canonical_name": "Orzhiv",
+              "type": "place",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            }
+          ],
+          "event_identity_kind": "actor_action",
+          "event_identity_confidence": 0.6
+        }
+      ]
+    },
+    {
+      "source_id": "news-web-guardian",
+      "title": "The Guardian",
+      "region": "europe",
+      "transport": "rss",
+      "status": "verified",
+      "material_id": "web:d7aed4fb31d4181be64afc72d594048a",
+      "observation_id": "obs_01a1293d326400007ebdfa5a",
+      "fetched_at": "2026-10-11T04:33:58Z",
+      "original": {
+        "url": "https://www.theguardian.com/society/2026/oct/09/vaccine-trial-guinea-bissau-rfk-jr",
+        "final_url": "https://www.theguardian.com/society/2026/oct/09/vaccine-trial-guinea-bissau-rfk-jr",
+        "sha256": "8122068767dca824fcb1e21a101926265d9615eb3f230a8f54f9b6a18b71b0e0",
+        "size_bytes": 330224,
+        "format": {
+          "media_type": "text/html",
+          "content_kind": "page",
+          "charset": "utf-8"
+        },
+        "http_status": 200
+      },
+      "prepared_articles": 1,
+      "verified_articles": 1,
+      "invocations": {
+        "store-raw": "inv_01a1293d395d89231295e0d07bbb",
+        "prepare": "inv_92d2bece1d724cec9f78e87b05d2a8e0",
+        "analyse": "inv_c05b007bb5c845ffb0b3a7fcfa687a77",
+        "verify": "inv_92ee1e9e833d45c4b529c23634ba6c5e",
+        "store-news": "inv_01a1294fa403021d439c97bd0f3b"
+      },
+      "packages": [
+        {
+          "package_id": "jane.storage-files",
+          "version": "1.0.0",
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+        },
+        {
+          "digest": "sha256:3014d03a8c7706deba272124d9f6dfbb25df79ed3c48d679703f776eb9c6966e",
+          "version": "1.0.1",
+          "package_id": "news.web-article"
+        },
+        {
+          "digest": "sha256:3cad58f3a57525bc4112a9f56502bfcf3eb8141f666401c7575c67cdb118d1f8",
+          "version": "1.0.0",
+          "package_id": "news.article-analysis"
+        },
+        {
+          "digest": "sha256:77f817d7327e1d4249ab6ad277fa6fa9884c287bbedbb543d7a5f83294a8b9a3",
+          "version": "1.1.0",
+          "package_id": "news.article-normalize"
+        },
+        {
+          "package_id": "jane.storage-postgresql",
+          "version": "1.0.0",
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+        }
+      ],
+      "raw_writes": [
+        {
+          "status": "written",
+          "target": {
+            "adapter": "filesystem",
+            "connection_id": "raw-files"
+          },
+          "object": {
+            "object_id": "obj_af3db79c49976897a5282de8013575ba",
+            "adapter": "filesystem",
+            "locator": {
+              "path": "objects/news-web-guardian/2026/10/11/web_d7aed4fb31d4181be64afc72d594048a/obs_01a1293d326400007ebdfa5a.html"
+            },
+            "media_type": "text/html",
+            "size_bytes": 330224,
+            "sha256": "8122068767dca824fcb1e21a101926265d9615eb3f230a8f54f9b6a18b71b0e0",
+            "connection_id": "raw-files"
+          }
+        }
+      ],
+      "llm_usage": {
+        "cost": {
+          "amount": 0.0051227,
+          "currency": "USD"
+        },
+        "model": "claude-haiku-5-5",
+        "provider": "anthropic",
+        "input_tokens": 15582,
+        "output_tokens": 7129
+      },
+      "jobs": {
+        "analyse": "job_2fa8012127084336a389bb9e7a29001e",
+        "prepare": "job_e1c8c199ef6c41c397fd11be161fed38",
+        "store-news": "job_c62b1aac2bfb4b0c933735e8243c433d",
+        "store-raw": "job_1c821baab0ea4727884f9e8060fc4a01",
+        "verify": "job_979d711f95944d0bba9a7920f2f910e1"
+      },
+      "validation_run_id": "news-validation-1f8a14db97be434c9a36973783185508",
+      "storage_rechecked_at": "2026-10-11T05:23:13.611663+00:00",
+      "articles": [
+        {
+          "url": "https://www.theguardian.com/society/2026/oct/09/vaccine-trial-guinea-bissau-rfk-jr",
+          "headline": "Controversial vaccine trial touted by RFK Jr gets go-ahead in Guinea-Bissau",
+          "headline_ukrainian": "Контроверсійне дослідження вакцин, яке підтримує RFK Jr, отримало дозвіл у Гвінеї-Бісау",
+          "source_language": "en",
+          "published_at": "2026-10-09T21:36:18Z",
+          "event_id": null,
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "evidence_validation": "verified",
+          "sentiment": {
+            "label": "neutral",
+            "confidence": 0.7
+          },
+          "entities": [
+            {
+              "name": "Robert F Kennedy Jr",
+              "canonical_name": "Robert F. Kennedy Jr.",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.5
+            },
+            {
+              "name": "Stig Børsen Hansen",
+              "canonical_name": "Stig Børsen Hansen",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.5
+            },
+            {
+              "name": "Paul Offit",
+              "canonical_name": "Paul Offit",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.4
+            },
+            {
+              "name": "Guinea-Bissau",
+              "canonical_name": "Guinea-Bissau",
+              "type": "country",
+              "role": "object",
+              "attitude": "neutral",
+              "attitude_confidence": 0.6
+            },
+            {
+              "name": "Centers for Disease Control and Prevention",
+              "canonical_name": "Centers for Disease Control and Prevention",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.6
+            },
+            {
+              "name": "University of Southern Denmark",
+              "canonical_name": "University of Southern Denmark",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.6
+            }
+          ],
+          "event_identity_kind": "actor_action",
+          "event_identity_confidence": 0.7
+        }
+      ]
+    },
+    {
+      "source_id": "news-web-bbc",
+      "title": "BBC News",
+      "region": "europe",
+      "transport": "rss",
+      "status": "verified",
+      "validation_run_id": "news-validation-64b189afe2294b94a53b4b4061ec7192",
+      "verified_at": "2026-10-11T05:06:15.109082+00:00",
+      "material_id": "web:782d0d55f743a233e594ad89cea05240",
+      "observation_id": "obs_01a1295a1c110000075c6cdb",
+      "fetched_at": "2026-10-11T05:05:33Z",
+      "original": {
+        "url": "https://www.bbc.co.uk/news/articles/cw33x4y8k82no",
+        "final_url": "https://www.bbc.co.uk/news/articles/cw33x4y8k82no",
+        "sha256": "a54ab898cfe7fb3817600a4d27047756c17cb2ddc82cf2c2aa4916b38df0b85c",
+        "size_bytes": 404785,
+        "format": {
+          "media_type": "text/html",
+          "content_kind": "page"
+        },
+        "http_status": 200
+      },
+      "prepared_articles": 1,
+      "verified_articles": 1,
+      "invocations": {
+        "store-raw": "inv_01a1295a29530afa4231b3796c74",
+        "prepare": "inv_bfeacd4125d34e28bb856ee9efe337bd",
+        "analyse": "inv_ff4dfbbd9f994e628227ec9a33db8db6",
+        "verify": "inv_926f5a4369dd4942996c702dc470e993",
+        "store-news": "inv_01a1295ab51380ddf8dc696a620c"
+      },
+      "packages": [
+        {
+          "package_id": "jane.storage-files",
+          "version": "1.0.0",
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+        },
+        {
+          "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3",
+          "version": "1.0.2",
+          "package_id": "news.web-article"
+        },
+        {
+          "digest": "sha256:60d97634892807ec8b88516a159d6ef06c56b0b6b7ffb1db6634559d6324c832",
+          "version": "1.1.0",
+          "package_id": "news.article-analysis"
+        },
+        {
+          "digest": "sha256:121672bf1fee12d9c52c18eec35f6e61b1602760cf7e2f2dcc87f07cb25ac3f8",
+          "version": "1.1.1",
+          "package_id": "news.article-normalize"
+        },
+        {
+          "package_id": "jane.storage-postgresql",
+          "version": "1.0.0",
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+        }
+      ],
+      "raw_writes": [
+        {
+          "status": "written",
+          "target": {
+            "adapter": "filesystem",
+            "connection_id": "raw-files"
+          },
+          "object": {
+            "object_id": "obj_6dd31000f7c47bcce2a910865153a00c",
+            "adapter": "filesystem",
+            "locator": {
+              "path": "objects/news-web-bbc/2026/10/11/web_782d0d55f743a233e594ad89cea05240/obs_01a1295a1c110000075c6cdb.html"
+            },
+            "media_type": "text/html",
+            "size_bytes": 404785,
+            "sha256": "a54ab898cfe7fb3817600a4d27047756c17cb2ddc82cf2c2aa4916b38df0b85c",
+            "connection_id": "raw-files"
+          }
+        }
+      ],
+      "llm_usage": {
+        "cost": {
+          "amount": 0.0028493,
+          "currency": "USD"
+        },
+        "model": "claude-haiku-5-5",
+        "provider": "anthropic",
+        "input_tokens": 7653,
+        "output_tokens": 4168
+      },
+      "jobs": {
+        "analyse": "job_abcda55d7c794c04bc8eb137aeafc74a",
+        "prepare": "job_498236c8e557401783b8a8781fe21f44",
+        "store-news": "job_f70c25d684c64ef0afb89d3fde13fb11",
+        "store-raw": "job_876540f03c1f48ad9629aa53d5bb0b3f",
+        "verify": "job_90736b1d26ec4182be12e836ba9298b1"
+      },
+      "storage_rechecked_at": "2026-10-11T05:23:13.633649+00:00",
+      "articles": [
+        {
+          "url": "https://www.bbc.co.uk/news/articles/cw33x4y8k82no",
+          "headline": "Twelve killed in attack on King Khalid Airport in Saudi capital Riyadh",
+          "headline_ukrainian": "Дванадцятеро загиблих унаслідок атаки на аеропорт King Khalid у saudівській столиці Ріяді",
+          "source_language": "en",
+          "published_at": "2026-10-10T15:05:55.014Z",
+          "event_id": "news-event-813fbcab5cfd8bc2e1993a4657e05170",
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "exact_canonical_identity",
+            "status": "grouped"
+          },
+          "evidence_validation": "verified",
+          "sentiment": {
+            "label": "neutral",
+            "confidence": 0.8
+          },
+          "entities": [
+            {
+              "name": "King Khalid International Airport",
+              "canonical_name": "King Khalid International Airport",
+              "type": "place",
+              "role": "object",
+              "attitude": "neutral",
+              "attitude_confidence": 0.9
+            },
+            {
+              "name": "Houthis",
+              "canonical_name": "Houthi movement (Ansar Allah)",
+              "type": "group",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "Saudi-led coalition",
+              "canonical_name": "Saudi-led coalition",
+              "type": "group",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "Saudi Arabia",
+              "canonical_name": "Saudi Arabia",
+              "type": "country",
+              "role": "object",
+              "attitude": "neutral",
+              "attitude_confidence": 0.9
+            }
+          ],
+          "event_identity_kind": "incident",
+          "event_identity_confidence": 0.85
+        }
+      ]
+    },
+    {
+      "source_id": "news-web-abc",
+      "title": "ABC News",
+      "region": "usa",
+      "transport": "rss",
+      "status": "verified",
+      "material_id": "web:352d24d1438198660f4dc5e11f43a837",
+      "observation_id": "obs_01a129401eea0000e2c3cd29",
+      "fetched_at": "2026-10-11T04:37:10Z",
+      "original": {
+        "url": "https://abcnews.com/International/wireStory/ethiopia-tells-acting-defense-eritrea-137153814",
+        "final_url": "https://abcnews.com/International/wireStory/ethiopia-tells-acting-defense-eritrea-137153814",
+        "sha256": "42f98ec3f7066e6746e561d8c405bfcbb10b5389134e9c6fe5fe20076d078f0a",
+        "size_bytes": 181728,
+        "format": {
+          "media_type": "text/html",
+          "content_kind": "page",
+          "charset": "utf-8"
+        },
+        "http_status": 200
+      },
+      "prepared_articles": 1,
+      "verified_articles": 1,
+      "invocations": {
+        "store-raw": "inv_01a1294020af7cc9fa425bcf1197",
+        "prepare": "inv_819450a55e4a40c994bb50ff871f6fb0",
+        "analyse": "inv_aa753d61466a47f6b99ac08b60149f49",
+        "verify": "inv_6cdd6717d582433d9ebb564410f5fb85",
+        "store-news": "inv_01a1294fcd70bdae2e8fd248c027"
+      },
+      "packages": [
+        {
+          "package_id": "jane.storage-files",
+          "version": "1.0.0",
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+        },
+        {
+          "digest": "sha256:3014d03a8c7706deba272124d9f6dfbb25df79ed3c48d679703f776eb9c6966e",
+          "version": "1.0.1",
+          "package_id": "news.web-article"
+        },
+        {
+          "digest": "sha256:3cad58f3a57525bc4112a9f56502bfcf3eb8141f666401c7575c67cdb118d1f8",
+          "version": "1.0.0",
+          "package_id": "news.article-analysis"
+        },
+        {
+          "digest": "sha256:77f817d7327e1d4249ab6ad277fa6fa9884c287bbedbb543d7a5f83294a8b9a3",
+          "version": "1.1.0",
+          "package_id": "news.article-normalize"
+        },
+        {
+          "package_id": "jane.storage-postgresql",
+          "version": "1.0.0",
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+        }
+      ],
+      "raw_writes": [
+        {
+          "status": "written",
+          "target": {
+            "adapter": "filesystem",
+            "connection_id": "raw-files"
+          },
+          "object": {
+            "object_id": "obj_2f0924c52de99ce42442f915d3119ea5",
+            "adapter": "filesystem",
+            "locator": {
+              "path": "objects/news-web-abc/2026/10/11/web_352d24d1438198660f4dc5e11f43a837/obs_01a129401eea0000e2c3cd29.html"
+            },
+            "media_type": "text/html",
+            "size_bytes": 181728,
+            "sha256": "42f98ec3f7066e6746e561d8c405bfcbb10b5389134e9c6fe5fe20076d078f0a",
+            "connection_id": "raw-files"
+          }
+        }
+      ],
+      "llm_usage": {
+        "cost": {
+          "amount": 0.0051311,
+          "currency": "USD"
+        },
+        "model": "claude-haiku-5-5",
+        "provider": "anthropic",
+        "input_tokens": 14036,
+        "output_tokens": 7455
+      },
+      "jobs": {
+        "analyse": "job_67a100f3278844f5b92d7b9e8d573b5c",
+        "prepare": "job_044841c4e52d4b1da2ac2c7cf80699de",
+        "store-news": "job_c0a877a390324d9299a2f433a809d56a",
+        "store-raw": "job_81664f9a67a947d1bd5fe57a3e282ae3",
+        "verify": "job_b0df0a233650492baf5e08545df3c095"
+      },
+      "validation_run_id": "news-validation-1f8a14db97be434c9a36973783185508",
+      "storage_rechecked_at": "2026-10-11T05:23:13.698627+00:00",
+      "articles": [
+        {
+          "url": "https://abcnews.com/International/wireStory/ethiopia-tells-acting-defense-eritrea-137153814",
+          "headline": "Ethiopia tells UN it is acting in self-defense against Eritrea",
+          "headline_ukrainian": "Ефіопія повідомила ООН, що вживає заходів самооборони проти Еритреї",
+          "source_language": "en",
+          "published_at": "2026-10-10T07:14:08Z",
+          "event_id": null,
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "evidence_validation": "verified",
+          "sentiment": {
+            "label": "neutral",
+            "confidence": 0.8
+          },
+          "entities": [
+            {
+              "name": "Ethiopia",
+              "canonical_name": "Ethiopia",
+              "type": "country",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "Eritrea",
+              "canonical_name": "Eritrea",
+              "type": "country",
+              "role": "object",
+              "attitude": "neutral",
+              "attitude_confidence": 0.75
+            },
+            {
+              "name": "Gedion Timothewos",
+              "canonical_name": "Gedion Timothewos",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "Yemane Gebremeskel",
+              "canonical_name": "Yemane Gebremeskel",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            },
+            {
+              "name": "Abiy Ahmed",
+              "canonical_name": "Abiy Ahmed",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.75
+            },
+            {
+              "name": "UN Security Council",
+              "canonical_name": "United Nations Security Council",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "TPLF",
+              "canonical_name": "Tigray People's Liberation Front",
+              "type": "group",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.75
+            },
+            {
+              "name": "Tigray Peace Force",
+              "canonical_name": "Tigray Peace Force",
+              "type": "group",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.75
+            }
+          ],
+          "event_identity_kind": "actor_action",
+          "event_identity_confidence": 0.7
+        }
+      ]
+    },
+    {
+      "source_id": "news-web-npr",
+      "title": "NPR",
+      "region": "usa",
+      "transport": "rss",
+      "status": "verified",
+      "analysis_profile": "default",
+      "cached_analysis_reuse": {
+        "kind": "identical_prepared_fields",
+        "original_invocation_id": "inv_dc578e51b19741a3bca683c97b47cda1",
+        "original_job_id": "job_2ce22e1960fa43b68a1b824cbbfce386",
+        "original_handler": {
+          "digest": "sha256:fccfa0d9e4f43a654e3e504d3912cd986817db773cbfadb55670b6d53557829b",
+          "version": "1.1.1",
+          "package_id": "news.article-analysis.validation-default"
+        },
+        "original_observations": [
+          {
+            "material_id": "web:ad5e0a42b626f436046a61c3f168bb83",
+            "observed_at": "2026-10-11T05:14:28Z",
+            "content_sha256": "1626646e6e274739a8926a3af05b6a0dd17c9ecabb09f3ea06c425d43535a1d3",
+            "observation_id": "obs_01a129624419000034772585"
+          }
+        ],
+        "original_raw_objects": [
+          {
+            "object_id": "obj_54f26c97deb4f4b75020540e39adfecb",
+            "adapter": "filesystem",
+            "locator": {
+              "path": "objects/news-web-npr/2026/10/11/web_ad5e0a42b626f436046a61c3f168bb83/obs_01a129624419000034772585.html"
+            },
+            "media_type": "text/html",
+            "size_bytes": 145556,
+            "sha256": "1626646e6e274739a8926a3af05b6a0dd17c9ecabb09f3ea06c425d43535a1d3",
+            "connection_id": "raw-files"
+          }
+        ],
+        "original_raw_sha256": "1626646e6e274739a8926a3af05b6a0dd17c9ecabb09f3ea06c425d43535a1d3",
+        "fresh_raw_sha256": "af7a14c12c17843bb300790648cd2ec46b87518f1103c613dd40e42345dceaff",
+        "prepared_fields_sha256": "b4411db4583be41d4de3ca001b4c4d3a5081ba148b36d55442a8e2fb15078acf",
+        "llm_called_on_fresh_raw": false
+      },
+      "validation_run_id": "news-validation-634dc77a242a4c4ebb432b76f376a916",
+      "verified_at": "2026-10-11T05:22:40.592323+00:00",
+      "material_id": "web:ad5e0a42b626f436046a61c3f168bb83",
+      "observation_id": "obs_01a1296989e90000139a0d4f",
+      "fetched_at": "2026-10-11T05:22:24Z",
+      "original": {
+        "url": "https://www.npr.org/2026/10/10/g-s1-147682/attack-on-riyadh-airport-killed-12-people-and-wounded-over-300-more-saudi-authorities-say",
+        "final_url": "https://www.npr.org/2026/10/10/g-s1-147682/attack-on-riyadh-airport-killed-12-people-and-wounded-over-300-more-saudi-authorities-say",
+        "sha256": "af7a14c12c17843bb300790648cd2ec46b87518f1103c613dd40e42345dceaff",
+        "size_bytes": 145533,
+        "format": {
+          "media_type": "text/html",
+          "content_kind": "page",
+          "charset": "utf-8"
+        },
+        "http_status": 200
+      },
+      "prepared_articles": 1,
+      "verified_articles": 1,
+      "invocations": {
+        "store-raw": "inv_01a1296990ae021e6e01dea707a4",
+        "prepare": "inv_e8e718f2bd024fd19ea3a7d42fc00d76",
+        "analyse": "inv_dc578e51b19741a3bca683c97b47cda1",
+        "verify": "inv_cc59f555ce4f40f7bbbac0a7c31ea541",
+        "store-news": "inv_01a12969be4d43653ac3c355f8f9"
+      },
+      "packages": [
+        {
+          "package_id": "jane.storage-files",
+          "version": "1.0.0",
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+        },
+        {
+          "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3",
+          "version": "1.0.2",
+          "package_id": "news.web-article"
+        },
+        {
+          "digest": "sha256:fccfa0d9e4f43a654e3e504d3912cd986817db773cbfadb55670b6d53557829b",
+          "version": "1.1.1",
+          "package_id": "news.article-analysis.validation-default"
+        },
+        {
+          "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+          "version": "1.1.2",
+          "package_id": "news.article-normalize"
+        },
+        {
+          "package_id": "jane.storage-postgresql",
+          "version": "1.0.0",
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+        }
+      ],
+      "raw_writes": [
+        {
+          "status": "written",
+          "target": {
+            "adapter": "filesystem",
+            "connection_id": "raw-files"
+          },
+          "object": {
+            "object_id": "obj_9acdb622de47557ccc5958ae208cbfe4",
+            "adapter": "filesystem",
+            "locator": {
+              "path": "objects/news-web-npr/2026/10/11/web_ad5e0a42b626f436046a61c3f168bb83/obs_01a1296989e90000139a0d4f.html"
+            },
+            "media_type": "text/html",
+            "size_bytes": 145533,
+            "sha256": "af7a14c12c17843bb300790648cd2ec46b87518f1103c613dd40e42345dceaff",
+            "connection_id": "raw-files"
+          }
+        }
+      ],
+      "llm_usage": {
+        "cost": {
+          "amount": 0.047996,
+          "currency": "USD"
+        },
+        "model": "claude-sonnet-5-5",
+        "provider": "anthropic",
+        "input_tokens": 8573,
+        "output_tokens": 3085
+      },
+      "jobs": {
+        "prepare": "job_a5f03a01435e4a8db7ea47fc792e80ea",
+        "store-news": "job_911893cf1a1248e7a89c750215c8ed28",
+        "store-raw": "job_10fd229f157848489bdac551d0ed2250",
+        "verify": "job_d6665190b8ee4246b863482e3a6bbe50",
+        "analyse": "job_2ce22e1960fa43b68a1b824cbbfce386"
+      },
+      "storage_rechecked_at": "2026-10-11T05:23:13.700158+00:00",
+      "articles": [
+        {
+          "url": "https://www.npr.org/2026/10/10/g-s1-147682/attack-on-riyadh-airport-killed-12-people-and-wounded-over-300-more-saudi-authorities-say",
+          "headline": "Attack on Riyadh airport killed 12 people and wounded over 300 more, Saudi authorities say",
+          "headline_ukrainian": "Напад на аеропорт Ер-Ріяда вбив 12 людей і поранив понад 300, повідомляють влада Саудівської Аравії",
+          "source_language": "en",
+          "published_at": "2026-10-10T19:44:15-04:00",
+          "event_id": "news-event-813fbcab5cfd8bc2e1993a4657e05170",
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "exact_canonical_identity",
+            "status": "grouped"
+          },
+          "evidence_validation": "verified",
+          "sentiment": {
+            "label": "neutral",
+            "confidence": 0.85
+          },
+          "entities": [
+            {
+              "name": "King Khalid International Airport",
+              "canonical_name": "King Khalid International Airport",
+              "type": "place",
+              "role": "object",
+              "attitude": "neutral",
+              "attitude_confidence": 0.9
+            },
+            {
+              "name": "Houthi",
+              "canonical_name": "Houthis",
+              "type": "group",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "Saudi Arabia",
+              "canonical_name": "Saudi Arabia",
+              "type": "country",
+              "role": "object",
+              "attitude": "neutral",
+              "attitude_confidence": 0.85
+            },
+            {
+              "name": "Donald Trump",
+              "canonical_name": "Donald Trump",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.85
+            },
+            {
+              "name": "Saudi civil aviation authorities",
+              "canonical_name": "General Authority of Civil Aviation (Saudi Arabia)",
+              "type": "organization",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.85
+            },
+            {
+              "name": "United States",
+              "canonical_name": "United States",
+              "type": "country",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "Iran",
+              "canonical_name": "Iran",
+              "type": "country",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            }
+          ],
+          "event_identity_kind": "incident",
+          "event_identity_confidence": 0.78
+        }
+      ]
+    },
+    {
+      "source_id": "news-web-rt",
+      "title": "RT на русском",
+      "region": "russia",
+      "transport": "rss",
+      "status": "verified",
+      "material_id": "web:17e3b9b6e4ebd70891c417158e47dab9",
+      "observation_id": "obs_01a12944b57900007ff48845",
+      "fetched_at": "2026-10-11T04:42:11Z",
+      "original": {
+        "url": "https://russian.rt.com/world/news/1693257-avstriya-taynyy-gruz",
+        "final_url": "https://russian.rt.com/world/news/1693257-avstriya-taynyy-gruz",
+        "sha256": "16b6673d092d2069b5cb360328531e9337314f7f892eb7c3fa070eb768436c53",
+        "size_bytes": 93244,
+        "format": {
+          "media_type": "text/html",
+          "content_kind": "page",
+          "charset": "utf-8"
+        },
+        "http_status": 200
+      },
+      "prepared_articles": 1,
+      "verified_articles": 1,
+      "invocations": {
+        "store-raw": "inv_01a12944b6c323a81588606d1c72",
+        "prepare": "inv_d16c897b9ed644358544a13c0e5e288c",
+        "analyse": "inv_2ac5ffeb8d4248ca804613416a8bd39f",
+        "verify": "inv_1f7c85b55444446aa2fef217938ea19b",
+        "store-news": "inv_01a129500281f8a313f8a21e45e0"
+      },
+      "packages": [
+        {
+          "package_id": "jane.storage-files",
+          "version": "1.0.0",
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+        },
+        {
+          "digest": "sha256:3014d03a8c7706deba272124d9f6dfbb25df79ed3c48d679703f776eb9c6966e",
+          "version": "1.0.1",
+          "package_id": "news.web-article"
+        },
+        {
+          "digest": "sha256:3cad58f3a57525bc4112a9f56502bfcf3eb8141f666401c7575c67cdb118d1f8",
+          "version": "1.0.0",
+          "package_id": "news.article-analysis"
+        },
+        {
+          "digest": "sha256:77f817d7327e1d4249ab6ad277fa6fa9884c287bbedbb543d7a5f83294a8b9a3",
+          "version": "1.1.0",
+          "package_id": "news.article-normalize"
+        },
+        {
+          "package_id": "jane.storage-postgresql",
+          "version": "1.0.0",
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+        }
+      ],
+      "raw_writes": [
+        {
+          "status": "written",
+          "target": {
+            "adapter": "filesystem",
+            "connection_id": "raw-files"
+          },
+          "object": {
+            "object_id": "obj_3278e85e7a3d2c827c4cfb4f3bc44fd5",
+            "adapter": "filesystem",
+            "locator": {
+              "path": "objects/news-web-rt/2026/10/11/web_17e3b9b6e4ebd70891c417158e47dab9/obs_01a12944b57900007ff48845.html"
+            },
+            "media_type": "text/html",
+            "size_bytes": 93244,
+            "sha256": "16b6673d092d2069b5cb360328531e9337314f7f892eb7c3fa070eb768436c53",
+            "connection_id": "raw-files"
+          }
+        }
+      ],
+      "llm_usage": {
+        "cost": {
+          "amount": 0.0041896,
+          "currency": "USD"
+        },
+        "model": "claude-haiku-5-5",
+        "provider": "anthropic",
+        "input_tokens": 11326,
+        "output_tokens": 6114
+      },
+      "jobs": {
+        "analyse": "job_32eda1aa7b714472ad65fcdad8cd2f0e",
+        "prepare": "job_105f2e7e3c644c2b9f65288ec44ddb22",
+        "store-news": "job_00f72f07aae2480392759349b2002a71",
+        "store-raw": "job_705fc01223344326a2e8a39246d02302",
+        "verify": "job_8191fee6b10844869cade0aea2284b48"
+      },
+      "validation_run_id": "news-validation-1f8a14db97be434c9a36973783185508",
+      "storage_rechecked_at": "2026-10-11T05:23:13.857147+00:00",
+      "articles": [
+        {
+          "url": "https://russian.rt.com/world/news/1693257-avstriya-taynyy-gruz",
+          "headline": "Оппозиция Австрии потребовала данные о тайном грузе Киева",
+          "headline_ukrainian": "Опозиція Австрії вимагає дані про таємний вантаж Києва",
+          "source_language": "ru",
+          "published_at": "2026-10-11T06:48:04+03:00",
+          "event_id": null,
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "evidence_validation": "verified",
+          "sentiment": {
+            "label": "neutral",
+            "confidence": 0.8
+          },
+          "entities": [
+            {
+              "name": "Raiffeisen Bank International",
+              "canonical_name": "Raiffeisen Bank International",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            },
+            {
+              "name": "Австрийская партия свободы (FPÖ)",
+              "canonical_name": "Freedom Party of Austria",
+              "type": "group",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "Кристиан Хафенекер",
+              "canonical_name": "Christian Hafenecker",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            },
+            {
+              "name": "Kronen Zeitung",
+              "canonical_name": "Kronen Zeitung",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            },
+            {
+              "name": "Руслан Кравченко",
+              "canonical_name": "Ruslan Kravchenko",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            },
+            {
+              "name": "Австрия",
+              "canonical_name": "Austria",
+              "type": "country",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            }
+          ],
+          "event_identity_kind": "actor_action",
+          "event_identity_confidence": 0.6
+        }
+      ]
+    },
+    {
+      "source_id": "news-web-ria",
+      "title": "РИА Новости",
+      "region": "russia",
+      "transport": "rss",
+      "status": "verified",
+      "material_id": "web:f7215919dfcf045b62266d7f70c3e637",
+      "observation_id": "obs_01a12944b6dd0000fbe044bc",
+      "fetched_at": "2026-10-11T04:42:11Z",
+      "original": {
+        "url": "https://ria.ru/20261011/opasnost-2123756148.html",
+        "final_url": "https://ria.ru/20261011/opasnost-2123756148.html",
+        "sha256": "0432fce96adec578723e47f1837a006ac4a7fc671f62cc12e46fe86ddd0d939f",
+        "size_bytes": 174010,
+        "format": {
+          "media_type": "text/html",
+          "content_kind": "page",
+          "charset": "utf-8"
+        },
+        "http_status": 200
+      },
+      "prepared_articles": 1,
+      "verified_articles": 1,
+      "invocations": {
+        "store-raw": "inv_01a12944b96d57df115adbf1752d",
+        "prepare": "inv_ff308acabb914abf98e88a053482ded4",
+        "analyse": "inv_39a3f277713d467d89d275d4d484dc8f",
+        "verify": "inv_d6cf17412fac4336bd034de17571fa75",
+        "store-news": "inv_01a1294fefdcbb58657e9074c3dc"
+      },
+      "packages": [
+        {
+          "package_id": "jane.storage-files",
+          "version": "1.0.0",
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+        },
+        {
+          "digest": "sha256:3014d03a8c7706deba272124d9f6dfbb25df79ed3c48d679703f776eb9c6966e",
+          "version": "1.0.1",
+          "package_id": "news.web-article"
+        },
+        {
+          "digest": "sha256:3cad58f3a57525bc4112a9f56502bfcf3eb8141f666401c7575c67cdb118d1f8",
+          "version": "1.0.0",
+          "package_id": "news.article-analysis"
+        },
+        {
+          "digest": "sha256:77f817d7327e1d4249ab6ad277fa6fa9884c287bbedbb543d7a5f83294a8b9a3",
+          "version": "1.1.0",
+          "package_id": "news.article-normalize"
+        },
+        {
+          "package_id": "jane.storage-postgresql",
+          "version": "1.0.0",
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+        }
+      ],
+      "raw_writes": [
+        {
+          "status": "written",
+          "target": {
+            "adapter": "filesystem",
+            "connection_id": "raw-files"
+          },
+          "object": {
+            "object_id": "obj_9752bb0a1f1fab72f5d3d939392c19e6",
+            "adapter": "filesystem",
+            "locator": {
+              "path": "objects/news-web-ria/2026/10/11/web_f7215919dfcf045b62266d7f70c3e637/obs_01a12944b6dd0000fbe044bc.html"
+            },
+            "media_type": "text/html",
+            "size_bytes": 174010,
+            "sha256": "0432fce96adec578723e47f1837a006ac4a7fc671f62cc12e46fe86ddd0d939f",
+            "connection_id": "raw-files"
+          }
+        }
+      ],
+      "llm_usage": {
+        "cost": {
+          "amount": 0.004274,
+          "currency": "USD"
+        },
+        "model": "claude-haiku-5-5",
+        "provider": "anthropic",
+        "input_tokens": 10570,
+        "output_tokens": 6434
+      },
+      "jobs": {
+        "analyse": "job_921063772fcc4b71a1e03859e979e709",
+        "prepare": "job_3708e6ddc3284ea18bd4f34fc3ad1400",
+        "store-news": "job_6efe4b099a494955b4264d6c04c9bc5d",
+        "store-raw": "job_f87b19dc30ec48078a617602ab34e4bd",
+        "verify": "job_d38c402afea045749575eeb10e636705"
+      },
+      "validation_run_id": "news-validation-1f8a14db97be434c9a36973783185508",
+      "storage_rechecked_at": "2026-10-11T05:23:13.885765+00:00",
+      "articles": [
+        {
+          "url": "https://ria.ru/20261011/opasnost-2123756148.html",
+          "headline": "В Крыму отменили беспилотную опасность",
+          "headline_ukrainian": "У Криму скасували небезпеку від безпілотників",
+          "source_language": "ru",
+          "published_at": "2026-10-11T06:46:00+03:00",
+          "event_id": null,
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "evidence_validation": "verified",
+          "sentiment": {
+            "label": "neutral",
+            "confidence": 0.85
+          },
+          "entities": [
+            {
+              "name": "ГУ МЧС по региону",
+              "canonical_name": "Main Directorate of the Ministry of Emergency Situations for the Republic of Crimea",
+              "type": "organization",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "Крым",
+              "canonical_name": "Crimea",
+              "type": "place",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.9
+            }
+          ],
+          "event_identity_kind": "actor_action",
+          "event_identity_confidence": 0.6
+        }
+      ]
+    },
+    {
+      "source_id": "news-tg-dwglavnoe",
+      "title": "DW Главное",
+      "region": "europe",
+      "transport": "telegram_public_web",
+      "status": "verified",
+      "material_id": "web:393bee644636c5daddc1e2e330ebe47d",
+      "observation_id": "obs_01a129466c21000051d25464",
+      "fetched_at": "2026-10-11T04:44:03Z",
+      "original": {
+        "url": "https://t.me/s/dwglavnoe",
+        "final_url": "https://t.me/s/dwglavnoe",
+        "sha256": "e2ce4266b2372dbd946056d965e849bf91255f8e033597f5ccc13018300b9c4f",
+        "size_bytes": 141296,
+        "format": {
+          "media_type": "text/html",
+          "content_kind": "page",
+          "charset": "utf-8"
+        },
+        "http_status": 200
+      },
+      "prepared_articles": 1,
+      "verified_articles": 1,
+      "invocations": {
+        "store-raw": "inv_01a129466ef4010f98ec1c5bbcb1",
+        "prepare": "inv_0888fe0ccd564d13b1c5420a15ad3a7a",
+        "analyse": "inv_ec7f6a20f21d4520841ae536770e44be",
+        "verify": "inv_8df4ac1e79f94dd79a526eef98ed5eee",
+        "store-news": "inv_01a129505c152add8bad3072e6d6"
+      },
+      "packages": [
+        {
+          "package_id": "jane.storage-files",
+          "version": "1.0.0",
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+        },
+        {
+          "digest": "sha256:6fef65d4fd12244a63df402fcc4766c518d8f1064699b112fae0d84e676d18fe",
+          "version": "1.0.0",
+          "package_id": "news.telegram-public-posts"
+        },
+        {
+          "digest": "sha256:3cad58f3a57525bc4112a9f56502bfcf3eb8141f666401c7575c67cdb118d1f8",
+          "version": "1.0.0",
+          "package_id": "news.article-analysis"
+        },
+        {
+          "digest": "sha256:77f817d7327e1d4249ab6ad277fa6fa9884c287bbedbb543d7a5f83294a8b9a3",
+          "version": "1.1.0",
+          "package_id": "news.article-normalize"
+        },
+        {
+          "package_id": "jane.storage-postgresql",
+          "version": "1.0.0",
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+        }
+      ],
+      "raw_writes": [
+        {
+          "status": "written",
+          "target": {
+            "adapter": "filesystem",
+            "connection_id": "raw-files"
+          },
+          "object": {
+            "object_id": "obj_7f0480c6868bb434958a97b9134770ba",
+            "adapter": "filesystem",
+            "locator": {
+              "path": "objects/news-tg-dwglavnoe/2026/10/11/web_393bee644636c5daddc1e2e330ebe47d/obs_01a129466c21000051d25464.html"
+            },
+            "media_type": "text/html",
+            "size_bytes": 141296,
+            "sha256": "e2ce4266b2372dbd946056d965e849bf91255f8e033597f5ccc13018300b9c4f",
+            "connection_id": "raw-files"
+          }
+        }
+      ],
+      "llm_usage": {
+        "cost": {
+          "amount": 0.0048877,
+          "currency": "USD"
+        },
+        "model": "claude-haiku-5-5",
+        "provider": "anthropic",
+        "input_tokens": 11877,
+        "output_tokens": 7400
+      },
+      "jobs": {
+        "analyse": "job_68fb79dda1214378b217274748e7ba31",
+        "prepare": "job_c25775ec08d14904858c81f2c719353a",
+        "store-news": "job_8ae88602e3c34ffe95d7310b098e09b9",
+        "store-raw": "job_df44a0c3167b4101a1cf413bb539d569",
+        "verify": "job_ae2715b4509349e1b54ef8109315680a"
+      },
+      "validation_run_id": "news-validation-1f8a14db97be434c9a36973783185508",
+      "storage_rechecked_at": "2026-10-11T05:23:13.950088+00:00",
+      "articles": [
+        {
+          "url": "https://t.me/dwglavnoe/69500",
+          "headline": "📣 Трамп призвал к уходу Зеленского с поста президента Украины. Первые реакции:",
+          "headline_ukrainian": "📣 Трамп закликав Зеленського піти з посади президента України. Перші реакції:",
+          "source_language": "ru",
+          "published_at": "2026-10-10T19:50:10Z",
+          "event_id": null,
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "evidence_validation": "verified",
+          "sentiment": {
+            "label": "neutral",
+            "confidence": 0.8
+          },
+          "entities": [
+            {
+              "name": "Трамп",
+              "canonical_name": "Donald Trump",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "Зеленский",
+              "canonical_name": "Volodymyr Zelensky",
+              "type": "person",
+              "role": "object",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "Андрей Сибига, глава МИД Украины",
+              "canonical_name": "Andrii Sybiha",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            },
+            {
+              "name": "Кирилл Дмитриев, спецпредставитель президента РФ",
+              "canonical_name": "Kirill Dmitriev",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            },
+            {
+              "name": "Эндрю Бёрнем, премьер-министр Великобритании",
+              "canonical_name": "Andy Burnham",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            },
+            {
+              "name": "Карин Прин, министр ФРГ по делам семьи",
+              "canonical_name": "Karin Prien",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            },
+            {
+              "name": "Максимилиан Кра, депутат бундестага",
+              "canonical_name": "Maximilian Krah",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            }
+          ],
+          "event_identity_kind": "actor_action",
+          "event_identity_confidence": 0.8
+        }
+      ]
+    },
+    {
+      "source_id": "news-tg-suspilnenews",
+      "title": "Суспільне Новини",
+      "region": "ukraine",
+      "transport": "telegram_public_web",
+      "status": "verified",
+      "material_id": "web:df9062d93baca70cda67e963055afb56",
+      "observation_id": "obs_01a12946624f000010464452",
+      "fetched_at": "2026-10-11T04:44:00Z",
+      "original": {
+        "url": "https://t.me/s/suspilnenews",
+        "final_url": "https://t.me/s/suspilnenews",
+        "sha256": "2a9bf85a5e8d53118cda475c995e0db97c9401981804ed5743e9b181f212c005",
+        "size_bytes": 115100,
+        "format": {
+          "media_type": "text/html",
+          "content_kind": "page",
+          "charset": "utf-8"
+        },
+        "http_status": 200
+      },
+      "prepared_articles": 1,
+      "verified_articles": 1,
+      "invocations": {
+        "store-raw": "inv_01a1294667a5b3128e225c117ce9",
+        "prepare": "inv_53dd67abab244c6fa2e86f393f301282",
+        "analyse": "inv_8aa534a6d28a4e3cb06e45bc373a8808",
+        "verify": "inv_16c6120f67c34002b7493cdad804bcfe",
+        "store-news": "inv_01a1295043666ac386a3f586fc90"
+      },
+      "packages": [
+        {
+          "package_id": "jane.storage-files",
+          "version": "1.0.0",
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+        },
+        {
+          "digest": "sha256:6fef65d4fd12244a63df402fcc4766c518d8f1064699b112fae0d84e676d18fe",
+          "version": "1.0.0",
+          "package_id": "news.telegram-public-posts"
+        },
+        {
+          "digest": "sha256:3cad58f3a57525bc4112a9f56502bfcf3eb8141f666401c7575c67cdb118d1f8",
+          "version": "1.0.0",
+          "package_id": "news.article-analysis"
+        },
+        {
+          "digest": "sha256:77f817d7327e1d4249ab6ad277fa6fa9884c287bbedbb543d7a5f83294a8b9a3",
+          "version": "1.1.0",
+          "package_id": "news.article-normalize"
+        },
+        {
+          "package_id": "jane.storage-postgresql",
+          "version": "1.0.0",
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+        }
+      ],
+      "raw_writes": [
+        {
+          "status": "written",
+          "target": {
+            "adapter": "filesystem",
+            "connection_id": "raw-files"
+          },
+          "object": {
+            "object_id": "obj_a719d3cd3cfeaafd78447f9e201d7dfb",
+            "adapter": "filesystem",
+            "locator": {
+              "path": "objects/news-tg-suspilnenews/2026/10/11/web_df9062d93baca70cda67e963055afb56/obs_01a12946624f000010464452.html"
+            },
+            "media_type": "text/html",
+            "size_bytes": 115100,
+            "sha256": "2a9bf85a5e8d53118cda475c995e0db97c9401981804ed5743e9b181f212c005",
+            "connection_id": "raw-files"
+          }
+        }
+      ],
+      "llm_usage": {
+        "cost": {
+          "amount": 0.0040563,
+          "currency": "USD"
+        },
+        "model": "claude-haiku-5-5",
+        "provider": "anthropic",
+        "input_tokens": 10898,
+        "output_tokens": 5933
+      },
+      "jobs": {
+        "analyse": "job_67d20e7eed7742f7b14dc38ba0690117",
+        "prepare": "job_82bf81e4cc794b989be1fcd20d4211bd",
+        "store-news": "job_6b7b047f415e48279e7179e5bf4b26d2",
+        "store-raw": "job_7925c63cb7e1406c973c98ff94e10cbd",
+        "verify": "job_c51539169ff44bf583b714c1b3175d41"
+      },
+      "validation_run_id": "news-validation-1f8a14db97be434c9a36973783185508",
+      "storage_rechecked_at": "2026-10-11T05:23:14.034338+00:00",
+      "articles": [
+        {
+          "url": "https://t.me/suspilnenews/77206",
+          "headline": "Американський конгресмен-республіканець Фіцпатрік заявив, що разом із колегами має намір примусово винести на голосування у Палаті представників законопроєкт про заборону будь-яких закупівель російської нафти. Документ матиме назву «Закон імені Рональда Рейгана про мир через силу».",
+          "headline_ukrainian": "Американський конгресмен-республіканець Фіцпатрік заявив, що разом із колегами має намір примусово винести на голосування у Палаті представників законопроєкт про заборону будь-яких закупівель російської нафти. Документ матиме назву «Закон імені Рональда Рейгана про мир через силу».",
+          "source_language": "uk",
+          "published_at": "2026-10-11T04:31:36Z",
+          "event_id": null,
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "evidence_validation": "verified",
+          "sentiment": {
+            "label": "neutral",
+            "confidence": 0.8
+          },
+          "entities": [
+            {
+              "name": "Фіцпатрік",
+              "canonical_name": "Fitzpatrick",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "російської нафти",
+              "canonical_name": "Russian oil",
+              "type": "product",
+              "role": "object",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            },
+            {
+              "name": "Палата представників",
+              "canonical_name": "United States House of Representatives",
+              "type": "organization",
+              "role": "object",
+              "attitude": "neutral",
+              "attitude_confidence": 0.7
+            }
+          ],
+          "event_identity_kind": "actor_action",
+          "event_identity_confidence": 0.7
+        }
+      ]
+    },
+    {
+      "source_id": "news-tg-golosameriki",
+      "title": "Голос Америки (VOA)",
+      "region": "usa",
+      "transport": "telegram_public_web",
+      "status": "verified",
+      "material_id": "web:fedfa275ad5879897dc87af500657ff7",
+      "observation_id": "obs_01a1294844c5000050094a43",
+      "fetched_at": "2026-10-11T04:46:04Z",
+      "original": {
+        "url": "https://t.me/s/golosameriki",
+        "final_url": "https://t.me/s/golosameriki",
+        "sha256": "ca773a7761eac4c0fb6bc49cd65e8803d508ee1503bd8ded51bbf73896cba0e0",
+        "size_bytes": 149270,
+        "format": {
+          "media_type": "text/html",
+          "content_kind": "page",
+          "charset": "utf-8"
+        },
+        "http_status": 200
+      },
+      "prepared_articles": 1,
+      "verified_articles": 1,
+      "invocations": {
+        "store-raw": "inv_01a1294846bae13af4b2d21da691",
+        "prepare": "inv_0a0ccfee27bd4567a05f664788056aef",
+        "analyse": "inv_8c417c91ecb848eda427a8c11f2148f9",
+        "verify": "inv_a90ed4a119a94b5984a1559e53db64ba",
+        "store-news": "inv_01a129543006bee11aaf429c13f6"
+      },
+      "packages": [
+        {
+          "package_id": "jane.storage-files",
+          "version": "1.0.0",
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+        },
+        {
+          "digest": "sha256:6fef65d4fd12244a63df402fcc4766c518d8f1064699b112fae0d84e676d18fe",
+          "version": "1.0.0",
+          "package_id": "news.telegram-public-posts"
+        },
+        {
+          "digest": "sha256:60d97634892807ec8b88516a159d6ef06c56b0b6b7ffb1db6634559d6324c832",
+          "version": "1.1.0",
+          "package_id": "news.article-analysis"
+        },
+        {
+          "digest": "sha256:4af6288f2292a540a4db4e2ab046123282bc1982b2cb53b93b52e29c9311d735",
+          "version": "1.1.0",
+          "package_id": "news.article-normalize"
+        },
+        {
+          "package_id": "jane.storage-postgresql",
+          "version": "1.0.0",
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+        }
+      ],
+      "raw_writes": [
+        {
+          "status": "written",
+          "target": {
+            "adapter": "filesystem",
+            "connection_id": "raw-files"
+          },
+          "object": {
+            "object_id": "obj_a6d41c862c8ecfdc33b99f64e4cb56de",
+            "adapter": "filesystem",
+            "locator": {
+              "path": "objects/news-tg-golosameriki/2026/10/11/web_fedfa275ad5879897dc87af500657ff7/obs_01a1294844c5000050094a43.html"
+            },
+            "media_type": "text/html",
+            "size_bytes": 149270,
+            "sha256": "ca773a7761eac4c0fb6bc49cd65e8803d508ee1503bd8ded51bbf73896cba0e0",
+            "connection_id": "raw-files"
+          }
+        }
+      ],
+      "llm_usage": {
+        "cost": {
+          "amount": 0.0022214,
+          "currency": "USD"
+        },
+        "model": "claude-haiku-5-5",
+        "provider": "anthropic",
+        "input_tokens": 6239,
+        "output_tokens": 3195
+      },
+      "jobs": {
+        "analyse": "job_73f878d89ed14fbeba6a0d46be5e51ce",
+        "prepare": "job_3cfeab7903444283ab13313193c15b6f",
+        "store-news": "job_2c210cd718e54f8ebc59efa9955eead6",
+        "store-raw": "job_f8a9776f20124fb7a9aba08812f57ead",
+        "verify": "job_93c25ca4e7a5409da68c2e29859f4ced"
+      },
+      "validation_run_id": "news-validation-1f8a14db97be434c9a36973783185508",
+      "storage_rechecked_at": "2026-10-11T05:23:14.098992+00:00",
+      "articles": [
+        {
+          "url": "https://t.me/golosameriki/44238",
+          "headline": "Президент США Дональд Трамп заявил, что договорился с президентом РФ Владимиром Путиным о поставках дизельного топлива на американский и мировой рынки.",
+          "headline_ukrainian": "Президент США Дональд Трамп заявив, що домовився з президентом РФ Володимиром Путіним про постачання дизельного палива на американський і світовий ринки.",
+          "source_language": "ru",
+          "published_at": "2026-10-09T20:39:27Z",
+          "event_id": null,
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "low_identity_confidence",
+            "status": "ungrouped"
+          },
+          "evidence_validation": "verified",
+          "sentiment": {
+            "label": "neutral",
+            "confidence": 0.8
+          },
+          "entities": [
+            {
+              "name": "Дональд Трамп",
+              "canonical_name": "Donald Trump",
+              "type": "person",
+              "role": "subject",
+              "attitude": "neutral",
+              "attitude_confidence": 0.9
+            },
+            {
+              "name": "Владимир Путин",
+              "canonical_name": "Vladimir Putin",
+              "type": "person",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.85
+            },
+            {
+              "name": "США",
+              "canonical_name": "United States",
+              "type": "country",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "РФ",
+              "canonical_name": "Russia",
+              "type": "country",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            },
+            {
+              "name": "Ормузским проливом",
+              "canonical_name": "Strait of Hormuz",
+              "type": "place",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            }
+          ],
+          "event_identity_kind": "actor_action",
+          "event_identity_confidence": 0.7
+        }
+      ]
+    },
+    {
+      "source_id": "news-tg-tass-agency",
+      "title": "ТАСС",
+      "region": "russia",
+      "transport": "telegram_public_web",
+      "status": "verified",
+      "validation_run_id": "news-validation-35d5b77a4aaf4b94951384c2cf613bbd",
+      "verified_at": "2026-10-11T05:09:07.141394+00:00",
+      "material_id": "web:f4d3d235766a10a706d22040c97cc66c",
+      "observation_id": "obs_01a1295ce2fe0000f0baced3",
+      "fetched_at": "2026-10-11T05:08:35Z",
+      "original": {
+        "url": "https://t.me/s/tass_agency",
+        "final_url": "https://t.me/s/tass_agency",
+        "sha256": "110f4f8ca1996e5c81f384d0c8439af5d5cf5a00055888397695fd94a98bd46b",
+        "size_bytes": 120731,
+        "format": {
+          "media_type": "text/html",
+          "content_kind": "page",
+          "charset": "utf-8"
+        },
+        "http_status": 200
+      },
+      "prepared_articles": 1,
+      "verified_articles": 1,
+      "invocations": {
+        "store-raw": "inv_01a1295ceb5789dd367597304758",
+        "prepare": "inv_9c9451f45e4a4b67a564f0b8c557cbc6",
+        "analyse": "inv_cda56f0a45774da586bcfac4a9f6bf31",
+        "verify": "inv_b3669f27e9344177992f86dce7a448af",
+        "store-news": "inv_01a1295d5cbc913e41c053644318"
+      },
+      "packages": [
+        {
+          "package_id": "jane.storage-files",
+          "version": "1.0.0",
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+        },
+        {
+          "digest": "sha256:9c17eb10b74ef3fa5df26b458ca992f64333b33bd9741229528afb0bdbddcac3",
+          "version": "1.0.1",
+          "package_id": "news.telegram-public-posts"
+        },
+        {
+          "digest": "sha256:60d97634892807ec8b88516a159d6ef06c56b0b6b7ffb1db6634559d6324c832",
+          "version": "1.1.0",
+          "package_id": "news.article-analysis"
+        },
+        {
+          "digest": "sha256:121672bf1fee12d9c52c18eec35f6e61b1602760cf7e2f2dcc87f07cb25ac3f8",
+          "version": "1.1.1",
+          "package_id": "news.article-normalize"
+        },
+        {
+          "package_id": "jane.storage-postgresql",
+          "version": "1.0.0",
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+        }
+      ],
+      "raw_writes": [
+        {
+          "status": "written",
+          "target": {
+            "adapter": "filesystem",
+            "connection_id": "raw-files"
+          },
+          "object": {
+            "object_id": "obj_54a117ee809721fb23f617c281f00b38",
+            "adapter": "filesystem",
+            "locator": {
+              "path": "objects/news-tg-tass-agency/2026/10/11/web_f4d3d235766a10a706d22040c97cc66c/obs_01a1295ce2fe0000f0baced3.html"
+            },
+            "media_type": "text/html",
+            "size_bytes": 120731,
+            "sha256": "110f4f8ca1996e5c81f384d0c8439af5d5cf5a00055888397695fd94a98bd46b",
+            "connection_id": "raw-files"
+          }
+        }
+      ],
+      "llm_usage": {
+        "cost": {
+          "amount": 0.0019818,
+          "currency": "USD"
+        },
+        "model": "claude-haiku-5-5",
+        "provider": "anthropic",
+        "input_tokens": 6213,
+        "output_tokens": 2721
+      },
+      "jobs": {
+        "analyse": "job_259c69cfae634d55b8c603b0ea0ad9e8",
+        "prepare": "job_e2a6e085a77144218e476b26ccc4f1d9",
+        "store-news": "job_edb4e79741494722a62a36129f46bd4d",
+        "store-raw": "job_9d64e9485aae479c88f92c3aadce15ba",
+        "verify": "job_6e333c2bedb844d0a68ec7e821b7dbe1"
+      },
+      "storage_rechecked_at": "2026-10-11T05:23:14.104816+00:00",
+      "articles": [
+        {
+          "url": "https://t.me/tass_agency/399749",
+          "headline": "❕Фрагменты БПЛА упали на территории аэропорта Сочи, возникшее возгорание оперативно ликвидировали, сообщает оперштаб Кубани.",
+          "headline_ukrainian": "Фрагменти БПЛА впали на території аеропорту Сочі, виникле загоряння оперативно ліквідували, повідомляє оперштаб Кубані.",
+          "source_language": "ru",
+          "published_at": "2026-10-11T04:50:34Z",
+          "event_id": null,
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "unverified_event_date",
+            "status": "ungrouped"
+          },
+          "evidence_validation": "verified",
+          "sentiment": {
+            "label": "neutral",
+            "confidence": 0.9
+          },
+          "entities": [
+            {
+              "name": "аэропорт Сочи",
+              "canonical_name": "Sochi International Airport",
+              "type": "place",
+              "role": "object",
+              "attitude": "neutral",
+              "attitude_confidence": 0.9
+            },
+            {
+              "name": "Сочи",
+              "canonical_name": "Sochi",
+              "type": "place",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.9
+            },
+            {
+              "name": "оперштаб Кубани",
+              "canonical_name": "Kuban Operational Headquarters",
+              "type": "organization",
+              "role": "mentioned",
+              "attitude": "neutral",
+              "attitude_confidence": 0.8
+            }
+          ],
+          "event_identity_kind": "incident",
+          "event_identity_confidence": 0.5
+        }
+      ]
+    }
+  ],
+  "total_llm_cost_usd": 0.1493741,
+  "real_cross_source_pair": {
+    "requested": true,
+    "verified": true,
+    "source_ids": [
+      "news-web-bbc",
+      "news-web-npr"
+    ],
+    "event_ids": [
+      "news-event-813fbcab5cfd8bc2e1993a4657e05170"
+    ],
+    "stored_events": [
+      {
+        "event_id": "news-event-813fbcab5cfd8bc2e1993a4657e05170",
+        "canonical": {
+          "date": "2026-10-10",
+          "action": "attack",
+          "object": "King Khalid International Airport",
+          "country": "Saudi Arabia",
+          "location": "Riyadh"
+        },
+        "identity_kind": "incident",
+        "grouping_method": "exact_canonical_identity",
+        "identity_confidence": 0.78
+      }
+    ]
+  }
+}

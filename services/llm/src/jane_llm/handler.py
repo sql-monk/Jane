@@ -144,7 +144,7 @@ class LlmHandler:
         self, pkg: LoadedPackage, output: Any, inp: dict[str, Any], scope_default: str
     ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
         defs = (pkg.manifest.get("output") or {}).get("entities") or []
-        if not defs or not isinstance(output, dict) or inp.get("kind") != "material":
+        if not defs or not isinstance(output, dict) or not isinstance(inp.get("material"), dict):
             return [], []
         material = inp["material"]
         observation = {

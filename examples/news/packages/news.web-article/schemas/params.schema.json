@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source_name", "region", "language"],
+  "properties": {
+    "source_id": {"type": "string"},
+    "source_name": {"type": "string", "minLength": 1},
+    "region": {"type": "string", "enum": ["ukraine", "europe", "usa", "russia"]},
+    "language": {"type": "string", "minLength": 2},
+    "max_text_chars": {"type": "integer", "minimum": 1000, "default": 16000},
+    "min_text_chars": {"type": "integer", "minimum": 1, "default": 160}
+  }
+}

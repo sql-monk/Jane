@@ -1,0 +1,79 @@
+[
+  {
+    "entity_type": "news_article",
+    "key": {
+      "scope": "news-fixture",
+      "natural": {
+        "url": "https://news.example.test/article"
+      }
+    },
+    "fields": {
+      "headline": "Fire damages London warehouse",
+      "headline_ukrainian": "Пожежа пошкодила склад у Лондоні",
+      "summary": "Пожежа пошкодила склад; за повідомленням пожежної служби, постраждалих немає.",
+      "source_language": "en",
+      "reporting_kind": "news",
+      "topics": [
+        "Надзвичайні події"
+      ],
+      "locations": [
+        "Лондон"
+      ],
+      "sentiment": {
+        "label": "neutral",
+        "confidence": 0.95,
+        "explanation": "Негативний факт подано без авторської оцінки.",
+        "evidence": [
+          {
+            "quote": "A fire damaged a warehouse in London on 11 October 2026.",
+            "reason": "Фактичний опис без оцінних прикметників.",
+            "attribution": "author"
+          }
+        ]
+      },
+      "entities": [
+        {
+          "name": "London Fire Brigade",
+          "canonical_name": "London Fire Brigade",
+          "type": "organization",
+          "role": "subject",
+          "attitude": "neutral",
+          "attitude_confidence": 0.95,
+          "evidence": [
+            {
+              "quote": "The London Fire Brigade said there were no injuries.",
+              "reason": "Нейтральне посилання на джерело повідомлення.",
+              "attribution": "author"
+            }
+          ]
+        }
+      ],
+      "event": {
+        "summary": "Пожежа на складі в Лондоні 11 жовтня 2026 року.",
+        "canonical": {
+          "date": "2026-10-11",
+          "primary_actor": "fire",
+          "action": "damage",
+          "object": "warehouse",
+          "location": "London"
+        },
+        "identity_confidence": 0.95,
+        "evidence": [
+          {
+            "quote": "A fire damaged a warehouse in London on 11 October 2026.",
+            "reason": "Указано дату, місце, конкретний акт і його об’єкт.",
+            "attribution": "author"
+          }
+        ],
+        "identity_specificity": "broad"
+      },
+      "material_id": "web:neutral-news",
+      "url": "https://news.example.test/article"
+    },
+    "observation": {
+      "observation_id": "obs-neutral-news",
+      "observed_at": "2026-10-11T08:00:01Z",
+      "material_id": "web:neutral-news"
+    }
+  }
+]

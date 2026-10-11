@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "canonical": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "primary_actor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "object": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "country": {
+          "type": "string",
+          "minLength": 1
+        },
+        "time": {
+          "type": "string",
+          "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+        }
+      },
+      "required": []
+    },
+    "identity_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "grouping_method": {
+      "const": "exact_canonical_identity"
+    },
+    "identity_kind": {
+      "enum": [
+        "actor_action",
+        "incident"
+      ]
+    }
+  },
+  "required": [
+    "event_id",
+    "summary",
+    "canonical",
+    "identity_confidence",
+    "grouping_method"
+  ]
+}

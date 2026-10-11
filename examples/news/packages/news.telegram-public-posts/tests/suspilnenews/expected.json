@@ -1,0 +1,20 @@
+{
+  "entities": [
+    {
+      "entity_type": "article",
+      "fields": {
+        "channel": "suspilnenews",
+        "message_id": 77204,
+        "url": "https://t.me/suspilnenews/77204",
+        "title": "Повторні вибухи чули в Дніпрі, інформують журналісти Суспільного.",
+        "text": "Повторні вибухи чули в Дніпрі, інформують журналісти Суспільного.",
+        "source_name": "Суспільне Новини",
+        "source_kind": "telegram",
+        "transport": "telegram_public_web",
+        "region": "ukraine",
+        "language": "uk",
+        "published_at": "2026-10-10T22:36:53Z"
+      }
+    }
+  ]
+}

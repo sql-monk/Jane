@@ -58,11 +58,11 @@ export function PackagesPage() {
     auto_changes_allowed: true,
   });
   const create = useMutation({
-    mutationFn: () =>
+    mutationFn: (submitted: typeof draft) =>
       unwrap(
         api.registry.POST("/v1/packages", {
           params: { header: { "Idempotency-Key": newIdempotencyKey() } },
-          body: draft,
+          body: submitted,
         }),
       ),
     onSuccess: (pkg) => {
@@ -76,8 +76,8 @@ export function PackagesPage() {
       Boolean(draft.package_id || draft.title || draft.kind !== "extractor" || !draft.auto_changes_allowed),
     label: "Новий пакет",
     onSave: async () => {
-      if (!SLUG_PATTERN.test(draft.package_id) || !draft.title) return false;
-      await create.mutateAsync();
+      if (!SLUG_PATTERN.test(draft.package_id) || !draft.title || create.isPending) return false;
+      await create.mutateAsync(draft);
       return true;
     },
   });
@@ -94,6 +94,7 @@ export function PackagesPage() {
         <button
           type="button"
           className="btn btn-primary"
+          disabled={create.isPending}
           onClick={() => guard.confirmChange(() => setCreating((v) => !v))}
         >
           Новий пакет
@@ -102,7 +103,7 @@ export function PackagesPage() {
     >
       {creating ? (
         <Section title="Новий пакет (без версій)">
-          <div className="grid-3">
+          <fieldset className="form-fields grid-3" disabled={create.isPending}>
             <Field label="package_id">
               <input
                 value={draft.package_id}
@@ -132,12 +133,12 @@ export function PackagesPage() {
               />
               Дозволити автоматичні зміни (версії від LLM)
             </label>
-          </div>
+          </fieldset>
           <button
             type="button"
             className="btn btn-primary"
             disabled={!SLUG_PATTERN.test(draft.package_id) || !draft.title || create.isPending}
-            onClick={() => create.mutate()}
+            onClick={() => create.mutate(draft)}
           >
             Створити
           </button>
@@ -583,12 +584,15 @@ function DiffTab({ pkg }: { pkg: Package }) {
   return (
     <>
       <div className="filters">
-        <Field label="Від (версія або parent:<версія>)">
-          <VersionPicker pkg={pkg} value={from} onChange={setFrom} allowEmpty includeParent />
-        </Field>
-        <Field label="До версії">
-          <VersionPicker pkg={pkg} value={to} onChange={setTo} />
-        </Field>
+        <VersionPicker
+          label="Від (версія або parent:<версія>)"
+          pkg={pkg}
+          value={from}
+          onChange={setFrom}
+          allowEmpty
+          includeParent
+        />
+        <VersionPicker label="До версії" pkg={pkg} value={to} onChange={setTo} />
         <button
           type="button"
           className="btn btn-primary"
@@ -661,7 +665,7 @@ function ForkTab({ pkg }: { pkg: Package }) {
     auto_changes_allowed: false,
   });
   const fork = useMutation({
-    mutationFn: () =>
+    mutationFn: (submitted: typeof draft) =>
       unwrap(
         api.registry.POST("/v1/packages/{package_id}/forks", {
           params: {
@@ -669,11 +673,11 @@ function ForkTab({ pkg }: { pkg: Package }) {
             header: { "Idempotency-Key": newIdempotencyKey() },
           },
           body: {
-            new_package_id: draft.new_package_id,
-            from_version: draft.from_version,
-            ...(draft.initial_version ? { initial_version: draft.initial_version } : {}),
-            ...(draft.title ? { title: draft.title } : {}),
-            auto_changes_allowed: draft.auto_changes_allowed,
+            new_package_id: submitted.new_package_id,
+            from_version: submitted.from_version,
+            ...(submitted.initial_version ? { initial_version: submitted.initial_version } : {}),
+            ...(submitted.title ? { title: submitted.title } : {}),
+            auto_changes_allowed: submitted.auto_changes_allowed,
           },
         }),
       ),
@@ -695,10 +699,11 @@ function ForkTab({ pkg }: { pkg: Package }) {
       if (
         !SLUG_PATTERN.test(draft.new_package_id) ||
         !SEMVER_PATTERN.test(draft.from_version) ||
-        (draft.initial_version && !SEMVER_PATTERN.test(draft.initial_version))
+        (draft.initial_version && !SEMVER_PATTERN.test(draft.initial_version)) ||
+        fork.isPending
       )
         return false;
-      await fork.mutateAsync();
+      await fork.mutateAsync(draft);
       return true;
     },
   });
@@ -708,20 +713,19 @@ function ForkTab({ pkg }: { pkg: Package }) {
         Форк — незалежна копія з посиланням на батька й вихідну версію. Зміни батька на форк не впливають;
         перенесення — лише за явною командою. Підключення й секрети не копіюються.
       </Notice>
-      <div className="grid-3">
+      <fieldset className="form-fields grid-3" disabled={fork.isPending}>
         <Field label="Новий package_id">
           <input
             value={draft.new_package_id}
             onChange={(e) => setDraft({ ...draft, new_package_id: e.target.value })}
           />
         </Field>
-        <Field label="Від версії">
-          <VersionPicker
-            pkg={pkg}
-            value={draft.from_version}
-            onChange={(from_version) => setDraft({ ...draft, from_version })}
-          />
-        </Field>
+        <VersionPicker
+          label="Від версії"
+          pkg={pkg}
+          value={draft.from_version}
+          onChange={(from_version) => setDraft({ ...draft, from_version })}
+        />
         <Field label="Перша версія форку (необов'язково)">
           <input
             value={draft.initial_version}
@@ -739,7 +743,7 @@ function ForkTab({ pkg }: { pkg: Package }) {
           />
           Дозволити автоматичні зміни форку
         </label>
-      </div>
+      </fieldset>
       <button
         type="button"
         className="btn btn-primary"
@@ -749,7 +753,7 @@ function ForkTab({ pkg }: { pkg: Package }) {
           Boolean(draft.initial_version && !SEMVER_PATTERN.test(draft.initial_version)) ||
           fork.isPending
         }
-        onClick={() => fork.mutate()}
+        onClick={() => fork.mutate(draft)}
       >
         Створити форк
       </button>
@@ -759,12 +763,14 @@ function ForkTab({ pkg }: { pkg: Package }) {
 }
 
 function VersionPicker({
+  label,
   pkg,
   value,
   onChange,
   allowEmpty = false,
   includeParent = false,
 }: {
+  label: string;
   pkg: Package;
   value: string;
   onChange: (value: string) => void;
@@ -780,25 +786,29 @@ function VersionPicker({
     ),
   );
   return (
-    <span>
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">{allowEmpty ? "Автоматично" : "Оберіть версію"}</option>
-        {list.items.map((version) => (
-          <option key={version.version} value={version.version}>
-            {version.version} · {statusLabel(version.status)}
-          </option>
-        ))}
-        {includeParent && pkg.fork_of ? (
-          <option value={`parent:${pkg.fork_of.version}`}>Батьківська {pkg.fork_of.version}</option>
-        ) : null}
-        {value && !list.items.some((version) => version.version === value) && !value.startsWith("parent:") ? (
-          <option value={value}>{value} (поза завантаженим каталогом)</option>
-        ) : null}
-      </select>
+    <div>
+      <Field label={label}>
+        <select value={value} onChange={(event) => onChange(event.target.value)}>
+          <option value="">{allowEmpty ? "Автоматично" : "Оберіть версію"}</option>
+          {list.items.map((version) => (
+            <option key={version.version} value={version.version}>
+              {version.version} · {statusLabel(version.status)}
+            </option>
+          ))}
+          {includeParent && pkg.fork_of ? (
+            <option value={`parent:${pkg.fork_of.version}`}>Батьківська {pkg.fork_of.version}</option>
+          ) : null}
+          {value &&
+          !list.items.some((version) => version.version === value) &&
+          !value.startsWith("parent:") ? (
+            <option value={value}>{value} (поза завантаженим каталогом)</option>
+          ) : null}
+        </select>
+      </Field>
       {list.isLoading ? <Loading what="Версії" /> : null}
       <ErrorBox error={list.error} />
       <LoadMore hasMore={list.hasMore} loading={list.loadingMore} onClick={list.loadMore} />
-    </span>
+    </div>
   );
 }
 

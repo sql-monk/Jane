@@ -1,16 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppProvider } from "../app/context";
 import { DEFAULT_CONFIG } from "../config";
 import { LlmPage, validProvider } from "../pages/LlmPage";
 import { ConnectionsPage } from "../pages/ConnectionsPage";
+import { PackagePage, PackagesPage } from "../pages/PackagesPage";
+import { AssistantPage } from "../pages/AssistantPage";
 import { ErrorBox, Field, ReasonAction, Table } from "./ui";
 import { UnsavedChangesProvider } from "./UnsavedChanges";
 import { openapiExample } from "../test/contracts";
-import type { Connection, Source } from "../api/types";
+import type { Connection, Package, PackageManifest, Source } from "../api/types";
 
 afterEach(() => {
   cleanup();
@@ -45,6 +47,152 @@ function dialogSupport() {
 }
 
 describe("admin settings review regressions", () => {
+  it("labels a search control inside a native form without including the submit button", () => {
+    render(
+      <Field label="Пошук у сховищі" hint="До розбиття на сторінки">
+        <form>
+          <input />
+          <button>Знайти</button>
+        </form>
+      </Field>,
+    );
+    const control = screen.getByRole("textbox", { name: "Пошук у сховищі" });
+    expect(control).toHaveAccessibleDescription("До розбиття на сторінки");
+    expect((control as HTMLInputElement).labels).toHaveLength(1);
+  });
+  it("ignores an older provider open response after a new editor is opened", async () => {
+    dialogSupport();
+    // Provider identity and fields from the llm.v1 listProviders example.
+    const existing = {
+      provider_id: "fake",
+      kind: "fake",
+      enabled: true,
+      models: [{ model_id: "fake-deterministic-1" }],
+    };
+    let complete: (() => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        const url = new URL(request.url);
+        if (url.pathname.endsWith("/providers/fake")) {
+          await new Promise<void>((resolve) => {
+            complete = resolve;
+          });
+          return Response.json(existing, { headers: { ETag: '"existing"' } });
+        }
+        return Response.json({
+          items: url.pathname.endsWith("/providers") ? [existing] : [],
+          next_cursor: null,
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    mount(<LlmPage />, "/llm");
+    await user.click(await screen.findByRole("button", { name: "fake" }));
+    await waitFor(() => expect(complete).toBeTypeOf("function"));
+    await user.click(screen.getByRole("button", { name: "Новий провайдер" }));
+    await user.type(screen.getByLabelText("Ідентифікатор провайдера"), "newer-provider-draft");
+    complete?.();
+    await waitFor(() =>
+      expect(screen.getByLabelText("Ідентифікатор провайдера")).toHaveValue("newer-provider-draft"),
+    );
+    await user.click(screen.getByRole("tab", { name: "Бюджети" }));
+    expect(screen.getByRole("dialog", { name: "Незбережені зміни" })).toBeVisible();
+  });
+  it.each(["create", "fork", "onboarding"] as const)(
+    "keeps %s inputs fixed while its request is pending",
+    async (mode) => {
+      dialogSupport();
+      const manifest = openapiExample<PackageManifest>("manifest-extractor");
+      const fetchedAt = openapiExample<{ fetched_at: string }>("material-web").fetched_at;
+      // Package view derived from the extractor manifest and the registry.v1 Package response fields.
+      const pkg: Package = {
+        package_id: manifest.package_id,
+        kind: manifest.kind,
+        title: manifest.title,
+        latest_version: manifest.version,
+        auto_changes_allowed: true,
+        deprecated: false,
+        created_at: fetchedAt,
+        updated_at: fetchedAt,
+      };
+      let complete: (() => void) | undefined;
+      let sent: Record<string, unknown> | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (request: Request) => {
+          const url = new URL(request.url);
+          if (request.method === "POST") {
+            sent = (await request.json()) as Record<string, unknown>;
+            await new Promise<void>((resolve) => {
+              complete = resolve;
+            });
+            return mode === "onboarding"
+              ? Response.json(
+                  { job_id: "job_review", kind: "onboarding", status: "queued", created_at: fetchedAt },
+                  { status: 202 },
+                )
+              : Response.json(
+                  { ...pkg, package_id: sent!["new_package_id"] ?? sent!["package_id"] },
+                  { status: 201 },
+                );
+          }
+          if (url.pathname.endsWith(`/packages/${pkg.package_id}`)) return Response.json(pkg);
+          if (url.pathname.endsWith("/versions"))
+            return Response.json({
+              items: [{ package_id: pkg.package_id, version: manifest.version, status: "approved" }],
+              next_cursor: null,
+            });
+          if (url.pathname.endsWith("/v1/info"))
+            return Response.json({ service: "assistant", version: "0.1.0", api_versions: ["v1"] });
+          if (url.pathname.endsWith("/jobs/job_review"))
+            return Response.json({
+              job_id: "job_review",
+              kind: "onboarding",
+              status: "queued",
+              created_at: fetchedAt,
+            });
+          return Response.json({ items: [], next_cursor: null });
+        }),
+      );
+      const user = userEvent.setup();
+      if (mode === "create") {
+        mount(<PackagesPage />, "/packages");
+        await user.click(screen.getByRole("button", { name: "Новий пакет" }));
+        await user.type(screen.getByLabelText("package_id"), "review-created");
+      } else if (mode === "fork") {
+        mount(
+          <Routes>
+            <Route path="/packages/:packageId" element={<PackagePage />} />
+          </Routes>,
+          `/packages/${pkg.package_id}`,
+        );
+        await user.click(await screen.findByRole("tab", { name: "Створити форк" }));
+        const version = screen.getByRole("combobox", { name: "Від версії" });
+        expect((version as HTMLSelectElement).labels).toHaveLength(1);
+        await user.type(screen.getByLabelText("Новий package_id"), "review-fork");
+      } else mount(<AssistantPage />, "/assistant");
+      const field = screen.getByLabelText(mode === "onboarding" ? "Назва або посилання" : "Назва");
+      await user.type(field, "Submitted title");
+      await user.click(
+        screen.getByRole("button", {
+          name: mode === "create" ? "Створити" : mode === "fork" ? "Створити форк" : "Почати підключення",
+        }),
+      );
+      await waitFor(() => expect(complete).toBeTypeOf("function"));
+      expect(field).toBeDisabled();
+      await user.type(field, " newer draft");
+      expect(field).toHaveValue("Submitted title");
+      expect(sent?.[mode === "onboarding" ? "query" : "title"]).toBe("Submitted title");
+      complete?.();
+      if (mode === "onboarding") {
+        await waitFor(() => expect(field).toBeEnabled());
+        await user.type(field, " next draft");
+        await user.click(screen.getByRole("tab", { name: "Запуски вдосконалення" }));
+        expect(screen.getByRole("dialog", { name: "Незбережені зміни" })).toBeVisible();
+      }
+    },
+  );
   it("gives selects an exact field name and associates hints and field errors separately", () => {
     render(
       <Field label="Рівень" hint="Область дії бюджету" error="Виберіть джерело">

@@ -173,31 +173,38 @@ function Onboarding({ sessionId, onOpen }: { sessionId: string | null; onOpen: (
       : null;
 
   const start = useMutation({
-    mutationFn: () => {
+    mutationFn: (submitted: typeof form) => {
+      const submittedHints = checkJson(submitted.hints);
       if (confidenceError) throw new Error(confidenceError);
       const limits: NonNullable<OnboardingRequest["limits"]> = {
-        ...(form.amount
-          ? { budget: { amount: Number(form.amount), currency: form.currency, period: "total" as const } }
+        ...(submitted.amount
+          ? {
+              budget: {
+                amount: Number(submitted.amount),
+                currency: submitted.currency,
+                period: "total" as const,
+              },
+            }
           : {}),
-        ...(form.samples ? { max_onboarding_samples: Number.parseInt(form.samples, 10) } : {}),
-        ...(form.confidence ? { min_onboarding_confidence: Number(form.confidence) } : {}),
+        ...(submitted.samples ? { max_onboarding_samples: Number.parseInt(submitted.samples, 10) } : {}),
+        ...(submitted.confidence ? { min_onboarding_confidence: Number(submitted.confidence) } : {}),
       };
       const body: OnboardingRequest = {
-        query: form.query,
-        ...(form.source_kind ? { source_kind: form.source_kind } : {}),
-        ...(form.expected
+        query: submitted.query,
+        ...(submitted.source_kind ? { source_kind: submitted.source_kind } : {}),
+        ...(submitted.expected
           ? {
-              expected_entity_types: form.expected
+              expected_entity_types: submitted.expected
                 .split(",")
                 .map((t) => t.trim())
                 .filter(Boolean),
             }
           : {}),
         ...(Object.keys(limits).length ? { limits } : {}),
-        ...(hints.value && typeof hints.value === "object"
-          ? { crawl_hints: hints.value as Record<string, unknown> }
+        ...(submittedHints.value && typeof submittedHints.value === "object"
+          ? { crawl_hints: submittedHints.value as Record<string, unknown> }
           : {}),
-        auto_activation: form.auto_activation,
+        auto_activation: submitted.auto_activation,
       };
       return unwrap(
         api.assistant.POST("/v1/onboarding-sessions", {
@@ -206,9 +213,9 @@ function Onboarding({ sessionId, onOpen }: { sessionId: string | null; onOpen: (
         }),
       ) as Promise<Job>;
     },
-    onSuccess: (job) => {
+    onSuccess: (job, submitted) => {
       guard.markSaved();
-      setBaseline(JSON.stringify(form));
+      setBaseline(JSON.stringify(submitted));
       setStartJob(job.job_id);
       void queryClient.invalidateQueries({ queryKey: ["onboarding-sessions"] });
       const id = sessionIdFromJob(job);
@@ -229,94 +236,97 @@ function Onboarding({ sessionId, onOpen }: { sessionId: string | null; onOpen: (
           в межах бюджету, визначає типи матеріалів і сутностей та пропонує кілька варіантів збору з
           поясненням охоплення, вартості й ризиків.
         </p>
-        <div className="grid-3">
-          <Field label="Назва або посилання">
-            <input
-              value={form.query}
-              onChange={(e) => setForm({ ...form, query: e.target.value })}
-              maxLength={2000}
+        <fieldset className="form-fields" disabled={start.isPending}>
+          <div className="grid-3">
+            <Field label="Назва або посилання">
+              <input
+                value={form.query}
+                onChange={(e) => setForm({ ...form, query: e.target.value })}
+                maxLength={2000}
+              />
+            </Field>
+            <Field label="Тип джерела (необов'язково)">
+              <input
+                list="onb-kinds"
+                value={form.source_kind}
+                onChange={(e) => setForm({ ...form, source_kind: e.target.value })}
+              />
+              <datalist id="onb-kinds">
+                <option value="web" />
+                <option value="telegram" />
+              </datalist>
+            </Field>
+            <Field label="Очікувані типи даних">
+              <input
+                value={form.expected}
+                onChange={(e) => setForm({ ...form, expected: e.target.value })}
+                placeholder="product, event"
+              />
+            </Field>
+            <Field label="Бюджет дослідження">
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              />
+            </Field>
+            <Field label="Валюта">
+              <input
+                value={form.currency}
+                onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
+                maxLength={3}
+              />
+            </Field>
+            <Field label="Макс. сторінок вибірки">
+              <input
+                type="number"
+                min={1}
+                value={form.samples}
+                onChange={(e) => setForm({ ...form, samples: e.target.value })}
+              />
+            </Field>
+            <Field
+              label="Поріг впевненості вибірки"
+              hint="Більше 0 і не більше 1; порожньо — поріг асистента (min_onboarding_confidence)"
+            >
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step="any"
+                value={form.confidence}
+                onChange={(e) => setForm({ ...form, confidence: e.target.value })}
+              />
+            </Field>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={form.auto_activation}
+                onChange={(e) => setForm({ ...form, auto_activation: e.target.checked })}
+              />
+              Дозволити автоматичну активацію
+            </label>
+          </div>
+          {confidenceError ? <p role="alert">{confidenceError}</p> : null}
+          <Field label="Правила обходу від користувача (фрагмент CollectorRules, необов'язково)">
+            <JsonEditor
+              text={form.hints}
+              onChange={(t) => setForm({ ...form, hints: t })}
+              label="Підказки обходу"
+              readOnly={start.isPending}
+              minHeight="5rem"
             />
           </Field>
-          <Field label="Тип джерела (необов'язково)">
-            <input
-              list="onb-kinds"
-              value={form.source_kind}
-              onChange={(e) => setForm({ ...form, source_kind: e.target.value })}
-            />
-            <datalist id="onb-kinds">
-              <option value="web" />
-              <option value="telegram" />
-            </datalist>
-          </Field>
-          <Field label="Очікувані типи даних">
-            <input
-              value={form.expected}
-              onChange={(e) => setForm({ ...form, expected: e.target.value })}
-              placeholder="product, event"
-            />
-          </Field>
-          <Field label="Бюджет дослідження">
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
-            />
-          </Field>
-          <Field label="Валюта">
-            <input
-              value={form.currency}
-              onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
-              maxLength={3}
-            />
-          </Field>
-          <Field label="Макс. сторінок вибірки">
-            <input
-              type="number"
-              min={1}
-              value={form.samples}
-              onChange={(e) => setForm({ ...form, samples: e.target.value })}
-            />
-          </Field>
-          <Field
-            label="Поріг впевненості вибірки"
-            hint="Більше 0 і не більше 1; порожньо — поріг асистента (min_onboarding_confidence)"
-          >
-            <input
-              type="number"
-              min={0}
-              max={1}
-              step="any"
-              value={form.confidence}
-              onChange={(e) => setForm({ ...form, confidence: e.target.value })}
-            />
-          </Field>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={form.auto_activation}
-              onChange={(e) => setForm({ ...form, auto_activation: e.target.checked })}
-            />
-            Дозволити автоматичну активацію
-          </label>
-        </div>
-        {confidenceError ? <p role="alert">{confidenceError}</p> : null}
-        <Field label="Правила обходу від користувача (фрагмент CollectorRules, необов'язково)">
-          <JsonEditor
-            text={form.hints}
-            onChange={(t) => setForm({ ...form, hints: t })}
-            label="Підказки обходу"
-            minHeight="5rem"
-          />
-        </Field>
+        </fieldset>
         <button
           type="button"
           className="btn btn-primary"
           disabled={
             !form.query.trim() || Boolean(hints.parseError) || Boolean(confidenceError) || start.isPending
           }
-          onClick={() => start.mutate()}
+          onClick={() => start.mutate(form)}
         >
           Почати підключення
         </button>

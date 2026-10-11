@@ -36,5 +36,5 @@ export function useStagePropertyHelp(stage: Stage) {
       describeStageProperty(stage, path, help.data ?? undefined, keys),
     [stage, help.data],
   );
-  return { describe, loading: help.isLoading, error: help.error };
+  return { describe, schema: help.data ?? undefined, loading: help.isLoading, error: help.error };
 }

@@ -13,6 +13,8 @@ import { UnifiedDiff } from "../components/UnifiedDiff";
 import { ErrorBox, Field, Loading, Notice, Page, Section } from "../components/ui";
 import { SCHEMAS } from "../lib/schema";
 import { SEMVER_PATTERN, bumpVersion } from "../lib/format";
+import { useUnsavedChanges } from "../components/UnsavedChanges";
+import "../chain-editor.css";
 
 const MANIFEST_TAB = "jane-package.json";
 const PACKAGE_PATH = /^(?!\/)(?!.*(^|\/)\.\.(\/|$))[A-Za-z0-9._/-]{1,300}$/;
@@ -41,15 +43,27 @@ export function PackageEditorPage() {
   const [newPath, setNewPath] = useState("");
   const [newVersion, setNewVersion] = useState("");
   const [summary, setSummary] = useState("");
+  const [baseline, setBaseline] = useState("");
+  const snapshot = JSON.stringify([files, manifestText, newVersion, summary, newPath]);
+  const dirty = Boolean(baseline && snapshot !== baseline);
 
   useEffect(() => {
-    if (!source.data) return;
+    if (!source.data || dirty) return;
     setFiles(source.data.files);
     setManifestText(toJsonText(source.data.version.manifest));
     setNewVersion(bumpVersion(version));
     const first = Object.keys(source.data.files).find((p) => p.endsWith(".py"));
     setActive(first ?? MANIFEST_TAB);
-  }, [source.data, version]);
+    setBaseline(
+      JSON.stringify([
+        source.data.files,
+        toJsonText(source.data.version.manifest),
+        bumpVersion(version),
+        "",
+        "",
+      ]),
+    );
+  }, [source.data, version, dirty]);
 
   const original = useMemo<Record<string, PackageFile>>(() => source.data?.files ?? {}, [source.data]);
   const changed = useMemo(() => {
@@ -85,8 +99,21 @@ export function PackageEditorPage() {
       const manifest = nextManifest(manifestCheck.value as PackageManifest, newVersion, summary);
       return publishVersion(api, packageId, manifest, files);
     },
-    onSuccess: (published) =>
-      navigate(`/packages/${encodeURIComponent(packageId)}?version=${encodeURIComponent(published.version)}`),
+    onSuccess: (published) => {
+      guard.markSaved();
+      setBaseline(snapshot);
+      navigate(`/packages/${encodeURIComponent(packageId)}?version=${encodeURIComponent(published.version)}`);
+    },
+  });
+  const guard = useUnsavedChanges({
+    dirty,
+    label: `Пакет ${packageId}`,
+    onDiscard: () => setBaseline(snapshot),
+    onSave: async () => {
+      if (!manifestCheck.ok || !manifestCheck.value || !SEMVER_PATTERN.test(newVersion)) return false;
+      await publish.mutateAsync();
+      return true;
+    },
   });
 
   if (source.isLoading) return <Loading what="Завантаження файлів пакета" />;
@@ -96,129 +123,146 @@ export function PackageEditorPage() {
 
   return (
     <Page title={`Редактор ${packageId}@${version}`}>
-      <ErrorBox error={source.error} />
-      <Notice>
-        Вихідна версія незмінна. Після публікації нова версія має статус draft: запустіть тести (без запису в
-        робочі дані), порівняйте відмінності, погодьте й активуйте в етапі завдання.{" "}
-        <Link to={`/packages/${encodeURIComponent(packageId)}`}>До пакета</Link>
-      </Notice>
-      <div className="editor-layout">
-        <nav className="file-tree" aria-label="Файли пакета">
-          <button
-            type="button"
-            className={active === MANIFEST_TAB ? "file file-active" : "file"}
-            onClick={() => setActive(MANIFEST_TAB)}
-          >
-            {MANIFEST_TAB}
-          </button>
-          {paths.map((p) => (
+      <fieldset className="form-fields" disabled={publish.isPending}>
+        <ErrorBox error={source.error} />
+        {dirty ? (
+          <Notice tone="warn">Є незбережені зміни пакета. Вони залишаються у чернетці між файлами.</Notice>
+        ) : null}
+        <Notice>
+          Вихідна версія незмінна. Після публікації нова версія має статус draft: запустіть тести (без запису
+          в робочі дані), порівняйте відмінності, погодьте й активуйте в етапі завдання.{" "}
+          <Link to={`/packages/${encodeURIComponent(packageId)}`}>До пакета</Link>
+        </Notice>
+        <div className="editor-layout">
+          <nav className="file-tree" aria-label="Файли пакета">
             <button
-              key={p}
               type="button"
-              className={active === p ? "file file-active" : "file"}
-              onClick={() => setActive(p)}
+              className={active === MANIFEST_TAB ? "file file-active" : "file"}
+              onClick={() => setActive(MANIFEST_TAB)}
             >
-              {changed.includes(p) ? "● " : ""}
-              {p}
+              {MANIFEST_TAB}
             </button>
-          ))}
-          <div className="inline-form">
-            <input
-              aria-label="Новий файл"
-              placeholder="src/new_module.py"
-              value={newPath}
-              onChange={(e) => setNewPath(e.target.value)}
-            />
+            {paths.map((p) => (
+              <button
+                key={p}
+                type="button"
+                className={active === p ? "file file-active" : "file"}
+                onClick={() => setActive(p)}
+              >
+                {changed.includes(p) ? "● " : ""}
+                {p}
+              </button>
+            ))}
+            <div className="inline-form">
+              <input
+                aria-label="Новий файл"
+                placeholder="src/new_module.py"
+                value={newPath}
+                onChange={(e) => setNewPath(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn btn-small"
+                disabled={!PACKAGE_PATH.test(newPath) || newPath in files || newPath === MANIFEST_TAB}
+                onClick={() => {
+                  setFiles((f) => ({ ...f, [newPath]: { encoding: "utf-8", data: "" } }));
+                  setActive(newPath);
+                  setNewPath("");
+                }}
+              >
+                Додати
+              </button>
+            </div>
+          </nav>
+          <div className="editor-main">
+            {active === MANIFEST_TAB ? (
+              <JsonEditor
+                text={manifestText}
+                onChange={setManifestText}
+                schema={SCHEMAS.manifest}
+                label="Маніфест"
+                minHeight="28rem"
+                readOnly={publish.isPending}
+              />
+            ) : current ? (
+              current.encoding === "base64" ? (
+                <p className="muted">
+                  Бінарний файл ({active}) — редагування недоступне, файл буде збережено без змін.
+                </p>
+              ) : (
+                <>
+                  <div className="editor-head">
+                    <code>{active}</code>
+                    <button
+                      type="button"
+                      className="btn btn-small btn-danger"
+                      onClick={() => {
+                        setFiles((f) => {
+                          const next = { ...f };
+                          delete next[active];
+                          return next;
+                        });
+                        setActive(MANIFEST_TAB);
+                      }}
+                    >
+                      Видалити файл
+                    </button>
+                  </div>
+                  <CodeEditor
+                    value={current.data}
+                    language={languageOfPath(active)}
+                    label={`Код ${active}`}
+                    minHeight="28rem"
+                    readOnly={publish.isPending}
+                    onChange={(data) => setFiles((f) => ({ ...f, [active]: { encoding: "utf-8", data } }))}
+                  />
+                </>
+              )
+            ) : null}
+          </div>
+        </div>
+        <Section title={`Зміни відносно ${version} (${changed.length})`}>
+          {patch ? (
+            <UnifiedDiff diff={patch} label="Локальні зміни" />
+          ) : (
+            <p className="muted">Змін у файлах немає.</p>
+          )}
+        </Section>
+        <Section title="Опублікувати нову версію">
+          <div className="grid-2">
+            <Field label="Нова версія">
+              <input value={newVersion} onChange={(e) => setNewVersion(e.target.value)} />
+            </Field>
+            <Field label="Опис змін">
+              <textarea
+                rows={3}
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                maxLength={4000}
+              />
+            </Field>
+          </div>
+          {manifestCheck.parseError || manifestCheck.issues.length ? (
+            <p className="error-inline">Маніфест не відповідає схемі — виправте на вкладці {MANIFEST_TAB}.</p>
+          ) : null}
+          <ErrorBox error={publish.error} title="Версію не опубліковано" />
+          <div className="form-save-bar">
             <button
               type="button"
-              className="btn btn-small"
-              disabled={!PACKAGE_PATH.test(newPath) || newPath in files || newPath === MANIFEST_TAB}
-              onClick={() => {
-                setFiles((f) => ({ ...f, [newPath]: { encoding: "utf-8", data: "" } }));
-                setActive(newPath);
-                setNewPath("");
-              }}
+              className="btn btn-primary"
+              disabled={
+                publish.isPending ||
+                !manifestCheck.ok ||
+                !manifestCheck.value ||
+                !SEMVER_PATTERN.test(newVersion)
+              }
+              onClick={() => publish.mutate()}
             >
-              Додати
+              Опублікувати як нову версію
             </button>
           </div>
-        </nav>
-        <div className="editor-main">
-          {active === MANIFEST_TAB ? (
-            <JsonEditor
-              text={manifestText}
-              onChange={setManifestText}
-              schema={SCHEMAS.manifest}
-              label="Маніфест"
-              minHeight="28rem"
-            />
-          ) : current ? (
-            current.encoding === "base64" ? (
-              <p className="muted">
-                Бінарний файл ({active}) — редагування недоступне, файл буде збережено без змін.
-              </p>
-            ) : (
-              <>
-                <div className="editor-head">
-                  <code>{active}</code>
-                  <button
-                    type="button"
-                    className="btn btn-small btn-danger"
-                    onClick={() => {
-                      setFiles((f) => {
-                        const next = { ...f };
-                        delete next[active];
-                        return next;
-                      });
-                      setActive(MANIFEST_TAB);
-                    }}
-                  >
-                    Видалити файл
-                  </button>
-                </div>
-                <CodeEditor
-                  value={current.data}
-                  language={languageOfPath(active)}
-                  label={`Код ${active}`}
-                  minHeight="28rem"
-                  onChange={(data) => setFiles((f) => ({ ...f, [active]: { encoding: "utf-8", data } }))}
-                />
-              </>
-            )
-          ) : null}
-        </div>
-      </div>
-      <Section title={`Зміни відносно ${version} (${changed.length})`}>
-        {patch ? (
-          <UnifiedDiff diff={patch} label="Локальні зміни" />
-        ) : (
-          <p className="muted">Змін у файлах немає.</p>
-        )}
-      </Section>
-      <Section title="Опублікувати нову версію">
-        <div className="grid-2">
-          <Field label="Нова версія">
-            <input value={newVersion} onChange={(e) => setNewVersion(e.target.value)} />
-          </Field>
-          <Field label="Опис змін">
-            <input value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={4000} />
-          </Field>
-        </div>
-        {manifestCheck.parseError || manifestCheck.issues.length ? (
-          <p className="error-inline">Маніфест не відповідає схемі — виправте на вкладці {MANIFEST_TAB}.</p>
-        ) : null}
-        <ErrorBox error={publish.error} title="Версію не опубліковано" />
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={
-            publish.isPending || !manifestCheck.ok || !manifestCheck.value || !SEMVER_PATTERN.test(newVersion)
-          }
-          onClick={() => publish.mutate()}
-        >
-          Опублікувати як нову версію
-        </button>
-      </Section>
+        </Section>
+      </fieldset>
     </Page>
   );
 }

@@ -11,6 +11,7 @@ export function EntityPicker({
   required = false,
   loading = false,
   error,
+  validationError,
 }: {
   label: string;
   value: string;
@@ -19,6 +20,7 @@ export function EntityPicker({
   required?: boolean;
   loading?: boolean;
   error?: unknown;
+  validationError?: string | undefined;
 }) {
   const id = useId();
   const [search, setSearch] = useState("");
@@ -41,6 +43,7 @@ export function EntityPicker({
       </Field>
       <Field
         label={label}
+        error={validationError}
         hint={
           selected
             ? `${selected.label}${selected.description ? ` — ${selected.description}` : ""}`

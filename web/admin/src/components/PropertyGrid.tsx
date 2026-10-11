@@ -1,7 +1,36 @@
-import { createContext, Fragment, useContext, useEffect, useId, useState } from "react";
+import { createContext, Fragment, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { emptyValue, jsonType, moveItem, renameField, type JsonType, type JsonValue } from "../lib/property";
 
 const TYPES: JsonType[] = ["string", "number", "boolean", "null", "object", "array"];
+const TYPE_LABELS: Record<JsonType, string> = {
+  string: "Рядок",
+  number: "Число",
+  boolean: "Так / ні",
+  null: "Порожнє",
+  object: "Об’єкт",
+  array: "Масив",
+};
+function optionLabel(option: unknown, keys: readonly (string | number)[]): string {
+  const names: Record<string, Record<string, string>> = {
+    mode: { full: "Повний збір", incremental: "Продовжити збір" },
+    op: {
+      eq: "Дорівнює",
+      ne: "Не дорівнює",
+      in: "Є у списку",
+      not_in: "Немає у списку",
+      exists: "Існує",
+      not_exists: "Не існує",
+      gt: "Більше",
+      gte: "Більше або дорівнює",
+      lt: "Менше",
+      lte: "Менше або дорівнює",
+      matches_glob: "Відповідає шаблону",
+      matches_regex: "Відповідає регулярному виразу",
+    },
+  };
+  const label = names[String(keys.at(-1))]?.[String(option)];
+  return label ? `${label} (${String(option)})` : String(option);
+}
 export const PropertyIssuesContext = createContext<(key: string, error: string) => void>(() => {});
 export const PropertyDraftsBlockedContext = createContext(false);
 export function PropertyGrid({
@@ -10,12 +39,23 @@ export function PropertyGrid({
   label = "Властивості",
   objectRoot = false,
   describe,
+  choices,
+  renderValue,
 }: {
   value: JsonValue;
   onChange: (value: JsonValue) => void;
   label?: string;
   objectRoot?: boolean;
   describe?: ((path: string, keys: readonly (string | number)[]) => string | undefined) | undefined;
+  choices?: ((path: string, keys: readonly (string | number)[]) => unknown[] | undefined) | undefined;
+  renderValue?:
+    | ((
+        path: string,
+        keys: readonly (string | number)[],
+        value: JsonValue,
+        onChange: (value: JsonValue) => void,
+      ) => ReactNode)
+    | undefined;
 }) {
   return (
     <div className="property-grid-wrap">
@@ -37,6 +77,8 @@ export function PropertyGrid({
             onChange={onChange}
             depth={0}
             describe={describe}
+            choices={choices}
+            renderValue={renderValue}
             fixedType={objectRoot}
           />
         </tbody>
@@ -58,6 +100,8 @@ function PropertyRow({
   prefix,
   visible = true,
   describe,
+  choices,
+  renderValue,
 }: {
   name: string;
   path: string;
@@ -72,6 +116,15 @@ function PropertyRow({
   prefix: string;
   visible?: boolean;
   describe?: ((path: string, keys: readonly (string | number)[]) => string | undefined) | undefined;
+  choices?: ((path: string, keys: readonly (string | number)[]) => unknown[] | undefined) | undefined;
+  renderValue?:
+    | ((
+        path: string,
+        keys: readonly (string | number)[],
+        value: JsonValue,
+        onChange: (value: JsonValue) => void,
+      ) => ReactNode)
+    | undefined;
 }) {
   const [open, setOpen] = useState(true);
   const [error, setError] = useState("");
@@ -83,6 +136,8 @@ function PropertyRow({
     return () => reportIssue(issueId, "");
   }, [reportIssue, issueId, error]);
   const description = describe?.(path, keys);
+  const allowed = choices?.(path, keys);
+  const customValue = renderValue?.(path, keys, value, onChange);
   const descriptionId = `${issueId}-description`;
   const type = jsonType(value);
   const container = type === "object" || type === "array";
@@ -91,7 +146,7 @@ function PropertyRow({
   return (
     <Fragment>
       <tr hidden={!visible}>
-        <td style={{ paddingLeft: `${Math.min(depth, 5) * 0.6 + 0.5}rem` }}>
+        <td data-label="Назва" style={{ paddingLeft: `${Math.min(depth, 5) * 0.6 + 0.5}rem` }}>
           <div className="property-name-controls">
             {container ? (
               <button
@@ -132,9 +187,9 @@ function PropertyRow({
             </p>
           ) : null}
         </td>
-        <td>
+        <td data-label="Тип">
           <select
-            disabled={fixedType || blocked}
+            disabled={fixedType || blocked || Boolean(allowed?.length) || Boolean(customValue)}
             aria-describedby={description ? descriptionId : undefined}
             aria-label={`Тип ${path}`}
             value={type}
@@ -144,14 +199,46 @@ function PropertyRow({
             }}
           >
             {TYPES.map((t) => (
-              <option key={t}>{t}</option>
+              <option key={t} value={t}>
+                {TYPE_LABELS[t]} ({t})
+              </option>
             ))}
           </select>
         </td>
-        <td>
+        <td data-label="Значення">
           <div className="property-value-controls">
             <div className="property-value">
-              {type === "string" ? (
+              {customValue ||
+                (allowed?.length ? (
+                  <select
+                    aria-label={`Значення ${path}`}
+                    aria-describedby={description ? descriptionId : undefined}
+                    value={typeof value === "string" ? value : JSON.stringify(value)}
+                    onChange={(event) => {
+                      const selected = allowed.find(
+                        (option) =>
+                          (typeof option === "string" ? option : JSON.stringify(option)) ===
+                          event.target.value,
+                      );
+                      onChange(selected as JsonValue);
+                    }}
+                  >
+                    {!allowed.some((option) => JSON.stringify(option) === JSON.stringify(value)) ? (
+                      <option value={typeof value === "string" ? value : JSON.stringify(value)}>
+                        Недопустиме: {String(value)}
+                      </option>
+                    ) : null}
+                    {allowed.map((option) => (
+                      <option
+                        key={JSON.stringify(option)}
+                        value={typeof option === "string" ? option : JSON.stringify(option)}
+                      >
+                        {optionLabel(option, keys)}
+                      </option>
+                    ))}
+                  </select>
+                ) : null)}
+              {!customValue && !allowed?.length && type === "string" ? (
                 <textarea
                   rows={1}
                   aria-describedby={description ? descriptionId : undefined}
@@ -160,7 +247,7 @@ function PropertyRow({
                   onChange={(e) => onChange(e.target.value)}
                 />
               ) : null}
-              {type === "number" ? (
+              {!customValue && !allowed?.length && type === "number" ? (
                 <input
                   type="number"
                   onChange={(e) =>
@@ -183,7 +270,7 @@ function PropertyRow({
                   }}
                 />
               ) : null}
-              {type === "boolean" ? (
+              {!customValue && !allowed?.length && type === "boolean" ? (
                 <input
                   type="checkbox"
                   aria-describedby={description ? descriptionId : undefined}
@@ -260,6 +347,8 @@ function PropertyRow({
             <PropertyRow
               prefix={prefix}
               describe={describe}
+              choices={choices}
+              renderValue={renderValue}
               visible={visible && open}
               key={key}
               name={key}
@@ -278,6 +367,8 @@ function PropertyRow({
             <PropertyRow
               prefix={prefix}
               describe={describe}
+              choices={choices}
+              renderValue={renderValue}
               visible={visible && open}
               key={index}
               name={String(index)}

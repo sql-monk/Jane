@@ -1,4 +1,4 @@
-import { captureRequest, expect, openapiExample, test } from "./fixtures";
+import { captureRequest, expect, fulfillJson, openapiExample, test } from "./fixtures";
 import type { TaskConfig } from "../src/api/types";
 
 test("visual chain preserves nested properties, refs and branches through save @mock", async ({ admin }) => {
@@ -182,6 +182,7 @@ test("property names and actions stay on one row with accessible parameter help 
   await admin.getByRole("tab", { name: "Ланцюжок" }).click();
   await admin.getByTestId("dag-node-collect").click();
   const grid = admin.getByRole("table", { name: "Властивості", exact: true });
+  await expect(admin.getByText("Завантажуємо описи параметрів…", { exact: true })).toHaveCount(0);
   const toggle = await grid.getByLabel("Розгорнути $.collector", { exact: true }).boundingBox();
   const name = await grid.getByLabel("Назва $.collector", { exact: true }).boundingBox();
   expect(toggle).not.toBeNull();
@@ -201,4 +202,35 @@ test("property names and actions stay on one row with accessible parameter help 
   await admin.setViewportSize({ width: 390, height: 844 });
   expect(await admin.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await expect(grid.getByLabel("Значення $.collector.mode", { exact: true })).toHaveValue("full");
+});
+
+test("mobile property cards edit nested arrays and reorder in both themes @mock", async ({ admin }) => {
+  const task = openapiExample<TaskConfig>("task-catalog");
+  task.stages.find((stage) => stage.stage_id === "extract-products")!.params = {
+    items: [1, 2],
+    meta: { tags: ["original"] },
+  };
+  await fulfillJson(admin, "/api/orchestrator/v1/tasks/shop-catalog", task);
+  await admin.setViewportSize({ width: 390, height: 844 });
+  await admin.goto("/tasks/shop-catalog");
+  await admin.getByRole("tab", { name: "Ланцюжок" }).click();
+  await admin.getByTestId("dag-node-extract-products").click();
+  const grid = admin.getByRole("table", { name: "Властивості", exact: true });
+  for (const theme of ["light", "dark"]) {
+    await admin.getByLabel("Тема оформлення").selectOption(theme);
+    expect(await admin.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    await expect(grid.getByLabel("Значення $.params.meta.tags[0]", { exact: true })).toBeVisible();
+  }
+  await grid.getByLabel("Значення $.params.meta.tags[0]", { exact: true }).fill("updated");
+  await grid.getByLabel("Вгору $.params.items[1]", { exact: true }).click();
+  await expect(grid.getByLabel("Значення $.params.items[0]", { exact: true })).toHaveValue("2");
+  const { body } = await captureRequest(admin, "PUT", "/api/orchestrator/v1/tasks/shop-catalog", () =>
+    admin.getByRole("button", { name: "Зберегти", exact: true }).click(),
+  );
+  expect(
+    (body["stages"] as TaskConfig["stages"]).find((stage) => stage.stage_id === "extract-products")?.params,
+  ).toEqual({
+    items: [2, 1],
+    meta: { tags: ["updated"] },
+  });
 });

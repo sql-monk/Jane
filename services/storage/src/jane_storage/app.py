@@ -38,7 +38,7 @@ from jane_kit.auth_scopes import HANDLER, STORAGE, merge
 from jane_kit.config import LimitError, LimitLayer
 from jane_kit.content import ContentWriter, FileTransitStore, inline_ref
 from jane_kit.contracts import ContractViolation, OpenAPISpec, contracts_dir
-from jane_kit.errors import FieldError, JaneError, NotFound, ValidationFailed
+from jane_kit.errors import FieldError, JaneError, NotFound, Timeout, ValidationFailed
 from jane_kit.idempotency import (
     IDEMPOTENCY_HEADER,
     REPLAY_HEADER,
@@ -755,6 +755,17 @@ def build_app(
                 raise JaneError(str(exc), code="upstream_unavailable", retryable=exc.retryable) from exc
             yield adapter
 
+    @asynccontextmanager
+    async def timed_reader(connection_id: str) -> AsyncIterator[Any]:
+        """Bound adapter acquisition and the complete catalog/entity read to the configured deadline."""
+        try:
+            async with asyncio.timeout(limits.timeouts.request_timeout_ms / 1000):
+                async with reader(connection_id) as adapter:
+                    yield adapter
+        except TimeoutError as exc:
+            # Driver exception messages may contain credentials or query data.
+            raise Timeout("Storage read exceeded the configured request timeout") from exc
+
     async def call(coro: Any) -> Any:
         try:
             return await coro
@@ -772,7 +783,7 @@ def build_app(
         cursor: str | None = None,
         limit: int | None = Query(default=None, ge=1),
     ) -> JSONResponse:
-        async with reader(connection_id) as adapter:
+        async with timed_reader(connection_id) as adapter:
             catalog_reader = getattr(adapter, "list_entity_types", None)
             if not callable(catalog_reader):
                 raise JaneError("This adapter does not support entity discovery", code="not_implemented")
@@ -798,7 +809,7 @@ def build_app(
         cursor: str | None = None,
         limit: int | None = Query(default=None, ge=1),
     ) -> JSONResponse:
-        async with reader(connection_id) as adapter:
+        async with timed_reader(connection_id) as adapter:
             term = search.strip() if search else ""
             if term and not callable(getattr(adapter, "search_entities", None)):
                 raise JaneError("This adapter does not support entity search", code="not_implemented")

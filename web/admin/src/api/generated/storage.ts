@@ -971,6 +971,24 @@ export interface components {
     };
   };
   responses: {
+    /** @description Перевищено налаштований timeouts.request_timeout_ms під час читання сховища. */
+    EntityReadTimeout: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        /**
+         * @example {
+         *       "type": "urn:jane:problem:timeout",
+         *       "title": "Timeout",
+         *       "status": 504,
+         *       "code": "timeout",
+         *       "retryable": true
+         *     }
+         */
+        "application/problem+json": components["schemas"]["problem.schema"];
+      };
+    };
     /** @description Каталог або пошук сутностей не підтримується цим адаптером. */
     DiscoveryNotSupported: {
       headers: {
@@ -1431,6 +1449,7 @@ export interface operations {
       404: components["responses"]["NotFound"];
       422: components["responses"]["UnprocessableEntity"];
       501: components["responses"]["DiscoveryNotSupported"];
+      504: components["responses"]["EntityReadTimeout"];
     };
   };
   listEntities: {
@@ -1471,6 +1490,7 @@ export interface operations {
       404: components["responses"]["NotFound"];
       422: components["responses"]["UnprocessableEntity"];
       501: components["responses"]["DiscoveryNotSupported"];
+      504: components["responses"]["EntityReadTimeout"];
     };
   };
   listEntityHistory: {

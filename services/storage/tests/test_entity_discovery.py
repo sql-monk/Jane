@@ -1,12 +1,18 @@
 """Catalog, server-side search and inventories against the real filesystem adapter."""
 
+import asyncio
+import json
+import threading
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
 from jane_kit.contracts import OpenAPISpec
+from jane_storage.app import build_app
+from jane_storage.settings import Settings
 
 
 def seed(client: TestClient, h: SimpleNamespace) -> None:
@@ -80,3 +86,65 @@ def test_optional_catalog_unavailable_and_failure_not_empty(
     )
     assert response.status_code == 501
     assert client.get("/v1/entity-types", params={"connection_id": "broken-files"}).status_code == 502
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "query"),
+    [
+        ("list_entity_types", "/v1/entity-types", {}),
+        ("list_entities", "/v1/entities", {"entity_type": "product"}),
+        ("search_entities", "/v1/entities", {"entity_type": "product", "search": "private-query"}),
+        (
+            "read_entity",
+            "/v1/entities",
+            {"entity_type": "product", "key": "private-key", "search": "private-query"},
+        ),
+    ],
+)
+def test_configured_read_deadline_returns_safe_problem(
+    method: str,
+    path: str,
+    query: dict[str, str],
+    settings: Settings,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from jane_storage_files import FilesystemAdapter
+
+    original = getattr(FilesystemAdapter, method)
+    cancelled = threading.Event()
+
+    async def delayed_real_read(self: FilesystemAdapter, *args: Any, **kwargs: Any) -> Any:
+        try:
+            await asyncio.sleep(0.1)
+            return await original(self, *args, **kwargs)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    monkeypatch.setattr(FilesystemAdapter, method, delayed_real_read)
+    limits_file = tmp_path / "read-deadline.json"
+    limits_file.write_text(
+        json.dumps({"defaults": {"timeouts": {"request_timeout_ms": 5}}}), encoding="utf-8"
+    )
+    spec = OpenAPISpec.load(Path(__file__).resolve().parents[3] / "contracts/openapi/storage.v1.yaml")
+    with TestClient(build_app(settings.with_overrides(limits_file=limits_file))) as client:
+        assert client.get("/v1/info").json()["limits"]["defaults"]["timeouts"]["request_timeout_ms"] == 5
+
+        # Warm the real connection so this regression measures cancellation of the operation,
+        # rather than timing out during first-time schema initialization.
+        async def warm_connection() -> None:
+            async with client.app.state.pool.lease("raw-files", "filesystem", {}):
+                pass
+
+        assert client.portal is not None
+        client.portal.call(warm_connection)
+        response = client.get(path, params={"connection_id": "raw-files", **query})
+    assert response.status_code == 504, response.text
+    assert response.headers["content-type"].startswith("application/problem+json")
+    assert response.json()["code"] == "timeout"
+    assert response.json()["retryable"] is True
+    assert cancelled.is_set(), "the actual adapter operation was not cancelled"
+    assert "private-query" not in response.text and "private-key" not in response.text
+    assert str(tmp_path) not in response.text
+    spec.validate_response("GET", path, 504, response.json(), response.headers["content-type"])

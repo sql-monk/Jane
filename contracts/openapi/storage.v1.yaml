@@ -449,6 +449,8 @@ paths:
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
         '501':
           $ref: '#/components/responses/DiscoveryNotSupported'
+        '504':
+          $ref: '#/components/responses/EntityReadTimeout'
   /v1/entities:
     get:
       x-jane-scope: storage:read
@@ -533,6 +535,8 @@ paths:
           $ref: 'common.yaml#/components/responses/UnprocessableEntity'
         '501':
           $ref: '#/components/responses/DiscoveryNotSupported'
+        '504':
+          $ref: '#/components/responses/EntityReadTimeout'
   /v1/entity-history:
     get:
       x-jane-scope: storage:read
@@ -796,6 +800,18 @@ paths:
           $ref: 'common.yaml#/components/responses/NotFound'
 components:
   responses:
+    EntityReadTimeout:
+      description: Перевищено налаштований timeouts.request_timeout_ms під час читання сховища.
+      content:
+        application/problem+json:
+          schema:
+            $ref: ../schemas/common/problem.schema.json
+          example:
+            type: urn:jane:problem:timeout
+            title: Timeout
+            status: 504
+            code: timeout
+            retryable: true
     DiscoveryNotSupported:
       description: Каталог або пошук сутностей не підтримується цим адаптером.
       content:

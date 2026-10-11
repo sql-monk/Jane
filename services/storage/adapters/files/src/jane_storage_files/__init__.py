@@ -472,6 +472,7 @@ class _Store:
 
     def list_entities(
         self,
+        stop: threading.Event,
         entity_type: str,
         scope: str | None,
         updated_since: datetime | None,
@@ -482,7 +483,9 @@ class _Store:
         folder = self.root / "entities" / entity_type
         snaps = []
         for path in folder.glob("*.json") if folder.is_dir() else []:
+            self._check_scan_cancelled(stop)
             doc = self.read_json(path)
+            self._check_scan_cancelled(stop)
             if doc is None:
                 continue
             snap = snapshot_from_json(doc)
@@ -500,6 +503,7 @@ class _Store:
             ):
                 continue
             snaps.append(snap)
+        self._check_scan_cancelled(stop)
         snaps.sort(key=lambda s: s.canonical_key)
         if cursor is not None:
             after = str(_unb64(cursor))
@@ -533,17 +537,30 @@ class _Store:
             "types": types,
         }
 
+    @staticmethod
+    def _check_scan_cancelled(stop: threading.Event) -> None:
+        if stop.is_set():
+            raise AdapterError("entity scan cancelled", retryable=True)
+
     def list_entity_types(
-        self, scope: str | None, cursor: str | None, limit: int
+        self, stop: threading.Event, scope: str | None, cursor: str | None, limit: int
     ) -> tuple[list[dict[str, Any]], str | None]:
+        self._check_scan_cancelled(stop)
         after = str(_unb64(cursor)) if cursor else None
         rows = []
-        for folder in sorted((self.root / "entities").glob("*")):
+        folders = []
+        for folder in (self.root / "entities").glob("*"):
+            self._check_scan_cancelled(stop)
+            folders.append(folder)
+        for folder in sorted(folders):
+            self._check_scan_cancelled(stop)
             if not folder.is_dir() or (after is not None and folder.name <= after):
                 continue
             count = 0
             for path in folder.glob("*.json"):
+                self._check_scan_cancelled(stop)
                 doc = self.read_json(path)
+                self._check_scan_cancelled(stop)
                 if doc is None:
                     continue
                 snap = snapshot_from_json(doc)
@@ -553,6 +570,7 @@ class _Store:
                 rows.append({"entity_type": folder.name, "entity_count": count})
             if len(rows) > limit:
                 break
+        self._check_scan_cancelled(stop)
         page = rows[:limit]
         return page, _b64(page[-1]["entity_type"]) if len(rows) > limit else None
 
@@ -644,6 +662,14 @@ class FilesystemAdapter:
         except OSError as exc:
             raise AdapterError(f"filesystem error: {exc}", retryable=True) from exc
 
+    async def _scan(self, fn: Callable[..., T], *args: Any) -> T:
+        stop = threading.Event()
+        try:
+            return await self._run(fn, stop, *args)
+        finally:
+            # Cancelling the await cannot kill an in-flight filesystem call. Stop before the next record.
+            stop.set()
+
     async def open(self, connection: ResolvedConnection, options: Mapping[str, Any]) -> None:
         params = dict(connection.params)
         base = params.get("base_path")
@@ -724,7 +750,7 @@ class FilesystemAdapter:
         cursor: str | None = None,
         limit: int,
     ) -> tuple[Sequence[EntitySnapshot], str | None]:
-        return await self._run(self.store.list_entities, entity_type, scope, updated_since, cursor, limit)
+        return await self._scan(self.store.list_entities, entity_type, scope, updated_since, cursor, limit)
 
     async def search_entities(
         self,
@@ -736,14 +762,14 @@ class FilesystemAdapter:
         cursor: str | None = None,
         limit: int,
     ) -> tuple[Sequence[EntitySnapshot], str | None]:
-        return await self._run(
+        return await self._scan(
             self.store.list_entities, entity_type, scope, updated_since, cursor, limit, search
         )
 
     async def list_entity_types(
         self, *, scope: str | None = None, cursor: str | None = None, limit: int
     ) -> tuple[Sequence[Mapping[str, Any]], str | None]:
-        return await self._run(self.store.list_entity_types, scope, cursor, limit)
+        return await self._scan(self.store.list_entity_types, scope, cursor, limit)
 
     async def entity_statistics(self) -> dict[str, Any]:
         stop = threading.Event()

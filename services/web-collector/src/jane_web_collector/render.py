@@ -38,7 +38,7 @@ import contextlib
 import importlib.util
 import logging
 import time
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -471,6 +471,25 @@ class Renderer:
             log.info("headless browser started", extra={"browser_version": self._browser.version})
             return self._browser
 
+    @contextlib.asynccontextmanager
+    async def _fetch_page_slot(self, host: str, request_timeout_ms: int) -> AsyncIterator[None]:
+        """Bound document requests waiting for the shared pool without cancelling the browser driver."""
+        try:
+            async with asyncio.timeout(request_timeout_ms / 1000):
+                await self._pages.acquire()
+        except TimeoutError:
+            log.warning(
+                "browser page pool timeout",
+                extra={"host": host, "request_timeout_ms": request_timeout_ms},
+            )
+            raise httpx.ReadTimeout(
+                f"browser page pool timeout after request_timeout_ms={request_timeout_ms}"
+            ) from None
+        try:
+            yield
+        finally:
+            self._pages.release()
+
     async def fetch(
         self,
         url: str,
@@ -488,7 +507,7 @@ class Renderer:
         """
         request_limits = timeouts or limits.timeouts
         host = (urlsplit(url).hostname or "").lower().rstrip(".")
-        async with self._pages:
+        async with self._fetch_page_slot(host, request_limits.request_timeout_ms):
             browser = await self._get_browser()
             from playwright.async_api import Error as PlaywrightError
             from playwright.async_api import TimeoutError as PlaywrightTimeoutError

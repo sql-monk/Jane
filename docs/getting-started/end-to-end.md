@@ -1,8 +1,10 @@
 # Наскрізний сценарій: від джерела до збережених сутностей
 
-Сценарій піднімає ланцюжок Jane на Docker, публікує пакети в Registry, створює джерело й два незалежні завдання та виконує їх на тестовому магазині: повний каталог товарів і перевірку цін за розкладом. Результат — RAW-сторінки у файлах і картки товарів у PostgreSQL, де перевірка цін оновила лише ціну й наявність.
+Сценарій піднімає ланцюжок Jane на Docker, публікує пакети в Registry, створює джерело й два незалежні завдання та виконує їх на тестовому магазині: повний каталог товарів і перевірку цін за розкладом. Результат — RAW-сторінки у файлах і картки товарів у MongoDB (колекція `product`), де перевірка цін оновила лише ціну й наявність.
 
 Виконано 2026-10-11 на Windows 11, Docker Desktop, ревізія `48389a3`; на Linux не перевірявся. Передумови й підготовка — [початок роботи](README.md).
+
+Інструкції оновлено під сховище сутностей MongoDB (підключення `results-mongo`, пакет `jane.storage-mongodb@2.0.0`, ревізія `118707e`). Блоки виводу нижче — з перевірочного запуску 2026-10-11, коли картки писалися в PostgreSQL (`results-pg`, `jane.storage-postgresql@1.0.0`). На MongoDB сценарій ще не перевірено.
 
 ## Зміст
 
@@ -17,9 +19,9 @@
 
 | Крок | Модуль | Дія |
 |---|---|---|
-| `publish` | Registry | публікує й погоджує 7 пакетів: правила колектора, два екстрактори, пакети збереження `jane.storage-files` і `jane.storage-postgresql`, пакети Telegram-прикладу |
-| `apply` | Orchestrator | створює підключення `raw-files` і `results-pg`, джерело `testsite-shop` і завдання `testsite-catalog` |
-| `catalog` | Orchestrator → Web Collector, Storage, Handler Runtime | запуск повного каталогу: сторінки категорій із пагінацією → RAW у файлах, картки товарів → PostgreSQL |
+| `publish` | Registry | публікує й погоджує 7 пакетів: правила колектора, два екстрактори, пакети збереження `jane.storage-files` і `jane.storage-mongodb`, пакети Telegram-прикладу |
+| `apply` | Orchestrator | створює підключення `raw-files` і `results-mongo`, джерело `testsite-shop` і завдання `testsite-catalog` |
+| `catalog` | Orchestrator → Web Collector, Storage, Handler Runtime | запуск повного каталогу: сторінки категорій із пагінацією → RAW у файлах, картки товарів → MongoDB |
 | `price-check` | Orchestrator | створює завдання `testsite-price-check` з розкладом і чекає його першого запуску за розкладом: 4 URL товарів → лише `price` і `availability` |
 | `verify` | Storage, Orchestrator | перевіряє результат через публічні API читання |
 
@@ -45,7 +47,7 @@ project: jane-doc-start   profile: dev-laptop   stack file: C:/repos/Jane/.claud
   orchestrator       http://127.0.0.1:18910
 ```
 
-Стек складається з testsite, Registry, Storage, Handler Runtime, Web Collector, Orchestrator, а також PostgreSQL і MinIO як їхніх залежностей. Сервіси працюють у режимі `api_key`; ключі згенеровано в `.jane/stack-jane-doc-start.json`. Адреси без секретів показує команда:
+Стек складається з testsite, Registry, Storage, Handler Runtime, Web Collector, Orchestrator, а також PostgreSQL, MinIO і MongoDB як їхніх залежностей. MongoDB стартує разом зі Storage для підключення `results-mongo`, і поточна ревізія друкує ще рядок `mongodb 127.0.0.1:<порт>`; у виводі вище його немає, бо перевірочний запуск був до цієї зміни. Сервіси працюють у режимі `api_key`; ключі згенеровано в `.jane/stack-jane-doc-start.json`. Адреси без секретів показує команда:
 
 ```powershell
 uv run --all-packages python deploy/profiles/stack.py env --project jane-doc-start
@@ -123,7 +125,7 @@ summary: .jane/examples-jane-doc-start.json
 
 - `"ok": true` — усі перевірки `verify` пройшли.
 - `raw_objects: 23` — Storage зберіг усі 23 сторінки каталогу як RAW у підключенні `raw-files`.
-- `entities: 16` — 16 карток товарів у підключенні `results-pg` з усіма полями картки.
+- `entities: 16` — 16 карток товарів у підключенні сутностей (`results-mongo`; у перевірочному запуску — `results-pg`) з усіма полями картки.
 - `partial_updates` — для кожного з 4 товарів перевірки цін запис має `completeness: partial` і лише поля `price`, `availability`, `sku`; поля `title`, `category`, `url` лишилися з повного каталогу, версія стану — 2.
 
 Лічильники етапів запуску каталогу з підсумку `.jane/examples-jane-doc-start.json`: `collect` — 23 матеріали, `store-raw` — 23 успішні записи, `extract-products` і `store-products` — по 16 (екстрактор отримує лише сторінки `*/product/*`). Решта 7 матеріалів — сторінки, що не є товарами, — враховано як невідомі (`unknown_materials: 7`): їм не відповідає жоден прив'язаний екстрактор, а `forward_unknown_to_llm` вимкнено, тож LLM не викликався.
@@ -138,7 +140,7 @@ PowerShell:
 
 ```powershell
 $key = (Get-Content .jane/stack-jane-doc-start.json | ConvertFrom-Json).env.JANE_API_KEY_ADMIN
-$r = Invoke-RestMethod -Headers @{Authorization = "Bearer $key"} -Uri "http://127.0.0.1:18906/v1/entities?connection_id=results-pg&entity_type=product&scope=testsite-shop&limit=100"
+$r = Invoke-RestMethod -Headers @{Authorization = "Bearer $key"} -Uri "http://127.0.0.1:18906/v1/entities?connection_id=results-mongo&entity_type=product&scope=testsite-shop&limit=100"
 $r.items | ForEach-Object { [pscustomobject]@{sku = $_.fields.sku; price = $_.fields.price.amount; availability = $_.fields.availability; version = $_.version} } | Format-Table -AutoSize
 ```
 
@@ -146,10 +148,10 @@ Bash:
 
 ```bash
 key=$(python -c "import json; print(json.load(open('.jane/stack-jane-doc-start.json'))['env']['JANE_API_KEY_ADMIN'])")
-curl -s -H "Authorization: Bearer $key" "http://127.0.0.1:18906/v1/entities?connection_id=results-pg&entity_type=product&scope=testsite-shop&limit=100"
+curl -s -H "Authorization: Bearer $key" "http://127.0.0.1:18906/v1/entities?connection_id=results-mongo&entity_type=product&scope=testsite-shop&limit=100"
 ```
 
-Замініть порт `18906` на адресу `storage` зі свого виводу кроку 1. Вивід PowerShell перевірочного запуску:
+Замініть порт `18906` на адресу `storage` зі свого виводу кроку 1. Вивід PowerShell перевірочного запуску (2026-10-11, підключення `results-pg`):
 
 ```text
 sku              price availability version

@@ -1,9 +1,11 @@
 """Laptop prices of five real shops (Rozetka, Allo, Citrus, Foxtrot, Moyo) on a running Jane stack.
 
 Publishes and approves the packages of ``examples/shops/packages`` (a JSON-LD and a product-card extractor,
-collector rules per shop) and the storage packages, puts the connections ``raw-files`` / ``results-pg`` (as
-``examples/documents/connections.json``), creates a source and a task per shop and starts every task once:
-category pages 1-5 -> RAW in files -> ``offer`` entities in PostgreSQL. The tasks then run on their schedule.
+collector rules per shop) and the storage packages ``jane.storage-files`` / ``jane.storage-mongodb``, puts the
+connections ``raw-files`` / ``results-mongo`` (from ``examples/documents/connections.json``), creates or replaces
+a source and a task per shop and starts every task once: category pages 1-5 -> RAW in files -> entities of the
+taxonomy type ``product_electronics`` (the extractor stage parameter ``entity_type``) in MongoDB, a collection
+per entity type. The tasks then run on their schedule.
 
     uv run --all-packages python examples/shops/setup_shops.py --project <compose-project> [--no-run]
 
@@ -34,7 +36,14 @@ SHOPS = {
     "foxtrot": ("https://www.foxtrot.com.ua/uk/shop/noutbuki.html", "Фокстрот — ноутбуки", CARDS),
     "moyo": ("https://www.moyo.ua/ua/comp-and-periphery/notebooks/", "MOYO — ноутбуки", CARDS),
 }
-STORAGE = ("jane.storage-files", "jane.storage-postgresql")
+# the taxonomy type of the laptop category (docs/delivery/mongo-entities.md): the extractors take it from the
+# stage parameter entity_type, it names the entity collection in MongoDB
+ENTITY_TYPE = "product_electronics"
+# (storage package, connection id): RAW pages in files, entities in MongoDB
+RAW = ("jane.storage-files", "raw-files")
+RESULTS = ("jane.storage-mongodb", "results-mongo")
+STORAGE = (RAW[0], RESULTS[0])
+CONNECTIONS = HERE.parent / "documents" / "connections.json"
 
 
 def package_dirs(packages: Path = PACKAGES) -> dict[str, Path]:
@@ -95,6 +104,34 @@ def publish(svc: ex.Services, packages: Path = PACKAGES) -> dict[str, dict[str, 
     return refs
 
 
+def connection_docs(path: Path = CONNECTIONS) -> list[dict[str, Any]]:
+    """The connections the tasks use (``raw-files``, ``results-mongo``) from ``path``."""
+    wanted = {RAW[1], RESULTS[1]}
+    docs = [c for c in ex.read_json(path)["connections"] if c["connection_id"] in wanted]
+    if missing := wanted - {c["connection_id"] for c in docs}:
+        raise RuntimeError(f"{path}: connections {sorted(missing)} are missing")
+    return docs
+
+
+def upsert(orch: ex.Api, collection: str, id_field: str, doc: dict[str, Any]) -> int:
+    """Create a source or a task, or replace the existing one (new package versions, another storage)."""
+    if collection == "tasks":
+        check = orch.call("POST", "/v1/task-validations", json=doc).json()
+        if not check["valid"]:
+            raise RuntimeError(f"task {doc['task_id']} is invalid: {check['errors']}")
+    r = orch.call("POST", f"/v1/{collection}", ok=(201, 409), json=doc, headers={"Idempotency-Key": ex.key()})
+    if r.status_code == 409:
+        current = orch.call("GET", f"/v1/{collection}/{doc[id_field]}")
+        r = orch.call(
+            "PUT",
+            f"/v1/{collection}/{doc[id_field]}",
+            json=doc,
+            headers={"If-Match": current.headers["ETag"]},
+        )
+    ex.log(f"orchestrator: {collection[:-1]} {doc[id_field]} -> {r.status_code}")
+    return r.status_code
+
+
 def source_doc(shop: str, url: str, title: str, refs: dict[str, dict[str, str]]) -> dict[str, Any]:
     return {
         "source_id": f"shop-{shop}",
@@ -105,7 +142,7 @@ def source_doc(shop: str, url: str, title: str, refs: dict[str, dict[str, str]])
         "collector_rules": refs[f"shops.{shop}-notebooks-rules"],
         "limits": {"rate": {"requests_per_second_per_host": 1, "min_delay_ms_per_host": 1000}},
         "forward_unknown_to_llm": False,
-        "expected_entity_types": ["offer"],
+        "expected_entity_types": [ENTITY_TYPE],
         "labels": {"group": "notebook-prices"},
     }
 
@@ -114,21 +151,22 @@ def task_doc(shop: str, title: str, extractor: str, refs: dict[str, dict[str, st
     return {
         "task_id": f"notebooks-{shop}",
         "title": f"{title}: ціни",
-        "description": "Сторінки категорії → RAW у files, пропозиції (offer) у PostgreSQL.",
+        "description": f"Сторінки категорії → RAW у files, товари з цінами ({ENTITY_TYPE}) у MongoDB.",
         "input": {"source_id": f"shop-{shop}"},
         "stages": [
             {"stage_id": "collect", "kind": "collect", "collector": {"collector": "web", "mode": "full"}},
             {
                 "stage_id": "store-raw",
                 "kind": "handler",
-                "handler": refs["jane.storage-files"],
-                "connections": {"target": "raw-files"},
+                "handler": refs[RAW[0]],
+                "connections": {"target": RAW[1]},
                 "inputs": [{"from": "collect"}],
             },
             {
                 "stage_id": "extract-offers",
                 "kind": "handler",
                 "handler": refs[extractor],
+                "params": {"entity_type": ENTITY_TYPE},
                 "inputs": [
                     {
                         "from": "collect",
@@ -139,8 +177,8 @@ def task_doc(shop: str, title: str, extractor: str, refs: dict[str, dict[str, st
             {
                 "stage_id": "store-offers",
                 "kind": "handler",
-                "handler": refs["jane.storage-postgresql"],
-                "connections": {"target": "results-pg"},
+                "handler": refs[RESULTS[0]],
+                "connections": {"target": RESULTS[1]},
                 "inputs": [
                     {
                         "from": "extract-offers",
@@ -167,23 +205,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         refs = publish(svc)
         orch = svc.orchestrator
-        for conn in ex.read_json(HERE.parent / "documents" / "connections.json")["connections"]:
+        for conn in connection_docs():
             orch.call("PUT", f"/v1/connections/{conn['connection_id']}", ok=(200, 201), json=conn)
         for shop, (url, title, extractor) in SHOPS.items():
-            source = source_doc(shop, url, title, refs)
-            r = orch.call(
-                "POST", "/v1/sources", ok=(201, 409), json=source, headers={"Idempotency-Key": ex.key()}
-            )
-            if r.status_code == 409:  # exists: replace it (e.g. a new rules version)
-                current = orch.call("GET", f"/v1/sources/{source['source_id']}")
-                r = orch.call(
-                    "PUT",
-                    f"/v1/sources/{source['source_id']}",
-                    json=source,
-                    headers={"If-Match": current.headers["ETag"]},
-                )
-            ex.log(f"orchestrator: source {source['source_id']} -> {r.status_code}")
-            ex.create_task(orch, task_doc(shop, title, extractor, refs))
+            upsert(orch, "sources", "source_id", source_doc(shop, url, title, refs))
+            upsert(orch, "tasks", "task_id", task_doc(shop, title, extractor, refs))
         if ns.no_run:
             return 0
         runs = {shop: ex.start_run(orch, f"notebooks-{shop}", "examples/shops: first run") for shop in SHOPS}
@@ -194,11 +220,11 @@ def main(argv: list[str] | None = None) -> int:
             failed += run["status"] != "succeeded"
         time.sleep(2)
         for shop in SHOPS:
-            offers = svc.storage.pages(
+            products = svc.storage.pages(
                 "/v1/entities",
-                {"connection_id": "results-pg", "entity_type": "offer", "scope": f"shop-{shop}"},
+                {"connection_id": RESULTS[1], "entity_type": ENTITY_TYPE, "scope": f"shop-{shop}"},
             )
-            ex.log(f"storage: {len(offers)} offers of shop-{shop}")
+            ex.log(f"storage: {len(products)} {ENTITY_TYPE} of shop-{shop}")
         return 1 if failed else 0
     finally:
         svc.close()

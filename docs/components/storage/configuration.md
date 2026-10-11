@@ -136,10 +136,19 @@ Dev-стек ([infra/compose.yaml](../../../infra/compose.yaml)) задає `AUT
       "title": "Development results",
       "params": { "host": "postgres", "port": 5432, "database": "jane_storage_results", "schema": "public", "sslmode": "disable" },
       "secret_refs": { "username": "env:JANE_SECRET_DEV_PG_USER", "password": "env:JANE_SECRET_DEV_PG_PASSWORD" }
+    },
+    {
+      "connection_id": "results-mongo",
+      "kind": "mongodb",
+      "title": "Development results (MongoDB)",
+      "params": { "host": "mongodb", "port": 27017, "database": "jane_results", "auth_source": "admin" },
+      "secret_refs": { "username": "env:JANE_SECRET_DEV_MONGO_USER", "password": "env:JANE_SECRET_DEV_MONGO_PASSWORD" }
     }
   ]
 }
 ```
+
+У прикладах RAW пишеться в `raw-files`, а сутності — у `results-mongo`, колекція на тип ([ADR-0011](../../adr/0011-data-placement.md)). `results-pg` лишається для завдань, які зберігають сутності в PostgreSQL. Секрети `JANE_SECRET_DEV_*` і призначення кожного підключення описано в [infra/README.md](../../../infra/README.md#підключення-storage).
 
 Значення в `params`, схожі на секрет (імена на кшталт `password`, `token`, `api_key`; рядки з ключем AWS, приватним ключем або `user:pass@` в URL), відхиляються з `422 secret_detected`. Параметри `params` кожного адаптера — [адаптери](adapters.md).
 
@@ -189,7 +198,7 @@ Dev-стек ([infra/compose.yaml](../../../infra/compose.yaml)) задає `AUT
 | `jane.storage-files@1.0.0` | `filesystem` | `raw_and_entities` | `material`, `entities` | `prefix`, `format.raw`, `format.entities` (`json` \| `jsonl`) |
 | `jane.storage-postgresql@1.0.0` | `postgresql` | `raw_and_entities` | `material`, `entities` | `schema`, `table_prefix`, `format.raw` |
 | `jane.storage-sqlserver@1.0.0` | `sqlserver` | `raw_and_entities` | `material`, `entities` | `schema`, `table_prefix`, `format.raw` |
-| `jane.storage-mongodb@1.0.0` | `mongodb` | `raw_and_entities` | `material`, `entities` | `prefix`, `format.raw` |
+| `jane.storage-mongodb@2.0.0` | `mongodb` | `raw_and_entities` | `material`, `entities` | `prefix`, `format.raw` |
 | `jane.storage-minio@1.0.0` | `minio` | `raw_and_entities` | `material`, `entities` | `prefix`, `format.raw` |
 | `jane.storage-s3@1.0.0` | `s3` | `raw_and_entities` | `material`, `entities` | `prefix`, `format.raw` |
 
@@ -206,7 +215,7 @@ Dev-стек ([infra/compose.yaml](../../../infra/compose.yaml)) задає `AUT
 
 Сутності завжди зберігаються як JSON-документи; файловий адаптер може вести історію у JSON Lines (`format.entities: jsonl`).
 
-Перелік установлених пакетів із digest:
+Перелік установлених пакетів із digest (вивід — ревізія `118707e`, 2026-10-12):
 
 ```powershell
 uv run --all-packages jane-storage-packages list
@@ -215,7 +224,7 @@ uv run --all-packages jane-storage-packages list
 ```text
 jane.storage-files@1.0.0  adapter=filesystem  writes=raw_and_entities  sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f
 jane.storage-minio@1.0.0  adapter=minio  writes=raw_and_entities  sha256:aa521ad477f613472271ed9b46e9afa68b1f03d09974a50f0eb2146907d1a680
-jane.storage-mongodb@1.0.0  adapter=mongodb  writes=raw_and_entities  sha256:f9bf94e803118d0d28d4fe004b59df865b6679a1bbc0025d10832a02a5d44dff
+jane.storage-mongodb@2.0.0  adapter=mongodb  writes=raw_and_entities  sha256:2307eeb9e72b59a234f812a9f8dc716b05a9ac4643e843a520dac2ba3d8faad3
 jane.storage-postgresql@1.0.0  adapter=postgresql  writes=raw_and_entities  sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b
 jane.storage-s3@1.0.0  adapter=s3  writes=raw_and_entities  sha256:f67fc13b21711b053e96929d1ce38f6cc16b87368ea64407bdf9f1715ac1b07b
 jane.storage-sqlserver@1.0.0  adapter=sqlserver  writes=raw_and_entities  sha256:a3fd13c6e28ae187a2a68303a8440722cb75bd4718349a4b3e27214b6e3954bd

@@ -16,7 +16,7 @@
 
 ## Потік даних між етапами
 
-Приклад — завдання повного каталогу з [examples](../../examples/README.md) (`examples/documents/task.testsite-catalog.json`): усі сторінки зберігаються як RAW, сторінки товарів передаються екстрактору, сутності — у PostgreSQL.
+Приклад — завдання повного каталогу з [examples](../../examples/README.md) (`examples/documents/task.testsite-catalog.json`): усі сторінки зберігаються як RAW у файлах, сторінки товарів передаються екстрактору, сутності — у MongoDB (підключення `results-mongo`).
 
 ![Логічний потік даних завдання каталогу](../diagrams/platform/task-dataflow.light.png#gh-light-mode-only)
 ![Логічний потік даних завдання каталогу](../diagrams/platform/task-dataflow.dark.png#gh-dark-mode-only)

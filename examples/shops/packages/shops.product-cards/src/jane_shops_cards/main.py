@@ -4,8 +4,12 @@ Foxtrot and Moyo render each product of a category page as ``<div class="product
 the product data in attributes (Foxtrot: ``data-code``, ``data-title``, ``data-brand``, ``data-variant``;
 Moyo: ``data-product_id``, ``data-name``, ``data-brand``, ``data-status-product``, ``data-img`` and the
 product URL base64-encoded in ``data-async``); without a URL attribute the first ``.html`` link inside the card
-is the product page. Every card with an id, a title, a price and a URL becomes an ``offer`` entity - the same
-entity type and schema as ``shops.jsonld-offers``, keyed by the shop and the shop's product id.
+is the product page. Every card with an id, a title, a price and a URL becomes an entity - the same entity
+types and schema as ``shops.jsonld-offers``, keyed by the shop and the shop's product id.
+
+The entity type is the required stage parameter ``entity_type`` - a ``product_*`` type of the taxonomy that
+the task chooses for the one category it collects (laptops: ``product_electronics``); the extractor does not
+guess it from the page.
 """
 
 from __future__ import annotations
@@ -74,7 +78,16 @@ def _availability(card: dict[str, str]) -> str:
     return AVAILABILITY.get(raw.casefold(), "unknown")
 
 
+def _entity_type(params: dict[str, Any]) -> str:
+    """The ``product_*`` type of the stage; the runtime checks it against the params schema (enum)."""
+    value = params.get("entity_type")
+    if not isinstance(value, str) or not value.startswith("product_"):
+        raise ValueError(f"params.entity_type must be a product_* type, got {value!r}")
+    return value
+
+
 def extract(material: Material, params: dict[str, Any], ctx: Context) -> ExtractResult:
+    entity_type = _entity_type(params)
     page = _Cards(str(params.get("card_class") or "product-card"))
     page.feed(ctx.text())
     page_url = str((material.get("locator") or {}).get("url") or "")
@@ -105,4 +118,4 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
         found.setdefault(product_id, fields)
     if not found:
         return empty()
-    return success([entity("offer", fields) for fields in found.values()])
+    return success([entity(entity_type, fields) for fields in found.values()])

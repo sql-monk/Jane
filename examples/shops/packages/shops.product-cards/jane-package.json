@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "shops.product-cards",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "Shops: product offers from product-card data attributes",
-  "description": "Пропозиції товарів з карток div.product-card сторінок категорій (атрибути data-price, data-title/data-name, data-code/data-product_id, data-brand, наявність, посилання): Foxtrot, Moyo. Та сама сутність offer, що й у shops.jsonld-offers.",
+  "description": "Товари магазину з карток div.product-card сторінок категорій (атрибути data-price, data-title/data-name, data-code/data-product_id, data-brand, наявність, посилання): Foxtrot, Moyo. Ті самі типи й схема, що й у shops.jsonld-offers; тип product_* задає обов'язковий параметр етапу entity_type.",
   "tags": [
     "shops",
     "prices",
@@ -30,13 +30,157 @@
   "output": {
     "entities": [
       {
-        "entity_type": "offer",
-        "schema": "schemas/offer.schema.json",
+        "entity_type": "product_food",
+        "schema": "schemas/product.schema.json",
         "key_fields": [
           "shop",
           "product_id"
         ],
-        "description": "Товар магазину з поточною ціною й наявністю"
+        "description": "Товар магазину з поточною ціною й наявністю: продукти, напої, алкоголь"
+      },
+      {
+        "entity_type": "product_beauty",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: косметика, парфуми, гігієна й догляд"
+      },
+      {
+        "entity_type": "product_household",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: побутова хімія"
+      },
+      {
+        "entity_type": "product_book",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: книжки"
+      },
+      {
+        "entity_type": "product_kids",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: іграшки, дитячий транспорт, дитячі товари"
+      },
+      {
+        "entity_type": "product_electronics",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: електроніка, ноутбуки"
+      },
+      {
+        "entity_type": "product_appliance",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: побутова техніка"
+      },
+      {
+        "entity_type": "product_tools",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: інструменти, будівництво й ремонт, сантехніка, освітлення, підлога"
+      },
+      {
+        "entity_type": "product_garden",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: сад і город"
+      },
+      {
+        "entity_type": "product_home",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: дім, інтер'єр, меблі, товари для дому"
+      },
+      {
+        "entity_type": "product_clothing",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: одяг, взуття, аксесуари, галантерея"
+      },
+      {
+        "entity_type": "product_auto",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: автотовари"
+      },
+      {
+        "entity_type": "product_pet",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: зоотовари"
+      },
+      {
+        "entity_type": "product_sport",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: спорт і туризм"
+      },
+      {
+        "entity_type": "product_office",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: канцтовари, шкільне"
+      },
+      {
+        "entity_type": "product_health",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: медичні товари"
+      },
+      {
+        "entity_type": "product_other",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину з поточною ціною й наявністю: сезонні розділи, несортовані й решта товарів"
       }
     ]
   },
@@ -55,6 +199,9 @@
         "media_type": "text/html",
         "url": "https://www.foxtrot.com.ua/uk/shop/noutbuki.html"
       },
+      "params": {
+        "entity_type": "product_electronics"
+      },
       "expected_status": "success",
       "expected": "tests/foxtrot-notebooks/expected.json",
       "compare": "exact",
@@ -66,6 +213,9 @@
         "file": "tests/moyo-notebooks/page.html",
         "media_type": "text/html",
         "url": "https://www.moyo.ua/ua/comp-and-periphery/notebooks/"
+      },
+      "params": {
+        "entity_type": "product_electronics"
       },
       "expected_status": "success",
       "expected": "tests/moyo-notebooks/expected.json",
@@ -79,6 +229,9 @@
         "media_type": "text/html",
         "url": "https://www.moyo.ua/ua/"
       },
+      "params": {
+        "entity_type": "product_electronics"
+      },
       "expected_status": "empty",
       "origin": "human"
     }
@@ -86,10 +239,14 @@
   "provenance": {
     "created_by": "human",
     "authors": [
-      "Claude (coordinator)"
+      "Claude"
     ],
-    "created_at": "2026-10-10T00:00:00Z",
-    "change_summary": "Laptop prices of Foxtrot and Moyo from product cards."
+    "created_at": "2026-10-12T00:00:00Z",
+    "based_on": {
+      "package_id": "shops.product-cards",
+      "version": "1.0.0"
+    },
+    "change_summary": "2.0.0: entity type from the required stage parameter entity_type (product_* taxonomy, no default) instead of offer; every product_* type is declared with the same schema and key fields."
   },
   "bindings_hint": {
     "source_kinds": [

@@ -22,7 +22,7 @@
 | Assistant, Handler Runtime | PostgreSQL `jane_assistant`, `jane_handler_runtime` | спільна міграція `jane_kit.stores.postgres.migrate`: `CREATE … IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS` під advisory lock |
 | Web Collector | SQLite `state.db` | схема створюється під час відкриття; відсутні колонки додаються на місці |
 | Telegram Collector | SQLite `state.db` | `PRAGMA user_version` (зараз 1); файл старішої версії оновлюється один раз; файл новішої версії, ніж код, — помилка старту `StateFileTooNew` |
-| Storage | цільові сховища | адаптер викликає ідемпотентний `ensure_schema` під час першого відкриття підключення в процесі (PostgreSQL — таблиці `entities`, `entity_history`, `deliveries`, `objects` з префіксом під advisory lock; SQL Server — під `sp_getapplock`); власної бази стану Storage не має |
+| Storage | цільові сховища | адаптер викликає ідемпотентний `ensure_schema` під час першого відкриття підключення в процесі (PostgreSQL — таблиці `entities`, `entity_history`, `deliveries`, `objects` з префіксом під advisory lock; SQL Server — під `sp_getapplock`; MongoDB — індекси колекцій об'єктів, а колекції типу та їхні індекси — під час першого запису типу); власної бази стану Storage не має. `jane.storage-mongodb@2.0.0` змінила розкладку й колекцій 1.x не переносить — [Storage: оновлення](../components/storage/operations.md#оновлення-й-міграції) |
 
 Ролі й бази PostgreSQL створює не сервіс, а провізіонер стеку (`infra/postgres/provision.sql`) — [infra/README.md](../../infra/README.md#postgresql-бази-й-ролі-сервісів).
 

@@ -2,8 +2,13 @@
 
 One package for several shops. Rozetka and Citrus put an ``ItemList`` of ``Product`` items with an ``Offer``
 on a category page; Allo puts a collection ``Product`` whose ``offers`` list holds one ``Offer`` per product.
-Every product with a URL and a price becomes an ``offer`` entity keyed by the shop and the shop's product id
-(``sku``, else the numeric id in the product URL, else the URL). A page without such JSON-LD is ``empty``.
+Every product with a URL and a price becomes an entity keyed by the shop and the shop's product id (``sku``,
+else the numeric id in the product URL, else the URL). A page without such JSON-LD is ``empty``.
+
+The entity type is the required stage parameter ``entity_type`` - a ``product_*`` type of the taxonomy that
+the task chooses for the one category it collects (laptops: ``product_electronics``); every such type is
+declared in ``output.entities`` with the same schema. A category page does not say which taxonomy group it
+belongs to, so the extractor does not guess the type.
 """
 
 from __future__ import annotations
@@ -120,7 +125,16 @@ def _shop(url: str) -> str:
     return host.removeprefix("www.")
 
 
+def _entity_type(params: dict[str, Any]) -> str:
+    """The ``product_*`` type of the stage; the runtime checks it against the params schema (enum)."""
+    value = params.get("entity_type")
+    if not isinstance(value, str) or not value.startswith("product_"):
+        raise ValueError(f"params.entity_type must be a product_* type, got {value!r}")
+    return value
+
+
 def extract(material: Material, params: dict[str, Any], ctx: Context) -> ExtractResult:
+    entity_type = _entity_type(params)
     page = _LdJson()
     page.feed(ctx.text())
     page_url = str((material.get("locator") or {}).get("url") or "")
@@ -155,4 +169,4 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
             found.setdefault((fields["shop"], fields["product_id"]), fields)
     if not found:
         return empty()
-    return success([entity("offer", fields) for fields in found.values()])
+    return success([entity(entity_type, fields) for fields in found.values()])

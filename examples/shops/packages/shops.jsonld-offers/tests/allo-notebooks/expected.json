@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "offer",
+      "entity_type": "product_electronics",
       "fields": {
         "shop": "allo.ua",
         "product_id": "1203902",
@@ -29,7 +29,7 @@
       }
     },
     {
-      "entity_type": "offer",
+      "entity_type": "product_electronics",
       "fields": {
         "shop": "allo.ua",
         "product_id": "1190437",
@@ -57,7 +57,7 @@
       }
     },
     {
-      "entity_type": "offer",
+      "entity_type": "product_electronics",
       "fields": {
         "shop": "allo.ua",
         "product_id": "1029355",

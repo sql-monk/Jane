@@ -1,10 +1,11 @@
 # Ціни ноутбуків у реальних магазинах
 
-Приклад Jane на справжніх сайтах: для п'яти українських магазинів збирає перші п'ять сторінок категорії ноутбуків, зберігає їх як RAW і витягує пропозиції товарів (`offer`) з ціною й наявністю в PostgreSQL. Завдання далі виконуються за розкладом двічі на день. Загальний опис прикладів — [examples/README.md](../README.md).
+Приклад Jane на справжніх сайтах: для п'яти українських магазинів збирає перші п'ять сторінок категорії ноутбуків, зберігає їх як RAW і витягує товари з ціною й наявністю — сутності типу `product_electronics` — у MongoDB. Завдання далі виконуються за розкладом двічі на день. Загальний опис прикладів — [examples/README.md](../README.md).
 
 ## Зміст
 
 - [Магазини й пакети](#магазини-й-пакети)
+- [Тип сутності](#тип-сутності)
 - [Що створює скрипт](#що-створює-скрипт)
 - [Запуск](#запуск)
 - [Перевірка без сервісів](#перевірка-без-сервісів)
@@ -14,32 +15,47 @@
 
 | Магазин | Джерело | Правила колектора | Екстрактор |
 |---|---|---|---|
-| Rozetka | `shop-rozetka` | `shops.rozetka-notebooks-rules` 1.0.1 | `shops.jsonld-offers` |
-| Allo | `shop-allo` | `shops.allo-notebooks-rules` 1.0.1 | `shops.jsonld-offers` |
-| Цитрус | `shop-citrus` | `shops.citrus-notebooks-rules` 1.0.1 | `shops.jsonld-offers` |
-| Фокстрот | `shop-foxtrot` | `shops.foxtrot-notebooks-rules` 1.0.0 | `shops.product-cards` |
-| MOYO | `shop-moyo` | `shops.moyo-notebooks-rules` 1.0.0 | `shops.product-cards` |
+| Rozetka | `shop-rozetka` | `shops.rozetka-notebooks-rules` 1.0.1 | `shops.jsonld-offers` 2.0.0 |
+| Allo | `shop-allo` | `shops.allo-notebooks-rules` 1.0.1 | `shops.jsonld-offers` 2.0.0 |
+| Цитрус | `shop-citrus` | `shops.citrus-notebooks-rules` 1.0.1 | `shops.jsonld-offers` 2.0.0 |
+| Фокстрот | `shop-foxtrot` | `shops.foxtrot-notebooks-rules` 1.0.0 | `shops.product-cards` 2.0.0 |
+| MOYO | `shop-moyo` | `shops.moyo-notebooks-rules` 1.0.0 | `shops.product-cards` 2.0.0 |
 
 - **Правила колектора** — один список URL (стратегія `seed_list`) із першими п'ятьма сторінками категорії, без переходу за посиланнями; `robots.txt` дотримується (`robots.mode: respect`). Для сторінок 2–5, які вказують `rel=canonical` на першу, дедуплікацію за canonical вимкнено.
-- **`shops.jsonld-offers`** витягує пропозиції зі schema.org JSON-LD сторінок категорій (`ItemList` → `Product` → `Offer` або `Product.offers`).
-- **`shops.product-cards`** витягує пропозиції з карток товарів у розмітці сторінки (атрибути `data-*` елементів `div.product-card`).
-- **Сутність `offer`**: обов'язкові поля `shop`, `product_id`, `title`, `url`, `price`; додатково `brand`, `image`, `availability`. Ключ — `shop` і `product_id`.
+- **`shops.jsonld-offers`** витягує товари з цінами зі schema.org JSON-LD сторінок категорій (`ItemList` → `Product` → `Offer` або `Product.offers`).
+- **`shops.product-cards`** витягує товари з цінами з карток товарів у розмітці сторінки (атрибути `data-*` елементів `div.product-card`).
+- **Поля сутності** (схема `schemas/product.schema.json`, однакова для обох екстракторів і всіх типів): обов'язкові `shop`, `product_id`, `title`, `url`, `price`; додатково `brand`, `image`, `availability`. Ключ — `shop` і `product_id`.
 
 Пакети лежать у [packages/](packages/); тестові сторінки екстракторів — у `tests/` кожного пакета.
+
+## Тип сутності
+
+Тип товару — група таксономії `product_*` ([план сутностей у MongoDB](../../docs/delivery/mongo-entities.md#таксономія-типів)); він входить в ідентичність сутності й задає колекцію MongoDB. Сторінка категорії магазину не каже, до якої групи таксономії вона належить, тому тип задає завдання:
+
+- обидва екстрактори беруть тип з **обов'язкового** параметра етапу `entity_type` (`schemas/params.schema.json`): перелік (`enum`) усіх 17 типів `product_*` таксономії, від `product_food` до `product_other`;
+- **типового значення немає**: Handler Runtime відхиляє виклик етапу без `entity_type` (параметри не відповідають `params_schema`), етап завершується помилкою, і жодна сутність не потрапляє в чужу колекцію;
+- маніфест кожного екстрактора декларує в `output.entities` усі ці типи з тією самою схемою й ключем, тож runtime приймає будь-який тип із переліку й відхиляє решту;
+- завдання ноутбуків задають `"params": {"entity_type": "product_electronics"}`. Завдання іншої категорії тих самих магазинів вказує свій тип (невідома група — `product_other`).
+
+Попередні версії екстракторів (1.0.0) писали тип `offer`. Перехід на `product_*` — несумісна зміна, тому версії 2.0.0. Сутності `offer`, записані раніше в PostgreSQL (`results-pg`), лишаються як є й не переносяться.
 
 ## Що створює скрипт
 
 [setup_shops.py](setup_shops.py) на запущеному стеку:
 
-1. Публікує й погоджує в Registry пакети з `packages/` і пакети збереження `jane.storage-files`, `jane.storage-postgresql`. Якщо версія вже є з іншим дайджестом, зупиняється з вимогою підняти версію пакета.
-2. Створює в Orchestrator підключення `raw-files` і `results-pg` з [../documents/connections.json](../documents/connections.json).
-3. Для кожного магазину створює (або замінює) джерело `shop-<магазин>` з лімітом 1 запит на секунду на хост і завдання `notebooks-<магазин>`:
+1. Публікує й погоджує в Registry пакети з `packages/` і пакети збереження `jane.storage-files` та `jane.storage-mongodb` (версії й дайджести — з цього checkout; для MongoDB це 2.0.0, колекція на тип сутності). Якщо версія вже є з іншим дайджестом, зупиняється з вимогою підняти версію пакета.
+2. Створює в Orchestrator підключення `raw-files` і `results-mongo` з [../documents/connections.json](../documents/connections.json); якщо котрогось там немає — зупиняється.
+3. Для кожного магазину створює або замінює джерело `shop-<магазин>` (ліміт 1 запит на секунду на хост, очікуваний тип `product_electronics`) і завдання `notebooks-<магазин>`:
    - `collect` — Web Collector, режим `full`, не глибше 1 рівня й не більше 10 сторінок за запуск;
    - `store-raw` — усі сторінки в `raw-files`;
-   - `extract-offers` — HTML-сторінки екстрактору магазину;
-   - `store-offers` — успішні результати в `results-pg`;
+   - `extract-offers` — HTML-сторінки екстрактору магазину з параметром `entity_type: product_electronics`;
+   - `store-offers` — успішні результати в `results-mongo` (`jane.storage-mongodb`);
    - розклад — cron `0 9,21 * * *`, часовий пояс `Europe/Kyiv`, `overlap: skip`.
-4. Запускає кожне завдання один раз, чекає завершення й друкує кількість пропозицій кожного магазину з `storage.v1`. З `--no-run` лише створює все без запуску.
+
+   Наявні джерела й завдання з тими самими ідентифікаторами замінюються (`PUT` з `If-Match`), тож повторний запуск скрипту переводить старі завдання на нові версії пакетів і MongoDB.
+4. Запускає кожне завдання один раз, чекає завершення й друкує кількість товарів кожного магазину з `storage.v1`. З `--no-run` лише створює все без запуску.
+
+Сутності лежать у базі `jane_results` підключення `results-mongo`: актуальний стан — колекція `product_electronics`, історія версій — `product_electronics.history`.
 
 Як Orchestrator виконує такі завдання — [виконання завдання](../../docs/architecture/task-execution.md).
 
@@ -47,7 +63,7 @@
 
 Не перевірено в цій документації: сценарій звертається до справжніх магазинів.
 
-1. Потрібен стек зі зв'язуванням сервісів за зразком [infra/compose.local.example.yaml](../../infra/compose.local.example.yaml): виконавці Orchestrator, адреси Registry, більший ліміт передачі сторінок для Web Collector. Як підняти — [платформа з Admin UI](../../docs/getting-started/platform.md).
+1. Потрібен стек зі зв'язуванням сервісів за зразком [infra/compose.local.example.yaml](../../infra/compose.local.example.yaml): виконавці Orchestrator, адреси Registry, більший ліміт передачі сторінок для Web Collector, MongoDB поруч зі Storage (Storage отримує `JANE_SECRET_DEV_MONGO_USER` / `JANE_SECRET_DEV_MONGO_PASSWORD`). Як підняти — [платформа з Admin UI](../../docs/getting-started/platform.md).
 2. Запустіть скрипт із назвою compose-проєкту стеку:
 
    ```powershell
@@ -56,23 +72,23 @@
 
    Параметри: `--no-run` — не запускати завдання; `--timeout` — секунд очікування одного запуску (типово 900).
 
-3. Очікуваний результат: для кожного магазину рядок `run notebooks-<магазин>: succeeded …` і рядок `storage: <N> offers of shop-<магазин>`. Код виходу `1`, якщо хоча б один запуск не `succeeded`.
+3. Очікуваний результат: для кожного магазину рядок `run notebooks-<магазин>: succeeded …` і рядок `storage: <N> product_electronics of shop-<магазин>`. Код виходу `1`, якщо хоча б один запуск не `succeeded`.
 
 Створені джерела й завдання лишаються в Orchestrator і виконуються за розкладом, доки їх не видалити або не зупинити стек.
 
 ## Перевірка без сервісів
 
-Тести пакетів і правил магазинів працюють без мережі й сервісів: тести маніфестів екстракторів на збережених сторінках і перевірка правил (схема, `robots.txt`, лише `seed_list`, не більше 5 URL).
+Тести пакетів і правил магазинів працюють без мережі й сервісів: тести маніфестів екстракторів на збережених сторінках; перевірка, що маніфести декларують усі типи `product_*` з однією схемою, а тип береться лише з параметра `entity_type` (без нього — `failed`); документи джерел і завдань скрипту за контрактами (`product_electronics`, `jane.storage-mongodb`, `results-mongo`); перевірка правил (схема, `robots.txt`, лише `seed_list`, не більше 5 URL).
 
 ```powershell
 uv run --all-packages pytest examples/tests/test_shops.py -q
 ```
 
-Вивід перевірочного запуску (2026-10-11, Windows 11, ревізія `48389a3`):
+Вивід перевірочного запуску (2026-10-12, Windows 11, робоча копія на основі `118707e3`):
 
 ```text
-.......                                                                  [100%]
-7 passed in 1.12s
+............                                                             [100%]
+12 passed in 1.06s
 ```
 
 ## Обмеження

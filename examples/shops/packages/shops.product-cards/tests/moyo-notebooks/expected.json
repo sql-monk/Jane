@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "offer",
+      "entity_type": "product_electronics",
       "fields": {
         "shop": "moyo.ua",
         "product_id": "734732",
@@ -30,7 +30,7 @@
       }
     },
     {
-      "entity_type": "offer",
+      "entity_type": "product_electronics",
       "fields": {
         "shop": "moyo.ua",
         "product_id": "821007",
@@ -59,7 +59,7 @@
       }
     },
     {
-      "entity_type": "offer",
+      "entity_type": "product_electronics",
       "fields": {
         "shop": "moyo.ua",
         "product_id": "651571",

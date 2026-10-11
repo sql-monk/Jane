@@ -42,7 +42,7 @@
 
 3. За потреби створіть `infra/compose.local.yaml` за зразком — див. [зв'язування сервісів](#звязування-сервісів).
 
-4. Запустіть сервіси. PostgreSQL, MinIO і тестовий сайт стартують автоматично як залежності; перший запуск збирає образи (у перевірці — близько 7,5 хвилини):
+4. Запустіть сервіси. PostgreSQL, MinIO, MongoDB і тестовий сайт стартують автоматично як залежності; перший запуск збирає образи (у перевірці — близько 7,5 хвилини):
 
    ```powershell
    just up --project jane-doc-start proxy storage handler-runtime web-collector telegram-collector orchestrator registry llm assistant
@@ -72,6 +72,8 @@
      db-assistant postgresql://127.0.0.1:18901/jane_assistant
      db-storage-results postgresql://127.0.0.1:18901/jane_storage_results
    ```
+
+   Поточна ревізія друкує ще рядок `mongodb 127.0.0.1:<порт>`: MongoDB стартує разом зі Storage для сховища сутностей `results-mongo` (база `jane_results`). У перевірочному запуску 2026-10-11 цього рядка ще не було. Облікові дані MongoDB показує `just env` (`JANE_STACK_MONGODB_*`).
 
 5. Отримайте адресу proxy та ключ адміністратора:
 

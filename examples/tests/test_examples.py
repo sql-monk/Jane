@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -145,6 +146,51 @@ def test_tasks_are_independent_and_differ_only_where_the_spec_says() -> None:
     stored = {s["stage_id"]: s for s in catalog["stages"]}
     assert stored["extract-products"]["handler"]["package_id"] == CATALOG
     assert stored["store-raw"]["connections"]["target"] == "raw-files"
+
+
+class _Refs(dict[str, dict[str, str]]):
+    """Package references of the task builders: any package id, pinned to a placeholder version and digest."""
+
+    def __missing__(self, package_id: str) -> dict[str, str]:
+        return {"package_id": package_id, "version": "1.0.0", "digest": "sha256:" + "0" * 64}
+
+
+def test_raw_goes_to_files_and_entities_to_mongodb_through_results_mongo() -> None:
+    """Entity types stay; only the store changes: the documents and the news/channels task builders."""
+    sys.path.insert(0, str(ex.EXAMPLES / "news"))
+    sys.path.insert(0, str(ex.EXAMPLES / "channels"))
+    import setup_channels
+    import setup_news
+
+    connections = {
+        c["connection_id"]: c for c in ex.read_json(ex.DOCUMENTS_DIR / ex.CONNECTIONS_DOC)["connections"]
+    }
+    assert set(connections) == {ex.RAW_CONNECTION, ex.RESULTS_CONNECTION}
+    manifest = ex.read_json(ex.package_dir(ex.RESULTS_PACKAGE) / "jane-package.json")
+    assert [c["kind"] for c in manifest["required_connections"]] == ["mongodb"]
+    assert connections[ex.RESULTS_CONNECTION]["kind"] == "mongodb"
+    # the same connections as the dev stack's Storage configuration
+    stack = {
+        c["connection_id"]: c
+        for c in ex.read_json(ex.ROOT / "infra" / "config" / "storage-connections.json")["connections"]
+    }
+    for connection_id, conn in connections.items():
+        fields = ("kind", "params", "secret_refs")
+        assert {k: conn.get(k) for k in fields} == {k: stack[connection_id].get(k) for k in fields}
+
+    refs = _Refs()
+    tasks = [ex.read_json(ex.DOCUMENTS_DIR / name) for name in (ex.CATALOG_DOC, ex.PRICE_DOC, ex.TG_TASK_DOC)]
+    tasks += [setup_news.task_doc(item, refs) for item in setup_news.sources()]
+    tasks += [setup_channels.task_doc(channel, refs) for channel in setup_channels.DEFAULT_CHANNELS]
+    for task in tasks:
+        stores = {
+            s["handler"]["package_id"]: s["connections"]["target"]
+            for s in task["stages"]
+            if str((s.get("handler") or {}).get("package_id", "")).startswith("jane.storage-")
+        }
+        assert set(stores) <= set(ex.STORAGE_PACKAGES), (task["task_id"], stores)
+        assert stores.get(ex.RESULTS_PACKAGE) == ex.RESULTS_CONNECTION, (task["task_id"], stores)
+        assert stores.get("jane.storage-files", ex.RAW_CONNECTION) == ex.RAW_CONNECTION, task["task_id"]
 
 
 def test_documents_hold_no_secret_values() -> None:

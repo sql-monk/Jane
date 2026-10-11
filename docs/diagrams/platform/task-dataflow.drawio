@@ -28,10 +28,10 @@
         <mxCell id="files" value="підключення raw-files&#10;файли HTML" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
           <mxGeometry x="900" y="110" width="230" height="70" as="geometry"/>
         </mxCell>
-        <mxCell id="store" value="store-products&#10;Storage: jane.storage-postgresql" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;" vertex="1" parent="1">
+        <mxCell id="store" value="store-products&#10;Storage: jane.storage-mongodb" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;" vertex="1" parent="1">
           <mxGeometry x="900" y="235" width="230" height="60" as="geometry"/>
         </mxCell>
-        <mxCell id="pgres" value="підключення results-pg&#10;сутності product" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
+        <mxCell id="pgres" value="підключення results-mongo&#10;колекція product" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
           <mxGeometry x="900" y="350" width="230" height="70" as="geometry"/>
         </mxCell>
         <mxCell id="f1" value="сторінки" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;dashed=1;dashPattern=2 3;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="src" target="collect">

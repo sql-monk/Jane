@@ -59,7 +59,7 @@ REGISTRY_ENV = {
 }
 RAW, RESULTS = (
     "raw-files",
-    "results-pg",
+    "results-mongo",
 )  # connection ids of the documents (tests/e2e/config/storage-connections.json)
 CATALOG_EXTRACTOR, PRICE_EXTRACTOR = (
     "examples.testsite-catalog-extractor",

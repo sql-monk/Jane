@@ -9,19 +9,18 @@
       }
     },
     {
-      "connection_id": "results-pg",
-      "kind": "postgresql",
-      "title": "Приклади: сутності в PostgreSQL стеку",
+      "connection_id": "results-mongo",
+      "kind": "mongodb",
+      "title": "Приклади: сутності в MongoDB стеку",
       "params": {
-        "host": "postgres",
-        "port": 5432,
-        "database": "jane_storage_results",
-        "schema": "public",
-        "sslmode": "disable"
+        "host": "mongodb",
+        "port": 27017,
+        "database": "jane_results",
+        "auth_source": "admin"
       },
       "secret_refs": {
-        "username": "env:JANE_SECRET_DEV_PG_USER",
-        "password": "env:JANE_SECRET_DEV_PG_PASSWORD"
+        "username": "env:JANE_SECRET_DEV_MONGO_USER",
+        "password": "env:JANE_SECRET_DEV_MONGO_PASSWORD"
       }
     }
   ]

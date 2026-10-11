@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "offer",
+      "entity_type": "product_electronics",
       "fields": {
         "shop": "rozetka.com.ua",
         "product_id": "621368348",
@@ -30,7 +30,7 @@
       }
     },
     {
-      "entity_type": "offer",
+      "entity_type": "product_electronics",
       "fields": {
         "shop": "rozetka.com.ua",
         "product_id": "591360481",
@@ -59,7 +59,7 @@
       }
     },
     {
-      "entity_type": "offer",
+      "entity_type": "product_electronics",
       "fields": {
         "shop": "rozetka.com.ua",
         "product_id": "553197315",

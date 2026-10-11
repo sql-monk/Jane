@@ -32,7 +32,7 @@ Telegram читається через `https://t.me/s/<channel>` штатним
 
 ## Налаштування та запуск
 
-Потрібні Python/`uv`, запущений стек із Registry, Orchestrator, Web Collector, Handler Runtime, LLM і Storage, налаштований провайдер LLM та керовані підключення `raw-files` і `results-pg`. Сценарій використовує ці підключення і перевіряє їхню наявність. Ключ API береться з локального файла стану стека; секрети не входять до пакетів чи каталогів.
+Потрібні Python/`uv`, запущений стек із Registry, Orchestrator, Web Collector, Handler Runtime, LLM і Storage, налаштований провайдер LLM та керовані підключення `raw-files` і `results-mongo` (MongoDB, [../documents/connections.json](../documents/connections.json)). Сценарій використовує ці підключення і перевіряє їхню наявність. Ключ API береться з локального файла стану стека; секрети не входять до пакетів чи каталогів.
 
 Команди виконуються з кореня checkout. Для поточного проєкту `jane-demo` файл стану — `.jane/stack-jane-demo.json`. Якщо код запускається з іншого checkout, передайте фактичний шлях до цього файла через `--stack-file`; синтаксис Python/`uv` однаковий на Windows і Linux.
 
@@ -121,7 +121,7 @@ Orchestrator керує логічним потоком `collect → prepare →
 | [news.telegram-public-posts](packages/news.telegram-public-posts/jane-package.json) | Окремі текстові дописи зі своїми URL |
 | [news.article-analysis](packages/news.article-analysis/jane-package.json) | Багатомовний аналіз за JSON Schema |
 | [news.article-normalize](packages/news.article-normalize/jane-package.json) | Перевірка цитат, URL, атрибуції й точної ідентичності події |
-| `jane.storage-files`, `jane.storage-postgresql` | RAW у `raw-files`; структуровані результати у `results-pg` |
+| `jane.storage-files`, `jane.storage-mongodb` | RAW у `raw-files`; структуровані результати у `results-mongo` — колекції `news_article` і `news_event` |
 
 API визначені контрактами [Orchestrator](../../contracts/openapi/orchestrator.v1.yaml), [Registry](../../contracts/openapi/registry.v1.yaml), [Handler](../../contracts/openapi/handler.v1.yaml), [LLM](../../contracts/openapi/llm.v1.yaml) і [Storage](../../contracts/openapi/storage.v1.yaml). Основні операції: `/v1/sources`, `/v1/tasks`, `/v1/tasks/{task_id}/runs`, `/v1/runs/{run_id}`, `/v1/entities`. POST із побічним ефектом використовують `Idempotency-Key`; доступ — Bearer token. Джерела та завдання належать Orchestrator, пакети — Registry, збережені сутності — Storage.
 
@@ -143,7 +143,7 @@ Helper створює похідний образ на основі поточн
 
 ## Перевірка і діагностика
 
-Докази перевірок і межі підтвердженого результату — у [VERIFICATION.md](VERIFICATION.md). Для локальної перевірки пакетів:
+Докази перевірок і межі підтвердженого результату — у [VERIFICATION.md](VERIFICATION.md). Їх зібрано, коли результати зберігалися в PostgreSQL (`jane.storage-postgresql`, `results-pg`); [config.lock.json](config.lock.json) — знімок тієї розгорнутої конфігурації. Ці результати в `results-mongo` не переносяться, тож `validate_live.py --report-only` для старих квитанцій їх не знайде. Для локальної перевірки пакетів:
 
 ```powershell
 uv run --all-packages pytest examples/news/test_analysis.py examples/news/test_web_article.py examples/news/test_telegram_sources.py examples/news/test_web_sources.py -q

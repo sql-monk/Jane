@@ -69,7 +69,7 @@ def package_dirs() -> dict[str, Path]:
     }
     for directory in storage_dirs().values():
         manifest = ex.read_json(directory / "jane-package.json")
-        if manifest["package_id"] in {"jane.storage-files", "jane.storage-postgresql"}:
+        if manifest["package_id"] in ex.STORAGE_PACKAGES:
             result[manifest["package_id"]] = directory
     return result
 
@@ -179,7 +179,7 @@ def task_doc(
         "task_id": item["source_id"],
         "title": f"{item['title']}: аналіз новин щогодини",
         "enabled": enabled,
-        "description": "RAW → текст → багатомовний LLM → перевірені цитати, тональність і події → PostgreSQL.",
+        "description": "RAW → текст → багатомовний LLM → перевірені цитати, тональність і події → MongoDB.",
         "input": {"source_id": item["source_id"]},
         "stages": [
             {
@@ -191,7 +191,7 @@ def task_doc(
                 "stage_id": "store-raw",
                 "kind": "handler",
                 "handler": refs["jane.storage-files"],
-                "connections": {"target": "raw-files"},
+                "connections": {"target": ex.RAW_CONNECTION},
                 "inputs": [{"from": "collect"}],
             },
             {
@@ -231,8 +231,8 @@ def task_doc(
             {
                 "stage_id": "store-news",
                 "kind": "handler",
-                "handler": refs["jane.storage-postgresql"],
-                "connections": {"target": "results-pg"},
+                "handler": refs[ex.RESULTS_PACKAGE],
+                "connections": {"target": ex.RESULTS_CONNECTION},
                 "inputs": [
                     {"from": "verify", "when": {"field": "result.status", "op": "eq", "value": "success"}}
                 ],
@@ -278,7 +278,7 @@ def apply(
     svc: NewsServices, refs: dict[str, dict[str, str]], items: list[dict[str, Any]], ns: argparse.Namespace
 ) -> None:
     # Use existing managed storage connections; don't replace their credentials or configuration.
-    for identity in ("raw-files", "results-pg"):
+    for identity in (ex.RAW_CONNECTION, ex.RESULTS_CONNECTION):
         svc.orchestrator.call("GET", f"/v1/connections/{identity}")
     for item in items:
         task = task_doc(
@@ -326,7 +326,11 @@ def verify(svc: NewsServices, items: list[dict[str, Any]]) -> dict[str, Any]:
         task = svc.orchestrator.call("GET", f"/v1/tasks/{item['source_id']}").json()
         records = svc.storage.pages(
             "/v1/entities",
-            {"connection_id": "results-pg", "entity_type": "news_article", "scope": item["source_id"]},
+            {
+                "connection_id": ex.RESULTS_CONNECTION,
+                "entity_type": "news_article",
+                "scope": item["source_id"],
+            },
         )
         runs = svc.orchestrator.call(
             "GET", "/v1/runs", params={"task_id": item["source_id"], "limit": 3}
@@ -369,7 +373,8 @@ def verify(svc: NewsServices, items: list[dict[str, Any]]) -> dict[str, Any]:
         report["all_verified"] = report["all_verified"] and entry["verified"]
         ex.log(f"{item['source_id']}: {len(verified)} verified articles; enabled={entry['enabled']}")
     events = svc.storage.pages(
-        "/v1/entities", {"connection_id": "results-pg", "entity_type": "news_event", "scope": "news-events"}
+        "/v1/entities",
+        {"connection_id": ex.RESULTS_CONNECTION, "entity_type": "news_event", "scope": "news-events"},
     )
     report["events"] = len(events)
     return report

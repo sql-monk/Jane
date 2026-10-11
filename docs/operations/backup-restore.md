@@ -1,6 +1,6 @@
 # Резервування й відновлення
 
-Кожен сервіс Jane володіє своїм сховищем, тому резервна копія платформи — це набір копій окремих баз і томів за [власністю даних](README.md#власність-даних). Сторінка описує, що копіювати, як зробити узгоджену копію в dev-стеку і як відновити стек після втрати томів. Процедуру перевірено 2026-10-11 на стеку `jane-doc-ops` (Windows 11, PowerShell 7, ревізія `48389a3`).
+Кожен сервіс Jane володіє своїм сховищем, тому резервна копія платформи — це набір копій окремих баз і томів за [власністю даних](README.md#власність-даних). Сторінка описує, що копіювати, як зробити узгоджену копію в dev-стеку і як відновити стек після втрати томів. Процедуру перевірено 2026-10-11 на стеку `jane-doc-ops` (Windows 11, PowerShell 7, ревізія `48389a3`); команди для MongoDB — 2026-10-12 на окремому контейнері `mongo:8.0` ([MongoDB](#mongodb-сутності-з-пакетів)).
 
 ## Зміст
 
@@ -8,6 +8,7 @@
 - [Узгодженість копії](#узгодженість-копії)
 - [Резервування](#резервування)
 - [Відновлення](#відновлення)
+- [MongoDB: сутності з пакетів](#mongodb-сутності-з-пакетів)
 - [Перевірка після відновлення](#перевірка-після-відновлення)
 - [Обмеження](#обмеження)
 
@@ -22,13 +23,15 @@
 | Сесії підключення джерел | Assistant | база `jane_assistant` | `pg_dump` |
 | Кеш ідемпотентності, job, результати викликів | Handler Runtime | база `jane_handler_runtime` | `pg_dump` (за потреби) |
 | Стан обходу, буфер, курсори | Web Collector, Telegram Collector | томи `web-collector-data`, `telegram-collector-data` | архів тому при зупиненому сервісі |
-| Бізнес-результати: сутності, історія, RAW | користувач (пише Storage) | том `storage-data`, база `jane_storage_results`, інші цільові сховища | засобами сховища |
+| Сутності прикладів та їхня історія | користувач (пише Storage) | MongoDB, база `jane_results` (підключення `results-mongo`) | `mongodump` — [MongoDB](#mongodb-сутності-з-пакетів) |
+| RAW-сторінки | користувач (пише Storage) | том `storage-data` (підключення `raw-files`) | архів тому при зупиненому Storage |
+| Сутності в PostgreSQL та інших цільових сховищах | користувач (пише Storage) | база `jane_storage_results` (підключення `results-pg`), сховища користувача | `pg_dump` або засоби сховища |
 | Облікові дані стеку | оператор | `.jane/stack-<проєкт>.json` | копія файлу в захищеному місці |
 
 Пояснення:
 
 - **Що можна не копіювати.** Кеш ідемпотентності й job Handler Runtime, транзитні blob (`transit`) мають обмежений строк життя; після їх втрати незавершені виклики виконуються повторно. Втрата стану колектора означає, що наступний збір почнеться з початку.
-- **Облікові дані.** Файл стеку містить паролі ролей PostgreSQL, ключі MinIO та ключі API. MinIO зберігає свою конфігурацію в тому самому томі, тому відновлений том `minio-data` треба запускати з тими самими обліковими даними. Зберігайте файл окремо від даних і так само захищено, як секрети.
+- **Облікові дані.** Файл стеку містить паролі ролей PostgreSQL, кореневого користувача MongoDB, ключі MinIO та ключі API. MinIO зберігає свою конфігурацію в тому самому томі, тому відновлений том `minio-data` треба запускати з тими самими обліковими даними. Зберігайте файл окремо від даних і так само захищено, як секрети.
 - **Секрети підключень** у базах не зберігаються — лише `secret_refs`. Значення (`.jane/secrets`, змінні середовища) резервуються окремо засобами, якими їх видано.
 
 ## Узгодженість копії
@@ -36,6 +39,7 @@
 - Перед копіюванням зупиніть нові запуски: Orchestrator без планувальника й воркерів — [запуск](running.md#orchestrator-без-планувальника-й-воркерів).
 - `pg_dump` дає узгоджений знімок однієї бази. Бази різних сервісів копіюються в різні моменти; посилання між ними (наприклад завдання → версія пакета) лишаються дійсними, бо версії пакетів незмінні.
 - Томи з файлами (MinIO, SQLite колекторів, файли Storage) копіюйте при зупиненому сервісі-власнику.
+- `mongodump` без реплікасету не дає знімка всієї бази: колекції копіюються в різні моменти. Тому MongoDB копіюйте, коли Storage не пише.
 
 ![Процес резервування й відновлення](../diagrams/operations/backup-restore.light.png#gh-light-mode-only)
 ![Процес резервування й відновлення](../diagrams/operations/backup-restore.dark.png#gh-dark-mode-only)
@@ -135,6 +139,53 @@ docker volume rm jane-doc-ops_postgres-data jane-doc-ops_minio-data
 
    Сервіси бачать актуальну схему й міграцій не виконують.
 
+## MongoDB: сутності з пакетів
+
+Сутності прикладів лежать у базі `jane_results` контейнера `mongodb`, кожен тип — в окремій колекції ([типи сутностей](../reference/entity-types.md)). Копія логічна: `mongodump` виконується в контейнері стеку від імені кореневого користувача. Ім'я й пароль контейнер уже має в змінних `MONGO_INITDB_ROOT_USERNAME` і `MONGO_INITDB_ROOT_PASSWORD`, тож пароль не потрапляє в командний рядок хоста. Одинарні лапки не дають оболонці хоста підставити ці змінні.
+
+Перевірено 2026-10-12 на окремому контейнері `mongo:8.0` (mongodump 100.18.0) з тестовими колекціями в розкладці адаптера: `product_book`, `product_book.history`, `product_food`, `_deliveries`. Сценарій перевірки: копія, видалення контейнера з томом, новий контейнер із тим самим паролем, відновлення. Назва контейнера в командах — за схемою стеку `<проєкт>-mongodb-1`.
+
+Резервування — коли Storage не пише (Orchestrator без планувальника й воркерів, крок 1 [резервування](#резервування)); каталог `$b` — з кроку 2:
+
+```powershell
+docker exec jane-doc-ops-mongodb-1 sh -c 'mongodump --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --db jane_results --gzip --archive=/tmp/jane_results.archive.gz'
+docker cp jane-doc-ops-mongodb-1:/tmp/jane_results.archive.gz "$b\jane_results.archive.gz"
+```
+
+Очікуваний результат — код виходу 0 і файл `jane_results.archive.gz` у каталозі копії.
+
+Відновлення після втрати тому `mongodb-data`:
+
+1. Запустіть MongoDB. На порожньому томі контейнер створює кореневого користувача з паролем із файлу стеку:
+
+   ```powershell
+   just up mongodb --no-build --project jane-doc-ops
+   ```
+
+2. Скопіюйте архів у контейнер і відновіть базу. `--drop` спершу видаляє колекції з тими самими іменами:
+
+   ```powershell
+   docker cp "$b\jane_results.archive.gz" jane-doc-ops-mongodb-1:/tmp/jane_results.archive.gz
+   docker exec jane-doc-ops-mongodb-1 sh -c 'mongorestore --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --nsInclude "jane_results.*" --drop --gzip --archive=/tmp/jane_results.archive.gz'
+   ```
+
+3. Перевірте колекції — кількість документів та індексів кожної:
+
+   ```powershell
+   docker exec jane-doc-ops-mongodb-1 sh -c 'mongosh --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin jane_results --eval "db.getCollectionNames().sort().forEach(n => print(n, db.getCollection(n).countDocuments(), db.getCollection(n).getIndexes().length))"'
+   ```
+
+   Вивід перевірочного запуску на тестових колекціях (колекція, документи, індекси):
+
+   ```text
+   _deliveries 1 1
+   product_book 2 2
+   product_book.history 1 2
+   product_food 1 1
+   ```
+
+`mongorestore` відновлює індекси з копії. Індекси, яких бракує, адаптер створює сам під час першого запису типу ([адаптери: mongodb](../components/storage/adapters.md#mongodb)). Bash: ті самі команди, каталог копії — `$b/jane_results.archive.gz`; у Git Bash на Windows задайте `MSYS_NO_PATHCONV=1`.
+
 ## Перевірка після відновлення
 
 - `just ps --project jane-doc-ops` — усі контейнери `(healthy)`.
@@ -157,4 +208,5 @@ SHA-256 завантаженого архіву збігся з дайджест
 - Перевірено лише Orchestrator, Registry (PostgreSQL + MinIO) і порожній Storage. Бази LLM gateway, Assistant, Handler Runtime і томи колекторів відновлюються тим самим способом, але окремо не перевірялися.
 - Відновлення в стек із **новими** обліковими даними (інший файл стеку) не перевірялося; для MinIO воно потребує тих самих root-облікових даних.
 - Копіювання на рівні тому PostgreSQL (`/var/lib/postgresql` при зупиненому сервері) можливе, але не перевірялося; логічні копії дозволяють відновити бази окремо, за власниками.
-- Резервування цільових сховищ користувача (SQL Server, MongoDB, S3) виконується їхніми засобами й тут не описується.
+- Резервування цільових сховищ користувача поза dev-стеком (SQL Server, S3, власні MongoDB і PostgreSQL) виконується їхніми засобами й тут не описується.
+- Команди MongoDB перевірено на окремому контейнері, а не на стеку `jane-doc-ops`. Запуск `just up mongodb` для відновлення й варіант для Bash не перевірялися.

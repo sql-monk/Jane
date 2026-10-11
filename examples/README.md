@@ -18,7 +18,7 @@
 |---|---|
 | `jane_examples.py` | сценарій: офлайн-перевірки й виконання прикладів на стеку |
 | `packages/` | пакети прикладів: правила колекторів і екстрактори |
-| `packages.lock.json` | версії й дайджести канонічних архівів пакетів, зокрема `jane.storage-files` і `jane.storage-postgresql` |
+| `packages.lock.json` | версії й дайджести канонічних архівів пакетів, зокрема `jane.storage-files` і `jane.storage-mongodb` |
 | `documents/` | джерела, завдання й підключення для Orchestrator |
 | `telegram/` | підключення облікового запису й записаний канал для бекенда `recorded` |
 | `shops/` | ціни ноутбуків п'яти реальних магазинів — [shops/README.md](shops/README.md) |
@@ -42,13 +42,15 @@
 
 | Файл | Що описує |
 |---|---|
-| `documents/connections.json` | підключення `raw-files` (файли на томі Storage) і `results-pg` (база `jane_storage_results`; облікові дані — `env:JANE_SECRET_DEV_PG_*`) |
+| `documents/connections.json` | підключення `raw-files` (файли на томі Storage) і `results-mongo` (база MongoDB `jane_results` стеку; облікові дані — `env:JANE_SECRET_DEV_MONGO_*`) |
 | `documents/source.testsite-shop.json` | джерело `testsite-shop`: правила колектора й ліміт частоти джерела |
-| `documents/task.testsite-catalog.json` | завдання `testsite-catalog`: збір → RAW у файли; сторінки `*/product/*` → екстрактор каталогу → PostgreSQL; розклад cron |
-| `documents/task.testsite-price-check.json` | завдання `testsite-price-check`: 4 URL товарів → екстрактор цін → PostgreSQL; розклад щогодини |
+| `documents/task.testsite-catalog.json` | завдання `testsite-catalog`: збір → RAW у файли; сторінки `*/product/*` → екстрактор каталогу → MongoDB; розклад cron |
+| `documents/task.testsite-price-check.json` | завдання `testsite-price-check`: 4 URL товарів → екстрактор цін → MongoDB; розклад щогодини |
 | `documents/source.telegram-events.json`, `documents/task.telegram-events.json` | джерело й завдання Telegram-прикладу |
 
 Посилання на пакети в документах зафіксовано версією й дайджестом із `packages.lock.json`. Документи не містять значень секретів. Як Orchestrator виконує такі завдання — [виконання завдання](../docs/architecture/task-execution.md).
+
+RAW зберігає `jane.storage-files` у `raw-files`, сутності — `jane.storage-mongodb` у `results-mongo`: кожен тип сутності в окремій колекції (`product`, `event`), історія версій — у `<тип>.history`. Типи сутностей прикладів не змінилися. Дані, які раніше записано в PostgreSQL (`results-pg`), не переносяться й через `results-mongo` не читаються.
 
 ## Команди `jane_examples.py`
 

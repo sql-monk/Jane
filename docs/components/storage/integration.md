@@ -30,13 +30,15 @@
 
 | Операція | Призначення |
 |---|---|
-| `GET /v1/entities` | Поточний стан сутностей одного типу або однієї сутності за `key` |
+| `GET /v1/entity-types` | Каталог типів, для яких у просторі підключення є сутності, з кількістю |
+| `GET /v1/entities` | Поточний стан сутностей одного типу або однієї сутності за `key`; пошук підрядка `search` |
 | `GET /v1/entity-history` | Історія оновлень однієї сутності |
 | `GET /v1/objects` | Збережені RAW-об'єкти й документи з фільтрами |
 | `GET /v1/objects/{object_id}` | Опис об'єкта й відновлений `Material` |
 | `GET /v1/objects/{object_id}/content` | Байти об'єкта; підтримується `Range` |
+| `GET /v1/storage-status` | Результат останньої перевірки сховища й статистика без звернення до сховища |
 
-Також `GET /v1/health`, `GET /v1/info` (адаптери, пакети з digest, контрактні ліміти) і `/metrics`. Із `auth_mode=api_key` запит несе заголовок `Authorization: Bearer <ключ>`.
+Перевірку доступності й статистику запускає `POST /v1/storage-status/checks` (scope `connections:write`, `202` + job). Також `GET /v1/health`, `GET /v1/info` (адаптери, пакети з digest, контрактні ліміти) і `/metrics`. Із `auth_mode=api_key` запит несе заголовок `Authorization: Bearer <ключ>`.
 
 ## Самостійне використання
 
@@ -182,13 +184,24 @@ curl -s -X POST http://127.0.0.1:8107/v1/test-runs -H 'Content-Type: application
 
 | Операція | Параметри | Примітки |
 |---|---|---|
-| `GET /v1/entities` | `connection_id`, `entity_type` (обов'язкові); `key`, `scope`, `updated_since`, `cursor`, `limit` | З `key` — одна сутність або порожній список. Порядок — власний для адаптера, не «новіші першими» |
+| `GET /v1/entity-types` | `connection_id`; `scope`, `cursor`, `limit` | Типи за назвою з точною кількістю `entity_count`; `search_supported` — чи доступний пошук |
+| `GET /v1/entities` | `connection_id`, `entity_type` (обов'язкові); `key`, `scope`, `updated_since`, `search`, `cursor`, `limit` | З `key` — одна сутність або порожній список. `search` — буквальний підрядок без урахування регістру в ключі й полях, до пагінації. Порядок — власний для адаптера, не «новіші першими» |
 | `GET /v1/entity-history` | `connection_id`, `entity_type`, `key`; `cursor`, `limit` | Новіші версії першими; `404`, якщо сутності немає |
 | `GET /v1/objects` | `connection_id`; `source_id`, `material_id`, `material_ids` (до 200), `since`, `until`, `cursor`, `limit` | Кожен елемент — `object`, зведення `material`, `stored_at` |
 | `GET /v1/objects/{object_id}` | `connection_id` | `object`, `stored_at` і відновлений `material` |
 | `GET /v1/objects/{object_id}/content` | `connection_id`; заголовок `Range: bytes=…` | `200` або `206`; `416` для недосяжного діапазону |
 
 Курсор непрозорий і дійсний лише для того самого запиту й адаптера. Послідовні сторінки не є транзакційним знімком при паралельних записах.
+
+Каталог типів, пошук і статистику сутностей мають не всі адаптери:
+
+| Можливість | `filesystem`, `postgresql`, `mongodb` | `sqlserver`, `s3`, `minio` |
+|---|---|---|
+| `GET /v1/entity-types` | так | `501 not_implemented` |
+| `search` у `GET /v1/entities` | так | `501 not_implemented` |
+| Статистика об'єктів і сутностей у перевірці сховища | так | `null` з причиною `adapter_statistics_not_supported` |
+
+Як кожен адаптер рахує каталог і розмір (`size_basis`) — [адаптери](adapters.md). У прикладах Jane сутності читаються з `results-mongo`: кожен тип там — окрема колекція, а каталог показує, які типи вже мають сутності ([типи сутностей](../../reference/entity-types.md)).
 
 API читання бачить простір імен, заданий `params` самого підключення: параметр етапу `prefix` / `schema` / `table_prefix` у читанні недоступний. Щоб читати простір етапу, зареєструйте окреме підключення з тими самими значеннями в `params`.
 
@@ -244,6 +257,6 @@ Orchestrator може запустити етапи заново для збер
 
 ## Заміна сумісною реалізацією
 
-- **Інше сховище.** Змініть пакет етапу (`jane.storage-mongodb` замість `jane.storage-postgresql`) і підключення. Колектор, екстрактор і формат `EntityRecord` не змінюються; семантика злиття та дедуплікації однакова, бо її виконує ядро.
+- **Інше сховище.** Змініть пакет етапу (наприклад, `jane.storage-postgresql` замість `jane.storage-mongodb`) і підключення. Колектор, екстрактор і формат `EntityRecord` не змінюються; семантика злиття та дедуплікації однакова, бо її виконує ядро. Типове розміщення в Jane — сутності в MongoDB, RAW у файлах ([ADR-0011](../../adr/0011-data-placement.md)).
 - **Новий тип сховища.** Пакет адаптера за протоколом `StorageAdapter`, що проходить набір C-01…C-16, — [новий адаптер](new-adapter.md).
 - **Інший сервіс збереження.** Сервіс, який реалізує `handler.v1` (`handler_kind: storage`) і `storage.v1`, замінює Storage для Orchestrator і Assistant. Обов'язкові властивості: ідемпотентність за `delivery_key` між перезапусками, порядок спостережень, часткові оновлення й `cleared`, підтвердження `WriteAck` за схемою. Контрактні тести — `just contract`; сценарії поведінки — набір сумісності.

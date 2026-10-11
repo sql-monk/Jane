@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "offer",
+      "entity_type": "product_electronics",
       "fields": {
         "shop": "citrus.ua",
         "product_id": "790214",
@@ -29,7 +29,7 @@
       }
     },
     {
-      "entity_type": "offer",
+      "entity_type": "product_electronics",
       "fields": {
         "shop": "citrus.ua",
         "product_id": "788985",
@@ -58,7 +58,7 @@
       }
     },
     {
-      "entity_type": "offer",
+      "entity_type": "product_electronics",
       "fields": {
         "shop": "citrus.ua",
         "product_id": "798911",

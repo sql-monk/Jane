@@ -14,6 +14,13 @@
       "secret_refs": { "username": "env:JANE_SECRET_E2E_STORAGE_RESULTS_USER", "password": "env:JANE_SECRET_E2E_STORAGE_RESULTS_PASSWORD" }
     },
     {
+      "connection_id": "results-mongo",
+      "kind": "mongodb",
+      "title": "e2e: entities in the stack MongoDB",
+      "params": { "host": "mongodb", "port": 27017, "database": "jane_e2e_results", "auth_source": "admin" },
+      "secret_refs": { "username": "env:JANE_SECRET_E2E_MONGO_USER", "password": "env:JANE_SECRET_E2E_MONGO_PASSWORD" }
+    },
+    {
       "connection_id": "e2e-sqlserver",
       "kind": "sqlserver",
       "title": "e2e: RAW and entities in SQL Server",

@@ -55,7 +55,11 @@ LOCAL_PACKAGES = (
     "examples.telegram-rules",
     "examples.telegram-event-extractor",
 )
-STORAGE_PACKAGES = ("jane.storage-files", "jane.storage-postgresql")
+# RAW -> files, entities -> MongoDB (a collection per entity type); connection ids of documents/connections.json
+RESULTS_PACKAGE = "jane.storage-mongodb"
+STORAGE_PACKAGES = ("jane.storage-files", RESULTS_PACKAGE)
+RAW_CONNECTION = "raw-files"
+RESULTS_CONNECTION = "results-mongo"
 SOURCE_DOC = "source.testsite-shop.json"
 CATALOG_DOC = "task.testsite-catalog.json"
 PRICE_DOC = "task.testsite-price-check.json"
@@ -563,7 +567,7 @@ def verify(svc: Services, catalog_run: Mapping[str, Any], price_run: Mapping[str
     products = sorted(p for p in category_set if p.startswith("/product/"))
     failures: list[str] = []
 
-    raw = svc.storage.pages("/v1/objects", {"connection_id": "raw-files", "source_id": source_id})
+    raw = svc.storage.pages("/v1/objects", {"connection_id": RAW_CONNECTION, "source_id": source_id})
     raw_paths = {site_path(obj["material"]["url"]) for obj in raw if "url" in obj.get("material", {})}
     if missing_raw := sorted({site_path(p) for p in category_set} - raw_paths):
         failures.append(f"RAW: catalog pages not stored: {missing_raw}")
@@ -571,7 +575,8 @@ def verify(svc: Services, catalog_run: Mapping[str, Any], price_run: Mapping[str
     entities = {
         e["key"]["natural"]["sku"]: e
         for e in svc.storage.pages(
-            "/v1/entities", {"connection_id": "results-pg", "entity_type": "product", "scope": source_id}
+            "/v1/entities",
+            {"connection_id": RESULTS_CONNECTION, "entity_type": "product", "scope": source_id},
         )
     }
     skus = sorted(p.rsplit("/", 1)[-1] for p in products)
@@ -590,7 +595,11 @@ def verify(svc: Services, catalog_run: Mapping[str, Any], price_run: Mapping[str
         state = entities.get(sku) or {}
         history = svc.storage.pages(
             "/v1/entity-history",
-            {"connection_id": "results-pg", "entity_type": "product", "key": state.get("canonical_key", "")},
+            {
+                "connection_id": RESULTS_CONNECTION,
+                "entity_type": "product",
+                "key": state.get("canonical_key", ""),
+            },
         )
         records = [
             h for h in history if (h["record"].get("provenance") or {}).get("run_id") == price_run["run_id"]
@@ -692,13 +701,13 @@ def verify_telegram(svc: Services, history: Mapping[str, Any], changes: Mapping[
         failures.append(f"history run: expected 3 messages, got {history.get('counters')}")
     if (changes.get("counters") or {}).get("materials") != 2:
         failures.append(f"changes run: expected 2 observations (edit + new), got {changes.get('counters')}")
-    raw = svc.storage.pages("/v1/objects", {"connection_id": "raw-files", "source_id": source_id})
+    raw = svc.storage.pages("/v1/objects", {"connection_id": RAW_CONNECTION, "source_id": source_id})
     if len(raw) != 5 or len({o["material"]["observation_id"] for o in raw}) != 5:
         failures.append(f"RAW: expected 5 distinct observations, got {len(raw)}")
     events = {
         e["key"]["natural"]["event_id"]: e
         for e in svc.storage.pages(
-            "/v1/entities", {"connection_id": "results-pg", "entity_type": "event", "scope": source_id}
+            "/v1/entities", {"connection_id": RESULTS_CONNECTION, "entity_type": "event", "scope": source_id}
         )
     }
     expected = {f"{TG_CHANNEL}/1/1", f"{TG_CHANNEL}/3/2", f"{TG_CHANNEL}/4/1"}
@@ -710,7 +719,11 @@ def verify_telegram(svc: Services, history: Mapping[str, Any], changes: Mapping[
         failures.append(f"edited message did not update the event: {fields}")
     history_of_lecture = svc.storage.pages(
         "/v1/entity-history",
-        {"connection_id": "results-pg", "entity_type": "event", "key": lecture.get("canonical_key", "")},
+        {
+            "connection_id": RESULTS_CONNECTION,
+            "entity_type": "event",
+            "key": lecture.get("canonical_key", ""),
+        },
     )
     if len(history_of_lecture) != 2:
         failures.append(f"the edited event should have 2 history entries, got {len(history_of_lecture)}")

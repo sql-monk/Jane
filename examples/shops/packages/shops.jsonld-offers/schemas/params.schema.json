@@ -3,7 +3,33 @@
   "title": "shops.jsonld-offers params",
   "type": "object",
   "additionalProperties": false,
+  "required": [
+    "entity_type"
+  ],
   "properties": {
+    "entity_type": {
+      "description": "Тип сутності товару з таксономії product_*: за категорією, яку збирає завдання (ноутбуки — product_electronics). Обов'язковий, типового значення немає: тип визначає колекцію сховища.",
+      "type": "string",
+      "enum": [
+        "product_food",
+        "product_beauty",
+        "product_household",
+        "product_book",
+        "product_kids",
+        "product_electronics",
+        "product_appliance",
+        "product_tools",
+        "product_garden",
+        "product_home",
+        "product_clothing",
+        "product_auto",
+        "product_pet",
+        "product_sport",
+        "product_office",
+        "product_health",
+        "product_other"
+      ]
+    },
     "default_currency": {
       "description": "Валюта, якщо пропозиція її не вказує.",
       "type": "string",

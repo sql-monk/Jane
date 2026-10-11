@@ -66,7 +66,7 @@ def task_doc(channel: str, refs: dict[str, dict[str, str]]) -> dict[str, Any]:
     return {
         "task_id": f"posts-{channel.lower().replace('_', '-')}",
         "title": f"Пости @{channel}",
-        "description": "Повідомлення каналу → RAW у files, пости (post) у PostgreSQL.",
+        "description": "Повідомлення каналу → RAW у files, пости (post) у MongoDB.",
         "input": {"source_id": f"tg-{channel.lower().replace('_', '-')}"},
         "stages": [
             {
@@ -78,7 +78,7 @@ def task_doc(channel: str, refs: dict[str, dict[str, str]]) -> dict[str, Any]:
                 "stage_id": "store-raw",
                 "kind": "handler",
                 "handler": refs["jane.storage-files"],
-                "connections": {"target": "raw-files"},
+                "connections": {"target": ex.RAW_CONNECTION},
                 "inputs": [{"from": "collect"}],
             },
             {
@@ -90,8 +90,8 @@ def task_doc(channel: str, refs: dict[str, dict[str, str]]) -> dict[str, Any]:
             {
                 "stage_id": "store-posts",
                 "kind": "handler",
-                "handler": refs["jane.storage-postgresql"],
-                "connections": {"target": "results-pg"},
+                "handler": refs[ex.RESULTS_PACKAGE],
+                "connections": {"target": ex.RESULTS_CONNECTION},
                 "inputs": [
                     {
                         "from": "extract-posts",
@@ -176,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
             posts = svc.storage.pages(
                 "/v1/entities",
                 {
-                    "connection_id": "results-pg",
+                    "connection_id": ex.RESULTS_CONNECTION,
                     "entity_type": "post",
                     "scope": f"tg-{channel.lower().replace('_', '-')}",
                 },

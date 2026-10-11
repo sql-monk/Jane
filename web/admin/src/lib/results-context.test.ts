@@ -20,6 +20,8 @@ describe("honest storage result links", () => {
   });
   it("labels common business entities and preserves unknown codes", () => {
     expect(entityTypeLabel("offer")).toBe("Пропозиції магазинів");
+    expect(entityTypeLabel("product_book")).toBe("Товари: книжки");
+    expect(entityTypeLabel("ad_realty")).toBe("Оголошення: нерухомість");
     expect(entityTypeLabel("event_custom")).toBe("event_custom");
   });
 });

@@ -62,7 +62,7 @@ def _glob_to_regex(pattern: str) -> re.Pattern[str]:
 
 
 def load_rules(root: Path, wp: str) -> tuple[list[str], list[str]] | None:
-    map_path = root / Path(".Codex/wp-paths.json")
+    map_path = root / Path(".codex/wp-paths.json")
     if not map_path.is_file():
         map_path = root / MAP_FILE
     if not map_path.is_file():

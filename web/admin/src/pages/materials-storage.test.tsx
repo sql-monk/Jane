@@ -44,6 +44,8 @@ function mockObjects(contentText = "<script>window.stolen=true</script>") {
     vi.fn(async (request: Request) => {
       const url = new URL(request.url);
       requests.push(url);
+      if (url.pathname.endsWith("/v1/sources"))
+        return Response.json({ items: [openapiExample("source-shop")], next_cursor: null });
       if (url.pathname.endsWith("/connections"))
         return Response.json({
           items: [pg, { connection_id: "raw-files", kind: "filesystem" }],

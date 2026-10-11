@@ -115,6 +115,7 @@
         "web/admin/src/api/generated/**",
         "web/admin/src/components/components.test.tsx",
         "web/admin/src/components/post-m3.test.tsx",
+        "web/admin/src/pages/materials-storage.test.tsx",
         "web/admin/src/test/**",
         "web/admin/e2e/**",
         "web/admin/playwright*.ts",

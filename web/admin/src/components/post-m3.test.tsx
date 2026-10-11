@@ -309,8 +309,9 @@ describe("collect stage versions (R05: collector.rules activations)", () => {
     await within(card).findByRole("option", { name: `${rules.version} — погоджено` });
     await userEvent.selectOptions(within(card).getByLabelText("Версія для collect"), rules.version);
     await userEvent.click(within(card).getByRole("button", { name: "Активувати" }));
-    await userEvent.type(within(card).getByLabelText("Причина: Активувати"), "new rules");
-    await userEvent.click(within(card).getByRole("button", { name: "Активувати версію" }));
+    const confirmation = screen.getByRole("dialog", { name: "Активувати" });
+    await userEvent.type(within(confirmation).getByLabelText("Причина: Активувати"), "new rules");
+    await userEvent.click(within(confirmation).getByRole("button", { name: "Активувати версію" }));
     expect(await within(card).findByText(/Активація:/)).toBeInTheDocument();
     const post = requests.find((r) => r.method === "POST");
     expect(new URL(post?.url ?? "").pathname).toMatch(

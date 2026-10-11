@@ -1,0 +1,179 @@
+{
+  "schema_version": "1",
+  "package_id": "autos.autoria-ad-page",
+  "version": "1.1.0",
+  "kind": "extractor",
+  "title": "AUTO.RIA: car ad page -> car_ad",
+  "description": "Повне оголошення з картки auto.ria.com (/uk/auto_<марка>_<модель>_<id>.html): JSON-LD Vehicle (марка, модель, рік, ціна у валюті продавця, стан, продано) і серверний стан сторінки window.__PINIA__ (ціни в USD/UAH, пробіг, паливо й об'єм, коробка, кузов, привід, колір, регіон і місто, тип продавця, дата створення, фото). Без імен, телефонів, VIN і номерів; телефони, e-mail і вулиці в описі приховано. Додатково: двері, місця, покоління, модифікація, комплектація, потужність з одиницями й джерелом, екостандарт, стан фарби та технічний стан, витрати пального, опції за категоріями. Суперечності потужності не приховуються.",
+  "tags": [
+    "autos",
+    "autoria",
+    "car-ads"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_autoria_ad.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "car_ad",
+        "schema": "schemas/car_ad.schema.json",
+        "key_fields": [
+          "site",
+          "ad_id"
+        ],
+        "description": "Оголошення про продаж легкового авто (повне)"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "bmw-x5-private-usd",
+      "input": {
+        "file": "tests/bmw-x5-private-usd/page.html",
+        "media_type": "text/html",
+        "url": "https://auto.ria.com/uk/auto_bmw_x5_40065331.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/bmw-x5-private-usd/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "lada-2114-price-eur",
+      "input": {
+        "file": "tests/lada-2114-price-eur/page.html",
+        "media_type": "text/html",
+        "url": "https://auto.ria.com/uk/auto_vaz-lada_2114-samara_39595407.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/lada-2114-price-eur/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "lexus-es-dealer",
+      "input": {
+        "file": "tests/lexus-es-dealer/page.html",
+        "media_type": "text/html",
+        "url": "https://auto.ria.com/uk/auto_lexus_es_40547502.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/lexus-es-dealer/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "mazda-626-sold",
+      "input": {
+        "file": "tests/mazda-626-sold/page.html",
+        "media_type": "text/html",
+        "url": "https://auto.ria.com/uk/auto_mazda_626_39287135.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/mazda-626-sold/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "search-page",
+      "input": {
+        "file": "tests/search-page/page.html",
+        "media_type": "text/html",
+        "url": "https://auto.ria.com/uk/search/?abroad=0&category=1&customs_cleared=1&limit=20&order=7&page=0&search_type=2"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "bmw-5-series-live",
+      "input": {
+        "file": "tests/bmw-5-series-live/page.html",
+        "media_type": "text/html",
+        "url": "https://auto.ria.com/uk/auto_bmw_5_series_40541816.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/bmw-5-series-live/expected.json",
+      "compare": "exact",
+      "origin": "problem_sample"
+    },
+    {
+      "name": "peugeot-rifter-live",
+      "input": {
+        "file": "tests/peugeot-rifter-live/page.html",
+        "media_type": "text/html",
+        "url": "https://auto.ria.com/uk/auto_peugeot_rifter_40359418.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/peugeot-rifter-live/expected.json",
+      "compare": "exact",
+      "origin": "problem_sample"
+    },
+    {
+      "name": "volkswagen-passat-live",
+      "input": {
+        "file": "tests/volkswagen-passat-live/page.html",
+        "media_type": "text/html",
+        "url": "https://auto.ria.com/uk/auto_volkswagen_passat_40537546.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/volkswagen-passat-live/expected.json",
+      "compare": "exact",
+      "origin": "problem_sample"
+    },
+    {
+      "name": "description-disabled",
+      "input": {
+        "file": "tests/bmw-x5-private-usd/page.html",
+        "media_type": "text/html",
+        "url": "https://auto.ria.com/uk/auto_bmw_x5_40065331.html"
+      },
+      "params": {
+        "description_max_chars": 0
+      },
+      "expected_status": "success",
+      "expected": "tests/description-disabled/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (subagent: examples/sites autoria)",
+      "Codex (AUTO.RIA detailed vehicle catalog)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Extend optional detailed vehicle characteristics and grouped equipment; retain site labels and warn about conflicting power claims.",
+    "based_on": {
+      "package_id": "autos.autoria-ad-page",
+      "version": "1.0.0"
+    }
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ]
+  }
+}

@@ -1,0 +1,721 @@
+{
+  "source": "auto.ria.com",
+  "entity_type": "car_ad",
+  "package_versions": {
+    "autos.autoria-ad-page": "1.1.0",
+    "autos.autoria-search-page": "1.0.0",
+    "autos.autoria-rules": "1.1.0"
+  },
+  "verification": "Manually compare explicitly observed structured fields on three HTTP200 detail pages, then run extraction and JSON Schema validation. No credentials or seller contacts included.",
+  "samples": [
+    {
+      "url": "https://auto.ria.com/uk/auto_bmw_5_series_40541816.html",
+      "fetched_at": "2026-10-11T03:46:44.996016+00:00",
+      "http_status": 200,
+      "raw_sha256": "3ef8ee5a04da7446b4e81df0353d226577c8c636a4dacea89ebf05751d9b0f45",
+      "result_status": "success",
+      "natural_key": {
+        "site": "auto.ria.com",
+        "ad_id": "40541816"
+      },
+      "manual_assertions": {
+        "ad_id": "40541816",
+        "title": "BMW 5 Series 2018",
+        "body_type": "Седан",
+        "doors": 4,
+        "seats": 5,
+        "generation": "G30",
+        "modification": "540i Steptronic (340 к.с.)",
+        "trim": "Sport Line",
+        "power_hp": 340.0,
+        "modification_power_hp": 340.0,
+        "drive": "Задній",
+        "mileage_km": 125000,
+        "fuel": "Бензин",
+        "engine_l": 3.0,
+        "color": "Чорний металік"
+      },
+      "equipment": {
+        "comfort": [
+          "Люк",
+          "Бортовий комп'ютер",
+          "Датчик дощу",
+          "Запуск двигуна з кнопки",
+          "Оздоблення керма шкірою",
+          "Система «старт-стоп»",
+          "Круїз контроль"
+        ],
+        "safety": [
+          "Антиблокувальна система (ABS)",
+          "Розподіл гальмівних зусиль (BAS, EBD)"
+        ],
+        "multimedia": [
+          "Bluetooth",
+          "Android Auto",
+          "CarPlay"
+        ],
+        "headlights": [
+          "Світлодіодні"
+        ],
+        "interior_materials": [
+          "Шкіра"
+        ],
+        "interior_color": [
+          "Коричневий"
+        ],
+        "seat_adjustment": [
+          "Ручне регулювання передніх сидінь"
+        ],
+        "heated_seats": [
+          "Передні сидіння"
+        ],
+        "seat_memory": [
+          "Передні сидіння"
+        ],
+        "electric_windows": [
+          "Передні та задні"
+        ],
+        "climate_control": [
+          "Клімат-контроль 2-зонний"
+        ],
+        "lighting": [
+          "Датчик світла",
+          "Омивач фар"
+        ],
+        "parking_assistance": [
+          "Задня камера"
+        ],
+        "airbags": [
+          "Бічні задні"
+        ]
+      },
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "40541816",
+        "url": "https://auto.ria.com/uk/auto_bmw_5_series_40541816.html",
+        "title": "BMW 5 Series 2018",
+        "price": 35000.0,
+        "currency": "USD",
+        "make": "BMW",
+        "model": "5 Series",
+        "year": 2018,
+        "price_usd": 35000.0,
+        "price_uah": 1575000.0,
+        "mileage_km": 125000,
+        "transmission": "Автомат",
+        "fuel": "Бензин",
+        "engine_l": 3.0,
+        "body_type": "Седан",
+        "drive": "Задній",
+        "color": "Чорний металік",
+        "region": "Київська обл.",
+        "city": "Київ",
+        "seller_type": "private",
+        "condition": "used",
+        "published_at": "2026-10-09",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/bmw_5-series__660743313fx.webp",
+        "status": "active",
+        "doors": 4,
+        "seats": 5,
+        "generation": "G30",
+        "modification": "540i Steptronic (340 к.с.)",
+        "trim": "Sport Line",
+        "power_hp": 340.0,
+        "modification_power_hp": 340.0,
+        "inspection_ready": true,
+        "condition_options": [
+          "Гаражне зберігання"
+        ],
+        "equipment": {
+          "comfort": [
+            "Люк",
+            "Бортовий комп'ютер",
+            "Датчик дощу",
+            "Запуск двигуна з кнопки",
+            "Оздоблення керма шкірою",
+            "Система «старт-стоп»",
+            "Круїз контроль"
+          ],
+          "safety": [
+            "Антиблокувальна система (ABS)",
+            "Розподіл гальмівних зусиль (BAS, EBD)"
+          ],
+          "multimedia": [
+            "Bluetooth",
+            "Android Auto",
+            "CarPlay"
+          ],
+          "headlights": [
+            "Світлодіодні"
+          ],
+          "interior_materials": [
+            "Шкіра"
+          ],
+          "interior_color": [
+            "Коричневий"
+          ],
+          "seat_adjustment": [
+            "Ручне регулювання передніх сидінь"
+          ],
+          "heated_seats": [
+            "Передні сидіння"
+          ],
+          "seat_memory": [
+            "Передні сидіння"
+          ],
+          "electric_windows": [
+            "Передні та задні"
+          ],
+          "climate_control": [
+            "Клімат-контроль 2-зонний"
+          ],
+          "lighting": [
+            "Датчик світла",
+            "Омивач фар"
+          ],
+          "parking_assistance": [
+            "Задня камера"
+          ],
+          "airbags": [
+            "Бічні задні"
+          ]
+        }
+      },
+      "diagnostics": [],
+      "fixture": "packages/autos.autoria-ad-page/tests/bmw-5-series-live/page.html",
+      "fixture_sha256": "024e996734dbfe568c2b355be218b4cc4377b4a7c4104d5298dfeccdb0a2ad0d",
+      "fixture_notes": "Source-preserving JSON-LD and Pinia fragments; seller contact, VIN, plate and unrelated page sections removed."
+    },
+    {
+      "url": "https://auto.ria.com/uk/auto_peugeot_rifter_40359418.html",
+      "fetched_at": "2026-10-11T03:46:44.996785+00:00",
+      "http_status": 200,
+      "raw_sha256": "067072846859bcd2833cbaa7b05c65feb4705d2d345c3bb47fd24b688e671efc",
+      "result_status": "success",
+      "natural_key": {
+        "site": "auto.ria.com",
+        "ad_id": "40359418"
+      },
+      "manual_assertions": {
+        "ad_id": "40359418",
+        "title": "Peugeot Rifter 2020",
+        "body_type": "Мінівен",
+        "doors": 5,
+        "seats": 5,
+        "generation": "I покоління",
+        "modification": "1.6 HDi MT (92 к.с.) L2",
+        "trim": "Allure",
+        "power_hp": 92.0,
+        "power_kw": 68.0,
+        "modification_power_hp": 92.0,
+        "emission_standard": "Євро-5",
+        "technical_state": "Професійно відремонтовані пошкодження",
+        "paint_condition": "Професійно виправлені сліди використання",
+        "fuel_consumption_l_per_100km": {
+          "city": 7.0,
+          "highway": 4.8,
+          "combined": 6.0
+        },
+        "mileage_km": 57000,
+        "fuel": "Дизель",
+        "engine_l": 1.56,
+        "drive": "Передній"
+      },
+      "equipment": {
+        "comfort": [
+          "Бортовий комп'ютер",
+          "Датчик дощу",
+          "Тоновані вікна",
+          "Складане заднє сидіння",
+          "Третій задній підголівник",
+          "Оздоблення керма шкірою",
+          "Оздоблення шкірою важеля КПП",
+          "Передній центральний підлокітник",
+          "Розетка 12V",
+          "Мультифункціональне кермо",
+          "Електропривід дзеркал",
+          "Підкурювач і попільничка"
+        ],
+        "safety": [
+          "Центральний замок",
+          "Антиблокувальна система (ABS)",
+          "Система стабілізації (ESP)",
+          "Розподіл гальмівних зусиль (BAS, EBD)",
+          "Система кріплення IsoFix",
+          "Блокування замків задніх дверей"
+        ],
+        "multimedia": [
+          "Навігаційна система",
+          "Мультимедіа система з LCD-екраном",
+          "Bluetooth",
+          "USB",
+          "Android Auto",
+          "CarPlay"
+        ],
+        "headlights": [
+          "Галогенні"
+        ],
+        "interior_materials": [
+          "Тканина"
+        ],
+        "interior_color": [
+          "Темний"
+        ],
+        "seat_adjustment": [
+          "Ручне регулювання передніх сидінь"
+        ],
+        "heated_seats": [
+          "Передні сидіння"
+        ],
+        "electric_windows": [
+          "Передні та задні"
+        ],
+        "climate_control": [
+          "Клімат-контроль 2-зонний"
+        ],
+        "power_steering": [
+          "Електро"
+        ],
+        "steering_adjustment": [
+          "По висоті та по вильоту"
+        ],
+        "spare_wheel": [
+          "Повнорозмірне"
+        ],
+        "lighting": [
+          "Датчик світла",
+          "Денні ходові вогні",
+          "Протитуманні фари"
+        ],
+        "body_and_interior": [
+          "Довга база",
+          "Кузов MAXI",
+          "Захист картера"
+        ],
+        "parking_assistance": [
+          "Парктронік задній"
+        ],
+        "airbags": [
+          "Водія",
+          "Пасажира",
+          "Бічні задні"
+        ]
+      },
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "40359418",
+        "url": "https://auto.ria.com/uk/auto_peugeot_rifter_40359418.html",
+        "title": "Peugeot Rifter 2020",
+        "price": 17100.0,
+        "currency": "USD",
+        "make": "Peugeot",
+        "model": "Rifter",
+        "year": 2020,
+        "price_usd": 17100.0,
+        "price_uah": 769500.0,
+        "mileage_km": 57000,
+        "transmission": "Ручна / Механіка",
+        "fuel": "Дизель",
+        "engine_l": 1.56,
+        "body_type": "Мінівен",
+        "drive": "Передній",
+        "color": "Білий",
+        "region": "Івано-Франківська обл.",
+        "city": "Городенка",
+        "seller_type": "private",
+        "condition": "used",
+        "published_at": "2026-10-01",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/peugeot_rifter__657660667fx.webp",
+        "status": "active",
+        "doors": 5,
+        "seats": 5,
+        "generation": "I покоління",
+        "modification": "1.6 HDi MT (92 к.с.) L2",
+        "trim": "Allure",
+        "power_hp": 92.0,
+        "modification_power_hp": 92.0,
+        "power_kw": 68.0,
+        "emission_standard": "Євро-5",
+        "technical_state": "Професійно відремонтовані пошкодження",
+        "paint_condition": "Професійно виправлені сліди використання",
+        "inspection_ready": true,
+        "condition_options": [
+          "Гаражне зберігання",
+          "Сервісна книжка",
+          "Перший власник",
+          "Перша реєстрація"
+        ],
+        "fuel_consumption_l_per_100km": {
+          "city": 7.0,
+          "highway": 4.8,
+          "combined": 6.0
+        },
+        "equipment": {
+          "comfort": [
+            "Бортовий комп'ютер",
+            "Датчик дощу",
+            "Тоновані вікна",
+            "Складане заднє сидіння",
+            "Третій задній підголівник",
+            "Оздоблення керма шкірою",
+            "Оздоблення шкірою важеля КПП",
+            "Передній центральний підлокітник",
+            "Розетка 12V",
+            "Мультифункціональне кермо",
+            "Електропривід дзеркал",
+            "Підкурювач і попільничка"
+          ],
+          "safety": [
+            "Центральний замок",
+            "Антиблокувальна система (ABS)",
+            "Система стабілізації (ESP)",
+            "Розподіл гальмівних зусиль (BAS, EBD)",
+            "Система кріплення IsoFix",
+            "Блокування замків задніх дверей"
+          ],
+          "multimedia": [
+            "Навігаційна система",
+            "Мультимедіа система з LCD-екраном",
+            "Bluetooth",
+            "USB",
+            "Android Auto",
+            "CarPlay"
+          ],
+          "headlights": [
+            "Галогенні"
+          ],
+          "interior_materials": [
+            "Тканина"
+          ],
+          "interior_color": [
+            "Темний"
+          ],
+          "seat_adjustment": [
+            "Ручне регулювання передніх сидінь"
+          ],
+          "heated_seats": [
+            "Передні сидіння"
+          ],
+          "electric_windows": [
+            "Передні та задні"
+          ],
+          "climate_control": [
+            "Клімат-контроль 2-зонний"
+          ],
+          "power_steering": [
+            "Електро"
+          ],
+          "steering_adjustment": [
+            "По висоті та по вильоту"
+          ],
+          "spare_wheel": [
+            "Повнорозмірне"
+          ],
+          "lighting": [
+            "Датчик світла",
+            "Денні ходові вогні",
+            "Протитуманні фари"
+          ],
+          "body_and_interior": [
+            "Довга база",
+            "Кузов MAXI",
+            "Захист картера"
+          ],
+          "parking_assistance": [
+            "Парктронік задній"
+          ],
+          "airbags": [
+            "Водія",
+            "Пасажира",
+            "Бічні задні"
+          ]
+        }
+      },
+      "diagnostics": [],
+      "fixture": "packages/autos.autoria-ad-page/tests/peugeot-rifter-live/page.html",
+      "fixture_sha256": "41030f7bd5d8743327bb3f868bcc1941f7c181b6c850ea86eaa9801af84b937f",
+      "fixture_notes": "Source-preserving JSON-LD and Pinia fragments; seller contact, VIN, plate and unrelated page sections removed."
+    },
+    {
+      "url": "https://auto.ria.com/uk/auto_volkswagen_passat_40537546.html",
+      "fetched_at": "2026-10-11T03:46:44.997099+00:00",
+      "http_status": 200,
+      "raw_sha256": "cc126c50f206ff3aaf78471f442bb3008c5a9189aad8bf228257a1794cc35c2e",
+      "result_status": "success",
+      "natural_key": {
+        "site": "auto.ria.com",
+        "ad_id": "40537546"
+      },
+      "manual_assertions": {
+        "ad_id": "40537546",
+        "title": "Volkswagen Passat 2014",
+        "body_type": "Універсал",
+        "doors": 5,
+        "seats": 5,
+        "generation": "B7",
+        "modification": "1.6TDI MT (105 к.с.)",
+        "trim": "Comfortline",
+        "power_hp": 115.0,
+        "power_kw": 85.0,
+        "modification_power_hp": 105.0,
+        "technical_state": "Повністю непошкоджене",
+        "paint_condition": "Як нове",
+        "mileage_km": 339000,
+        "fuel": "Дизель",
+        "engine_l": 1.6,
+        "drive": "Передній"
+      },
+      "equipment": {
+        "comfort": [
+          "Бортовий комп'ютер",
+          "Датчик дощу",
+          "Підігрів дзеркал",
+          "Тоновані вікна",
+          "Запуск двигуна з кнопки",
+          "Складане заднє сидіння",
+          "Передній центральний підлокітник",
+          "Розетка 12V",
+          "Мультифункціональне кермо",
+          "Електропривід дзеркал",
+          "Бардачок з охолодженням",
+          "Підкурювач і попільничка",
+          "Круїз контроль"
+        ],
+        "safety": [
+          "Центральний замок",
+          "Антиблокувальна система (ABS)",
+          "Сигналізація",
+          "Система стабілізації (ESP)",
+          "Імобілайзер",
+          "Антипробуксовочна система (ASR)",
+          "Допомога при старті в гору",
+          "Допомога при спуску",
+          "Датчик тиску в шинах",
+          "Система кріплення IsoFix",
+          "Блокування замків задніх дверей"
+        ],
+        "multimedia": [
+          "AUX",
+          "Bluetooth",
+          "USB"
+        ],
+        "headlights": [
+          "Галогенні"
+        ],
+        "interior_materials": [
+          "Тканина"
+        ],
+        "interior_color": [
+          "Темний"
+        ],
+        "seat_adjustment": [
+          "Електрорегулювання сидіння водія"
+        ],
+        "heated_seats": [
+          "Передні сидіння"
+        ],
+        "electric_windows": [
+          "Передні та задні"
+        ],
+        "climate_control": [
+          "Клімат-контроль 2-зонний"
+        ],
+        "steering_adjustment": [
+          "По висоті та по вильоту"
+        ],
+        "spare_wheel": [
+          "Повнорозмірне"
+        ],
+        "lighting": [
+          "Датчик світла",
+          "Протитуманні фари"
+        ],
+        "body_and_interior": [
+          "Захист картера",
+          "Захист коробки"
+        ],
+        "parking_assistance": [
+          "Парктронік передній",
+          "Парктронік задній"
+        ],
+        "airbags": [
+          "Водія",
+          "Пасажира",
+          "Бічні передні",
+          "Бічні задні",
+          "Віконні (шторки)",
+          "Колін водія"
+        ]
+      },
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "40537546",
+        "url": "https://auto.ria.com/uk/auto_volkswagen_passat_40537546.html",
+        "title": "Volkswagen Passat 2014",
+        "price": 8390.0,
+        "currency": "USD",
+        "make": "Volkswagen",
+        "model": "Passat",
+        "year": 2014,
+        "price_usd": 8390.0,
+        "price_uah": 377550.0,
+        "mileage_km": 339000,
+        "transmission": "Ручна / Механіка",
+        "fuel": "Дизель",
+        "engine_l": 1.6,
+        "body_type": "Універсал",
+        "drive": "Передній",
+        "color": "Сірий",
+        "region": "Львівська обл.",
+        "city": "Львів",
+        "seller_type": "dealer",
+        "condition": "used",
+        "published_at": "2026-10-08",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/volkswagen_passat__660624829fx.webp",
+        "status": "active",
+        "doors": 5,
+        "seats": 5,
+        "generation": "B7",
+        "modification": "1.6TDI MT (105 к.с.)",
+        "trim": "Comfortline",
+        "power_hp": 115.0,
+        "modification_power_hp": 105.0,
+        "power_kw": 85.0,
+        "technical_state": "Повністю непошкоджене",
+        "paint_condition": "Як нове",
+        "inspection_ready": true,
+        "equipment": {
+          "comfort": [
+            "Бортовий комп'ютер",
+            "Датчик дощу",
+            "Підігрів дзеркал",
+            "Тоновані вікна",
+            "Запуск двигуна з кнопки",
+            "Складане заднє сидіння",
+            "Передній центральний підлокітник",
+            "Розетка 12V",
+            "Мультифункціональне кермо",
+            "Електропривід дзеркал",
+            "Бардачок з охолодженням",
+            "Підкурювач і попільничка",
+            "Круїз контроль"
+          ],
+          "safety": [
+            "Центральний замок",
+            "Антиблокувальна система (ABS)",
+            "Сигналізація",
+            "Система стабілізації (ESP)",
+            "Імобілайзер",
+            "Антипробуксовочна система (ASR)",
+            "Допомога при старті в гору",
+            "Допомога при спуску",
+            "Датчик тиску в шинах",
+            "Система кріплення IsoFix",
+            "Блокування замків задніх дверей"
+          ],
+          "multimedia": [
+            "AUX",
+            "Bluetooth",
+            "USB"
+          ],
+          "headlights": [
+            "Галогенні"
+          ],
+          "interior_materials": [
+            "Тканина"
+          ],
+          "interior_color": [
+            "Темний"
+          ],
+          "seat_adjustment": [
+            "Електрорегулювання сидіння водія"
+          ],
+          "heated_seats": [
+            "Передні сидіння"
+          ],
+          "electric_windows": [
+            "Передні та задні"
+          ],
+          "climate_control": [
+            "Клімат-контроль 2-зонний"
+          ],
+          "steering_adjustment": [
+            "По висоті та по вильоту"
+          ],
+          "spare_wheel": [
+            "Повнорозмірне"
+          ],
+          "lighting": [
+            "Датчик світла",
+            "Протитуманні фари"
+          ],
+          "body_and_interior": [
+            "Захист картера",
+            "Захист коробки"
+          ],
+          "parking_assistance": [
+            "Парктронік передній",
+            "Парктронік задній"
+          ],
+          "airbags": [
+            "Водія",
+            "Пасажира",
+            "Бічні передні",
+            "Бічні задні",
+            "Віконні (шторки)",
+            "Колін водія"
+          ]
+        }
+      },
+      "diagnostics": [
+        {
+          "level": "warning",
+          "message": "engine detail gives 115 hp; modification gives 105 hp",
+          "code": "extract.conflicting_power",
+          "material_id": "web:53b01dad5a7fdf032f69da46f6f4269f"
+        }
+      ],
+      "fixture": "packages/autos.autoria-ad-page/tests/volkswagen-passat-live/page.html",
+      "fixture_sha256": "d007bcfa25eeb53a5fe2e6da72bfc5ce6f5d4c54c3db00f7c06ed23939377739",
+      "fixture_notes": "Source-preserving JSON-LD and Pinia fragments; seller contact, VIN, plate and unrelated page sections removed."
+    }
+  ],
+  "catalog": {
+    "url": "https://auto.ria.com/uk/search/?abroad=0&category=1&customs_cleared=1&limit=20&order=7&page=0&search_type=2",
+    "fetched_at": "2026-10-11T04:02:47.436408+00:00",
+    "http_status": 200,
+    "raw_sha256": "ea598258b19e87b0d9ee824594cf0ecf965945c99e94d3958cc6a000ebba7f71",
+    "item_links_selector": {
+      "type": "css",
+      "value": "a.product-card[href*='/uk/auto_'][href$='.html']"
+    },
+    "matched_links": 21,
+    "unique_links": 21,
+    "links": [
+      "https://auto.ria.com/uk/auto_peugeot_4007_40380366.html",
+      "https://auto.ria.com/uk/auto_geely_mk_39595734.html",
+      "https://auto.ria.com/uk/auto_land-rover_range-rover-sport_40423584.html",
+      "https://auto.ria.com/uk/auto_bmw_x3_40271503.html",
+      "https://auto.ria.com/uk/auto_mazda_6_40415864.html",
+      "https://auto.ria.com/uk/auto_bmw_8-series-gran-coupe_40147263.html",
+      "https://auto.ria.com/uk/auto_audi_q5_40415852.html",
+      "https://auto.ria.com/uk/auto_dacia_sandero_39876655.html",
+      "https://auto.ria.com/uk/auto_opel_corsa_39166004.html",
+      "https://auto.ria.com/uk/auto_fiat_500l_39595816.html",
+      "https://auto.ria.com/uk/auto_peugeot_4007_40020213.html",
+      "https://auto.ria.com/uk/auto_volkswagen_golf_39722575.html",
+      "https://auto.ria.com/uk/auto_lincoln_mkx_39289557.html",
+      "https://auto.ria.com/uk/auto_chery_a15_40281486.html",
+      "https://auto.ria.com/uk/auto_opel_antara_39289315.html",
+      "https://auto.ria.com/uk/auto_citroen_c4_39384314.html",
+      "https://auto.ria.com/uk/auto_volkswagen_golf_39384433.html",
+      "https://auto.ria.com/uk/auto_honda_cr-v_39384404.html",
+      "https://auto.ria.com/uk/auto_nissan_qashqai_39289559.html",
+      "https://auto.ria.com/uk/auto_kia_sorento_40150548.html",
+      "https://auto.ria.com/uk/auto_volkswagen_golf_39289325.html"
+    ],
+    "fixture": "packages/autos.autoria-rules/tests/listing-links/page.html",
+    "fixture_sha256": "3732ad305aea3fb4f8ca858d8fbe58ff5e94943d9841f9f4c13229d89d152c9e",
+    "fixture_notes": "Only actual matched detail links retained from live search DOM, with additional unrelated negative links."
+  }
+}

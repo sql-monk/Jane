@@ -3,5 +3,35 @@
     "drawio": "4ce63d7f87feaa558e60a42da57def6718fda505abe78564db452f93d9d354f6",
     "light": "4ed9f61f46ec6ef0f56b8e4e2881f9f310e9ad471cf935d9729153f4e70769fa",
     "dark": "87be6b812eaf8c6b2f50c6999a290800335b9ebe554bb81f72e8a289e16fdc5e"
+  },
+  "platform/dev-stack": {
+    "drawio": "895fb723c7add8529a84cb04214e5ae2480e46c067852ea2012bd702659898f2",
+    "light": "ba3d742914016c3cd9aac9e340ff44d52329e2569c8c5954e0f85c7d25a273ff",
+    "dark": "1f057be755a10ed734c04a8f179063ab7ae8a1919513ea13d5a08f1b2be92053"
+  },
+  "platform/run-sequence": {
+    "drawio": "ff62dea3722670457463aacb9d705cd72d1028f3a7910e5fc944801df6cccc46",
+    "light": "d35f87234c0bceb354715c2b9b31ddbde8fd3002345f33d7623a65edf6324568",
+    "dark": "a86564cc8be6fe08e0819a7caf094b81dbc2871732bf78b9e21030c445f44af3"
+  },
+  "platform/task-dataflow": {
+    "drawio": "46f9c06065092db1218ba4a44fa8b0931fe97a9b79ff6230854b81ba75fa0f51",
+    "light": "8e0904b5c691013f80a4e71ff704d70ba2b9064f4a636d5863a14c201061d67f",
+    "dark": "968d945e1afb61f592e520124d9bcc41b9cffc178d99eef922c545a50c871aab"
+  },
+  "storage/components": {
+    "drawio": "a5e0dc447b1814af8168c3c4dfb555670bf74f5beedf008f0dcbb481c649ff95",
+    "light": "132ea2f6e3d20be17b21681f2f399602db7470a0449aba46d4362b90cc8c412c",
+    "dark": "9ebcc96e38340a03b206a482c2385e74e15e5d3cd1bbe17b6fb84fdef789d51e"
+  },
+  "storage/postgres-er": {
+    "drawio": "e9d883ee54ac41307accec021febbc97d94feda3c539ea306b0ca89d0470a7ee",
+    "light": "1d9e1be281bf0a24ac29d8eff827c0bd07ccbf533051d51e24371c1e60e29f84",
+    "dark": "2fc8b3bfc41436edfd731529e5b63846347bccf91e65df45a512cc064f76d12e"
+  },
+  "storage/write-sequence": {
+    "drawio": "d7d93cbe48bdd703268b0c08e7ff912a1386de200c217a3bb084e0bcc961e6c2",
+    "light": "721f86df12f1341eb170860aa6bef79eba06a6ca5032c7f80c3aad1170a0212f",
+    "dark": "a2e897d6ed5f0500f19d9d770cec21b039c792c0fb13c97840ce10146b95a4d3"
   }
 }

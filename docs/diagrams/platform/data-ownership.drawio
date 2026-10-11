@@ -1,0 +1,148 @@
+<mxfile host="drawio" version="31.4.5">
+  <diagram id="data-ownership" name="Власність даних">
+    <mxGraphModel adaptiveColors="none" grid="1" gridSize="10" page="0" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="o_orch" value="Orchestrator — БД jane_orchestrator" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#E1D5E7,#3A2D4D);swimlaneFillColor=none;strokeColor=light-dark(#9673A6,#B39DDB);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="330" height="166" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_orch_r0" value="sources, tasks" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_orch">
+          <mxGeometry y="30" width="330" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_orch_r1" value="runs, items (черга з lease)" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_orch">
+          <mxGeometry y="52" width="330" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_orch_r2" value="connections (лише secret_refs)" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_orch">
+          <mxGeometry y="74" width="330" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_orch_r3" value="platform_limits, activations, audit_events" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_orch">
+          <mxGeometry y="96" width="330" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_orch_r4" value="problem_groups, unknown_materials" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_orch">
+          <mxGeometry y="118" width="330" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_orch_r5" value="idempotency_keys" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_orch">
+          <mxGeometry y="140" width="330" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_reg" value="Registry — БД jane_registry + blob" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFE6CC,#4A3418);swimlaneFillColor=none;strokeColor=light-dark(#D79B00,#E3A541);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="420" y="20" width="300" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_reg_r0" value="пакети, версії, статуси" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_reg">
+          <mxGeometry y="30" width="300" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_reg_r1" value="звіти тестів, форки, походження" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_reg">
+          <mxGeometry y="52" width="300" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_reg_r2" value="архіви: бакет jane-registry, sha256/" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_reg">
+          <mxGeometry y="74" width="300" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_llm" value="LLM gateway — БД jane_llm" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);swimlaneFillColor=none;strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="760" y="20" width="290" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_llm_r0" value="підключення провайдерів" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_llm">
+          <mxGeometry y="30" width="290" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_llm_r1" value="бюджети, журнал витрат" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_llm">
+          <mxGeometry y="52" width="290" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_llm_r2" value="кеш ідемпотентності" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_llm">
+          <mxGeometry y="74" width="290" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_web" value="Web Collector — SQLite state.db" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#DAE8FC,#1C3557);swimlaneFillColor=none;strokeColor=light-dark(#6C8EBF,#79A6DC);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="20" y="230" width="330" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_web_r0" value="черга обходу, відомі URL" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_web">
+          <mxGeometry y="30" width="330" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_web_r1" value="стан стратегій, буфер матеріалів" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_web">
+          <mxGeometry y="52" width="330" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_web_r2" value="Job збору" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_web">
+          <mxGeometry y="74" width="330" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_tg" value="Telegram Collector — SQLite" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#DAE8FC,#1C3557);swimlaneFillColor=none;strokeColor=light-dark(#6C8EBF,#79A6DC);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="20" y="380" width="330" height="78" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_tg_r0" value="курсори каналів" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_tg">
+          <mxGeometry y="30" width="330" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_tg_r1" value="Job збору, буфер" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_tg">
+          <mxGeometry y="52" width="330" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_rt" value="Handler Runtime — БД jane_handler_runtime" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);swimlaneFillColor=none;strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="420" y="230" width="300" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_rt_r0" value="кеш delivery_key → результат" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_rt">
+          <mxGeometry y="30" width="300" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_rt_r1" value="кеш пакетів, прогони тестів" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_rt">
+          <mxGeometry y="52" width="300" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_rt_r2" value="без БД — пам'ять" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_rt">
+          <mxGeometry y="74" width="300" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_as" value="Assistant — БД jane_assistant" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#E1D5E7,#3A2D4D);swimlaneFillColor=none;strokeColor=light-dark(#9673A6,#B39DDB);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="760" y="230" width="290" height="78" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_as_r0" value="сесії підключення джерел" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_as">
+          <mxGeometry y="30" width="290" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_as_r1" value="сесії вдосконалення" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_as">
+          <mxGeometry y="52" width="290" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_st" value="Storage — сховища за підключеннями" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);swimlaneFillColor=none;strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="420" y="400" width="300" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_st_r0" value="RAW-об'єкти" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_st">
+          <mxGeometry y="30" width="300" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_st_r1" value="актуальні сутності й історія" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_st">
+          <mxGeometry y="52" width="300" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="o_st_r2" value="записи доставок (delivery_key)" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_st">
+          <mxGeometry y="74" width="300" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="ext" value="Цільові сховища користувача:&#10;PostgreSQL, SQL Server,&#10;MongoDB, MinIO, S3, файли" style="rounded=0;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="760" y="410" width="290" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="a1" value="storage.v1:&#10;читання RAW" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="o_orch" target="o_st">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="251" y="210"/>
+              <mxPoint x="385" y="210"/>
+              <mxPoint x="385" y="430"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a2" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.4;entryDx=0;entryDy=0;" edge="1" parent="1" source="o_orch" target="o_reg">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="a3" value="запис" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;dashed=1;dashPattern=2 3;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="o_st" target="ext">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="note" value="Кожен прямокутник — власне сховище модуля. Спільної бази немає: дані іншого модуля доступні лише через його API.&#10;Orchestrator зберігає лише ідентифікатори матеріалів і результатів, а не їхній вміст. Admin UI власних даних не має." style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);" vertex="1" parent="1">
+          <mxGeometry x="20" y="520" width="1030" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg0" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="20" y="590" as="sourcePoint"/>
+            <mxPoint x="70" y="590" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lt0" value="читання через API" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);" vertex="1" parent="1">
+          <mxGeometry x="78" y="580" width="130" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg1" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;dashed=1;dashPattern=2 3;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="228" y="590" as="sourcePoint"/>
+            <mxPoint x="278" y="590" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lt1" value="запис у зовнішнє сховище" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);" vertex="1" parent="1">
+          <mxGeometry x="286" y="580" width="180" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

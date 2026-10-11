@@ -43,14 +43,31 @@ test.describe("packages, versions, tests without writes, diff, forks, upstream, 
     expect(approve.body).toEqual({ status: "approved", reason: "tests passed on all bindings" });
   });
 
-  test("diff between versions", async ({ admin }) => {
+  test("diff between versions", async ({ admin, request }) => {
+    const versions = await (await request.get(`${mockUrl("registry")}/v1/packages/${PKG}/versions`)).json();
+    const history = await (
+      await request.get(
+        `${mockUrl("orchestrator")}/v1/tasks/shop-catalog/stages/extract-products/activations`,
+      )
+    ).json();
+    // The diff example compares 1.1.0 with 1.2.0, but the default version-list example contains only 1.2.0.
+    // Add the earlier package reference from the activation-history contract example to the neighbor catalog.
+    const earlier = history.items[0].package;
+    expect(earlier).toMatchObject({ package_id: PKG, version: "1.1.0" });
+    versions.items.push({ ...versions.items[0], ...earlier });
+    await fulfillJson(admin, `/api/registry/v1/packages/${PKG}/versions`, versions);
     await admin.goto(`/packages/${PKG}`);
     await admin.getByRole("tab", { name: "Відмінності" }).click();
-    await admin.getByLabel("Від (версія або parent:<версія>)").fill("1.1.0");
-    const { request } = await captureRequest(admin, "GET", `/api/registry/v1/packages/${PKG}/diff`, () =>
-      admin.getByRole("button", { name: "Порівняти" }).click(),
+    await admin.getByLabel("Від (версія або parent:<версія>)", { exact: true }).selectOption("1.1.0");
+    await admin.getByLabel("До версії", { exact: true }).selectOption("1.2.0");
+    const { request: diffRequest } = await captureRequest(
+      admin,
+      "GET",
+      `/api/registry/v1/packages/${PKG}/diff`,
+      () => admin.getByRole("button", { name: "Порівняти" }).click(),
     );
-    expect(new URL(request.url()).searchParams.get("from")).toBe("1.1.0");
+    expect(new URL(diffRequest.url()).searchParams.get("from")).toBe("1.1.0");
+    expect(new URL(diffRequest.url()).searchParams.get("to")).toBe("1.2.0");
     await expect(admin.locator(".diff-add")).toContainText("og_title(tree)");
     await expect(admin.locator(".diff-del")).toContainText("title = h1.text()");
     await expect(admin.getByRole("table", { name: "Зміни маніфесту" })).toContainText(
@@ -145,12 +162,19 @@ test.describe("packages, versions, tests without writes, diff, forks, upstream, 
     const card = admin.getByRole("region", { name: "Етап extract-products" });
     await card.getByLabel("Версія для extract-products").selectOption("1.2.0");
     await card.getByRole("button", { name: "Активувати" }).click();
-    await card.getByLabel("Причина: Активувати").fill("tests passed on all bindings");
+    await admin
+      .getByRole("dialog", { name: "Активувати", exact: true })
+      .getByLabel("Причина: Активувати")
+      .fill("tests passed on all bindings");
     const activate = await captureRequest(
       admin,
       "POST",
       "/api/orchestrator/v1/tasks/shop-catalog/stages/extract-products/activations",
-      () => card.getByRole("button", { name: "Активувати версію" }).click(),
+      () =>
+        admin
+          .getByRole("dialog", { name: "Активувати", exact: true })
+          .getByRole("button", { name: "Активувати версію", exact: true })
+          .click(),
     );
     expect(activate.request.headers()["idempotency-key"]).toBeTruthy();
     expect(activate.body).toMatchObject({
@@ -161,17 +185,26 @@ test.describe("packages, versions, tests without writes, diff, forks, upstream, 
     await expect(card.getByText(/Активація: .*1\.1\.0.*→/)).toBeVisible();
 
     await card.getByRole("button", { name: "Відкотити" }).click();
-    await card.getByLabel("Причина: Відкотити").fill("regression on category pages");
+    await admin
+      .getByRole("dialog", { name: "Відкотити", exact: true })
+      .getByLabel("Причина: Відкотити")
+      .fill("regression on category pages");
     const rollback = await captureRequest(
       admin,
       "POST",
       "/api/orchestrator/v1/tasks/shop-catalog/stages/extract-products/activations",
-      () => card.getByRole("button", { name: "Відкотити до попередньої" }).click(),
+      () =>
+        admin
+          .getByRole("dialog", { name: "Відкотити", exact: true })
+          .getByRole("button", { name: "Відкотити до попередньої", exact: true })
+          .click(),
     );
     expect(rollback.body).toEqual({ kind: "rollback", reason: "regression on category pages" });
 
     await admin.goto("/audit");
-    await expect(admin.getByRole("table", { name: "Події аудиту" })).toContainText("stage.activate");
+    await expect(
+      admin.getByRole("table", { name: "Події аудиту" }).getByTitle("stage.activate", { exact: true }),
+    ).toHaveText("Етап · Активовано");
   });
 
   test("fork in a task: bind an approved version of the fork to the stage", async ({ admin, request }) => {
@@ -204,12 +237,19 @@ test.describe("packages, versions, tests without writes, diff, forks, upstream, 
     await expect.poll(() => versionsOf).toContain("acme.product-extractor");
     await card.getByLabel("Версія для extract-products").selectOption("1.2.0");
     await card.getByRole("button", { name: "Активувати" }).click();
-    await card.getByLabel("Причина: Активувати").fill("switch the stage to the ACME fork");
+    await admin
+      .getByRole("dialog", { name: "Активувати", exact: true })
+      .getByLabel("Причина: Активувати")
+      .fill("switch the stage to the ACME fork");
     const { body } = await captureRequest(
       admin,
       "POST",
       "/api/orchestrator/v1/tasks/shop-catalog/stages/extract-products/activations",
-      () => card.getByRole("button", { name: "Активувати версію" }).click(),
+      () =>
+        admin
+          .getByRole("dialog", { name: "Активувати", exact: true })
+          .getByRole("button", { name: "Активувати версію", exact: true })
+          .click(),
     );
     expect(body).toMatchObject({
       kind: "activate",

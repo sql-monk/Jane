@@ -115,7 +115,7 @@ test.describe("real source onboarding in the admin @hybrid", () => {
 
     // ---- 3. adaptive sample through the real collector, analysis, proposals (the session polls with backoff)
     const status = view.locator(".kv-row", { hasText: "Стан" }).locator(".badge");
-    await expect(status).toHaveText("proposals_ready", { timeout: 600_000 });
+    await expect(status).toHaveText("Варіанти готові", { timeout: 600_000 });
     const session = (await jsonRequest(
       request,
       "get",
@@ -227,9 +227,15 @@ test.describe("real source onboarding in the admin @hybrid", () => {
     );
     await collect.getByLabel("Версія для collect").selectOption(source.collector_rules.version);
     await collect.getByRole("button", { name: "Активувати" }).click();
-    await collect.getByLabel("Причина: Активувати").fill("R26 accepted rules confirmed by a human");
+    await admin
+      .getByRole("dialog", { name: "Активувати", exact: true })
+      .getByLabel("Причина: Активувати")
+      .fill("R26 accepted rules confirmed by a human");
     const activation = await captureRequest(admin, "POST", /\/stages\/collect\/activations$/, () =>
-      collect.getByRole("button", { name: "Активувати версію" }).click(),
+      admin
+        .getByRole("dialog", { name: "Активувати", exact: true })
+        .getByRole("button", { name: "Активувати версію", exact: true })
+        .click(),
     );
     expect(activation.body).toMatchObject({
       kind: "activate",
@@ -237,9 +243,15 @@ test.describe("real source onboarding in the admin @hybrid", () => {
     });
     await expect(collect.getByText(/Активація:/)).toContainText(source.collector_rules.package_id);
     await collect.getByRole("button", { name: "Відкотити" }).click();
-    await collect.getByLabel("Причина: Відкотити").fill("R26 rollback of the collector rules");
+    await admin
+      .getByRole("dialog", { name: "Відкотити", exact: true })
+      .getByLabel("Причина: Відкотити")
+      .fill("R26 rollback of the collector rules");
     await captureRequest(admin, "POST", /\/stages\/collect\/activations$/, () =>
-      collect.getByRole("button", { name: "Відкотити до попередньої" }).click(),
+      admin
+        .getByRole("dialog", { name: "Відкотити", exact: true })
+        .getByRole("button", { name: "Відкотити до попередньої", exact: true })
+        .click(),
     );
     await expect(collect.getByText(/Відкат:/)).toContainText(source.collector_rules.package_id);
     const history = collect.getByRole("table", { name: "Історія активацій collect" });

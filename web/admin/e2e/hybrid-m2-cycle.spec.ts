@@ -1,5 +1,5 @@
 import path from "node:path";
-import { captureRequest, expect, realServiceUrl, test } from "./fixtures";
+import { captureRequest, expect, fillInstant, selectTask, realServiceUrl, test } from "./fixtures";
 import {
   TESTSITE_URL as site,
   jsonRequest,
@@ -179,10 +179,16 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
   // reprocessing of the stored RAW from a stage (run page): RAW stored since this run, from extract-products on
   await admin.getByRole("tab", { name: "Повторна обробка" }).click();
   const reprocessForm = admin.getByRole("form", { name: "Повторна обробка" });
-  await expect(reprocessForm.getByLabel("Завдання")).toHaveValue(taskId);
+  await expect(reprocessForm.getByLabel("Завдання", { exact: true })).toHaveValue(taskId);
   await reprocessForm.getByLabel("Сховище RAW", { exact: true }).fill("raw-files");
-  await reprocessForm.getByLabel("Почати з етапу").fill("extract-products");
-  await reprocessForm.getByLabel("Збережені з (RFC 3339)").fill(run["created_at"] as string);
+  await reprocessForm.getByLabel("Почати з етапу", { exact: true }).selectOption("extract-products");
+  await fillInstant(
+    admin,
+    reprocessForm.getByLabel("Збережені з", { exact: true }),
+    run["created_at"] as string,
+  );
+  await expect(reprocessForm.getByRole("button", { name: "Обробити повторно" })).toBeDisabled();
+  await reprocessForm.getByLabel("Підтверджую обробку всієї цієї вибірки").check();
   await reprocessForm.getByLabel("Причина").fill("M2 reprocess stored RAW of the run");
   const [stageReprocess, stageAccepted] = await Promise.all([
     captureRequest(admin, "POST", "/api/orchestrator/v1/reprocessing", () =>
@@ -195,7 +201,10 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
   expect(stageReprocess.request.headers()["idempotency-key"]).toBeTruthy();
   expect(stageReprocess.body).toEqual({
     task_id: taskId,
-    stored_materials: { storage_connection_id: "raw-files", since: run["created_at"] },
+    stored_materials: {
+      storage_connection_id: "raw-files",
+      since: new Date(run["created_at"] as string).toISOString(),
+    },
     from_stage: "extract-products",
     reason: "M2 reprocess stored RAW of the run",
   });
@@ -216,7 +225,7 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
     ["store-products", materialId, observationId, "success"],
   ]);
   await admin.reload();
-  await expect(admin.getByText("reprocess", { exact: true })).toBeVisible();
+  await expect(admin.locator(".kv-row", { hasText: "Спосіб запуску" })).toContainText("Повторна обробка");
   await expect(
     admin.getByRole("table", { name: "Прогрес етапів" }).getByRole("row", { name: /extract-products/ }),
   ).toContainText(`${extractor.package_id}@${extractor.version}`);
@@ -241,8 +250,11 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
   await materials.getByRole("button", { name: "Повторно обробити" }).click();
   const oneForm = admin.getByRole("form", { name: "Повторна обробка" });
   await expect(oneForm).toContainText(materialId);
-  await oneForm.getByLabel("Завдання").fill(taskId);
-  await oneForm.getByLabel("Почати з етапу").fill("extract-products");
+  await selectTask(oneForm, oneForm.getByLabel("Завдання", { exact: true }), taskId);
+  await oneForm.getByLabel("Почати з етапу", { exact: true }).selectOption("extract-products");
+  await expect(oneForm.getByLabel("Що обробити")).toHaveValue("object");
+  await oneForm.getByLabel("Що обробити").selectOption("material");
+  await oneForm.getByLabel("Підтверджую обробку всієї цієї вибірки").check();
   await oneForm.getByLabel("Причина").fill("M2 reprocess one stored material from admin");
   const reprocessing = await captureRequest(admin, "POST", "/api/orchestrator/v1/reprocessing", () =>
     oneForm.getByRole("button", { name: "Обробити повторно" }).click(),
@@ -258,8 +270,8 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
   const reprocessRunId = admin.url().split("/").at(-1) as string;
   const oneRun = await waitRun(request, orchestratorUrl, reprocessRunId);
   expect(oneRun["status"], JSON.stringify(oneRun)).toBe("succeeded");
-  // The selected material only, with its RAW of this source among the fed objects. The orchestrator does not
-  // filter by the task's source, so RAW of the same URL stored by OTHER sources is fed too (WP-09 test below).
+  // The selected material is processed within the task source; the WP-09 scenario below verifies
+  // that RAW stored by another source is excluded even when it shares the same material identity.
   const oneItems = (await runItems(request, orchestratorUrl, reprocessRunId)).filter(
     (i) => i.stage_id === "extract-products",
   );
@@ -281,9 +293,15 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
   await stage.getByLabel("Пакет для extract-products").selectOption(forkId);
   await stage.getByLabel("Версія для extract-products").selectOption("1.0.0");
   await stage.getByRole("button", { name: "Активувати" }).click();
-  await stage.getByLabel("Причина: Активувати").fill("M2 switch to approved independent fork");
+  await admin
+    .getByRole("dialog", { name: "Активувати", exact: true })
+    .getByLabel("Причина: Активувати")
+    .fill("M2 switch to approved independent fork");
   const activation = await captureRequest(admin, "POST", /\/stages\/extract-products\/activations$/, () =>
-    stage.getByRole("button", { name: "Активувати версію" }).click(),
+    admin
+      .getByRole("dialog", { name: "Активувати", exact: true })
+      .getByRole("button", { name: "Активувати версію", exact: true })
+      .click(),
   );
   expect(activation.body).toMatchObject({
     kind: "activate",
@@ -291,9 +309,15 @@ test("real M2 cycle: source, package, task, collection, materials, errors, fork 
   });
   await expect(stage.getByText(/Активація:/)).toContainText(forkId);
   await stage.getByRole("button", { name: "Відкотити" }).click();
-  await stage.getByLabel("Причина: Відкотити").fill("M2 restore original package");
+  await admin
+    .getByRole("dialog", { name: "Відкотити", exact: true })
+    .getByLabel("Причина: Відкотити")
+    .fill("M2 restore original package");
   const rollback = await captureRequest(admin, "POST", /\/stages\/extract-products\/activations$/, () =>
-    stage.getByRole("button", { name: "Відкотити до попередньої" }).click(),
+    admin
+      .getByRole("dialog", { name: "Відкотити", exact: true })
+      .getByRole("button", { name: "Відкотити до попередньої", exact: true })
+      .click(),
   );
   expect(rollback.body).toEqual({ kind: "rollback", reason: "M2 restore original package" });
   await expect(stage.getByText(/Відкат:/)).toContainText(extractor.package_id);
@@ -384,8 +408,11 @@ test("reprocessing one stored material takes only RAW of the task's source (WP-0
   await expect(materials.getByRole("row")).toHaveCount(2);
   await materials.getByRole("button", { name: "Повторно обробити" }).click();
   const form = admin.getByRole("form", { name: "Повторна обробка" });
-  await form.getByLabel("Завдання").fill(taskId);
-  await form.getByLabel("Почати з етапу").fill("extract-products");
+  await selectTask(form, form.getByLabel("Завдання", { exact: true }), taskId);
+  await form.getByLabel("Почати з етапу", { exact: true }).selectOption("extract-products");
+  await expect(form.getByLabel("Що обробити")).toHaveValue("object");
+  await form.getByLabel("Що обробити").selectOption("material");
+  await form.getByLabel("Підтверджую обробку всієї цієї вибірки").check();
   await form.getByRole("button", { name: "Обробити повторно" }).click();
   await expect(admin).toHaveURL(/\/runs\/run_/);
   const runId = admin.url().split("/").at(-1) as string;
@@ -407,8 +434,8 @@ test("reprocessing one stored material takes only RAW of the task's source (WP-0
   const ownObject = (own["items"] as Array<{ object: { object_id: string } }>)[0]?.object.object_id;
   await admin.goto(`/materials?connection_id=raw-files&source_id=${ownSource}`);
   await materials.getByRole("button", { name: "Повторно обробити" }).click();
-  await form.getByLabel("Завдання").fill(taskId);
-  await form.getByLabel("Почати з етапу").fill("extract-products");
+  await selectTask(form, form.getByLabel("Завдання", { exact: true }), taskId);
+  await form.getByLabel("Почати з етапу", { exact: true }).selectOption("extract-products");
   await form.getByLabel("Що обробити").selectOption("object");
   const exact = await captureRequest(admin, "POST", "/api/orchestrator/v1/reprocessing", () =>
     form.getByRole("button", { name: "Обробити повторно" }).click(),

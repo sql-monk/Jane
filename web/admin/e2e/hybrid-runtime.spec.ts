@@ -73,7 +73,7 @@ test.describe("real handler-runtime: package tests without writes @hybrid", () =
     for (const name of testNames)
       await expect(report.getByRole("table", { name: "Тестові випадки" })).toContainText(name);
     await expect(
-      report.getByRole("table", { name: "Тестові випадки" }).getByText("passed", { exact: true }),
+      report.getByRole("table", { name: "Тестові випадки" }).getByText("Пройдено", { exact: true }),
     ).toHaveCount(testNames.length);
 
     const codePath = "src/testsite_products/main.py";
@@ -98,8 +98,8 @@ test.describe("real handler-runtime: package tests without writes @hybrid", () =
     );
     await expect(admin).toHaveURL(new RegExp(`/packages/${seeded.package_id}\\?version=1\\.0\\.1`));
     await admin.getByRole("tab", { name: "Відмінності" }).click();
-    await admin.getByLabel("Від (версія або parent:<версія>)").fill("1.0.0");
-    await admin.getByLabel("До версії").fill("1.0.1");
+    await admin.getByLabel("Від (версія або parent:<версія>)", { exact: true }).selectOption("1.0.0");
+    await admin.getByLabel("До версії", { exact: true }).selectOption("1.0.1");
     await admin.getByRole("button", { name: "Порівняти" }).click();
     await expect(admin.getByLabel("Відмінності версій")).toContainText("e2e immutable editor version");
 
@@ -118,7 +118,7 @@ test.describe("real handler-runtime: package tests without writes @hybrid", () =
       retestPanel
         .getByLabel("Звіт тестів")
         .getByRole("table", { name: "Тестові випадки" })
-        .getByText("passed", { exact: true }),
+        .getByText("Пройдено", { exact: true }),
     ).toHaveCount(testNames.length);
     await admin.getByRole("button", { name: "Погодити", exact: true }).click();
     await admin.getByLabel("Причина: Погодити").fill("All isolated package tests passed");
@@ -126,6 +126,6 @@ test.describe("real handler-runtime: package tests without writes @hybrid", () =
       admin.getByRole("button", { name: "Погодити версію" }).click(),
     );
     expect(approve.body).toEqual({ status: "approved", reason: "All isolated package tests passed" });
-    await expect(admin.getByRole("table", { name: "Версії", exact: true })).toContainText("approved");
+    await expect(admin.getByRole("table", { name: "Версії", exact: true })).toContainText("Схвалено");
   });
 });

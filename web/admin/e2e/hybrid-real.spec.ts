@@ -1,11 +1,41 @@
-import { captureRequest, expect, realServiceUrl, test } from "./fixtures";
+import { captureRequest, expect, realServiceUrl, selectCatalogOption, test } from "./fixtures";
+import { jsonRequest, uniqueId } from "./seed";
 
 // Screens against REAL services (WP-10 llm, WP-11 assistant) while the other neighbours stay contract mocks.
 // Run: JANE_ADMIN_TARGET_LLM=http://127.0.0.1:<port> [JANE_ADMIN_TARGET_ASSISTANT=...] pnpm e2e --grep @hybrid
-// Nothing here depends on contract example data - only on behaviour of the real service.
+// The LLM budget uses a real task when Orchestrator is real, or the contract-mock task catalog otherwise.
 test.describe("real llm and assistant services @hybrid", () => {
-  test("LLM: providers, aliases, budget round-trip, usage", async ({ admin }) => {
+  test("LLM: providers, aliases, budget round-trip, usage", async ({ admin, request }) => {
     test.skip(!realServiceUrl("llm"), "JANE_ADMIN_TARGET_LLM / JANE_ADMIN_API_TARGET is not set");
+    const orchestrator = realServiceUrl("orchestrator");
+    const scope = orchestrator ? uniqueId("e2e-budget-task") : "shop-catalog";
+    if (orchestrator) {
+      const sourceId = uniqueId("e2e-budget-source");
+      await jsonRequest(
+        request,
+        "post",
+        `${orchestrator}/v1/sources`,
+        {
+          source_id: sourceId,
+          kind: "web",
+          title: sourceId,
+          locator: { url: "https://example.test/" },
+        },
+        201,
+      );
+      await jsonRequest(
+        request,
+        "post",
+        `${orchestrator}/v1/tasks`,
+        {
+          task_id: scope,
+          title: scope,
+          input: { source_id: sourceId },
+          stages: [{ stage_id: "collect", kind: "collect", collector: { collector: "web" } }],
+        },
+        201,
+      );
+    }
     await admin.goto("/llm");
     const providers = admin.getByRole("table", { name: "Провайдери LLM" });
     await expect(providers).toBeVisible();
@@ -17,9 +47,8 @@ test.describe("real llm and assistant services @hybrid", () => {
     ).toBeVisible();
 
     await admin.getByRole("tab", { name: "Бюджети" }).click();
-    const scope = `e2e-task-${Date.now()}`;
     await admin.getByLabel("Рівень").selectOption("task");
-    await admin.getByLabel("Ідентифікатор").fill(scope);
+    await selectCatalogOption(admin, admin.getByLabel("Завдання", { exact: true }), scope);
     await admin.getByLabel("Сума").fill("1.5");
     const saved = await captureRequest(admin, "PUT", `/api/llm/v1/budgets/task/${scope}`, () =>
       admin.getByRole("button", { name: "Зберегти бюджет" }).click(),
@@ -34,6 +63,10 @@ test.describe("real llm and assistant services @hybrid", () => {
     await budgets
       .getByRole("row", { name: new RegExp(scope) })
       .getByRole("button", { name: "Прибрати" })
+      .click();
+    await admin
+      .getByRole("dialog", { name: "Прибрати", exact: true })
+      .getByRole("button", { name: "Підтвердити", exact: true })
       .click();
     await expect(budgets.or(admin.getByText("Немає даних"))).not.toContainText(scope);
 
@@ -59,7 +92,7 @@ test.describe("real llm and assistant services @hybrid", () => {
     expect(response.status()).toBe(202);
     const panel = admin.getByLabel("Підключення джерела");
     await expect(panel).toBeVisible();
-    await expect(panel.locator(".badge")).toHaveText(/queued|running|succeeded|failed|cancelled/);
+    await expect(panel.locator(".badge")).toHaveText(/У черзі|Виконується|Успішно|Помилка|Скасовано/);
     // The real job links to its session (links.session): the session view opens with a live status.
     await expect(admin.getByRole("heading", { name: /^Сесія onb_/ })).toBeVisible();
     await expect(

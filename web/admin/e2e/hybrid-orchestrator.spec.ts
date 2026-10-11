@@ -228,7 +228,7 @@ test.describe("real orchestrator: sources, tasks, schedules, limits, connections
     const response = await cancelled.request.response();
     expect(response?.status()).toBe(202);
     expect(((await response?.json()) as { status: string }).status).toBe("cancelling");
-    await expect(admin.getByText(/Скасування:/)).toContainText("cancelling");
+    await expect(admin.getByText(/Скасування:/)).toContainText("Скасовується");
 
     await expect
       .poll(async () => (await jsonRequest(request, "get", runUrl))["status"], { timeout: 60_000 })

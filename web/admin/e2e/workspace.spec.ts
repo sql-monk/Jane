@@ -93,7 +93,7 @@ test.describe("admin workspace", () => {
       items: list.items.map((run) => ({ ...run, status: "queued" })),
     });
     await admin.goto("/");
-    const metric = admin.locator(".metric").filter({ hasText: "Серед останніх запусків" });
+    const metric = admin.getByRole("link", { name: /^У роботі(?:\s|$)/ });
     await expect(metric.locator(".metric-value")).toHaveText(String(list.items.length));
     await expect(metric).toHaveAttribute("href", "/runs");
     await metric.click();

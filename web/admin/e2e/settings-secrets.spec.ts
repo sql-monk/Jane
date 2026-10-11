@@ -1,4 +1,12 @@
-import { captureRequest, expect, expectNoSecretLeak, fulfillJson, mockUrl, test } from "./fixtures";
+import {
+  captureRequest,
+  expect,
+  expectNoSecretLeak,
+  fulfillJson,
+  mockUrl,
+  preferExample,
+  test,
+} from "./fixtures";
 
 // Values that must never reach the screen even if a service returned them by mistake.
 const LEAKED = ["pg-password-LEAK-1", "tg-bot-token-LEAK-2", "Bearer eyLEAKLEAKLEAK3"];
@@ -24,7 +32,11 @@ test.describe("connections, LLM, limits and secrets @mock", () => {
       "env:JANE_SECRET_RESULTS_PG_PASSWORD",
     );
     await expectNoSecretLeak(admin, LEAKED);
-    await admin.getByRole("button", { name: /Results DB · results-pg/ }).click();
+    await admin
+      .getByRole("table", { name: "Підключення", exact: true })
+      .getByRole("row", { name: /results-pg/ })
+      .getByRole("button")
+      .click();
     await expect(admin.getByLabel("Ідентифікатор підключення")).toHaveValue("results-pg");
     await expectNoSecretLeak(admin, LEAKED);
     for (const input of await admin.locator("input").all()) {
@@ -80,6 +92,7 @@ test.describe("connections, LLM, limits and secrets @mock", () => {
   });
 
   test("LLM: providers via connections, budgets, usage", async ({ admin }) => {
+    await preferExample(admin, "/api/orchestrator/v1/tasks", "list");
     await admin.goto("/llm");
     await expect(admin.getByRole("table", { name: "Провайдери LLM" })).toContainText("fake-deterministic-1");
     await admin.getByRole("tab", { name: "Бюджети" }).click();

@@ -22,9 +22,46 @@ export async function fillInstant(page: Page, field: Locator, instant: string): 
   const value = await page.evaluate((timestamp) => {
     const date = new Date(timestamp);
     const two = (part: number) => String(part).padStart(2, "0");
-    return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}T${two(date.getHours())}:${two(date.getMinutes())}:${two(date.getSeconds())}.${String(date.getMilliseconds()).padStart(3, "0")}`;
+    const input = document.createElement("input");
+    input.type = "datetime-local";
+    input.value = `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}T${two(date.getHours())}:${two(date.getMinutes())}:${two(date.getSeconds())}.${String(date.getMilliseconds()).padStart(3, "0")}`;
+    // Browsers omit zero seconds/fractions. Playwright requires this canonical native value.
+    return input.value;
   }, instant);
   await field.fill(value);
+}
+
+/** Select an existing entity through its paginated UI catalog, without injecting options. */
+export async function selectCatalogOption(
+  container: Page | Locator,
+  field: Locator,
+  value: string,
+  moreLabel = "Показати ще",
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const present = await field
+          .locator("option")
+          .evaluateAll(
+            (options, id) => options.some((option) => (option as HTMLOptionElement).value === id),
+            value,
+          );
+        if (present) return true;
+        const more = container.getByRole("button", { name: moreLabel, exact: true });
+        if ((await more.count()) === 1 && (await more.isVisible()) && (await more.isEnabled()))
+          await more.click();
+        return false;
+      },
+      { message: `Entity ${value} must be available in the UI catalog`, timeout: 10_000 },
+    )
+    .toBe(true);
+  await field.selectOption(value);
+}
+
+/** Reprocessing offers its own task-catalog pagination control. */
+export async function selectTask(container: Page | Locator, field: Locator, taskId: string): Promise<void> {
+  await selectCatalogOption(container, field, taskId, "Більше завдань");
 }
 
 /** `contracts/examples/openapi/<name>.json` -> its `value` (contract examples are the only test data). */

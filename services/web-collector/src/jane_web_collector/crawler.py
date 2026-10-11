@@ -34,6 +34,7 @@ from jane_contracts.discovery import (
     UrlKind,
 )
 from jane_kit.config import LimitLayer, ResolvedLimits
+from jane_kit.errors import FieldError, ValidationFailed
 from jane_kit.jobs import JobCancelledError, JobContext
 
 from .connections import ConnectionPolicy, auth_headers
@@ -230,13 +231,28 @@ class CrawlRun:
             headers.setdefault("Accept", ", ".join(self.accept))
         creds: dict[str, str] = {}
         if fetch_cfg.get("connection_id"):
+            if fetch_cfg.get("transport") == "browser":
+                raise ValidationFailed(
+                    "browser transport does not support managed connection credentials",
+                    errors=[
+                        FieldError(
+                            pointer="/rules/fetch/connection_id", message="unsupported with browser transport"
+                        )
+                    ],
+                )
             found = self.state.get_connection(fetch_cfg["connection_id"])
             if found is not None:
                 creds = auth_headers(found[0], deps.connection_policy)
         # per-host limits are shared with every other collection and fetch of this process (WP-02c)
         self.host_session = deps.host_limiter.session(self.limits)
         self.robots_fetcher = Fetcher(
-            deps.client, self.limits, self.host_session, user_agent=user_agent, headers=headers
+            deps.client,
+            self.limits,
+            self.host_session,
+            user_agent=user_agent,
+            headers=headers,
+            transport=fetch_cfg.get("transport", "http"),
+            browser_fetch=deps.renderer.fetch if deps.renderer is not None else None,
         )
         self.robots = RobotsCache(self._fetch_robots, token, self.limits.collector.robots_cache_ttl_seconds)
         self.fetcher = Fetcher(
@@ -248,6 +264,8 @@ class CrawlRun:
             auth_headers=creds,
             connection_policy=deps.connection_policy,
             crawl_delay_for=None if self.owner_policy else self._crawl_delay,
+            transport=fetch_cfg.get("transport", "http"),
+            browser_fetch=deps.renderer.fetch if deps.renderer is not None else None,
         )
         self.strategies: list[tuple[str, DiscoveryStrategy, StrategyContext, int]] = []
         self.cancelled = False

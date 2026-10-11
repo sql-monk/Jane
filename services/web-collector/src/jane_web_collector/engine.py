@@ -425,6 +425,15 @@ class Engine:
         headers = dict(fetch_cfg.get("headers") or {})
         creds: dict[str, str] = {}
         if fetch_cfg.get("connection_id"):
+            if fetch_cfg.get("transport") == "browser":
+                raise ValidationFailed(
+                    "browser transport does not support managed connection credentials",
+                    errors=[
+                        FieldError(
+                            pointer="/rules/fetch/connection_id", message="unsupported with browser transport"
+                        )
+                    ],
+                )
             found = self.state.get_connection(fetch_cfg["connection_id"])
             if found is None:
                 raise ValidationFailed(
@@ -434,7 +443,15 @@ class Engine:
             creds = auth_headers(found[0], self.connection_policy)
         # the request's limits take part in the shared per-host limits until the fetch is over
         host_session = self.host_limiter.session(limits)
-        base_fetcher = Fetcher(self.client, limits, host_session, user_agent=user_agent, headers=headers)
+        base_fetcher = Fetcher(
+            self.client,
+            limits,
+            host_session,
+            user_agent=user_agent,
+            headers=headers,
+            transport=fetch_cfg.get("transport", "http"),
+            browser_fetch=self.renderer.fetch,
+        )
 
         async def fetch_robots(url: str) -> tuple[int, str] | None:
             try:
@@ -467,6 +484,8 @@ class Engine:
             auth_headers=creds,
             connection_policy=self.connection_policy,
             crawl_delay_for=crawl_delay,
+            transport=fetch_cfg.get("transport", "http"),
+            browser_fetch=self.renderer.fetch,
         )
         try:
             await check(canonical)

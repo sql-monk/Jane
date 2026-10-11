@@ -1,0 +1,6 @@
+{
+  "collector": "web",
+  "scope": {"allowed_domains": ["shop.example.test"]},
+  "strategies": [{"type": "seed_list", "urls": ["https://shop.example.test/"]}],
+  "fetch": {"transport": "unknown"}
+}

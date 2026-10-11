@@ -72,6 +72,13 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
             type: "object",
             additionalProperties: false,
             properties: {
+              transport: {
+                type: "string",
+                enum: ["http", "browser"],
+                default: "http",
+                description:
+                  "Транспорт початкового GET-запиту: http — звичайний HTTP-клієнт; browser — мережевий стек Chromium через контрольований egress proxy. Для browser повертаються оригінальні байти відповіді, JavaScript під час завантаження вимкнено; render_js окремо визначає потребу рендерингу. Межі, robots.txt, переадресації, ліміти, тайм-аути та перевірки вихідних адрес залишаються обов'язковими. Потрібна збірка Web Collector з Chromium; за відсутності підтримки — not_implemented. POST та автентифіковані запити через цей транспорт не підтримуються.",
+              },
               user_agent: { type: "string", maxLength: 300 },
               headers: {
                 description:
@@ -423,7 +430,7 @@ export const contractSchemas: Record<string, Record<string, unknown>> = {
             format: "uri",
             pattern: "^https?://",
             description:
-              "Базовий URL для відносних URL товарів (наприклад https://shop.example.test/ для API під /api/). Якщо не задано — URL сторінки API. Результат завжди проходить звичайні scope, normalization і robots перевірки.",
+              "Базовий URL для відносних URL товарів (наприклад https://shop.example.test/ для API під /api/). Якщо не задано — URL сторінки API. Результат проходить normalization і scope; robots перевіряється при HTTP-завантаженні, включно з навігацією API. Для emit_items_as_materials URL товару не завантажується.",
           },
           lastmod_path: { type: "string" },
           emit_items_as_materials: {

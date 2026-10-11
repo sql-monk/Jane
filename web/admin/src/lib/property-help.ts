@@ -243,3 +243,49 @@ export function describeStageProperty(
     ...(keys ? { keys } : {}),
   });
 }
+
+/** Enum widgets follow the selected contract branch and package schema, including nested arrays. */
+export function stagePropertyChoices(
+  stage: Stage,
+  keys: readonly PathPart[],
+  paramsSchema?: PropertySchema,
+): unknown[] | undefined {
+  const task = contractSchemas["task-config.schema.json"];
+  if (!task) return undefined;
+  const inParams = keys[0] === "params" && keys.length > 1;
+  const schema = inParams ? paramsSchema : { $ref: "#/$defs/Stage" };
+  if (!schema) return undefined;
+  const nodes = candidates(
+    {
+      node: schema,
+      document: inParams ? schema : task,
+      documentPath: inParams ? "" : "task-config.schema.json",
+    },
+    inParams ? keys.slice(1) : keys,
+    inParams ? stage.params : stage,
+    contractSchemas,
+  );
+  const choices = nodes.map((node) => (Array.isArray(node["enum"]) ? node["enum"] : undefined));
+  return choices.length &&
+    choices[0] &&
+    choices.every((choice) => JSON.stringify(choice) === JSON.stringify(choices[0]))
+    ? choices[0]
+    : undefined;
+}
+
+export function conditionPropertyChoices(keys: readonly PathPart[]): unknown[] | undefined {
+  const task = contractSchemas["task-config.schema.json"];
+  if (!task) return undefined;
+  const nodes = candidates(
+    { node: { $ref: "#/$defs/Condition" }, document: task, documentPath: "task-config.schema.json" },
+    keys,
+    undefined,
+    contractSchemas,
+  );
+  const choices = nodes.map((node) => (Array.isArray(node["enum"]) ? node["enum"] : undefined));
+  return choices.length &&
+    choices[0] &&
+    choices.every((choice) => JSON.stringify(choice) === JSON.stringify(choices[0]))
+    ? choices[0]
+    : undefined;
+}

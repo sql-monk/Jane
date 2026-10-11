@@ -83,6 +83,7 @@ STORAGE: dict[str, Scopes] = {
     **_connections("handler:invoke", "storage:read"),
     "GET /v1/storage-status": "storage:read",
     "GET /v1/entities": "storage:read",
+    "GET /v1/entity-types": "storage:read",
     "GET /v1/entity-history": "storage:read",
     "GET /v1/objects": "storage:read",
     "GET /v1/objects/{object_id}": "storage:read",

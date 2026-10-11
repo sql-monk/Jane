@@ -46,6 +46,7 @@
         "web/admin/src/lib/property*.ts",
         "web/admin/src/lib/schema*.ts",
         "web/admin/src/lib/unsaved*.ts",
+        "web/admin/src/components/useStagePropertyHelp.ts",
         "web/admin/src/chain-editor.css",
         "web/admin/e2e/chain-editor.spec.ts",
         "web/admin/e2e/safe-forms.spec.ts"
@@ -105,6 +106,7 @@
       "name": "admin-review-integration-acceptance",
       "allow": [
         ".codex/**",
+        "libs/jane-kit/src/jane_kit/auth_scopes.py",
         ".claude/hooks/jane_wp.py",
         "plan.md",
         "docs/delivery/**",

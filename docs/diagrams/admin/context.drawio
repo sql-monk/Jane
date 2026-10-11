@@ -1,0 +1,43 @@
+<mxfile host="app.diagrams.net" version="24.7.17">
+  <diagram id="admin-context" name="admin context">
+    <mxGraphModel dx="1400" dy="1000" grid="1" gridSize="10" page="0" background="none">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="user" value="Користувач" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=control;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="30" y="190" width="230" height="76" />
+        </mxCell>
+        <mxCell id="browser" value="React Admin&#10;Браузерний runtime" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=default;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="350" y="190" width="230" height="76" />
+        </mxCell>
+        <mxCell id="static" value="Static server&#10;assets + config.json + SPA" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=default;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="350" y="30" width="230" height="76" />
+        </mxCell>
+        <mxCell id="proxy" value="Reverse proxy&#10;/api/&lt;service&gt;" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=process;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="670" y="190" width="230" height="76" />
+        </mxCell>
+        <mxCell id="services" value="Сервіси Jane&#10;Публічні контракти" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=process;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="990" y="190" width="230" height="76" />
+        </mxCell>
+        <mxCell id="own" value="Session storage / Query cache&#10;Тема / API key / OIDC" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=data;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="350" y="380" width="230" height="76" />
+        </mxCell>
+        <mxCell id="e0" value="Дії" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="user" target="browser">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e1" value="Завантаження" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="static" target="browser">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e2" value="HTTP + Bearer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="browser" target="proxy">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e3" value="Роутинг" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="proxy" target="services">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e4" value="Власний browser state" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="browser" target="own">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

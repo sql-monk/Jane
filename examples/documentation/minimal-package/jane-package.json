@@ -1,0 +1,18 @@
+{
+  "schema_version": "1",
+  "package_id": "documentation.simple-product",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "Product from a plain text line",
+  "entry": {"runtime": "python", "module": "simple_product.main", "callable": "extract"},
+  "input": {"accepts": ["material"], "media_types": ["text/plain"]},
+  "params_schema": "schemas/params.schema.json",
+  "output": {"entities": [{"entity_type": "product", "schema": "schemas/product.schema.json", "key_fields": ["sku"]}]},
+  "dependencies": {"runtime_profile": "python-extractor@1", "python": []},
+  "access": {"network": "none"},
+  "tests": [
+    {"name": "product", "input": {"file": "tests/product/input.txt", "media_type": "text/plain"}, "expected_status": "success", "expected": "tests/product/expected.json", "compare": "exact", "origin": "human"},
+    {"name": "empty", "input": {"file": "tests/empty/input.txt", "media_type": "text/plain"}, "expected_status": "empty", "origin": "human"}
+  ],
+  "provenance": {"created_by": "human", "change_summary": "Minimal documentation example."}
+}

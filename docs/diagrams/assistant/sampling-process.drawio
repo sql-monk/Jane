@@ -1,0 +1,52 @@
+<mxfile host="app.diagrams.net" version="24.7.17">
+  <diagram id="assistant-sampling-process" name="assistant sampling-process">
+    <mxGraphModel dx="1400" dy="1000" grid="1" gridSize="10" page="0" background="none">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="collect" value="Почати collection&#10;за fetch_ratio / caps" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=default;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="30" y="30" width="230" height="76" />
+        </mxCell>
+        <mxCell id="pool" value="Poll матеріалів&#10;Diversity pool" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=data;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="350" y="30" width="230" height="76" />
+        </mxCell>
+        <mxCell id="class" value="Класифікувати batch&#10;через LLM" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=process;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="670" y="30" width="230" height="76" />
+        </mxCell>
+        <mxCell id="cov" value="Confidence достатній&#10;і типи представлені?" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=process;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="670" y="230" width="230" height="76" />
+        </mxCell>
+        <mxCell id="more" value="Budget / sample cap&#10;і progress дозволяють далі?" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=control;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="350" y="230" width="230" height="76" />
+        </mxCell>
+        <mxCell id="an" value="Аналіз типів&#10;і пакетні тести" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=process;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="990" y="230" width="230" height="76" />
+        </mxCell>
+        <mxCell id="bad" value="insufficient_sample" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=data;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="350" y="430" width="230" height="76" />
+        </mxCell>
+        <mxCell id="e0" value="Collection ID" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="collect" target="pool">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e1" value="Різні зразки" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="pool" target="class">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e2" value="Coverage evidence" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="class" target="cov">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e3" value="Так" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="cov" target="an">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e4" value="Ні" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="cov" target="more">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e5" value="Так" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="more" target="pool">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e6" value="Ні" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="more" target="bad">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,43 @@
+<mxfile host="app.diagrams.net" version="24.7.17">
+  <diagram id="assistant-data" name="assistant data">
+    <mxGraphModel dx="1400" dy="1000" grid="1" gridSize="10" page="0" background="none">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="sessions" value="sessions&#10;PK session_id&#10;doc JSON / version / updated_at" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=data;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="30" y="30" width="230" height="110" />
+        </mxCell>
+        <mxCell id="jobs" value="jobs&#10;Jane Kit store&#10;progress / result / leases" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=data;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="350" y="30" width="230" height="110" />
+        </mxCell>
+        <mxCell id="keys" value="idempotency&#10;Jane Kit store&#10;fingerprint / response / claim" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=data;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="670" y="30" width="230" height="110" />
+        </mxCell>
+        <mxCell id="registry" value="Package refs&#10;Registry API owner" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=control;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="30" y="260" width="230" height="110" />
+        </mxCell>
+        <mxCell id="materials" value="Material / ContentRef&#10;Collector / Storage owner" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=control;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="350" y="260" width="230" height="110" />
+        </mxCell>
+        <mxCell id="tasks" value="Source / task refs&#10;Orchestrator API owner" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=control;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="670" y="260" width="230" height="110" />
+        </mxCell>
+        <mxCell id="e0" value="job_id, логічне посилання" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="sessions" target="jobs">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e1" value="Saved response job ref" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="keys" target="jobs">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e2" value="package refs; без FK" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="sessions" target="registry">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e3" value="evidence / fixture refs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="sessions" target="materials">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e4" value="activated source/task refs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="sessions" target="tasks">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

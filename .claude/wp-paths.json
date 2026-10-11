@@ -276,5 +276,362 @@
         "docs/acceptance/**"
       ]
     }
+  },
+  "documentation_packages": {
+    "base_revision": "91876d1c369e91838cee9204658cc92a248adf95",
+    "coordinator_allow": [
+      ".claude/wp-paths.json",
+      "DOCUMENTATION_PLAN.md",
+      "DOCUMENTATION_REQUIREMENTS.md"
+    ],
+    "common_allow": [
+      "docs/delivery/documentation/{doc}.md",
+      "docs/delivery/documentation/{doc}/**"
+    ],
+    "packages": {
+      "DOC-00": {
+        "name": "inventory",
+        "allow": [
+          "docs-archive/manifest.md",
+          "docs-archive/inventory.json"
+        ]
+      },
+      "DOC-01": {
+        "name": "archive",
+        "allow": [
+          "docs-archive/legacy/**",
+          "DEVELOPMENT.md",
+          "contracts/README.md",
+          "contracts/docs/data-ownership.md",
+          "contracts/docs/discovery-strategy.md",
+          "contracts/docs/errors.md",
+          "contracts/docs/handler-packages.md",
+          "contracts/docs/storage-adapter.md",
+          "deploy/profiles/README.md",
+          "docs/acceptance/matrix.md",
+          "docs/acceptance/scenarios.md",
+          "docs/adr/0001-baseline-stack.md",
+          "docs/adr/0002-package-registry.md",
+          "docs/adr/0003-python-sandbox.md",
+          "docs/adr/0004-large-materials.md",
+          "docs/adr/0005-authentication.md",
+          "docs/adr/0006-secrets-and-connections.md",
+          "docs/adr/0007-target-environments.md",
+          "docs/adr/0008-api-and-delivery-semantics.md",
+          "docs/adr/0009-data-ownership-and-autonomy.md",
+          "docs/adr/0010-llm-exploration-in-assistant.md",
+          "docs/adr/README.md",
+          "docs/delivery/HANDOFF-2026-09-30.md",
+          "docs/delivery/HANDOFF-2026-10-09-stream-a.md",
+          "docs/delivery/HANDOFF-2026-10-09-stream-b-2.md",
+          "docs/delivery/HANDOFF-2026-10-09-stream-b-3.md",
+          "docs/delivery/HANDOFF-2026-10-09-stream-b-4.md",
+          "docs/delivery/HANDOFF-2026-10-09-stream-b-5.md",
+          "docs/delivery/HANDOFF-2026-10-09-stream-b.md",
+          "docs/delivery/HANDOFF-2026-10-09-stream-c-2.md",
+          "docs/delivery/HANDOFF-2026-10-09-stream-c-3.md",
+          "docs/delivery/HANDOFF-2026-10-09-stream-c-4.md",
+          "docs/delivery/HANDOFF-2026-10-09-stream-c.md",
+          "docs/delivery/M3/01g-auth-coordinator.md",
+          "docs/delivery/M3/01g-auth.md",
+          "docs/delivery/M3/01h-content-policy.md",
+          "docs/delivery/M3/13t-real-registry.md",
+          "docs/delivery/M3/14d-docs.md",
+          "docs/delivery/M3/cleanup-plan.md",
+          "docs/delivery/M3/final-gate.md",
+          "docs/delivery/M3/final-review-delta.md",
+          "docs/delivery/M3/final-review.md",
+          "docs/delivery/M3/m3-should-fix.md",
+          "docs/delivery/M3/open-requests.md",
+          "docs/delivery/M3/stream-b.md",
+          "docs/delivery/M3/stream-c.md",
+          "docs/delivery/WP-00.md",
+          "docs/delivery/WP-01.md",
+          "docs/delivery/WP-02.md",
+          "docs/delivery/WP-03.md",
+          "docs/delivery/WP-04.md",
+          "docs/delivery/WP-05.md",
+          "docs/delivery/WP-06.md",
+          "docs/delivery/WP-07.md",
+          "docs/delivery/WP-08.md",
+          "docs/delivery/WP-09.md",
+          "docs/delivery/WP-10.md",
+          "docs/delivery/WP-11.md",
+          "docs/delivery/WP-12.md",
+          "docs/delivery/WP-12/admin-refresh.md",
+          "docs/delivery/WP-13.md",
+          "docs/delivery/WP-14.md",
+          "docs/delivery/WP-15.md",
+          "docs/delivery/WP-15/companion-deploy-profiles.patch",
+          "docs/delivery/WP-15/companion-jane-kit.patch",
+          "docs/delivery/WP-16.md",
+          "docs/delivery/WP-17.md",
+          "docs/delivery/WP-18.md",
+          "docs/delivery/WP-19.md",
+          "docs/delivery/WP-19/ci.md",
+          "docs/delivery/WP-19/contracts-r1.md",
+          "docs/delivery/WP-19/contracts-r2.md",
+          "docs/delivery/WP-19/review-r1.md",
+          "docs/delivery/WP-19/review-r2.md",
+          "docs/delivery/WP-19/telegram-pagination-followup.md",
+          "docs/delivery/WP-19/telegram-pagination-review.md",
+          "docs/delivery/WP-19/workspace-doc-followup.md",
+          "docs/delivery/WP-20.md",
+          "docs/delivery/WP-21.md",
+          "docs/delivery/WP-23/c2-workspace.md",
+          "docs/delivery/WP-23/c3-format.md",
+          "docs/delivery/WP-23/c4-cleanup.md",
+          "docs/delivery/post-m3/README.md",
+          "docs/delivery/post-m3/final-ci.md",
+          "docs/delivery/post-m3/stream-a-handoff.md",
+          "docs/delivery/post-m3/stream-b-handoff.md",
+          "docs/delivery/post-m3/stream-b.md",
+          "docs/delivery/post-m3/stream-c-handoff.md",
+          "docs/delivery/post-m3/stream-c.md",
+          "docs/delivery/status.md",
+          "docs/operations/README.md",
+          "docs/operations/backup-restore.md",
+          "docs/operations/limits-validation.md",
+          "examples/README.md",
+          "examples/shops/README.md",
+          "infra/README.md",
+          "libs/extractor-sdk/README.md",
+          "libs/jane-kit/README.md",
+          "services/assistant/README.md",
+          "services/handler-runtime/README.md",
+          "services/llm/README.md",
+          "services/orchestrator/README.md",
+          "services/registry/README.md",
+          "services/storage/README.md",
+          "services/storage/adapters/files/README.md",
+          "services/storage/adapters/minio/README.md",
+          "services/storage/adapters/mongodb/README.md",
+          "services/storage/adapters/postgres/README.md",
+          "services/storage/adapters/s3/README.md",
+          "services/storage/adapters/sqlserver/README.md",
+          "services/telegram-collector/README.md",
+          "services/web-collector/README.md",
+          "services/web-collector/strategies/discovery/README.md",
+          "tests/e2e/README.shared-hosts.md",
+          "tests/fixtures/testsite/README.md",
+          "web/admin/README.md"
+        ]
+      },
+      "DOC-02": {
+        "name": "structure-style",
+        "allow": [
+          "docs/README.md",
+          "docs/development/documentation-style.md",
+          "docs/development/documentation-templates/**",
+          "docs/acceptance/documentation-matrix.md",
+          "docs/delivery/documentation/status.md",
+          ".agents/skills/jane-documentation/**",
+          "AGENTS.md",
+          "docs/acceptance/diagram-matrix.md",
+          "docs/diagrams/development/**"
+        ]
+      },
+      "DOC-03": {
+        "name": "tooling",
+        "allow": [
+          "scripts/docs/**",
+          "justfile",
+          ".github/workflows/documentation.yml",
+          "docs/development/documentation-tools.md",
+          "docs/reference/symbols.json",
+          "docs/reference/api-operations.json",
+          "docs/reference/configuration.json",
+          "docs/components/*/reference/*/generated/**",
+          "scripts/dev.py",
+          "docs/diagrams/manifest.json"
+        ]
+      },
+      "DOC-04": {
+        "name": "architecture",
+        "allow": [
+          "docs/overview/**",
+          "docs/architecture/**",
+          "docs/adr/**",
+          "docs/diagrams/platform/**"
+        ]
+      },
+      "DOC-06": {
+        "name": "packages",
+        "allow": [
+          "docs/reference/packages/**",
+          "docs/diagrams/packages/**"
+        ]
+      },
+      "DOC-07": {
+        "name": "user-guides",
+        "allow": [
+          "docs/getting-started/**",
+          "docs/user-guide/**",
+          "examples/documentation/**",
+          "docs/diagrams/user-guide/**",
+          "docs/diagrams/getting-started/**"
+        ]
+      },
+      "DOC-08": {
+        "name": "operations",
+        "allow": [
+          "docs/operations/**",
+          "docs/diagrams/operations/**"
+        ]
+      },
+      "DOC-09": {
+        "name": "development",
+        "allow": [
+          "docs/development/**",
+          "docs/diagrams/development/**"
+        ],
+        "deny": [
+          "docs/development/documentation-style.md",
+          "docs/development/documentation-templates/**",
+          "docs/development/documentation-tools.md"
+        ]
+      },
+      "DOC-10": {
+        "name": "navigation",
+        "allow": [
+          "README.md",
+          "DEVELOPMENT.md",
+          "docs/components/README.md",
+          "docs/reference/README.md",
+          "docs/delivery/status.md",
+          "infra/README.md",
+          "deploy/profiles/README.md",
+          "examples/README.md",
+          "examples/shops/README.md",
+          "tests/fixtures/testsite/README.md",
+          "tests/e2e/README.shared-hosts.md",
+          "contracts/README.md",
+          "contracts/docs/*.md",
+          "services/*/README.md",
+          "services/storage/adapters/*/README.md",
+          "services/web-collector/strategies/discovery/README.md",
+          "libs/*/README.md",
+          "docs/diagrams/README.md"
+        ]
+      },
+      "DOC-11": {
+        "name": "acceptance",
+        "allow": [
+          "docs/acceptance/**"
+        ],
+        "deny": []
+      },
+      "DOC-05-web-collector": {
+        "name": "web-collector",
+        "allow": [
+          "docs/components/web-collector/**",
+          "docs/diagrams/web-collector/**"
+        ],
+        "deny": [
+          "docs/components/web-collector/reference/*/generated/**"
+        ]
+      },
+      "DOC-05-telegram-collector": {
+        "name": "telegram-collector",
+        "allow": [
+          "docs/components/telegram-collector/**",
+          "docs/diagrams/telegram-collector/**"
+        ],
+        "deny": [
+          "docs/components/telegram-collector/reference/*/generated/**"
+        ]
+      },
+      "DOC-05-storage": {
+        "name": "storage",
+        "allow": [
+          "docs/components/storage/**",
+          "docs/diagrams/storage/**"
+        ],
+        "deny": [
+          "docs/components/storage/reference/*/generated/**"
+        ]
+      },
+      "DOC-05-registry": {
+        "name": "registry",
+        "allow": [
+          "docs/components/registry/**",
+          "docs/diagrams/registry/**"
+        ],
+        "deny": [
+          "docs/components/registry/reference/*/generated/**"
+        ]
+      },
+      "DOC-05-handler-runtime": {
+        "name": "handler-runtime",
+        "allow": [
+          "docs/components/handler-runtime/**",
+          "docs/diagrams/handler-runtime/**"
+        ],
+        "deny": [
+          "docs/components/handler-runtime/reference/*/generated/**"
+        ]
+      },
+      "DOC-05-llm": {
+        "name": "llm",
+        "allow": [
+          "docs/components/llm/**",
+          "docs/diagrams/llm/**"
+        ],
+        "deny": [
+          "docs/components/llm/reference/*/generated/**"
+        ]
+      },
+      "DOC-05-orchestrator": {
+        "name": "orchestrator",
+        "allow": [
+          "docs/components/orchestrator/**",
+          "docs/diagrams/orchestrator/**"
+        ],
+        "deny": [
+          "docs/components/orchestrator/reference/*/generated/**"
+        ]
+      },
+      "DOC-05-assistant": {
+        "name": "assistant",
+        "allow": [
+          "docs/components/assistant/**",
+          "docs/diagrams/assistant/**"
+        ],
+        "deny": [
+          "docs/components/assistant/reference/*/generated/**"
+        ]
+      },
+      "DOC-05-jane-kit": {
+        "name": "jane-kit",
+        "allow": [
+          "docs/components/jane-kit/**",
+          "docs/diagrams/jane-kit/**"
+        ],
+        "deny": [
+          "docs/components/jane-kit/reference/*/generated/**"
+        ]
+      },
+      "DOC-05-extractor-sdk": {
+        "name": "extractor-sdk",
+        "allow": [
+          "docs/components/extractor-sdk/**",
+          "docs/diagrams/extractor-sdk/**"
+        ],
+        "deny": [
+          "docs/components/extractor-sdk/reference/*/generated/**"
+        ]
+      },
+      "DOC-05-admin": {
+        "name": "admin",
+        "allow": [
+          "docs/components/admin/**",
+          "docs/diagrams/admin/**"
+        ],
+        "deny": [
+          "docs/components/admin/reference/*/generated/**"
+        ]
+      }
+    },
+    "note": "DOC packages use explicit ownership and scripts/docs tooling; numeric WP registry and markers are unchanged. Shared/generated outputs are written by the stated owners; initial scaffolding is transferred after DOC-02."
   }
 }

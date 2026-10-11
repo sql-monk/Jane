@@ -1,0 +1,43 @@
+<mxfile host="app.diagrams.net" version="24.7.17">
+  <diagram id="llm-types" name="llm types">
+    <mxGraphModel dx="1400" dy="1000" grid="1" gridSize="10" page="0" background="none">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="gateway" value="Gateway&#10;complete / resolve_model" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=process;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="30" y="30" width="230" height="100" />
+        </mxCell>
+        <mxCell id="store" value="Store Protocol&#10;reserve / charge / usage" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=default;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="350" y="30" width="230" height="100" />
+        </mxCell>
+        <mxCell id="pg" value="MemoryStore / PostgresStore&#10;Власний state" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=data;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="670" y="30" width="230" height="100" />
+        </mxCell>
+        <mxCell id="adapter" value="ProviderAdapter Protocol&#10;async complete" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=default;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="30" y="250" width="230" height="100" />
+        </mxCell>
+        <mxCell id="fake" value="FakeProvider" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=process;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="350" y="250" width="230" height="100" />
+        </mxCell>
+        <mxCell id="real" value="AnthropicProvider" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=process;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="670" y="250" width="230" height="100" />
+        </mxCell>
+        <mxCell id="e0" value="Використовує" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="gateway" target="store">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e1" value="Реалізує" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;dashed=1;endFill=0;" edge="1" parent="1" source="pg" target="store">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e2" value="Викликає" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="gateway" target="adapter">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e3" value="Реалізує" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;dashed=1;endFill=0;" edge="1" parent="1" source="fake" target="adapter">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e4" value="Реалізує" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;dashed=1;endFill=0;" edge="1" parent="1" source="real" target="adapter">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

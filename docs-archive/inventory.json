@@ -1,0 +1,1395 @@
+{
+  "date": "2026-10-11",
+  "base_revision": "91876d1c369e91838cee9204658cc92a248adf95",
+  "branch": "codex/documentation-rebuild-20261011",
+  "baseline_status": [
+    " M .claude/wp-paths.json",
+    " M AGENTS.md",
+    " M README.md",
+    "?? .agents/skills/jane-documentation/",
+    "?? DOCUMENTATION_PLAN.md",
+    "?? DOCUMENTATION_REQUIREMENTS.md",
+    "?? docs-archive/"
+  ],
+  "state": "archived",
+  "entries": [
+    {
+      "source": ".agents/skills/jane-contracts/SKILL.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "f2af9ebf3ba316af124bef2ae4250d9ac8ff28546275ab024b30fc343816a24e",
+      "size": 10969,
+      "archive": null
+    },
+    {
+      "source": ".agents/skills/jane-documentation/SKILL.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "03d3ce1751dc6c5c2e8dbd294acab9b31748d41ac158a2a98e79e48e627b8bc0",
+      "size": 11401,
+      "archive": null
+    },
+    {
+      "source": ".agents/skills/jane-documentation/agents/openai.yaml",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "9b8e7a87e6bfbf0b8886692106babcd7f0638eb87fb3207fe45d6d0d3c1399c3",
+      "size": 455,
+      "archive": null
+    },
+    {
+      "source": ".agents/skills/jane-handler-package/SKILL.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "5857bd01a785c57bf06c6a06ae16649fc9d28a1b7d3108ec913ce0aa2fb14024",
+      "size": 8503,
+      "archive": null
+    },
+    {
+      "source": ".agents/skills/jane-wp/SKILL.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "f90dbb60e8362d0b1820509b0949e8c2742b8432b5317a0a83ee9bfffaaa0e45",
+      "size": 5799,
+      "archive": null
+    },
+    {
+      "source": ".agents/skills/jane-wp/report-template.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "a792b42713c1831b73369cd0ee51524a05cd551e3e116e08deee83d9a0639796",
+      "size": 1736,
+      "archive": null
+    },
+    {
+      "source": ".claude/agents/contract-guardian.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "a833fdcd5297a94d54553af026c3d6f4f8e4ae3b76b978d03681485c538323ac",
+      "size": 5598,
+      "archive": null
+    },
+    {
+      "source": ".claude/agents/wp-reviewer.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "4d0b6a483a6511ea44fd6612fa43c394608605d3641711727fcfdab27155bbb4",
+      "size": 4541,
+      "archive": null
+    },
+    {
+      "source": ".claude/skills/jane-contracts/SKILL.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "2bf2bdcba72f451e36f430381688c9dc4dd0b84d14de414ef7b58ac6396761be",
+      "size": 11490,
+      "archive": null
+    },
+    {
+      "source": ".claude/skills/jane-handler-package/SKILL.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "4becc086e242f13d7c214181d4f7bcc039ba17385d574eab2da4bfbd952dff19",
+      "size": 12674,
+      "archive": null
+    },
+    {
+      "source": ".claude/skills/jane-wp/SKILL.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "334941beb57f8da3abb837e7ca62fb7ca86a221c1684d1f253fbaec2e940b25f",
+      "size": 5802,
+      "archive": null
+    },
+    {
+      "source": ".claude/skills/jane-wp/report-template.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "a792b42713c1831b73369cd0ee51524a05cd551e3e116e08deee83d9a0639796",
+      "size": 1736,
+      "archive": null
+    },
+    {
+      "source": "AGENTS.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "d68c30ab1e6a432e6ea407a48bc763038d594d3c76c3ddda52ae60a7574cf704",
+      "size": 4197,
+      "archive": null
+    },
+    {
+      "source": "CLAUDE.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "8c73e5a2c2da140edbf403350bab55ba3d28ae1363b0276144994209645296a0",
+      "size": 3773,
+      "archive": null
+    },
+    {
+      "source": "DEVELOPMENT.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "8648262fd245698119e1a3a06b561ef3432fe696520029e6c8950c8e46d510a5",
+      "size": 14088,
+      "archive": "docs-archive/legacy/DEVELOPMENT.md"
+    },
+    {
+      "source": "DOCUMENTATION_PLAN.md",
+      "action": "preserve",
+      "reason": "Погоджений новий документ або чинне нормативне джерело роботи агентів",
+      "sha256": "c422e8db92b4c83b8f5619a6c0a3b9105f09cb3ee002746847452bd71272d172",
+      "size": 35254,
+      "archive": null
+    },
+    {
+      "source": "DOCUMENTATION_REQUIREMENTS.md",
+      "action": "preserve",
+      "reason": "Погоджений новий документ або чинне нормативне джерело роботи агентів",
+      "sha256": "97ed7b8379408049d695a33260768feff78798096a04335e3457441eda9bfb3b",
+      "size": 20789,
+      "archive": null
+    },
+    {
+      "source": "README.md",
+      "action": "preserve",
+      "reason": "Погоджений новий документ або чинне нормативне джерело роботи агентів",
+      "sha256": "bb36da137ea893a98161a68e0cb7366fae660efb62bc8d90a8123f7baccaf958",
+      "size": 18565,
+      "archive": null
+    },
+    {
+      "source": "TECHNICAL_SPECIFICATION.md",
+      "action": "preserve",
+      "reason": "Погоджений новий документ або чинне нормативне джерело роботи агентів",
+      "sha256": "ce5c626f83e92818fb6c8fe1ed3e4b4d15da3c74aed28abf1c4b41d08b0b440a",
+      "size": 29903,
+      "archive": null
+    },
+    {
+      "source": "contracts/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "58763c2f3857080a2aa6748264ac6f7966c43b32020e751cbec7c95a301462b8",
+      "size": 6186,
+      "archive": "docs-archive/legacy/contracts/README.md"
+    },
+    {
+      "source": "contracts/docs/data-ownership.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "8b7188039cf2840c1257d7edf614baba2303b86d25c1c47bb0c48a38ceffd4f7",
+      "size": 9467,
+      "archive": "docs-archive/legacy/contracts/docs/data-ownership.md"
+    },
+    {
+      "source": "contracts/docs/discovery-strategy.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "1654d96b5debd4dd1cb67f0a8d565528f66ce913a98102b9150ebae91add4621",
+      "size": 11111,
+      "archive": "docs-archive/legacy/contracts/docs/discovery-strategy.md"
+    },
+    {
+      "source": "contracts/docs/errors.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "c8e366e38f43af47fe5636b24cbdc444d439a0cd1e7972c5d7c7ede1b4e9b9cd",
+      "size": 6402,
+      "archive": "docs-archive/legacy/contracts/docs/errors.md"
+    },
+    {
+      "source": "contracts/docs/handler-packages.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "3dbec7a5171e2ce8a80e0517c28039b57f5ca7371d95ef86144861f07b23f24d",
+      "size": 10803,
+      "archive": "docs-archive/legacy/contracts/docs/handler-packages.md"
+    },
+    {
+      "source": "contracts/docs/storage-adapter.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "a6138393446ef3dbd33fb107d795be4b8faf63cfa45eb1c8956471cf21f00ee8",
+      "size": 18606,
+      "archive": "docs-archive/legacy/contracts/docs/storage-adapter.md"
+    },
+    {
+      "source": "deploy/profiles/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "e77468a205db6ab076b089ce39ff4cf9dcee3db1dc8b6ca9bbe1a97f942939e6",
+      "size": 12265,
+      "archive": "docs-archive/legacy/deploy/profiles/README.md"
+    },
+    {
+      "source": "docs/acceptance/matrix.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "a127363f1b752dddebfd3a81414321fe48791f1a96472f68037c2d682f7648aa",
+      "size": 27173,
+      "archive": "docs-archive/legacy/docs/acceptance/matrix.md"
+    },
+    {
+      "source": "docs/acceptance/scenarios.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "3e5aa83d7b5fb0b46fd546dc3083f90d83e07d1b48120dec6fe4bb6348f332f3",
+      "size": 76819,
+      "archive": "docs-archive/legacy/docs/acceptance/scenarios.md"
+    },
+    {
+      "source": "docs/adr/0001-baseline-stack.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "317b4c26808a40251b9ce1c9142943c0e666bd4595c2d2a6f54dc85386df7c80",
+      "size": 3803,
+      "archive": "docs-archive/legacy/docs/adr/0001-baseline-stack.md"
+    },
+    {
+      "source": "docs/adr/0002-package-registry.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "c0bd76428bb997eae7066cc3d368b7338eb21379eedb0ac69b544c900e7f4f0d",
+      "size": 6763,
+      "archive": "docs-archive/legacy/docs/adr/0002-package-registry.md"
+    },
+    {
+      "source": "docs/adr/0003-python-sandbox.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "637c2663a93eac70a66e566fbfe3d2a9becdeafdcc7ba41b9ccc3ab6fca82d8f",
+      "size": 5052,
+      "archive": "docs-archive/legacy/docs/adr/0003-python-sandbox.md"
+    },
+    {
+      "source": "docs/adr/0004-large-materials.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "7d3fa203c57deb303d0de52eedc5f4c95553532c080444322655c20422b53912",
+      "size": 5535,
+      "archive": "docs-archive/legacy/docs/adr/0004-large-materials.md"
+    },
+    {
+      "source": "docs/adr/0005-authentication.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "96a51cc08b73b30b76b4d3d8f8660a22e034f90d69321a6de965f7ae963c3a3d",
+      "size": 9379,
+      "archive": "docs-archive/legacy/docs/adr/0005-authentication.md"
+    },
+    {
+      "source": "docs/adr/0006-secrets-and-connections.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "fdc29d3c25cd686c3010a45763bfdd29e7007228a9c7aff07cc2463ac10bc8a2",
+      "size": 7139,
+      "archive": "docs-archive/legacy/docs/adr/0006-secrets-and-connections.md"
+    },
+    {
+      "source": "docs/adr/0007-target-environments.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "948e67b313b3d3511ebf5f91630fc308ccbcebec8ecdfa6a3df77b75d28ac447",
+      "size": 4509,
+      "archive": "docs-archive/legacy/docs/adr/0007-target-environments.md"
+    },
+    {
+      "source": "docs/adr/0008-api-and-delivery-semantics.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "9cc7710a2516eeb1cabb2f4e8b9a7010d48ecdab47164a11d0af9d6757afb1f9",
+      "size": 6278,
+      "archive": "docs-archive/legacy/docs/adr/0008-api-and-delivery-semantics.md"
+    },
+    {
+      "source": "docs/adr/0009-data-ownership-and-autonomy.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "167fe964fac10203941c85fdcc030a92b27210fabc235326f51c151313d86f8c",
+      "size": 4066,
+      "archive": "docs-archive/legacy/docs/adr/0009-data-ownership-and-autonomy.md"
+    },
+    {
+      "source": "docs/adr/0010-llm-exploration-in-assistant.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "2c001b08e9fe928b143759b7eed939092b7b0f979f8a7b2f5f0e3d6474e9a5c8",
+      "size": 2723,
+      "archive": "docs-archive/legacy/docs/adr/0010-llm-exploration-in-assistant.md"
+    },
+    {
+      "source": "docs/adr/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "826fddafb733640c67401ab73b433de78b2df50cf0d992813f53a49fb5cd1176",
+      "size": 2177,
+      "archive": "docs-archive/legacy/docs/adr/README.md"
+    },
+    {
+      "source": "docs/delivery/HANDOFF-2026-09-30.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "7f027485f6ca9956a8c6abde5ff85e3d5172342bc0be0dad3ed37b5f0fab0986",
+      "size": 5941,
+      "archive": "docs-archive/legacy/docs/delivery/HANDOFF-2026-09-30.md"
+    },
+    {
+      "source": "docs/delivery/HANDOFF-2026-10-09-stream-a.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "025069b35e36ca8685d7b61379252f87d3488207930ee8da7013aa5450e28950",
+      "size": 25125,
+      "archive": "docs-archive/legacy/docs/delivery/HANDOFF-2026-10-09-stream-a.md"
+    },
+    {
+      "source": "docs/delivery/HANDOFF-2026-10-09-stream-b-2.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "9f38975ae29defe8ffdb9982c38139006692412171bda63bb200dccf1b8e3593",
+      "size": 7241,
+      "archive": "docs-archive/legacy/docs/delivery/HANDOFF-2026-10-09-stream-b-2.md"
+    },
+    {
+      "source": "docs/delivery/HANDOFF-2026-10-09-stream-b-3.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "5247d50f0a5c9cecaa2530432c7bf02af51f452c252cf3fde51e084370d44db5",
+      "size": 3758,
+      "archive": "docs-archive/legacy/docs/delivery/HANDOFF-2026-10-09-stream-b-3.md"
+    },
+    {
+      "source": "docs/delivery/HANDOFF-2026-10-09-stream-b-4.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "e21f445b242a79f77ce53a6620edc9acc3a226e9b21312c82397acf7ba29f767",
+      "size": 3533,
+      "archive": "docs-archive/legacy/docs/delivery/HANDOFF-2026-10-09-stream-b-4.md"
+    },
+    {
+      "source": "docs/delivery/HANDOFF-2026-10-09-stream-b-5.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "949ffd2fb4cad97cf88e260cff1e8e8608acaadbeaf456d3ded9ccd8f6a11ee4",
+      "size": 4704,
+      "archive": "docs-archive/legacy/docs/delivery/HANDOFF-2026-10-09-stream-b-5.md"
+    },
+    {
+      "source": "docs/delivery/HANDOFF-2026-10-09-stream-b.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "8bdda665be3b12faf4e8cb34bc16cdfa4d61fd469ec89492198924d89d27de6e",
+      "size": 16684,
+      "archive": "docs-archive/legacy/docs/delivery/HANDOFF-2026-10-09-stream-b.md"
+    },
+    {
+      "source": "docs/delivery/HANDOFF-2026-10-09-stream-c-2.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "34d00320ba9a628c82147418e2eb6e165d17b8818232a57c88a6f1d2670d467f",
+      "size": 6124,
+      "archive": "docs-archive/legacy/docs/delivery/HANDOFF-2026-10-09-stream-c-2.md"
+    },
+    {
+      "source": "docs/delivery/HANDOFF-2026-10-09-stream-c-3.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "1079acc4b72244393d64cea7ea53c366b78c400dbfd5ea26209cccf75c22308a",
+      "size": 4596,
+      "archive": "docs-archive/legacy/docs/delivery/HANDOFF-2026-10-09-stream-c-3.md"
+    },
+    {
+      "source": "docs/delivery/HANDOFF-2026-10-09-stream-c-4.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "acd35dccc0e669fd80c8c00e820f80ab78d2fa84117c9ab085225f0005a0df46",
+      "size": 3915,
+      "archive": "docs-archive/legacy/docs/delivery/HANDOFF-2026-10-09-stream-c-4.md"
+    },
+    {
+      "source": "docs/delivery/HANDOFF-2026-10-09-stream-c.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "50129628503887e00aa45c024ca84ea228f277c0a54c2e0a2e9b6040ebf849eb",
+      "size": 8971,
+      "archive": "docs-archive/legacy/docs/delivery/HANDOFF-2026-10-09-stream-c.md"
+    },
+    {
+      "source": "docs/delivery/M3/01g-auth-coordinator.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "97ca5e1017896ec01e48bebbc45315680b31a782294ae2b7d59bee66574b84f1",
+      "size": 7308,
+      "archive": "docs-archive/legacy/docs/delivery/M3/01g-auth-coordinator.md"
+    },
+    {
+      "source": "docs/delivery/M3/01g-auth.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "bebdacadff1736ad8c4779c900bd2d728d812d52d4174b0d1713a3a37ca342e6",
+      "size": 42432,
+      "archive": "docs-archive/legacy/docs/delivery/M3/01g-auth.md"
+    },
+    {
+      "source": "docs/delivery/M3/01h-content-policy.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "827557e92f6a12d482ca5e5a9eec57aed2d409ed366b7e838b40661fd1199c02",
+      "size": 31634,
+      "archive": "docs-archive/legacy/docs/delivery/M3/01h-content-policy.md"
+    },
+    {
+      "source": "docs/delivery/M3/13t-real-registry.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "a8f13583cb13be754686de366bf9566719dadcc24cb64992bf8a32a6a06dbc87",
+      "size": 13995,
+      "archive": "docs-archive/legacy/docs/delivery/M3/13t-real-registry.md"
+    },
+    {
+      "source": "docs/delivery/M3/14d-docs.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "7b5b16f9d9cfce16826f8b4f4a33d15841f3681cb01bdd071f905946dc8ff1a3",
+      "size": 22301,
+      "archive": "docs-archive/legacy/docs/delivery/M3/14d-docs.md"
+    },
+    {
+      "source": "docs/delivery/M3/cleanup-plan.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "6a00d2afc9312fff7f530b5523f682545ac29f8020537a9290c4203bc5b4195e",
+      "size": 37035,
+      "archive": "docs-archive/legacy/docs/delivery/M3/cleanup-plan.md"
+    },
+    {
+      "source": "docs/delivery/M3/final-gate.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "70cb359ade62c350548ad6f4babb67f72a9ec7769ab4b2d2f5fe06cfb84bee0a",
+      "size": 6253,
+      "archive": "docs-archive/legacy/docs/delivery/M3/final-gate.md"
+    },
+    {
+      "source": "docs/delivery/M3/final-review-delta.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "aa162032a9de70b73d41d9263176cb9aed423dc69b5acfa4beef9ac08f199dec",
+      "size": 41074,
+      "archive": "docs-archive/legacy/docs/delivery/M3/final-review-delta.md"
+    },
+    {
+      "source": "docs/delivery/M3/final-review.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "8e46dfacb1118a919a6ac5bef8629c70c26ea939a78bb6ece903882b0c015894",
+      "size": 12507,
+      "archive": "docs-archive/legacy/docs/delivery/M3/final-review.md"
+    },
+    {
+      "source": "docs/delivery/M3/m3-should-fix.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "692e60a47ece7ee8eaabb469bfe3c91fb548085e89306b711bd585bc563e91ec",
+      "size": 28407,
+      "archive": "docs-archive/legacy/docs/delivery/M3/m3-should-fix.md"
+    },
+    {
+      "source": "docs/delivery/M3/open-requests.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "3693577b4cbdfbafb62bfd28ef67bb8d5b300213f06115c6784c58d043c63556",
+      "size": 32804,
+      "archive": "docs-archive/legacy/docs/delivery/M3/open-requests.md"
+    },
+    {
+      "source": "docs/delivery/M3/stream-b.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "34f344a4534dfb1bcb0c46948e262736cc2327a027a22e625b32d8d4dd34b15b",
+      "size": 35460,
+      "archive": "docs-archive/legacy/docs/delivery/M3/stream-b.md"
+    },
+    {
+      "source": "docs/delivery/M3/stream-c.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "190bf6fea41fe95467fe0f2effba1a3860e2beac5bf2968dc89878409881e2c6",
+      "size": 23100,
+      "archive": "docs-archive/legacy/docs/delivery/M3/stream-c.md"
+    },
+    {
+      "source": "docs/delivery/WP-00.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "153eeedfb65c34e063222e40671969047801efc32b326f247aab3a3c1b382752",
+      "size": 42292,
+      "archive": "docs-archive/legacy/docs/delivery/WP-00.md"
+    },
+    {
+      "source": "docs/delivery/WP-01.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "21b40cb722327a4a2d356ded15580ea119ef758ad05272fc3b7b7562126320b3",
+      "size": 95963,
+      "archive": "docs-archive/legacy/docs/delivery/WP-01.md"
+    },
+    {
+      "source": "docs/delivery/WP-02.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "67bc205bfb24e8f7c2c584e493631734018d5d88b1f1068ccc5b5d1597c38c76",
+      "size": 85741,
+      "archive": "docs-archive/legacy/docs/delivery/WP-02.md"
+    },
+    {
+      "source": "docs/delivery/WP-03.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "4cbc86fd11221fc2ba62bee6eec95436b20e1832ab64d5e4b93824aabc27c5e1",
+      "size": 16510,
+      "archive": "docs-archive/legacy/docs/delivery/WP-03.md"
+    },
+    {
+      "source": "docs/delivery/WP-04.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "9faa99b97395d363027901befd88a3dc9a6c6bff6d57d825b45b7bc96ea9d7dd",
+      "size": 46316,
+      "archive": "docs-archive/legacy/docs/delivery/WP-04.md"
+    },
+    {
+      "source": "docs/delivery/WP-05.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "b4675e90f8dde09eaff7de18caaa23e385fe5801b65624681cb56e5e9aa0f588",
+      "size": 44979,
+      "archive": "docs-archive/legacy/docs/delivery/WP-05.md"
+    },
+    {
+      "source": "docs/delivery/WP-06.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "dde8d6697e859d0938c3bd60245a373779fd9e178fc81f7456387e23a56c3e5b",
+      "size": 46401,
+      "archive": "docs-archive/legacy/docs/delivery/WP-06.md"
+    },
+    {
+      "source": "docs/delivery/WP-07.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "2e465da028d8f60277b204096386d94aeddedce9c3215518e5ba9ca896324cd8",
+      "size": 60325,
+      "archive": "docs-archive/legacy/docs/delivery/WP-07.md"
+    },
+    {
+      "source": "docs/delivery/WP-08.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "d432ad0c4b45dfc80db8edab938b7e26dac8d0c702f53dcd9e9447d4683986c3",
+      "size": 37557,
+      "archive": "docs-archive/legacy/docs/delivery/WP-08.md"
+    },
+    {
+      "source": "docs/delivery/WP-09.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "cd47939ae7974c2942dd46874ad5f6f216ce135e7e69e3bafdf0bc9bf2691edb",
+      "size": 51134,
+      "archive": "docs-archive/legacy/docs/delivery/WP-09.md"
+    },
+    {
+      "source": "docs/delivery/WP-10.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "9ab09522a5a6aeeb8fb192805a1640045bb3345d406d8c10abc59adca69f725b",
+      "size": 39179,
+      "archive": "docs-archive/legacy/docs/delivery/WP-10.md"
+    },
+    {
+      "source": "docs/delivery/WP-11.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "0609ec1ce85264f0e2e2836bafb9535060c4930bc2ce67f3bd439f99507779e3",
+      "size": 57625,
+      "archive": "docs-archive/legacy/docs/delivery/WP-11.md"
+    },
+    {
+      "source": "docs/delivery/WP-12.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "2ebb8f4fc81ec551f97b8437204b032ed6426fd1591066c3d7102b3a1e87ec07",
+      "size": 137174,
+      "archive": "docs-archive/legacy/docs/delivery/WP-12.md"
+    },
+    {
+      "source": "docs/delivery/WP-12/admin-refresh.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "34f1470180f71f6d68423b07f396741068a584600965a5e33eba444f039fdb16",
+      "size": 16926,
+      "archive": "docs-archive/legacy/docs/delivery/WP-12/admin-refresh.md"
+    },
+    {
+      "source": "docs/delivery/WP-13.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "fcd08003aff64e57e95526ca2fa08fffc596d37dab2d352ca911dfa9833e201f",
+      "size": 328486,
+      "archive": "docs-archive/legacy/docs/delivery/WP-13.md"
+    },
+    {
+      "source": "docs/delivery/WP-14.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "87169e6148b9940d1edf3a398e3148a24fdd22d6ec68481102a0d26f6d543fdc",
+      "size": 92467,
+      "archive": "docs-archive/legacy/docs/delivery/WP-14.md"
+    },
+    {
+      "source": "docs/delivery/WP-15.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "d3d63c6b4b904bdaf80f23ba06754de12ea3ff2c143222d88189aee3cdec926f",
+      "size": 41071,
+      "archive": "docs-archive/legacy/docs/delivery/WP-15.md"
+    },
+    {
+      "source": "docs/delivery/WP-15/companion-deploy-profiles.patch",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "2fcc5409444511ae3410cc712c0c694ba278422e80fdc7e7ef5abd19efce8461",
+      "size": 3303,
+      "archive": "docs-archive/legacy/docs/delivery/WP-15/companion-deploy-profiles.patch"
+    },
+    {
+      "source": "docs/delivery/WP-15/companion-jane-kit.patch",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "3f97cfc13245f29b82f2bbdfdfcc25e2c6b662d6b4036c8fd8ed9275f67dffc5",
+      "size": 1342,
+      "archive": "docs-archive/legacy/docs/delivery/WP-15/companion-jane-kit.patch"
+    },
+    {
+      "source": "docs/delivery/WP-16.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "6be9ab12e4515396e2e9b10e28b4833b620ad5b8f658899dbc21630263f3aad6",
+      "size": 42888,
+      "archive": "docs-archive/legacy/docs/delivery/WP-16.md"
+    },
+    {
+      "source": "docs/delivery/WP-17.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "ae24c70202e96777ec76b0ad14b4106f56ef6d1123fce39e350425ad8ffa7903",
+      "size": 35551,
+      "archive": "docs-archive/legacy/docs/delivery/WP-17.md"
+    },
+    {
+      "source": "docs/delivery/WP-18.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "679dbc2757dffb6a91228755c79fac99dc03535a95419baf1d787d139444bfaa",
+      "size": 21882,
+      "archive": "docs-archive/legacy/docs/delivery/WP-18.md"
+    },
+    {
+      "source": "docs/delivery/WP-19.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "a299bba13c07c7599c921c3881f20624bfad899782e443be459eb0f52646a611",
+      "size": 80156,
+      "archive": "docs-archive/legacy/docs/delivery/WP-19.md"
+    },
+    {
+      "source": "docs/delivery/WP-19/ci.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "ad2818a4c362c13ce9b01670560ba93eb5b4098f4ab285a73ee568a7ce89882a",
+      "size": 3987,
+      "archive": "docs-archive/legacy/docs/delivery/WP-19/ci.md"
+    },
+    {
+      "source": "docs/delivery/WP-19/contracts-r1.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "06b2612343f9c2616af1410cffb2a50fff56dabe9c7e60ef72448cd3ee4598bf",
+      "size": 5086,
+      "archive": "docs-archive/legacy/docs/delivery/WP-19/contracts-r1.md"
+    },
+    {
+      "source": "docs/delivery/WP-19/contracts-r2.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "5c1303e218b2174a0fcb68e33b6446ea8e3c1b2c1c3721ed55b395804a76db27",
+      "size": 3955,
+      "archive": "docs-archive/legacy/docs/delivery/WP-19/contracts-r2.md"
+    },
+    {
+      "source": "docs/delivery/WP-19/review-r1.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "2bec261890c93b0c1a6a57029973a9a93aae1bd9a088147c2c3ba8a48dec61c3",
+      "size": 3334,
+      "archive": "docs-archive/legacy/docs/delivery/WP-19/review-r1.md"
+    },
+    {
+      "source": "docs/delivery/WP-19/review-r2.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "8ce9a5a0d9ccb19d6a0190c7e85e93440923eb2c417f5c59c6f001c200c30b67",
+      "size": 3755,
+      "archive": "docs-archive/legacy/docs/delivery/WP-19/review-r2.md"
+    },
+    {
+      "source": "docs/delivery/WP-19/telegram-pagination-followup.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "7001b5d63469ce51a7a9f0cfd4bb11cca0fdb2efd89836e97e5deb3c486ab723",
+      "size": 11511,
+      "archive": "docs-archive/legacy/docs/delivery/WP-19/telegram-pagination-followup.md"
+    },
+    {
+      "source": "docs/delivery/WP-19/telegram-pagination-review.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "e49efa4d33cdea3e410310f00c003792d0cf101b38cf8637c05899ea0339df2a",
+      "size": 4095,
+      "archive": "docs-archive/legacy/docs/delivery/WP-19/telegram-pagination-review.md"
+    },
+    {
+      "source": "docs/delivery/WP-19/workspace-doc-followup.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "5527a4e0fa887d5896b0dd2b91d6df1bac8a3a6c77f23ce764253e781b9f2d83",
+      "size": 4132,
+      "archive": "docs-archive/legacy/docs/delivery/WP-19/workspace-doc-followup.md"
+    },
+    {
+      "source": "docs/delivery/WP-20.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "04630e5d8ed619d15c6ba26dbc08f5301fe4580bdb459616129c19ce5fd75f2a",
+      "size": 31002,
+      "archive": "docs-archive/legacy/docs/delivery/WP-20.md"
+    },
+    {
+      "source": "docs/delivery/WP-21.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "99c47c0d4a43b4b6df4cc2e2eae14be22eed04696f820322b114083d140b84f3",
+      "size": 28677,
+      "archive": "docs-archive/legacy/docs/delivery/WP-21.md"
+    },
+    {
+      "source": "docs/delivery/WP-23/c2-workspace.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "86bb537633546d7f054fb0bb923f89e09a8b7d1cda8b0bdfc3394cf88c66a6f7",
+      "size": 16967,
+      "archive": "docs-archive/legacy/docs/delivery/WP-23/c2-workspace.md"
+    },
+    {
+      "source": "docs/delivery/WP-23/c3-format.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "4537bbd883c7c5b24950015990041134b5b132ae92357782c2f0994d535083c8",
+      "size": 7880,
+      "archive": "docs-archive/legacy/docs/delivery/WP-23/c3-format.md"
+    },
+    {
+      "source": "docs/delivery/WP-23/c4-cleanup.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "46528e7b42f2f971028d4037fee13290ebf04af03fc7b404b5e0275efe3cee6e",
+      "size": 18312,
+      "archive": "docs-archive/legacy/docs/delivery/WP-23/c4-cleanup.md"
+    },
+    {
+      "source": "docs/delivery/post-m3/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "942876cd19b0b4b3d6763b99df4ba4e37b6a2bbc47a9dd2edcaa5bf301871370",
+      "size": 4967,
+      "archive": "docs-archive/legacy/docs/delivery/post-m3/README.md"
+    },
+    {
+      "source": "docs/delivery/post-m3/final-ci.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "693cc69981b1c4f6529ff22a3966e55be6714126b816367b2c12a115f2f591a1",
+      "size": 6622,
+      "archive": "docs-archive/legacy/docs/delivery/post-m3/final-ci.md"
+    },
+    {
+      "source": "docs/delivery/post-m3/stream-a-handoff.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "f091e6bc84e8865e673ed22469e2230a70611ca6ba3d5263c17999a0382f8349",
+      "size": 8101,
+      "archive": "docs-archive/legacy/docs/delivery/post-m3/stream-a-handoff.md"
+    },
+    {
+      "source": "docs/delivery/post-m3/stream-b-handoff.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "af667314f806b9b8599adcae43ccd91e25ee94aafb6e62b3fe52605ec335232a",
+      "size": 6146,
+      "archive": "docs-archive/legacy/docs/delivery/post-m3/stream-b-handoff.md"
+    },
+    {
+      "source": "docs/delivery/post-m3/stream-b.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "c37bb859f2a9383a3145891a23229543e673afc3b01d08054ba6077e9c1c847a",
+      "size": 73402,
+      "archive": "docs-archive/legacy/docs/delivery/post-m3/stream-b.md"
+    },
+    {
+      "source": "docs/delivery/post-m3/stream-c-handoff.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "ea902ae04db06631b0ed838b5801b640c8a7cc2bb21cae9d6035c155cabc53a4",
+      "size": 5503,
+      "archive": "docs-archive/legacy/docs/delivery/post-m3/stream-c-handoff.md"
+    },
+    {
+      "source": "docs/delivery/post-m3/stream-c.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "f6dd6cb8628388a6c628a45338c33f2e068334df6dc8249eabd7779b955abd0b",
+      "size": 42018,
+      "archive": "docs-archive/legacy/docs/delivery/post-m3/stream-c.md"
+    },
+    {
+      "source": "docs/delivery/status.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "f737e627fc6b1231fdae37c127d44366e9dd99acf7e7c04054795bd51a067024",
+      "size": 122240,
+      "archive": "docs-archive/legacy/docs/delivery/status.md"
+    },
+    {
+      "source": "docs/operations/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "ce5ba7525412906efbcc7a97dd1a61b956d0babcf7fbeb3dfb3c7e84cd8c4b21",
+      "size": 18052,
+      "archive": "docs-archive/legacy/docs/operations/README.md"
+    },
+    {
+      "source": "docs/operations/backup-restore.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "6a4c775a3a551e6388c0c00ab9ff835e32f4a539564e0396dd891a540799cbbc",
+      "size": 13708,
+      "archive": "docs-archive/legacy/docs/operations/backup-restore.md"
+    },
+    {
+      "source": "docs/operations/limits-validation.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "fbde76d3ab876a5bd7593be9e5195d95c808041057ab8c70546357b4289e1186",
+      "size": 22693,
+      "archive": "docs-archive/legacy/docs/operations/limits-validation.md"
+    },
+    {
+      "source": "examples/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "2555c6fd17647952b84066ac5e91787108a4da9edf37a367d637cd29f1b71299",
+      "size": 15849,
+      "archive": "docs-archive/legacy/examples/README.md"
+    },
+    {
+      "source": "examples/shops/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "659e00c019d2ab851d3fa7ceaeb81747246f2553fbb105d462f24e41db5c9401",
+      "size": 2637,
+      "archive": "docs-archive/legacy/examples/shops/README.md"
+    },
+    {
+      "source": "infra/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "f64703eba48b8b9946c2b5ffe25b3cde77cd1d60cd9dcb4ef4c1b930caff897b",
+      "size": 15381,
+      "archive": "docs-archive/legacy/infra/README.md"
+    },
+    {
+      "source": "libs/extractor-sdk/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "0c798b85ecabf54aa9377c2ac84ea9809f5729abafc8d0bf751b25d24fa7c1b8",
+      "size": 7948,
+      "archive": "docs-archive/legacy/libs/extractor-sdk/README.md"
+    },
+    {
+      "source": "libs/jane-kit/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "cf3ec9fed43430d06c46501d7ea2ef9d4d00f9dd9c27aca970744391cf0ba89f",
+      "size": 24328,
+      "archive": "docs-archive/legacy/libs/jane-kit/README.md"
+    },
+    {
+      "source": "plan.md",
+      "action": "preserve",
+      "reason": "Погоджений новий документ або чинне нормативне джерело роботи агентів",
+      "sha256": "f6706e509672990e888743e761e3b1acab977e9f11c8e8cdacfcee551986b2f2",
+      "size": 29514,
+      "archive": null
+    },
+    {
+      "source": "recomendations.md",
+      "action": "preserve",
+      "reason": "Погоджений новий документ або чинне нормативне джерело роботи агентів",
+      "sha256": "8ddefc8c630f4aea8caa62d84a9ca079021502d11027ee97616cc4bf358360e8",
+      "size": 8818,
+      "archive": null
+    },
+    {
+      "source": "services/assistant/CLAUDE.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "6e965924f472487c522001e47921f2a98d8dc95f7677d590bf9ee7e28513b973",
+      "size": 548,
+      "archive": null
+    },
+    {
+      "source": "services/assistant/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "46972ad56f91ddba0e07e76c6ec3afd2ed74226defb2e3511f4d259ccedc6568",
+      "size": 52175,
+      "archive": "docs-archive/legacy/services/assistant/README.md"
+    },
+    {
+      "source": "services/handler-runtime/CLAUDE.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "04987caba34f1ee563068aab7c347aaf360752d533aec9a186bf20c8f1352b2a",
+      "size": 667,
+      "archive": null
+    },
+    {
+      "source": "services/handler-runtime/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "eb69252833361501a758e301e8fa89d0fb05b804ee425b611e81e6157362b573",
+      "size": 28405,
+      "archive": "docs-archive/legacy/services/handler-runtime/README.md"
+    },
+    {
+      "source": "services/llm/CLAUDE.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "d4b5d7a2c09f84354148176ec21b86b1d29fc1ea85578f2195ee83f4ca8e1b1f",
+      "size": 534,
+      "archive": null
+    },
+    {
+      "source": "services/llm/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "9213c493ea77dad71870d86cbff86c23d87984cd17830dfe888a7289264e7506",
+      "size": 41071,
+      "archive": "docs-archive/legacy/services/llm/README.md"
+    },
+    {
+      "source": "services/llm/packages/jane.llm-event-extractor/README.md",
+      "action": "preserve",
+      "reason": "Файл виконуваного пакета або тестового прикладу; зміна впливає на виконання чи digest",
+      "sha256": "894475979f22c63abb0ccd669e7dd00d964a8c008a4e839199e7db06acacbdc4",
+      "size": 730,
+      "archive": null
+    },
+    {
+      "source": "services/llm/packages/jane.llm-event-extractor/prompts/input.md",
+      "action": "preserve",
+      "reason": "Файл виконуваного пакета або тестового прикладу; зміна впливає на виконання чи digest",
+      "sha256": "fb1b6921fdc45006ad018f7143e3adb4faa4b35b0d5b8d3b3a1436e4e90ceaeb",
+      "size": 115,
+      "archive": null
+    },
+    {
+      "source": "services/llm/packages/jane.llm-event-extractor/prompts/instructions.md",
+      "action": "preserve",
+      "reason": "Файл виконуваного пакета або тестового прикладу; зміна впливає на виконання чи digest",
+      "sha256": "e3838286f7c5207ee1289c11b419c34f10c08678eef6a51e2a7d680786059d40",
+      "size": 711,
+      "archive": null
+    },
+    {
+      "source": "services/orchestrator/CLAUDE.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "de4b7544aaa79f746a8b6feaf07657d22e6937c26b3055985d3f8cc605a3fd95",
+      "size": 484,
+      "archive": null
+    },
+    {
+      "source": "services/orchestrator/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "056873df86d7fe6e17d46b800f5cba2d34f9651669b97cd5e981757e56128278",
+      "size": 30719,
+      "archive": "docs-archive/legacy/services/orchestrator/README.md"
+    },
+    {
+      "source": "services/registry/CLAUDE.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "f6cc28334764c2cac650f41a68c4c7889e5575f0addd12f4526dc012832f833e",
+      "size": 553,
+      "archive": null
+    },
+    {
+      "source": "services/registry/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "3a72fdb3f1f1ccd3d827013a9dc7aed6af83c7dc58ecd1a4332445081704fc85",
+      "size": 29858,
+      "archive": "docs-archive/legacy/services/registry/README.md"
+    },
+    {
+      "source": "services/storage/CLAUDE.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "51fa79807e9e0cc8bdbf0c27a7cfe8e36e087f2a9cf75e81592ad5c56f405d56",
+      "size": 455,
+      "archive": null
+    },
+    {
+      "source": "services/storage/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "4e9dc628512439542c2c2bf2e181f33306d98c7e2ae1ada58b3fff213ef6e7e4",
+      "size": 31241,
+      "archive": "docs-archive/legacy/services/storage/README.md"
+    },
+    {
+      "source": "services/storage/adapters/files/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "09784dcf3d7b1208b3a48a82c36f0768f4e2567a96e3cb7674f0360e12dc32b9",
+      "size": 3450,
+      "archive": "docs-archive/legacy/services/storage/adapters/files/README.md"
+    },
+    {
+      "source": "services/storage/adapters/minio/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "5fd4de63b6eb8fc3d41be40682aa5c58a80303e64db5eefa87b48b3b671c0edc",
+      "size": 3112,
+      "archive": "docs-archive/legacy/services/storage/adapters/minio/README.md"
+    },
+    {
+      "source": "services/storage/adapters/mongodb/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "a2cab3b61019cdfa73863a902bfa3656c8227241c8bdb00e542a5525fe583387",
+      "size": 5147,
+      "archive": "docs-archive/legacy/services/storage/adapters/mongodb/README.md"
+    },
+    {
+      "source": "services/storage/adapters/postgres/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "09ca9c1bc39ffb8b30293fea11541c788800f2f29b7f87180bd911a1f5aab521",
+      "size": 2689,
+      "archive": "docs-archive/legacy/services/storage/adapters/postgres/README.md"
+    },
+    {
+      "source": "services/storage/adapters/s3/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "57754b1ad2ad8d387bf31cb76c6605d581f1ca6044e6877a925406afbae091f5",
+      "size": 8636,
+      "archive": "docs-archive/legacy/services/storage/adapters/s3/README.md"
+    },
+    {
+      "source": "services/storage/adapters/sqlserver/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "c6055913b84b7a016cd8843bcef9963de0de2c7dab4d2279b27bb1cf7671694a",
+      "size": 4294,
+      "archive": "docs-archive/legacy/services/storage/adapters/sqlserver/README.md"
+    },
+    {
+      "source": "services/telegram-collector/CLAUDE.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "738da081c6e9c0d25f6cfb6212e3fe173d1245888a0032bfd90b7c175826e6c8",
+      "size": 564,
+      "archive": null
+    },
+    {
+      "source": "services/telegram-collector/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "d01d6492050184b4bfbccc1613647572f7b6e43ea15065ca9b095e437546f6cb",
+      "size": 30030,
+      "archive": "docs-archive/legacy/services/telegram-collector/README.md"
+    },
+    {
+      "source": "services/web-collector/CLAUDE.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "33b27a310747ef6c997724d7ba1fd46883fc54de2e1b6acf6276ac2724d33e3e",
+      "size": 547,
+      "archive": null
+    },
+    {
+      "source": "services/web-collector/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "457a4c897b40353272b54a2f726b7063b3d3800f216630e385fc577b0db171b9",
+      "size": 53171,
+      "archive": "docs-archive/legacy/services/web-collector/README.md"
+    },
+    {
+      "source": "services/web-collector/strategies/discovery/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "5b0b4540d5517567c32991606402d63474041e559162b434e978a45055e786f4",
+      "size": 17845,
+      "archive": "docs-archive/legacy/services/web-collector/strategies/discovery/README.md"
+    },
+    {
+      "source": "templates/service/CLAUDE.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "a96d8862cf3195cabf2224dcb9df8d32dda9322709e36dc8564735970fb91350",
+      "size": 387,
+      "archive": null
+    },
+    {
+      "source": "templates/service/README.md",
+      "action": "preserve",
+      "reason": "Виконуваний шаблон генерації сервісу",
+      "sha256": "f92950b2ca95ee0833970e0b91de1684bfe7a74c9bf4b103975b6fe0b933d7ae",
+      "size": 7476,
+      "archive": null
+    },
+    {
+      "source": "tests/e2e/README.shared-hosts.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "6fdd2745578130729bc38deff79f164ab40e8ce2f539af74fa0094b2238d9b8c",
+      "size": 5544,
+      "archive": "docs-archive/legacy/tests/e2e/README.shared-hosts.md"
+    },
+    {
+      "source": "tests/e2e/packages/e2e.llm-page-triage/prompts/instructions.md",
+      "action": "preserve",
+      "reason": "Файл виконуваного пакета або тестового прикладу; зміна впливає на виконання чи digest",
+      "sha256": "ea8b19313a0c62ac63784fd0a123d267c704a594c4066fb209e9cd4200f661f4",
+      "size": 652,
+      "archive": null
+    },
+    {
+      "source": "tests/fixtures/testsite/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "56b57a94592a97c990301c83e366818b3648a072fc9a248eb1fa8b07e4787658",
+      "size": 7124,
+      "archive": "docs-archive/legacy/tests/fixtures/testsite/README.md"
+    },
+    {
+      "source": "web/admin/CLAUDE.md",
+      "action": "preserve",
+      "reason": "Чинні інструкції або конфігурація агентів/CI",
+      "sha256": "b6d4c4d3b041500a880734896549b6020da8bc83b47b85677309f691c8423225",
+      "size": 451,
+      "archive": null
+    },
+    {
+      "source": "web/admin/README.md",
+      "action": "archive",
+      "reason": "Попередня описова документація; новий зміст створюється за кодом і контрактами",
+      "sha256": "8a18e7603e117737de457b19e18bc067e7cea862046e30cf3ff084c7112d0eeb",
+      "size": 22761,
+      "archive": "docs-archive/legacy/web/admin/README.md"
+    }
+  ],
+  "link_migrations": [
+    {
+      "from": ".claude/skills/jane-handler-package/SKILL.md",
+      "link": "../../../libs/extractor-sdk/README.md",
+      "target": "libs/extractor-sdk/README.md",
+      "action": "new-routing-page",
+      "owner": "DOC-10",
+      "reason": "Зберегти працездатність посилання новою сторінкою переходу; старий зміст залишається лише в архіві"
+    },
+    {
+      "from": ".claude/skills/jane-handler-package/SKILL.md",
+      "link": "../../../contracts/docs/handler-packages.md#структура-архіву",
+      "target": "contracts/docs/handler-packages.md",
+      "action": "new-routing-page",
+      "owner": "DOC-10",
+      "reason": "Зберегти працездатність посилання новою сторінкою переходу; старий зміст залишається лише в архіві"
+    },
+    {
+      "from": ".claude/skills/jane-handler-package/SKILL.md",
+      "link": "../../../services/registry/README.md",
+      "target": "services/registry/README.md",
+      "action": "new-routing-page",
+      "owner": "DOC-10",
+      "reason": "Зберегти працездатність посилання новою сторінкою переходу; старий зміст залишається лише в архіві"
+    },
+    {
+      "from": ".claude/skills/jane-handler-package/SKILL.md",
+      "link": "../../../services/handler-runtime/README.md",
+      "target": "services/handler-runtime/README.md",
+      "action": "new-routing-page",
+      "owner": "DOC-10",
+      "reason": "Зберегти працездатність посилання новою сторінкою переходу; старий зміст залишається лише в архіві"
+    },
+    {
+      "from": "AGENTS.md",
+      "link": "docs/delivery/status.md",
+      "target": "docs/delivery/status.md",
+      "action": "new-routing-page",
+      "owner": "DOC-10",
+      "reason": "Зберегти працездатність посилання новою сторінкою переходу; старий зміст залишається лише в архіві"
+    },
+    {
+      "from": "AGENTS.md",
+      "link": "DEVELOPMENT.md",
+      "target": "DEVELOPMENT.md",
+      "action": "new-routing-page",
+      "owner": "DOC-10",
+      "reason": "Зберегти працездатність посилання новою сторінкою переходу; старий зміст залишається лише в архіві"
+    },
+    {
+      "from": "AGENTS.md",
+      "link": "tests/fixtures/testsite/README.md",
+      "target": "tests/fixtures/testsite/README.md",
+      "action": "new-routing-page",
+      "owner": "DOC-10",
+      "reason": "Зберегти працездатність посилання новою сторінкою переходу; старий зміст залишається лише в архіві"
+    },
+    {
+      "from": "CLAUDE.md",
+      "link": "docs/delivery/status.md",
+      "target": "docs/delivery/status.md",
+      "action": "new-routing-page",
+      "owner": "DOC-10",
+      "reason": "Зберегти працездатність посилання новою сторінкою переходу; старий зміст залишається лише в архіві"
+    },
+    {
+      "from": "CLAUDE.md",
+      "link": "DEVELOPMENT.md",
+      "target": "DEVELOPMENT.md",
+      "action": "new-routing-page",
+      "owner": "DOC-10",
+      "reason": "Зберегти працездатність посилання новою сторінкою переходу; старий зміст залишається лише в архіві"
+    },
+    {
+      "from": "CLAUDE.md",
+      "link": "tests/fixtures/testsite/README.md",
+      "target": "tests/fixtures/testsite/README.md",
+      "action": "new-routing-page",
+      "owner": "DOC-10",
+      "reason": "Зберегти працездатність посилання новою сторінкою переходу; старий зміст залишається лише в архіві"
+    },
+    {
+      "from": "templates/service/README.md",
+      "link": "../../docs/adr/0005-authentication.md",
+      "target": "docs/adr/0005-authentication.md",
+      "action": "new-routing-page",
+      "owner": "DOC-10",
+      "reason": "Зберегти працездатність посилання новою сторінкою переходу; старий зміст залишається лише в архіві"
+    }
+  ],
+  "build_readme_replacements": [
+    {
+      "target": "libs/extractor-sdk/README.md",
+      "project": "jane-extractor-sdk",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "libs/jane-kit/README.md",
+      "project": "jane-kit",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "services/assistant/README.md",
+      "project": "jane-assistant",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "services/handler-runtime/README.md",
+      "project": "jane-handler-runtime",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "services/llm/README.md",
+      "project": "jane-llm",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "services/orchestrator/README.md",
+      "project": "jane-orchestrator",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "services/registry/README.md",
+      "project": "jane-registry",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "services/storage/adapters/files/README.md",
+      "project": "jane-storage-files",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "services/storage/adapters/minio/README.md",
+      "project": "jane-storage-minio",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "services/storage/adapters/mongodb/README.md",
+      "project": "jane-storage-mongodb",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "services/storage/adapters/postgres/README.md",
+      "project": "jane-storage-postgres",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "services/storage/adapters/s3/README.md",
+      "project": "jane-storage-s3",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "services/storage/adapters/sqlserver/README.md",
+      "project": "jane-storage-sqlserver",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "services/storage/README.md",
+      "project": "jane-storage",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "services/telegram-collector/README.md",
+      "project": "jane-telegram-collector",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "services/web-collector/README.md",
+      "project": "jane-web-collector",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    },
+    {
+      "target": "tests/fixtures/testsite/README.md",
+      "project": "jane-testsite",
+      "reason": "README є входом збірки Python-пакета; після архівування потрібна нова сторінка"
+    }
+  ],
+  "verified_copies": 115
+}

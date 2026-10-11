@@ -1,0 +1,40 @@
+<mxfile host="app.diagrams.net" version="24.7.17">
+  <diagram id="llm-data" name="llm data">
+    <mxGraphModel dx="1400" dy="1000" grid="1" gridSize="10" page="0" background="none">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="config" value="config&#10;PK kind / key&#10;doc JSON providers / aliases / budgets" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=data;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="30" y="30" width="230" height="110" />
+        </mxCell>
+        <mxCell id="count" value="counters&#10;PK scope_type / scope_id / window_key&#10;spent / reserved / requests" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=data;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="350" y="30" width="230" height="110" />
+        </mxCell>
+        <mxCell id="res" value="reservations&#10;PK reservation_id&#10;amount / keys JSON / created_at" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=data;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="670" y="30" width="230" height="110" />
+        </mxCell>
+        <mxCell id="usage" value="usage&#10;PK id&#10;completion / scope / tokens / cost" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=data;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="30" y="260" width="230" height="110" />
+        </mxCell>
+        <mxCell id="inv" value="invocations&#10;PK invocation_id&#10;result JSON" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=data;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="350" y="260" width="230" height="110" />
+        </mxCell>
+        <mxCell id="kit" value="jobs / idempotency&#10;Jane Kit own-schema state" style="whiteSpace=wrap;html=0;fontFamily=Arial;fontSize=14;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#172554;spacing=8;rounded=1;janeRole=data;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="670" y="260" width="230" height="110" />
+        </mxCell>
+        <mxCell id="e0" value="Budget definition, логічно" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="config" target="count">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e1" value="keys JSON для reservation" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="res" target="count">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e2" value="Cost accounting, логічно" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="usage" target="count">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e3" value="Job / invocation result refs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;whiteSpace=wrap;fontFamily=Arial;fontSize=12;strokeColor=#475569;fontColor=#172554;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="kit" target="inv">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

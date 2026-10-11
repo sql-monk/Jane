@@ -6,6 +6,7 @@
 - [recomendations.md](recomendations.md) — інструменти для агентів.
 - Статус WP: [docs/delivery/status.md](docs/delivery/status.md) (веде координатор). Звіти: `docs/delivery/WP-NN.md`.
 - Контракти: `contracts/` (після WP-00). Конвенції API — скіл `jane-contracts`.
+- Документація: [DOCUMENTATION_REQUIREMENTS.md](DOCUMENTATION_REQUIREMENTS.md) і [DOCUMENTATION_PLAN.md](DOCUMENTATION_PLAN.md); прийнятий стиль — кореневий [README.md](README.md). Для створення, редагування й перевірки документації використовуй скіл [jane-documentation](.agents/skills/jane-documentation/SKILL.md).
 
 ## Як працювати над WP
 Використовуй скіл `jane-wp`. Коротко: гілка `wp/NN-<назва>`, файл `.jane-wp` з номером WP у корені checkout,
@@ -38,6 +39,6 @@ Windows і Linux. Шляхи через `pathlib`. Ключові команди
 Тестові стеки — з унікальним compose-проєктом, портами й томами.
 
 ## Перевірка власності
-```
+```powershell
 python .Codex/hooks/jane_wp.py check-diff main
 ```

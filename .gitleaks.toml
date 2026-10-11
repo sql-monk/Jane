@@ -21,3 +21,13 @@ condition = "AND"
 regexTarget = "match"
 regexes = ['''^delivery_key"?\s*[:=]\s*"?(?:[0-9a-f]{64}|[0-9a-f]{32})"?\s*$''']
 paths = ['''^contracts/''']
+
+# The API reference generated from those contract examples (scripts/docs) copies the same delivery_key
+# values. Same rule, same exact field/value shape, only the generated reference files.
+[[allowlists]]
+description = "delivery_key hex idempotency keys copied from contract examples into the generated API reference"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "match"
+regexes = ['''^delivery_key"?\s*[:=]\s*"?(?:[0-9a-f]{64}|[0-9a-f]{32})"?\s*$''']
+paths = ['''^docs/components/[^/]+/reference/api/generated/[^/]+\.md$''', '''^docs/reference/api-operations\.json$''']

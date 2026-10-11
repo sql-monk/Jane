@@ -4,10 +4,7 @@ export function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date
-    .toISOString()
-    .replace("T", " ")
-    .replace(/\.\d{3}Z$/, "Z");
+  return `${new Intl.DateTimeFormat("uk-UA", { timeZone: "Europe/Kyiv", dateStyle: "short", timeStyle: "medium" }).format(date)} (Київ)`;
 }
 
 /** Like formatDate, but keeps milliseconds (attempt diagnostics: a retry must start after its backoff). */
@@ -15,7 +12,90 @@ export function formatInstant(value: string | null | undefined): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toISOString().replace("T", " ");
+  return `${formatDate(value)} · ${String(date.getMilliseconds()).padStart(3, "0")} мс`;
+}
+
+export function formatDuration(start: string | null | undefined, end?: string | null): string {
+  if (!start) return "—";
+  const elapsed = (end ? Date.parse(end) : Date.now()) - Date.parse(start);
+  if (!Number.isFinite(elapsed) || elapsed < 0) return "—";
+  const seconds = Math.floor(elapsed / 1000);
+  if (seconds < 60) return `${seconds} с`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} хв ${seconds % 60} с`;
+  return `${Math.floor(seconds / 3600)} год ${Math.floor((seconds % 3600) / 60)} хв`;
+}
+
+/** datetime-local uses the browser's timezone; transmit an explicit RFC 3339 instant. */
+export function inputInstant(value: string): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+export const SCOPE_LABELS: Record<string, string> = {
+  platform: "Платформа",
+  source: "Джерело",
+  task: "Завдання",
+  stage: "Етап",
+  connection: "Підключення",
+  limits: "Ліміти",
+  problem_group: "Група проблем",
+};
+export const PERIOD_LABELS: Record<string, string> = {
+  run: "за запуск",
+  day: "за добу",
+  week: "за тиждень",
+  month: "за місяць",
+  total: "за весь час",
+};
+const STATUS_LABELS: Record<string, string> = {
+  succeeded: "Успішно",
+  success: "Успішно",
+  completed: "Завершено",
+  approved: "Схвалено",
+  passed: "Пройдено",
+  synced: "Синхронізовано",
+  ok: "Гаразд",
+  resolved: "Вирішено",
+  proposals_ready: "Варіанти готові",
+  running: "Виконується",
+  queued: "У черзі",
+  leased: "Передано виконавцю",
+  in_progress: "В обробці",
+  pending: "Очікує",
+  cancelling: "Скасовується",
+  retrying: "Повторна спроба",
+  claimed: "Взято в роботу",
+  in_progress_parked: "Призупинено",
+  retry_scheduled: "Повтор заплановано",
+  lease_reclaimed: "Повернуто в чергу",
+  draft: "Чернетка",
+  sampling: "Збирається вибірка",
+  analyzing: "Аналізується",
+  resolving: "Вирішується",
+  applying: "Застосовується",
+  degraded: "Частково доступно",
+  unrecognized: "Не розпізнано",
+  empty: "Порожньо",
+  open: "Відкрита",
+  needs_disambiguation: "Потрібне уточнення",
+  insufficient_sample: "Недостатня вибірка",
+  unknown: "Невідомо",
+  skipped: "Пропущено",
+  ignored: "Ігноровано",
+  deprecated: "Застаріле",
+  cancelled: "Скасовано",
+  failed: "Помилка",
+  rejected: "Відхилено",
+  yanked: "Відкликано",
+  down: "Недоступно",
+  unresolved: "Не вирішено",
+  available: "Доступно",
+  unavailable: "Недоступно",
+  unsupported: "Не підтримується",
+};
+export function statusLabel(value: string): string {
+  return STATUS_LABELS[value] ?? value;
 }
 
 export function formatMoney(money: Money | null | undefined): string {

@@ -9,13 +9,15 @@ export function Page({
   title,
   actions,
   children,
+  description: pageDescription,
 }: {
   title: string;
+  description?: string;
   actions?: ReactNode;
   children: ReactNode;
 }) {
   const location = useLocation();
-  const description = navigationFor(location.pathname)?.description;
+  const description = pageDescription ?? navigationFor(location.pathname)?.description;
   return (
     <section className="page">
       <header className="page-header">

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ModuleTelemetry",
+  "type": "object",
+  "required": [
+    "service",
+    "instance_id",
+    "sample_interval_seconds",
+    "retention_seconds",
+    "metrics",
+    "samples"
+  ],
+  "properties": {
+    "service": {
+      "type": "string"
+    },
+    "instance_id": {
+      "type": "string"
+    },
+    "sample_interval_seconds": {
+      "type": "number",
+      "minimum": 1
+    },
+    "retention_seconds": {
+      "type": "integer",
+      "minimum": 60
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "unit"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "at",
+          "instance_id",
+          "values"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "instance_id": {
+            "type": "string"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

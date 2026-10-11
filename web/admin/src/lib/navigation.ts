@@ -8,6 +8,18 @@ export const NAV_GROUPS: Array<{
     label: "Робочий простір",
     items: [
       {
+        to: "/monitoring",
+        label: "Моніторинг",
+        icon: "overview",
+        description: "Графіки, черги, швидкість обробки й доступність модулів.",
+      },
+      {
+        to: "/modules",
+        label: "Модулі",
+        icon: "connections",
+        description: "Стан, налаштування та діагностика кожного модуля.",
+      },
+      {
         to: "/",
         label: "Огляд",
         icon: "overview",

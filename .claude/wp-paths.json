@@ -275,6 +275,23 @@
         "tests/e2e/**",
         "docs/acceptance/**"
       ]
+    },
+    "33": {
+      "name": "admin-operations",
+      "allow": [
+        "libs/jane-kit/**",
+        "services/orchestrator/src/jane_orchestrator/app.py",
+        "contracts/**",
+        "web/admin/**",
+        "infra/compose.yaml",
+        ".claude/wp-paths.json",
+        "plan.md",
+        "docs/adr/0005-authentication.md",
+        "docs/delivery/WP-33.md",
+        "docs/delivery/WP-33/**",
+        "scripts/admin_operations_deploy.py",
+        ".agents/skills/jane-contracts/SKILL.md"
+      ]
     }
   }
 }

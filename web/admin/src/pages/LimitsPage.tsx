@@ -8,6 +8,7 @@ import { EffectiveLimitsView } from "../components/EffectiveLimitsView";
 import { JsonEditor, checkJson, toJsonText } from "../components/JsonEditor";
 import { ErrorBox, Field, Loading, Notice, Page, Section } from "../components/ui";
 import { SCHEMAS } from "../lib/schema";
+import { PlatformLimitsForm } from "../components/PlatformLimitsForm";
 
 export function LimitsPage() {
   const api = useApi();
@@ -47,13 +48,17 @@ export function LimitsPage() {
       >
         {platform.isLoading ? <Loading /> : null}
         <ErrorBox error={platform.error} />
-        <JsonEditor
-          text={text}
-          onChange={setText}
-          schema={SCHEMAS.platformLimits}
-          label="Ліміти платформи"
-          minHeight="20rem"
-        />
+        <PlatformLimitsForm text={text} onChange={setText} />
+        <details className="module-setting-group">
+          <summary>Розширений редактор JSON</summary>
+          <JsonEditor
+            text={text}
+            onChange={setText}
+            schema={SCHEMAS.platformLimits}
+            label="Ліміти платформи"
+            minHeight="20rem"
+          />
+        </details>
         <button
           type="button"
           className="btn btn-primary"

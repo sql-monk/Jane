@@ -9,9 +9,11 @@ import type { paths as LlmPaths } from "./generated/llm";
 import type { paths as HandlerPaths } from "./generated/handler";
 import type { paths as AssistantPaths } from "./generated/assistant";
 import type { paths as CollectorPaths } from "./generated/collector";
+import type { paths as OperationsPaths } from "./generated/operations";
 import { ApiError, toProblem } from "./problem";
 
 export interface ApiClients {
+  module: (name: string) => Client<OperationsPaths>;
   orchestrator: Client<OrchestratorPaths>;
   registry: Client<RegistryPaths>;
   storage: Client<StoragePaths>;
@@ -56,6 +58,7 @@ export function createApiClients(config: AdminConfig, hooks: AuthHooks): ApiClie
   }
   const executors = new Map<string, Client<HandlerPaths>>();
   const collectors = new Map<string, Client<CollectorPaths>>();
+  const modules = new Map<string, Client<OperationsPaths>>();
   function named<P extends object>(cache: Map<string, Client<P>>, name: string): Client<P> {
     if (!EXECUTOR_NAME.test(name)) throw new Error(`invalid executor name: ${name}`);
     let client = cache.get(name);
@@ -66,6 +69,7 @@ export function createApiClients(config: AdminConfig, hooks: AuthHooks): ApiClie
     return client;
   }
   return {
+    module: (name) => named(modules, name),
     orchestrator: make<OrchestratorPaths>(serviceBaseUrl(config, "orchestrator")),
     registry: make<RegistryPaths>(serviceBaseUrl(config, "registry")),
     storage: make<StoragePaths>(serviceBaseUrl(config, "storage")),

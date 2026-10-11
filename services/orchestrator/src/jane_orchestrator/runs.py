@@ -38,6 +38,20 @@ def canonical_key(entity: Mapping[str, Any]) -> str | None:
     return f"{key['scope']}|{json.dumps(key['natural'], sort_keys=True, separators=(',', ':'), ensure_ascii=False)}"
 
 
+def canonical_scope(key: str) -> str | None:
+    """A scope can contain pipes. Locate the delimiter whose suffix is the natural-key JSON object."""
+    for position, char in enumerate(key):
+        if char != "|":
+            continue
+        try:
+            natural = json.loads(key[position + 1 :])
+        except ValueError:
+            continue
+        if isinstance(natural, dict):
+            return key[:position]
+    return None
+
+
 class Runs:
     def __init__(self, core: Core) -> None:
         self.core = core
@@ -152,23 +166,31 @@ class Runs:
         return dict(row)
 
     @staticmethod
-    def _counts(conn: Any, run_id: str) -> dict[str, dict[str, int]]:
+    def _progress(conn: Any, run_id: str) -> tuple[dict[str, dict[str, int]], datetime | None]:
         rows = conn.execute(
-            "SELECT stage_id, status, result_status, count(*) AS n FROM items WHERE run_id = %s"
+            "SELECT stage_id, status, result_status, count(*) AS n, max(updated_at) AS activity"
+            " FROM items WHERE run_id = %s"
             " GROUP BY stage_id, status, result_status",
             (run_id,),
         ).fetchall()
         out: dict[str, dict[str, int]] = {}
+        activity = None
         for r in rows:
+            if r["activity"] is not None and (activity is None or r["activity"] > activity):
+                activity = r["activity"]
             counts = out.setdefault(r["stage_id"], {})
             counts[r["status"]] = counts.get(r["status"], 0) + int(r["n"])
             if r["result_status"]:
                 counts[r["result_status"]] = counts.get(r["result_status"], 0) + int(r["n"])
-        return out
+        return out, activity
 
-    def run_view(self, conn: Any, row: Mapping[str, Any]) -> dict[str, Any]:
+    @staticmethod
+    def _counts(conn: Any, run_id: str) -> dict[str, dict[str, int]]:
+        return Runs._progress(conn, run_id)[0]
+
+    def run_view(self, conn: Any, row: Mapping[str, Any], *, include_summary: bool = True) -> dict[str, Any]:
         run_id = row["run_id"]
-        counts = self._counts(conn, run_id)
+        counts, activity = self._progress(conn, run_id)
         stages = []
         for s in row["config"]["stages"]:
             progress: dict[str, Any] = {"stage_id": s["stage_id"], "counts": counts.get(s["stage_id"], {})}
@@ -187,6 +209,9 @@ class Runs:
         view: dict[str, Any] = {
             "run_id": run_id,
             "task_id": row["task_id"],
+            "source_id": row["source_id"],
+            "collector_kind": _collect_stage(row["config"])["collector"]["collector"],
+            "updated_at": rfc3339(max(row["updated_at"], activity) if activity else row["updated_at"]),
             "task_etag": row["task_etag"],
             "status": row["status"],
             "trigger": row["trigger"],
@@ -208,11 +233,91 @@ class Runs:
             view["costs"] = {"llm": {"amount": float(cost["s"]), "currency": cost["c"]}}
         if row["error"]:
             view["error"] = row["error"]
+        if include_summary:
+            view["summary"] = self.output_summary(conn, row)
         return view
+
+    @staticmethod
+    def output_summary(conn: Any, run: Mapping[str, Any]) -> dict[str, Any]:
+        """Unique entity identities recorded by this run; never query a storage database.
+
+        Legacy traces were capped, so their identities are a lower bound and labelled as such.
+        """
+        collect = _collect_stage(run["config"])["stage_id"]
+        evidence = conn.execute(
+            "SELECT stage_id, outputs, outputs_complete FROM items WHERE run_id = %s",
+            (run["run_id"],),
+        ).fetchall()
+        identities: set[tuple[str, str, str, str]] = {
+            (r["category"], r["connection_id"], r["entity_type"], r["canonical_key"])
+            for r in conn.execute(
+                "SELECT category, connection_id, entity_type, canonical_key FROM run_output_identities WHERE run_id = %s",
+                (run["run_id"],),
+            ).fetchall()
+        }
+        complete = True
+        legacy = False
+        for item in evidence:
+            if item["stage_id"] == collect:
+                continue
+            if item["outputs_complete"] is False:
+                complete = False
+            if item["outputs_complete"] is None and item["outputs"] is not None:
+                complete = False
+                legacy = True
+                for ref in item["outputs"] or []:
+                    if (
+                        ref.get("kind") != "entity"
+                        or not ref.get("canonical_key")
+                        or not ref.get("entity_type")
+                    ):
+                        continue
+                    if ref.get("write_status") == "simulated":
+                        continue
+                    connection = str(ref.get("connection_id") or "")
+                    if connection and run["test_mode"]:
+                        continue
+                    identities.add(
+                        (
+                            "saved" if connection else "extracted",
+                            connection,
+                            ref["entity_type"],
+                            ref["canonical_key"],
+                        )
+                    )
+        extracted = {(kind, key) for category, _, kind, key in identities if category == "extracted"}
+        saved = {
+            (connection, kind, key) for category, connection, kind, key in identities if category == "saved"
+        }
+        groups: dict[tuple[str, str, str], int] = {}
+        for connection, kind, key in saved:
+            scope = canonical_scope(key)
+            if scope is not None:
+                group = (connection, kind, scope)
+                groups[group] = groups.get(group, 0) + 1
+        out = {
+            "basis": "recorded_handler_outputs",
+            "complete": complete,
+            "legacy_trace": legacy,
+            "extracted_entities": len(extracted),
+            "saved_records": len(saved),
+            "result_groups": [
+                {"connection_id": c, "entity_type": t, "scope": s, "count": n}
+                for (c, t, s), n in sorted(groups.items())
+                if c
+            ],
+        }
+        if legacy:
+            # Old references did not distinguish writes without a connection from extraction.
+            # Nor did they say whether the configured trace cap dropped other identities.
+            # Keep confirmed storage links but never present ambiguous historical counts.
+            out.pop("extracted_entities")
+            out.pop("saved_records")
+        return out
 
     def job_view(self, conn: Any, row: Mapping[str, Any]) -> dict[str, Any]:
         run_id = row["run_id"]
-        counts = self._counts(conn, run_id)
+        counts, activity = self._progress(conn, run_id)
         collect_id = _collect_stage(row["config"])["stage_id"]
         done = sum(
             n
@@ -227,7 +332,7 @@ class Runs:
             "kind": "run",
             "status": row["status"],
             "created_at": rfc3339(row["created_at"]),
-            "updated_at": rfc3339(row["updated_at"]),
+            "updated_at": rfc3339(max(row["updated_at"], activity) if activity else row["updated_at"]),
             "progress": {
                 "completed": done,
                 "total": None if not row["feed_done"] else done + active,
@@ -284,7 +389,7 @@ class Runs:
             f"SELECT * FROM runs WHERE {' AND '.join(where)} ORDER BY seq DESC LIMIT %s",  # noqa: S608 - fixed fragments
             (*params, limit + 1),
         ).fetchall()
-        items = [self.run_view(conn, r) for r in rows[:limit]]
+        items = [self.run_view(conn, r, include_summary=False) for r in rows[:limit]]
         nxt = encode_cursor(int(rows[limit - 1]["seq"])) if len(rows) > limit else None
         return items, nxt
 

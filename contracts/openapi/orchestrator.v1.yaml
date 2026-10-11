@@ -997,6 +997,12 @@ paths:
       summary: Проблемні матеріали, згруповані за джерелом і характером проблеми
       tags: [problems]
       parameters:
+        - name: group_id
+          in: query
+          required: false
+          description: Точний вибір групи, зокрема для посилання з журналу аудиту.
+          schema:
+            type: string
         - name: source_id
           in: query
           required: false
@@ -1433,6 +1439,18 @@ paths:
       summary: Журнал аудиту (активації, відкати, зміни конфігурацій, підключень і лімітів)
       tags: [audit]
       parameters:
+        - name: since
+          in: query
+          required: false
+          description: Події від цього часу включно (UTC RFC 3339).
+          schema:
+            $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+        - name: until
+          in: query
+          required: false
+          description: Події до цього часу, не включно (UTC RFC 3339).
+          schema:
+            $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
         - name: subject_type
           in: query
           required: false
@@ -1474,7 +1492,13 @@ paths:
                         details:
                           version: 1.2.0
                           previous: 1.1.0
+                          before:
+                            package: {package_id: shop-example.product-extractor, version: 1.1.0}
+                          after:
+                            package: {package_id: shop-example.product-extractor, version: 1.2.0}
                     next_cursor: null
+        '400':
+          $ref: 'common.yaml#/components/responses/BadRequest'
         '401':
           $ref: 'common.yaml#/components/responses/Unauthenticated'
   /v1/jobs/{job_id}:
@@ -1679,6 +1703,17 @@ components:
         task_etag:
           type: string
           description: Версія конфігурації завдання, з якою виконується запуск.
+        source_id:
+          type: string
+          description: Джерело з незмінного знімка конфігурації запуску.
+        collector_kind:
+          type: string
+          description: Тип колектора з незмінного знімка конфігурації (наприклад web або telegram).
+        updated_at:
+          $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+          description: Остання зміна стану запуску або його елементів; не лише початок збору.
+        summary:
+          $ref: '#/components/schemas/RunOutputSummary'
         status:
           $ref: '../schemas/common/job.schema.json#/$defs/JobStatus'
         trigger:
@@ -1714,6 +1749,43 @@ components:
               $ref: '../schemas/handler-result.schema.json#/$defs/Money'
         error:
           $ref: '../schemas/common/problem.schema.json'
+    RunOutputSummary:
+      type: object
+      description: |
+        Унікальні сутності з фактичних виходів обробників цього запуску. Не статистика таблиць сховища.
+        Історичне обрізане трасування має complete=false, legacy_trace=true, кількості недоступні.
+        Для entities_ref без inline-сутностей complete=false; зафіксовані кількості є нижньою межею.
+        Записи у двох різних підключеннях рахуються окремо.
+        Імітовані записи тестового режиму не включено до saved_records.
+      properties:
+        basis:
+          type: string
+          examples: [recorded_handler_outputs]
+        complete:
+          type: boolean
+        legacy_trace:
+          type: boolean
+        extracted_entities:
+          type: integer
+          minimum: 0
+        saved_records:
+          type: integer
+          minimum: 0
+        result_groups:
+          type: array
+          description: Актуальні результати за підтвердженими типом, scope та сховищем; не фільтр за запуском.
+          items:
+            type: object
+            properties:
+              connection_id:
+                type: string
+              entity_type:
+                type: string
+              scope:
+                type: string
+              count:
+                type: integer
+                minimum: 0
     StageItem:
       type: object
       required: [item_id, stage_id, status, attempts]
@@ -1856,6 +1928,9 @@ components:
                             type: string
                           connection_id:
                             type: string
+                          write_status:
+                            type: string
+                            description: Стан підтвердження запису; simulated не означає збережені робочі дані.
     UnknownMaterial:
       type: object
       required: [material_id, observation_id, source_id, registered_at, forwarded_to_llm]
@@ -1968,6 +2043,24 @@ components:
                 $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
               message:
                 type: string
+              attempts:
+                type: integer
+                minimum: 0
+              next_retry_at:
+                $ref: '../schemas/common/defs.schema.json#/$defs/Timestamp'
+              error:
+                $ref: '../schemas/common/problem.schema.json'
+        unsupported_executors:
+          type: array
+          description: Виконавці з 501 not_implemented для керованих підключень; це не збій синхронізації.
+          items:
+            type: object
+            properties:
+              executor:
+                type: string
+              reason:
+                type: string
+                examples: [managed_connections_not_supported]
     ActivationRequest:
       type: object
       additionalProperties: false
@@ -2041,6 +2134,7 @@ components:
           type: string
         details:
           type: object
+          description: Для оновлень changed містить змінені поля; before та after — їх фактичні значення із прихованими секретами. Старі події можуть містити лише назви полів.
   examples:
     RunRunning:
       summary: Запуск повного збору в процесі
@@ -2053,6 +2147,14 @@ components:
         test_mode: false
         created_at: '2026-09-27T10:00:00Z'
         started_at: '2026-09-27T10:00:01Z'
+        source_id: shop-example
+        collector_kind: web
+        updated_at: '2026-09-27T10:03:00Z'
+        summary:
+          basis: recorded_handler_outputs
+          complete: false
+          legacy_trace: true
+          result_groups: []
         collection_id: job_01J9ZQ3F8W2N4K7T5B6C1D0E9F
         backpressure: false
         stages:

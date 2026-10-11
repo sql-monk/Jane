@@ -17,6 +17,8 @@ do the same work twice and a killed worker's work is taken over once its lease e
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import math
 import random
@@ -498,13 +500,69 @@ class Engine:
                 (Jsonb(err), *self._event("failed", item, None, err), item["item_id"]),
             )
             run_failed = stage.get("on_failure") == "fail_run" and self.runs.fail_run(
-                conn, run["run_id"], {**err, "details": {"stage_id": stage["stage_id"]}}
+                conn,
+                run["run_id"],
+                {**err, "details": {**(err.get("details") or {}), "stage_id": stage["stage_id"]}},
             )
         self.core.metrics.inc("items", outcome="failed")
         if run_failed:
             self._cancel_collection(run)
         self.runs.maybe_finish(run["run_id"])
         return "failed"
+
+    @staticmethod
+    def _record_output_identities(
+        conn: Any, run: Mapping[str, Any], item: Mapping[str, Any], result: Mapping[str, Any]
+    ) -> None:
+        """Keep exact compact business identities; the trace remains bounded by configuration.
+
+        Write confirmations, including duplicate/stale acknowledgements, prove a saved record exists.
+        Simulations do not. Referenced entity payloads cannot be counted without dereferencing them;
+        the summary explicitly reports incomplete evidence in that case.
+        """
+        output = result.get("output") or {}
+        identities: set[tuple[str, str, str, str, str]] = set()
+        complete = not bool(output.get("entities_ref"))
+        for entity in output.get("entities") or []:
+            key = canonical_key(entity)
+            kind = entity.get("entity_type")
+            if key and kind:
+                identities.add((run["run_id"], "extracted", "", str(kind), key))
+            else:
+                complete = False
+        for write in output.get("writes") or []:
+            if write.get("status") == "simulated" or run["test_mode"]:
+                continue
+            entity = write.get("entity")
+            if not entity:
+                continue  # RAW writes are materials, not saved business records.
+            key, kind = entity.get("canonical_key"), entity.get("entity_type")
+            if key and kind:
+                identities.add(
+                    (
+                        run["run_id"],
+                        "saved",
+                        str((write.get("target") or {}).get("connection_id") or ""),
+                        str(kind),
+                        str(key),
+                    )
+                )
+            else:
+                complete = False
+        if identities:
+            with conn.cursor() as cursor:
+                cursor.executemany(
+                    "INSERT INTO run_output_identities (run_id, category, connection_id, entity_type, canonical_key, key_digest)"
+                    " VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                    [
+                        (
+                            *identity,
+                            hashlib.sha256(json.dumps(identity[2:], ensure_ascii=False).encode()).hexdigest(),
+                        )
+                        for identity in sorted(identities)
+                    ],
+                )
+        conn.execute("UPDATE items SET outputs_complete = %s WHERE item_id = %s", (complete, item["item_id"]))
 
     def _outputs(self, result: Mapping[str, Any]) -> list[dict[str, Any]]:
         cap = self.core.engine.trace_outputs_max
@@ -528,6 +586,8 @@ class Engine:
                 ref = {"kind": "data"}
             if conn_id:
                 ref["connection_id"] = conn_id
+            if w.get("status"):
+                ref["write_status"] = w["status"]
             out.append(ref)
         if "data" in output or output.get("data_ref"):
             out.append({"kind": "data"})
@@ -563,11 +623,25 @@ class Engine:
                         "UPDATE items SET stored_object_id = %s WHERE item_id = %s",
                         (next(iter(objects)), item["item_id"]),
                     )
+            failure = result.get("failure") or {}
+            failure_code = {
+                "schema_mismatch": "schema_mismatch",
+                "timeout": "timeout",
+                "resource_exceeded": "limit_exceeded",
+                "budget_exhausted": "budget_exhausted",
+                "invalid_params": "validation_failed",
+                "dependency_error": "dependency_not_allowed",
+                "sandbox_violation": "access_denied_by_policy",
+                "connection_error": "upstream_unavailable",
+            }.get(str(failure.get("kind") or ""), "upstream_conflict")
             final_error = (
-                problem("upstream_conflict", str((result.get("failure") or {}).get("message", "")), 502)
+                problem(failure_code, str(failure.get("message", "")), 502, bool(failure.get("retryable")))
                 if final_failed
                 else None
             )
+            if final_error is not None:
+                final_error["details"] = {"stage_id": stage["stage_id"], "failure_kind": failure.get("kind")}
+                final_error["trace_id"] = run["trace_id"]
             conn.execute(
                 _COMPLETE_SQL,
                 (
@@ -583,6 +657,7 @@ class Engine:
                     item["item_id"],
                 ),
             )
+            self._record_output_identities(conn, run, item, result)
             if status in {"unrecognized", "failed"}:
                 self._record_problem(conn, run, item, stage, result)
             if locked["run_status"] == "running":
@@ -601,7 +676,7 @@ class Engine:
                 and self.runs.fail_run(
                     conn,
                     run["run_id"],
-                    problem("upstream_conflict", f"stage '{stage['stage_id']}' failed", 502),
+                    final_error or problem("upstream_conflict", f"stage '{stage['stage_id']}' failed", 502),
                 )
             )
         self.core.metrics.inc("items", outcome=str(status))
@@ -1449,10 +1524,11 @@ class Engine:
             if row is None:
                 return done
             cfg = self.core.executors.configs.get(row["executor"])
-            status, message = "synced", None
+            status, message, diagnostic = "synced", None, None
             unused = False
             if cfg is None:
                 status, message = "failed", "executor is no longer configured"
+                diagnostic = problem("upstream_unavailable", "Executor is no longer configured", 503)
             else:
                 try:
                     if row["op"] == "delete":
@@ -1467,7 +1543,15 @@ class Engine:
                             cfg, "PUT", f"/v1/connections/{row['connection_id']}", json=doc_row["doc"]
                         )
                 except ExecutorError as exc:
-                    message = str(exc)
+                    message = f"{row['executor']}: HTTP {exc.status or 503} ({exc.code})"
+                    diagnostic = {
+                        "type": f"urn:jane:problem:{exc.code}",
+                        "title": "Connection synchronization failed",
+                        "status": exc.status or 503,
+                        "code": exc.code,
+                        "retryable": exc.retryable,
+                        "details": {"executor": row["executor"]},
+                    }
                     if exc.status in NO_CONNECTIONS_STATUSES and exc.code == "not_implemented":
                         # handler.v1: /v1/connections* are optional for an executor without managed
                         # connections (handler-runtime answers PUT with 501 not_implemented). Not a failed
@@ -1482,6 +1566,17 @@ class Engine:
                     else:
                         status = "failed"
             with self.core.db.tx() as conn:
+                if unused:
+                    conn.execute(
+                        "INSERT INTO connection_unsupported (connection_id, executor) VALUES (%s, %s)"
+                        " ON CONFLICT DO NOTHING",
+                        (row["connection_id"], row["executor"]),
+                    )
+                elif status == "synced":
+                    conn.execute(
+                        "DELETE FROM connection_unsupported WHERE connection_id = %s AND executor = %s",
+                        (row["connection_id"], row["executor"]),
+                    )
                 if unused or (row["op"] == "delete" and status == "synced"):
                     conn.execute(
                         "DELETE FROM connection_sync WHERE connection_id = %s AND executor = %s AND lease_owner = %s",
@@ -1489,12 +1584,13 @@ class Engine:
                     )
                 else:
                     conn.execute(
-                        "UPDATE connection_sync SET status = %s, message = %s, lease_owner = NULL, lease_expires_at = NULL,"
+                        "UPDATE connection_sync SET status = %s, message = %s, error = %s, lease_owner = NULL, lease_expires_at = NULL,"
                         " synced_at = CASE WHEN %s = 'synced' THEN now() ELSE synced_at END,"
                         " available_at = now() + %s WHERE connection_id = %s AND executor = %s AND lease_owner = %s",
                         (
                             status,
                             message,
+                            Jsonb(diagnostic) if diagnostic else None,
                             status,
                             _ms(eng.sync_retry_ms),
                             row["connection_id"],

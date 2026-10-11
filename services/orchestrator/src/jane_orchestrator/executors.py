@@ -69,7 +69,9 @@ class ExecutorError(Exception):
         detail = self.message[:1000]
         if self.problem:
             out = {
-                k: v for k, v in self.problem.items() if k in {"type", "title", "status", "code", "detail"}
+                k: v
+                for k, v in self.problem.items()
+                if k in {"type", "title", "status", "code", "detail", "trace_id", "errors"}
             }
             out.setdefault("detail", detail)
             out["retryable"] = self.retryable

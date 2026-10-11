@@ -1,4 +1,9 @@
 {
+  "acceptance/criteria-map": {
+    "drawio": "648583a161abacc9d59ed403505c17c77330f7cfca261f86a07fae4f64ded1ac",
+    "light": "37f483e7a0177a625b7e02d7185fc95b73508232c37dbd3e6a9301fb06f4e701",
+    "dark": "665371f058c94363742e52f92ec33353ed3f713668718d3cbe0ad922397ed90f"
+  },
   "admin/async-job": {
     "drawio": "bbdfd9c72e20e359766a6acc48e7f8d6459d74b73c52c79cde6ed8c6b3a9a2f6",
     "light": "d81f1f33803bf967bfcd9f0785a1b2563c0eaf64b415670efa06b114143e704e",
@@ -13,6 +18,31 @@
     "drawio": "75c1150f99ebc96b9d69aafcc6fcd27a48e47e61c00cf20ce29249c27e3326bb",
     "light": "0811351e3565a67a4655950e1bc5d2293e26ad9cb55395d16735ee338f1c62c6",
     "dark": "5dbed6b41d0ddf5d8c40875f9d9d6d5c7c505e95a9eaab53dea093a92da29258"
+  },
+  "assistant/context": {
+    "drawio": "6b09155feb3011e31696481a3fa87d9bb37896e910cf1de4ce0055b880b2ef66",
+    "light": "692bc3f846037217ea5fc06388e5c677e83b059f2dae56a336636b21671ab102",
+    "dark": "b68436928388b07751f32a35bf18cc7cde42ac261ba9a612dc4b2387a1e589d1"
+  },
+  "assistant/improvement-flow": {
+    "drawio": "79545c1b365b312d519d93b3188be7c28b489e10976df6dee6c8414dd3bd4a71",
+    "light": "e1f98349c0cbc2723a9e9a7da3406a523532c7a4726fe80f43c867f0adc766cb",
+    "dark": "70ceb13f49960387d686a857697e06edf18a8817a2a25277f67dbffff4d21d3d"
+  },
+  "assistant/onboarding-sequence": {
+    "drawio": "be7d2266c2fd51254017d39a2654249850d80394ac7db81d65ac8cccaf1f0cd7",
+    "light": "795190de1bf7d81ca051f9ce37a21e33ac28297347bc7d0eb93799ce47f10e18",
+    "dark": "e0f01a0801709f02de5ed8dcf1dcd921acb6dd18c061b7512c54405fcc56f705"
+  },
+  "assistant/session-states": {
+    "drawio": "b32dee668fd5f7f469ba0b52e07a8d6473941b2ae421c741a9ac75bd388abe70",
+    "light": "ebe4764a86b251f6e477d2299b863ec32dae2f455b6fd62075bd4b10ad3dd0d0",
+    "dark": "9370b087c65bf9244af29cbf2726f6196b977b700f5723cf44852bfa75aa41bc"
+  },
+  "assistant/store-er": {
+    "drawio": "04e466f2eac8f9a47ead8d1cdd574411cbff3ac376a37458c684b2578d699f6d",
+    "light": "d82122b1ec4798f42758da92aaf9a08388f9ea86f574be212e11bdf965072834",
+    "dark": "9638fc1893c997ad41e2683f441ec06eee1f738d6fd0c1a1f5111a0f54084446"
   },
   "contracts/contract-change": {
     "drawio": "2cec4f3ea9c8e08ba7fee97fd3613fe559ff25cde380a0c5f9f9eecd384c2998",
@@ -79,6 +109,36 @@
     "light": "43c6ea40e11865de894bea3d8e78c0833d0126ba3b874a6c488acac2bd57b1bc",
     "dark": "53d015a00babf7f4263dfe0432d53e9414065a53ad75185ad35ce995b1ddf9ea"
   },
+  "llm/completion-sequence": {
+    "drawio": "8e1b97d4f90deaf6d30b165ff76896e0f66e50eb24784e03c46d34ffa3a1ba93",
+    "light": "222686fa719bdeac3f0239b46795edd5efd2f5b7ff7387934d059fd709db3c0f",
+    "dark": "d5b65a3ac4153d51fa5a645eeb4a0a06457cbe4a577cf3fd8d701b05a937385e"
+  },
+  "llm/job-states": {
+    "drawio": "dfb7a4053e3e0527b8708436117aba8d6a05a2be4535219c63b4873753013dc6",
+    "light": "de0a88c3b6a58b466eaeb16eac0cef8072c7cc103ed867e3bde61f271730104d",
+    "dark": "ced91b7e73fe3466ef854266a03550b254b86ec8f39dd592dfcef429991c51ef"
+  },
+  "llm/store-er": {
+    "drawio": "c5edf65ef613482be4ca781036d9670e5bd16211148a2a1ba8d44381fd53e982",
+    "light": "32c68deb4fad29d0738cd3032a488b5e9f699c62414322ca7b0f1633229c01c2",
+    "dark": "8863f107254071a3e51b9a135b5bf8b95496790431c2dcc670323f40e3477e68"
+  },
+  "operations/backup-restore": {
+    "drawio": "36fc223f4323ac7af8cfa54920ce3d14e42a25b56a76fd7eb588dd2d58d0c318",
+    "light": "7163f607c2537710840f4a232a65dadb0338a520bb92f2c6c58e30e4acff6365",
+    "dark": "15ba36c8e9a0e3055c4ea682c20ef1212079a2eb054dd723ff007740c616dec0"
+  },
+  "operations/data-ownership": {
+    "drawio": "85fc632ba49ac87d17e54a9da02c6a1a07a60b8841553383119a1cb08eb7d464",
+    "light": "9bdcee4a9ea908bad2124cedd80319c8a9dda5576c61ad50e88a534f3a7ec52f",
+    "dark": "cd32a32126f75d93a780f1a95b9bd0503b93269d39203482de9bf059b2c6ad20"
+  },
+  "operations/service-upgrade": {
+    "drawio": "305d0d7cb7367b22b52863381282596763b805ffa6e4c5ae2a6f34bc82f5e8d3",
+    "light": "64f9be11e4a76c37ccab4f2c879ce18efb3cae1387ecf444fc409eb6fc34b014",
+    "dark": "1bfadd29ce3b1745eb18521b3b67b3146c31d9596572ab73519e961ab2d930dd"
+  },
   "orchestrator/data-model": {
     "drawio": "e2997d964aac90191772a407ef99901344501e0dc4796fb2669bd439ece52dea",
     "light": "91b1c56bd41d8eedacc1010c2f99b6b1232f2b873297d9c3c7ef581b9d268ed4",
@@ -118,6 +178,16 @@
     "drawio": "4ce63d7f87feaa558e60a42da57def6718fda505abe78564db452f93d9d354f6",
     "light": "4ed9f61f46ec6ef0f56b8e4e2881f9f310e9ad471cf935d9729153f4e70769fa",
     "dark": "87be6b812eaf8c6b2f50c6999a290800335b9ebe554bb81f72e8a289e16fdc5e"
+  },
+  "platform/context": {
+    "drawio": "a8792d5c3be3427c5089a8742d8133dc3068e211e82032aa5696c9dcc458ccaf",
+    "light": "3686792eaa83a5029c2652b09562882ba2b78672bd552613ebe2bc34824452a5",
+    "dark": "7b41ad7be477d4fa48b6db12a8aa8df352bf33f0a6310645e5c2f3175c984808"
+  },
+  "platform/data-ownership": {
+    "drawio": "61c16ba509bc5e9bd2f4feaba8c9709a66d6311b8a1dc4c286c4255f491cf03a",
+    "light": "fec9f69f755192508e6a118c8a0b810fa832edd9bac80c5a4b27de57340f2433",
+    "dark": "e3d89ceec8931aa52a08787b80ff3a0b5ee71be2cd2f132e85e7b4a1364c995c"
   },
   "platform/dev-stack": {
     "drawio": "895fb723c7add8529a84cb04214e5ae2480e46c067852ea2012bd702659898f2",
@@ -159,9 +229,44 @@
     "light": "721f86df12f1341eb170860aa6bef79eba06a6ca5032c7f80c3aad1170a0212f",
     "dark": "a2e897d6ed5f0500f19d9d770cec21b039c792c0fb13c97840ce10146b95a4d3"
   },
+  "telegram-collector/channel-run": {
+    "drawio": "e195fa70456afab592617b9a402db8c18d2fe5024d355dda4e7c13ee28a114ec",
+    "light": "132c68cac1aa60becf20e851ed9bafd4b533f1daedf60c4516857cdb750e41a8",
+    "dark": "58eebb799613f3f471895ef8f29f27a4767ffed2c66ea4ad6540cdcd4deb28b6"
+  },
+  "telegram-collector/components": {
+    "drawio": "a9ac6daeb49e5fbb6bfea87de6e4b138aef89b3abb23d0d41284f3d1aa85ca37",
+    "light": "f53f1bcc460c9bf985d3c150cf35dd0ace71e85d10e173cfcebd3de8fb83e51a",
+    "dark": "708be0cb6df241ba342ecc8bbf4bad4468c244def61c775185bbd101364caf7e"
+  },
+  "telegram-collector/state-er": {
+    "drawio": "03c3f1d9ccd3902ab31d348040831b6b30b5a58c7028bf790e3a7a88c78da8f7",
+    "light": "497b0041bd64fba9e5c356ed31701f1dca58079b3f00646516e44b7a8f980d5d",
+    "dark": "3602abfa9f2ff03714abd807b4bc7b39ca3d4cff637370b2e3e2e56ae28094a2"
+  },
   "user-guide/source-to-results": {
     "drawio": "562d3f31960c34d901a516581dc4e1ea6a0db99265060558f8c230fb6a8b0c0c",
     "light": "4b96792230a7c0f938da1a350fab302c8ac443a117f4aaf4090ba67a3ba24a29",
     "dark": "e2b85d625ec5ec7a899a1a9a2dee9384269f30eceb1e5024727c73863cc1b5ed"
+  },
+  "web-collector/collection-states": {
+    "drawio": "f9d0d35a70e4a7390a3783f72bd0d14128ac78baddb5c4f220139ee6941cd24d",
+    "light": "dbf69f368d83b7f46804d000fcd5ed6b76bd2dade51abe76be97b16118081d88",
+    "dark": "a5aa7dede427920ed0dc74716452ccc6a22626828a1bb33fe90a94a2f87fd14f"
+  },
+  "web-collector/components": {
+    "drawio": "c13619bcbdddb598c9f10231cfdabdb458c9ef352c5f89b40f676e1caacb36ff",
+    "light": "b894ecba405b1684c32ccbcd579d5c874420508ac8cfbc5c5e6320c784bc716b",
+    "dark": "05f50d0aaa003d0a09911dd8b4ffd142b1eaa4da75bd6531e96b475575f4a4a7"
+  },
+  "web-collector/state-er": {
+    "drawio": "0e8780a24c2ba7716d7af7c9bf52d9ae317aa213d61499f9ba4c1a41e8580f0b",
+    "light": "364c6bd5e4e0336936527a1fec4eb29b41f3680c722706a212d9a9dd8ca929d5",
+    "dark": "7defacf67613d2a630fe5c25accaa76a343e02f1ee39b6e002e40bbb674e1a03"
+  },
+  "web-collector/url-pipeline": {
+    "drawio": "3a00eb114b7b811d4ccf788c685d1a86c695212a0ce6306b0a1dbb81ce961b6c",
+    "light": "5a8ebd7d761a01bb5a5a643f4a42621fa933bbb2a6f329420b74e1696ed4e13f",
+    "dark": "c858c876c092078a03ac4bde55cbafbfee829c767af1857d63ccae8f4ed64997"
   }
 }

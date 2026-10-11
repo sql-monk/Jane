@@ -8,8 +8,7 @@ Jane — модульна платформа, яка збирає матеріа
 
 - [Що робить Jane](#що-робить-jane)
 - [Як складається платформа](#як-складається-платформа)
-- [Типи модулів](#типи-модулів)
-- [Каталог модулів](#каталог-модулів)
+- [Модулі](#модулі)
 - [Швидкий старт](#швидкий-старт)
 - [Модуль окремо: Web Collector](#модуль-окремо-web-collector)
 - [Структура репозиторію](#структура-репозиторію)
@@ -42,44 +41,30 @@ Jane — модульна платформа, яка збирає матеріа
 - **Кожен модуль володіє своїми даними.** Спільної бази немає; чужі дані доступні лише через API. Деталі — [карта власності даних](contracts/docs/data-ownership.md).
 - **Registry — опційна залежність.** Правила колектора й пакет обробника можна передати в запиті або взяти з локального каталогу.
 
-## Типи модулів
+## Модулі
 
-- **Колектор** — отримує матеріали з джерела й повертає їх із метаданими (`collector.v1`). Бізнес-результатів не зберігає.
-- **Обробник** — виконує один етап над переданими даними (`handler.v1`): збереження, витягування або виклик LLM. Екстрактор — це пакет обробника; його код виконує Handler Runtime.
-- **Репозиторій** — зберігає пакети обробників і правила колекторів (`registry.v1`).
-- **Координація** — Orchestrator виконує завдання; Assistant за допомогою LLM готує джерела, правила й екстрактори.
-- **Інтерфейс** — вебзастосунок для оператора.
-- **Бібліотека** — спільний код сервісів, SDK екстракторів і контракти.
+Типи модулів, автономність і залежності кожного — у [каталозі модулів](docs/components/README.md).
 
-## Каталог модулів
-
-| Модуль | Тип | Призначення | Окремо | Обов'язкові залежності | Опційні залежності |
-|---|---|---|---|---|---|
-| [Web Collector](services/web-collector/README.md) | колектор | Вебсторінки за стратегіями пошуку | так | доступ до сайтів, каталог стану | Registry, транзитне сховище, Playwright |
-| [Telegram Collector](services/telegram-collector/README.md) | колектор | Повідомлення й редагування каналів | так | клієнт Telegram, каталог стану | Registry, транзитне сховище |
-| [Storage](services/storage/README.md) | обробник | Запис і читання RAW та сутностей через адаптери | так | цільове сховище | Registry |
-| [Handler Runtime](services/handler-runtime/README.md) | обробник | Виконання Python-екстракторів у пісочниці | так | Docker або Podman | PostgreSQL, Registry |
-| [LLM gateway](services/llm/README.md) | обробник | Виклики моделей, бюджети, облік витрат | так | PostgreSQL або режим `memory` | провайдер LLM, Registry |
-| [Registry](services/registry/README.md) | репозиторій | Пакети: версії, тести, форки, експорт | так | PostgreSQL, S3 або MinIO | профілі Handler Runtime |
-| [Orchestrator](services/orchestrator/README.md) | координація | Джерела, завдання, розклади, черга етапів | поєднує інші | PostgreSQL, виконавці | — |
-| [Assistant](services/assistant/README.md) | координація | Підготовка джерел і вдосконалення екстракторів | частково | LLM gateway, Registry, колектор, Handler Runtime | Orchestrator, Storage, PostgreSQL |
-| [Admin UI](web/admin/) | інтерфейс | Керування платформою в браузері | на моках API | API сервісів | — |
-| [jane-kit](libs/jane-kit/README.md) | бібліотека | Конфігурація й ліміти, помилки, ідемпотентність, job, автентифікація | — | FastAPI, Pydantic | — |
-| [jane-extractor-sdk](libs/extractor-sdk/README.md) | бібліотека | Типи й помічники для авторів екстракторів | так | — | — |
-| [jane-contracts](contracts/README.md) | контракти | OpenAPI, JSON Schema, Python Protocol-и | так | — | — |
-
-Пояснення до таблиці:
-
-- **Окремо** — чи можна запустити й використати модуль без інших модулів Jane. Assistant без своїх обов'язкових сусідів повертає `upstream_unavailable` для функцій, яким вони потрібні.
-- **Каталог стану** колекторів — локальна база SQLite; кілька екземплярів Web Collector узгоджують ліміти хоста через спільний каталог.
-- **Цільове сховище** Storage — адаптери PostgreSQL, SQL Server, MongoDB, MinIO, S3 і файлової системи; файловому адаптеру потрібен лише каталог.
-- **Handler Runtime** без PostgreSQL тримає стан у пам'яті — це підходить лише для одного екземпляра.
-- **LLM gateway** має вбудований детермінований провайдер `fake`; реальні відповіді дає провайдер Anthropic за налаштованим підключенням.
-- **Registry** для локальних дослідів працює без зовнішніх сервісів: `JANE_REGISTRY_DB=memory`, `JANE_REGISTRY_BLOB=filesystem`.
+| Модуль | Призначення |
+|---|---|
+| [Web Collector](docs/components/web-collector/README.md) | вебсторінки за стратегіями пошуку |
+| [Telegram Collector](docs/components/telegram-collector/README.md) | повідомлення й редагування Telegram-каналів |
+| [Storage](docs/components/storage/README.md) | запис і читання RAW та сутностей через адаптери |
+| [Handler Runtime](docs/components/handler-runtime/README.md) | виконання Python-екстракторів у пісочниці |
+| [LLM gateway](docs/components/llm/README.md) | виклики моделей, бюджети, облік витрат |
+| [Registry](docs/components/registry/README.md) | пакети обробників: версії, тести, форки |
+| [Orchestrator](docs/components/orchestrator/README.md) | джерела, завдання, розклади, виконання ланцюжків |
+| [Assistant](docs/components/assistant/README.md) | підготовка джерел і вдосконалення екстракторів з LLM |
+| [Admin UI](docs/components/admin/README.md) | керування платформою в браузері |
+| [jane-kit](docs/components/jane-kit/README.md) | спільна бібліотека сервісів |
+| [jane-extractor-sdk](docs/components/extractor-sdk/README.md) | SDK авторів екстракторів |
+| [jane-contracts](docs/components/contracts/README.md) | OpenAPI, JSON Schema, Python Protocol-и |
 
 ## Швидкий старт
 
-Піднімає всю платформу з адмінкою на локальному Docker. Кроки виконано 2026-10-11 на Windows 11, ревізія `dd99d22`; на Linux не перевірялися.
+Піднімає всю платформу з адмінкою на локальному Docker. Кроки виконано 2026-10-11 на Windows 11; на Linux не перевірялися.
+
+Такий стек не зв'язує сервіси між собою: Orchestrator не має виконавців, тож завдання не просуваються. Наскрізний сценарій із даними — від джерела до збережених сутностей — описано в [docs/getting-started/end-to-end.md](docs/getting-started/end-to-end.md).
 
 ### Передумови
 
@@ -156,7 +141,7 @@ just down -v
 
 ## Модуль окремо: Web Collector
 
-Отримує одну сторінку тестового сайту без Docker, Orchestrator і Registry. Так само самостійно запускаються інші модулі — команди в їхніх README з [каталогу](#каталог-модулів).
+Отримує одну сторінку тестового сайту без Docker, Orchestrator і Registry. Так само самостійно запускаються інші модулі — команди в їхніх quickstart з [каталогу](docs/components/README.md).
 
 1. У першому терміналі запустіть тестовий сайт:
 
@@ -216,6 +201,8 @@ just down -v
 
 ## Структура репозиторію
 
+Повна карта з точками входу й тестами — [docs/architecture/repository-map.md](docs/architecture/repository-map.md).
+
 ```text
 Jane/
 ├── services/                  # сервіси; кожен — Python-пакет із src/, tests/, Dockerfile і README
@@ -263,6 +250,8 @@ Jane/
 
 ## Що читати далі
 
+Уся документація з маршрутами для користувача, розробника й адміністратора — [docs/README.md](docs/README.md).
+
 | Потреба | Документ |
 |---|---|
 | Вимоги до платформи та критерії приймання | [TECHNICAL_SPECIFICATION.md](TECHNICAL_SPECIFICATION.md) |
@@ -271,5 +260,5 @@ Jane/
 | Формат пакетів обробників | [contracts/docs/handler-packages.md](contracts/docs/handler-packages.md) |
 | Модель помилок API | [contracts/docs/errors.md](contracts/docs/errors.md) |
 | Власність даних і повтори | [contracts/docs/data-ownership.md](contracts/docs/data-ownership.md) |
-| Запуск, конфігурація й API окремого модуля | README модуля з [каталогу](#каталог-модулів) |
+| Запуск, конфігурація й API окремого модуля | комплект модуля з [каталогу](docs/components/README.md) |
 | Вимоги до документації | [DOCUMENTATION_REQUIREMENTS.md](DOCUMENTATION_REQUIREMENTS.md) |

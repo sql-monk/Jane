@@ -1,0 +1,721 @@
+{
+  "captured_at": "2026-10-11T05:10:59.107205+00:00",
+  "completed_at": "2026-10-11T05:13:34.707094+00:00",
+  "project": "jane-demo",
+  "full_scan_complete": false,
+  "sites": [
+    {
+      "site": "bi",
+      "source_id": "bi-ua",
+      "task_id": "catalog-bi",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 900
+      },
+      "configured_rules": {
+        "digest": "sha256:271eb2f85e858773094c79d910f085172e2373e70d3c096170b322bcfd2ce084",
+        "version": "1.1.1",
+        "package_id": "catalog.bi-catalog-rules"
+      },
+      "run": {
+        "run_id": "run_01M4MNDS2TTNVFY0Q2XYTRW1RM",
+        "status": "running",
+        "trigger": "manual",
+        "test_mode": false,
+        "created_at": "2026-10-11T05:02:02.837Z",
+        "started_at": "2026-10-11T05:02:02.892Z",
+        "finished_at": null,
+        "collection_id": "job_9647e1fe447344a687f2a9fd26496fb0"
+      },
+      "collection": {
+        "collection_id": "job_9647e1fe447344a687f2a9fd26496fb0",
+        "status": "running",
+        "mode": "incremental",
+        "state_key": "bi-ua",
+        "created_at": "2026-10-11T05:02:02Z",
+        "finished_at": null,
+        "rules": {
+          "digest": "sha256:b3ce290cb0d5e745b5961835ca1dff0f8d59761eca8b4da37631fe4876539a70",
+          "package_id": "catalog.bi-catalog-rules",
+          "version": "1.1.0"
+        },
+        "stats": {
+          "discovered": 90000,
+          "fetched": 6,
+          "emitted": 0,
+          "acknowledged": 0,
+          "unacked": 0,
+          "duplicates": 270000,
+          "skipped_out_of_scope": 360000,
+          "skipped_robots": 0,
+          "not_modified": 0,
+          "errors": 0,
+          "frontier_size": 90001,
+          "bytes_fetched": 52427004,
+          "overflow_pending": 0
+        }
+      },
+      "entity_validation": {
+        "count": 329,
+        "schema_package": "catalog.bi-products",
+        "schema_package_version": "1.0.0",
+        "schema_invalid": 0,
+        "required_missing": {
+          "shop": 0,
+          "product_id": 0,
+          "title": 0,
+          "currency": 0,
+          "url": 0,
+          "availability": 0
+        },
+        "with_attributes": 329,
+        "priced": 324,
+        "versions": {
+          "2": 1,
+          "1": 328
+        },
+        "latest_updated_at": "2026-10-11T04:53:57.452604Z",
+        "schema_validation_source": "local package field schema; frozen running package version appears in stages and provenance"
+      },
+      "native_run_entity_samples": [
+        {
+          "canonical_key": "bi-ua|{\"product_id\":\"136915\",\"shop\":\"bi.ua\"}",
+          "title": "Р†РЅС‚РµСЂР°РєС‚РёРІРЅР° С–РіСЂР°С€РєР° Р РѕР±РѕС‚ Р›РµРІРµРЅСЏ WowWee",
+          "url": "https://bi.ua/ukr/product/interaktivnaya-igrushka-robot-lvenok-wowwee-9007.html",
+          "price": null,
+          "currency": "UAH",
+          "attributes_count": 6,
+          "completeness": "partial",
+          "applied_fields": [
+            "attributes",
+            "availability",
+            "brand",
+            "category",
+            "category_path",
+            "currency",
+            "image",
+            "product_id",
+            "reviews_count",
+            "shop",
+            "sku",
+            "title",
+            "url"
+          ],
+          "stale_fields": [],
+          "run_id": "run_01M4MNDS2TTNVFY0Q2XYTRW1RM",
+          "observation": {
+            "material_id": "web:43eff4e67a103348c2a584a5ba358281",
+            "observed_at": "2026-10-11T05:12:30Z",
+            "content_sha256": "ce36392279355157e89d46dbdd4da52bf7256570766660c6e63ba90690d0f6cc",
+            "observation_id": "obs_01a1296079b40000a5cc532c"
+          }
+        },
+        {
+          "canonical_key": "bi-ua|{\"product_id\":\"138486\",\"shop\":\"bi.ua\"}",
+          "title": "Р†РЅС‚РµСЂР°РєС‚РёРІРЅР° С–РіСЂР°С€РєР° РњСѓР»СЊС‚РёРјРµРґС–Р№РЅРёР№ РІРµРґРјРµРґРёРє iteddy",
+          "url": "https://bi.ua/ukr/product/188-iteddy-multimediyniy-mishka-iteddy.html",
+          "price": null,
+          "currency": "UAH",
+          "attributes_count": 6,
+          "completeness": "partial",
+          "applied_fields": [
+            "attributes",
+            "availability",
+            "brand",
+            "category",
+            "category_path",
+            "currency",
+            "image",
+            "product_id",
+            "reviews_count",
+            "shop",
+            "sku",
+            "title",
+            "url"
+          ],
+          "stale_fields": [],
+          "run_id": "run_01M4MNDS2TTNVFY0Q2XYTRW1RM",
+          "observation": {
+            "material_id": "web:a3f4aa82d288f9a5727e05dd4a07e195",
+            "observed_at": "2026-10-11T05:12:37Z",
+            "content_sha256": "c9763f44e7cdc72786ae310aeada18c091e56441d8118a6be2eb770a51c90147",
+            "observation_id": "obs_01a1296091fc0000217f1a36"
+          }
+        },
+        {
+          "canonical_key": "bi-ua|{\"product_id\":\"138872\",\"shop\":\"bi.ua\"}",
+          "title": "РњРѕС” Р»Р°СЃРєР°РІРµ С†СѓС†РµРЅСЏ",
+          "url": "https://bi.ua/ukr/product/moy-laskovyy-schenok-77698.html",
+          "price": null,
+          "currency": "UAH",
+          "attributes_count": 6,
+          "completeness": "partial",
+          "applied_fields": [
+            "attributes",
+            "availability",
+            "brand",
+            "category",
+            "category_path",
+            "currency",
+            "image",
+            "product_id",
+            "reviews_count",
+            "shop",
+            "sku",
+            "title",
+            "url"
+          ],
+          "stale_fields": [],
+          "run_id": "run_01M4MNDS2TTNVFY0Q2XYTRW1RM",
+          "observation": {
+            "material_id": "web:a80cdcd423fdff02c92b7db772fd2162",
+            "observed_at": "2026-10-11T05:12:13Z",
+            "content_sha256": "1b747a56b212c26cf0fb8f148e6efe11959e0f775bbf086e575a2fadd51ca799",
+            "observation_id": "obs_01a1296036ce0000fbf74b27"
+          }
+        }
+      ]
+    },
+    {
+      "site": "epicentrk",
+      "source_id": "epicentrk",
+      "task_id": "catalog-epicentrk",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 900
+      },
+      "configured_rules": {
+        "digest": "sha256:4597bac06168ff7463b2d85895347ffc624d2bb594a67bce2409df682bd268b3",
+        "version": "1.1.1",
+        "package_id": "catalog.epicentrk-catalog-rules"
+      },
+      "run": {
+        "run_id": "run_01M4MNDS8QRZZ66GQ30NADGGWZ",
+        "status": "running",
+        "trigger": "manual",
+        "test_mode": false,
+        "created_at": "2026-10-11T05:02:03.026Z",
+        "started_at": "2026-10-11T05:02:03.058Z",
+        "finished_at": null,
+        "collection_id": "job_a8f9530014114d569e347841ab0f0cbc"
+      },
+      "collection": {
+        "collection_id": "job_a8f9530014114d569e347841ab0f0cbc",
+        "status": "queued",
+        "mode": "incremental",
+        "state_key": "epicentrk",
+        "created_at": "2026-10-11T05:02:03Z",
+        "finished_at": null,
+        "rules": {
+          "digest": "sha256:dca90da021230a891cd0520a0643bf0d8edb483386d4f701629c82c80a22f719",
+          "package_id": "catalog.epicentrk-catalog-rules",
+          "version": "1.1.0"
+        },
+        "stats": {
+          "discovered": 180000,
+          "fetched": 6,
+          "emitted": 0,
+          "acknowledged": 0,
+          "unacked": 0,
+          "duplicates": 240000,
+          "skipped_out_of_scope": 0,
+          "skipped_robots": 0,
+          "not_modified": 0,
+          "errors": 0,
+          "frontier_size": 180000,
+          "bytes_fetched": 25072053,
+          "overflow_pending": 0
+        }
+      },
+      "entity_validation": {
+        "count": 315,
+        "schema_package": "catalog.epicentrk-products",
+        "schema_package_version": "1.0.0",
+        "schema_invalid": 0,
+        "required_missing": {
+          "shop": 0,
+          "product_id": 0,
+          "title": 0,
+          "url": 0,
+          "availability": 0
+        },
+        "with_attributes": 315,
+        "priced": 312,
+        "versions": {
+          "2": 1,
+          "1": 314
+        },
+        "latest_updated_at": "2026-10-11T04:54:05.837625Z",
+        "schema_validation_source": "local package field schema; frozen running package version appears in stages and provenance"
+      },
+      "native_run_entity_samples": []
+    },
+    {
+      "site": "prostor",
+      "source_id": "prostor",
+      "task_id": "catalog-prostor",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 900
+      },
+      "configured_rules": {
+        "digest": "sha256:4faff513c7fff4766f73996422668fae4c0451f65c2dcf8e46b17cd1b0ff926a",
+        "version": "1.1.1",
+        "package_id": "catalog.prostor-catalog-rules"
+      },
+      "run": {
+        "run_id": "run_01M4MNDSFCA0NMCBZVJJGPS2CE",
+        "status": "running",
+        "trigger": "manual",
+        "test_mode": false,
+        "created_at": "2026-10-11T05:02:03.239Z",
+        "started_at": "2026-10-11T05:02:03.647Z",
+        "finished_at": null,
+        "collection_id": "job_5af7a28314584e98b63355aaf3aff255"
+      },
+      "collection": {
+        "collection_id": "job_5af7a28314584e98b63355aaf3aff255",
+        "status": "running",
+        "mode": "incremental",
+        "state_key": "prostor",
+        "created_at": "2026-10-11T05:02:03Z",
+        "finished_at": null,
+        "rules": {
+          "digest": "sha256:367478c9abbdf443ca7ca0010dc6fa902254a47749588e23f072acb5af9b4409",
+          "package_id": "catalog.prostor-catalog-rules",
+          "version": "1.1.0"
+        },
+        "stats": {
+          "discovered": 9339,
+          "fetched": 17,
+          "emitted": 16,
+          "acknowledged": 16,
+          "unacked": 0,
+          "duplicates": 19,
+          "skipped_out_of_scope": 13911,
+          "skipped_robots": 0,
+          "not_modified": 0,
+          "errors": 0,
+          "frontier_size": 9323,
+          "bytes_fetched": 7840622,
+          "overflow_pending": 0
+        }
+      },
+      "entity_validation": {
+        "count": 541,
+        "schema_package": "catalog.prostor-product-extractor",
+        "schema_package_version": "1.1.1",
+        "schema_invalid": 0,
+        "required_missing": {
+          "shop": 0,
+          "product_id": 0,
+          "title": 0,
+          "price": 0,
+          "currency": 0,
+          "url": 0,
+          "completeness": 0
+        },
+        "with_attributes": 541,
+        "priced": 541,
+        "versions": {
+          "2": 1,
+          "1": 540
+        },
+        "latest_updated_at": "2026-10-11T05:11:29.177589Z",
+        "schema_validation_source": "local package field schema; frozen running package version appears in stages and provenance"
+      },
+      "native_run_entity_samples": [
+        {
+          "canonical_key": "prostor|{\"product_id\":\"108\",\"shop\":\"prostor\"}",
+          "title": "РЎРёСЂРѕРІР°С‚РєР° РґР»СЏ РІС–Р№ Eveline Advance Volumiere 10 РјР»",
+          "url": "https://prostor.ua/ua/product/eveline-sirovatka-d-viy-advance-volumiere10ml/",
+          "price": 159.0,
+          "currency": "UAH",
+          "attributes_count": 7,
+          "completeness": "full",
+          "applied_fields": [
+            "attributes",
+            "availability",
+            "brand",
+            "category",
+            "category_path",
+            "completeness",
+            "currency",
+            "image",
+            "old_price",
+            "price",
+            "product_id",
+            "rating",
+            "reviews_count",
+            "shop",
+            "sku",
+            "title",
+            "unit",
+            "url",
+            "volume"
+          ],
+          "stale_fields": [],
+          "run_id": "run_01M4MNDSFCA0NMCBZVJJGPS2CE",
+          "observation": {
+            "material_id": "web:ffeb92862c9a60928863b2358c9dd51e",
+            "observed_at": "2026-10-11T05:11:07Z",
+            "content_sha256": "0a8a32c4d01e9615a19b5ea1ceeb9f85d5129a822ef2493449b3dbc240d3539e",
+            "observation_id": "obs_01a1295f34120000eeef53d8"
+          }
+        },
+        {
+          "canonical_key": "prostor|{\"product_id\":\"109\",\"shop\":\"prostor\"}",
+          "title": "РЎРёСЂРѕРІР°С‚РєР° РґР»СЏ РІС–Р№ Eveline SOS Lash Booster 10 РјР»",
+          "url": "https://prostor.ua/ua/product/eveline-sirovatka-d-viy-sos-lash-booster10ml/",
+          "price": 212.0,
+          "currency": "UAH",
+          "attributes_count": 6,
+          "completeness": "full",
+          "applied_fields": [
+            "attributes",
+            "availability",
+            "brand",
+            "category",
+            "category_path",
+            "completeness",
+            "currency",
+            "image",
+            "old_price",
+            "price",
+            "product_id",
+            "rating",
+            "reviews_count",
+            "shop",
+            "sku",
+            "title",
+            "unit",
+            "url",
+            "volume"
+          ],
+          "stale_fields": [],
+          "run_id": "run_01M4MNDSFCA0NMCBZVJJGPS2CE",
+          "observation": {
+            "material_id": "web:aa327171f5344c32b3acace17f77f673",
+            "observed_at": "2026-10-11T05:12:08Z",
+            "content_sha256": "2f28195d3d22fd4221e78ea4d0d5795e22a8602fd0d4a34e04c8bd54878acb97",
+            "observation_id": "obs_01a1296021a80000bdc7f17f"
+          }
+        },
+        {
+          "canonical_key": "prostor|{\"product_id\":\"11\",\"shop\":\"prostor\"}",
+          "title": "РўСѓС€ РґР»СЏ РІС–Р№ Eveline Big Volume Explosion С‡РѕСЂРЅР° 12 РјР»",
+          "url": "https://prostor.ua/ua/product/eveline-tush-d-viy-big-volume-explosion-11ml/",
+          "price": 299.0,
+          "currency": "UAH",
+          "attributes_count": 10,
+          "completeness": "full",
+          "applied_fields": [
+            "attributes",
+            "availability",
+            "brand",
+            "category",
+            "category_path",
+            "completeness",
+            "currency",
+            "image",
+            "old_price",
+            "price",
+            "product_id",
+            "rating",
+            "reviews_count",
+            "shop",
+            "sku",
+            "title",
+            "unit",
+            "url",
+            "volume"
+          ],
+          "stale_fields": [],
+          "run_id": "run_01M4MNDSFCA0NMCBZVJJGPS2CE",
+          "observation": {
+            "material_id": "web:3eae991787733932b142d2096434ae95",
+            "observed_at": "2026-10-11T05:03:36Z",
+            "content_sha256": "3c89fc113aba650eac8c22784d37e36046ad37daf563516e0a9b2c188cff1537",
+            "observation_id": "obs_01a12958529e000010dabb5e"
+          }
+        }
+      ]
+    },
+    {
+      "site": "varus",
+      "source_id": "varus",
+      "task_id": "catalog-varus",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "interval_seconds": 900
+      },
+      "configured_rules": {
+        "digest": "sha256:fe5a778bf6891344aac44cdf09a31d5afb26555823531e3b4327777569a8dac3",
+        "version": "1.1.1",
+        "package_id": "catalog.varus-catalog-rules"
+      },
+      "run": {
+        "run_id": "run_01M4MNDSP1D4M33J4DFJV5QR68",
+        "status": "running",
+        "trigger": "manual",
+        "test_mode": false,
+        "created_at": "2026-10-11T05:02:03.445Z",
+        "started_at": "2026-10-11T05:02:03.651Z",
+        "finished_at": null,
+        "collection_id": "job_786f1f227651443f987dfba7bccf499b"
+      },
+      "collection": {
+        "collection_id": "job_786f1f227651443f987dfba7bccf499b",
+        "status": "running",
+        "mode": "incremental",
+        "state_key": "varus",
+        "created_at": "2026-10-11T05:02:03Z",
+        "finished_at": null,
+        "rules": {
+          "digest": "sha256:df30e951565e9db2097f8c18a1120b516893fc0ef5b98d81d4398a676c6d689e",
+          "package_id": "catalog.varus-catalog-rules",
+          "version": "1.1.0"
+        },
+        "stats": {
+          "discovered": 1344,
+          "fetched": 28,
+          "emitted": 1344,
+          "acknowledged": 1121,
+          "unacked": 223,
+          "duplicates": 480,
+          "skipped_out_of_scope": 0,
+          "skipped_robots": 0,
+          "not_modified": 0,
+          "errors": 0,
+          "frontier_size": 1,
+          "bytes_fetched": 5751162,
+          "overflow_pending": 0
+        }
+      },
+      "entity_validation": {
+        "count": 937,
+        "schema_package": "catalog.varus-product-extractor",
+        "schema_package_version": "1.1.1",
+        "schema_invalid": 0,
+        "required_missing": {
+          "shop": 0,
+          "product_id": 0,
+          "title": 0,
+          "url": 0,
+          "currency": 0,
+          "availability": 0,
+          "completeness": 0
+        },
+        "with_attributes": 924,
+        "priced": 900,
+        "versions": {
+          "1": 935,
+          "2": 2
+        },
+        "latest_updated_at": "2026-10-11T05:11:58.732496Z",
+        "schema_validation_source": "local package field schema; frozen running package version appears in stages and provenance"
+      },
+      "native_run_entity_samples": [
+        {
+          "canonical_key": "varus|{\"product_id\":\"100365\",\"shop\":\"varus\"}",
+          "title": "РџРѕР»С–СЂРѕР»СЊ РґР»СЏ РјРµР±Р»С–РІ Pronto СЂС–РґРєРёР№ 300 РјР»",
+          "url": "https://varus.ua/polirol-dlia-mebliv-pronto-ridkyi-300-ml",
+          "price": 43.5,
+          "currency": "UAH",
+          "attributes_count": 6,
+          "completeness": "full",
+          "applied_fields": [
+            "attributes",
+            "availability",
+            "brand",
+            "category",
+            "category_path",
+            "completeness",
+            "country",
+            "currency",
+            "image",
+            "old_price",
+            "price",
+            "product_id",
+            "shop",
+            "sku",
+            "title",
+            "unit",
+            "url",
+            "volume"
+          ],
+          "stale_fields": [],
+          "run_id": "run_01M4MNDSP1D4M33J4DFJV5QR68",
+          "observation": {
+            "material_id": "web:6851e0c0ecdbbf9e679c95095d930b8f",
+            "observed_at": "2026-10-11T05:02:28Z",
+            "content_sha256": "cdaa70c672e65e53c84beedf7d674767dee2101e3caa1b87d090ebf52e3756b5",
+            "observation_id": "obs_01a12957478b000043fb772e"
+          }
+        },
+        {
+          "canonical_key": "varus|{\"product_id\":\"183803\",\"shop\":\"varus\"}",
+          "title": "РџРµС‡РёРІРѕ Gullon Duo Choco СЃРµРЅРґРІС–С‡ 145 Рі",
+          "url": "https://varus.ua/pechyvo-gullon-duo-choco-sendvich-170-h",
+          "price": 52.9,
+          "currency": "UAH",
+          "attributes_count": 15,
+          "completeness": "full",
+          "applied_fields": [
+            "attributes",
+            "availability",
+            "brand",
+            "category",
+            "category_path",
+            "completeness",
+            "currency",
+            "image",
+            "old_price",
+            "price",
+            "product_id",
+            "shop",
+            "sku",
+            "title",
+            "unit",
+            "url",
+            "weight"
+          ],
+          "stale_fields": [],
+          "run_id": "run_01M4MNDSP1D4M33J4DFJV5QR68",
+          "observation": {
+            "material_id": "web:a8ea8b1adbf3521f405b399f2fb6cad7",
+            "observed_at": "2026-10-11T05:03:36Z",
+            "content_sha256": "088f334ae754da747d9e301638375cc7fb0fa1e3e714e53754a6d27bf78f3277",
+            "observation_id": "obs_01a12958527a000037ceb2e7"
+          }
+        },
+        {
+          "canonical_key": "varus|{\"product_id\":\"212919\",\"shop\":\"varus\"}",
+          "title": "Р—СѓР±РЅР° РїР°СЃС‚Р° Lacalut Р”РёС‚СЏС‡Р° 50 РјР»",
+          "url": "https://varus.ua/zubna-pasta-lacalut-dytiacha-50-ml",
+          "price": 164.9,
+          "currency": "UAH",
+          "attributes_count": 10,
+          "completeness": "full",
+          "applied_fields": [
+            "attributes",
+            "availability",
+            "brand",
+            "category",
+            "category_path",
+            "completeness",
+            "country",
+            "currency",
+            "image",
+            "old_price",
+            "price",
+            "product_id",
+            "shop",
+            "sku",
+            "title",
+            "unit",
+            "url",
+            "volume"
+          ],
+          "stale_fields": [],
+          "run_id": "run_01M4MNDSP1D4M33J4DFJV5QR68",
+          "observation": {
+            "material_id": "web:a99883507f473a559530c042b2ae59c7",
+            "observed_at": "2026-10-11T05:02:10Z",
+            "content_sha256": "51b1a1bf34d5a210c80f34e04a4763dc5947300417ebd63a2d22c3fdf3e43050",
+            "observation_id": "obs_01a12957024100001ec4a23c"
+          }
+        }
+      ]
+    },
+    {
+      "site": "yakaboo",
+      "source_id": "yakaboo",
+      "task_id": "catalog-yakaboo",
+      "enabled": true,
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "interval_seconds": 900
+      },
+      "configured_rules": {
+        "digest": "sha256:755806333f0cc283296ed25194799fba6334a34cf31d5d37b0bbffb4dfd7c21d",
+        "version": "1.1.1",
+        "package_id": "catalog.yakaboo-catalog-rules"
+      },
+      "run": {
+        "run_id": "run_01M4MNDSWEDFYX9HD8C73RXX8E",
+        "status": "running",
+        "trigger": "manual",
+        "test_mode": false,
+        "created_at": "2026-10-11T05:02:03.652Z",
+        "started_at": "2026-10-11T05:02:03.722Z",
+        "finished_at": null,
+        "collection_id": "job_097bd7e0f55542bba72f5a094278e891"
+      },
+      "collection": {
+        "collection_id": "job_097bd7e0f55542bba72f5a094278e891",
+        "status": "running",
+        "mode": "incremental",
+        "state_key": "yakaboo",
+        "created_at": "2026-10-11T05:02:03Z",
+        "finished_at": null,
+        "rules": {
+          "digest": "sha256:08ba5579cb1f6219d07abaa8625773066d53855bfea9bc9e4273a16b7b1d7395",
+          "package_id": "catalog.yakaboo-catalog-rules",
+          "version": "1.1.0"
+        },
+        "stats": {
+          "discovered": 0,
+          "fetched": 20,
+          "emitted": 0,
+          "acknowledged": 0,
+          "unacked": 0,
+          "duplicates": 0,
+          "skipped_out_of_scope": 780000,
+          "skipped_robots": 0,
+          "not_modified": 0,
+          "errors": 0,
+          "frontier_size": 1,
+          "bytes_fetched": 200147583,
+          "overflow_pending": 0
+        }
+      },
+      "entity_validation": {
+        "count": 300,
+        "schema_package": "catalog.yakaboo-book-extractor",
+        "schema_package_version": "1.0.0",
+        "schema_invalid": 0,
+        "required_missing": {
+          "shop": 0,
+          "product_id": 0,
+          "title": 0,
+          "price": 0,
+          "currency": 0,
+          "url": 0,
+          "completeness": 0
+        },
+        "with_attributes": 300,
+        "priced": 300,
+        "versions": {
+          "1": 299,
+          "2": 1
+        },
+        "latest_updated_at": "2026-10-11T04:54:02.082515Z",
+        "schema_validation_source": "local package field schema; frozen running package version appears in stages and provenance"
+      },
+      "native_run_entity_samples": []
+    }
+  ]
+}

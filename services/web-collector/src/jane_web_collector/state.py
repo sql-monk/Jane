@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS seed_navigation (
     body BLOB NOT NULL,
     PRIMARY KEY (collection_id, strategy_id, url)
 );
+CREATE INDEX IF NOT EXISTS seed_navigation_lookup ON seed_navigation(strategy_id, url, collection_id);
 CREATE TABLE IF NOT EXISTS strategy_state (
     collection_id TEXT NOT NULL,
     strategy_id TEXT NOT NULL,
@@ -233,6 +234,7 @@ class StateStore:
                 "CREATE INDEX IF NOT EXISTS frontier_pending_order "
                 "ON frontier(collection_id, status, seen_before, priority DESC, seq)"
             )
+            self._init_frontier_counts(db)
         if "seen_before" not in {row[1] for row in self._db.execute("PRAGMA table_info(frontier_overflow)")}:
             self._db.execute(
                 "ALTER TABLE frontier_overflow ADD COLUMN seen_before INTEGER NOT NULL DEFAULT 0"
@@ -253,6 +255,52 @@ class StateStore:
     def close(self) -> None:
         with self._lock:
             self._db.close()
+
+    @staticmethod
+    def _init_frontier_counts(db: sqlite3.Connection) -> None:
+        """Backfill once, then count every frontier transition in its original transaction.
+
+        Triggers also cover bulk adoption, fencing rollbacks and retention deletes. Counting the
+        whole catalog on each heartbeat or admission batch would otherwise stall the event loop.
+        """
+        exists = db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'frontier_status_counts'"
+        ).fetchone()
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS frontier_status_counts (collection_id TEXT NOT NULL, "
+            "status TEXT NOT NULL, kind TEXT NOT NULL, value INTEGER NOT NULL, "
+            "PRIMARY KEY (collection_id, status, kind))"
+        )
+        if exists is None:
+            db.execute(
+                "INSERT INTO frontier_status_counts SELECT collection_id, status, kind, COUNT(*) "
+                "FROM frontier GROUP BY collection_id, status, kind"
+            )
+        increment = (
+            "INSERT INTO frontier_status_counts VALUES (NEW.collection_id, NEW.status, NEW.kind, 1) "
+            "ON CONFLICT(collection_id, status, kind) DO UPDATE SET value = value + 1;"
+        )
+        decrement = (
+            "UPDATE frontier_status_counts SET value = value - 1 WHERE collection_id = OLD.collection_id "
+            "AND status = OLD.status AND kind = OLD.kind; "
+            "DELETE FROM frontier_status_counts WHERE collection_id = OLD.collection_id "
+            "AND status = OLD.status AND kind = OLD.kind AND value = 0;"
+        )
+        db.execute(
+            "CREATE TRIGGER IF NOT EXISTS frontier_count_insert AFTER INSERT ON frontier BEGIN "
+            + increment
+            + " END"
+        )
+        db.execute(
+            "CREATE TRIGGER IF NOT EXISTS frontier_count_delete AFTER DELETE ON frontier BEGIN "
+            + decrement
+            + " END"
+        )
+        db.execute(
+            "CREATE TRIGGER IF NOT EXISTS frontier_count_update AFTER UPDATE OF collection_id, status, kind "
+            "ON frontier WHEN OLD.collection_id <> NEW.collection_id OR OLD.status <> NEW.status "
+            "OR OLD.kind <> NEW.kind BEGIN " + decrement + increment + " END"
+        )
 
     @contextmanager
     def tx(self, fence: Fence | None = None) -> Iterator[sqlite3.Connection]:
@@ -434,18 +482,26 @@ class StateStore:
             ids = [str(r[0]) for r in rows]
             for cid in ids:
                 succeeded = self.get_status(cid) == "succeeded"
-                # A bounded successful run's unfinished crawl outlives its result/material retention.
-                db.execute(
-                    "DELETE FROM frontier WHERE collection_id = ? AND status NOT IN ('deferred', 'loaned')",
-                    (cid,),
-                )
-                has_deferred = db.execute(
-                    "SELECT 1 FROM frontier WHERE collection_id = ? AND status IN ('deferred', 'loaned') LIMIT 1",
-                    (cid,),
+                checkpointed = db.execute(
+                    "SELECT 1 FROM deferred_crawls WHERE collection_id = ?", (cid,)
                 ).fetchone()
-                if not succeeded:
-                    db.execute("DELETE FROM frontier WHERE collection_id = ?", (cid,))
-                    has_deferred = None
+                # A bounded successful run's unfinished crawl outlives its result/material retention.
+                keep = {"deferred", "loaned"} if succeeded else set()
+                if succeeded and checkpointed:
+                    keep.update(("pending", "inflight"))
+                physical = db.execute(
+                    "SELECT status FROM frontier_status_counts WHERE collection_id = ? GROUP BY status",
+                    (cid,),
+                ).fetchall()
+                # Equality on each terminal status deletes only its rows, without scanning the
+                # multi-million pending tail on every bounded run's retention pass.
+                for physical_status in physical:
+                    if physical_status[0] not in keep:
+                        db.execute(
+                            "DELETE FROM frontier WHERE collection_id = ? AND status = ?",
+                            (cid, physical_status[0]),
+                        )
+                has_deferred = any(physical_status[0] in keep for physical_status in physical)
                 if succeeded and not has_deferred and self.overflow_count(cid):
                     has_deferred = True
                 if succeeded and not has_deferred:
@@ -455,8 +511,11 @@ class StateStore:
                         "SELECT 1 FROM deferred_crawls checkpoint JOIN deferred_crawls donor "
                         "ON donor.state_key = checkpoint.state_key AND donor.fingerprint = checkpoint.fingerprint "
                         "JOIN collections c ON c.collection_id = donor.collection_id "
-                        "JOIN frontier f ON f.collection_id = donor.collection_id "
-                        "WHERE checkpoint.collection_id = ? AND c.status = 'succeeded' AND f.status IN ('deferred', 'loaned') LIMIT 1",
+                        "WHERE checkpoint.collection_id = ? AND c.status = 'succeeded' "
+                        "AND (EXISTS (SELECT 1 FROM frontier_status_counts f WHERE f.collection_id = donor.collection_id "
+                        "AND f.status IN ('pending', 'inflight', 'deferred', 'loaned')) "
+                        "OR EXISTS (SELECT 1 FROM counters o WHERE o.name = 'overflow:' || donor.collection_id "
+                        "AND o.value > 0)) LIMIT 1",
                         (cid,),
                     ).fetchone()
                 tables = (
@@ -663,9 +722,19 @@ class StateStore:
 
     def frontier_counts(self, collection_id: str) -> dict[str, int]:
         rows = self._all(
-            "SELECT status, COUNT(*) FROM frontier WHERE collection_id = ? GROUP BY status", (collection_id,)
+            "SELECT status, SUM(value) FROM frontier_status_counts WHERE collection_id = ? GROUP BY status",
+            (collection_id,),
         )
         counts = {str(r[0]): int(r[1]) for r in rows}
+        checkpoint = self._one(
+            "SELECT 1 FROM deferred_crawls d JOIN collections c ON c.collection_id = d.collection_id "
+            "WHERE d.collection_id = ? AND c.status = 'succeeded'",
+            (collection_id,),
+        )
+        if checkpoint:
+            deferred = counts.pop("pending", 0) + counts.pop("inflight", 0)
+            if deferred:
+                counts["deferred"] = counts.get("deferred", 0) + deferred
         overflow = self.overflow_count(collection_id)
         if overflow:
             counts["overflow"] = overflow
@@ -687,11 +756,13 @@ class StateStore:
         fingerprint: str,
         seeded: Sequence[str],
     ) -> int:
-        """Checkpoint the unspent frontier in the same fenced transaction as successful completion."""
-        count = db.execute(
-            "UPDATE frontier SET status = 'deferred' WHERE collection_id = ? AND status IN ('pending', 'inflight')",
-            (collection_id,),
-        ).rowcount
+        """Atomically checkpoint the collection, leaving its potentially millions of rows untouched.
+
+        Pending/inflight rows of this successful checkpoint are logically deferred. Legacy physical
+        deferred rows remain readable; only the bounded batch actually borrowed changes ownership.
+        """
+        counts = self.frontier_counts(collection_id)
+        count = counts.get("pending", 0) + counts.get("inflight", 0)
         if count or self.overflow_count(collection_id) or self.continuation_size(state_key, fingerprint):
             db.execute(
                 "INSERT OR REPLACE INTO deferred_crawls VALUES (?, ?, ?, ?)",
@@ -754,7 +825,8 @@ class StateStore:
             "SELECT d.collection_id, d.seeded FROM deferred_crawls d "
             "JOIN collections c ON c.collection_id = d.collection_id "
             "WHERE d.state_key = ? AND d.fingerprint = ? AND c.status = 'succeeded' "
-            "AND (EXISTS (SELECT 1 FROM frontier f WHERE f.collection_id = d.collection_id AND f.status = 'deferred') "
+            "AND (EXISTS (SELECT 1 FROM frontier_status_counts f WHERE f.collection_id = d.collection_id "
+            "AND f.status IN ('pending', 'inflight', 'deferred')) "
             "OR EXISTS (SELECT 1 FROM frontier_overflow o WHERE o.collection_id = d.collection_id)) "
             "ORDER BY c.created_at, d.collection_id",
             (state_key, fingerprint),
@@ -769,23 +841,24 @@ class StateStore:
         accepted: list[FrontierRow] = []
         seeded: list[str] = json.loads(context["seeded"]) if context else []
         snapshots: dict[str, Any] = self.load_strategy_states(context["collection_id"]) if context else {}
-        if context:
-            db.execute(
-                "INSERT OR IGNORE INTO seed_navigation SELECT ?, strategy_id, url, resource, body "
-                "FROM seed_navigation WHERE collection_id = ?",
-                (collection_id, context["collection_id"]),
-            )
         # Prefer unseen URLs across *all* old runs, including a newer donor's discovered tail.
         for revisits in (0, 1):
             for donor in donors:
                 cid = donor["collection_id"]
                 self.promote_overflow(db, cid, limit - len(accepted), status="deferred", revisits=revisits)
-                rows = db.execute(
-                    "SELECT f.* FROM frontier f WHERE f.collection_id = ? AND f.status = 'deferred' "
-                    "AND EXISTS (SELECT 1 FROM url_state u WHERE u.state_key = ? AND u.url = f.url "
-                    "AND u.status BETWEEN 200 AND 399) = ? ORDER BY f.priority DESC, f.seq LIMIT ?",
-                    (cid, state_key, revisits, limit - len(accepted)),
-                ).fetchall()
+                rows = []
+                for physical_status in ("pending", "inflight", "deferred"):
+                    rows.extend(
+                        db.execute(
+                            "SELECT * FROM frontier WHERE collection_id = ? AND status = ? AND seen_before = ? "
+                            "ORDER BY priority DESC, seq LIMIT ?",
+                            (cid, physical_status, revisits, limit - len(accepted)),
+                        ).fetchall()
+                    )
+                # Each status uses its index independently. Merge at most three bounded windows,
+                # preserving priority without a SQL sort over the donor's entire catalog.
+                rows.sort(key=lambda raw: (-raw["priority"], raw["seq"]))
+                rows = rows[: limit - len(accepted)]
                 for raw in rows:
                     row = admit(FrontierRow(**{key: raw[key] for key in FrontierRow.__dataclass_fields__}))
                     if row is not None and self.add_urls(db, collection_id, [row]):
@@ -807,7 +880,8 @@ class StateStore:
             self._one(
                 "SELECT 1 FROM deferred_crawls d JOIN collections c ON c.collection_id = d.collection_id "
                 "JOIN frontier f ON f.collection_id = d.collection_id AND f.url = ? "
-                "WHERE d.state_key = ? AND d.fingerprint = ? AND c.status = 'succeeded' AND f.status IN ('deferred', 'loaned') "
+                "WHERE d.state_key = ? AND d.fingerprint = ? AND c.status = 'succeeded' "
+                "AND f.status IN ('pending', 'inflight', 'deferred', 'loaned') "
                 "UNION ALL SELECT 1 FROM deferred_crawls d JOIN collections c ON c.collection_id = d.collection_id "
                 "JOIN frontier_overflow o ON o.collection_id = d.collection_id AND o.url = ? "
                 "WHERE d.state_key = ? AND d.fingerprint = ? AND c.status = 'succeeded' LIMIT 1",
@@ -818,18 +892,19 @@ class StateStore:
 
     def continuation_size(self, state_key: str, fingerprint: str) -> int:
         row = self._one(
-            "SELECT COUNT(*) FROM deferred_crawls d JOIN collections c ON c.collection_id = d.collection_id "
-            "JOIN frontier f ON f.collection_id = d.collection_id "
-            "WHERE d.state_key = ? AND d.fingerprint = ? AND c.status IN ('queued', 'running', 'succeeded') AND f.status = 'deferred'",
+            "SELECT SUM(f.value) FROM deferred_crawls d JOIN collections c ON c.collection_id = d.collection_id "
+            "JOIN frontier_status_counts f ON f.collection_id = d.collection_id "
+            "WHERE d.state_key = ? AND d.fingerprint = ? AND c.status IN ('queued', 'running', 'succeeded') "
+            "AND f.status IN ('pending', 'inflight', 'deferred')",
             (state_key, fingerprint),
         )
         overflow = self._one(
-            "SELECT COUNT(*) FROM frontier_overflow o JOIN deferred_crawls d ON d.collection_id = o.collection_id "
+            "SELECT SUM(o.value) FROM deferred_crawls d JOIN counters o ON o.name = 'overflow:' || d.collection_id "
             "JOIN collections c ON c.collection_id = d.collection_id "
             "WHERE d.state_key = ? AND d.fingerprint = ? AND c.status IN ('queued', 'running', 'succeeded')",
             (state_key, fingerprint),
         )
-        return (int(row[0]) if row else 0) + (int(overflow[0]) if overflow else 0)
+        return (int(row[0] or 0) if row else 0) + (int(overflow[0] or 0) if overflow else 0)
 
     def save_seed_navigation(
         self,
@@ -846,12 +921,29 @@ class StateStore:
         )
 
     def seed_navigation(
-        self, collection_id: str, strategy_id: str, url: str
+        self,
+        collection_id: str,
+        strategy_id: str,
+        url: str,
+        *,
+        state_key: str | None = None,
+        fingerprint: str | None = None,
     ) -> tuple[dict[str, Any], bytes] | None:
         row = self._one(
             "SELECT resource, body FROM seed_navigation WHERE collection_id = ? AND strategy_id = ? AND url = ?",
             (collection_id, strategy_id, url),
         )
+        if row is None and state_key is not None and fingerprint is not None:
+            # An immutable successful donor's navigation can be replayed without copying its XML
+            # BLOBs to every budget-sized borrower. Start from the exact URL index, not all donors.
+            row = self._one(
+                "SELECT n.resource, n.body FROM seed_navigation n INDEXED BY seed_navigation_lookup "
+                "JOIN deferred_crawls d ON d.collection_id = n.collection_id "
+                "JOIN collections c ON c.collection_id = d.collection_id "
+                "WHERE n.strategy_id = ? AND n.url = ? AND d.state_key = ? AND d.fingerprint = ? "
+                "AND c.status = 'succeeded' ORDER BY c.finished_ts DESC, d.collection_id DESC LIMIT 1",
+                (strategy_id, url, state_key, fingerprint),
+            )
         return (json.loads(row[0]), zlib.decompress(row[1])) if row else None
 
     def clear_seed_navigation(
@@ -895,25 +987,28 @@ class StateStore:
 
     def pending_count(self, collection_id: str, *, materials_only: bool = False) -> int:
         row = self._one(
-            "SELECT COUNT(*) FROM frontier WHERE collection_id = ? AND status = 'pending' "
+            "SELECT SUM(value) FROM frontier_status_counts WHERE collection_id = ? AND status = 'pending' "
             "AND (? = 0 OR kind = 'material')",
             (collection_id, int(materials_only)),
         )
-        return int(row[0]) if row else 0
+        return int(row[0] or 0) if row else 0
 
     def frontier_size_for_state_key(self, state_key: str) -> int:
         row = self._one(
-            "SELECT COUNT(*) FROM frontier f JOIN collections c ON c.collection_id = f.collection_id "
+            "SELECT SUM(f.value) FROM collections c JOIN frontier_status_counts f "
+            "ON f.collection_id = c.collection_id "
             "WHERE c.state_key = ? AND ((c.status IN ('queued', 'running', 'cancelling') "
-            "AND f.status IN ('pending', 'inflight')) OR (c.status = 'succeeded' AND f.status = 'deferred'))",
+            "AND f.status IN ('pending', 'inflight')) OR (c.status = 'succeeded' "
+            "AND (f.status = 'deferred' OR (f.status IN ('pending', 'inflight') "
+            "AND EXISTS (SELECT 1 FROM deferred_crawls d WHERE d.collection_id = c.collection_id)))))",
             (state_key,),
         )
         overflow = self._one(
-            "SELECT COUNT(*) FROM frontier_overflow o JOIN collections c ON c.collection_id = o.collection_id "
+            "SELECT SUM(o.value) FROM collections c JOIN counters o ON o.name = 'overflow:' || c.collection_id "
             "WHERE c.state_key = ? AND c.status IN ('queued', 'running', 'cancelling', 'succeeded')",
             (state_key,),
         )
-        return (int(row[0]) if row else 0) + (int(overflow[0]) if overflow else 0)
+        return (int(row[0] or 0) if row else 0) + (int(overflow[0] or 0) if overflow else 0)
 
     # ------------------------------------------------------------------ strategy state
     def save_strategy_states(

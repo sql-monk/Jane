@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import sqlite3
 import threading
@@ -12,6 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -196,6 +198,164 @@ def test_unfinished_index_survives_restart_and_retention_gc(tmp_path: Path, cata
         assert db.execute("SELECT COUNT(*) FROM seed_navigation").fetchone()[0] == 0
 
 
+def test_navigation_cache_is_shared_transitively_without_blob_copies(tmp_path: Path) -> None:
+    path = tmp_path / "shared-cache.db"
+    state = StateStore(path)
+    url = "https://store.test/sitemap.xml"
+    expected = b"<sitemapindex>original immutable donor body</sitemapindex>"
+    try:
+        for cid, key in (
+            ("origin", "catalog"),
+            ("middle", "catalog"),
+            ("latest", "catalog"),
+            ("wrong-source", "elsewhere"),
+            ("wrong-rule", "catalog"),
+            ("cancelled", "catalog"),
+            ("failed", "catalog"),
+        ):
+            state.create_collection(
+                cid,
+                state_key=key,
+                status="running",
+                request={},
+                rules={},
+                rules_ref=None,
+                created_at="2026-10-11T00:00:00Z",
+                effective_limits={},
+            )
+        with state.tx() as db:
+            state.add_urls(db, "origin", [FrontierRow(url, 0, 0, "navigation", "catalog")])
+            state.save_seed_navigation(db, "origin", "catalog", url, {"origin": True}, expected)
+            state.defer_pending(db, "origin", "catalog", "rules", [])
+            state.set_status("origin", "succeeded", finished_at="2026-10-11T00:00:01Z", db=db)
+            for cid, key, fingerprint, terminal in (
+                ("wrong-source", "elsewhere", "rules", "succeeded"),
+                ("wrong-rule", "catalog", "changed", "succeeded"),
+                ("cancelled", "catalog", "rules", "cancelled"),
+                ("failed", "catalog", "rules", "failed"),
+            ):
+                state.add_urls(db, cid, [FrontierRow(url, 0, 0, "navigation", "catalog")])
+                state.save_seed_navigation(db, cid, "catalog", url, {"wrong": cid}, cid.encode())
+                state.defer_pending(db, cid, key, fingerprint, [])
+                state.set_status(cid, terminal, finished_at="2026-10-11T00:00:02Z", db=db)
+        for borrower in ("middle", "latest"):
+            statements: list[str] = []
+            with state.tx() as db:
+                db.set_trace_callback(statements.append)
+                rows, seeded, _ = state.adopt_deferred(db, borrower, "catalog", "rules", 1, lambda row: row)
+                assert len(rows) == 1 and rows[0].kind == "navigation" and seeded == []
+                assert state.seed_navigation(
+                    borrower, "catalog", url, state_key="catalog", fingerprint="rules"
+                ) == ({"origin": True}, expected)
+                state.defer_pending(db, borrower, "catalog", "rules", [])
+                state.settle_loans(db, borrower_id=borrower)
+                state.set_status(borrower, "succeeded", finished_at="2026-10-11T00:00:03Z", db=db)
+                db.set_trace_callback(None)
+                assert not any(
+                    "INSERT OR IGNORE INTO SEED_NAVIGATION SELECT" in sql.upper() for sql in statements
+                )
+                assert (
+                    db.execute(
+                        "SELECT COUNT(*) FROM seed_navigation WHERE collection_id IN ('origin','middle','latest')"
+                    ).fetchone()[0]
+                    == 1
+                )
+            state.expire_finished(time.time() + 1)
+            state.close()
+            state = StateStore(path)
+            assert state.seed_navigation(
+                borrower, "catalog", url, state_key="catalog", fingerprint="rules"
+            ) == ({"origin": True}, expected)
+        # Even the original nav-only checkpoint survives GC while the transitive tail needs it.
+        with state.read() as db:
+            assert (
+                db.execute("SELECT COUNT(*) FROM seed_navigation WHERE collection_id = 'origin'").fetchone()[
+                    0
+                ]
+                == 1
+            )
+            plan = db.execute(
+                "EXPLAIN QUERY PLAN SELECT n.resource, n.body FROM seed_navigation n "
+                "INDEXED BY seed_navigation_lookup JOIN deferred_crawls d ON d.collection_id = n.collection_id "
+                "JOIN collections c ON c.collection_id = d.collection_id WHERE n.strategy_id = ? AND n.url = ? "
+                "AND d.state_key = ? AND d.fingerprint = ? AND c.status = 'succeeded'",
+                ("catalog", url, "catalog", "rules"),
+            ).fetchall()
+            details = " ".join(str(row[3]) for row in plan)
+            assert "SEARCH n USING INDEX seed_navigation_lookup (strategy_id=? AND url=?)" in details
+            assert "SCAN " not in details, details
+        # The current run's own cache wins; successful complete discovery clears shared old caches.
+        with state.tx() as db:
+            state.save_seed_navigation(db, "latest", "catalog", url, {"local": True}, b"local")
+        assert state.seed_navigation("latest", "catalog", url, state_key="catalog", fingerprint="rules") == (
+            {"local": True},
+            b"local",
+        )
+        with state.tx() as db:
+            state.clear_seed_navigation(db, "latest", "catalog", "catalog", "rules", ["catalog"])
+            state.complete_discovery(db, "catalog", "rules", ["catalog"])
+        assert (
+            state.seed_navigation("latest", "catalog", url, state_key="catalog", fingerprint="rules") is None
+        )
+    finally:
+        state.close()
+
+
+def test_nav_only_shared_cache_survives_gc_when_tail_is_only_in_overflow(tmp_path: Path) -> None:
+    path = tmp_path / "spooled-cache.db"
+    state = StateStore(path)
+    root, next_url = "https://store.test/root.xml", "https://store.test/next.xml"
+    try:
+        for cid in ("origin", "spool-owner", "reader"):
+            state.create_collection(
+                cid,
+                state_key="catalog",
+                status="running",
+                request={},
+                rules={},
+                rules_ref=None,
+                created_at="2026-10-11T00:00:00Z",
+                effective_limits={},
+            )
+        with state.tx() as db:
+            state.save_seed_navigation(db, "origin", "catalog", root, {"root": True}, b"immutable XML")
+            state.add_urls(db, "origin", [FrontierRow(next_url, 0, 0, "navigation", "catalog")])
+            state.defer_pending(db, "origin", "catalog", "rules", [])
+            state.set_status("origin", "succeeded", finished_at="2026-10-11T00:00:01Z", db=db)
+            rows, _, _ = state.adopt_deferred(db, "spool-owner", "catalog", "rules", 1, lambda row: row)
+            assert [row.url for row in rows] == [next_url]
+            state.mark_url(db, "spool-owner", next_url, "done")
+            state.add_overflow(
+                db, "spool-owner", FrontierRow("https://store.test/tail.xml", 0, 0, "navigation", "catalog")
+            )
+            state.defer_pending(db, "spool-owner", "catalog", "rules", [])
+            state.settle_loans(db, borrower_id="spool-owner")
+            state.set_status("spool-owner", "succeeded", finished_at="2026-10-11T00:00:02Z", db=db)
+        assert state.continuation_size("catalog", "rules") == 1
+        assert state.expire_finished(time.time() + 1) == ["origin", "spool-owner"]
+        assert state.frontier_counts("origin") == {}
+        assert state.frontier_counts("spool-owner") == {"overflow": 1}
+        state.close()
+        state = StateStore(path)
+        assert state.seed_navigation("reader", "catalog", root, state_key="catalog", fingerprint="rules") == (
+            {"root": True},
+            b"immutable XML",
+        )
+        assert state.continuation_size("catalog", "rules") == 1
+        with state.tx() as db:
+            rows, _, _ = state.adopt_deferred(db, "reader", "catalog", "rules", 1, lambda row: row)
+            assert [row.url for row in rows] == ["https://store.test/tail.xml"]
+            state.mark_url(db, "reader", rows[0].url, "done")
+            state.settle_loans(db, borrower_id="reader")
+            state.complete_discovery(db, "catalog", "rules", ["catalog"])
+        assert state.continuation_size("catalog", "rules") == 0
+        assert (
+            state.seed_navigation("reader", "catalog", root, state_key="catalog", fingerprint="rules") is None
+        )
+    finally:
+        state.close()
+
+
 def test_changed_rules_do_not_adopt_the_old_queue(tmp_path: Path, catalog: Catalog) -> None:
     with TestClient(build_app(_settings(tmp_path))) as client:
         _, _, first = _run(client, _body(catalog, 3))
@@ -288,6 +448,15 @@ def test_unfinished_loans_return_after_terminal_borrower_and_gc(
         assert catalog.requests.count("/product/1") == 1
         with sqlite3.connect(settings.state_dir / "state.db") as db:
             assert db.execute("SELECT COUNT(*) FROM frontier_loans").fetchone()[0] == 0
+            actual = db.execute(
+                "SELECT collection_id, status, kind, COUNT(*) FROM frontier "
+                "GROUP BY collection_id, status, kind ORDER BY collection_id, status, kind"
+            ).fetchall()
+            recorded = db.execute(
+                "SELECT collection_id, status, kind, value FROM frontier_status_counts "
+                "ORDER BY collection_id, status, kind"
+            ).fetchall()
+            assert recorded == actual  # loan recovery + GC never leave stale progress counters
 
 
 def test_adoption_is_fenced_and_excludes_other_sources_and_cancelled_runs(tmp_path: Path) -> None:
@@ -427,3 +596,228 @@ def test_legacy_frontier_backfills_the_indexed_marker_on_restart(tmp_path: Path)
         assert state.overflow_count("legacy") == 1
     finally:
         state.close()
+
+
+def test_frontier_counters_migrate_restart_and_track_transactional_changes(tmp_path: Path) -> None:
+    path = tmp_path / "counts.db"
+    with sqlite3.connect(path) as db:
+        db.executescript(SCHEMA)
+        db.execute(
+            "INSERT INTO collections(collection_id, state_key, status, request, rules, created_at) "
+            "VALUES ('legacy', 'catalog', 'running', '{}', '{}', '2026-10-11T00:00:00Z')"
+        )
+        db.executemany(
+            "INSERT INTO frontier(collection_id, url, status, priority, seq, depth, kind) "
+            "VALUES ('legacy', ?, 'pending', 0, ?, 0, ?)",
+            ((f"https://store.test/{n}", n, "material" if n % 2 else "navigation") for n in range(10_000)),
+        )
+    state = StateStore(path)
+    try:
+        assert state.frontier_counts("legacy") == {"pending": 10_000}
+        assert state.pending_count("legacy", materials_only=True) == 5_000
+        assert state.frontier_size_for_state_key("catalog") == 10_000
+        assert state.claim("legacy", "writer", 30)
+
+        def rollback() -> None:
+            with state.tx(("legacy", "writer")) as db:
+                state.mark_url(db, "legacy", "https://store.test/1", "done")
+                raise RuntimeError("rollback")
+
+        with pytest.raises(RuntimeError, match="rollback"):
+            rollback()
+        assert state.frontier_counts("legacy") == {"pending": 10_000}
+        assert len(state.take_pending("legacy", 2, ("legacy", "writer"))) == 2
+        assert state.frontier_counts("legacy") == {"inflight": 2, "pending": 9_998}
+        assert state.reset_inflight("legacy", ("legacy", "writer")) == 2
+        with state.tx(("legacy", "writer")) as db:
+            db.execute("UPDATE frontier SET kind = 'material' WHERE url = 'https://store.test/0'")
+            state.mark_url(db, "legacy", "https://store.test/1", "done")
+            assert (
+                state.add_urls(
+                    db, "legacy", [FrontierRow("https://store.test/2", 0, 0, "material", "catalog")]
+                )
+                == 0
+            )
+        assert state.pending_count("legacy", materials_only=True) == 5_000
+        assert state.frontier_counts("legacy") == {"done": 1, "pending": 9_999}
+    finally:
+        state.close()
+    state = StateStore(path)
+    try:
+        assert state.frontier_counts("legacy") == {"done": 1, "pending": 9_999}
+        assert state.frontier_size_for_state_key("catalog") == 9_999
+        with state.read() as db:
+            plan = db.execute(
+                "EXPLAIN QUERY PLAN SELECT status, SUM(value) FROM frontier_status_counts "
+                "WHERE collection_id = ? GROUP BY status",
+                ("legacy",),
+            ).fetchall()
+            details = " ".join(str(row[3]) for row in plan)
+            assert "SEARCH frontier_status_counts USING INDEX" in details, details
+            assert "SCAN " not in details and "TEMP B-TREE" not in details, details
+            statements: list[str] = []
+            db.set_trace_callback(statements.append)
+            state.frontier_counts("legacy")
+            state.pending_count("legacy", materials_only=True)
+            state.frontier_size_for_state_key("catalog")
+            state.continuation_size("catalog", "rules")
+            db.set_trace_callback(None)
+            assert not any("COUNT(*)" in sql.upper() or "FROM FRONTIER " in sql.upper() for sql in statements)
+            print(details)
+        with state.tx() as db:
+            statements = []
+            db.set_trace_callback(statements.append)
+            state.defer_pending(db, "legacy", "catalog", "rules", ["catalog"])
+            assert state.frontier_counts("legacy") == {"done": 1, "pending": 9_999}
+            state.set_status("legacy", "succeeded", db=db)
+            db.set_trace_callback(None)
+            assert not any("UPDATE FRONTIER SET STATUS" in sql.upper() for sql in statements)
+            assert (
+                db.execute(
+                    "SELECT COUNT(*) FROM frontier WHERE collection_id = 'legacy' AND status = 'pending'"
+                ).fetchone()[0]
+                == 9_999
+            )
+        assert state.frontier_counts("legacy") == {"done": 1, "deferred": 9_999}
+        assert state.continuation_size("catalog", "rules") == 9_999
+        assert state.has_deferred_url("catalog", "rules", "https://store.test/2")
+        # Retention deletes just the terminal status bucket and keeps untouched logical pending.
+        state.set_status("legacy", "succeeded", finished_at="2026-10-11T00:00:01Z")
+        assert state.expire_finished(time.time() + 1) == ["legacy"]
+        assert state.frontier_counts("legacy") == {"deferred": 9_999}
+        state.delete_state("catalog")
+        assert state.frontier_counts("legacy") == {}
+        with state.read() as db:
+            assert db.execute("SELECT COUNT(*) FROM frontier_status_counts").fetchone()[0] == 0
+    finally:
+        state.close()
+
+
+def test_checkpoint_borrows_only_an_indexed_budget_window_across_legacy_statuses(tmp_path: Path) -> None:
+    state = StateStore(tmp_path / "window.db")
+    try:
+        for cid in ("donor", "borrower"):
+            state.create_collection(
+                cid,
+                state_key="catalog",
+                status="running",
+                request={"mode": "incremental"},
+                rules={},
+                rules_ref=None,
+                created_at="2026-10-11T00:00:00Z",
+                effective_limits={},
+            )
+        with state.tx() as db:
+            state.add_urls(
+                db,
+                "donor",
+                (
+                    FrontierRow(f"https://store.test/{n}", n % 17, 0, "material", "catalog")
+                    for n in range(10_000)
+                ),
+            )
+            # New logical pending, interrupted inflight and old physical deferred coexist.
+            db.execute(
+                "UPDATE frontier SET status = 'inflight', priority = 99 WHERE url = 'https://store.test/1'"
+            )
+            db.execute(
+                "UPDATE frontier SET status = 'deferred', priority = 100 WHERE url = 'https://store.test/2'"
+            )
+            assert state.defer_pending(db, "donor", "catalog", "rules", ["catalog"]) == 9_999
+            state.set_status("donor", "succeeded", finished_at="2026-10-11T00:00:01Z", db=db)
+            for status in ("pending", "inflight", "deferred"):
+                plan = db.execute(
+                    "EXPLAIN QUERY PLAN SELECT * FROM frontier WHERE collection_id = ? "
+                    "AND status = ? AND seen_before = ? ORDER BY priority DESC, seq LIMIT ?",
+                    ("donor", status, 0, 400),
+                ).fetchall()
+                details = " ".join(str(row[3]) for row in plan)
+                assert "SEARCH frontier USING INDEX frontier_pending_order" in details, details
+                assert "TEMP B-TREE" not in details and "SCAN " not in details, details
+            rows, _, _ = state.adopt_deferred(db, "borrower", "catalog", "rules", 400, lambda row: row)
+        assert len(rows) == 400
+        assert [row.url for row in rows[:2]] == ["https://store.test/2", "https://store.test/1"]
+        assert state.frontier_counts("donor") == {"deferred": 9_600, "loaned": 400}
+        assert state.frontier_counts("borrower") == {"pending": 400}
+        assert state.continuation_size("catalog", "rules") == 9_600
+        assert state.frontier_size_for_state_key("catalog") == 10_000
+        with state.tx() as db:
+            state.mark_url(db, "borrower", rows[0].url, "done")
+            state.set_status("borrower", "cancelled", finished_at="2026-10-11T00:00:01Z", db=db)
+        state.expire_finished(time.time() + 1)
+        with state.tx() as db:
+            state.settle_loans(db, state_key="catalog", fingerprint="rules")
+        assert state.frontier_counts("donor") == {"deferred": 9_999}
+        assert state.continuation_size("catalog", "rules") == 9_999
+        state.close()
+        state = StateStore(tmp_path / "window.db")
+        assert state.frontier_counts("donor") == {"deferred": 9_999}
+        assert state.continuation_size("catalog", "rules") == 9_999
+    finally:
+        state.close()
+
+
+@pytest.mark.parametrize("filtered", [False, True])
+def test_large_seed_keeps_api_and_heartbeat_running(tmp_path: Path, catalog: Catalog, filtered: bool) -> None:
+    catalog.per_shard = 12_000
+    settings = _settings(tmp_path).model_copy(
+        update={"lease_seconds": 2, "heartbeat_interval_ms": 50, "state_busy_timeout_ms": 1}
+    )
+    app = build_app(settings)
+    with app.state.store.tx() as db:
+        db.execute("CREATE TABLE seeding_lease_ticks (collection_id TEXT NOT NULL)")
+        db.execute(
+            "CREATE TRIGGER observe_seed_lease AFTER UPDATE OF lease_until ON collections "
+            "WHEN NEW.lease_until > OLD.lease_until AND ("
+            "EXISTS (SELECT 1 FROM frontier_status_counts WHERE collection_id = NEW.collection_id "
+            "AND status = 'pending' AND kind = 'material' AND value BETWEEN 1 AND 11999) "
+            "OR CAST(json_extract(NEW.stats, '$.skipped_out_of_scope') AS INTEGER) BETWEEN 1 AND 11999) "
+            "BEGIN INSERT INTO seeding_lease_ticks VALUES (NEW.collection_id); END"
+        )
+    body = _body(catalog, 3)
+    body["limits"]["crawl"].update({"max_links_per_page": 20_000, "max_frontier_size": 15_000})
+    if filtered:
+        body["rules"]["scope"]["include"] = [{"type": "regex", "value": r"/(sitemap|shard-).*\.xml$"}]
+    stop = threading.Event()
+    samples: list[int] = []
+    response_times: list[float] = []
+
+    async def observe_api() -> None:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as api:
+            while not stop.is_set():
+                started = time.monotonic()
+                response = await api.get("/v1/states/catalog")
+                response_times.append(time.monotonic() - started)
+                if response.status_code == 200:
+                    state_view = response.json()
+                    if filtered:
+                        collections = app.state.store.active_for_state_key("catalog")
+                        if collections:
+                            view = await api.get(f"/v1/collections/{collections[0]}")
+                            samples.append(view.json()["stats"]["skipped_out_of_scope"])
+                    else:
+                        samples.append(state_view["frontier_size"])
+                await asyncio.sleep(0)
+
+    with TestClient(app) as client:
+        assert client.portal is not None
+        monitor = client.portal.start_task_soon(observe_api)
+        try:
+            cid, materials, view = _run(client, body)
+        finally:
+            stop.set()
+            monitor.result(timeout=10)
+        assert any(1 < value < catalog.per_shard for value in samples), samples[:10]
+        with app.state.store.read() as db:
+            ticks = db.execute(
+                "SELECT COUNT(*) FROM seeding_lease_ticks WHERE collection_id = ?", (cid,)
+            ).fetchone()[0]
+        assert ticks > 0  # renewal happened while seeding, before the complete catalog was queued
+        assert view["status"] == "succeeded" and "handed_over" not in view
+        assert view["stats"]["discovered"] == (0 if filtered else catalog.per_shard)
+        assert len(materials) == (0 if filtered else 1)
+        assert view["stats"]["continuation_pending"] == (0 if filtered else catalog.per_shard - 1)
+        print(
+            f"filtered={filtered} partial_api_samples={len(samples)} lease_ticks={ticks} "
+            f"max_api_seconds={max(response_times):.4f}"
+        )

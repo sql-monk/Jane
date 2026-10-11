@@ -15,7 +15,7 @@ import hashlib
 import json
 import logging
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -395,7 +395,7 @@ class CrawlRun:
             )
         return rows
 
-    def insert_rows(self, db: Any, rows: Sequence[FrontierRow], *, immediate: bool = False) -> None:
+    def insert_rows(self, db: Any, rows: Iterable[FrontierRow], *, immediate: bool = False) -> None:
         counts = self.state.frontier_counts(self.collection_id)
         queued = counts.get("pending", 0) + counts.get("inflight", 0)
         for row in rows:
@@ -920,7 +920,13 @@ class CrawlRun:
             return None
         row = FrontierRow(canonical, 0, 0, kind, caller, None, self.section_for(canonical))
         if self._seeding == caller and kind == "navigation":
-            cached = self.state.seed_navigation(self.collection_id, caller, canonical)
+            cached = self.state.seed_navigation(
+                self.collection_id,
+                caller,
+                canonical,
+                state_key=self.state_key,
+                fingerprint=self.continuation_fingerprint,
+            )
             if cached is not None:
                 metadata, cached_body = cached
                 metadata["fetched_at"] = datetime.fromisoformat(metadata["fetched_at"])
@@ -1092,23 +1098,28 @@ class CrawlRun:
 
     async def _seed(self) -> None:
         seeded: list[str] = list(self.meta.get("seeded") or [])
+        batch_limit = max(1, min(self.limits.crawl.max_links_per_page, self.limits.crawl.max_pages_per_run))
+        # Parsing limits may admit a whole sitemap; they must not also become one long SQLite write.
+        quantum = self.deps.heartbeat_seconds / 4
         for sid, strategy, ctx, _ in self.strategies:
             if sid in seeded:
                 continue
             batch: list[DiscoveredUrl] = []
             self._seeding = sid
             self._seed_interrupted = False
+            flush_at = time.monotonic() + quantum
             try:
                 async for cand in strategy.seeds(ctx):
                     batch.append(cand)
-                    if len(batch) >= max(1, self.limits.crawl.max_links_per_page):
-                        self._commit_seeds(batch)
+                    if len(batch) >= batch_limit or time.monotonic() >= flush_at:
+                        await self._commit_seeds(batch)
                         batch = []
+                        flush_at = time.monotonic() + quantum
                     if self.cancelled:
                         return
             finally:
                 self._seeding = None
-            self._commit_seeds(batch)
+            await self._commit_seeds(batch)
             if self._seed_interrupted:
                 break
             seeded.append(sid)
@@ -1119,24 +1130,37 @@ class CrawlRun:
                 )
                 self._persist(db)
 
-    def _commit_seeds(self, batch: Sequence[DiscoveredUrl]) -> None:
+    async def _commit_seeds(self, batch: Sequence[DiscoveredUrl]) -> None:
         if not batch:
             return
-        rows = self.admit(batch, None)
-        if self.counters.get("continued_urls"):
-            # Replay rebuilds an interrupted discovery queue. Materials already observed earlier
-            # in this same crawl cycle should not compete with its still-unseen tail.
-            unseen: list[FrontierRow] = []
-            for row in rows:
-                previous = self.state.url_state(self.state_key, row.url)
-                if previous is not None and 200 <= (previous.get("status") or 0) < 400:
-                    self.stats["duplicates"] += 1
-                else:
-                    unseen.append(row)
-            rows = unseen
-        with self._tx() as db:
-            self.insert_rows(db, rows)
-            self._persist(db)
+        candidates = iter(batch)
+        exhausted = False
+        while not exhausted:
+            deadline = time.monotonic() + self.deps.heartbeat_seconds / 4
+
+            def admitted(deadline: float) -> Iterator[FrontierRow]:
+                nonlocal exhausted
+                # Include rejected candidates in the time slice: a large filtered sitemap must
+                # leave the heartbeat and API runnable too. Never yield control inside a transaction.
+                while time.monotonic() < deadline:
+                    try:
+                        candidate = next(candidates)
+                    except StopIteration:
+                        exhausted = True
+                        return
+                    for row in self.admit([candidate], None):
+                        if self.counters.get("continued_urls"):
+                            # Replay must not revisit materials observed earlier in this crawl cycle.
+                            previous = self.state.url_state(self.state_key, row.url)
+                            if previous is not None and 200 <= (previous.get("status") or 0) < 400:
+                                self.stats["duplicates"] += 1
+                                continue
+                        yield row
+
+            with self._tx() as db:
+                self.insert_rows(db, admitted(deadline))
+                self._persist(db)
+            await asyncio.sleep(0)
 
     async def _beat(self) -> None:
         """Renew the lease; detect cancellation requested through another instance; report progress."""
@@ -1252,11 +1276,14 @@ class CrawlRun:
                 self.state.clear_continuation(db, self.state_key, self.continuation_fingerprint)
             self.stats["continuation_pending"] = pending
             result["continuation_pending"] = pending
-            open_rows = db.execute(
-                "SELECT COUNT(*) FROM frontier WHERE collection_id = ? AND status IN ('pending', 'inflight')",
-                (self.collection_id,),
-            ).fetchone()[0]
-            if open_rows:  # cannot happen after the loop above; never report success with open URLs
+            counts = self.state.frontier_counts(self.collection_id)
+            open_rows = counts.get("pending", 0) + counts.get("inflight", 0)
+            checkpoint = db.execute(
+                "SELECT 1 FROM deferred_crawls WHERE collection_id = ?", (self.collection_id,)
+            ).fetchone()
+            if open_rows and not (self.stop_reason and checkpoint):
+                # Open rows may belong only to the atomically checkpointed budget stop. A normal
+                # successful run must have exhausted its queue; running rows stay visible as pending.
                 raise RuntimeError(f"{open_rows} URLs still open at the end of the run")
             self._persist(db)
             self.state.set_status(self.collection_id, "succeeded", finished_at=_now_iso(), db=db)

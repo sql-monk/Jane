@@ -30,12 +30,13 @@ import socket
 import tomllib
 import uuid
 from collections.abc import Mapping
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Self
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from jane_kit.auth import AuthSettings
@@ -55,6 +56,7 @@ __all__ = [
 ]
 
 LEVELS: tuple[str, ...] = ("platform", "source", "task", "stage", "request")
+_SKIP_OPERATIONS: ContextVar[bool] = ContextVar("skip_module_configuration", default=False)
 """Levels of ``LimitLevel`` in the contract, least specific first (plus ``hard_cap`` in provenance)."""
 
 _CONTRACT_LIMITS: dict[str, tuple[str, ...]] = {
@@ -179,6 +181,7 @@ class ResolvedLimits[L: Limits]:
     ignored: dict[str, str] = field(default_factory=dict)
     """Contract path -> label of the shared layer whose value was not applied: this service has no such limit."""
     ignored_hard_caps: dict[str, str] = field(default_factory=dict)
+    module_baseline: dict[str, Any] = field(default_factory=dict)
     """Same for ``hard_caps`` of shared layers."""
 
     def platform_limits(self) -> dict[str, Any]:
@@ -420,6 +423,13 @@ def resolve_limits[L: Limits](
         profile=profile,
         ignored=ignored,
         ignored_hard_caps=ignored_caps,
+        module_baseline=_flatten(
+            resolve_limits(
+                model, *(layer for layer in layers if layer.name != "module"), on_exceed=on_exceed
+            ).limits.model_dump()
+        )
+        if any(layer.name == "module" for layer in layers)
+        else dict(flat),
     )
 
 
@@ -493,6 +503,7 @@ class JaneSettings(BaseSettings, AuthSettings):
     """
 
     model_config = SettingsConfigDict(env_prefix="JANE_", extra="ignore", env_nested_delimiter="__")
+    _operations_baseline: dict[str, Any] = PrivateAttr(default_factory=dict)
 
     service_name: str = "jane-service"
     instance_id: str = Field(
@@ -509,6 +520,34 @@ class JaneSettings(BaseSettings, AuthSettings):
     limits_file: Path | None = None
     """Platform limits file (``PlatformLimits`` shape, e.g. a whole ``deploy/profiles/<profile>.json``: limits
     this service does not have are ignored, typos are errors); env ``<PREFIX>LIMITS__*`` overrides it."""
+    operations_dir: Path | None = None
+    """Own durable telemetry/configuration directory; default .jane/operations/<service>."""
+    operations_sample_interval_seconds: float = Field(default=5, ge=1, le=300)
+    operations_retention_seconds: int = Field(default=86_400, ge=60, le=604_800)
+    operations_max_points: int = Field(default=720, ge=2, le=10_000)
+
+    def model_post_init(self, context: Any) -> None:
+        self._operations_baseline = self.model_dump()
+        if _SKIP_OPERATIONS.get():
+            return
+        from jane_kit.operations import EDITABLE_SETTINGS, read_overrides
+
+        values = {
+            p[9:]: v
+            for p, v in read_overrides(self).items()
+            if p.startswith("settings.") and p[9:] in EDITABLE_SETTINGS
+        }
+        if values:
+            validated = self.validate_configuration(values)
+            for key in values:
+                setattr(self, key, getattr(validated, key))
+
+    def validate_configuration(self, values: dict[str, Any]) -> Self:
+        token = _SKIP_OPERATIONS.set(True)
+        try:
+            return type(self).model_validate({**self.model_dump(), **values})
+        finally:
+            _SKIP_OPERATIONS.reset(token)
 
     def platform_layers(self, env_prefix: str = "JANE_LIMITS__") -> list[LimitLayer]:
         """Platform layers in order: limits file, then environment overrides."""
@@ -518,6 +557,11 @@ class JaneSettings(BaseSettings, AuthSettings):
         env_layer = layer_from_env(env_prefix, level="platform")
         if env_layer.values or env_layer.hard_caps:
             layers.append(env_layer)
+        from jane_kit.operations import read_overrides, unflatten
+
+        overrides = {p[7:]: v for p, v in read_overrides(self).items() if p.startswith("limits.")}
+        if overrides:
+            layers.append(LimitLayer(level="platform", name="module", values=unflatten(overrides)))
         return layers
 
     def with_overrides(self, **values: Any) -> Self:

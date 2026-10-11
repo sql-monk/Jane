@@ -26,6 +26,13 @@ export interface PollingConfig {
 }
 
 export interface AdminConfig {
+  module_services: Record<string, string>;
+  monitoring: {
+    refresh_interval_ms: number;
+    default_window_minutes: number;
+    stale_after_ms: number;
+    max_points: number;
+  };
   /** Prefix of the reverse proxy: `<api_base>/<service>/v1/...` (ADR-0005). May be absolute (https://jane.example/api). */
   api_base: string;
   /** Reverse-proxy service name for every contract. */
@@ -39,6 +46,13 @@ export interface AdminConfig {
 }
 
 export const DEFAULT_CONFIG: AdminConfig = {
+  module_services: {},
+  monitoring: {
+    refresh_interval_ms: 5000,
+    default_window_minutes: 60,
+    stale_after_ms: 15000,
+    max_points: 600,
+  },
   api_base: "/api",
   services: {
     orchestrator: "orchestrator",
@@ -98,8 +112,28 @@ export function parseConfig(raw: unknown): AdminConfig {
     }
   }
   const polling = isRecord(raw["polling"]) ? raw["polling"] : {};
+  const monitoring = isRecord(raw["monitoring"]) ? raw["monitoring"] : {};
+  const moduleServices: Record<string, string> = {};
+  if (isRecord(raw["module_services"]))
+    for (const [key, value] of Object.entries(raw["module_services"])) {
+      if (typeof value === "string" && /^[a-z0-9][a-z0-9._-]*$/.test(value)) moduleServices[key] = value;
+    }
   const initial = positive(polling["initial_ms"], DEFAULT_CONFIG.polling.initial_ms, 100);
   return {
+    module_services: moduleServices,
+    monitoring: {
+      refresh_interval_ms: positive(
+        monitoring["refresh_interval_ms"],
+        DEFAULT_CONFIG.monitoring.refresh_interval_ms,
+        1000,
+      ),
+      default_window_minutes: positive(
+        monitoring["default_window_minutes"],
+        DEFAULT_CONFIG.monitoring.default_window_minutes,
+      ),
+      stale_after_ms: positive(monitoring["stale_after_ms"], DEFAULT_CONFIG.monitoring.stale_after_ms, 1000),
+      max_points: Math.floor(positive(monitoring["max_points"], DEFAULT_CONFIG.monitoring.max_points, 2)),
+    },
     api_base:
       typeof raw["api_base"] === "string" && raw["api_base"]
         ? raw["api_base"].replace(/\/+$/, "")

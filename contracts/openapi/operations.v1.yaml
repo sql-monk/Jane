@@ -1,0 +1,186 @@
+openapi: 3.1.0
+info:
+  title: Jane Module Operations API
+  version: 1.0.0
+  description: 'Спільний автономний API кожного модуля: історія метрик і конфігурація.
+    Зміни застосовуються після перезапуску модуля.'
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Jane
+servers:
+- url: http://localhost:8000
+security:
+- bearerAuth: []
+paths:
+  /v1/configuration:
+    get:
+      operationId: getModuleConfiguration
+      summary: Конфігурація модуля
+      x-jane-scope:
+      - modules:read
+      - modules:write
+      responses:
+        '200':
+          description: Успішна відповідь
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common/module-configuration.schema.json
+              example:
+                service: web-collector
+                instance_id: web-1
+                revision: 0
+                updated_at: null
+                fields:
+                - path: settings.render_enabled
+                  value: true
+                  type: boolean
+                  description: Рендеринг JavaScript
+                  requires_restart: true
+                  origin: startup
+                overrides: {}
+                pending_restart: false
+        '400': &id001
+          $ref: common.yaml#/components/responses/BadRequest
+        '401': &id002
+          $ref: common.yaml#/components/responses/Unauthenticated
+        '403': &id003
+          $ref: common.yaml#/components/responses/Forbidden
+        '422': &id004
+          $ref: common.yaml#/components/responses/UnprocessableEntity
+        '500': &id005
+          $ref: common.yaml#/components/responses/InternalError
+      tags:
+      - operations
+    put:
+      operationId: putModuleConfiguration
+      summary: Зберегти перевизначення конфігурації
+      x-jane-scope: modules:write
+      parameters:
+      - $ref: common.yaml#/components/parameters/IfMatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../schemas/common/module-configuration.schema.json#/$defs/Update
+            example:
+              values:
+                settings.render_enabled: false
+      responses:
+        '200':
+          description: Успішна відповідь
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common/module-configuration.schema.json
+              example:
+                service: web-collector
+                instance_id: web-1
+                revision: 1
+                updated_at: '2026-10-11T06:01:00Z'
+                fields:
+                - path: settings.render_enabled
+                  value: true
+                  type: boolean
+                  description: Рендеринг JavaScript
+                  requires_restart: true
+                  origin: startup
+                  configured_value: false
+                  inherited_value: true
+                overrides:
+                  settings.render_enabled: false
+                pending_restart: true
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '422': *id004
+        '500': *id005
+        '412':
+          $ref: common.yaml#/components/responses/PreconditionFailed
+        '428':
+          description: Спочатку отримайте ETag конфігурації
+          content:
+            application/problem+json:
+              schema:
+                $ref: common.yaml#/components/schemas/Problem
+      tags:
+      - operations
+      description: 'If-Match з попереднього GET обов’язковий: 428 без нього, 412 для
+        застарілого ETag. PUT повністю замінює overrides; values={} повертає успадкування.
+        Значення активного процесу не змінюються до перезапуску модуля. Секрети, інфраструктурні
+        шляхи та політики доступу не приймаються.'
+  /v1/telemetry:
+    get:
+      operationId: getModuleTelemetry
+      summary: Історія метрик модуля
+      x-jane-scope:
+      - modules:read
+      - modules:write
+      parameters:
+      - name: since
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: until
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 2
+          default: 600
+        description: Обмежено налаштованим operations_max_points; історія обмежена
+          retention.
+      responses:
+        '200':
+          description: Успішна відповідь
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common/module-telemetry.schema.json
+              example:
+                service: web-collector
+                instance_id: web-1
+                sample_interval_seconds: 5
+                retention_seconds: 86400
+                metrics:
+                - key: http_requests_per_second
+                  label: API-запити
+                  unit: запитів/с
+                samples:
+                - at: '2026-10-11T06:00:00Z'
+                  instance_id: web-1
+                  values:
+                    http_requests_per_second: 0.4
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '422': *id004
+        '500': *id005
+      tags:
+      - operations
+      description: Історія кожного процесу модуля з UTC timestamps. null означає відсутнє
+        вимірювання; перший rate після старту null. HTTP health/info/configuration/telemetry
+        не входять у бізнес API-лічильники. Діапазон не може перевищувати збережену
+        історію; пропуски та зміни instance_id не можна з’єднувати суцільною лінією.
+components:
+  securitySchemes:
+    bearerAuth:
+      $ref: common.yaml#/components/securitySchemes/bearerAuth

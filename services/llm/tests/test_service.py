@@ -209,6 +209,59 @@ def test_invalid_entity_is_schema_mismatch(client: TestClient, h: Any) -> None:
     assert res["diagnostics"]["validation_errors"]
 
 
+@pytest.mark.parametrize("with_material", [True, False])
+def test_prepared_entities_keep_material_observation(client: TestClient, h: Any, with_material: bool) -> None:
+    """A prepared text input still produces entities with its original material provenance."""
+    _scripted(client, [{"when_data_contains": "Концерт", "output": {"events": [EVENT]}}])
+    files = read_dir(PACKAGE_DIR)
+    manifest = json.loads(files["jane-package.json"])
+    manifest["input"]["accepts"] = ["entities"]
+    files["jane-package.json"] = json.dumps(manifest).encode("utf-8")
+    archive = build_archive(files)
+    material = json.loads((PACKAGE_DIR / "tests" / "concert" / "material.json").read_text(encoding="utf-8"))
+    prepared = {
+        "kind": "entities",
+        "entities": [
+            {
+                "entity_type": "prepared_text",
+                "key": {"scope": "news-tg", "natural": {"message": material["material_id"]}},
+                "fields": {"text": "Концерт"},
+                "observation": {
+                    "observation_id": material["observation_id"],
+                    "observed_at": material["fetched_at"],
+                },
+            }
+        ],
+    }
+    if with_material:
+        prepared["material"] = material
+    response = client.post(
+        "/v1/invocations",
+        json={
+            "handler": {"package_id": manifest["package_id"], "version": manifest["version"]},
+            "package_archive": {
+                "kind": "inline",
+                "media_type": "application/zip",
+                "encoding": "base64",
+                "data": base64.b64encode(archive).decode("ascii"),
+            },
+            "inputs": [prepared],
+            "delivery": {"delivery_key": f"prepared-entities-{with_material}"},
+        },
+        headers=h.idem(),
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    if with_material:
+        assert result["status"] == "success"
+        entity = result["output"]["entities"][0]
+        assert entity["key"]["natural"] == {"message": material["material_id"]}
+        assert entity["observation"]["observation_id"] == material["observation_id"]
+    else:
+        assert result["status"] == "empty"
+        assert result["output"]["entities"] == []
+
+
 def test_seed_file(make_client: Callable[..., TestClient], tmp_path: Path) -> None:
     seed = tmp_path / "seed.yaml"
     seed.write_text(

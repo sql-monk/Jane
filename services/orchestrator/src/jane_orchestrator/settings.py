@@ -110,6 +110,9 @@ class EngineLimits(Limits):
 
     workers: int = Field(default=2, ge=0)
     """Worker threads per process (0 — API only)."""
+    item_queue_ordering: Literal["fifo", "run_round_robin"] = "fifo"
+    """Item claims: global FIFO by default; opt-in rotation by a run's last activity. Fair claims touch
+    ``runs.updated_at``; collection/status writes also count as activity. Within a run items stay FIFO."""
     task_ids: list[str] = Field(default_factory=list)
     """Optional task allowlist for this process's workers, schedules and run housekeeping. Empty means all
     tasks. Env accepts a JSON array or CSV; the shared queue's leases and delivery keys stay unchanged."""

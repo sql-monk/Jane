@@ -1,0 +1,13 @@
+{
+  "source_id": "news-web-npr",
+  "feed_url": "https://feeds.npr.org/1001/rss.xml",
+  "article_url": "https://www.npr.org/2026/10/10/g-s1-147682/attack-on-riyadh-airport-killed-12-people-and-wounded-over-300-more-saudi-authorities-say",
+  "fetched_at": "2026-10-11T03:56:56.242717Z",
+  "feed_http_status": 200,
+  "article_http_status": 200,
+  "robots_allowed": true,
+  "feed_entries": 10,
+  "title": "Attack on Riyadh airport killed 12 people and wounded over 300 more, Saudi authorities say",
+  "excerpt": "Saudi authorities say the latest attack on the international airport in the capital, Riyadh, has killed 12 people and injured over 300. Their statement says the dead on Saturday included four Saudi citizens as well as two Bangladeshi nationals, a Palestinian, a U.S. citizen, an Egyptian, a Jordanian, a Syrian and a Sudanese. It said some of those injured were in critical condition. The attack — th",
+  "capture_method": "live HTTP in running Linux web-collector container; normal TLS verification; metadata excerpt only"
+}

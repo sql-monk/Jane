@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "max_posts": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 3
+    },
+    "title_max_chars": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 300
+    },
+    "source_name": {
+      "type": "string"
+    },
+    "region": {
+      "type": "string"
+    },
+    "language": {
+      "type": "string"
+    }
+  }
+}

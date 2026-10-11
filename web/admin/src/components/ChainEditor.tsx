@@ -8,6 +8,7 @@ import { checkJson, JsonEditor, toJsonText } from "./JsonEditor";
 import { DagView } from "./DagView";
 import { PropertyGrid, PropertyIssuesContext, PropertyDraftsBlockedContext } from "./PropertyGrid";
 import { ErrorBox, Field, LoadMore } from "./ui";
+import { useStagePropertyHelp } from "./useStagePropertyHelp";
 import "../chain-editor.css";
 
 export function ChainEditor({
@@ -137,35 +138,40 @@ export function ChainEditor({
                 {stage ? (
                   <section aria-label="Вибраний етап">
                     <h3>{stage.stage_id}</h3>
-                    <Field label="Ідентифікатор етапу">
-                      <input
-                        key={`identity-${stage.stage_id}-${editReset}`}
-                        defaultValue={stage.stage_id}
-                        disabled={Object.keys(propertyIssues).length > 0}
-                        onBlur={(e) => {
-                          try {
-                            update(renameStage(stages, stage.stage_id, e.target.value));
-                            setSelected(e.target.value);
-                            setError("");
-                          } catch (err) {
-                            setError((err as Error).message);
-                            e.target.value = stage.stage_id;
-                          }
+                    <div className="chain-stage-identity">
+                      <Field
+                        label="Ідентифікатор етапу"
+                        hint="Унікальна назва етапу. При перейменуванні зв’язки оновлюються автоматично."
+                      >
+                        <input
+                          key={`identity-${stage.stage_id}-${editReset}`}
+                          defaultValue={stage.stage_id}
+                          disabled={Object.keys(propertyIssues).length > 0}
+                          onBlur={(e) => {
+                            try {
+                              update(renameStage(stages, stage.stage_id, e.target.value));
+                              setSelected(e.target.value);
+                              setError("");
+                            } catch (err) {
+                              setError((err as Error).message);
+                              e.target.value = stage.stage_id;
+                            }
+                          }}
+                        />
+                      </Field>
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        disabled={hasDraftIssues}
+                        onClick={() => {
+                          update(removeStage(stages, stage.stage_id));
+                          setSelected(null);
                         }}
-                      />
-                    </Field>
-                    <button
-                      type="button"
-                      className="btn btn-danger"
-                      disabled={hasDraftIssues}
-                      onClick={() => {
-                        update(removeStage(stages, stage.stage_id));
-                        setSelected(null);
-                      }}
-                    >
-                      Видалити етап і його зв’язки
-                    </button>
-                    <fieldset disabled={hasDraftIssues}>
+                      >
+                        Видалити етап і його зв’язки
+                      </button>
+                    </div>
+                    <fieldset className="chain-package-fields" disabled={hasDraftIssues}>
                       <ChainPackagePicker key={stage.stage_id} stage={stage} onChange={patch} />
                     </fieldset>
                     {stage.kind === "handler" ? (
@@ -179,25 +185,10 @@ export function ChainEditor({
                     ) : null}
                     <h4>Властивості етапу</h4>
                     <p className="muted">Типи JSON зберігаються. Помилки схеми показано перед збереженням.</p>
-                    <PropertyGrid
+                    <StagePropertyGrid
                       key={`properties-${stage.stage_id}-${editReset}`}
-                      objectRoot
-                      value={
-                        Object.fromEntries(
-                          Object.entries(stage).filter(
-                            ([k]) => k !== "stage_id" && k !== "kind" && k !== "inputs",
-                          ),
-                        ) as JsonValue
-                      }
-                      onChange={(v) => {
-                        if (v && typeof v === "object" && !Array.isArray(v))
-                          patch({
-                            ...v,
-                            stage_id: stage.stage_id,
-                            kind: stage.kind,
-                            ...(stage.inputs ? { inputs: stage.inputs } : {}),
-                          } as Stage);
-                      }}
+                      stage={stage}
+                      onChange={patch}
                     />
                   </section>
                 ) : (
@@ -230,6 +221,38 @@ export function ChainEditor({
         </div>
       </PropertyDraftsBlockedContext.Provider>
     </PropertyIssuesContext.Provider>
+  );
+}
+
+function StagePropertyGrid({ stage, onChange }: { stage: Stage; onChange: (stage: Stage) => void }) {
+  const help = useStagePropertyHelp(stage);
+  return (
+    <>
+      {help.loading ? (
+        <p className="muted" role="status">
+          Завантажуємо описи параметрів…
+        </p>
+      ) : null}
+      {help.error ? <p className="muted">Описи параметрів пакета наразі недоступні.</p> : null}
+      <PropertyGrid
+        objectRoot
+        describe={help.describe}
+        value={
+          Object.fromEntries(
+            Object.entries(stage).filter(([k]) => k !== "stage_id" && k !== "kind" && k !== "inputs"),
+          ) as JsonValue
+        }
+        onChange={(v) => {
+          if (v && typeof v === "object" && !Array.isArray(v))
+            onChange({
+              ...v,
+              stage_id: stage.stage_id,
+              kind: stage.kind,
+              ...(stage.inputs ? { inputs: stage.inputs } : {}),
+            } as Stage);
+        }}
+      />
+    </>
   );
 }
 
@@ -274,7 +297,14 @@ function ChainPackagePicker({ stage, onChange }: { stage: Stage; onChange: (stag
   };
   return (
     <div className="grid-2">
-      <Field label={stage.kind === "collect" ? "Пакет правил" : "Пакет обробника"}>
+      <Field
+        label={stage.kind === "collect" ? "Пакет правил" : "Пакет обробника"}
+        hint={
+          stage.kind === "collect"
+            ? "Правила збору. Значення «—» означає правила джерела."
+            : "Пакет, який обробляє вхідні матеріали або зберігає результат."
+        }
+      >
         <select value={packageId} onChange={(e) => setRef({ package_id: e.target.value, version: "" })}>
           <option value="">—</option>
           {packageId && !packages.items.some((p) => p.package_id === packageId) ? (
@@ -290,7 +320,7 @@ function ChainPackagePicker({ stage, onChange }: { stage: Stage; onChange: (stag
         </select>
         <LoadMore hasMore={packages.hasMore} loading={packages.loadingMore} onClick={packages.loadMore} />
       </Field>
-      <Field label="Версія пакета">
+      <Field label="Версія пакета" hint="Точна версія вибраного пакета для цього етапу.">
         <select
           value={ref?.version ?? ""}
           onChange={(e) => setRef({ package_id: packageId, version: e.target.value })}

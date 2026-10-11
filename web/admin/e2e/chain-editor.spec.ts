@@ -175,3 +175,30 @@ test("invalid array draft blocks structural edits and supports explicit discard 
     (body["stages"] as TaskConfig["stages"]).find((s) => s.stage_id === "extract-products")?.params,
   ).toEqual({ items: [1, 9.5] });
 });
+
+test("property names and actions stay on one row with accessible parameter help @mock", async ({ admin }) => {
+  await admin.setViewportSize({ width: 1360, height: 1000 });
+  await admin.goto("/tasks/shop-catalog");
+  await admin.getByRole("tab", { name: "Ланцюжок" }).click();
+  await admin.getByTestId("dag-node-collect").click();
+  const grid = admin.getByRole("table", { name: "Властивості", exact: true });
+  const toggle = await grid.getByLabel("Розгорнути $.collector", { exact: true }).boundingBox();
+  const name = await grid.getByLabel("Назва $.collector", { exact: true }).boundingBox();
+  expect(toggle).not.toBeNull();
+  expect(name).not.toBeNull();
+  expect(Math.abs(toggle!.y + toggle!.height / 2 - name!.y - name!.height / 2)).toBeLessThan(2);
+  expect(toggle!.x + toggle!.width).toBeLessThanOrEqual(name!.x);
+  const value = await grid.getByLabel("Значення $.collector.mode", { exact: true }).boundingBox();
+  const remove = await grid.getByLabel("Видалити $.collector.mode", { exact: true }).boundingBox();
+  expect(value).not.toBeNull();
+  expect(remove).not.toBeNull();
+  expect(Math.abs(value!.y + value!.height / 2 - remove!.y - remove!.height / 2)).toBeLessThan(2);
+  expect(value!.x + value!.width).toBeLessThanOrEqual(remove!.x);
+  await expect(grid.getByLabel("Значення $.collector.mode", { exact: true })).toHaveAccessibleDescription(
+    /full.*incremental/,
+  );
+  await expect(grid.getByRole("columnheader")).toHaveCount(3);
+  await admin.setViewportSize({ width: 390, height: 844 });
+  expect(await admin.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await expect(grid.getByLabel("Значення $.collector.mode", { exact: true })).toHaveValue("full");
+});

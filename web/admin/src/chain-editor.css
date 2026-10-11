@@ -50,6 +50,67 @@
 }
 @media (max-width: 760px) {
   .chain-editor .chain-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.chain-editor .chain-stage-identity {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.chain-editor .chain-stage-identity > .btn {
+  justify-self: start;
+}
+.chain-editor .chain-package-fields {
+  border: 0;
+  padding: 0;
+  margin: 0 0 1rem;
+  min-width: 0;
+}
+.chain-editor .property-grid-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.chain-editor .property-grid {
+  min-width: 520px;
+}
+.chain-editor .property-name-controls,
+.chain-editor .property-value-controls,
+.chain-editor .property-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.chain-editor .property-name-controls > input,
+.chain-editor .property-value {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.chain-editor .property-name-controls > .btn,
+.chain-editor .property-actions {
+  flex: 0 0 auto;
+}
+.chain-editor .property-actions > .btn,
+.chain-editor .property-name-controls > .btn {
+  padding: 0.35rem 0.5rem;
+  white-space: nowrap;
+}
+.chain-editor .property-value > textarea {
+  display: block;
+  resize: vertical;
+  min-height: 2rem;
+}
+.chain-editor .property-description {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  margin: 0.4rem 0 0;
+}
+
+.chain-editor,
+.chain-editor .chain-layout > section {
+  min-width: 0;
+  max-width: 100%;
 }

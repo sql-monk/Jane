@@ -226,7 +226,7 @@ class ApiFeedStrategy:
         max_bytes = limit(ctx, "crawl.max_material_bytes")
         url: str | None = self.url
         if self.partition_path is not None:
-            url = set_query_param(url, self.partition_param, str(self._active_partition))
+            url = set_query_param(self.url, self.partition_param, str(self._active_partition))
         step = 0  # pagination steps from the first page; items of this page get depth step + 1
         pages_seen: set[str] = set()
         items_seen: set[str] = set()

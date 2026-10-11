@@ -17,6 +17,7 @@ do the same work twice and a killed worker's work is taken over once its lease e
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import logging
@@ -51,6 +52,40 @@ it stays a visible ``failed`` sync, so a collector never starts without a connec
 
 def _ms(value: int) -> timedelta:
     return timedelta(milliseconds=value)
+
+
+def _jsonb_inputs(inputs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Persist NUL-containing inline content using the existing lossless ContentRef encoding.
+
+    PostgreSQL JSONB cannot represent U+0000 in a string. Base64 represents the exact UTF-8
+    content bytes; its digest, size and all material metadata remain unchanged. Ordinary text,
+    base64 and blob references pass through as received. Never mutate the collector's document.
+    """
+    persisted = []
+    for inp in inputs:
+        material = inp.get("material")
+        content = material.get("content") if isinstance(material, dict) else None
+        if (
+            isinstance(material, dict)
+            and isinstance(content, dict)
+            and content.get("kind") == "inline"
+            and content.get("encoding") == "utf-8"
+            and isinstance(data := content.get("data"), str)
+            and "\x00" in data
+        ):
+            inp = {
+                **inp,
+                "material": {
+                    **material,
+                    "content": {
+                        **content,
+                        "encoding": "base64",
+                        "data": base64.b64encode(data.encode()).decode("ascii"),
+                    },
+                },
+            }
+        persisted.append(inp)
+    return persisted
 
 
 def _utc(expr: str) -> str:
@@ -802,7 +837,7 @@ class Engine:
                     run["task_id"],
                     ni.stage_id,
                     ni.item_key,
-                    Jsonb(ni.inputs),
+                    Jsonb(_jsonb_inputs(ni.inputs)),
                     mat.get("material_id"),
                     mat.get("observation_id"),
                     (mat.get("source") or {}).get("source_id") or run["source_id"],

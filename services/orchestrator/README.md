@@ -128,6 +128,7 @@ platform → source → task → stage → request (`RunRequest.limits`), `hard_
 | Параметр | Типово | Опис |
 |---|---|---|
 | `workers` | 2 | потоків-воркерів у процесі |
+| `task_ids` | `[]` | список задач для worker цього процесу; `[]` охоплює всі задачі. Env приймає JSON-масив або CSV; фільтр діє на збір, елементи етапів, планувальник і завершення запусків |
 | `lease_ms` / `heartbeat_ms` | 30000 / 10000 | lease елемента/збору та його подовження |
 | `poll_interval_ms` | 500 | пауза воркера без роботи |
 | `feed_page_size` / `feed_wait_ms` | 100 / 1000 | розмір сторінки матеріалів і long-poll колектора |
@@ -147,6 +148,18 @@ platform → source → task → stage → request (`RunRequest.limits`), `hard_
 | `max_lease_reclaims` | 5 | перехоплень простроченого lease до позначення елемента `failed` (не спроби `retries`) |
 | `schedule_batch` | 20 | завдань, що стали запусками за один прохід планувальника |
 | `reap_batch` | 50 | запусків за один прохід прибирання |
+
+Окремий процес для каталогу можна налаштувати так:
+
+```powershell
+$env:JANE_ORCHESTRATOR_LIMITS__ENGINE__TASK_IDS = '["ads-autoria","ads-rst"]'
+uv run --package jane-orchestrator python -m jane_orchestrator worker
+```
+
+Альтернативне значення — `ads-autoria,ads-rst`. Worker використовує ту саму власну БД оркестратора,
+lease і ключі доставки; вибір обмежено цими задачами, а порядок усередині вибірки лишається FIFO.
+Загальні worker без цього параметра й далі обробляють усі задачі. Синхронізація підключень і бюджетів
+лишилася спільною. Порожні ідентифікатори спричиняють помилку конфігурації; `[]` явно знімає фільтр.
 
 Ліміти сторінок: `…_LIMITS__PAGES__DEFAULT_PAGE_SIZE` = 50, `MAX_PAGE_SIZE` = 500.
 

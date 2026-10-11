@@ -87,6 +87,7 @@ _CLAIM_ITEM_SQL = "".join(
         SELECT i.item_id, i.status AS old_status
         FROM items i JOIN runs r ON r.run_id = i.run_id
         WHERE r.status = 'running'
+          AND (%s::text[] IS NULL OR r.task_id = ANY(%s))
           AND ((i.status IN ('queued', 'retrying') AND i.available_at <= now())
                OR (i.status = 'running' AND i.lease_expires_at < now()))
           AND (SELECT count(*) FROM items x
@@ -113,7 +114,7 @@ _CLAIM_ITEM_SQL = "".join(
     """,
     )
 )
-"""Claim one item (placeholders: worker, lease interval, attempt history cap)."""
+"""Claim one item (placeholders: optional task allowlist twice, worker, lease interval, history cap)."""
 
 
 _RETRY_SQL = "".join(
@@ -215,9 +216,11 @@ class Engine:
 
     # ================================================================== items
     def claim_item(self, worker: str) -> dict[str, Any] | None:
+        task_ids = self.core.engine.task_ids or None
         with self.core.db.tx() as conn:
             row = conn.execute(
-                _CLAIM_ITEM_SQL, (worker, self.lease, self.core.engine.attempt_history_max)
+                _CLAIM_ITEM_SQL,
+                (task_ids, task_ids, worker, self.lease, self.core.engine.attempt_history_max),
             ).fetchone()
         if row is not None and row["old_status"] == "running":
             self.core.metrics.inc("leases_expired")
@@ -706,6 +709,7 @@ class Engine:
 
     # ================================================================== feed
     def claim_feed(self, worker: str) -> dict[str, Any] | None:
+        task_ids = self.core.engine.task_ids or None
         with self.core.db.tx() as conn:
             row = conn.execute(
                 """
@@ -713,13 +717,14 @@ class Engine:
                 WHERE run_id = (
                     SELECT run_id FROM runs
                     WHERE status IN ('queued', 'running', 'cancelling') AND NOT feed_done
+                      AND (%s::text[] IS NULL OR task_id = ANY(%s))
                       AND feed_available_at <= now()
                       AND (feed_lease_expires_at IS NULL OR feed_lease_expires_at < now())
                     ORDER BY feed_available_at LIMIT 1
                     FOR UPDATE SKIP LOCKED)
                 RETURNING *
                 """,
-                (worker, self.lease),
+                (worker, self.lease, task_ids, task_ids),
             ).fetchone()
         return dict(row) if row else None
 
@@ -1259,11 +1264,13 @@ class Engine:
     def schedule_due(self) -> int:
         """Create runs for due tasks (row lock per task: one run per tick across all instances)."""
         created = 0
+        task_ids = self.core.engine.task_ids or None
         with self.core.db.tx() as conn:
             rows = conn.execute(
                 "SELECT t.*, s.doc AS source_doc FROM tasks t JOIN sources s ON s.source_id = t.source_id"
-                " WHERE t.next_run_at <= now() ORDER BY t.next_run_at LIMIT %s FOR UPDATE OF t SKIP LOCKED",
-                (self.core.engine.schedule_batch,),
+                " WHERE t.next_run_at <= now() AND (%s::text[] IS NULL OR t.task_id = ANY(%s))"
+                " ORDER BY t.next_run_at LIMIT %s FOR UPDATE OF t SKIP LOCKED",
+                (task_ids, task_ids, self.core.engine.schedule_batch),
             ).fetchall()
             for row in rows:
                 doc = row["doc"]
@@ -1294,24 +1301,26 @@ class Engine:
         ``reap_batch`` always makes progress). Several reapers may pick the same run: state changes are
         conditional and only the reaper that changed the state counts it and calls the collector."""
         eng = self.core.engine
+        task_ids = eng.task_ids or None
         with self.core.db.conn() as conn:
             timed_out = conn.execute(
                 """
                 SELECT * FROM runs
                 WHERE status IN ('running', 'cancelling') AND started_at IS NOT NULL
+                  AND (%s::text[] IS NULL OR task_id = ANY(%s))
                   AND jsonb_typeof(limits->'task'->'timeouts'->'run_timeout_ms') = 'number'
                   AND started_at + ((limits->'task'->'timeouts'->>'run_timeout_ms')::bigint
                                     * interval '1 millisecond') < now()
                 ORDER BY started_at LIMIT %s
                 """,
-                (eng.reap_batch,),
+                (task_ids, task_ids, eng.reap_batch),
             ).fetchall()
             # candidates that maybe_finish will close: a drained running run with no active item, or a
             # cancelling run whose remaining items are not held by a live lease
             drained = conn.execute(
                 """
                 SELECT r.run_id FROM runs r
-                WHERE r.feed_done AND (
+                WHERE (%s::text[] IS NULL OR r.task_id = ANY(%s)) AND r.feed_done AND (
                     (r.status = 'running' AND NOT EXISTS (
                         SELECT 1 FROM items i WHERE i.run_id = r.run_id
                           AND i.status IN ('queued', 'retrying', 'leased', 'running')))
@@ -1320,7 +1329,7 @@ class Engine:
                           AND i.status IN ('leased', 'running') AND i.lease_expires_at >= now())))
                 ORDER BY r.seq LIMIT %s
                 """,
-                (eng.reap_batch,),
+                (task_ids, task_ids, eng.reap_batch),
             ).fetchall()
         closed = 0
         for run in timed_out:

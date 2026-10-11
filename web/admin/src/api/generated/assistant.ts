@@ -982,7 +982,7 @@ export interface components {
       url_path: string;
       /**
        * Format: uri
-       * @description Базовий URL для відносних URL товарів (наприклад https://shop.example.test/ для API під /api/). Якщо не задано — URL сторінки API. Результат завжди проходить звичайні scope, normalization і robots перевірки.
+       * @description Базовий URL для відносних URL товарів (наприклад https://shop.example.test/ для API під /api/). Якщо не задано — URL сторінки API. Результат проходить normalization і scope; robots перевіряється при HTTP-завантаженні, включно з навігацією API. Для emit_items_as_materials URL товару не завантажується.
        */
       item_url_base?: string;
       lastmod_path?: string;

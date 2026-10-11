@@ -1,0 +1,1 @@
+"""Documentation extractor example."""

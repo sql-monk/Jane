@@ -1,0 +1,206 @@
+# replaceTask
+
+Замінити конфігурацію завдання (ліміти, розклад, етапи) без зміни коду
+
+Контракт: [contracts/openapi/orchestrator.v1.yaml](../../../../../../contracts/openapi/orchestrator.v1.yaml).
+
+```http
+PUT /v1/tasks/{task_id}
+```
+
+## Доступ
+
+```json
+{
+  "scope": [
+    "orchestrator:write",
+    "orchestrator:admin"
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
+}
+```
+
+## Параметри
+
+| Ім’я | Розміщення | Обов’язковий |
+|---|---|---|
+| `task_id` | `path` | так |
+| `If-Match` | `header` | ні |
+
+```json
+[
+  {
+    "in": "path",
+    "name": "task_id",
+    "required": true,
+    "schema": {
+      "$ref": "../schemas/common/defs.schema.json#/$defs/Slug"
+    }
+  },
+  {
+    "description": "ETag ресурсу для оптимістичного блокування. Розбіжність — 412 `precondition_failed`.",
+    "example": "\"v7\"",
+    "in": "header",
+    "name": "If-Match",
+    "required": false,
+    "schema": {
+      "type": "string"
+    }
+  }
+]
+```
+
+## Тіло запиту
+
+```json
+{
+  "content": {
+    "application/json": {
+      "examples": {
+        "priceCheck": {
+          "$ref": "../examples/openapi/task-price-check.json"
+        }
+      },
+      "schema": {
+        "$ref": "../schemas/task-config.schema.json"
+      }
+    }
+  },
+  "required": true
+}
+```
+
+
+## Відповіді та помилки
+
+| HTTP | Опис | Помилка |
+|---|---|---|
+| `200` | Завдання оновлено; поточні запуски продовжуються зі старою конфігурацією. | ні |
+| `401` | Немає або недійсний токен (`unauthenticated`). | так |
+| `404` | Ресурс не знайдено (`not_found`). | так |
+| `412` | If-Match не збігається з поточним ETag (`precondition_failed`). | так |
+| `422` | Семантична помилка (`validation_failed`, `idempotency_key_reused`, `limit_exceeded`, `secret_detected`, `schema_mismatch` тощо). | так |
+
+```json
+{
+  "200": {
+    "content": {
+      "application/json": {
+        "examples": {
+          "priceCheck": {
+            "$ref": "../examples/openapi/task-price-check.json"
+          }
+        },
+        "schema": {
+          "$ref": "../schemas/task-config.schema.json"
+        }
+      }
+    },
+    "description": "Завдання оновлено; поточні запуски продовжуються зі старою конфігурацією.",
+    "headers": {
+      "ETag": {
+        "$ref": "common.yaml#/components/headers/ETag"
+      }
+    }
+  },
+  "401": {
+    "content": {
+      "application/problem+json": {
+        "examples": {
+          "unauthenticated": {
+            "value": {
+              "code": "unauthenticated",
+              "status": 401,
+              "title": "Unauthenticated",
+              "type": "urn:jane:problem:unauthenticated"
+            }
+          }
+        },
+        "schema": {
+          "$ref": "#/components/schemas/Problem"
+        }
+      }
+    },
+    "description": "Немає або недійсний токен (`unauthenticated`)."
+  },
+  "404": {
+    "content": {
+      "application/problem+json": {
+        "examples": {
+          "notFound": {
+            "$ref": "#/components/examples/ProblemNotFound"
+          }
+        },
+        "schema": {
+          "$ref": "#/components/schemas/Problem"
+        }
+      }
+    },
+    "description": "Ресурс не знайдено (`not_found`)."
+  },
+  "412": {
+    "content": {
+      "application/problem+json": {
+        "examples": {
+          "precondition": {
+            "value": {
+              "code": "precondition_failed",
+              "status": 412,
+              "title": "Precondition failed",
+              "type": "urn:jane:problem:precondition_failed"
+            }
+          }
+        },
+        "schema": {
+          "$ref": "#/components/schemas/Problem"
+        }
+      }
+    },
+    "description": "If-Match не збігається з поточним ETag (`precondition_failed`)."
+  },
+  "422": {
+    "content": {
+      "application/problem+json": {
+        "examples": {
+          "idempotencyReused": {
+            "$ref": "#/components/examples/ProblemIdempotencyReused"
+          },
+          "validation": {
+            "$ref": "#/components/examples/ProblemValidation"
+          }
+        },
+        "schema": {
+          "$ref": "#/components/schemas/Problem"
+        }
+      }
+    },
+    "description": "Семантична помилка (`validation_failed`, `idempotency_key_reused`, `limit_exceeded`, `secret_detected`, `schema_mismatch` тощо)."
+  }
+}
+```
+
+## Метадані поведінки
+
+```json
+{
+  "x-jane-scope": [
+    "orchestrator:write",
+    "orchestrator:admin"
+  ]
+}
+```
+
+## Схеми
+
+- [contracts/schemas/common/defs.schema.json#/$defs/Slug](../../../../../../contracts/schemas/common/defs.schema.json#/$defs/Slug)
+- [contracts/schemas/task-config.schema.json](../../../../../../contracts/schemas/task-config.schema.json)
+- [contracts/examples/openapi/task-price-check.json](../../../../../../contracts/examples/openapi/task-price-check.json)
+- [contracts/openapi/common.yaml#/components/headers/ETag](../../../../../../contracts/openapi/common.yaml#/components/headers/ETag)
+- [contracts/openapi/common.yaml#/components/schemas/Problem](../../../../../../contracts/openapi/common.yaml#/components/schemas/Problem)
+- [contracts/openapi/common.yaml#/components/examples/ProblemNotFound](../../../../../../contracts/openapi/common.yaml#/components/examples/ProblemNotFound)
+- [contracts/openapi/common.yaml#/components/examples/ProblemValidation](../../../../../../contracts/openapi/common.yaml#/components/examples/ProblemValidation)
+- [contracts/openapi/common.yaml#/components/examples/ProblemIdempotencyReused](../../../../../../contracts/openapi/common.yaml#/components/examples/ProblemIdempotencyReused)

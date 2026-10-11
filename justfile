@@ -111,3 +111,19 @@ contracts-mock api *args:
 # Python client of one contract: `just contracts-gen storage services/x/src/jane_x/_generated/storage`
 contracts-gen api out:
     @contracts-gen
+
+# Generate public code/API references
+docs-gen *args:
+    @docs-gen
+
+# Reference drift, Markdown and paired Draw.io PNG validation
+docs-check *args:
+    @docs-check
+
+# Preview Markdown pages in a real browser
+docs-render *args:
+    @docs-render
+
+# Export editable Draw.io models to both transparent PNG themes
+docs-export *args:
+    @docs-export

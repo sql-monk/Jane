@@ -1,0 +1,138 @@
+# deleteTask
+
+Видалити завдання (історія запусків зберігається)
+
+Контракт: [contracts/openapi/orchestrator.v1.yaml](../../../../../../contracts/openapi/orchestrator.v1.yaml).
+
+```http
+DELETE /v1/tasks/{task_id}
+```
+
+## Доступ
+
+```json
+{
+  "scope": [
+    "orchestrator:write",
+    "orchestrator:admin"
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
+}
+```
+
+## Параметри
+
+| Ім’я | Розміщення | Обов’язковий |
+|---|---|---|
+| `task_id` | `path` | так |
+
+```json
+[
+  {
+    "in": "path",
+    "name": "task_id",
+    "required": true,
+    "schema": {
+      "$ref": "../schemas/common/defs.schema.json#/$defs/Slug"
+    }
+  }
+]
+```
+
+## Тіло запиту
+
+Тіло запиту не визначено.
+
+## Відповіді та помилки
+
+| HTTP | Опис | Помилка |
+|---|---|---|
+| `204` | Видалено. | ні |
+| `401` | Немає або недійсний токен (`unauthenticated`). | так |
+| `404` | Ресурс не знайдено (`not_found`). | так |
+| `409` | Конфлікт стану (`conflict`, `version_exists`, `idempotency_in_progress`, `job_not_cancellable`, `upstream_conflict`). | так |
+
+```json
+{
+  "204": {
+    "description": "Видалено."
+  },
+  "401": {
+    "content": {
+      "application/problem+json": {
+        "examples": {
+          "unauthenticated": {
+            "value": {
+              "code": "unauthenticated",
+              "status": 401,
+              "title": "Unauthenticated",
+              "type": "urn:jane:problem:unauthenticated"
+            }
+          }
+        },
+        "schema": {
+          "$ref": "#/components/schemas/Problem"
+        }
+      }
+    },
+    "description": "Немає або недійсний токен (`unauthenticated`)."
+  },
+  "404": {
+    "content": {
+      "application/problem+json": {
+        "examples": {
+          "notFound": {
+            "$ref": "#/components/examples/ProblemNotFound"
+          }
+        },
+        "schema": {
+          "$ref": "#/components/schemas/Problem"
+        }
+      }
+    },
+    "description": "Ресурс не знайдено (`not_found`)."
+  },
+  "409": {
+    "content": {
+      "application/problem+json": {
+        "examples": {
+          "conflict": {
+            "value": {
+              "code": "conflict",
+              "detail": "resource already exists",
+              "status": 409,
+              "title": "Conflict",
+              "type": "urn:jane:problem:conflict"
+            }
+          }
+        },
+        "schema": {
+          "$ref": "#/components/schemas/Problem"
+        }
+      }
+    },
+    "description": "Конфлікт стану (`conflict`, `version_exists`, `idempotency_in_progress`, `job_not_cancellable`, `upstream_conflict`)."
+  }
+}
+```
+
+## Метадані поведінки
+
+```json
+{
+  "x-jane-scope": [
+    "orchestrator:write",
+    "orchestrator:admin"
+  ]
+}
+```
+
+## Схеми
+
+- [contracts/schemas/common/defs.schema.json#/$defs/Slug](../../../../../../contracts/schemas/common/defs.schema.json#/$defs/Slug)
+- [contracts/openapi/common.yaml#/components/schemas/Problem](../../../../../../contracts/openapi/common.yaml#/components/schemas/Problem)
+- [contracts/openapi/common.yaml#/components/examples/ProblemNotFound](../../../../../../contracts/openapi/common.yaml#/components/examples/ProblemNotFound)

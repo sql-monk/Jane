@@ -722,6 +722,27 @@ def cmd_gen_client(ns: argparse.Namespace) -> int:
     return run(uv_run("jane-codegen", "client", ns.spec, "--out", ns.out)).returncode
 
 
+# Documentation commands keep the existing cross-platform just dispatch.
+def cmd_docs(ns: argparse.Namespace) -> int:
+    forwarded = ns.pytest_args
+    if ns.cmd == "docs-check":
+        commands = [
+            [sys.executable, "scripts/docs/generate.py", "--check"],
+            [sys.executable, "scripts/docs/check.py", *forwarded],
+            [sys.executable, "scripts/docs/diagrams.py"],
+        ]
+    elif ns.cmd == "docs-gen":
+        commands = [[sys.executable, "scripts/docs/generate.py", *forwarded]]
+    else:
+        script = "drawio_export.mjs" if ns.cmd == "docs-export" else "render.mjs"
+        commands = [["node", f"scripts/docs/{script}", *forwarded]]
+    for command in commands:
+        code = run(command).returncode
+        if code:
+            return code
+    return 0
+
+
 # ----------------------------------------------------------------------------- CLI
 def from_just(argv: list[str]) -> list[str]:
     """``just`` calls ``dev.py --just <recipe line> <recipe name> <args...>`` (see justfile)."""
@@ -748,6 +769,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         p = sub.add_parser(name, help=help_ + (" (unknown arguments go to pytest)" if pytest_args else ""))
         p.set_defaults(fn=fn, takes_pytest_args=pytest_args)
         return p
+
+    for name in ("docs-gen", "docs-check", "docs-render", "docs-export"):
+        add(name, cmd_docs, "documentation generation, validation or rendering", True)
 
     add("sync", cmd_sync, "uv sync --all-packages")
     add("lint", cmd_lint, "ruff check + format check + contracts lint")

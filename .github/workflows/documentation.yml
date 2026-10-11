@@ -1,0 +1,57 @@
+name: documentation
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches: ["codex/documentation-*"]
+
+permissions:
+  contents: read
+
+jobs:
+  documentation:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.13"
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: scripts/docs/package-lock.json
+      - run: uv sync --all-packages --locked
+      - run: npm ci --prefix scripts/docs --ignore-scripts --no-audit --no-fund
+      - run: node scripts/docs/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Tool regression and types
+        run: |
+          uv run --all-packages python -m pytest scripts/docs/tests -q
+          uv run --all-packages ruff check scripts/docs scripts/dev.py examples/documentation
+          uv run --all-packages ruff format --check scripts/docs scripts/dev.py examples/documentation
+          uv run --all-packages mypy scripts/docs --ignore-missing-imports
+      - name: Source coverage and stored exports
+        run: |
+          uv run --all-packages python scripts/docs/generate.py --check
+          uv run --all-packages python scripts/docs/check.py
+          uv run --all-packages python scripts/docs/diagrams.py
+      - name: Real Draw.io export and Markdown render
+        run: |
+          node scripts/docs/drawio_export.mjs --path docs/diagrams
+          uv run --all-packages python scripts/docs/diagrams.py
+          node scripts/docs/render.mjs --paths README.md docs --both-themes
+      - name: Rendering evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-${{ matrix.os }}
+          path: .jane/doc-render/
+          if-no-files-found: warn

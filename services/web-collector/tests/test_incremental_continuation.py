@@ -5,19 +5,21 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import sqlite3
+import sys
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator, Mapping
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from jane_web_collector.app import build_app
+from jane_web_collector.crawler import CrawlRun
 from jane_web_collector.state import SCHEMA, FrontierRow, LeaseLost, StateStore
 from jane_web_collector.testing import FAST_LIMITS, REPO_ROOT, drain, make_settings, start, wait_done
 
@@ -34,6 +36,11 @@ class Catalog:
     release: threading.Event = field(default_factory=threading.Event)
     state_path: Path | None = None
     active_peak: int = 0
+    xml_padding: int = 0
+    xml_lastmod: str | None = None
+    body_build_times: list[float] = field(default_factory=list)
+    body_write_times: list[float] = field(default_factory=list)
+    prebuilt_shards: dict[int, bytes] = field(default_factory=dict)
 
     def url(self, path: str) -> str:
         return self.base + path
@@ -61,6 +68,7 @@ def catalog() -> Iterator[Catalog]:
             if self.path == catalog.hold_path:
                 catalog.entered.set()
                 catalog.release.wait(timeout=20)
+            body_started = time.perf_counter()
             if self.path == "/robots.txt":
                 content, media_type = b"User-agent: *\nAllow: /\n", "text/plain"
             elif self.path == "/sitemap.xml":
@@ -71,14 +79,22 @@ def catalog() -> Iterator[Catalog]:
                 content, media_type = f"<sitemapindex>{rows}</sitemapindex>".encode(), "application/xml"
             elif self.path.startswith("/shard-"):
                 shard = int(self.path.removeprefix("/shard-").removesuffix(".xml"))
-                urls = [
-                    catalog.url(f"/product/{n}")
-                    for n in range(shard * catalog.per_shard, (shard + 1) * catalog.per_shard)
-                ]
-                if catalog.extra:
-                    urls.append(catalog.url("/product/new"))
-                rows = "".join(f"<url><loc>{url}</loc></url>" for url in urls)
-                content, media_type = f"<urlset>{rows}</urlset>".encode(), "application/xml"
+                prebuilt = catalog.prebuilt_shards.get(shard)
+                if prebuilt is None:
+                    urls = [
+                        catalog.url(f"/product/{n}")
+                        for n in range(shard * catalog.per_shard, (shard + 1) * catalog.per_shard)
+                    ]
+                    if catalog.extra:
+                        urls.append(catalog.url("/product/new"))
+                    suffix = "?title=" + "x" * catalog.xml_padding if catalog.xml_padding else ""
+                    lastmod = f"<lastmod>{catalog.xml_lastmod}</lastmod>" if catalog.xml_lastmod else ""
+                    rows = "".join(f"<url><loc>{url}{suffix}</loc>{lastmod}</url>" for url in urls)
+                    content = f"<urlset>{rows}</urlset>".encode()
+                else:
+                    content = prebuilt
+                media_type = "application/xml"
+                catalog.body_build_times.append(time.perf_counter() - body_started)
             else:
                 content, media_type = f"<html><h1>{self.path}</h1></html>".encode(), "text/html"
             if self.path.startswith("/product/") and self.headers.get("If-None-Match") == '"v1"':
@@ -91,7 +107,9 @@ def catalog() -> Iterator[Catalog]:
             self.send_header("ETag", '"v1"')
             self.end_headers()
             with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+                write_started = time.perf_counter()
                 self.wfile.write(content)
+                catalog.body_write_times.append(time.perf_counter() - write_started)
 
         def log_message(self, format: str, *args: object) -> None:
             pass
@@ -821,3 +839,340 @@ def test_large_seed_keeps_api_and_heartbeat_running(tmp_path: Path, catalog: Cat
             f"filtered={filtered} partial_api_samples={len(samples)} lease_ticks={ticks} "
             f"max_api_seconds={max(response_times):.4f}"
         )
+
+
+@pytest.mark.parametrize("heartbeat_ms", [500, 5_000], ids=["live-heartbeat", "default-heartbeat"])
+def test_five_large_sitemaps_parse_off_loop_with_live_health_and_heartbeats(
+    tmp_path: Path, catalog: Catalog, monkeypatch: pytest.MonkeyPatch, heartbeat_ms: int
+) -> None:
+    """Exercise five live jobs and actual 50k-entry XML parsing, including a wholly filtered shard."""
+    catalog.per_shard = 50_000
+    catalog.xml_padding = 96
+    catalog.xml_lastmod = "2026-10-11T00:00:00Z"
+    catalog.hold_path = "/shard-0.xml"
+    rows = "".join(
+        f"<url><loc>{catalog.url(f'/product/{n}')}?title={'x' * catalog.xml_padding}</loc>"
+        f"<lastmod>{catalog.xml_lastmod}</lastmod></url>"
+        for n in range(catalog.per_shard)
+    )
+    catalog.prebuilt_shards[0] = f"<urlset>{rows}</urlset>".encode()
+    monkeypatch.setenv("JANE_WEB_COLLECTOR_LIMITS__JOBS__MAX_CONCURRENT_JOBS", "5")
+    monkeypatch.setenv("JANE_WEB_COLLECTOR_LIMITS__CONCURRENCY__MAX_PARALLEL_FETCHES", "5")
+    monkeypatch.setenv("JANE_WEB_COLLECTOR_LIMITS__CONCURRENCY__MAX_PARALLEL_FETCHES_PER_HOST", "5")
+    settings = make_settings(
+        tmp_path,
+        discovery_path=REPO_ROOT / "services/web-collector/strategies/discovery",
+        heartbeat_interval_ms=heartbeat_ms,
+        lease_seconds=30,
+    )
+    app = build_app(settings)
+    with app.state.store.tx() as db:
+        db.execute("CREATE TABLE parallel_lease_gaps (seconds REAL NOT NULL)")
+        db.execute(
+            "CREATE TRIGGER observe_parallel_lease AFTER UPDATE OF lease_until ON collections "
+            "WHEN NEW.lease_until > OLD.lease_until AND OLD.lease_until > 0 "
+            "BEGIN INSERT INTO parallel_lease_gaps VALUES (NEW.lease_until - OLD.lease_until); END"
+        )
+    parser = sys.modules[app.state.engine.registry.get("sitemap").__module__]
+    parse_code = parser.parse_sitemap.__code__
+    workers = parser._parse_executor().workers
+    stop = threading.Event()
+    parse_threads: set[int] = set()
+    active_parse_threads: set[int] = set()
+    loop_threads: set[int] = set()
+    response_times: list[float] = []
+    lease_times: dict[str, float] = {}
+    health_errors: list[BaseException] = []
+    setup_response_times: list[float] = []
+    setup_api_times: list[float] = []
+    setup_stop = threading.Event()
+    active_ready = threading.Event()
+    samples = {"peak": 0, "active_jobs": 0, "health": 0, "renewals": 0, "parse_epoch": 0}
+
+    def parse_started(*args: Any) -> None:
+        thread_id = threading.get_ident()
+        parse_threads.add(thread_id)
+        active_parse_threads.add(thread_id)
+        samples["peak"] = max(samples["peak"], len(active_parse_threads))
+        samples["parse_epoch"] += 1
+
+    def parse_finished(*args: Any) -> None:
+        if args[0] == parse_code:
+            active_parse_threads.discard(threading.get_ident())
+
+    # Only ten local-code start/return events observe the real component. Walking
+    # every live Python stack can itself retain parser frames and perturb GC/GIL work.
+    @contextlib.contextmanager
+    def observe_parser() -> Iterator[None]:
+        monitoring_id = next(n for n in range(6) if sys.monitoring.get_tool(n) is None)
+        events = sys.monitoring.events
+        sys.monitoring.use_tool_id(monitoring_id, "sitemap-parser-test")
+        try:
+            sys.monitoring.register_callback(monitoring_id, events.PY_START, parse_started)
+            sys.monitoring.register_callback(monitoring_id, events.PY_RETURN, parse_finished)
+            sys.monitoring.register_callback(monitoring_id, events.PY_UNWIND, parse_finished)
+            sys.monitoring.set_local_events(monitoring_id, parse_code, events.PY_START | events.PY_RETURN)
+            # Exception-unwind is a global-only event in Python 3.12; the callback
+            # checks exact code and observes a real CPU function exit, never await cancellation.
+            sys.monitoring.set_events(monitoring_id, events.PY_UNWIND)
+            yield
+        finally:
+            sys.monitoring.set_events(monitoring_id, events.NO_EVENTS)
+            sys.monitoring.set_local_events(monitoring_id, parse_code, events.NO_EVENTS)
+            for event in (events.PY_START, events.PY_RETURN, events.PY_UNWIND):
+                sys.monitoring.register_callback(monitoring_id, event, None)
+            sys.monitoring.free_tool_id(monitoring_id)
+
+    async def observe_leases() -> None:
+        loop_threads.add(threading.get_ident())
+        while not stop.is_set():
+            active = bool(active_parse_threads)
+            with app.state.store.read() as db:
+                rows = db.execute(
+                    "SELECT state_key, lease_until FROM collections WHERE status = 'running'"
+                ).fetchall()
+            samples["active_jobs"] = max(samples["active_jobs"], len(rows))
+            for key, expiry in rows:
+                if active and key in lease_times and expiry > lease_times[key]:
+                    samples["renewals"] += 1
+                lease_times[key] = expiry
+            await asyncio.sleep(0.01)
+
+    def observe_health(
+        client: TestClient,
+        health_stop: threading.Event,
+        latencies: list[float],
+        ready: threading.Event | None = None,
+    ) -> None:
+        # A separate requester measures time waiting for the loop as well as HTTP execution.
+        try:
+            while not health_stop.is_set():
+                epoch = samples["parse_epoch"]
+                overlap = bool(active_parse_threads)
+                started = time.perf_counter()
+                response = client.get("/v1/health")
+                assert response.status_code == 200
+                ended = time.perf_counter()
+                latencies.append(ended - started)
+                if latencies is response_times and (overlap or epoch != samples["parse_epoch"]):
+                    samples["health"] += 1
+                if ready is not None:
+                    ready.set()
+                health_stop.wait(0.01)
+        except BaseException as exc:
+            health_errors.append(exc)
+
+    with observe_parser(), TestClient(app) as client:
+        assert client.portal is not None
+        monitor = client.portal.start_task_soon(observe_leases)
+        setup_health = threading.Thread(
+            target=observe_health, args=(client, setup_stop, setup_response_times), daemon=True
+        )
+        health = threading.Thread(
+            target=observe_health, args=(client, stop, response_times, active_ready), daemon=True
+        )
+        setup_health.start()
+        try:
+            ids = []
+            for n in range(5):
+                body = _body(catalog, 400)
+                body.update({"source_id": f"parallel-{n}", "state_key": f"parallel-{n}"})
+                body["limits"]["concurrency"] = {
+                    "max_parallel_fetches": 5,
+                    "max_parallel_fetches_per_host": 5,
+                }
+                body["limits"]["crawl"].update(
+                    {"max_links_per_page": 60_000, "max_material_bytes": 32 * 1024 * 1024}
+                )
+                body["rules"]["scope"]["include"] = [{"type": "regex", "value": r"/(sitemap|shard-).*\.xml$"}]
+                api_started = time.monotonic()
+                ids.append(start(client, body))
+                setup_api_times.append(time.monotonic() - api_started)
+            deadline = time.monotonic() + 10
+            while catalog.requests.count(catalog.hold_path) < 5 and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert catalog.requests.count(catalog.hold_path) == 5
+            # Finish every setup request before the timed gated burst; no inflight setup
+            # probe can be misclassified as parser/seeding work.
+            setup_stop.set()
+            setup_health.join(timeout=10)
+            assert not setup_health.is_alive()
+            health.start()
+            assert active_ready.wait(timeout=10)
+            catalog.release.set()  # all five real large responses become available together
+            for cid in ids:
+                view = wait_done(client, cid, timeout=120)
+                assert view["status"] == "succeeded", view
+                assert "handed_over" not in view
+                assert view["stats"]["skipped_out_of_scope"] == 50_000
+                assert view["stats"]["fetched"] == 2
+        finally:
+            stop.set()
+            setup_stop.set()
+            monitor.result(timeout=10)
+            setup_health.join(timeout=10)
+            if health.ident is not None:
+                health.join(timeout=10)
+            assert not health.is_alive()
+            assert health_errors == []
+        with app.state.store.read() as db:
+            renewal_gap = db.execute("SELECT MAX(seconds) FROM parallel_lease_gaps").fetchone()[0]
+            renewal_count = db.execute("SELECT COUNT(*) FROM parallel_lease_gaps").fetchone()[0]
+    print(
+        f"five_sources=5 entries_each=50000 heartbeat_ms={heartbeat_ms} workers={workers} "
+        f"peak_parse_workers={samples['peak']} "
+        f"active_jobs={samples['active_jobs']} live_health={samples['health']} "
+        f"lease_renewals={renewal_count} parse_overlap_renewals={samples['renewals']} "
+        f"max_renewal_gap_seconds={renewal_gap:.4f} "
+        f"max_health_seconds={max(response_times):.4f}"
+        f" max_setup_health_seconds={max(setup_response_times):.4f} "
+        f"max_setup_post_seconds={max(setup_api_times):.4f}"
+        f" max_source_build_seconds={max(catalog.body_build_times):.4f} "
+        f"max_source_write_seconds={max(catalog.body_write_times):.4f}"
+    )
+    # Observe the actual parser: synchronous parsing on the app loop cannot pass this proof.
+    assert parse_threads and parse_threads.isdisjoint(loop_threads)
+    assert 1 <= samples["peak"] <= workers
+    assert samples["active_jobs"] == 5
+    assert samples["health"] > 0 and renewal_count > 0
+    assert renewal_gap < settings.lease_seconds
+    assert max(response_times) < 3  # the deployed container health probe's deadline
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cancel_task", [False, True], ids=["consumer-break", "consumer-cancel"])
+async def test_core_closes_nested_sitemap_consumer_deterministically(
+    tmp_path: Path, catalog: Catalog, cancel_task: bool
+) -> None:
+    catalog.per_shard = 5_000
+    app = build_app(_settings(tmp_path))
+    state, deps = app.state.store, app.state.engine.deps
+    body = _body(catalog, 400)
+    body["limits"]["crawl"]["max_links_per_page"] = 6_000
+    cid = "consumer-closed"
+    state.create_collection(
+        cid,
+        state_key=cid,
+        status="running",
+        request=body,
+        rules=body["rules"],
+        rules_ref=None,
+        created_at="2026-10-11T00:00:00Z",
+        effective_limits={},
+    )
+    assert state.claim(cid, deps.instance_id, deps.lease_seconds)
+    run = CrawlRun(deps, state.get_collection(cid))
+    run._build_strategies()
+    parser = sys.modules[app.state.engine.registry.get("sitemap").__module__]
+    executor = parser._parse_executor()
+    admitted = asyncio.Event()
+
+    def signal_admission() -> int:
+        admitted.set()
+        return 0
+
+    with state.tx() as db:
+        db.create_function("signal_consumer_admission", 0, signal_admission)
+        db.execute(
+            "CREATE TRIGGER observe_consumer_admission AFTER INSERT ON frontier "
+            "WHEN NEW.collection_id = 'consumer-closed' AND NEW.kind = 'material' AND NEW.status = 'pending' "
+            "BEGIN SELECT signal_consumer_admission(); END"
+        )
+    task = asyncio.create_task(run._seed())
+    try:
+        await asyncio.wait_for(admitted.wait(), timeout=10)
+        assert not run.meta.get("seeded") and executor._available == 0
+        if cancel_task:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            run.cancelled = True
+            await task
+        assert executor._available == 1 and not executor._waiters
+        assert 0 < state.frontier_counts(cid)["pending"] < catalog.per_shard
+        # Both nested generators closed before the task returned, without waiting for finalizers/GC.
+        result = await executor.parse(
+            b"<urlset><url><loc>https://store.test/next</loc></url></urlset>",
+            "https://store.test",
+            max_bytes=4096,
+            max_entries=10,
+        )
+        assert [entry.loc for entry in result.urls] == ["https://store.test/next"]
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        run.host_session.close()
+        await deps.client.aclose()
+        state.close()
+
+
+@pytest.mark.asyncio
+async def test_core_preserves_sdk_iterator_without_optional_aclose(tmp_path: Path, catalog: Catalog) -> None:
+    from jane_contracts.discovery import DiscoveredUrl, DiscoveryContext, FetchedResource
+
+    class PlainIterator:
+        aclose = "unrelated SDK metadata"
+
+        def __init__(self) -> None:
+            self.emitted = False
+
+        def __aiter__(self) -> PlainIterator:
+            return self
+
+        async def __anext__(self) -> DiscoveredUrl:
+            if self.emitted:
+                raise StopAsyncIteration
+            self.emitted = True
+            return DiscoveredUrl(url=catalog.url("/product/0"), strategy_id="catalog")
+
+    class SDKStrategy:
+        """The strategy neighbour meets the existing AsyncIterator contract without aclose."""
+
+        type_name: ClassVar[str] = "sitemap"
+
+        def __init__(self, config: Mapping[str, Any], strategy_id: str) -> None:
+            self.strategy_id = strategy_id
+
+        def seeds(self, ctx: DiscoveryContext) -> AsyncIterator[DiscoveredUrl]:
+            return PlainIterator()
+
+        async def on_fetched(
+            self, resource: FetchedResource, ctx: DiscoveryContext
+        ) -> AsyncIterator[DiscoveredUrl]:
+            return
+            yield  # pragma: no cover - the optional SDK neighbour reacts to no fetched pages
+
+        def snapshot(self) -> Mapping[str, Any]:
+            return {}
+
+        def restore(self, state: Mapping[str, Any]) -> None:
+            pass
+
+    app = build_app(_settings(tmp_path))
+    state, deps = app.state.store, app.state.engine.deps
+    body = _body(catalog, 400)
+    cid = "sdk-iterator"
+    state.create_collection(
+        cid,
+        state_key=cid,
+        status="running",
+        request=body,
+        rules=body["rules"],
+        rules_ref=None,
+        created_at="2026-10-11T00:00:00Z",
+        effective_limits={},
+    )
+    assert state.claim(cid, deps.instance_id, deps.lease_seconds)
+    run = CrawlRun(deps, state.get_collection(cid))
+    run._build_strategies()
+    sid, _, ctx, priority = run.strategies[0]
+    run.strategies = [(sid, SDKStrategy({}, sid), ctx, priority)]
+    try:
+        await run._seed()  # real admission, persistence and caller-side iterator handling
+        assert state.frontier_counts(cid) == {"pending": 1}
+        assert run.meta["seeded"] == [sid]
+    finally:
+        run.host_session.close()
+        await deps.client.aclose()
+        state.close()

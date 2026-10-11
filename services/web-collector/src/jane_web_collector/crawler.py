@@ -15,7 +15,7 @@ import hashlib
 import json
 import logging
 import time
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -1126,8 +1126,10 @@ class CrawlRun:
             self._seeding = sid
             self._seed_interrupted = False
             flush_at = time.monotonic() + quantum
+            candidates: AsyncIterator[DiscoveredUrl] | None = None
             try:
-                async for cand in strategy.seeds(ctx):
+                candidates = strategy.seeds(ctx)
+                async for cand in candidates:
                     batch.append(cand)
                     if len(batch) >= batch_limit or time.monotonic() >= flush_at:
                         await self._commit_seeds(batch)
@@ -1137,6 +1139,10 @@ class CrawlRun:
                         return
             finally:
                 self._seeding = None
+                # SDK iterators need not expose aclose; generators that own resources do.
+                close = getattr(candidates, "aclose", None)
+                if callable(close):
+                    await close()
             await self._commit_seeds(batch)
             if self._seed_interrupted:
                 break

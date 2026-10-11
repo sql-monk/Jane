@@ -766,10 +766,7 @@ class Admin:
                 "problem_group.update",
                 "problem_group",
                 group_id,
-                {
-                    **dict(patch),
-                    **audit_changes({k: row.get(k) for k in patch}, {k: new.get(k) for k in patch}),
-                },
+                audit_changes({k: row.get(k) for k in patch}, {k: new.get(k) for k in patch}),
             )
         return self._group_view(new)
 

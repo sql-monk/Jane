@@ -104,6 +104,48 @@ def test_audit_date_filters_and_real_configuration_differences(make_client: Any)
 
 
 @pytest.mark.integration
+def test_problem_group_audit_redacts_whole_event_and_keeps_safe_changes(
+    make_client: Any, neighbours: Neighbours
+) -> None:
+    def unrecognized(body: dict[str, Any], _: dict[str, Any]) -> dict[str, Any]:
+        result = base_result(body, "unrecognized", "extractor")
+        result["unrecognized"] = {"partial": False, "signature": "missing-selector:.price"}
+        return result
+
+    neighbours.runtime.behaviors["shop-example.product-extractor"] = unrecognized
+    client = make_client()
+    setup(client)
+    wait_run(client, start(client))
+    group = client.get("/v1/problem-groups").json()["items"][0]
+    url = f"/v1/problem-groups/{group['group_id']}"
+    fake_secret = "audit-regression-fake-value"
+    notes = ("awaits approval", f"Bearer {fake_secret}", "review completed")
+    for note in notes:
+        response = client.patch(
+            url,
+            json={"note": note, "status": "in_progress"},
+            headers={"Content-Type": "application/merge-patch+json"},
+        )
+        assert response.status_code == 200
+        assert response.json()["note"] == note and response.json()["status"] == "in_progress"
+
+    audit = client.get(
+        "/v1/audit-events", params={"subject_type": "problem_group", "subject_id": group["group_id"]}
+    )
+    assert audit.status_code == 200
+    assert fake_secret not in audit.text  # Includes every event and its duplicated/top-level fields.
+    events = [event for event in audit.json()["items"] if event["action"] == "problem_group.update"]
+    assert len(events) == 3
+    final, secret, initial = (event["details"] for event in events)
+    assert initial["after"] == {"note": "awaits approval", "status": "in_progress"}
+    assert secret["before"] == {"note": "awaits approval"}
+    assert secret["after"] == {"note": "[redacted]"}
+    assert final["before"] == {"note": "[redacted]"}
+    assert final["after"] == {"note": "review completed"}
+    assert all("note" not in event["details"] for event in events)
+
+
+@pytest.mark.integration
 def test_connection_unsupported_is_distinct_from_failed_sync(
     make_client: Any, neighbours: Neighbours
 ) -> None:

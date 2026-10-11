@@ -108,6 +108,7 @@
         ".codex/**",
         "libs/jane-kit/src/jane_kit/auth_scopes.py",
         "contracts/docs/admin-observability.md",
+        "services/storage/tests/test_contract.py",
         ".claude/hooks/jane_wp.py",
         "plan.md",
         "docs/delivery/**",

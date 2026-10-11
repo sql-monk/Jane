@@ -107,7 +107,9 @@ def test_storage_read_api_matches_contract(client: TestClient, h: SimpleNamespac
     api.get("/v1/info")
     api.get("/v1/entity-types", params={"connection_id": "raw-files"})
     api.get("/v1/entity-types", params={"connection_id": "nope"})
-    api.get("/v1/entities", params={"connection_id": "raw-files", "entity_type": "product", "search": "Kettle"})
+    api.get(
+        "/v1/entities", params={"connection_id": "raw-files", "entity_type": "product", "search": "Kettle"}
+    )
     api.get("/v1/entities", params={"connection_id": "raw-files", "entity_type": "product"})
     api.get("/v1/entities", params={"connection_id": "raw-files", "entity_type": "product", "key": key})
     api.get("/v1/entities", params={"connection_id": "nope", "entity_type": "product"})

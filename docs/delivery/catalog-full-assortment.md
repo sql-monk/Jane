@@ -9,6 +9,7 @@
 - [Живі сутності й оновлення цін](#живі-сутності-й-оновлення-цін)
 - [Перевірки з фактичним виводом](#перевірки-з-фактичним-виводом)
 - [Поточна запущена версія](#поточна-запущена-версія)
+- [Інцидент PROSTOR 11 жовтня 2026](#інцидент-prostor-11-жовтня-2026)
 - [Межі результату](#межі-результату)
 
 ## Реалізовано
@@ -107,11 +108,62 @@ Collector, Registry і адмінка розгорнуті. Спільний с�
 
 Старі запуски з обмеженими категоріями вже мали terminal collector, але утримували `overlap: skip` в оркестраторі. 04:56 UTC скасовано лише ці п’ять старих catalog runs і через Collector API скинуто лише їхні старі checkpoints. Товари та історія PostgreSQL збережені. О 05:02 UTC запущено п’ять нових повних обходів і відновлено нативний розклад 900 секунд із `overlap: skip`.
 
-Знімок із `checked_at: 07:21:51 UTC`, отриманий послідовними API-запитами до 07:24:41 UTC, містить **15 299 товарів**: BI — 2301, Епіцентр — 587, PROSTOR — 2317, VARUS — 9794, Yakaboo — 300. Для всіх п’яти `schema_invalid: 0`. Об’єднання назв доступних властивостей містить відповідно 26, 562, 98, 431 і 30 ключів; це кількість різних властивостей у каталозі, а не в кожному товарі. Історія та provenance підтверджують нові сутності з повного обходу BI, Епіцентру, PROSTOR і VARUS. Yakaboo ще обробляє sitemap; його початкові 300 сутностей походять із попередніх запусків і живої перевірки цін. Ранні sitemap Yakaboo містять RU категорії й фільтри; перевірені пізні UA товарні URL відповідають правилам.
+Знімок із `checked_at: 07:21:51 UTC`, отриманий послідовними API-запитами до 07:24:41 UTC, містить **15 299 товарів**: BI — 2301, Епіцентр — 587, PROSTOR — 2317, VARUS — 9794, Yakaboo — 300. Із них **14 032 мають ціну**. Для всіх п’яти `schema_invalid: 0`. Об’єднання назв доступних властивостей містить відповідно 26, 562, 98, 431 і 30 ключів; це кількість різних властивостей у каталозі, а не в кожному товарі. Історія та provenance підтверджують нові сутності з повного обходу BI, Епіцентру, PROSTOR і VARUS. Yakaboo ще обробляє sitemap; його початкові 300 сутностей походять із попередніх запусків і живої перевірки цін. Ранні sitemap Yakaboo містять RU категорії й фільтри; перевірені пізні UA товарні URL відповідають правилам.
 
 У поточному runtime-доказі завершені native parts BI о 07:17:50 UTC та PROSTOR о 07:17:02 UTC мають `succeeded`, відповідно 400 і 392 fetched URL. BI зберіг `continuation_pending: 116587`, PROSTOR — `7336`; нові scheduled runs позичили з цих checkpoints по 400 URL. Для PROSTOR stats містять 13 помилок, а перша сторінка їхнього списку — п’ять `not_found` / `out_of_scope`, `has_more: true`. Цей результат доводить збереження невиконаної черги, а не завершення всього асортименту.
 
 Перевірені фактичні ліміти спільного стеку: Collector — 32 jobs і 4 години на job; HandlerRuntime — 8 jobs та 8 паралельних invocation; Orchestrator — 12 workers. Маніфести нормалізовано до LF, дев’ять змінених пакетів повторно опубліковано як `1.1.1`: байти всіх 19 пакетів і їхні digests збігаються з Git index. Jobs, створені до цієї публікації, зберегли свою версію `1.1.0`; нові scheduled runs у поточному runtime-доказі використовують `1.1.1`.
+
+## Інцидент PROSTOR 11 жовтня 2026
+
+### Спостереження до виправлення
+
+Під час аудиту 11 жовтня 2026 Collector job `job_9cc8013d1a294a569ac20551b42843e1` уже мав `succeeded` і 380 emitted матеріалів. Orchestrator run `run_01M4N4AX9Z7DBDDNGNGJK76CCN` залишався `running`: прийнято 372 матеріали, завершено 744 handler items, `feed_done: false`. Решта 8 матеріалів залишалася у буфері Collector; їхня відповідь мала `end_of_stream: true`.
+
+Вставка routed inputs у PostgreSQL JSONB повторно завершувалася `psycopg.errors.UntranslatableCharacter`: `\u0000 cannot be converted to text`. Транзакція приймання сторінки відкочувалася до збереження `feed_cursor`, тому звичайний retry знову отримував той самий неприйнятий залишок. Завершення Collector саме собою не встановлює `feed_done`: останню непорожню сторінку потрібно зберегти, а наступний порожній EOF-запит підтверджує її ACK. `overlap: skip` орієнтується на активний run Orchestrator; інтервал 900 секунд не розблоковує помилку приймання матеріалу.
+
+Read-only перевірка підтвердила єдиний NUL у `$.items[0].content.data`: inline `text/html`, `encoding: utf-8`, 245 334 декодованих байти. Фактичні size і SHA-256 збігалися із заявленими; base64 round-trip повернув ідентичні байти, розмір і digest, а закодований рядок не містив NUL. GET виконувався без `after`, з `wait_ms: 0`; ACK і збережений курсор Orchestrator не змінювалися.
+
+### Зміна збереження payload
+
+Прийнятий source commit — `5a3ce874252386b7a7071911c9bf2c02efff619f`. У [engine.py](../../services/orchestrator/src/jane_orchestrator/engine.py) `_jsonb_inputs` перед вставкою inputs переводить лише `material.content.data` із реальним U+0000 та `encoding: utf-8` у `encoding: base64`. Це вже дозволена форма [ContentRef](../../contracts/schemas/common/content-ref.schema.json); споживачі декодують ті самі UTF-8 байти.
+
+Перетворення зберігає `sha256`, `size_bytes`, charset та всі інші поля матеріалу. Оригінальний документ Collector не змінюється; звичайний текст, буквальний рядок `\u0000`, готові base64 і blob references передаються без змін. Логіка курсора, транзакцій, delivery keys і EOF ACK залишається чинною. Для відновлення поточного run після розгортання потрібен його звичайний retry; ручне просування курсора чи скидання стану не застосовувалося.
+
+### Перевірки й стан приймання
+
+[Регресія](../../services/orchestrator/tests/test_feed_content_encoding.py) працює зі справжнім PostgreSQL 18; HTTP-сусіди перевіряються за контрактами. Тестові fixtures створюють і видаляють власну унікальну БД на наявному тестовому PostgreSQL. Перевірено точні байти через `ContentReader`, збережені metadata, durable cursor, читання новим app/worker, наступний порожній EOF ACK і завершення всіх downstream stages без втрат чи повторних ефектів.
+
+```text
+PG baseline до виправлення: 1 failed in 15.19s
+psycopg.errors.UntranslatableCharacter: unsupported Unicode escape sequence
+DETAIL: \u0000 cannot be converted to text; parameter $6
+independent NUL regression + existing final EOF ACK: 2 passed in 75.67s
+first combined NUL / EOF / M1 run: 1 failed, 2 passed in 110.05s (M1 timeout 30s)
+targeted M1 rerun: 1 passed in 29.09s
+ruff check: All checks passed; format: 2 files already formatted
+mypy engine.py: Success: no issues found in 1 source file
+```
+
+Старий M1-тест і його 30-секундний timeout не змінювалися; точна причина першого timeout не доведена. Незалежне source review прийняло виправлення. [CI 38132054531](https://github.com/sql-monk/Jane/actions/runs/38132054531) завершився успішно на точному commit `5a3ce874`: перевірено всі 14 jobs через API з `per_page=100`.
+
+### Відновлення чинного запуску
+
+О 11:23:16–17 UTC оновлено обидва процеси Orchestrator до образу `sha256:be47a9747786a2b7a2267ea62d5a4f0f3980d5f81b9ab0d0f8e9a4d1f7be80f2`. SHA-256 чинного `engine.py` — `25d1ea1cd2fb07ea841ab37966d00919de08e8cdf7409531461434918f265409`, точні байти прийнятого commit `5a3ce874`. Перші десять шарів образу збігаються з фактичною базою `0fe…a8a368`; інші 46 файлів core/kit збережено. Середовище, ресурси, групи, порти, томи й мережеві aliases збережено; Collector560, його container ID, час запуску й конфігурація не змінювалися.
+
+Перед запуском нових процесів власний стан Orchestrator був незмінний у спокійному вікні: `after_stop` та `before_start` мають однаковий SHA-256 `7246d7ddbb7290663c77108fc3fc686724f2b5bf7a807a66429810abef23cfaf`. Після запуску звичайний retry просунув курсор того самого run з hash `db50ff0b…92cd4b0a` до `71bb92a6…eec7bd27`. О 11:23:34.391179 UTC він завершився `succeeded`, `feed_done: true`, `backpressure: false`, без `feed_error`. У кожному з трьох етапів стало 380 завершених items замість 372: решта восьми матеріалів пройшла collect, extract і store. Ручних змін стану через БД чи API, cancel/reset/replay та нових backups або exports не виконувалося.
+
+Перед успішним застосуванням дві спроби завершилися перевірками без запуску нових writers: build не розпізнав локальний image ID, а наступна спроба відхилила різницю `OomKillDisable: null` проти типового `false` і автоматично повернула початкові writers. Відновлення БД не виконувалося. Побудову виправлено перевіреним локальним alias із контролем image ID та базових шарів; порівняння нормалізує лише підтверджений типовий параметр [Docker daemon](https://github.com/moby/moby/blob/master/daemon/daemon_unix.go). Тіло запиту clone та ефективні налаштування лишилися чинними; explicit `true` та інші зміни відхиляються. Незалежний review прийняв фінальний helper з SHA-256 `15fdb9016a8c2cfb3ec1841e71cdce6448a0432bf1a2011306daa6096c184bfd`; реальний preflight перевірив обидві заміни, negative controls — OOM, Env, hostname, Memory, GroupAdd та custom alias.
+
+Жива перевірка Storage API о 11:27:40 UTC підтвердила всі вісім точних canonical keys: schema errors — 0, ціни додатні й скінченні, властивостей відповідно 3 / 14 / 3 / 14 / 15 / 9 / 9 / 6. У кожній історії є той самий run та відповідні observation/material IDs; provenance посилається на `catalog.prostor-product-extractor` версії `1.1.1`. Товар із проблемного NUL-матеріалу також збережений і валідний.
+
+Повторне читання persisted ContentRef після завершення недоступне: штатний cleanup обнулив payload усіх восьми items. Це не підміняється повторним збором або відновленням payload. Доказ точних байтів спирається на початкову read-only перевірку матеріалу й реальну PG-регресію. Зіставлення успішних invocation із кодом дає додатковий висновок: до extraction мала пройти обов’язкова SHA-256 перевірка [ContentReader](../../libs/jane-kit/src/jane_kit/content.py), оскільки Collector завжди додає digest, а fix його зберігає. Це висновок із коду та результату виконання, а не повторне читання payload. Для inline decoder перевіряє hash і ліміт декодованих байтів; він не робить окремого порівняння declared `size_bytes` із довжиною. Початковий матеріал мав підтверджену довжину 245 334 байти, а lossless перетворення зберігає його байти й metadata.
+
+Наступний native run `run_01M4NC23MJQG9RPHZ810M40QC6` почався за розкладом о 11:37:37.717 UTC, `trigger: schedule`, Collector job `job_4fa7767bf2d741fba24eee343f160bb7`, правила `1.1.1`. Він продовжив 400 URL. О 11:38:48 UTC fetched збільшився з 57 до 58, emitted — із 46 до 47; 45 матеріалів уже збережено. Source state просунувся з `known: 5504 / frontier: 3736` до `5562 / 3678`. Collector повідомляв одну помилку джерела; це не подається як збір без помилок. Наступний запуск не створювали вручну. Повний датований доказ із перевірками восьми товарів, п’яти розкладів, schema/provenance та здоров’я: [feed-recovery-verification.json](../../examples/sites/catalogs/feed-recovery-verification.json).
+
+Друга перевірка того самого scheduled run о 11:40:02 UTC підтвердила 106 завершених store items; fetched у job зріс до 119, а collection stats, прочитані наступним запитом, уже мали 120 fetched і 109 emitted. Черга джерела просунулася до `known: 5624 / frontier: 3616`. Єдина зафіксована помилка джерела — `not_found`. У датованому вікні 11:29:58–11:39:58 UTC в логах Collector не було `lease_lost`, SQLite lock/error, OOM чи startup/restart сигналів; контрольний health GET мав HTTP 200 за 31,9 мс. Це спостереження лише за вказане вікно.
+
+Після розгортання перевірено всі п’ять чинних задач: `enabled: true`, `interval_seconds: 900`, `overlap: skip`, `mode: incremental`; digest документів задач не змінився. Read-only вибірки Storage о 11:04:46 UTC для всіх п’яти сайтів валідні за UTF-8 схемами, мають додатну скінченну ціну й 7 / 10 / 15 / 8 / 8 властивостей відповідно. Вибірка Yakaboo походить зі старого subset run; нові збережені сутності саме його поточного повного обходу станом на 11:29:29 UTC залишаються недоведеними. Два початкові процеси Orchestrator збережені зупиненими, exit code 0; нових копій їхніх даних не створено.
 
 ## Межі результату
 

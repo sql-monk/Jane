@@ -1,0 +1,853 @@
+{
+  "format": "jane.catalog.feed-recovery-verification.v1",
+  "captured_at": "2026-10-11T11:39:58.300362Z",
+  "completed_at": "2026-10-11T11:40:02.562711Z",
+  "scope": "Recovery of the existing PROSTOR feed and its next natural bounded full-assortment continuation.",
+  "deployment": {
+    "commit": "5a3ce874252386b7a7071911c9bf2c02efff619f",
+    "ci_run": 38132054531,
+    "ci_required_jobs": 14,
+    "ci_verified_success": true,
+    "helper_sha256": "15fdb9016a8c2cfb3ec1841e71cdce6448a0432bf1a2011306daa6096c184bfd",
+    "image": "sha256:be47a9747786a2b7a2267ea62d5a4f0f3980d5f81b9ab0d0f8e9a4d1f7be80f2",
+    "engine_sha256": "25d1ea1cd2fb07ea841ab37966d00919de08e8cdf7409531461434918f265409",
+    "updated_writers": 2,
+    "other_core_kit_files_preserved": 46,
+    "preservation": {
+      "effective_writer_configs": true,
+      "other_core_kit_bytes": true,
+      "unrelated_containers_and_collector560": true,
+      "quiescent_exact_own_state": true
+    },
+    "state_hashes": {
+      "before_stop": "f4d9b7bd891f3e0cc9343a16d87f38d03e5818820862262c7f63ea4e8d05f55c",
+      "after_stop": "7246d7ddbb7290663c77108fc3fc686724f2b5bf7a807a66429810abef23cfaf",
+      "before_start": "7246d7ddbb7290663c77108fc3fc686724f2b5bf7a807a66429810abef23cfaf",
+      "after_start": "fdf5532b68c5e643048961c0d6aa76f393ec76b5a0b2e7eaeed6c600d4df2a28"
+    },
+    "cursor_sha256_before": "db50ff0be3bde8fdcb9da145b7ec677162679269784cd3499f42e87f92cd4b0a",
+    "cursor_sha256_after": "71bb92a6dbe32adba92f564ad14bc9d76f75f1f8448e349017072769eec7bd27",
+    "manual_database_api_state_writes": 0,
+    "backups_or_exports_created": 0,
+    "attempts": [
+      {
+        "outcome": "build_refused_before_writer_stop"
+      },
+      {
+        "outcome": "configuration_representation_refused_before_new_writer_start",
+        "rollback_original_writers_restored": true,
+        "database_restore": false
+      },
+      {
+        "outcome": "successful_engine_only_overlay",
+        "original_containers_retained_stopped": 2
+      }
+    ],
+    "original_containers_retained_stopped": 2,
+    "original_container_exit_codes": [
+      0,
+      0
+    ],
+    "additional_original_container_cleanup_performed": false,
+    "original_container_data_copies_created": 0
+  },
+  "preapply_baseline": {
+    "captured_at": "2026-10-11T10:50:07.975793Z",
+    "collector": {
+      "container_id": "ebf7400996394887dfcfa6ae79ae84526f8f49c4c354e832980515ee69a64d2d",
+      "image": "sha256:560bda29114a0e96ffc030bbb9eb82bc0a32ef15f1107a35f9c64b1472843251",
+      "started_at": "2026-10-11T07:21:14.622802307Z",
+      "running": true,
+      "health": "healthy",
+      "failing_streak": 0,
+      "restart_count": 0,
+      "oom_killed": false,
+      "configuration_fingerprint": "06f7a59f3c62e81c4e01178a4a4d66465156d3b80dec74043a55202e5fb7fe08"
+    },
+    "prostor": {
+      "run_id": "run_01M4N4AX9Z7DBDDNGNGJK76CCN",
+      "task_id": "catalog-prostor",
+      "source_id": "prostor",
+      "status": "running",
+      "collection_id": "job_9cc8013d1a294a569ac20551b42843e1",
+      "feed_done": false,
+      "backpressure": true,
+      "created_at": "2026-10-11T09:22:37.501902Z",
+      "started_at": "2026-10-11T09:22:37.549235Z",
+      "updated_at": "2026-10-11T09:35:07.580159Z",
+      "finished_at": null,
+      "feed_cursor_sha256": "db50ff0be3bde8fdcb9da145b7ec677162679269784cd3499f42e87f92cd4b0a",
+      "feed_cursor_present": true,
+      "feed_error_present": false,
+      "item_counts_by_status": {
+        "completed": 1116
+      },
+      "item_count": 1116
+    },
+    "actual_nul_material": {
+      "scalars": {
+        "own_orchestrator_checkpoint_unchanged": true,
+        "buffer_item_count": 8,
+        "end_of_stream": true,
+        "first_nul_path": "$.items[0].content.data",
+        "total_nul_count": 1
+      },
+      "findings": [
+        {
+          "path": "$.items[0].content.data",
+          "nul_count": 1,
+          "inline_ref": true,
+          "content_ref_path": "$.items[0].content",
+          "encoding": "utf-8",
+          "media_type": "text/html",
+          "size_bytes": 245334,
+          "declared_size_bytes": 245334,
+          "size_matches": true,
+          "sha256": "2d8ed5b2e93111e8126a3464f3b17c411a5e64cb56f2beb411928c360f605901",
+          "declared_sha256_matches": true,
+          "base64_roundtrip_bytes_equal": true,
+          "base64_roundtrip_size_equal": true,
+          "base64_roundtrip_sha256_equal": true,
+          "base64_string_nul_count": 0
+        }
+      ]
+    }
+  },
+  "recovered_existing_run": {
+    "captured_at": "2026-10-11T11:24:48.635430Z",
+    "run_id": "run_01M4N4AX9Z7DBDDNGNGJK76CCN",
+    "status": "succeeded",
+    "collection_id": "job_9cc8013d1a294a569ac20551b42843e1",
+    "feed_done": true,
+    "backpressure": false,
+    "started_at": "2026-10-11T09:22:37.549235Z",
+    "updated_at": "2026-10-11T11:23:34.391180Z",
+    "finished_at": "2026-10-11T11:23:34.391179Z",
+    "feed_cursor_sha256": "71bb92a6dbe32adba92f564ad14bc9d76f75f1f8448e349017072769eec7bd27",
+    "feed_error_present": false,
+    "stage_status_counts": [
+      {
+        "stage_id": "collect",
+        "status": "completed",
+        "count": 380
+      },
+      {
+        "stage_id": "extract-products",
+        "status": "completed",
+        "count": 380
+      },
+      {
+        "stage_id": "store-products",
+        "status": "completed",
+        "count": 380
+      }
+    ],
+    "task": {
+      "next_run_at": "2026-10-11T11:37:37.467346Z",
+      "last_scheduled_at": "2026-10-11T11:22:37.467346Z",
+      "schedule": {
+        "type": "interval",
+        "overlap": "skip",
+        "timezone": "Europe/Kyiv",
+        "interval_seconds": 900
+      },
+      "enabled": true
+    }
+  },
+  "recovered_eight_observations": {
+    "captured_at": "2026-10-11T11:27:40.792393Z",
+    "run_id": "run_01M4N4AX9Z7DBDDNGNGJK76CCN",
+    "observations_checked": 8,
+    "items_checked": 24,
+    "all24_items_completed": true,
+    "all8_stored_schema_and_provenance_verified": true,
+    "schema_encoding": "UTF-8",
+    "schema_file_sha256": "923c30eb3a4878dee8a3171d59133b0921ff72eb3a4ec3eef1b916ae3b35980f",
+    "schema_ref": "catalog.prostor-product-extractor@1.1.1#product",
+    "package_id": "catalog.prostor-product-extractor",
+    "package_version": "1.1.1",
+    "package_digest": "sha256:f22a6e847a29e5148e145fd02048bc3f3bbec962061b6b8aa2976a156ce950a5",
+    "observations": [
+      {
+        "material_id": "web:747c0d16f876cc5d547e5b666b56fd8e",
+        "observation_id": "obs_01a12a4d01a90000741d5973",
+        "items": {
+          "collect": "itm_01M4NB81TZ2T6JRKF3Q4154G21",
+          "extract-products": "itm_01M4NB81V0N4R4RKP341NHHSAZ",
+          "store-products": "itm_01M4NB84NG2JTDDHKXK6V4X91S"
+        },
+        "all_stages_completed": true,
+        "content_sha256": "2d8ed5b2e93111e8126a3464f3b17c411a5e64cb56f2beb411928c360f605901",
+        "canonical_identity_sha256": "34f29634f0d4cbc7df0c1610b964f5e7449c109ad34432025d77565b822363fe",
+        "write_status": "written",
+        "current_entity_version": 1,
+        "current_updated_at": "2026-10-11T11:23:30.429092Z",
+        "schema_error_count": 0,
+        "price_is_numeric_finite_positive": true,
+        "attributes_count": 3,
+        "attributes_sha256": "cf0e3892c54db9ce37b2bd0bcd3da6596e829a31d0f7e395f5d42054c3ef76c3",
+        "price_sha256": "4bf4f525504cc0a2c514f8cfd5d73ea65c50af4bbcd047c0f01fd331ed3ef051",
+        "exact_run_observation_material_provenance_match": true,
+        "matched_observed_at": "2026-10-11T09:30:52Z",
+        "history_fields_schema_valid": true,
+        "current_fields_equal_matched_history": true,
+        "target_nul_material_matches_baseline": true
+      },
+      {
+        "material_id": "web:fa6b68cdf54cb7b203bd882546ec335f",
+        "observation_id": "obs_01a12a4d08d800000f4bc40b",
+        "items": {
+          "collect": "itm_01M4NB81V9GDRRYJVBS26VAPTQ",
+          "extract-products": "itm_01M4NB81VAT8624GT16V0PH6NE",
+          "store-products": "itm_01M4NB866EVVNFEE5S9F10F6QZ"
+        },
+        "all_stages_completed": true,
+        "content_sha256": "ab03d5b81c6fb79645562e7cdd7eb4fc8a9ec4fffc444c848b3692ba38e39c7d",
+        "canonical_identity_sha256": "fe3e1dfa5e18a8ff63ddb65b0670c8c89ac5092e6e7a8eccd6cf88d262b9d75c",
+        "write_status": "written",
+        "current_entity_version": 1,
+        "current_updated_at": "2026-10-11T11:23:30.976274Z",
+        "schema_error_count": 0,
+        "price_is_numeric_finite_positive": true,
+        "attributes_count": 14,
+        "attributes_sha256": "6b085a612f6e44a73454a999278b3b1d83cc92a5dce22917a0294f482010d000",
+        "price_sha256": "d2c79c7a6da05478d54be2fcf8b57833206fe10939dcab9dcbebc06b88b8c0f7",
+        "exact_run_observation_material_provenance_match": true,
+        "matched_observed_at": "2026-10-11T09:30:54Z",
+        "history_fields_schema_valid": true,
+        "current_fields_equal_matched_history": true,
+        "target_nul_material_matches_baseline": false
+      },
+      {
+        "material_id": "web:6c0d31017180af06ed293c6742a53c71",
+        "observation_id": "obs_01a12a4d0c5200006cc45d47",
+        "items": {
+          "collect": "itm_01M4NB81VGDVJS63Z8JWXCCC66",
+          "extract-products": "itm_01M4NB81VHX73EN0B8470YDEQK",
+          "store-products": "itm_01M4NB86KBG3KMNAP7CQD9AJDT"
+        },
+        "all_stages_completed": true,
+        "content_sha256": "bafd0d9702f2745aa5d40d9cfa03fd5c918121d54ad58134cf45d10bf16e2c20",
+        "canonical_identity_sha256": "2e498d7b367e131d8d85872b5da52ef2df955af807190c54687eca0ecdf837f3",
+        "write_status": "written",
+        "current_entity_version": 1,
+        "current_updated_at": "2026-10-11T11:23:31.352660Z",
+        "schema_error_count": 0,
+        "price_is_numeric_finite_positive": true,
+        "attributes_count": 3,
+        "attributes_sha256": "e774929515f85c7201f5b54bc54f275b6b2b28b0509dc78c1511c04f41c0fd48",
+        "price_sha256": "e6da2ed23244cd5d05ff47fabb923bf7b9580cae7be62f012ea12d2fd7fc4962",
+        "exact_run_observation_material_provenance_match": true,
+        "matched_observed_at": "2026-10-11T09:30:54Z",
+        "history_fields_schema_valid": true,
+        "current_fields_equal_matched_history": true,
+        "target_nul_material_matches_baseline": false
+      },
+      {
+        "material_id": "web:35d8110545e97bd57ea01c4027877e6d",
+        "observation_id": "obs_01a12a4d102a0000da80ba17",
+        "items": {
+          "collect": "itm_01M4NB81VQ95CPR2FC8GCHVNT8",
+          "extract-products": "itm_01M4NB81VR65B3KDZQRPD05NGB",
+          "store-products": "itm_01M4NB87CYJVYWFME9DHVQ5YKR"
+        },
+        "all_stages_completed": true,
+        "content_sha256": "a270daa9d674f66c3371a9fc506c0ef17ce385d8df1545f5f771d95712ddd585",
+        "canonical_identity_sha256": "457be2e59a2111a9c65d2f4af5755042743c00e57c082f6d47a90d8e9f245c0a",
+        "write_status": "written",
+        "current_entity_version": 2,
+        "current_updated_at": "2026-10-11T11:23:31.813963Z",
+        "schema_error_count": 0,
+        "price_is_numeric_finite_positive": true,
+        "attributes_count": 14,
+        "attributes_sha256": "b7fb47e068c38b1df38fa2f42e3b14cb9c2db1fbbf874704aae59b0e223dced7",
+        "price_sha256": "5d6ba45ee1d5e1697ad5f130677d44a7812ad273f13d6ce06d86d647961635d7",
+        "exact_run_observation_material_provenance_match": true,
+        "matched_observed_at": "2026-10-11T09:30:55Z",
+        "history_fields_schema_valid": true,
+        "current_fields_equal_matched_history": true,
+        "target_nul_material_matches_baseline": false
+      },
+      {
+        "material_id": "web:c2de42e8216b35d3c8b2a535539354a5",
+        "observation_id": "obs_01a12a4d185f00006455c1ec",
+        "items": {
+          "collect": "itm_01M4NB81VZZ27NRN053ARQ2QVV",
+          "extract-products": "itm_01M4NB81W0AMSWD9YNNXC10FWB",
+          "store-products": "itm_01M4NB881VRZQ0A5BRA7SNVH8K"
+        },
+        "all_stages_completed": true,
+        "content_sha256": "d87a7e5f5f3e8369e5c26c491db1e9604b4748bd329bf8059c81a1554d277c1c",
+        "canonical_identity_sha256": "10dbbdbd49a953f2bffc0fff22f1b98edbaf783f162f8cebd27d691a070109cd",
+        "write_status": "written",
+        "current_entity_version": 1,
+        "current_updated_at": "2026-10-11T11:23:32.491002Z",
+        "schema_error_count": 0,
+        "price_is_numeric_finite_positive": true,
+        "attributes_count": 15,
+        "attributes_sha256": "eb041b94e84d57e78d596c70bf58379f9c59c33678bdaf49d3c321d5f3075881",
+        "price_sha256": "88184681a40a03a4963e35ece44b48dbbad5a910e873a18ae885d4c9ff96bd08",
+        "exact_run_observation_material_provenance_match": true,
+        "matched_observed_at": "2026-10-11T09:30:58Z",
+        "history_fields_schema_valid": true,
+        "current_fields_equal_matched_history": true,
+        "target_nul_material_matches_baseline": false
+      },
+      {
+        "material_id": "web:b6e57380bf2b929898db375762725ab4",
+        "observation_id": "obs_01a12a4d1d350000adc7b6fd",
+        "items": {
+          "collect": "itm_01M4NB81WF1BS7RKEYK38EP6JD",
+          "extract-products": "itm_01M4NB81WGFRDCD76Y1PD8AND2",
+          "store-products": "itm_01M4NB88DS859EZ2QHCY5WFC0S"
+        },
+        "all_stages_completed": true,
+        "content_sha256": "1a2e1d315ae5bdbbeca8b0951799226e37f5bcb7cc2a22c84001066f06be96f2",
+        "canonical_identity_sha256": "ad5c73a7ddbe6dfe347d1b0fb8f12787b3db551a15e68887a9da460eac0af1e2",
+        "write_status": "written",
+        "current_entity_version": 1,
+        "current_updated_at": "2026-10-11T11:23:33.159778Z",
+        "schema_error_count": 0,
+        "price_is_numeric_finite_positive": true,
+        "attributes_count": 9,
+        "attributes_sha256": "27790cb3316f8315d998c64a60c71c0ab407ee7724f5daeb100281a810d33b5f",
+        "price_sha256": "5d6ba45ee1d5e1697ad5f130677d44a7812ad273f13d6ce06d86d647961635d7",
+        "exact_run_observation_material_provenance_match": true,
+        "matched_observed_at": "2026-10-11T09:30:59Z",
+        "history_fields_schema_valid": true,
+        "current_fields_equal_matched_history": true,
+        "target_nul_material_matches_baseline": false
+      },
+      {
+        "material_id": "web:09debace6aa29f36050addbb38db054e",
+        "observation_id": "obs_01a12a4d25710000a3a618fc",
+        "items": {
+          "collect": "itm_01M4NB81X0VNNRSCSFKMJ55SMP",
+          "extract-products": "itm_01M4NB81X1EYD4KV7T6GCGNG5K",
+          "store-products": "itm_01M4NB89PT0RF9NGX1K72G7KJP"
+        },
+        "all_stages_completed": true,
+        "content_sha256": "d52957f3051aa2d70670916ff393f307c58a862127c69a75effcdee4ac5520d5",
+        "canonical_identity_sha256": "3d9f0c008b3a5ec7291352b8e776ba309f4858883bd0a2302f2819ed1a373240",
+        "write_status": "written",
+        "current_entity_version": 1,
+        "current_updated_at": "2026-10-11T11:23:33.564763Z",
+        "schema_error_count": 0,
+        "price_is_numeric_finite_positive": true,
+        "attributes_count": 9,
+        "attributes_sha256": "588b6a416712d31241f3263e5ba05feffa08821c2a0198a224bda8940cd33c59",
+        "price_sha256": "5d6ba45ee1d5e1697ad5f130677d44a7812ad273f13d6ce06d86d647961635d7",
+        "exact_run_observation_material_provenance_match": true,
+        "matched_observed_at": "2026-10-11T09:31:01Z",
+        "history_fields_schema_valid": true,
+        "current_fields_equal_matched_history": true,
+        "target_nul_material_matches_baseline": false
+      },
+      {
+        "material_id": "web:0e7be8a904433af470b105febfc97893",
+        "observation_id": "obs_01a12a4d28cd0000b3cd4125",
+        "items": {
+          "collect": "itm_01M4NB81XA5NJGXXT74C6K4DYB",
+          "extract-products": "itm_01M4NB81XA8NH1Y44XXE27CZJB",
+          "store-products": "itm_01M4NB8A6GJ2EZPH85Z506PPM9"
+        },
+        "all_stages_completed": true,
+        "content_sha256": "8645565968a0d2658f168e49fd64575dfb2e7a2b6a2c9af19674b16448b01826",
+        "canonical_identity_sha256": "fc553c126a2418b1541e0a5255d6a5fec85a0dfea63539c9d58198255150288a",
+        "write_status": "written",
+        "current_entity_version": 1,
+        "current_updated_at": "2026-10-11T11:23:34.038772Z",
+        "schema_error_count": 0,
+        "price_is_numeric_finite_positive": true,
+        "attributes_count": 6,
+        "attributes_sha256": "aa4f2afbaf1749349fa67743c76032397c934030b6d7645dfba32fd85a3a32b7",
+        "price_sha256": "66878467e390f2065e90a537777ad96d723fab1b0d61fb2e8078d0bb68015483",
+        "exact_run_observation_material_provenance_match": true,
+        "matched_observed_at": "2026-10-11T09:31:02Z",
+        "history_fields_schema_valid": true,
+        "current_fields_equal_matched_history": true,
+        "target_nul_material_matches_baseline": false
+      }
+    ],
+    "content_reader_evidence": {
+      "classification": "inference_from_exact_source_and_successful_real_invocations",
+      "extractor_calls_context_text": true,
+      "handler_material_resolution_calls_content_fetcher": true,
+      "content_fetcher_delegates_to_content_reader": true,
+      "producer_declares_inline_sha256_and_size": true,
+      "candidate_preserves_declared_sha256_and_size": true,
+      "content_reader_strict_base64_decode": true,
+      "content_reader_validates_declared_sha256_before_extraction": true,
+      "inline_decoded_byte_limit_enforced": true,
+      "inline_declared_size_equality_enforced": false,
+      "runtime_effective_input_byte_limit_measured": false,
+      "direct_postcompletion_contentref_byte_reread_available": false,
+      "direct_reread_limitation": "normal_completed_item_payload_cleanup",
+      "inference": "The producer declared SHA-256, the fix preserved it, and all eight real extractions succeeded; ContentReader SHA validation therefore passed before extraction. This is an inference, not a post-completion payload byte re-read.",
+      "sources": [
+        "services/handler-runtime/src/jane_handler_runtime/executor.py:176",
+        "services/handler-runtime/src/jane_handler_runtime/packages.py:70",
+        "libs/jane-kit/src/jane_kit/content.py:159",
+        "libs/jane-kit/src/jane_kit/content.py:173",
+        "libs/jane-kit/src/jane_kit/content.py:189",
+        "services/web-collector/src/jane_web_collector/materials.py:112",
+        "services/web-collector/src/jane_web_collector/materials.py:138",
+        "libs/jane-kit/src/jane_kit/content.py:390",
+        "examples/sites/packages/catalog.prostor-product-extractor/src/jane_sites_prostor_card/main.py:202"
+      ]
+    }
+  },
+  "next_natural_scheduled_continuation": {
+    "manual_trigger": false,
+    "first_observed_at": "2026-10-11T11:38:48.027216Z",
+    "latest_observed_at": "2026-10-11T11:40:02.562711Z",
+    "native_run_first": {
+      "run_id": "run_01M4NC23MJQG9RPHZ810M40QC6",
+      "status": "running",
+      "trigger": "schedule",
+      "created_at": "2026-10-11T11:37:37.680479Z",
+      "started_at": "2026-10-11T11:37:37.717740Z",
+      "updated_at": "2026-10-11T11:38:46.462171Z",
+      "collection_id": "job_4fa7767bf2d741fba24eee343f160bb7",
+      "feed_done": false,
+      "feed_cursor_sha256": "053207e26a5e6e0b0fdcc0ae0499bba54afd9c16787f5e2c31657d29f1fb18fa",
+      "stage_status_counts": [
+        {
+          "stage_id": "collect",
+          "status": "completed",
+          "count": 46
+        },
+        {
+          "stage_id": "extract-products",
+          "status": "completed",
+          "count": 45
+        },
+        {
+          "stage_id": "extract-products",
+          "status": "running",
+          "count": 1
+        },
+        {
+          "stage_id": "store-products",
+          "status": "completed",
+          "count": 45
+        }
+      ]
+    },
+    "native_run_latest": {
+      "run_id": "run_01M4NC23MJQG9RPHZ810M40QC6",
+      "status": "running",
+      "trigger": "schedule",
+      "created_at": "2026-10-11T11:37:37.680479Z",
+      "started_at": "2026-10-11T11:37:37.717740Z",
+      "updated_at": "2026-10-11T11:39:59.588099Z",
+      "collection_id": "job_4fa7767bf2d741fba24eee343f160bb7",
+      "feed_done": false,
+      "feed_cursor_sha256": "19d6e1b90f365ac06e05ff6bce3635d63967ba14e8372accf4c288a97a812df6",
+      "stage_status_counts": [
+        {
+          "stage_id": "collect",
+          "status": "completed",
+          "count": 107
+        },
+        {
+          "stage_id": "extract-products",
+          "status": "completed",
+          "count": 106
+        },
+        {
+          "stage_id": "extract-products",
+          "status": "running",
+          "count": 1
+        },
+        {
+          "stage_id": "store-products",
+          "status": "completed",
+          "count": 106
+        }
+      ]
+    },
+    "collector_job_first": {
+      "job_id": "job_4fa7767bf2d741fba24eee343f160bb7",
+      "status": "running",
+      "created_at": "2026-10-11T11:37:40.524527Z",
+      "started_at": "2026-10-11T11:37:40.525170Z",
+      "updated_at": "2026-10-11T11:38:46.979705Z",
+      "finished_at": null,
+      "progress": {
+        "completed": 58,
+        "total": 401,
+        "unit": "urls",
+        "counters": {
+          "discovered": 400,
+          "fetched": 57,
+          "emitted": 46,
+          "acknowledged": 0,
+          "unacked": 0,
+          "duplicates": 10,
+          "skipped_out_of_scope": 0,
+          "skipped_robots": 0,
+          "not_modified": 0,
+          "errors": 1,
+          "frontier_size": 0,
+          "bytes_fetched": 15024094,
+          "overflow_pending": 0,
+          "continued_urls": 400
+        },
+        "updated_at": "2026-10-11T11:38:46.876784Z"
+      }
+    },
+    "collector_job_latest": {
+      "job_id": "job_4fa7767bf2d741fba24eee343f160bb7",
+      "status": "running",
+      "created_at": "2026-10-11T11:37:40.524527Z",
+      "started_at": "2026-10-11T11:37:40.525170Z",
+      "updated_at": "2026-10-11T11:40:01.057986Z",
+      "finished_at": null,
+      "progress": {
+        "completed": 121,
+        "total": 402,
+        "unit": "urls",
+        "counters": {
+          "discovered": 400,
+          "fetched": 119,
+          "emitted": 108,
+          "acknowledged": 0,
+          "unacked": 0,
+          "duplicates": 10,
+          "skipped_out_of_scope": 0,
+          "skipped_robots": 0,
+          "not_modified": 0,
+          "errors": 1,
+          "frontier_size": 0,
+          "bytes_fetched": 31319854,
+          "overflow_pending": 0,
+          "continued_urls": 400
+        },
+        "updated_at": "2026-10-11T11:40:00.915876Z"
+      }
+    },
+    "collector_collection_latest": {
+      "collection_id": "job_4fa7767bf2d741fba24eee343f160bb7",
+      "source_id": "prostor",
+      "state_key": "prostor",
+      "status": "running",
+      "mode": "incremental",
+      "rules": {
+        "digest": "sha256:4faff513c7fff4766f73996422668fae4c0451f65c2dcf8e46b17cd1b0ff926a",
+        "package_id": "catalog.prostor-catalog-rules",
+        "version": "1.1.1"
+      },
+      "stats": {
+        "discovered": 400,
+        "fetched": 120,
+        "emitted": 109,
+        "acknowledged": 108,
+        "unacked": 1,
+        "duplicates": 10,
+        "skipped_out_of_scope": 0,
+        "skipped_robots": 0,
+        "not_modified": 0,
+        "errors": 1,
+        "frontier_size": 280,
+        "bytes_fetched": 31564635,
+        "by_strategy": {},
+        "overflow_pending": 0
+      }
+    },
+    "source_state_before": {
+      "state_key": "prostor",
+      "known_urls": 5504,
+      "frontier_size": 3736,
+      "updated_at": "2026-10-11T09:31:02Z"
+    },
+    "source_state_first": {
+      "state_key": "prostor",
+      "known_urls": 5562,
+      "frontier_size": 3678,
+      "updated_at": "2026-10-11T11:38:47Z"
+    },
+    "source_state_latest": {
+      "state_key": "prostor",
+      "known_urls": 5624,
+      "frontier_size": 3616,
+      "updated_at": "2026-10-11T11:40:01Z"
+    },
+    "fetch_error_metadata": [
+      {
+        "code": "not_found",
+        "at": "2026-10-11T11:37:51Z",
+        "error_code": null,
+        "error_status": null,
+        "error_type": null
+      }
+    ],
+    "continued_urls": 400,
+    "progress_between_observations": true
+  },
+  "native_tasks": [
+    {
+      "task_id": "catalog-bi",
+      "enabled": true,
+      "interval_seconds": 900,
+      "overlap": "skip",
+      "collector_mode": "incremental",
+      "task_document_sha256": "1dae73afac03d6c6ca07bbc0e0c425163e07d59a1944beee540bc86e850a0bac",
+      "captured_at": "2026-10-11T11:29:28.669201Z",
+      "next_run_at": "2026-10-11T11:52:32.425Z",
+      "document_checked_at": "2026-10-11T11:29:28.669201Z",
+      "document_digest_matches_preapply": true,
+      "last_run": {
+        "run_id": "run_01M4NC1YPPGBQHXF2GQB9V3KEH",
+        "status": "running"
+      },
+      "schedule_checked_at": "2026-10-11T11:40:02.562711Z"
+    },
+    {
+      "task_id": "catalog-epicentrk",
+      "enabled": true,
+      "interval_seconds": 900,
+      "overlap": "skip",
+      "collector_mode": "incremental",
+      "task_document_sha256": "9d778224c29281c6aadd4e55c85645957a76abf4806a8098cac1ec2a8e8bf4e7",
+      "captured_at": "2026-10-11T11:29:28.866901Z",
+      "next_run_at": "2026-10-11T11:52:34.765Z",
+      "document_checked_at": "2026-10-11T11:29:28.866901Z",
+      "document_digest_matches_preapply": true,
+      "last_run": {
+        "run_id": "run_01M4NC2148MCB3WFCK1YGY8GES",
+        "status": "running"
+      },
+      "schedule_checked_at": "2026-10-11T11:40:02.562711Z"
+    },
+    {
+      "task_id": "catalog-prostor",
+      "enabled": true,
+      "interval_seconds": 900,
+      "overlap": "skip",
+      "collector_mode": "incremental",
+      "task_document_sha256": "45a9ae4741f6244f964f38aa02e34e213a1fb2e4f882136584a6740949bd16f7",
+      "captured_at": "2026-10-11T11:29:29.047767Z",
+      "next_run_at": "2026-10-11T11:52:37.467Z",
+      "document_checked_at": "2026-10-11T11:29:29.047767Z",
+      "document_digest_matches_preapply": true,
+      "last_run": {
+        "run_id": "run_01M4NC23MJQG9RPHZ810M40QC6",
+        "status": "running"
+      },
+      "schedule_checked_at": "2026-10-11T11:40:02.562711Z"
+    },
+    {
+      "task_id": "catalog-varus",
+      "enabled": true,
+      "interval_seconds": 900,
+      "overlap": "skip",
+      "collector_mode": "incremental",
+      "task_document_sha256": "3a5e0be9ab108e01941c51773de66799b04b089d842c8d39573578ddc046bd77",
+      "captured_at": "2026-10-11T11:29:29.219286Z",
+      "next_run_at": "2026-10-11T11:52:39.575Z",
+      "document_checked_at": "2026-10-11T11:29:29.219286Z",
+      "document_digest_matches_preapply": true,
+      "last_run": {
+        "run_id": "run_01M4NB6PQGS6DNMSXZ3273Y6NE",
+        "status": "succeeded",
+        "finished_at": "2026-10-11T11:37:40.564Z"
+      },
+      "schedule_checked_at": "2026-10-11T11:40:02.562711Z"
+    },
+    {
+      "task_id": "catalog-yakaboo",
+      "enabled": true,
+      "interval_seconds": 900,
+      "overlap": "skip",
+      "collector_mode": "incremental",
+      "task_document_sha256": "07582cf97e858a8a7fa16786a1e01dd1ac126306efc3bb0c0907781660e721c2",
+      "captured_at": "2026-10-11T11:29:29.407156Z",
+      "next_run_at": "2026-10-11T11:52:43.385Z",
+      "document_checked_at": "2026-10-11T11:29:29.407156Z",
+      "document_digest_matches_preapply": true,
+      "last_run": {
+        "run_id": "run_01M4N3FM7BPDRG1GEJQ9XDAEY2",
+        "status": "running"
+      },
+      "schedule_checked_at": "2026-10-11T11:40:02.562711Z"
+    }
+  ],
+  "site_entity_samples": {
+    "checked_at": "2026-10-11T11:04:46.971941Z",
+    "schema_encoding": "UTF-8",
+    "samples": [
+      {
+        "scope": "bi-ua",
+        "canonical_identity_sha256": "e2d8637d21f2235b0e5a469c93377e6577833b22018039ec89d90866d4688f0f",
+        "attributes_count": 7,
+        "schema_valid": true,
+        "price_is_numeric": true,
+        "price_is_finite": true,
+        "price_is_positive": true,
+        "package_id": "catalog.bi-products",
+        "package_version": "1.0.0",
+        "provenance_run_id": "run_01M4MNDS2TTNVFY0Q2XYTRW1RM",
+        "material_id": "web:04ee6115a1d59365799a2008d50b0cc1",
+        "observation_id": "obs_01a1297f72660000a1ca6512",
+        "observed_at": "2026-10-11T05:46:20Z",
+        "schema_file_sha256": "537947677f4060f4ca2d9f31db7cb29cf2cbf8dab1a095d6c0f10e243a3392ef",
+        "product_id_sha256": "8dc8933c4f5abc247a3e74e81a979f2651f665d66737ae91830c0a86a7349751",
+        "price_sha256": "84dc693dfa6d1633135f298c49ee06482ac048a03aef17d8249b7361f05001ef",
+        "attributes_sha256": "8623dbebf96e0511307a83ab321035861a7ca3368c4c1b8e417ff1462c881b2c",
+        "schema_error_count": 0,
+        "schema_sha256": "f5d0237cd8a5a00782e504e4a27624f63b2358a570199234a5efec60580eaec5",
+        "updated_at": "2026-10-11T05:46:28.614581Z",
+        "provenance_stage_id": "extract-products",
+        "schema_ref": "catalog.bi-products@1.0.0#product"
+      },
+      {
+        "scope": "epicentrk",
+        "canonical_identity_sha256": "b4e9203181175461adb740b4c65b61915e5b50b1be023672ff4acde63b3ba978",
+        "attributes_count": 10,
+        "schema_valid": true,
+        "price_is_numeric": true,
+        "price_is_finite": true,
+        "price_is_positive": true,
+        "package_id": "catalog.epicentrk-products",
+        "package_version": "1.0.0",
+        "provenance_run_id": "run_01M4MXF3E850G6B1J29AQFHN2T",
+        "material_id": "web:8009f083c923dcbbe2733ddbc401ef29",
+        "observation_id": "obs_01a129e1faf80000261dfaf0",
+        "observed_at": "2026-10-11T07:33:58Z",
+        "schema_file_sha256": "18baa081ed618bd104fd8392f80c8676582fde7214965b4f0fde685c22f1ea6f"
+      },
+      {
+        "scope": "prostor",
+        "canonical_identity_sha256": "066354d255124a2f277c8470b298b386159badb0d093e6b31b6742d404f40731",
+        "attributes_count": 15,
+        "schema_valid": true,
+        "price_is_numeric": true,
+        "price_is_finite": true,
+        "price_is_positive": true,
+        "package_id": "catalog.prostor-product-extractor",
+        "package_version": "1.1.0",
+        "provenance_run_id": "run_01M4MNDSFCA0NMCBZVJJGPS2CE",
+        "material_id": "web:f9e34a0def1f99d6300557d871a6499c",
+        "observation_id": "obs_01a12977fbe900007cc51c55",
+        "observed_at": "2026-10-11T05:38:11Z",
+        "schema_file_sha256": "923c30eb3a4878dee8a3171d59133b0921ff72eb3a4ec3eef1b916ae3b35980f"
+      },
+      {
+        "scope": "varus",
+        "canonical_identity_sha256": "88ec36583d2e434e388a0905ac4587d0af05e27610a1dfd8176eb49f2502f7e5",
+        "attributes_count": 8,
+        "schema_valid": true,
+        "price_is_numeric": true,
+        "price_is_finite": true,
+        "price_is_positive": true,
+        "package_id": "catalog.varus-product-extractor",
+        "package_version": "1.1.1",
+        "package_digest": "sha256:e47e379d2f4a6f3a43e7384be3d892725782cc9b654cddc013674c375a924cb6",
+        "provenance_run_id": "run_01M4N6XC340D916QJPB2TCSYBR",
+        "material_id": "web:dcf7425428e0742ca9c0a6e746cc74da",
+        "observation_id": "obs_01a12a8e117e000024365565",
+        "observed_at": "2026-10-11T10:41:55Z",
+        "registry_schema_bytes_equal": true,
+        "registry_digest_matches_provenance": true,
+        "schema_error_count": 0,
+        "schema_file_sha256": "d4b1abb7ced28d71e01fb4c55543e62fd47f62c33698ba53b290592cdd4d434e",
+        "audited_schema_encoding": "UTF-8"
+      },
+      {
+        "scope": "yakaboo",
+        "canonical_identity_sha256": "cde050a0cf26d14dbf5395c4f46ea71f47817cce84460ee7b271127a2dee6853",
+        "attributes_count": 8,
+        "schema_valid": true,
+        "price_is_numeric": true,
+        "price_is_finite": true,
+        "price_is_positive": true,
+        "package_id": "catalog.yakaboo-book-extractor",
+        "package_version": "1.0.0",
+        "provenance_run_id": "run_01M4ME0G67RKHKXE3NM585BWTZ",
+        "material_id": "web:396102fc698d6bd3702c736447b862a7",
+        "observation_id": "obs_01a128ea408400006aad2cfa",
+        "observed_at": "2026-10-11T03:03:23Z",
+        "ua_product_url": true,
+        "from_old_subset_run": true,
+        "schema_file_sha256": "39c60a0bc04eeae4cf1111f198432c789afb8c4c97b1ffa92e79f127b1ebad0d"
+      }
+    ]
+  },
+  "yakaboo_whole_site_entities": {
+    "checked_at": "2026-10-11T11:29:29.609227Z",
+    "run_id": "run_01M4N3FM7BPDRG1GEJQ9XDAEY2",
+    "updated_candidates_since_run_start": 0,
+    "status": "UNPROVEN",
+    "valid_live_sample_from_old_subset": true
+  },
+  "runtime_preservation": {
+    "collector_current": {
+      "container_id": "ebf7400996394887dfcfa6ae79ae84526f8f49c4c354e832980515ee69a64d2d",
+      "image": "sha256:560bda29114a0e96ffc030bbb9eb82bc0a32ef15f1107a35f9c64b1472843251",
+      "started_at": "2026-10-11T07:21:14.622802307Z",
+      "running": true,
+      "health": "healthy",
+      "failing_streak": 0,
+      "restart_count": 0,
+      "oom_killed": false,
+      "configuration_fingerprint": "06f7a59f3c62e81c4e01178a4a4d66465156d3b80dec74043a55202e5fb7fe08"
+    },
+    "collector_id_image_start_config_matches_preapply": true,
+    "writer_code_checks": [
+      {
+        "name": "jane-demo-orchestrator-1",
+        "image": "sha256:be47a9747786a2b7a2267ea62d5a4f0f3980d5f81b9ab0d0f8e9a4d1f7be80f2",
+        "started_at": "2026-10-11T11:23:16.836871703Z",
+        "running": true,
+        "health": "healthy",
+        "engine_sha256": [
+          "25d1ea1cd2fb07ea841ab37966d00919de08e8cdf7409531461434918f265409"
+        ],
+        "other_core_kit_files_count": 46,
+        "other_core_kit_manifest_sha256": "ad2b3ae5c3e2005132b607bc31b667754ffc0af6717bc5ed9b14f686326349e4",
+        "other_core_kit_baseline_manifest_matches": true
+      },
+      {
+        "name": "jane-demo-automarket-priority-worker",
+        "image": "sha256:be47a9747786a2b7a2267ea62d5a4f0f3980d5f81b9ab0d0f8e9a4d1f7be80f2",
+        "started_at": "2026-10-11T11:23:17.662411373Z",
+        "running": true,
+        "health": null,
+        "engine_sha256": [
+          "25d1ea1cd2fb07ea841ab37966d00919de08e8cdf7409531461434918f265409"
+        ],
+        "other_core_kit_files_count": 46,
+        "other_core_kit_manifest_sha256": "ad2b3ae5c3e2005132b607bc31b667754ffc0af6717bc5ed9b14f686326349e4",
+        "other_core_kit_baseline_manifest_matches": true
+      }
+    ]
+  },
+  "bounded_health_observation": {
+    "start_at": "2026-10-11T11:29:58.300362Z",
+    "end_at": "2026-10-11T11:39:58.300362Z",
+    "signal_counts": {
+      "lease_lost": 0,
+      "sqlite_locked": 0,
+      "sqlite_error": 0,
+      "oom_error": 0,
+      "startup_restart": 0
+    },
+    "lease_events": [],
+    "single_collector_health_get": {
+      "http_status": 200,
+      "elapsed_ms": 31.9,
+      "status": "ok"
+    }
+  },
+  "limitations": [
+    "Initial full-assortment discovery remains in progress; this proves scheduled continuation, not completed site coverage.",
+    "Direct post-completion input-byte re-read is unavailable because successful items normally clear their payload.",
+    "ContentReader hash preservation is an inference from exact code, the actual declared baseline hash and successful real extraction; inline declared-size equality is not separately enforced.",
+    "The health and lease observations apply only to the dated bounded window.",
+    "New whole-site Yakaboo product entities remain unproven; its valid entity sample came from an earlier subset run."
+  ],
+  "metadata_only": true,
+  "manual_database_or_api_state_writes_by_verifier": 0,
+  "data_config_exports_copies_or_backups_created": 0
+}

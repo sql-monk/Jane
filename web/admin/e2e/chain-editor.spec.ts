@@ -57,8 +57,17 @@ test("new visual task picks registry package/version and creates branches @mock"
   await admin.getByLabel("Назва", { exact: true }).fill("Visual Task");
   await admin.getByLabel("Джерело (source_id)").fill("shop-example");
   await admin.getByRole("tab", { name: "Ланцюжок" }).click();
+  const version = admin.getByLabel("Версія пакета");
+  await expect(admin.getByLabel("Пакет правил")).toHaveValue("");
+  await expect(version).toBeDisabled();
+  await expect(version.locator("option:checked")).toHaveText("Із джерела: 1.0.0");
   await admin.getByRole("button", { name: "Додати етап-обробник" }).click();
+  await expect(admin.getByLabel("Пакет обробника")).toHaveValue("");
+  await expect(version).toBeDisabled();
+  await expect(version.locator("option:checked")).toHaveText("Виберіть версію");
   await admin.getByLabel("Пакет обробника").selectOption("shop-example.product-extractor");
+  await expect(version).toBeEnabled();
+  await expect(version.locator("option:checked")).toHaveText("Виберіть версію");
   await admin.getByLabel("Версія пакета").selectOption("1.2.0");
   await admin.getByTestId("dag-node-collect").click();
   await admin.getByRole("button", { name: "Додати етап-обробник" }).click();

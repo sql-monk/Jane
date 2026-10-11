@@ -390,7 +390,7 @@ export function ChainPackagePicker({
           onChange={(e) => setRef({ package_id: packageId, version: e.target.value })}
         >
           <option value="">
-            {!packageId && source?.collector_rules
+            {stage.kind === "collect" && inherit && !packageId && source?.collector_rules
               ? `Із джерела: ${source.collector_rules.version}`
               : "Виберіть версію"}
           </option>

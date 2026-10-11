@@ -1,4 +1,39 @@
 {
+  "extractor-sdk/author-workflow": {
+    "drawio": "c6b704d104d5253e697237c4f5ba7a03f2f99318f75650b99f9b9f6131c4c94e",
+    "light": "41539cb56fa523745acd33582a973550dc8824f268c008a92d4e4b62ae04844f",
+    "dark": "c81bb09ec245bea77dadf7a5fbdb17fbc4bb7c216b27fd7337dc7903b5fac9b7"
+  },
+  "extractor-sdk/runner-protocol": {
+    "drawio": "ac36155d2f48a96022c7c5f82d13f9bfb3826724e46899cd00a77bf654fe96d6",
+    "light": "4e825bb70bf90c7fe888b1682490e5f0bb4adb8dfeae2d93405cb4d42600a126",
+    "dark": "43db6a4770572b77d8576e356880c5175f23e3be9251998c70dab9daa1dd59be"
+  },
+  "handler-runtime/components": {
+    "drawio": "a9b03efd5048cdbadd89c8ebd5fc8a945af1550945483a2f9f7fda23b4fd9c3a",
+    "light": "4b4c3dfe537f0614e0aef7d1d1f5192d1a774654b7dfeb75bec5d3d731bb9ab9",
+    "dark": "a4989a9aeeb77ec383e6d8bf9b2833f6350de103c22a4f7d869c41436205e52b"
+  },
+  "handler-runtime/invocation-sequence": {
+    "drawio": "1e2dd2b5b2da2ce1b088804983ce5e4285bf1be78efe54d6fff600a8d89a7b15",
+    "light": "520ce4e3cdeb7bf0fac874fecf76d66c9b0ce807dda0d052ec89ac67b45dd20b",
+    "dark": "55ad417bd9c60b477618f626cbcefd6f6a6ac28bb997e9e53e7ce73becb63161"
+  },
+  "handler-runtime/job-states": {
+    "drawio": "2693d4babac6342bd13b91e6612c235d879e80351f6ed08b48a35bc8b3336a60",
+    "light": "c74406571c747664289f814584204714ccc6172e43da0ee5cf70b2be3ae9868d",
+    "dark": "be7332ba79650e0bfc9c1fb117138ff588db2c8c0112b6d653a10588ba5b9544"
+  },
+  "handler-runtime/result-classification": {
+    "drawio": "4f60655d9a7e9b8fbc121f09b8798572ddae28cc1d1dcfa35176825fe44abb9b",
+    "light": "c3ec914ec8c09fcc8ddf8c10627ae7683a8bb7c3acdfbbced0efdbd2b45180b0",
+    "dark": "3ec3443871e63fa63742b8151c21ba6cf89c7fcf9d184a85551651636942cf81"
+  },
+  "handler-runtime/state-er": {
+    "drawio": "92a7801cdb0ec4d639b0f58dc5e5cf98c509830e3fc0ac92f458e7842699c480",
+    "light": "10a5a8ac72c29491d80a79fbc58212322dff564d7f95149ace951e6e8b41156e",
+    "dark": "8f11b67872296fbbf4fe69bf9f7c6fab565e6967855a62d5093814209252e952"
+  },
   "platform/composition": {
     "drawio": "4ce63d7f87feaa558e60a42da57def6718fda505abe78564db452f93d9d354f6",
     "light": "4ed9f61f46ec6ef0f56b8e4e2881f9f310e9ad471cf935d9729153f4e70769fa",

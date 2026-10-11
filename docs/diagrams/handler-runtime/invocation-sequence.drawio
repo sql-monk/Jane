@@ -1,0 +1,88 @@
+<mxfile host="drawio" version="31.4.5">
+  <diagram id="hr-invocation" name="Виклик обробника">
+    <mxGraphModel adaptiveColors="none" grid="1" gridSize="10" page="0" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="lc" value="Клієнт" style="shape=umlLifeline;perimeter=lifelinePerimeter;container=0;collapsible=0;recursiveResize=0;size=48;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#F5F5F5,#2D333B);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;outlineConnect=0;" vertex="1" parent="1">
+          <mxGeometry x="15" y="20" width="170" height="760" as="geometry"/>
+        </mxCell>
+        <mxCell id="la" value="HTTP API&#10;і JobRunner" style="shape=umlLifeline;perimeter=lifelinePerimeter;container=0;collapsible=0;recursiveResize=0;size=48;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;outlineConnect=0;" vertex="1" parent="1">
+          <mxGeometry x="245" y="20" width="170" height="760" as="geometry"/>
+        </mxCell>
+        <mxCell id="le" value="Executor" style="shape=umlLifeline;perimeter=lifelinePerimeter;container=0;collapsible=0;recursiveResize=0;size=48;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;outlineConnect=0;" vertex="1" parent="1">
+          <mxGeometry x="475" y="20" width="170" height="760" as="geometry"/>
+        </mxCell>
+        <mxCell id="ld" value="Docker Engine" style="shape=umlLifeline;perimeter=lifelinePerimeter;container=0;collapsible=0;recursiveResize=0;size=48;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;outlineConnect=0;" vertex="1" parent="1">
+          <mxGeometry x="705" y="20" width="170" height="760" as="geometry"/>
+        </mxCell>
+        <mxCell id="lr" value="Раннер SDK&#10;у контейнері" style="shape=umlLifeline;perimeter=lifelinePerimeter;container=0;collapsible=0;recursiveResize=0;size=48;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;outlineConnect=0;" vertex="1" parent="1">
+          <mxGeometry x="935" y="20" width="170" height="760" as="geometry"/>
+        </mxCell>
+        <mxCell id="m1" value="POST /v1/invocations" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;verticalAlign=bottom;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="100" y="110" as="sourcePoint"/><mxPoint x="330" y="110" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="m2" value="prepare()" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;verticalAlign=bottom;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="330" y="150" as="sourcePoint"/><mxPoint x="560" y="150" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="m3" value="пакет, маніфест, params, inputs" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;align=left;spacingLeft=6;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="560" y="175" as="sourcePoint"/><mxPoint x="560" y="199" as="targetPoint"/><Array as="points"><mxPoint x="600" y="175"/><mxPoint x="600" y="199"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="m4" value="помилка до запуску" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;verticalAlign=bottom;endArrow=open;endFill=0;endSize=8;dashed=1;dashPattern=2 3;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="560" y="235" as="sourcePoint"/><mxPoint x="330" y="235" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="m5" value="job: run()" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;verticalAlign=bottom;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="330" y="280" as="sourcePoint"/><mxPoint x="560" y="280" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="m6" value="create, /work, start" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;verticalAlign=bottom;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="560" y="320" as="sourcePoint"/><mxPoint x="790" y="320" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="m7" value="runner /work" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;verticalAlign=bottom;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="790" y="360" as="sourcePoint"/><mxPoint x="1020" y="360" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="m8" value="extract(...)" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;align=left;spacingLeft=6;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="1020" y="385" as="sourcePoint"/><mxPoint x="1020" y="409" as="targetPoint"/><Array as="points"><mxPoint x="1060" y="385"/><mxPoint x="1060" y="409"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="m9" value="stdout: JSON протоколу v1" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;verticalAlign=bottom;endArrow=open;endFill=0;endSize=8;dashed=1;dashPattern=2 3;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="1020" y="450" as="sourcePoint"/><mxPoint x="560" y="450" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="m10" value="wait до wall_time_ms" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;verticalAlign=bottom;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="560" y="490" as="sourcePoint"/><mxPoint x="790" y="490" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="m11" value="logs, inspect, remove" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;verticalAlign=bottom;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="560" y="530" as="sourcePoint"/><mxPoint x="790" y="530" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="m12" value="класифікація" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;align=left;spacingLeft=6;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="560" y="555" as="sourcePoint"/><mxPoint x="560" y="579" as="targetPoint"/><Array as="points"><mxPoint x="600" y="555"/><mxPoint x="600" y="579"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="m13" value="HandlerResult" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;verticalAlign=bottom;endArrow=open;endFill=0;endSize=8;dashed=1;dashPattern=2 3;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="560" y="615" as="sourcePoint"/><mxPoint x="330" y="615" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="m14" value="200 або 202 + Job" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;verticalAlign=bottom;endArrow=open;endFill=0;endSize=8;dashed=1;dashPattern=2 3;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="330" y="655" as="sourcePoint"/><mxPoint x="100" y="655" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="m15" value="GET /v1/jobs/{job_id}" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;verticalAlign=bottom;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="100" y="700" as="sourcePoint"/><mxPoint x="330" y="700" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="m16" value="Job.result" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;verticalAlign=bottom;endArrow=open;endFill=0;endSize=8;dashed=1;dashPattern=2 3;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="330" y="740" as="sourcePoint"/><mxPoint x="100" y="740" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="n1" value="Повтор Idempotency-Key: збережена відповідь, duplicate: true" style="shape=note;size=12;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFF9DB,#3A3418);strokeColor=light-dark(#B8A44C,#8B7D3A);align=left;spacingLeft=8;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1130" y="90" width="300" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="n2" value="До запуску: 422, 404, 502 або 503 у форматі problem+json" style="shape=note;size=12;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFF9DB,#3A3418);strokeColor=light-dark(#B8A44C,#8B7D3A);align=left;spacingLeft=8;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1130" y="213" width="300" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="n3" value="Не встиг за wall_time_ms: kill контейнера, failed і timeout" style="shape=note;size=12;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFF9DB,#3A3418);strokeColor=light-dark(#B8A44C,#8B7D3A);align=left;spacingLeft=8;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1130" y="468" width="300" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="n4" value="sync: 200 або 202, якщо довше за sync_response_max_ms; async: одразу 202" style="shape=note;size=12;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFF9DB,#3A3418);strokeColor=light-dark(#B8A44C,#8B7D3A);align=left;spacingLeft=8;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1130" y="633" width="300" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="n5" value="Опитування до кінцевого стану Job" style="shape=note;size=12;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFF9DB,#3A3418);strokeColor=light-dark(#B8A44C,#8B7D3A);align=left;spacingLeft=8;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1130" y="698" width="300" height="44" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

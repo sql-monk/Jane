@@ -1,0 +1,124 @@
+<mxfile host="drawio" version="31.4.5">
+  <diagram id="hr-components" name="Компоненти Handler Runtime">
+    <mxGraphModel adaptiveColors="none" grid="1" gridSize="10" page="0" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="orch" value="Orchestrator,&#10;Assistant" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#E1D5E7,#3A2D4D);strokeColor=light-dark(#9673A6,#B39DDB);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="480" y="10" width="170" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="third" value="Сторонній&#10;застосунок" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#F5F5F5,#2D333B);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="690" y="10" width="160" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="author" value="Автор пакета" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#F5F5F5,#2D333B);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="880" y="10" width="140" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="grp" value="Handler Runtime" style="rounded=1;arcSize=4;whiteSpace=wrap;html=0;fillColor=none;verticalAlign=bottom;align=left;spacingLeft=12;spacingTop=4;spacingBottom=6;fontStyle=1;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="300" y="100" width="720" height="440" as="geometry"/>
+        </mxCell>
+        <mxCell id="state" value="Стан сервісу&#10;memory або PostgreSQL" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="330" y="140" width="200" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="api" value="HTTP API: app.py&#10;invocations, test-runs, jobs" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="570" y="140" width="230" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="cli" value="CLI: cli.py&#10;run, test, profile,&#10;build-image" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="850" y="136" width="150" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="exec" value="Executor: executor.py&#10;перевірки, ліміти, результат" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="570" y="245" width="230" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="store" value="PackageStore&#10;кеш пакетів за дайджестом" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="330" y="330" width="220" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="fetch" value="ContentFetcher&#10;file:// у blob_roots,&#10;download_url з allowlist" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="330" y="430" width="220" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="backend" value="SandboxBackend&#10;docker або subprocess" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="780" y="330" width="210" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="pg" value="PostgreSQL&#10;стан кількох екземплярів" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="0" y="140" width="180" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="registry" value="Registry&#10;архіви пакетів" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFE6CC,#4A3418);strokeColor=light-dark(#D79B00,#E0A84A);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="0" y="330" width="180" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="blob" value="Blob-сховище&#10;файли, HTTP(S)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="0" y="434" width="180" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="engine" value="Docker або Podman&#10;Engine API" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="780" y="580" width="210" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="box" value="Контейнер пісочниці&#10;раннер SDK + код пакета&#10;без мережі, read-only" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="780" y="680" width="210" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e1" value="handler.v1" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="orch" target="api">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.7;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="third" target="api">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="author" target="cli">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="api" target="state">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="e5" value="state_dsn" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;dashed=1;dashPattern=6 4;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="state" target="pg">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="api" target="exec">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="cli" target="exec">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="e8" value="" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="exec" target="store">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="e9" value="inputs" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="exec" target="fetch">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="e10" value="package_archive" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="store" target="fetch">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="e11" value="registry.v1" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;dashed=1;dashPattern=6 4;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="store" target="registry">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="e12" value="" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;dashed=1;dashPattern=2 3;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="fetch" target="blob">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="e13" value="" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="exec" target="backend">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="e14" value="контейнер на виклик" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="backend" target="engine">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="e15" value="" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;dashed=1;dashPattern=2 3;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="engine" target="box">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="legTitle" value="Легенда" style="text;html=0;whiteSpace=wrap;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);align=left;verticalAlign=middle;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="0" y="600" width="200" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg0" value="" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;strokeColor=light-dark(#424A53,#C9D1D9);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="0" y="636" as="sourcePoint"/><mxPoint x="50" y="636" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="legT0" value="виклик API або коду" style="text;html=0;whiteSpace=wrap;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);align=left;verticalAlign=middle;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="626" width="300" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg1" value="" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;dashed=1;dashPattern=6 4;strokeColor=light-dark(#424A53,#C9D1D9);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="0" y="660" as="sourcePoint"/><mxPoint x="50" y="660" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="legT1" value="опційна залежність" style="text;html=0;whiteSpace=wrap;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);align=left;verticalAlign=middle;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="650" width="300" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg2" value="" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;dashed=1;dashPattern=2 3;strokeColor=light-dark(#424A53,#C9D1D9);" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="0" y="684" as="sourcePoint"/><mxPoint x="50" y="684" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="legT2" value="дані: файли, мережа, процес" style="text;html=0;whiteSpace=wrap;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);align=left;verticalAlign=middle;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="674" width="300" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

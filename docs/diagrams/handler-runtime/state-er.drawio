@@ -1,0 +1,31 @@
+<mxfile host="drawio" version="31.4.5">
+  <diagram id="hr-state-er" name="Стан у PostgreSQL">
+    <mxGraphModel adaptiveColors="none" grid="1" gridSize="10" page="0" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="schema" value="Схема jane_handler_runtime (state_schema)" style="rounded=1;arcSize=4;whiteSpace=wrap;html=0;fillColor=none;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4;spacingBottom=6;fontStyle=1;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="0" y="0" width="1000" height="330" as="geometry"/>
+        </mxCell>
+        <mxCell id="idem" value="idempotency&#10;key: text PK = Idempotency-Key&#10;fingerprint: text&#10;state: text&#10;expires_at: timestamptz&#10;lease_until, owner, token&#10;status_code, body, headers" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;align=left;verticalAlign=middle;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="30" y="50" width="290" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="jobs" value="jobs&#10;job_id: text PK&#10;doc: jsonb (Job)&#10;owner: text&#10;lease_until: timestamptz&#10;finished_at: timestamptz&#10;updated_at: timestamptz" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;align=left;verticalAlign=middle;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="370" y="50" width="270" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="results" value="results&#10;invocation_id: text PK&#10;doc: jsonb (HandlerResult)&#10;created_at: timestamptz" style="rounded=1;arcSize=12;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;align=left;verticalAlign=middle;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="690" y="50" width="280" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1" value="doc.idempotency_key" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;dashed=1;dashPattern=6 4;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="idem" target="jobs">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="r2" value="doc.labels.invocation_id" style="edgeStyle=none;rounded=0;html=0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=7;dashed=1;dashPattern=6 4;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#1A1A1A,#E6EDF3);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="jobs" target="results">
+          <mxGeometry relative="1" as="geometry"></mxGeometry>
+        </mxCell>
+        <mxCell id="ern" value="Зовнішніх ключів немає: зв'язки логічні. Ключі живуть idempotency_ttl_seconds, job — job_retention_seconds, результати видаляються після idempotency_ttl_seconds." style="shape=note;size=12;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFF9DB,#3A3418);strokeColor=light-dark(#B8A44C,#8B7D3A);align=left;spacingLeft=8;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="30" y="230" width="940" height="56" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

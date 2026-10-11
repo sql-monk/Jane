@@ -1,0 +1,129 @@
+{
+  "sourceRevision": "ada35865a3270e4ae85c945b2b29c2222380260f",
+  "taskId": "visual-chain-20261011",
+  "sourceId": "visual-live-20261011",
+  "connectionId": "visual-raw-20261011",
+  "run": {
+    "run_id": "run_01M4M91XP4A79RA2MC9AGQP9RC",
+    "task_id": "visual-chain-20261011",
+    "task_etag": "\"v4\"",
+    "status": "succeeded",
+    "trigger": "manual",
+    "test_mode": false,
+    "created_at": "2026-10-11T01:25:51.424Z",
+    "stages": [
+      {
+        "stage_id": "collect",
+        "counts": {
+          "completed": 2
+        }
+      },
+      {
+        "stage_id": "store-raw",
+        "counts": {
+          "completed": 2,
+          "success": 2
+        },
+        "handler": {
+          "version": "1.0.0",
+          "package_id": "jane.storage-files"
+        }
+      }
+    ],
+    "counters": {
+      "materials": 2,
+      "unknown_materials": 0
+    },
+    "backpressure": false,
+    "started_at": "2026-10-11T01:25:51.810Z",
+    "finished_at": "2026-10-11T01:25:54.102Z",
+    "collection_id": "job_add8066812d94d25820117fcd3151424"
+  },
+  "config": {
+    "input": {
+      "urls": [
+        "http://testsite:8080/product/phone-alpha",
+        "http://testsite:8080/news/2026/autumn-sale"
+      ],
+      "source_id": "visual-live-20261011"
+    },
+    "title": "Повний візуальний сценарій",
+    "stages": [
+      {
+        "kind": "collect",
+        "stage_id": "collect",
+        "collector": {
+          "mode": "full",
+          "rules": {
+            "version": "1.0.0",
+            "package_id": "demo.visual-web-rules"
+          },
+          "collector": "web"
+        }
+      },
+      {
+        "kind": "handler",
+        "inputs": [
+          {
+            "from": "collect"
+          }
+        ],
+        "params": {
+          "format": {
+            "raw": "original",
+            "entities": "jsonl"
+          },
+          "prefix": "visual-live-20261011"
+        },
+        "handler": {
+          "version": "1.0.0",
+          "package_id": "jane.storage-files"
+        },
+        "bindings": [
+          {
+            "media_types": [
+              "text/html"
+            ],
+            "url_patterns": [
+              {
+                "value": "**/news/**"
+              },
+              {
+                "value": "**/product/**"
+              }
+            ]
+          }
+        ],
+        "stage_id": "store-raw",
+        "connections": {
+          "target": "visual-raw-20261011"
+        }
+      }
+    ],
+    "enabled": true,
+    "task_id": "visual-chain-20261011"
+  },
+  "objects": [
+    {
+      "object_id": "obj_493a173c02b465a19d19cd64be303bfb",
+      "url": "http://testsite:8080/product/phone-alpha",
+      "bytes": 1081,
+      "sha256": "ed3d75422039bccf31d4544c62981e4d284fc17adc6e266ad52965bd97630013"
+    },
+    {
+      "object_id": "obj_3b6a738858bef8fec69c80a37b38ac46",
+      "url": "http://testsite:8080/news/2026/autumn-sale",
+      "bytes": 872,
+      "sha256": "731fbf1a7c2c0742e1ff30c35dea2a99676981575d7684dd0ad790b52f1667d4"
+    }
+  ],
+  "browser": {
+    "nestedObjectEdited": true,
+    "arrayOfObjectsReordered": true,
+    "stringArrayEditedAndRemoved": true,
+    "persistedAfterReload": true,
+    "bothOriginalContentsOpened": true,
+    "traceLinked": true,
+    "pageErrors": []
+  }
+}

@@ -1,0 +1,377 @@
+{
+  "source_id": "news-tg-tass-agency",
+  "run_id": "run_01M4MQ6F4GP8Z5XKG7K3E7SW6K",
+  "request_outcome": {
+    "manual_start_status": 409,
+    "code": "conflict",
+    "created_new_run": false,
+    "using_existing_postfix_scheduled_run": true
+  },
+  "poll_interval_seconds": 20,
+  "snapshots": [
+    {
+      "checked_at": "2026-10-11T05:34:16.470807Z",
+      "status": "running",
+      "stage_counts": {
+        "collect": {
+          "completed": 1
+        },
+        "store-raw": {
+          "completed": 1,
+          "success": 1
+        },
+        "prepare": {
+          "completed": 1,
+          "success": 1
+        },
+        "analyse": {
+          "completed": 1,
+          "success": 1
+        },
+        "verify": {
+          "completed": 1,
+          "success": 1
+        },
+        "store-news": {
+          "queued": 1
+        }
+      }
+    },
+    {
+      "checked_at": "2026-10-11T05:34:36.506874Z",
+      "status": "succeeded",
+      "stage_counts": {
+        "collect": {
+          "completed": 1
+        },
+        "store-raw": {
+          "completed": 1,
+          "success": 1
+        },
+        "prepare": {
+          "completed": 1,
+          "success": 1
+        },
+        "analyse": {
+          "completed": 1,
+          "success": 1
+        },
+        "verify": {
+          "completed": 1,
+          "success": 1
+        },
+        "store-news": {
+          "completed": 1,
+          "success": 1
+        }
+      }
+    }
+  ],
+  "latest_run": {
+    "run_id": "run_01M4MQ6F4GP8Z5XKG7K3E7SW6K",
+    "task_id": "news-tg-tass-agency",
+    "status": "succeeded",
+    "trigger": "schedule",
+    "created_at": "2026-10-11T05:33:00.357Z",
+    "started_at": "2026-10-11T05:33:01.119Z",
+    "finished_at": "2026-10-11T05:34:26.021Z",
+    "counters": {
+      "materials": 1,
+      "unknown_materials": 0
+    },
+    "stages": [
+      {
+        "stage_id": "collect",
+        "counts": {
+          "completed": 1
+        }
+      },
+      {
+        "stage_id": "store-raw",
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+          "version": "1.0.0",
+          "package_id": "jane.storage-files"
+        }
+      },
+      {
+        "stage_id": "prepare",
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:9c17eb10b74ef3fa5df26b458ca992f64333b33bd9741229528afb0bdbddcac3",
+          "version": "1.0.1",
+          "package_id": "news.telegram-public-posts"
+        }
+      },
+      {
+        "stage_id": "analyse",
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98",
+          "version": "1.1.1",
+          "package_id": "news.article-analysis"
+        }
+      },
+      {
+        "stage_id": "verify",
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+          "version": "1.1.2",
+          "package_id": "news.article-normalize"
+        }
+      },
+      {
+        "stage_id": "store-news",
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+          "version": "1.0.0",
+          "package_id": "jane.storage-postgresql"
+        }
+      }
+    ]
+  },
+  "items": [
+    {
+      "item_id": "itm_01M4MQ6RDW93K4Y488372GWEHQ",
+      "stage_id": "collect",
+      "status": "completed",
+      "attempts": 0,
+      "material_id": "web:f4d3d235766a10a706d22040c97cc66c",
+      "observation_id": "obs_01a1297360560000e8096e0b",
+      "finished_at": "2026-10-11T05:33:09.947Z"
+    },
+    {
+      "item_id": "itm_01M4MQ6RDXAZX4VRWY4KN085VC",
+      "stage_id": "store-raw",
+      "status": "completed",
+      "attempts": 1,
+      "material_id": "web:f4d3d235766a10a706d22040c97cc66c",
+      "observation_id": "obs_01a1297360560000e8096e0b",
+      "result_status": "success",
+      "invocation_id": "inv_01a12973649b0fd69a89e3ac682b",
+      "handler": {
+        "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+        "version": "1.0.0",
+        "package_id": "jane.storage-files"
+      },
+      "started_at": "2026-10-11T05:33:10.607Z",
+      "finished_at": "2026-10-11T05:33:10.791Z"
+    },
+    {
+      "item_id": "itm_01M4MQ6RE1221YWCD1GBHH6DMR",
+      "stage_id": "prepare",
+      "status": "completed",
+      "attempts": 1,
+      "material_id": "web:f4d3d235766a10a706d22040c97cc66c",
+      "observation_id": "obs_01a1297360560000e8096e0b",
+      "result_status": "success",
+      "invocation_id": "inv_51ea8f53b546461f88ade9666029b92f",
+      "handler": {
+        "digest": "sha256:9c17eb10b74ef3fa5df26b458ca992f64333b33bd9741229528afb0bdbddcac3",
+        "version": "1.0.1",
+        "package_id": "news.telegram-public-posts"
+      },
+      "started_at": "2026-10-11T05:33:43.005Z",
+      "finished_at": "2026-10-11T05:33:47.842Z"
+    },
+    {
+      "item_id": "itm_01M4MQ7XE762K3FY9AYA9DQJV7",
+      "stage_id": "analyse",
+      "status": "completed",
+      "attempts": 1,
+      "material_id": "web:f4d3d235766a10a706d22040c97cc66c",
+      "observation_id": "obs_01a1297360560000e8096e0b",
+      "result_status": "success",
+      "invocation_id": "inv_3746f4a789bc49debc2899021e8660c7",
+      "handler": {
+        "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98",
+        "version": "1.1.1",
+        "package_id": "news.article-analysis"
+      },
+      "started_at": "2026-10-11T05:33:48.147Z",
+      "finished_at": "2026-10-11T05:34:09.016Z"
+    },
+    {
+      "item_id": "itm_01M4MQ8J41CPPXDXY74NGT9FM1",
+      "stage_id": "verify",
+      "status": "completed",
+      "attempts": 1,
+      "material_id": "web:f4d3d235766a10a706d22040c97cc66c",
+      "observation_id": "obs_01a1297360560000e8096e0b",
+      "result_status": "success",
+      "invocation_id": "inv_2b67668fcea94a3fae9d146950d3c598",
+      "handler": {
+        "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1",
+        "version": "1.1.2",
+        "package_id": "news.article-normalize"
+      },
+      "started_at": "2026-10-11T05:34:09.051Z",
+      "finished_at": "2026-10-11T05:34:10.419Z"
+    },
+    {
+      "item_id": "itm_01M4MQ8KFR7BZ6XJC5S08QQFQT",
+      "stage_id": "store-news",
+      "status": "completed",
+      "attempts": 1,
+      "material_id": "web:f4d3d235766a10a706d22040c97cc66c",
+      "observation_id": "obs_01a1297360560000e8096e0b",
+      "result_status": "success",
+      "invocation_id": "inv_01a129748ac15b7bfefb435c82e8",
+      "handler": {
+        "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+        "version": "1.0.0",
+        "package_id": "jane.storage-postgresql"
+      },
+      "started_at": "2026-10-11T05:34:25.914Z",
+      "finished_at": "2026-10-11T05:34:26.011Z"
+    }
+  ],
+  "items_next_cursor": null,
+  "last_checked_at": "2026-10-11T05:34:36.506874Z",
+  "terminal": true,
+  "source_entity_verification": {
+    "records": [
+      {
+        "canonical_key": "news-tg-tass-agency|{\"url\":\"https://t.me/tass_agency/399749\"}",
+        "key": {
+          "scope": "news-tg-tass-agency",
+          "natural": {
+            "url": "https://t.me/tass_agency/399749"
+          }
+        },
+        "updated_at": "2026-10-11T05:09:06.984000Z",
+        "fields": {
+          "url": "https://t.me/tass_agency/399749",
+          "source_id": "news-tg-tass-agency",
+          "source_name": "ТАСС",
+          "source_kind": "telegram",
+          "transport": "telegram_public_web",
+          "region": "russia",
+          "evidence_validation": "verified",
+          "material_id": "web:f4d3d235766a10a706d22040c97cc66c",
+          "event_id": null,
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "unverified_event_date",
+            "status": "ungrouped"
+          }
+        },
+        "field_observation_ids": [
+          "obs_01a1295ce2fe0000f0baced3"
+        ],
+        "belongs_to_observed_run": false
+      },
+      {
+        "canonical_key": "news-tg-tass-agency|{\"url\":\"https://t.me/tass_agency/399752\"}",
+        "key": {
+          "scope": "news-tg-tass-agency",
+          "natural": {
+            "url": "https://t.me/tass_agency/399752"
+          }
+        },
+        "updated_at": "2026-10-11T05:34:25.989455Z",
+        "fields": {
+          "url": "https://t.me/tass_agency/399752",
+          "source_id": "news-tg-tass-agency",
+          "source_name": "ТАСС",
+          "source_kind": "telegram",
+          "transport": "telegram_public_web",
+          "region": "russia",
+          "evidence_validation": "verified",
+          "material_id": "web:f4d3d235766a10a706d22040c97cc66c",
+          "event_id": null,
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "unverified_event_date",
+            "status": "ungrouped"
+          }
+        },
+        "field_observation_ids": [
+          "obs_01a1297360560000e8096e0b"
+        ],
+        "belongs_to_observed_run": true
+      },
+      {
+        "canonical_key": "news-tg-tass-agency|{\"url\":\"https://t.me/tass_agency/399753\"}",
+        "key": {
+          "scope": "news-tg-tass-agency",
+          "natural": {
+            "url": "https://t.me/tass_agency/399753"
+          }
+        },
+        "updated_at": "2026-10-11T05:34:25.999240Z",
+        "fields": {
+          "url": "https://t.me/tass_agency/399753",
+          "source_id": "news-tg-tass-agency",
+          "source_name": "ТАСС",
+          "source_kind": "telegram",
+          "transport": "telegram_public_web",
+          "region": "russia",
+          "evidence_validation": "verified",
+          "material_id": "web:f4d3d235766a10a706d22040c97cc66c",
+          "event_id": null,
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "unverified_event_date",
+            "status": "ungrouped"
+          }
+        },
+        "field_observation_ids": [
+          "obs_01a1297360560000e8096e0b"
+        ],
+        "belongs_to_observed_run": true
+      },
+      {
+        "canonical_key": "news-tg-tass-agency|{\"url\":\"https://t.me/tass_agency/399754\"}",
+        "key": {
+          "scope": "news-tg-tass-agency",
+          "natural": {
+            "url": "https://t.me/tass_agency/399754"
+          }
+        },
+        "updated_at": "2026-10-11T05:34:26.005337Z",
+        "fields": {
+          "url": "https://t.me/tass_agency/399754",
+          "source_id": "news-tg-tass-agency",
+          "source_name": "ТАСС",
+          "source_kind": "telegram",
+          "transport": "telegram_public_web",
+          "region": "russia",
+          "evidence_validation": "verified",
+          "material_id": "web:f4d3d235766a10a706d22040c97cc66c",
+          "event_id": null,
+          "event_grouping": {
+            "method": "exact_canonical_identity",
+            "reason": "unverified_event_date",
+            "status": "ungrouped"
+          }
+        },
+        "field_observation_ids": [
+          "obs_01a1297360560000e8096e0b"
+        ],
+        "belongs_to_observed_run": true
+      }
+    ],
+    "verified_total": 4,
+    "verified_for_run": 3,
+    "next_cursor": null
+  }
+}

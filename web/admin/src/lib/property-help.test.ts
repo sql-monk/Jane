@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Stage } from "../api/types";
-import { describeSchemaPath, describeStageProperty } from "./property-help";
+import {
+  conditionPropertyChoices,
+  describeSchemaPath,
+  describeStageProperty,
+  stagePropertyChoices,
+} from "./property-help";
 
 const collect: Stage = {
   stage_id: "collect",
@@ -17,6 +22,21 @@ const handler: Stage = {
 };
 
 describe("stage property descriptions", () => {
+  it("resolves enum widgets from contract branches and nested package arrays", () => {
+    expect(stagePropertyChoices(collect, ["collector", "mode"])).toEqual(["full", "incremental"]);
+    expect(conditionPropertyChoices(["op"])).toContain("matches_regex");
+    expect(conditionPropertyChoices(["all", 0, "op"])).toContain("eq");
+    const schema = {
+      properties: {
+        steps: {
+          type: "array",
+          items: { type: "object", properties: { format: { enum: ["json", "html"] } } },
+        },
+      },
+    };
+    expect(stagePropertyChoices(handler, ["params", "steps", 3, "format"], schema)).toEqual(["json", "html"]);
+    expect(stagePropertyChoices(handler, ["params", "invented"], schema)).toBeUndefined();
+  });
   it("describes collector mode from contract metadata including enum and default", () => {
     expect(describeStageProperty(collect, "$.collector.mode")).toContain("продовжити від збереженого стану");
     expect(describeStageProperty(collect, "$.collector.mode")).toContain('"full", "incremental"');

@@ -1,0 +1,32 @@
+{
+  "source_id": "classified-dim-ria",
+  "kind": "web",
+  "title": "DIM.RIA — оренда квартир у Києві",
+  "description": "Публічні оголошення https://dom.ria.com/uk/arenda-kvartir/kiev/; ліміти у examples/classifieds/sites.json.",
+  "locator": {
+    "url": "https://dom.ria.com/uk/arenda-kvartir/kiev/"
+  },
+  "collector_rules": {
+    "package_id": "classifieds.dim-ria-rules",
+    "version": "1.0.0",
+    "digest": "sha256:5ded59fd6e212b07586e91ca5db70399cc78470fff7134036c2573d784e1df29"
+  },
+  "limits": {
+    "rate": {
+      "requests_per_second_per_host": 0.5,
+      "min_delay_ms_per_host": 2000,
+      "respect_crawl_delay": true
+    },
+    "concurrency": {
+      "max_parallel_fetches_per_host": 1
+    }
+  },
+  "forward_unknown_to_llm": false,
+  "expected_entity_types": [
+    "classified_ad"
+  ],
+  "labels": {
+    "group": "classifieds",
+    "site": "dim-ria"
+  }
+}

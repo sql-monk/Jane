@@ -5,7 +5,7 @@ import { unwrap } from "../api/client";
 import { TERMINAL_JOB_STATUSES, useJob } from "../api/hooks";
 import type { Job, TestReport } from "../api/types";
 import { formatDate } from "../lib/format";
-import { ErrorBox, JsonView, Status, Table } from "./ui";
+import { ErrorBox, JsonView, ReasonAction, Status, Table } from "./ui";
 
 interface CancelPaths {
   "/v1/jobs/{job_id}/cancel": {
@@ -40,11 +40,11 @@ export function JobPanel({
   const job = useJob(service, client as never, jobId);
   const queryClient = useQueryClient();
   const cancel = useMutation({
-    mutationFn: () =>
+    mutationFn: (reason: string) =>
       unwrap(
         (client as Client<CancelPaths>).POST("/v1/jobs/{job_id}/cancel", {
           params: { path: { job_id: jobId } },
-          body: { reason: "cancelled from admin" },
+          body: { reason: reason || "cancelled from admin" },
         }),
       ),
     onSuccess: (data) => queryClient.setQueryData(["job", service, jobId], data),
@@ -56,26 +56,39 @@ export function JobPanel({
         <strong>{title}</strong> <code>{jobId}</code>{" "}
         <Status value={data?.status ?? (job.isLoading ? "queued" : null)} />
         {cancellable && data && !TERMINAL_JOB_STATUSES.has(data.status) ? (
-          <button
-            type="button"
-            className="btn btn-danger"
-            onClick={() => cancel.mutate()}
-            disabled={cancel.isPending}
-          >
-            Скасувати job
-          </button>
+          <ReasonAction
+            label="Скасувати операцію"
+            confirmLabel="Підтвердити скасування"
+            danger
+            busy={cancel.isPending}
+            requireReason={false}
+            impact={`Операцію ${jobId} буде зупинено. Уже збережені дані залишаться у сховищах.`}
+            onConfirm={(reason) => cancel.mutate(reason)}
+          />
         ) : null}
       </div>
       <ErrorBox error={job.error ?? cancel.error} />
       {data?.progress ? (
         <p className="muted">
           Прогрес: {data.progress.completed ?? 0}
-          {data.progress.total ? ` / ${data.progress.total}` : ""} {data.progress.unit ?? ""}
+          {data.progress.total !== null && data.progress.total !== undefined
+            ? ` / ${data.progress.total}`
+            : ""}{" "}
+          {data.progress.unit === "items" ? "елементів" : (data.progress.unit ?? "")}
         </p>
       ) : null}
-      {data?.error ? <ErrorBox error={data.error} title="Job завершився з помилкою" /> : null}
+      {data?.error ? <ErrorBox error={data.error} title="Операція завершилася з помилкою" /> : null}
       {data?.finished_at ? <p className="muted">Завершено: {formatDate(data.finished_at)}</p> : null}
-      {data?.result ? renderResult ? renderResult(data.result) : <JsonView value={data.result} /> : null}
+      {data?.result ? (
+        renderResult ? (
+          renderResult(data.result)
+        ) : (
+          <details>
+            <summary>Технічний результат операції</summary>
+            <JsonView value={data.result} />
+          </details>
+        )
+      ) : null}
     </div>
   );
 }

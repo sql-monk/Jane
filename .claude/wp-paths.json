@@ -275,6 +275,34 @@
         "tests/e2e/**",
         "docs/acceptance/**"
       ]
+    },
+    "33": {
+      "name": "admin-operations",
+      "allow": [
+        "libs/jane-kit/**",
+        "services/orchestrator/src/jane_orchestrator/app.py",
+        "services/web-collector/Dockerfile",
+        "services/telegram-collector/Dockerfile",
+        "services/handler-runtime/Dockerfile",
+        "services/storage/Dockerfile",
+        "services/llm/Dockerfile",
+        "services/assistant/Dockerfile",
+        "services/registry/Dockerfile",
+        "services/orchestrator/Dockerfile",
+        "templates/service/Dockerfile",
+        "contracts/**",
+        "web/admin/**",
+        "infra/compose.yaml",
+        "infra/tests/test_auth_config.py",
+        ".claude/wp-paths.json",
+        "plan.md",
+        "docs/adr/0005-authentication.md",
+        "docs/delivery/WP-33.md",
+        "docs/delivery/WP-33/**",
+        "scripts/admin_operations_deploy.py",
+        "scripts/admin_operations_smoke.py",
+        ".agents/skills/jane-contracts/SKILL.md"
+      ]
     }
   }
 }

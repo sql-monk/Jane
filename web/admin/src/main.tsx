@@ -6,6 +6,7 @@ import { App } from "./App";
 import { AppProvider } from "./app/context";
 import { loadConfig } from "./config";
 import "./styles.css";
+import "./module-operations.css";
 import { initializeTheme } from "./app/theme";
 
 initializeTheme();

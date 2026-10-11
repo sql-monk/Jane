@@ -1,0 +1,72 @@
+{
+  "site": "shafa",
+  "source_id": "classified-shafa",
+  "run": {
+    "run_id": "run_01M4MMRZTXCF5GR2DYCCMBFA3Z",
+    "task_id": "classifieds-shafa",
+    "trigger": "manual",
+    "status": "succeeded",
+    "started_at": "2026-10-11T04:50:49.556Z",
+    "finished_at": "2026-10-11T04:51:00.125Z",
+    "counters": {
+      "materials": 0,
+      "unknown_materials": 0
+    },
+    "stages": {
+      "collect": {
+        "counts": {}
+      },
+      "store-raw": {
+        "counts": {},
+        "handler": {
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+          "version": "1.0.0",
+          "package_id": "jane.storage-files"
+        }
+      },
+      "extract-ads": {
+        "counts": {},
+        "handler": {
+          "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce",
+          "version": "1.0.0",
+          "package_id": "classifieds.shafa-ads"
+        }
+      },
+      "store-ads": {
+        "counts": {},
+        "handler": {
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+          "version": "1.0.0",
+          "package_id": "jane.storage-postgresql"
+        }
+      }
+    }
+  },
+  "verified": false,
+  "errors": [
+    "No actual entities were obtained and verified against persisted RAW."
+  ],
+  "samples": [],
+  "packages": {
+    "store-raw": {
+      "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+      "version": "1.0.0",
+      "package_id": "jane.storage-files"
+    },
+    "extract-ads": {
+      "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce",
+      "version": "1.0.0",
+      "package_id": "classifieds.shafa-ads"
+    },
+    "store-ads": {
+      "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+      "version": "1.0.0",
+      "package_id": "jane.storage-postgresql"
+    }
+  },
+  "raw_objects": 0,
+  "persisted_entities": 0,
+  "extraction_items": 0,
+  "checked_entities": 0,
+  "checked_raw_objects": 0
+}

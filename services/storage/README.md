@@ -353,3 +353,20 @@ storage не читає його таблиці. Зовнішні сховища
 У filesystem cancel/timeout встановлює cooperative stop event; worker припиняє обходи між metadata records.
 Помилка статистики не скасовує успішний health: availability available, статистики null,
 причина statistics_check_failed. POST replay повертає той самий Job і Idempotency-Replayed=true.
+
+## Каталог, пошук і статистика результатів
+
+`GET /v1/entity-types?connection_id=results-pg` повертає фактичні типи сутностей, їх кількості та курсор; необов’язковий `scope` — саме область ключа, визначена обробником. `GET /v1/entities?connection_id=results-pg&entity_type=offer&search=Lenovo` шукає буквальний підрядок у ключі й полях до пагінації; регістр не враховується, `%` і `_` не є шаблонами. Без пошуку старі запити незмінні.
+
+Каталог і пошук реалізують PostgreSQL та файловий адаптер. Решта адаптерів повертають `501 not_implemented` для цих необов’язкових можливостей; звичайний перегляд за відомим типом лишається доступним. Основний `StorageAdapter` не змінено; розширення описує `EntityDiscoveryAdapter`.
+
+Фонова перевірка сховища окремо рахує RAW і документи (`statistics`) та актуальні сутності (`entity_statistics`). Для PostgreSQL обсяг сутностей — `pg_total_relation_size` таблиці станів з індексами, для файлів — байти документів станів. Історія та доставка не входять у ці показники. Відсутню можливість або невдалу перевірку повертаємо як `null` з причиною, а не нуль. Каталог і читання сутностей (включно з пошуком та exact key) мають спільний deadline `timeouts.request_timeout_ms`, який охоплює отримання адаптера й запит. Перевищення повертає `504 timeout` як `application/problem+json`, без даних запиту чи повідомлень драйвера. Скасування файлового обходу припиняє наступні читання; окремий уже розпочатий файловий системний виклик не переривається примусово. Фонова перевірка також обмежена налаштованим `timeouts.request_timeout_ms`; сторінки — `pages.default_page_size` і `pages.max_page_size` (поточні типові значення 50 і 500).
+
+Адресні перевірки з кореня checkout:
+
+```powershell
+uv run pytest services/storage/tests/test_entity_discovery.py services/storage/tests/test_storage_status.py -q
+uv run pytest services/storage/adapters/postgres/tests/test_compat.py -k discovery -m integration -q
+```
+
+Другій команді потрібен власний dev-стек PostgreSQL; кожен тест використовує окрему схему й прибирає її після завершення.

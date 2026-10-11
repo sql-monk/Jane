@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useApi } from "../app/context";
 import { unwrap } from "../api/client";
-import { safeProblemCode } from "../api/problem";
+import { errorMessage, safeProblemCode } from "../api/problem";
+import { looksLikeSecretValue } from "../lib/secrets";
 import { TERMINAL_JOB_STATUSES, pollDelay, useCursorList } from "../api/hooks";
 import { useConfig } from "../app/context";
 import type { JobStatus, Run, StageItem } from "../api/types";
@@ -24,8 +25,18 @@ import {
   Tabs,
 } from "../components/ui";
 import { formatDate, formatInstant, formatMoney, refLabel } from "../lib/format";
+import { formatDuration, statusLabel } from "../lib/format";
+import { resultsHref, entityTypeLabel } from "../lib/results-context";
+import { useTaskOptions } from "../lib/pickers";
 
 const JOB_STATUSES: JobStatus[] = ["queued", "running", "cancelling", "succeeded", "failed", "cancelled"];
+const TRIGGER_LABELS: Record<string, string> = {
+  manual: "Вручну",
+  schedule: "За розкладом",
+  reprocess: "Повторна обробка",
+  assistant: "Асистент",
+  api: "Зовнішній запит",
+};
 const ITEM_STATUSES: NonNullable<StageItem["status"]>[] = [
   "queued",
   "leased",
@@ -41,6 +52,7 @@ type RunActionFeedback = { runId: string; error?: unknown };
 
 export function RunsPage() {
   const api = useApi();
+  const tasks = useTaskOptions();
   const [feedback, setFeedback] = useState<RunActionFeedback | null>(null);
   const [params, setParams] = useSearchParams();
   const taskId = params.get("task_id") ?? "";
@@ -79,14 +91,36 @@ export function RunsPage() {
     >
       <div className="filters">
         <Field label="Завдання">
-          <input value={taskId} onChange={(e) => update("task_id", e.target.value)} />
+          <input
+            list="run-task-options"
+            value={taskId}
+            onChange={(e) => update("task_id", e.target.value)}
+            placeholder="Назва або ідентифікатор завдання"
+          />
+          <datalist id="run-task-options">
+            {tasks.options.map((task) => (
+              <option key={task.value} value={task.value}>
+                {task.label}
+              </option>
+            ))}
+          </datalist>
+          {tasks.hasMore ? (
+            <button
+              type="button"
+              className="btn btn-small"
+              onClick={tasks.loadMore}
+              disabled={tasks.loadingMore}
+            >
+              Більше завдань
+            </button>
+          ) : null}
         </Field>
         <Field label="Стан">
           <select value={status} onChange={(e) => update("status", e.target.value)}>
             <option value="">усі</option>
             {JOB_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {statusLabel(s)}
               </option>
             ))}
           </select>
@@ -94,6 +128,7 @@ export function RunsPage() {
       </div>
       {list.isLoading ? <Loading /> : null}
       <ErrorBox error={list.error} />
+      <ErrorBox error={tasks.error} title="Список завдань недоступний" />
       {feedback ? (
         <div>
           <div className="button-row">
@@ -112,6 +147,8 @@ export function RunsPage() {
       <Table
         label="Запуски"
         rows={list.items}
+        loading={list.isLoading}
+        error={list.error}
         rowKey={(r) => r.run_id}
         columns={[
           {
@@ -131,10 +168,11 @@ export function RunsPage() {
             ),
           },
           { header: "Стан", cell: (r) => <Status value={r.status} /> },
-          { header: "Тригер", cell: (r) => r.trigger },
+          { header: "Спосіб запуску", cell: (r) => TRIGGER_LABELS[r.trigger] ?? r.trigger },
           { header: "Тест", cell: (r) => (r.test_mode ? "так" : "") },
           { header: "Створено", cell: (r) => formatDate(r.created_at) },
           { header: "Завершено", cell: (r) => formatDate(r.finished_at) },
+          { header: "Тривалість", cell: (r) => formatDuration(r.started_at, r.finished_at) },
           { header: "Дії", cell: (run) => <RunListActions run={run} onFeedback={setFeedback} /> },
         ]}
       />
@@ -224,8 +262,13 @@ export function RunPage() {
       actions={
         <>
           <Link className="btn" to="/results">
-            Розібрані дані
+            Усі розібрані дані
           </Link>
+          {data?.source_id ? (
+            <Link className="btn" to={`/materials?source_id=${encodeURIComponent(data.source_id)}`}>
+              Матеріали джерела
+            </Link>
+          ) : null}
           {data && !TERMINAL_JOB_STATUSES.has(data.status) ? (
             <ReasonAction
               label="Скасувати запуск"
@@ -253,18 +296,29 @@ export function RunPage() {
           <KeyValue
             rows={[
               ["Завдання", <Link to={`/tasks/${encodeURIComponent(data.task_id)}`}>{data.task_id}</Link>],
+              [
+                "Джерело",
+                data.source_id ? (
+                  <Link to={`/sources/${encodeURIComponent(data.source_id)}`}>{data.source_id}</Link>
+                ) : (
+                  "Недоступно"
+                ),
+              ],
               ["Стан", <Status value={data.status} />],
-              ["Тригер", data.trigger],
+              ["Спосіб запуску", TRIGGER_LABELS[data.trigger] ?? data.trigger],
               ["Тестовий режим", data.test_mode ? "так (без запису в робочі дані)" : "ні"],
               ["Створено", formatDate(data.created_at)],
               ["Почато", formatDate(data.started_at)],
               ["Завершено", formatDate(data.finished_at)],
+              ["Тривалість", formatDuration(data.started_at, data.finished_at)],
+              ["Останній прогрес", formatDate(data.updated_at)],
               ["Витрати LLM", <span data-testid="run-cost">{formatMoney(data.costs?.llm)}</span>],
-              ["Backpressure", data.backpressure ? "так, збір пригальмовано" : "ні"],
+              ["Збір пригальмовано через чергу", data.backpressure ? "так" : "ні"],
               ["Версія конфігурації", data.task_etag ?? "—"],
             ]}
           />
           {data.error ? <ErrorBox error={data.error} title="Помилка запуску" /> : null}
+          <RunOutcome run={data} />
           <Tabs<RunTab>
             tabs={[
               ["progress", "Прогрес етапів"],
@@ -297,20 +351,105 @@ function StageProgressTable({ run }: { run: Run }) {
         columns={[
           { header: "Етап", cell: (s) => s.stage_id },
           { header: "Пакет", cell: (s) => refLabel(s.handler) },
-          ...keys.map((k) => ({ header: k, cell: (s: (typeof stages)[number]) => s.counts?.[k] ?? 0 })),
+          ...keys.map((k) => ({
+            header:
+              (
+                {
+                  completed: "Завершено",
+                  success: "Успішно",
+                  running: "Виконується",
+                  failed: "З помилкою",
+                  queued: "У черзі",
+                  unrecognized: "Не розпізнано",
+                  empty: "Без результатів",
+                  cancelled: "Скасовано",
+                  retrying: "Повтор",
+                  skipped: "Пропущено",
+                  leased: "Взято в роботу",
+                } as Record<string, string>
+              )[k] ?? k,
+            cell: (s: (typeof stages)[number]) => s.counts?.[k] ?? 0,
+          })),
         ]}
       />
       {run.counters && Object.keys(run.counters).length ? (
-        <KeyValue rows={Object.entries(run.counters).map(([k, v]) => [k, String(v)] as [string, string])} />
+        <KeyValue
+          rows={Object.entries(run.counters).map(
+            ([k, v]) =>
+              [
+                (
+                  { materials: "Отримані матеріали", unknown_materials: "Невідомі матеріали" } as Record<
+                    string,
+                    string
+                  >
+                )[k] ?? k,
+                String(v),
+              ] as [string, string],
+          )}
+        />
       ) : null}
     </>
+  );
+}
+
+export function RunOutcome({ run }: { run: Run }) {
+  const summary = run.summary;
+  const label = (count: number | undefined) =>
+    count === undefined ? "Недоступно" : `${summary?.complete === false ? "Щонайменше " : ""}${count}`;
+  return (
+    <Section title="Результат ланцюжка">
+      <KeyValue
+        rows={[
+          [
+            run.trigger === "reprocess" ? "RAW отримано зі сховища" : "Зібрано матеріалів",
+            String(run.counters?.materials ?? "Недоступно"),
+          ],
+          ["Розібрано унікальних сутностей", label(summary?.extracted_entities)],
+          ["Підтверджено збережених записів", label(summary?.saved_records)],
+        ]}
+      />
+      <p className="muted">
+        Кількості отримано з відповідей обробників цього запуску. Кількості елементів етапу означають
+        оброблені порції матеріалів, а не кількість сутностей.
+      </p>
+      {summary?.complete === false ? (
+        <Notice>
+          {summary.legacy_trace
+            ? "Точні кількості недоступні: історичне трасування було обрізане й не зберігало повний облік сутностей."
+            : "Підсумок неповний: частину сутностей передано за посиланням. Зафіксовані кількості є нижньою межею."}
+        </Notice>
+      ) : null}
+      {(summary?.result_groups?.length ?? 0) > 0 ? (
+        <>
+          <div className="button-row">
+            {summary?.result_groups?.map((group) => (
+              <Link
+                className="btn"
+                key={`${group.connection_id}/${group.entity_type}/${group.scope}`}
+                to={resultsHref({
+                  ...(group.connection_id ? { connectionId: group.connection_id } : {}),
+                  ...(group.entity_type ? { entityType: group.entity_type } : {}),
+                  ...(group.scope ? { scope: group.scope } : {}),
+                })}
+              >
+                {entityTypeLabel(group.entity_type ?? "")} · {group.scope} · {group.connection_id}
+              </Link>
+            ))}
+          </div>
+          <p className="muted">
+            Посилання відкривають актуальні записи відповідного типу, області ключів і сховища. Там можуть
+            бути результати інших запусків.
+          </p>
+        </>
+      ) : null}
+    </Section>
   );
 }
 
 function RunItems({ runId }: { runId: string }) {
   const api = useApi();
   const [stageId, setStageId] = useState("");
-  const [status, setStatus] = useState<StageItem["status"] | "">("failed");
+  const [status, setStatus] = useState<StageItem["status"] | "">("");
   const list = useCursorList(["run-items", runId, stageId, status], (cursor, limit) =>
     unwrap(
       api.orchestrator.GET("/v1/runs/{run_id}/items", {
@@ -337,7 +476,7 @@ function RunItems({ runId }: { runId: string }) {
             <option value="">усі</option>
             {ITEM_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {statusLabel(s)}
               </option>
             ))}
           </select>
@@ -347,6 +486,9 @@ function RunItems({ runId }: { runId: string }) {
       <Table
         label="Елементи запуску"
         rows={list.items}
+        loading={list.isLoading}
+        error={list.error}
+        empty={status === "failed" ? "Помилок у цій вибірці немає" : "Елементів у цій вибірці немає"}
         rowKey={(i) => i.item_id}
         columns={[
           { header: "Етап", cell: (i) => i.stage_id },
@@ -373,7 +515,7 @@ function RunItems({ runId }: { runId: string }) {
             cell: (i) =>
               i.error ? (
                 <>
-                  Помилка елемента (<code>{safeProblemCode(i.error.code)}</code>)
+                  <ErrorBox error={i.error} title="Помилка елемента" />
                 </>
               ) : (
                 "—"
@@ -392,11 +534,18 @@ function CollectorErrors({ run }: { run: Run }) {
     queryKey: ["executors"],
     queryFn: () => unwrap(api.orchestrator.GET("/v1/executors")),
   });
-  const collectorExecutor = executors.data?.items.find((e) => e.role === "collector")?.executor;
+  const collectors = executors.data?.items.filter((executor) => executor.role === "collector") ?? [];
+  const collectorExecutor =
+    collectors.find((executor) => executor.capabilities?.["collector"] === run.collector_kind)?.executor ??
+    (!run.collector_kind && collectors.length === 1 ? collectors[0]?.executor : undefined);
   const collectionId = run.collection_id;
   const errors = useQuery({
     queryKey: ["collection-errors", collectorExecutor, collectionId],
-    enabled: Boolean(collectionId && executors.isFetched),
+    enabled: Boolean(
+      collectionId &&
+      executors.isSuccess &&
+      (collectorExecutor || (!run.collector_kind && collectors.length === 0)),
+    ),
     queryFn: () => {
       const client = collectorExecutor ? api.collectorExecutor(collectorExecutor) : api.collector;
       return unwrap(
@@ -406,23 +555,66 @@ function CollectorErrors({ run }: { run: Run }) {
       );
     },
   });
-  if (!collectionId) return <p className="muted">Запуск без збору (наприклад повторна обробка).</p>;
+  if (!collectionId)
+    return (
+      <Notice>
+        {run.trigger === "reprocess"
+          ? "Повторна обробка читає RAW зі сховища й не запускає колектор."
+          : run.status === "failed"
+            ? "Збір не вдалося почати: колектор не створив операцію збору. Причину показано у помилці запуску вище; перевірте джерело, правила й доступність виконавця."
+            : "Операцію збору ще не створено. Очікуємо запуск колектора."}
+      </Notice>
+    );
+  if (executors.error)
+    return <ErrorBox error={executors.error} title="Не вдалося визначити виконавця збору" />;
+  if (executors.isFetched && !collectorExecutor && (run.collector_kind || collectors.length > 1))
+    return (
+      <Notice>
+        Не вдалося визначити колектор цього запуску. Перевірте тип колектора у джерелі та налаштованих
+        виконавців.
+      </Notice>
+    );
   return (
     <Section title={`Помилки й пропуски збору ${collectionId}`}>
       <ErrorBox error={errors.error} />
       <Table
         label="Помилки колектора"
         rows={errors.data?.items ?? []}
+        loading={errors.isLoading}
+        error={errors.error}
+        empty="Помилок і пропусків збору немає"
         rowKey={(e, i) => `${e.url ?? ""}-${i}`}
         columns={[
-          { header: "URL / повідомлення", cell: () => "—" },
+          {
+            header: "URL / повідомлення",
+            cell: (error) =>
+              collectorAddress(error.url) ??
+              (error.telegram_message ? "Повідомлення Telegram" : "Адреса недоступна"),
+          },
           { header: "Код", cell: (e) => <code>{safeProblemCode(e.code)}</code> },
           { header: "HTTP", cell: (e) => e.http_status ?? "—" },
           { header: "Спроби", cell: (e) => e.attempts ?? "—" },
-          { header: "Повідомлення", cell: () => "Помилка збору" },
+          {
+            header: "Що перевірити",
+            cell: (error) =>
+              errorMessage({ title: "Помилка збору", code: error.code, status: error.http_status ?? 502 }),
+          },
           { header: "Коли", cell: (e) => formatDate(e.at) },
         ]}
       />
     </Section>
   );
+}
+
+export function collectorAddress(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    const address = new URL(value);
+    // Credentials and query tokens are excluded from the displayed address.
+    if (!["http:", "https:"].includes(address.protocol) || looksLikeSecretValue(address.pathname))
+      return null;
+    return address.origin + address.pathname;
+  } catch {
+    return null;
+  }
 }

@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { CodeEditor } from "./CodeEditor";
-import { validateAgainst, type SchemaIssue, type SchemaRef } from "../lib/schema";
+import { schemaIssueLabel, validateAgainst, type SchemaIssue, type SchemaRef } from "../lib/schema";
 
 export interface JsonCheck {
   value: unknown;
@@ -13,10 +13,10 @@ export function checkJson(text: string, schema?: SchemaRef): JsonCheck {
   let value: unknown;
   try {
     value = text.trim() ? JSON.parse(text) : undefined;
-  } catch (e) {
+  } catch {
     return {
       value: undefined,
-      parseError: e instanceof Error ? e.message : String(e),
+      parseError: "Некоректний JSON: перевірте лапки, коми та парні дужки",
       issues: [],
       ok: false,
     };
@@ -32,33 +32,44 @@ export function JsonEditor({
   schema,
   label,
   minHeight,
+  readOnly = false,
 }: {
   text: string;
   onChange: (text: string) => void;
   schema?: SchemaRef;
   label: string;
   minHeight?: string;
+  readOnly?: boolean;
 }) {
   const check = useMemo(() => checkJson(text, schema), [text, schema]);
+  const [touched, setTouched] = useState(false);
   return (
     <div className="json-editor">
       <CodeEditor
         value={text}
-        onChange={onChange}
+        onChange={(next) => {
+          setTouched(true);
+          onChange(next);
+        }}
         language="json"
         label={label}
+        readOnly={readOnly}
         {...(minHeight ? { minHeight } : {})}
       />
-      {check.parseError ? (
+      {touched && check.parseError ? (
         <p className="error-inline" role="alert">
           JSON: {check.parseError}
         </p>
       ) : null}
-      {check.issues.length ? (
+      {touched && check.issues.length ? (
         <ul className="error-inline" role="alert" aria-label={`Помилки схеми: ${label}`}>
           {check.issues.map((issue, i) => (
             <li key={i}>
-              <code>{issue.pointer}</code> {issue.message}
+              {schemaIssueLabel(issue)}
+              <details>
+                <summary>Технічні подробиці</summary>
+                <code>{issue.technical ?? issue.pointer}</code>
+              </details>
             </li>
           ))}
         </ul>

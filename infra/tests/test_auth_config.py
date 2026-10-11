@@ -16,7 +16,17 @@ import pytest
 import yaml
 
 from jane_kit.auth import ApiKeyConfig
-from jane_kit.auth_scopes import ASSISTANT, COLLECTOR, HANDLER, LLM, ORCHESTRATOR, REGISTRY, STORAGE, merge
+from jane_kit.auth_scopes import (
+    ASSISTANT,
+    COLLECTOR,
+    HANDLER,
+    LLM,
+    OPERATIONS,
+    ORCHESTRATOR,
+    REGISTRY,
+    STORAGE,
+    merge,
+)
 from jane_kit.devstack import STACK_IDENTITIES, api_key_var, new_api_keys
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -31,6 +41,7 @@ TABLES = {
     "registry": merge(REGISTRY),
     "assistant": merge(ASSISTANT),
 }
+TABLES = {service: merge(table, OPERATIONS) for service, table in TABLES.items()}
 VAR = re.compile(r"\$\{(?P<name>[A-Z0-9_]+)(?::?[-?][^}]*)?\}")
 
 
@@ -76,6 +87,8 @@ def test_service_runs_with_api_keys(service: str) -> None:
     assert set(by_name) <= set(STACK_IDENTITIES)
     for key in parsed:
         assert set(key.scopes) <= known, (service, key.name, set(key.scopes) - known)
+        if key.name != "admin":
+            assert not {"modules:read", "modules:write"} & set(key.scopes)
         assert key.sha256 == keys[f"{api_key_var(key.name)}_SHA256"]
     # the operator's key (admin UI, e2e harness) can call every operation of the service
     assert set(by_name["admin"].scopes) == known

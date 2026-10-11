@@ -2,12 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import { useApi } from "../app/context";
 import { unwrap } from "../api/client";
 import { useCursorList } from "../api/hooks";
-import type { Stage } from "../api/types";
+import type { Source, Stage } from "../api/types";
+import { Link } from "react-router-dom";
 import { removeStage, renameStage, type JsonValue } from "../lib/property";
 import { checkJson, JsonEditor, toJsonText } from "./JsonEditor";
 import { DagView } from "./DagView";
 import { PropertyGrid, PropertyIssuesContext, PropertyDraftsBlockedContext } from "./PropertyGrid";
-import { ErrorBox, Field, LoadMore } from "./ui";
+import { ErrorBox, Field, JsonView, LoadMore } from "./ui";
+import { ConnectionPicker } from "./ConnectionPicker";
+import { conditionPropertyChoices, stagePropertyChoices } from "../lib/property-help";
 import { useStagePropertyHelp } from "./useStagePropertyHelp";
 import "../chain-editor.css";
 
@@ -16,11 +19,15 @@ export function ChainEditor({
   onChange,
   requireCollect = true,
   onValidityChange,
+  source,
+  readOnly = false,
 }: {
   text: string;
   onChange: (text: string) => void;
   requireCollect?: boolean;
   onValidityChange?: (valid: boolean) => void;
+  source?: Source | undefined;
+  readOnly?: boolean;
 }) {
   const parsed = checkJson(text);
   const valid =
@@ -44,6 +51,7 @@ export function ChainEditor({
   const [propertyIssues, setPropertyIssues] = useState<Record<string, string>>({});
   const [editReset, setEditReset] = useState(0);
   const hasDraftIssues = Boolean(error) || Object.keys(propertyIssues).length > 0;
+  const blocked = hasDraftIssues || readOnly;
   const reportIssue = useCallback(
     (key: string, issue: string) =>
       setPropertyIssues((previous) => {
@@ -60,20 +68,23 @@ export function ChainEditor({
     [error, propertyIssues, onValidityChange],
   );
   const stage = stages.find((s) => s.stage_id === selected) ?? stages[0];
-  const update = (next: Stage[]) => onChange(toJsonText(next));
+  const update = (next: Stage[]) => {
+    const nextText = toJsonText(next);
+    if (nextText !== text) onChange(nextText);
+  };
   const patch = (next: Stage) => update(stages.map((s) => (s.stage_id === stage?.stage_id ? next : s)));
   return (
     <PropertyIssuesContext.Provider value={reportIssue}>
-      <PropertyDraftsBlockedContext.Provider value={hasDraftIssues}>
+      <PropertyDraftsBlockedContext.Provider value={blocked}>
         <div className="chain-editor">
           <div className="button-row">
-            <button type="button" className="btn" disabled={hasDraftIssues} onClick={() => setRaw(!raw)}>
+            <button type="button" className="btn" disabled={blocked} onClick={() => setRaw(!raw)}>
               {raw ? "Візуальний редактор" : "Редагувати JSON"}
             </button>
             <button
               type="button"
               className="btn"
-              disabled={!valid || hasDraftIssues}
+              disabled={!valid || blocked}
               onClick={() => {
                 let id = `stage-${stages.length + 1}`;
                 while (stages.some((s) => s.stage_id === id)) id += "-new";
@@ -95,7 +106,7 @@ export function ChainEditor({
             <button
               type="button"
               className="btn"
-              disabled={!valid || hasDraftIssues || stages.some((s) => s.kind === "collect")}
+              disabled={!valid || blocked || stages.some((s) => s.kind === "collect")}
               onClick={() => {
                 let id = "collect";
                 while (stages.some((s) => s.stage_id === id)) id += "-new";
@@ -107,14 +118,20 @@ export function ChainEditor({
             </button>
           </div>
           {raw ? (
-            <JsonEditor text={text} onChange={onChange} label="Етапи завдання" minHeight="20rem" />
+            <JsonEditor
+              text={text}
+              onChange={onChange}
+              label="Етапи завдання"
+              minHeight="20rem"
+              readOnly={readOnly}
+            />
           ) : valid ? (
             <>
               <DagView
                 stages={stages}
                 selected={stage?.stage_id ?? ""}
                 onSelect={(id) => {
-                  if (!hasDraftIssues) setSelected(id);
+                  if (!blocked) setSelected(id);
                 }}
                 requireCollect={requireCollect}
               />
@@ -126,9 +143,9 @@ export function ChainEditor({
                       type="button"
                       key={s.stage_id}
                       aria-pressed={s === stage}
-                      disabled={hasDraftIssues}
+                      disabled={blocked}
                       onClick={() => {
-                        if (!hasDraftIssues) setSelected(s.stage_id);
+                        if (!blocked) setSelected(s.stage_id);
                       }}
                     >
                       {s.stage_id}
@@ -162,7 +179,7 @@ export function ChainEditor({
                       <button
                         type="button"
                         className="btn btn-danger"
-                        disabled={hasDraftIssues}
+                        disabled={blocked}
                         onClick={() => {
                           update(removeStage(stages, stage.stage_id));
                           setSelected(null);
@@ -171,8 +188,13 @@ export function ChainEditor({
                         Видалити етап і його зв’язки
                       </button>
                     </div>
-                    <fieldset className="chain-package-fields" disabled={hasDraftIssues}>
-                      <ChainPackagePicker key={stage.stage_id} stage={stage} onChange={patch} />
+                    <fieldset className="chain-package-fields" disabled={blocked}>
+                      <ChainPackagePicker
+                        key={stage.stage_id}
+                        stage={stage}
+                        source={source}
+                        onChange={patch}
+                      />
                     </fieldset>
                     {stage.kind === "handler" ? (
                       <ChainLinks
@@ -180,7 +202,7 @@ export function ChainEditor({
                         stage={stage}
                         stages={stages}
                         onChange={patch}
-                        blocked={hasDraftIssues}
+                        blocked={blocked}
                       />
                     ) : null}
                     <h4>Властивості етапу</h4>
@@ -237,9 +259,22 @@ function StagePropertyGrid({ stage, onChange }: { stage: Stage; onChange: (stage
       <PropertyGrid
         objectRoot
         describe={help.describe}
+        choices={(_path, keys) => stagePropertyChoices(stage, keys, help.schema)}
+        renderValue={(path, keys, value, setValue) =>
+          keys[0] === "connections" && keys.length === 2 && typeof value === "string" ? (
+            <ConnectionPicker label={`Значення ${path}`} value={value} onChange={setValue} />
+          ) : null
+        }
         value={
           Object.fromEntries(
-            Object.entries(stage).filter(([k]) => k !== "stage_id" && k !== "kind" && k !== "inputs"),
+            Object.entries(stage)
+              .filter(([k]) => !["stage_id", "kind", "inputs", "handler"].includes(k))
+              .map(([key, value]) => [
+                key,
+                key === "collector" && value
+                  ? Object.fromEntries(Object.entries(value).filter(([name]) => name !== "rules"))
+                  : value,
+              ]),
           ) as JsonValue
         }
         onChange={(v) => {
@@ -248,15 +283,39 @@ function StagePropertyGrid({ stage, onChange }: { stage: Stage; onChange: (stage
               ...v,
               stage_id: stage.stage_id,
               kind: stage.kind,
+              ...(stage.handler ? { handler: stage.handler } : {}),
+              ...(stage.collector?.rules &&
+              v["collector"] &&
+              typeof v["collector"] === "object" &&
+              !Array.isArray(v["collector"])
+                ? { collector: { ...v["collector"], rules: stage.collector.rules } }
+                : {}),
               ...(stage.inputs ? { inputs: stage.inputs } : {}),
             } as Stage);
         }}
       />
+      <details className="form-advanced">
+        <summary>Технічні властивості пакета (лише перегляд)</summary>
+        <p className="muted">
+          Пакет і версію змінюйте у полях над властивостями. Дайджест фіксує конкретний вміст пакета.
+        </p>
+        <JsonView value={stage.kind === "handler" ? stage.handler : stage.collector?.rules} compact />
+      </details>
     </>
   );
 }
 
-function ChainPackagePicker({ stage, onChange }: { stage: Stage; onChange: (stage: Stage) => void }) {
+export function ChainPackagePicker({
+  stage,
+  source,
+  inherit = true,
+  onChange,
+}: {
+  stage: Stage;
+  source?: Source | undefined;
+  inherit?: boolean;
+  onChange: (stage: Stage) => void;
+}) {
   const api = useApi();
   const ref = stage.kind === "handler" ? stage.handler : stage.collector?.rules;
   const packages = useCursorList(["chain-packages", stage.kind], (cursor, limit) =>
@@ -301,12 +360,16 @@ function ChainPackagePicker({ stage, onChange }: { stage: Stage; onChange: (stag
         label={stage.kind === "collect" ? "Пакет правил" : "Пакет обробника"}
         hint={
           stage.kind === "collect"
-            ? "Правила збору. Значення «—» означає правила джерела."
+            ? inherit
+              ? "Правила збору. Можна використати правила джерела або задати пакет етапу."
+              : "Пакет правил, за яким колектор обходить це джерело."
             : "Пакет, який обробляє вхідні матеріали або зберігає результат."
         }
       >
         <select value={packageId} onChange={(e) => setRef({ package_id: e.target.value, version: "" })}>
-          <option value="">—</option>
+          <option value="">
+            {stage.kind === "collect" && inherit ? "Правила джерела" : "Виберіть пакет"}
+          </option>
           {packageId && !packages.items.some((p) => p.package_id === packageId) ? (
             <option>{packageId}</option>
           ) : null}
@@ -322,10 +385,15 @@ function ChainPackagePicker({ stage, onChange }: { stage: Stage; onChange: (stag
       </Field>
       <Field label="Версія пакета" hint="Точна версія вибраного пакета для цього етапу.">
         <select
+          disabled={!packageId}
           value={ref?.version ?? ""}
           onChange={(e) => setRef({ package_id: packageId, version: e.target.value })}
         >
-          <option value="">—</option>
+          <option value="">
+            {!packageId && source?.collector_rules
+              ? `Із джерела: ${source.collector_rules.version}`
+              : "Виберіть версію"}
+          </option>
           {ref?.version && !versions.items.some((v) => v.version === ref.version) ? (
             <option>{ref.version}</option>
           ) : null}
@@ -336,6 +404,22 @@ function ChainPackagePicker({ stage, onChange }: { stage: Stage; onChange: (stag
         <LoadMore hasMore={versions.hasMore} loading={versions.loadingMore} onClick={versions.loadMore} />
       </Field>
       <ErrorBox error={packages.error ?? versions.error} />
+      {stage.kind === "collect" && inherit && !packageId ? (
+        <p className="muted">
+          {source?.collector_rules ? (
+            <>
+              Правила з джерела{" "}
+              <Link to={`/sources/${encodeURIComponent(source.source_id)}`}>{source.title}</Link>:{" "}
+              <strong>
+                {source.collector_rules.package_id}@{source.collector_rules.version}
+              </strong>
+              .
+            </>
+          ) : (
+            "Успадковані правила ще не вибрані. Виберіть джерело з правилами або задайте пакет для цього етапу."
+          )}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -401,6 +485,7 @@ function ChainLinks({
             <>
               <PropertyGrid
                 label={`Умова зв’язку ${i + 1}`}
+                choices={(_path, keys) => conditionPropertyChoices(keys)}
                 value={input.when as JsonValue}
                 onChange={(v) =>
                   onChange({

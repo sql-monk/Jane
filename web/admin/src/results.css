@@ -34,3 +34,36 @@
   color: var(--accent);
   margin-bottom: 0.5rem;
 }
+
+.result-type-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.result-type-card {
+  display: grid;
+  gap: 0.35rem;
+  min-width: min(15rem, 100%);
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  text-decoration: none;
+}
+.result-type-card small {
+  color: var(--muted);
+}
+.result-search {
+  display: flex;
+  gap: 0.5rem;
+}
+.result-search input {
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .result-type-card {
+    width: 100%;
+  }
+  .result-search {
+    flex-wrap: wrap;
+  }
+}

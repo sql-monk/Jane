@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import subprocess
 import sys
 import textwrap
+import threading
 import time
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from jane_contracts.storage_adapter import AdapterError, DeliveryRecord, ResolvedConnection
+from jane_contracts.storage_adapter import AdapterError, DeliveryRecord, EntitySnapshot, ResolvedConnection
 from jane_storage.codec import delivery_to_json, dumps, utcnow
 from jane_storage.engine import StorageEngine
 from jane_storage.keys import canonical_key, key_digest
@@ -181,3 +185,74 @@ def test_fresh_lock_taken_during_stale_break_is_restored(
     os.utime(lock, (old, old))
     store._break_if_stale(lock)  # really stale now: removed
     assert not lock.exists()
+
+
+@pytest.mark.parametrize("operation", ["catalog", "list", "search"])
+async def test_entity_scan_stops_after_cancelled_filesystem_read(
+    operation: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adapter = await open_adapter(tmp_path)
+    engine = StorageEngine(adapter)
+    for index in range(5):
+        record = rec("title", "Needle", 0, f"obs-{index}")
+        record["key"] = {"scope": "s", "natural": {"sku": str(index)}}
+        await engine.store_entity(record, f"cancel-scan-{index}")
+
+    entered, release, finished = threading.Event(), threading.Event(), threading.Event()
+    reads: list[Path] = []
+    errors: list[AdapterError] = []
+    real_read = Path.read_bytes
+    real_to_thread = asyncio.to_thread
+    folder = adapter.store.root / "entities" / "product"
+
+    def gated_read(path: Path) -> bytes:
+        if path.parent == folder and path.suffix == ".json":
+            reads.append(path)
+            if len(reads) == 1:
+                entered.set()
+                assert release.wait(timeout=2), "filesystem test gate was not released"
+        return real_read(path)
+
+    async def observed_to_thread(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+        if getattr(fn, "__name__", "") not in {"list_entities", "list_entity_types"}:
+            return await real_to_thread(fn, *args, **kwargs)
+
+        def observed_work() -> Any:
+            try:
+                return fn(*args, **kwargs)
+            except AdapterError as exc:
+                errors.append(exc)
+                raise
+            finally:
+                finished.set()
+
+        return await real_to_thread(observed_work)
+
+    # Instrument filesystem I/O and the executor, while running the actual adapter and scan.
+    monkeypatch.setattr(Path, "read_bytes", gated_read)
+    monkeypatch.setattr(asyncio, "to_thread", observed_to_thread)
+    task: asyncio.Task[
+        tuple[Sequence[Mapping[str, Any]], str | None] | tuple[Sequence[EntitySnapshot], str | None]
+    ]
+    if operation == "catalog":
+        task = asyncio.create_task(adapter.list_entity_types(limit=1))
+    elif operation == "search":
+        task = asyncio.create_task(adapter.search_entities("product", search="Needle", limit=1))
+    else:
+        task = asyncio.create_task(adapter.list_entities("product", limit=1))
+    try:
+        assert await real_to_thread(entered.wait, 1), "the real scan did not enter filesystem I/O"
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        release.set()
+        assert await real_to_thread(finished.wait, 1), (
+            "the filesystem worker kept scanning after cancellation"
+        )
+        assert len(reads) == 1, "cancelled scan read additional entity documents"
+        assert len(errors) == 1 and errors[0].retryable
+    finally:
+        release.set()
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await adapter.close()

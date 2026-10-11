@@ -96,7 +96,7 @@ test.describe("problem groups, improvement, unknown materials, assistant session
     await admin.goto("/problems?tab=unknown");
     const table = admin.getByRole("table", { name: "Невідомі матеріали" });
     await expect(table).toContainText("https://shop.example.test/gift-cards");
-    await expect(table).toContainText("forward_unknown_to_llm=false");
+    await expect(table).toContainText("Немає відповідного обробника; передавання в LLM вимкнено");
   });
 
   test("assistant: onboarding by name, disambiguation, proposals with coverage, cost and risks, acceptance", async ({

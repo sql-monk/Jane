@@ -38,8 +38,10 @@ import {
   Table,
   Tabs,
 } from "../components/ui";
-import { formatDate, formatMoney, refLabel } from "../lib/format";
+import { formatDate, formatMoney, refLabel, PERIOD_LABELS, statusLabel } from "../lib/format";
+import { useSourceOptions } from "../lib/pickers";
 import { STRATEGY_LABELS } from "./RulesEditorPage";
+import { useUnsavedChanges } from "../components/UnsavedChanges";
 
 const ACTIVE_STATUSES = new Set(["resolving", "sampling", "analyzing", "applying"]);
 const ONBOARDING_STATUSES: OnboardingStatus[] = [
@@ -133,7 +135,7 @@ function OnboardingLimits() {
               "Макс. сторінок вибірки (max_onboarding_samples)",
               String(defaults?.max_onboarding_samples ?? "—"),
             ],
-            ["Бюджет LLM асистента", budget ? `${formatMoney(budget)} / ${budget.period}` : "—"],
+            ["Бюджет LLM асистента", budget ? `${formatMoney(budget)} ${PERIOD_LABELS[budget.period]}` : "—"],
             ["Профіль лімітів", info.data.limits?.profile ?? "—"],
           ]}
         />
@@ -163,6 +165,7 @@ function Onboarding({ sessionId, onOpen }: { sessionId: string | null; onOpen: (
     hints: "",
   });
   const hints = checkJson(form.hints);
+  const [baseline, setBaseline] = useState(JSON.stringify(form));
   const confidenceError =
     form.confidence &&
     (!Number.isFinite(Number(form.confidence)) || Number(form.confidence) <= 0 || Number(form.confidence) > 1)
@@ -170,31 +173,38 @@ function Onboarding({ sessionId, onOpen }: { sessionId: string | null; onOpen: (
       : null;
 
   const start = useMutation({
-    mutationFn: () => {
+    mutationFn: (submitted: typeof form) => {
+      const submittedHints = checkJson(submitted.hints);
       if (confidenceError) throw new Error(confidenceError);
       const limits: NonNullable<OnboardingRequest["limits"]> = {
-        ...(form.amount
-          ? { budget: { amount: Number(form.amount), currency: form.currency, period: "total" as const } }
+        ...(submitted.amount
+          ? {
+              budget: {
+                amount: Number(submitted.amount),
+                currency: submitted.currency,
+                period: "total" as const,
+              },
+            }
           : {}),
-        ...(form.samples ? { max_onboarding_samples: Number.parseInt(form.samples, 10) } : {}),
-        ...(form.confidence ? { min_onboarding_confidence: Number(form.confidence) } : {}),
+        ...(submitted.samples ? { max_onboarding_samples: Number.parseInt(submitted.samples, 10) } : {}),
+        ...(submitted.confidence ? { min_onboarding_confidence: Number(submitted.confidence) } : {}),
       };
       const body: OnboardingRequest = {
-        query: form.query,
-        ...(form.source_kind ? { source_kind: form.source_kind } : {}),
-        ...(form.expected
+        query: submitted.query,
+        ...(submitted.source_kind ? { source_kind: submitted.source_kind } : {}),
+        ...(submitted.expected
           ? {
-              expected_entity_types: form.expected
+              expected_entity_types: submitted.expected
                 .split(",")
                 .map((t) => t.trim())
                 .filter(Boolean),
             }
           : {}),
         ...(Object.keys(limits).length ? { limits } : {}),
-        ...(hints.value && typeof hints.value === "object"
-          ? { crawl_hints: hints.value as Record<string, unknown> }
+        ...(submittedHints.value && typeof submittedHints.value === "object"
+          ? { crawl_hints: submittedHints.value as Record<string, unknown> }
           : {}),
-        auto_activation: form.auto_activation,
+        auto_activation: submitted.auto_activation,
       };
       return unwrap(
         api.assistant.POST("/v1/onboarding-sessions", {
@@ -203,12 +213,18 @@ function Onboarding({ sessionId, onOpen }: { sessionId: string | null; onOpen: (
         }),
       ) as Promise<Job>;
     },
-    onSuccess: (job) => {
+    onSuccess: (job, submitted) => {
+      guard.markSaved();
+      setBaseline(JSON.stringify(submitted));
       setStartJob(job.job_id);
       void queryClient.invalidateQueries({ queryKey: ["onboarding-sessions"] });
       const id = sessionIdFromJob(job);
       if (id) onOpen(id);
     },
+  });
+  const guard = useUnsavedChanges({
+    dirty: JSON.stringify(form) !== baseline,
+    label: "Налаштування дослідження джерела",
   });
 
   return (
@@ -220,94 +236,97 @@ function Onboarding({ sessionId, onOpen }: { sessionId: string | null; onOpen: (
           в межах бюджету, визначає типи матеріалів і сутностей та пропонує кілька варіантів збору з
           поясненням охоплення, вартості й ризиків.
         </p>
-        <div className="grid-3">
-          <Field label="Назва або посилання">
-            <input
-              value={form.query}
-              onChange={(e) => setForm({ ...form, query: e.target.value })}
-              maxLength={2000}
+        <fieldset className="form-fields" disabled={start.isPending}>
+          <div className="grid-3">
+            <Field label="Назва або посилання">
+              <input
+                value={form.query}
+                onChange={(e) => setForm({ ...form, query: e.target.value })}
+                maxLength={2000}
+              />
+            </Field>
+            <Field label="Тип джерела (необов'язково)">
+              <input
+                list="onb-kinds"
+                value={form.source_kind}
+                onChange={(e) => setForm({ ...form, source_kind: e.target.value })}
+              />
+              <datalist id="onb-kinds">
+                <option value="web" />
+                <option value="telegram" />
+              </datalist>
+            </Field>
+            <Field label="Очікувані типи даних">
+              <input
+                value={form.expected}
+                onChange={(e) => setForm({ ...form, expected: e.target.value })}
+                placeholder="product, event"
+              />
+            </Field>
+            <Field label="Бюджет дослідження">
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              />
+            </Field>
+            <Field label="Валюта">
+              <input
+                value={form.currency}
+                onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
+                maxLength={3}
+              />
+            </Field>
+            <Field label="Макс. сторінок вибірки">
+              <input
+                type="number"
+                min={1}
+                value={form.samples}
+                onChange={(e) => setForm({ ...form, samples: e.target.value })}
+              />
+            </Field>
+            <Field
+              label="Поріг впевненості вибірки"
+              hint="Більше 0 і не більше 1; порожньо — поріг асистента (min_onboarding_confidence)"
+            >
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step="any"
+                value={form.confidence}
+                onChange={(e) => setForm({ ...form, confidence: e.target.value })}
+              />
+            </Field>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={form.auto_activation}
+                onChange={(e) => setForm({ ...form, auto_activation: e.target.checked })}
+              />
+              Дозволити автоматичну активацію
+            </label>
+          </div>
+          {confidenceError ? <p role="alert">{confidenceError}</p> : null}
+          <Field label="Правила обходу від користувача (фрагмент CollectorRules, необов'язково)">
+            <JsonEditor
+              text={form.hints}
+              onChange={(t) => setForm({ ...form, hints: t })}
+              label="Підказки обходу"
+              readOnly={start.isPending}
+              minHeight="5rem"
             />
           </Field>
-          <Field label="Тип джерела (необов'язково)">
-            <input
-              list="onb-kinds"
-              value={form.source_kind}
-              onChange={(e) => setForm({ ...form, source_kind: e.target.value })}
-            />
-            <datalist id="onb-kinds">
-              <option value="web" />
-              <option value="telegram" />
-            </datalist>
-          </Field>
-          <Field label="Очікувані типи даних">
-            <input
-              value={form.expected}
-              onChange={(e) => setForm({ ...form, expected: e.target.value })}
-              placeholder="product, event"
-            />
-          </Field>
-          <Field label="Бюджет дослідження">
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
-            />
-          </Field>
-          <Field label="Валюта">
-            <input
-              value={form.currency}
-              onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
-              maxLength={3}
-            />
-          </Field>
-          <Field label="Макс. сторінок вибірки">
-            <input
-              type="number"
-              min={1}
-              value={form.samples}
-              onChange={(e) => setForm({ ...form, samples: e.target.value })}
-            />
-          </Field>
-          <Field
-            label="Поріг впевненості вибірки"
-            hint="Більше 0 і не більше 1; порожньо — поріг асистента (min_onboarding_confidence)"
-          >
-            <input
-              type="number"
-              min={0}
-              max={1}
-              step="any"
-              value={form.confidence}
-              onChange={(e) => setForm({ ...form, confidence: e.target.value })}
-            />
-          </Field>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={form.auto_activation}
-              onChange={(e) => setForm({ ...form, auto_activation: e.target.checked })}
-            />
-            Дозволити автоматичну активацію
-          </label>
-        </div>
-        {confidenceError ? <p role="alert">{confidenceError}</p> : null}
-        <Field label="Правила обходу від користувача (фрагмент CollectorRules, необов'язково)">
-          <JsonEditor
-            text={form.hints}
-            onChange={(t) => setForm({ ...form, hints: t })}
-            label="Підказки обходу"
-            minHeight="5rem"
-          />
-        </Field>
+        </fieldset>
         <button
           type="button"
           className="btn btn-primary"
           disabled={
             !form.query.trim() || Boolean(hints.parseError) || Boolean(confidenceError) || start.isPending
           }
-          onClick={() => start.mutate()}
+          onClick={() => start.mutate(form)}
         >
           Почати підключення
         </button>
@@ -355,7 +374,7 @@ function SessionList({ selected, onOpen }: { selected: string | null; onOpen: (i
             <option value="">усі</option>
             {ONBOARDING_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {statusLabel(s)}
               </option>
             ))}
           </select>
@@ -381,6 +400,8 @@ function SessionList({ selected, onOpen }: { selected: string | null; onOpen: (i
       <ErrorBox error={list.error} title="Список сесій недоступний" />
       <Table
         label="Сесії підключення"
+        loading={list.isLoading}
+        error={list.error}
         rows={list.items}
         rowKey={(s) => s.session_id}
         empty="Сесій ще немає"
@@ -417,6 +438,23 @@ function SessionList({ selected, onOpen }: { selected: string | null; onOpen: (i
 function ImprovementRuns({ jobId, onOpen }: { jobId: string | null; onOpen: (id: string) => void }) {
   const api = useApi();
   const [filter, setFilter] = useState({ package_id: "", source_id: "", problem_group_id: "", status: "" });
+  const sources = useSourceOptions();
+  const packages = useCursorList(["packages", "assistant-picker"], (cursor, limit) =>
+    unwrap(api.registry.GET("/v1/packages", { params: { query: { limit, ...(cursor ? { cursor } : {}) } } })),
+  );
+  const groups = useCursorList(["problem-groups", "assistant-picker", filter.source_id], (cursor, limit) =>
+    unwrap(
+      api.orchestrator.GET("/v1/problem-groups", {
+        params: {
+          query: {
+            limit,
+            ...(cursor ? { cursor } : {}),
+            ...(filter.source_id ? { source_id: filter.source_id } : {}),
+          },
+        },
+      }),
+    ),
+  );
   return (
     <>
       <Section title="Запуски вдосконалення екстракторів">
@@ -425,34 +463,65 @@ function ImprovementRuns({ jobId, onOpen }: { jobId: string | null; onOpen: (id:
         </p>
         <div className="filters">
           <Field label="Пакет (package_id)">
-            <input
+            <select
               value={filter.package_id}
-              onChange={(e) => setFilter({ ...filter, package_id: e.target.value.trim() })}
-            />
+              onChange={(e) => setFilter({ ...filter, package_id: e.target.value })}
+            >
+              <option value="">Усі пакети</option>
+              {packages.items.map((pkg) => (
+                <option key={pkg.package_id} value={pkg.package_id}>
+                  {pkg.title} · {pkg.package_id}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Джерело (source_id)">
-            <input
+            <select
               value={filter.source_id}
-              onChange={(e) => setFilter({ ...filter, source_id: e.target.value.trim() })}
-            />
+              onChange={(e) => setFilter({ ...filter, source_id: e.target.value, problem_group_id: "" })}
+            >
+              <option value="">Усі джерела</option>
+              {sources.options.map((source) => (
+                <option key={source.value} value={source.value}>
+                  {source.label} · {source.value}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Група проблем (problem_group_id)">
-            <input
+            <select
               value={filter.problem_group_id}
-              onChange={(e) => setFilter({ ...filter, problem_group_id: e.target.value.trim() })}
-            />
+              onChange={(e) => setFilter({ ...filter, problem_group_id: e.target.value })}
+            >
+              <option value="">Усі групи</option>
+              {groups.items.map((group) => (
+                <option key={group.group_id} value={group.group_id}>
+                  {group.problem} · {group.group_id}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Стан job">
             <select value={filter.status} onChange={(e) => setFilter({ ...filter, status: e.target.value })}>
               <option value="">усі</option>
               {JOB_STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {statusLabel(s)}
                 </option>
               ))}
             </select>
           </Field>
         </div>
+        <ErrorBox error={sources.error ?? packages.error ?? groups.error} title="Каталог фільтрів" />
+        <LoadMore
+          hasMore={sources.hasMore || packages.hasMore || groups.hasMore}
+          loading={sources.loadingMore || packages.loadingMore || groups.loadingMore}
+          onClick={() => {
+            if (sources.hasMore) sources.loadMore();
+            if (packages.hasMore) packages.loadMore();
+            if (groups.hasMore) groups.loadMore();
+          }}
+        />
         <ImprovementRunList
           filter={{
             ...(filter.package_id ? { package_id: filter.package_id } : {}),

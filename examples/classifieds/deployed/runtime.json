@@ -1,0 +1,1674 @@
+{
+  "captured_at": "2026-10-11T06:33:01.258319Z",
+  "capture_started_at": "2026-10-11T06:32:49.967010Z",
+  "container_set_changed_during_capture": false,
+  "capture_consistency": {
+    "same_matching_container_set": true,
+    "same_images_and_start_times": true,
+    "consistent": true,
+    "scope": "Container membership, image IDs and start times checked at both ends; API/settings observations are timestamped within this interval."
+  },
+  "project": "jane-demo",
+  "capture_mode": "Read-only Docker metadata and direct source-file hashes; no service module imports, Settings() construction or direct database access. Read-only GET /v1/info supplies whitelisted numeric limits.",
+  "provenance": {
+    "classification": "mixed operational deployment",
+    "checkout_head": "25377ae0d1dae8be73277ea16325b02875e5bbf3",
+    "checkout_dirty_tracked_paths": [
+      "docs/delivery/classifieds-20261011.md",
+      "examples/classifieds/deployed/runs.json",
+      "examples/classifieds/deployed/service-discovery.json",
+      "examples/classifieds/deployed/verification.olx.json",
+      "examples/classifieds/setup_classifieds.py",
+      "examples/tests/test_classifieds.py"
+    ],
+    "full_image_equals_checkout_head": "not established",
+    "fingerprint_scope": "Only listed files at package-spec or deployment-audit-resolved paths, configured discovery files and canonical collector-rules schemas are compared. Existing operations image files and per-service image IDs retain their own provenance.",
+    "probe_scope": "Fresh processes read files in the same running containers without importing service modules or constructing Settings(); existing server process module caches are not inspected.",
+    "guard_overlay": {
+      "path": ".jane\\browser-guard-overlay\\deploy-after.json",
+      "sha256": "sha256:66c10d52f9340efe890165b0bcbf3f06f072201d82b9172dfd669e2bdaac0aa1",
+      "container_id": "sha256:8498960bc3372f49e20a47e73ba3ace8c88bb3759a1f453e2acffbe372f44f1c",
+      "image_id": "sha256:82ad1d201b6656a5f36d7f1d3c4358da19f5e9adf5166a37718c95f67154c786",
+      "evidence_scope": "Resolved paths and accepted guard deployment audit; settings from that prior audit are not reused as current settings."
+    }
+  },
+  "saved_evidence": [
+    {
+      "phase": "baseline",
+      "path": ".jane\\classifieds-deploy-baseline.json",
+      "sha256": "sha256:dd3c3651e3cb7e1c6f5f350bdb3358aed8111a39f9e6841f8a9408da89141657"
+    },
+    {
+      "phase": "after",
+      "path": ".jane\\classifieds-deploy-after.json",
+      "sha256": "sha256:a20a832c4382833ce43bc8b66c5ad58e1d544e6e01187bf99a1b1c348a82a7b3"
+    },
+    {
+      "phase": "heartbeat500",
+      "path": ".jane\\classifieds-deploy-heartbeat500.json",
+      "sha256": "sha256:89ec79ef4097421690823a47949f11068350e490f59abaabb6d0cfa29565160b"
+    }
+  ],
+  "missing_expected_services": [],
+  "service_discovery": {
+    "policy": "Exactly one matching running container must publish the service API port. Matching containers without a published port remain recorded and are not designated as the API-serving instance.",
+    "errors": []
+  },
+  "primary_services": {
+    "assistant": {
+      "container_id": "sha256:a44fcead091101a9ac9569f6a74c5350d57ee6bdd748224d234a43d692e840a8",
+      "image_reference": "jane-demo-operations-assistant:stage1",
+      "image_id": "sha256:efe4edd99863eb859fec2701e3ac58174ab828222be7083395008d331175fc24",
+      "endpoint_urls": [
+        "http://127.0.0.1:52316"
+      ],
+      "health": "healthy",
+      "sources": {
+        "collector_schema_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+        "collector_schema_hash": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+        "collector_schema_path": "/app/contracts/schemas/collector-rules.schema.json",
+        "inspection": "Direct files from package specs/baseline-resolved paths; no module import or Settings()",
+        "jane_kit_operations": {
+          "auth.py": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+          "config.py": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+          "operations.py": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+          "service.py": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+        },
+        "module_files": {
+          "jane_assistant.settings": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_assistant/settings.py",
+            "sha256": "sha256:a4e041430e5902f4bd243a7220142ee77e73e9358e2f56df3c04c08125fe40b3"
+          },
+          "jane_kit.auth": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/auth.py",
+            "sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6"
+          },
+          "jane_kit.config": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/config.py",
+            "sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3"
+          },
+          "jane_kit.operations": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/operations.py",
+            "sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e"
+          },
+          "jane_kit.service": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/service.py",
+            "sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+          }
+        }
+      },
+      "comparison_to_checkout": {
+        "collector": {},
+        "discovery": {},
+        "jane_kit": {
+          "auth.py": {
+            "runtime_sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+            "checkout_sha256": "sha256:391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c",
+            "matches_checkout": false
+          },
+          "config.py": {
+            "runtime_sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+            "checkout_sha256": "sha256:d0e126b418fd414fa8ea966ded39868ab596f6e0f66a7ff0d13f3362eafc5209",
+            "matches_checkout": false
+          },
+          "operations.py": {
+            "runtime_sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+            "checkout_sha256": null,
+            "matches_checkout": false
+          },
+          "service.py": {
+            "runtime_sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c",
+            "checkout_sha256": "sha256:95560025c33495e34d93540acd776d6df0b8878b8445a7dda1f0a570db8746dc",
+            "matches_checkout": false
+          }
+        },
+        "collector_rules_schema": {
+          "runtime_sha256": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+          "checkout_sha256": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+          "runtime_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+          "checkout_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+          "matches_checkout_bytes": true,
+          "matches_checkout_canonical_json": true
+        }
+      },
+      "proxy_config": null,
+      "info_configuration": {
+        "method": "GET",
+        "endpoint": "http://127.0.0.1:52316/v1/info",
+        "status_code": 200,
+        "captured_at": "2026-10-11T06:32:56.648490Z",
+        "available": true,
+        "scope": "Whitelisted numeric configured defaults and hard caps only",
+        "defaults": {
+          "transfer": {
+            "inline_max_bytes": 262144
+          }
+        },
+        "hard_caps": {}
+      },
+      "resolved_paths_provenance": null,
+      "collector_env_jobs_match_info_defaults": null,
+      "capture_end": {
+        "image_id": "sha256:efe4edd99863eb859fec2701e3ac58174ab828222be7083395008d331175fc24",
+        "started_at": "2026-10-11T05:43:51.011782512Z",
+        "status": "running",
+        "health": "healthy"
+      }
+    },
+    "handler-runtime": {
+      "container_id": "sha256:fecae1168f859c5d61dedc9c1acb9567fcf6afac443b4a77a53ba03589db902a",
+      "image_reference": "jane-demo-operations-handler-runtime:stage1",
+      "image_id": "sha256:02fec1e58f14c235d8c9fb4deed5bd453e9b9d9c946315e2afa7e3b618cddb32",
+      "endpoint_urls": [
+        "http://127.0.0.1:62130"
+      ],
+      "health": "healthy",
+      "sources": {
+        "inspection": "Direct files from package specs/baseline-resolved paths; no module import or Settings()",
+        "jane_kit_operations": {
+          "auth.py": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+          "config.py": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+          "operations.py": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+          "service.py": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+        },
+        "module_files": {
+          "jane_handler_runtime.settings": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_handler_runtime/settings.py",
+            "sha256": "sha256:11073892b013ccdeb3ac5ca4aa7c50599832f70bcd781c0765adb1f8cbb4e974"
+          },
+          "jane_kit.auth": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/auth.py",
+            "sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6"
+          },
+          "jane_kit.config": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/config.py",
+            "sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3"
+          },
+          "jane_kit.operations": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/operations.py",
+            "sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e"
+          },
+          "jane_kit.service": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/service.py",
+            "sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+          }
+        }
+      },
+      "comparison_to_checkout": {
+        "collector": {},
+        "discovery": {},
+        "jane_kit": {
+          "auth.py": {
+            "runtime_sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+            "checkout_sha256": "sha256:391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c",
+            "matches_checkout": false
+          },
+          "config.py": {
+            "runtime_sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+            "checkout_sha256": "sha256:d0e126b418fd414fa8ea966ded39868ab596f6e0f66a7ff0d13f3362eafc5209",
+            "matches_checkout": false
+          },
+          "operations.py": {
+            "runtime_sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+            "checkout_sha256": null,
+            "matches_checkout": false
+          },
+          "service.py": {
+            "runtime_sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c",
+            "checkout_sha256": "sha256:95560025c33495e34d93540acd776d6df0b8878b8445a7dda1f0a570db8746dc",
+            "matches_checkout": false
+          }
+        }
+      },
+      "proxy_config": null,
+      "info_configuration": {
+        "method": "GET",
+        "endpoint": "http://127.0.0.1:62130/v1/info",
+        "status_code": 200,
+        "captured_at": "2026-10-11T06:32:56.694004Z",
+        "available": true,
+        "scope": "Whitelisted numeric configured defaults and hard caps only",
+        "defaults": {
+          "concurrency": {
+            "max_parallel_invocations": 8
+          }
+        },
+        "hard_caps": {}
+      },
+      "resolved_paths_provenance": null,
+      "collector_env_jobs_match_info_defaults": null,
+      "capture_end": {
+        "image_id": "sha256:02fec1e58f14c235d8c9fb4deed5bd453e9b9d9c946315e2afa7e3b618cddb32",
+        "started_at": "2026-10-11T05:43:05.523735215Z",
+        "status": "running",
+        "health": "healthy"
+      }
+    },
+    "orchestrator": {
+      "container_id": "sha256:4446e13d1fa18acd0c25be1595ecd1485feabc5ea173f3455f13bdeeea75d213",
+      "image_reference": "jane-demo-operations-orchestrator:stage1",
+      "image_id": "sha256:a0d4807dd64fa4c1a548ed3a25f85916466f6fad836bd1ca01ea21b45bac4aea",
+      "endpoint_urls": [
+        "http://127.0.0.1:52310"
+      ],
+      "health": "healthy",
+      "sources": {
+        "inspection": "Direct files from package specs/baseline-resolved paths; no module import or Settings()",
+        "jane_kit_operations": {
+          "auth.py": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+          "config.py": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+          "operations.py": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+          "service.py": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+        },
+        "module_files": {
+          "jane_kit.auth": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/auth.py",
+            "sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6"
+          },
+          "jane_kit.config": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/config.py",
+            "sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3"
+          },
+          "jane_kit.operations": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/operations.py",
+            "sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e"
+          },
+          "jane_kit.service": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/service.py",
+            "sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+          },
+          "jane_orchestrator.settings": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_orchestrator/settings.py",
+            "sha256": "sha256:35b08610e4588d78627a6c90cb217662ad42e8bbc1b49374bd6e87fa7c7c0a26"
+          }
+        }
+      },
+      "comparison_to_checkout": {
+        "collector": {},
+        "discovery": {},
+        "jane_kit": {
+          "auth.py": {
+            "runtime_sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+            "checkout_sha256": "sha256:391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c",
+            "matches_checkout": false
+          },
+          "config.py": {
+            "runtime_sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+            "checkout_sha256": "sha256:d0e126b418fd414fa8ea966ded39868ab596f6e0f66a7ff0d13f3362eafc5209",
+            "matches_checkout": false
+          },
+          "operations.py": {
+            "runtime_sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+            "checkout_sha256": null,
+            "matches_checkout": false
+          },
+          "service.py": {
+            "runtime_sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c",
+            "checkout_sha256": "sha256:95560025c33495e34d93540acd776d6df0b8878b8445a7dda1f0a570db8746dc",
+            "matches_checkout": false
+          }
+        }
+      },
+      "proxy_config": null,
+      "info_configuration": {
+        "method": "GET",
+        "endpoint": "http://127.0.0.1:52310/v1/info",
+        "status_code": 200,
+        "captured_at": "2026-10-11T06:32:56.737880Z",
+        "available": true,
+        "scope": "Whitelisted numeric configured defaults and hard caps only",
+        "defaults": {},
+        "hard_caps": {}
+      },
+      "resolved_paths_provenance": null,
+      "collector_env_jobs_match_info_defaults": null,
+      "capture_end": {
+        "image_id": "sha256:a0d4807dd64fa4c1a548ed3a25f85916466f6fad836bd1ca01ea21b45bac4aea",
+        "started_at": "2026-10-11T05:44:19.189713643Z",
+        "status": "running",
+        "health": "healthy"
+      }
+    },
+    "proxy": {
+      "container_id": "sha256:194a5242af6e0fcc55a701ff1a0ba8731223ca20426890550103266d4cb30b48",
+      "image_reference": "caddy:2-alpine",
+      "image_id": "sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b",
+      "endpoint_urls": [
+        "http://127.0.0.1:54347"
+      ],
+      "health": "healthy",
+      "sources": {},
+      "comparison_to_checkout": {},
+      "proxy_config": {
+        "path": "/etc/caddy/Caddyfile",
+        "sha256": "sha256:dccc30b7130a584a3e28618516f2b653dcd77ed312f033b6eba00196eba9d381"
+      },
+      "info_configuration": null,
+      "resolved_paths_provenance": null,
+      "collector_env_jobs_match_info_defaults": null,
+      "capture_end": {
+        "image_id": "sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b",
+        "started_at": "2026-10-11T04:48:31.047558569Z",
+        "status": "running",
+        "health": "healthy"
+      }
+    },
+    "registry": {
+      "container_id": "sha256:21d3a28589ef95ee96ccc0da1e28c686074371a14fb84478541666c369404854",
+      "image_reference": "jane-demo-operations-registry:stage1",
+      "image_id": "sha256:84c03f726eb5161ef63268b0499b34f4e41739ca6fe4af23d94b86b08ce6afd4",
+      "endpoint_urls": [
+        "http://127.0.0.1:62129"
+      ],
+      "health": "healthy",
+      "sources": {
+        "collector_schema_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+        "collector_schema_hash": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+        "collector_schema_path": "/app/contracts/schemas/collector-rules.schema.json",
+        "inspection": "Direct files from package specs/baseline-resolved paths; no module import or Settings()",
+        "jane_kit_operations": {
+          "auth.py": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+          "config.py": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+          "operations.py": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+          "service.py": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+        },
+        "module_files": {
+          "jane_kit.auth": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/auth.py",
+            "sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6"
+          },
+          "jane_kit.config": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/config.py",
+            "sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3"
+          },
+          "jane_kit.operations": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/operations.py",
+            "sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e"
+          },
+          "jane_kit.service": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/service.py",
+            "sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+          },
+          "jane_registry.settings": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_registry/settings.py",
+            "sha256": "sha256:7135effcbdf6d65337a9203f0e270219c14e8060cc7e2c5c016e596977da9b36"
+          }
+        }
+      },
+      "comparison_to_checkout": {
+        "collector": {},
+        "discovery": {},
+        "jane_kit": {
+          "auth.py": {
+            "runtime_sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+            "checkout_sha256": "sha256:391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c",
+            "matches_checkout": false
+          },
+          "config.py": {
+            "runtime_sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+            "checkout_sha256": "sha256:d0e126b418fd414fa8ea966ded39868ab596f6e0f66a7ff0d13f3362eafc5209",
+            "matches_checkout": false
+          },
+          "operations.py": {
+            "runtime_sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+            "checkout_sha256": null,
+            "matches_checkout": false
+          },
+          "service.py": {
+            "runtime_sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c",
+            "checkout_sha256": "sha256:95560025c33495e34d93540acd776d6df0b8878b8445a7dda1f0a570db8746dc",
+            "matches_checkout": false
+          }
+        },
+        "collector_rules_schema": {
+          "runtime_sha256": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+          "checkout_sha256": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+          "runtime_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+          "checkout_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+          "matches_checkout_bytes": true,
+          "matches_checkout_canonical_json": true
+        }
+      },
+      "proxy_config": null,
+      "info_configuration": {
+        "method": "GET",
+        "endpoint": "http://127.0.0.1:62129/v1/info",
+        "status_code": 200,
+        "captured_at": "2026-10-11T06:32:56.768650Z",
+        "available": true,
+        "scope": "Whitelisted numeric configured defaults and hard caps only",
+        "defaults": {
+          "transfer": {
+            "max_request_body_bytes": 31457280
+          }
+        },
+        "hard_caps": {}
+      },
+      "resolved_paths_provenance": null,
+      "collector_env_jobs_match_info_defaults": null,
+      "capture_end": {
+        "image_id": "sha256:84c03f726eb5161ef63268b0499b34f4e41739ca6fe4af23d94b86b08ce6afd4",
+        "started_at": "2026-10-11T05:44:05.27490341Z",
+        "status": "running",
+        "health": "healthy"
+      }
+    },
+    "web-collector": {
+      "container_id": "sha256:8498960bc3372f49e20a47e73ba3ace8c88bb3759a1f453e2acffbe372f44f1c",
+      "image_reference": "jane-demo-classifieds-browser-guard:15bb32d-947803d4",
+      "image_id": "sha256:82ad1d201b6656a5f36d7f1d3c4358da19f5e9adf5166a37718c95f67154c786",
+      "endpoint_urls": [
+        "http://127.0.0.1:55683"
+      ],
+      "health": "healthy",
+      "sources": {
+        "api_feed_paths": {
+          "/app/strategies/discovery/api_feed.py": "sha256:2e29fe68989cf899e511baf419d756913bdc35adc07db9f1f73e3863930d8321"
+        },
+        "collector_schema_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+        "collector_schema_hash": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+        "collector_schema_path": "/app/contracts/schemas/collector-rules.schema.json",
+        "collector_settings_hash": "sha256:3c2ed26dd0f2aae983acaa31804cf268756b3641f27ed0a38dced5467c376f1b",
+        "collector_source_root": "/app/.venv/lib/python3.12/site-packages/jane_web_collector",
+        "collector_sources": {
+          "crawler.py": "sha256:c35d963cf1b0105b6105ed39ace1dad399b5a8cee6a3d6d715fef186e82991f4",
+          "engine.py": "sha256:b6990911d1fe95998232df77544f9a2e0b4f3431d647d74345a5ea87fd68c263",
+          "fetcher.py": "sha256:78499a210f6d59cfedf9f172261edcf38da9f64f7a382f8a35749a64a4a6e6fe",
+          "render.py": "sha256:3b23561722395d1e2678da99767cdc91082f2b643c348fc0526e97e44b107e39",
+          "state.py": "sha256:fad0f2d5968ad761aee22cd31eb64c03c7ea378c2b4f9040c08e4f3f0784c458"
+        },
+        "effective_discovery_path": "/app/strategies/discovery",
+        "inspection": "Direct files from package specs/baseline-resolved paths; no module import or Settings()",
+        "jane_kit_operations": {
+          "auth.py": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+          "config.py": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+          "operations.py": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+          "service.py": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+        },
+        "module_files": {
+          "jane_kit.auth": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/auth.py",
+            "sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6"
+          },
+          "jane_kit.config": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/config.py",
+            "sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3"
+          },
+          "jane_kit.operations": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/operations.py",
+            "sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e"
+          },
+          "jane_kit.service": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/service.py",
+            "sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+          },
+          "jane_web_collector.crawler": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/crawler.py",
+            "sha256": "sha256:c35d963cf1b0105b6105ed39ace1dad399b5a8cee6a3d6d715fef186e82991f4"
+          },
+          "jane_web_collector.engine": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/engine.py",
+            "sha256": "sha256:b6990911d1fe95998232df77544f9a2e0b4f3431d647d74345a5ea87fd68c263"
+          },
+          "jane_web_collector.fetcher": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/fetcher.py",
+            "sha256": "sha256:78499a210f6d59cfedf9f172261edcf38da9f64f7a382f8a35749a64a4a6e6fe"
+          },
+          "jane_web_collector.render": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/render.py",
+            "sha256": "sha256:3b23561722395d1e2678da99767cdc91082f2b643c348fc0526e97e44b107e39"
+          },
+          "jane_web_collector.settings": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/settings.py",
+            "sha256": "sha256:3c2ed26dd0f2aae983acaa31804cf268756b3641f27ed0a38dced5467c376f1b"
+          },
+          "jane_web_collector.state": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/state.py",
+            "sha256": "sha256:fad0f2d5968ad761aee22cd31eb64c03c7ea378c2b4f9040c08e4f3f0784c458"
+          },
+          "jane_web_collector_discovery.api_feed": {
+            "path": "/app/strategies/discovery/api_feed.py",
+            "sha256": "sha256:2e29fe68989cf899e511baf419d756913bdc35adc07db9f1f73e3863930d8321"
+          },
+          "jane_web_collector_discovery.sitemap": {
+            "path": "/app/strategies/discovery/sitemap.py",
+            "sha256": "sha256:9376bd54b693bd7fa10ae9f55d29feb9378ee962ff54219340d25c402486fe94"
+          }
+        },
+        "sitemap_paths": {
+          "/app/strategies/discovery/sitemap.py": "sha256:9376bd54b693bd7fa10ae9f55d29feb9378ee962ff54219340d25c402486fe94"
+        },
+        "current_settings": {
+          "heartbeat_interval_ms": 500,
+          "jobs": {
+            "max_concurrent_jobs": 32,
+            "job_timeout_ms": 14400000
+          }
+        },
+        "settings_measurement": "Whitelisted numeric values explicitly present in actual Docker Config.Env; absent values are omitted, not inferred. No Settings() constructor."
+      },
+      "comparison_to_checkout": {
+        "collector": {
+          "crawler.py": {
+            "runtime_sha256": "sha256:c35d963cf1b0105b6105ed39ace1dad399b5a8cee6a3d6d715fef186e82991f4",
+            "checkout_sha256": "sha256:c35d963cf1b0105b6105ed39ace1dad399b5a8cee6a3d6d715fef186e82991f4",
+            "matches_checkout": true
+          },
+          "engine.py": {
+            "runtime_sha256": "sha256:b6990911d1fe95998232df77544f9a2e0b4f3431d647d74345a5ea87fd68c263",
+            "checkout_sha256": "sha256:b6990911d1fe95998232df77544f9a2e0b4f3431d647d74345a5ea87fd68c263",
+            "matches_checkout": true
+          },
+          "fetcher.py": {
+            "runtime_sha256": "sha256:78499a210f6d59cfedf9f172261edcf38da9f64f7a382f8a35749a64a4a6e6fe",
+            "checkout_sha256": "sha256:78499a210f6d59cfedf9f172261edcf38da9f64f7a382f8a35749a64a4a6e6fe",
+            "matches_checkout": true
+          },
+          "render.py": {
+            "runtime_sha256": "sha256:3b23561722395d1e2678da99767cdc91082f2b643c348fc0526e97e44b107e39",
+            "checkout_sha256": "sha256:3b23561722395d1e2678da99767cdc91082f2b643c348fc0526e97e44b107e39",
+            "matches_checkout": true
+          },
+          "state.py": {
+            "runtime_sha256": "sha256:fad0f2d5968ad761aee22cd31eb64c03c7ea378c2b4f9040c08e4f3f0784c458",
+            "checkout_sha256": "sha256:fad0f2d5968ad761aee22cd31eb64c03c7ea378c2b4f9040c08e4f3f0784c458",
+            "matches_checkout": true
+          }
+        },
+        "discovery": {
+          "sitemap.py": {
+            "runtime_sha256": "sha256:9376bd54b693bd7fa10ae9f55d29feb9378ee962ff54219340d25c402486fe94",
+            "checkout_sha256": "sha256:9376bd54b693bd7fa10ae9f55d29feb9378ee962ff54219340d25c402486fe94",
+            "matches_checkout": true
+          },
+          "api_feed.py": {
+            "runtime_sha256": "sha256:2e29fe68989cf899e511baf419d756913bdc35adc07db9f1f73e3863930d8321",
+            "checkout_sha256": "sha256:2e29fe68989cf899e511baf419d756913bdc35adc07db9f1f73e3863930d8321",
+            "matches_checkout": true
+          }
+        },
+        "jane_kit": {
+          "auth.py": {
+            "runtime_sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+            "checkout_sha256": "sha256:391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c",
+            "matches_checkout": false
+          },
+          "config.py": {
+            "runtime_sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+            "checkout_sha256": "sha256:d0e126b418fd414fa8ea966ded39868ab596f6e0f66a7ff0d13f3362eafc5209",
+            "matches_checkout": false
+          },
+          "operations.py": {
+            "runtime_sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+            "checkout_sha256": null,
+            "matches_checkout": false
+          },
+          "service.py": {
+            "runtime_sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c",
+            "checkout_sha256": "sha256:95560025c33495e34d93540acd776d6df0b8878b8445a7dda1f0a570db8746dc",
+            "matches_checkout": false
+          }
+        },
+        "collector_rules_schema": {
+          "runtime_sha256": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+          "checkout_sha256": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+          "runtime_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+          "checkout_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+          "matches_checkout_bytes": true,
+          "matches_checkout_canonical_json": true
+        }
+      },
+      "proxy_config": null,
+      "info_configuration": {
+        "method": "GET",
+        "endpoint": "http://127.0.0.1:55683/v1/info",
+        "status_code": 200,
+        "captured_at": "2026-10-11T06:32:59.772795Z",
+        "available": true,
+        "scope": "Whitelisted numeric configured defaults and hard caps only",
+        "defaults": {
+          "transfer": {
+            "inline_max_bytes": 8388608,
+            "transit_ttl_seconds": 604800
+          },
+          "concurrency": {
+            "max_parallel_fetches": 4,
+            "max_parallel_fetches_per_host": 2
+          }
+        },
+        "hard_caps": {}
+      },
+      "resolved_paths_provenance": {
+        "path": ".jane\\browser-guard-overlay\\deploy-after.json",
+        "sha256": "sha256:66c10d52f9340efe890165b0bcbf3f06f072201d82b9172dfd669e2bdaac0aa1",
+        "same_container_and_image": true
+      },
+      "collector_env_jobs_match_info_defaults": {
+        "max_concurrent_jobs": null,
+        "job_timeout_ms": null
+      },
+      "capture_end": {
+        "image_id": "sha256:82ad1d201b6656a5f36d7f1d3c4358da19f5e9adf5166a37718c95f67154c786",
+        "started_at": "2026-10-11T06:25:50.315301727Z",
+        "status": "running",
+        "health": "healthy"
+      }
+    }
+  },
+  "containers": [
+    {
+      "service": "web-collector",
+      "container_name": "jane-demo-web-collector-1",
+      "container_id": "sha256:8498960bc3372f49e20a47e73ba3ace8c88bb3759a1f453e2acffbe372f44f1c",
+      "image_reference": "jane-demo-classifieds-browser-guard:15bb32d-947803d4",
+      "image_id": "sha256:82ad1d201b6656a5f36d7f1d3c4358da19f5e9adf5166a37718c95f67154c786",
+      "started_at": "2026-10-11T06:25:50.315301727Z",
+      "status": "running",
+      "health": "healthy",
+      "failing_streak": 2,
+      "env_hash": "sha256:ff82dc8c988f2efa7290a7ae30aa0ce2eacd638fb4c2d9da9784eea5510f531f",
+      "env_hash_format": "sha256(compact JSON of sorted Config.Env array)",
+      "port_bindings": {
+        "8101/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "55683"
+          }
+        ]
+      },
+      "published_ports": {
+        "8101/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "55683"
+          }
+        ]
+      },
+      "mounts": [
+        {
+          "Type": "volume",
+          "Name": "jane-demo-operations-web-collector",
+          "Source": "/var/lib/docker/volumes/jane-demo-operations-web-collector/_data",
+          "Destination": "/var/lib/jane-operations",
+          "RW": true,
+          "Propagation": ""
+        },
+        {
+          "Type": "volume",
+          "Name": "jane-demo_web-collector-data",
+          "Source": "/var/lib/docker/volumes/jane-demo_web-collector-data/_data",
+          "Destination": "/var/lib/jane-web-collector",
+          "RW": true,
+          "Propagation": ""
+        }
+      ],
+      "group_add": null,
+      "resolved_paths_provenance": {
+        "path": ".jane\\browser-guard-overlay\\deploy-after.json",
+        "sha256": "sha256:66c10d52f9340efe890165b0bcbf3f06f072201d82b9172dfd669e2bdaac0aa1",
+        "same_container_and_image": true
+      },
+      "sources": {
+        "api_feed_paths": {
+          "/app/strategies/discovery/api_feed.py": "sha256:2e29fe68989cf899e511baf419d756913bdc35adc07db9f1f73e3863930d8321"
+        },
+        "collector_schema_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+        "collector_schema_hash": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+        "collector_schema_path": "/app/contracts/schemas/collector-rules.schema.json",
+        "collector_settings_hash": "sha256:3c2ed26dd0f2aae983acaa31804cf268756b3641f27ed0a38dced5467c376f1b",
+        "collector_source_root": "/app/.venv/lib/python3.12/site-packages/jane_web_collector",
+        "collector_sources": {
+          "crawler.py": "sha256:c35d963cf1b0105b6105ed39ace1dad399b5a8cee6a3d6d715fef186e82991f4",
+          "engine.py": "sha256:b6990911d1fe95998232df77544f9a2e0b4f3431d647d74345a5ea87fd68c263",
+          "fetcher.py": "sha256:78499a210f6d59cfedf9f172261edcf38da9f64f7a382f8a35749a64a4a6e6fe",
+          "render.py": "sha256:3b23561722395d1e2678da99767cdc91082f2b643c348fc0526e97e44b107e39",
+          "state.py": "sha256:fad0f2d5968ad761aee22cd31eb64c03c7ea378c2b4f9040c08e4f3f0784c458"
+        },
+        "effective_discovery_path": "/app/strategies/discovery",
+        "inspection": "Direct files from package specs/baseline-resolved paths; no module import or Settings()",
+        "jane_kit_operations": {
+          "auth.py": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+          "config.py": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+          "operations.py": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+          "service.py": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+        },
+        "module_files": {
+          "jane_kit.auth": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/auth.py",
+            "sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6"
+          },
+          "jane_kit.config": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/config.py",
+            "sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3"
+          },
+          "jane_kit.operations": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/operations.py",
+            "sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e"
+          },
+          "jane_kit.service": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/service.py",
+            "sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+          },
+          "jane_web_collector.crawler": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/crawler.py",
+            "sha256": "sha256:c35d963cf1b0105b6105ed39ace1dad399b5a8cee6a3d6d715fef186e82991f4"
+          },
+          "jane_web_collector.engine": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/engine.py",
+            "sha256": "sha256:b6990911d1fe95998232df77544f9a2e0b4f3431d647d74345a5ea87fd68c263"
+          },
+          "jane_web_collector.fetcher": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/fetcher.py",
+            "sha256": "sha256:78499a210f6d59cfedf9f172261edcf38da9f64f7a382f8a35749a64a4a6e6fe"
+          },
+          "jane_web_collector.render": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/render.py",
+            "sha256": "sha256:3b23561722395d1e2678da99767cdc91082f2b643c348fc0526e97e44b107e39"
+          },
+          "jane_web_collector.settings": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/settings.py",
+            "sha256": "sha256:3c2ed26dd0f2aae983acaa31804cf268756b3641f27ed0a38dced5467c376f1b"
+          },
+          "jane_web_collector.state": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/state.py",
+            "sha256": "sha256:fad0f2d5968ad761aee22cd31eb64c03c7ea378c2b4f9040c08e4f3f0784c458"
+          },
+          "jane_web_collector_discovery.api_feed": {
+            "path": "/app/strategies/discovery/api_feed.py",
+            "sha256": "sha256:2e29fe68989cf899e511baf419d756913bdc35adc07db9f1f73e3863930d8321"
+          },
+          "jane_web_collector_discovery.sitemap": {
+            "path": "/app/strategies/discovery/sitemap.py",
+            "sha256": "sha256:9376bd54b693bd7fa10ae9f55d29feb9378ee962ff54219340d25c402486fe94"
+          }
+        },
+        "sitemap_paths": {
+          "/app/strategies/discovery/sitemap.py": "sha256:9376bd54b693bd7fa10ae9f55d29feb9378ee962ff54219340d25c402486fe94"
+        },
+        "current_settings": {
+          "heartbeat_interval_ms": 500,
+          "jobs": {
+            "max_concurrent_jobs": 32,
+            "job_timeout_ms": 14400000
+          }
+        },
+        "settings_measurement": "Whitelisted numeric values explicitly present in actual Docker Config.Env; absent values are omitted, not inferred. No Settings() constructor."
+      },
+      "comparison_to_checkout": {
+        "collector": {
+          "crawler.py": {
+            "runtime_sha256": "sha256:c35d963cf1b0105b6105ed39ace1dad399b5a8cee6a3d6d715fef186e82991f4",
+            "checkout_sha256": "sha256:c35d963cf1b0105b6105ed39ace1dad399b5a8cee6a3d6d715fef186e82991f4",
+            "matches_checkout": true
+          },
+          "engine.py": {
+            "runtime_sha256": "sha256:b6990911d1fe95998232df77544f9a2e0b4f3431d647d74345a5ea87fd68c263",
+            "checkout_sha256": "sha256:b6990911d1fe95998232df77544f9a2e0b4f3431d647d74345a5ea87fd68c263",
+            "matches_checkout": true
+          },
+          "fetcher.py": {
+            "runtime_sha256": "sha256:78499a210f6d59cfedf9f172261edcf38da9f64f7a382f8a35749a64a4a6e6fe",
+            "checkout_sha256": "sha256:78499a210f6d59cfedf9f172261edcf38da9f64f7a382f8a35749a64a4a6e6fe",
+            "matches_checkout": true
+          },
+          "render.py": {
+            "runtime_sha256": "sha256:3b23561722395d1e2678da99767cdc91082f2b643c348fc0526e97e44b107e39",
+            "checkout_sha256": "sha256:3b23561722395d1e2678da99767cdc91082f2b643c348fc0526e97e44b107e39",
+            "matches_checkout": true
+          },
+          "state.py": {
+            "runtime_sha256": "sha256:fad0f2d5968ad761aee22cd31eb64c03c7ea378c2b4f9040c08e4f3f0784c458",
+            "checkout_sha256": "sha256:fad0f2d5968ad761aee22cd31eb64c03c7ea378c2b4f9040c08e4f3f0784c458",
+            "matches_checkout": true
+          }
+        },
+        "discovery": {
+          "sitemap.py": {
+            "runtime_sha256": "sha256:9376bd54b693bd7fa10ae9f55d29feb9378ee962ff54219340d25c402486fe94",
+            "checkout_sha256": "sha256:9376bd54b693bd7fa10ae9f55d29feb9378ee962ff54219340d25c402486fe94",
+            "matches_checkout": true
+          },
+          "api_feed.py": {
+            "runtime_sha256": "sha256:2e29fe68989cf899e511baf419d756913bdc35adc07db9f1f73e3863930d8321",
+            "checkout_sha256": "sha256:2e29fe68989cf899e511baf419d756913bdc35adc07db9f1f73e3863930d8321",
+            "matches_checkout": true
+          }
+        },
+        "jane_kit": {
+          "auth.py": {
+            "runtime_sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+            "checkout_sha256": "sha256:391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c",
+            "matches_checkout": false
+          },
+          "config.py": {
+            "runtime_sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+            "checkout_sha256": "sha256:d0e126b418fd414fa8ea966ded39868ab596f6e0f66a7ff0d13f3362eafc5209",
+            "matches_checkout": false
+          },
+          "operations.py": {
+            "runtime_sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+            "checkout_sha256": null,
+            "matches_checkout": false
+          },
+          "service.py": {
+            "runtime_sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c",
+            "checkout_sha256": "sha256:95560025c33495e34d93540acd776d6df0b8878b8445a7dda1f0a570db8746dc",
+            "matches_checkout": false
+          }
+        },
+        "collector_rules_schema": {
+          "runtime_sha256": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+          "checkout_sha256": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+          "runtime_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+          "checkout_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+          "matches_checkout_bytes": true,
+          "matches_checkout_canonical_json": true
+        }
+      },
+      "preservation_against_saved_reports": {
+        "baseline": {
+          "env_hash": false,
+          "port_bindings": true,
+          "published_ports": true,
+          "group_add": true,
+          "mounts": true,
+          "jane_kit_operations": false
+        },
+        "after": {
+          "env_hash": false,
+          "port_bindings": true,
+          "published_ports": true,
+          "group_add": true,
+          "mounts": true,
+          "jane_kit_operations": false
+        },
+        "heartbeat500": {
+          "env_hash": true,
+          "port_bindings": true,
+          "published_ports": true,
+          "group_add": true,
+          "mounts": true,
+          "jane_kit_operations": false
+        }
+      },
+      "published_endpoint_urls": [
+        "http://127.0.0.1:55683"
+      ],
+      "primary_api_serving": true,
+      "serving_designation": "primary_published_api",
+      "info_configuration": {
+        "method": "GET",
+        "endpoint": "http://127.0.0.1:55683/v1/info",
+        "status_code": 200,
+        "captured_at": "2026-10-11T06:32:59.772795Z",
+        "available": true,
+        "scope": "Whitelisted numeric configured defaults and hard caps only",
+        "defaults": {
+          "transfer": {
+            "inline_max_bytes": 8388608,
+            "transit_ttl_seconds": 604800
+          },
+          "concurrency": {
+            "max_parallel_fetches": 4,
+            "max_parallel_fetches_per_host": 2
+          }
+        },
+        "hard_caps": {}
+      },
+      "collector_env_jobs_match_info_defaults": {
+        "max_concurrent_jobs": null,
+        "job_timeout_ms": null
+      },
+      "collector_jobs_info_note": "null means /v1/info does not expose this jobs field; Config.Env remains its direct evidence.",
+      "capture_end": {
+        "image_id": "sha256:82ad1d201b6656a5f36d7f1d3c4358da19f5e9adf5166a37718c95f67154c786",
+        "started_at": "2026-10-11T06:25:50.315301727Z",
+        "status": "running",
+        "health": "healthy"
+      },
+      "same_image_and_start_at_capture_end": true
+    },
+    {
+      "service": "orchestrator",
+      "container_name": "jane-demo-orchestrator-1",
+      "container_id": "sha256:4446e13d1fa18acd0c25be1595ecd1485feabc5ea173f3455f13bdeeea75d213",
+      "image_reference": "jane-demo-operations-orchestrator:stage1",
+      "image_id": "sha256:a0d4807dd64fa4c1a548ed3a25f85916466f6fad836bd1ca01ea21b45bac4aea",
+      "started_at": "2026-10-11T05:44:19.189713643Z",
+      "status": "running",
+      "health": "healthy",
+      "failing_streak": 0,
+      "env_hash": "sha256:60f673f1fe34a3c56bd1a128419974b9d83b4bb286cc7ababc642a2a31a93a5f",
+      "env_hash_format": "sha256(compact JSON of sorted Config.Env array)",
+      "port_bindings": {
+        "8000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "52310"
+          }
+        ]
+      },
+      "published_ports": {
+        "8000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "52310"
+          }
+        ]
+      },
+      "mounts": [
+        {
+          "Type": "volume",
+          "Name": "jane-demo-operations-orchestrator",
+          "Source": "/var/lib/docker/volumes/jane-demo-operations-orchestrator/_data",
+          "Destination": "/var/lib/jane-operations",
+          "RW": true,
+          "Propagation": ""
+        }
+      ],
+      "group_add": null,
+      "sources": {
+        "inspection": "Direct files from package specs/baseline-resolved paths; no module import or Settings()",
+        "jane_kit_operations": {
+          "auth.py": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+          "config.py": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+          "operations.py": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+          "service.py": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+        },
+        "module_files": {
+          "jane_kit.auth": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/auth.py",
+            "sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6"
+          },
+          "jane_kit.config": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/config.py",
+            "sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3"
+          },
+          "jane_kit.operations": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/operations.py",
+            "sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e"
+          },
+          "jane_kit.service": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/service.py",
+            "sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+          },
+          "jane_orchestrator.settings": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_orchestrator/settings.py",
+            "sha256": "sha256:35b08610e4588d78627a6c90cb217662ad42e8bbc1b49374bd6e87fa7c7c0a26"
+          }
+        }
+      },
+      "comparison_to_checkout": {
+        "collector": {},
+        "discovery": {},
+        "jane_kit": {
+          "auth.py": {
+            "runtime_sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+            "checkout_sha256": "sha256:391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c",
+            "matches_checkout": false
+          },
+          "config.py": {
+            "runtime_sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+            "checkout_sha256": "sha256:d0e126b418fd414fa8ea966ded39868ab596f6e0f66a7ff0d13f3362eafc5209",
+            "matches_checkout": false
+          },
+          "operations.py": {
+            "runtime_sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+            "checkout_sha256": null,
+            "matches_checkout": false
+          },
+          "service.py": {
+            "runtime_sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c",
+            "checkout_sha256": "sha256:95560025c33495e34d93540acd776d6df0b8878b8445a7dda1f0a570db8746dc",
+            "matches_checkout": false
+          }
+        }
+      },
+      "preservation_against_saved_reports": {},
+      "published_endpoint_urls": [
+        "http://127.0.0.1:52310"
+      ],
+      "primary_api_serving": true,
+      "serving_designation": "primary_published_api",
+      "info_configuration": {
+        "method": "GET",
+        "endpoint": "http://127.0.0.1:52310/v1/info",
+        "status_code": 200,
+        "captured_at": "2026-10-11T06:32:56.737880Z",
+        "available": true,
+        "scope": "Whitelisted numeric configured defaults and hard caps only",
+        "defaults": {},
+        "hard_caps": {}
+      },
+      "capture_end": {
+        "image_id": "sha256:a0d4807dd64fa4c1a548ed3a25f85916466f6fad836bd1ca01ea21b45bac4aea",
+        "started_at": "2026-10-11T05:44:19.189713643Z",
+        "status": "running",
+        "health": "healthy"
+      },
+      "same_image_and_start_at_capture_end": true
+    },
+    {
+      "service": "registry",
+      "container_name": "jane-demo-registry-1",
+      "container_id": "sha256:21d3a28589ef95ee96ccc0da1e28c686074371a14fb84478541666c369404854",
+      "image_reference": "jane-demo-operations-registry:stage1",
+      "image_id": "sha256:84c03f726eb5161ef63268b0499b34f4e41739ca6fe4af23d94b86b08ce6afd4",
+      "started_at": "2026-10-11T05:44:05.27490341Z",
+      "status": "running",
+      "health": "healthy",
+      "failing_streak": 0,
+      "env_hash": "sha256:9000e15799021e809b0634e48cfda8b82b9a8352b8ad8d653a7da2d55baa9892",
+      "env_hash_format": "sha256(compact JSON of sorted Config.Env array)",
+      "port_bindings": {
+        "8000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "62129"
+          }
+        ]
+      },
+      "published_ports": {
+        "8000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "62129"
+          }
+        ]
+      },
+      "mounts": [
+        {
+          "Type": "volume",
+          "Name": "jane-demo-operations-registry",
+          "Source": "/var/lib/docker/volumes/jane-demo-operations-registry/_data",
+          "Destination": "/var/lib/jane-operations",
+          "RW": true,
+          "Propagation": ""
+        }
+      ],
+      "group_add": null,
+      "sources": {
+        "collector_schema_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+        "collector_schema_hash": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+        "collector_schema_path": "/app/contracts/schemas/collector-rules.schema.json",
+        "inspection": "Direct files from package specs/baseline-resolved paths; no module import or Settings()",
+        "jane_kit_operations": {
+          "auth.py": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+          "config.py": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+          "operations.py": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+          "service.py": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+        },
+        "module_files": {
+          "jane_kit.auth": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/auth.py",
+            "sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6"
+          },
+          "jane_kit.config": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/config.py",
+            "sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3"
+          },
+          "jane_kit.operations": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/operations.py",
+            "sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e"
+          },
+          "jane_kit.service": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/service.py",
+            "sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+          },
+          "jane_registry.settings": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_registry/settings.py",
+            "sha256": "sha256:7135effcbdf6d65337a9203f0e270219c14e8060cc7e2c5c016e596977da9b36"
+          }
+        }
+      },
+      "comparison_to_checkout": {
+        "collector": {},
+        "discovery": {},
+        "jane_kit": {
+          "auth.py": {
+            "runtime_sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+            "checkout_sha256": "sha256:391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c",
+            "matches_checkout": false
+          },
+          "config.py": {
+            "runtime_sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+            "checkout_sha256": "sha256:d0e126b418fd414fa8ea966ded39868ab596f6e0f66a7ff0d13f3362eafc5209",
+            "matches_checkout": false
+          },
+          "operations.py": {
+            "runtime_sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+            "checkout_sha256": null,
+            "matches_checkout": false
+          },
+          "service.py": {
+            "runtime_sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c",
+            "checkout_sha256": "sha256:95560025c33495e34d93540acd776d6df0b8878b8445a7dda1f0a570db8746dc",
+            "matches_checkout": false
+          }
+        },
+        "collector_rules_schema": {
+          "runtime_sha256": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+          "checkout_sha256": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+          "runtime_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+          "checkout_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+          "matches_checkout_bytes": true,
+          "matches_checkout_canonical_json": true
+        }
+      },
+      "preservation_against_saved_reports": {
+        "baseline": {
+          "env_hash": true,
+          "port_bindings": true,
+          "published_ports": true,
+          "group_add": true,
+          "mounts": true,
+          "jane_kit_operations": false
+        },
+        "after": {
+          "env_hash": true,
+          "port_bindings": true,
+          "published_ports": true,
+          "group_add": true,
+          "mounts": true,
+          "jane_kit_operations": false
+        },
+        "heartbeat500": {
+          "env_hash": true,
+          "port_bindings": true,
+          "published_ports": true,
+          "group_add": true,
+          "mounts": true,
+          "jane_kit_operations": true
+        }
+      },
+      "published_endpoint_urls": [
+        "http://127.0.0.1:62129"
+      ],
+      "primary_api_serving": true,
+      "serving_designation": "primary_published_api",
+      "info_configuration": {
+        "method": "GET",
+        "endpoint": "http://127.0.0.1:62129/v1/info",
+        "status_code": 200,
+        "captured_at": "2026-10-11T06:32:56.768650Z",
+        "available": true,
+        "scope": "Whitelisted numeric configured defaults and hard caps only",
+        "defaults": {
+          "transfer": {
+            "max_request_body_bytes": 31457280
+          }
+        },
+        "hard_caps": {}
+      },
+      "capture_end": {
+        "image_id": "sha256:84c03f726eb5161ef63268b0499b34f4e41739ca6fe4af23d94b86b08ce6afd4",
+        "started_at": "2026-10-11T05:44:05.27490341Z",
+        "status": "running",
+        "health": "healthy"
+      },
+      "same_image_and_start_at_capture_end": true
+    },
+    {
+      "service": "assistant",
+      "container_name": "jane-demo-assistant-1",
+      "container_id": "sha256:a44fcead091101a9ac9569f6a74c5350d57ee6bdd748224d234a43d692e840a8",
+      "image_reference": "jane-demo-operations-assistant:stage1",
+      "image_id": "sha256:efe4edd99863eb859fec2701e3ac58174ab828222be7083395008d331175fc24",
+      "started_at": "2026-10-11T05:43:51.011782512Z",
+      "status": "running",
+      "health": "healthy",
+      "failing_streak": 0,
+      "env_hash": "sha256:45560ae454c81a4d31ac190e91d97f222e0e3934ee8e0cf26f9ab85700eebafe",
+      "env_hash_format": "sha256(compact JSON of sorted Config.Env array)",
+      "port_bindings": {
+        "8000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "52316"
+          }
+        ]
+      },
+      "published_ports": {
+        "8000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "52316"
+          }
+        ]
+      },
+      "mounts": [
+        {
+          "Type": "volume",
+          "Name": "jane-demo-operations-assistant",
+          "Source": "/var/lib/docker/volumes/jane-demo-operations-assistant/_data",
+          "Destination": "/var/lib/jane-operations",
+          "RW": true,
+          "Propagation": ""
+        }
+      ],
+      "group_add": null,
+      "sources": {
+        "collector_schema_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+        "collector_schema_hash": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+        "collector_schema_path": "/app/contracts/schemas/collector-rules.schema.json",
+        "inspection": "Direct files from package specs/baseline-resolved paths; no module import or Settings()",
+        "jane_kit_operations": {
+          "auth.py": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+          "config.py": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+          "operations.py": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+          "service.py": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+        },
+        "module_files": {
+          "jane_assistant.settings": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_assistant/settings.py",
+            "sha256": "sha256:a4e041430e5902f4bd243a7220142ee77e73e9358e2f56df3c04c08125fe40b3"
+          },
+          "jane_kit.auth": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/auth.py",
+            "sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6"
+          },
+          "jane_kit.config": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/config.py",
+            "sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3"
+          },
+          "jane_kit.operations": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/operations.py",
+            "sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e"
+          },
+          "jane_kit.service": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/service.py",
+            "sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+          }
+        }
+      },
+      "comparison_to_checkout": {
+        "collector": {},
+        "discovery": {},
+        "jane_kit": {
+          "auth.py": {
+            "runtime_sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+            "checkout_sha256": "sha256:391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c",
+            "matches_checkout": false
+          },
+          "config.py": {
+            "runtime_sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+            "checkout_sha256": "sha256:d0e126b418fd414fa8ea966ded39868ab596f6e0f66a7ff0d13f3362eafc5209",
+            "matches_checkout": false
+          },
+          "operations.py": {
+            "runtime_sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+            "checkout_sha256": null,
+            "matches_checkout": false
+          },
+          "service.py": {
+            "runtime_sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c",
+            "checkout_sha256": "sha256:95560025c33495e34d93540acd776d6df0b8878b8445a7dda1f0a570db8746dc",
+            "matches_checkout": false
+          }
+        },
+        "collector_rules_schema": {
+          "runtime_sha256": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+          "checkout_sha256": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+          "runtime_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+          "checkout_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+          "matches_checkout_bytes": true,
+          "matches_checkout_canonical_json": true
+        }
+      },
+      "preservation_against_saved_reports": {
+        "baseline": {
+          "env_hash": true,
+          "port_bindings": true,
+          "published_ports": true,
+          "group_add": true,
+          "mounts": true,
+          "jane_kit_operations": false
+        },
+        "after": {
+          "env_hash": true,
+          "port_bindings": true,
+          "published_ports": true,
+          "group_add": true,
+          "mounts": true,
+          "jane_kit_operations": false
+        },
+        "heartbeat500": {
+          "env_hash": true,
+          "port_bindings": true,
+          "published_ports": true,
+          "group_add": true,
+          "mounts": true,
+          "jane_kit_operations": true
+        }
+      },
+      "published_endpoint_urls": [
+        "http://127.0.0.1:52316"
+      ],
+      "primary_api_serving": true,
+      "serving_designation": "primary_published_api",
+      "info_configuration": {
+        "method": "GET",
+        "endpoint": "http://127.0.0.1:52316/v1/info",
+        "status_code": 200,
+        "captured_at": "2026-10-11T06:32:56.648490Z",
+        "available": true,
+        "scope": "Whitelisted numeric configured defaults and hard caps only",
+        "defaults": {
+          "transfer": {
+            "inline_max_bytes": 262144
+          }
+        },
+        "hard_caps": {}
+      },
+      "capture_end": {
+        "image_id": "sha256:efe4edd99863eb859fec2701e3ac58174ab828222be7083395008d331175fc24",
+        "started_at": "2026-10-11T05:43:51.011782512Z",
+        "status": "running",
+        "health": "healthy"
+      },
+      "same_image_and_start_at_capture_end": true
+    },
+    {
+      "service": "handler-runtime",
+      "container_name": "jane-demo-handler-runtime-1",
+      "container_id": "sha256:fecae1168f859c5d61dedc9c1acb9567fcf6afac443b4a77a53ba03589db902a",
+      "image_reference": "jane-demo-operations-handler-runtime:stage1",
+      "image_id": "sha256:02fec1e58f14c235d8c9fb4deed5bd453e9b9d9c946315e2afa7e3b618cddb32",
+      "started_at": "2026-10-11T05:43:05.523735215Z",
+      "status": "running",
+      "health": "healthy",
+      "failing_streak": 0,
+      "env_hash": "sha256:de6283919146d3e92de23fb02e2246d53d354dd9bec5b9c8cfa72d332c8f5a7e",
+      "env_hash_format": "sha256(compact JSON of sorted Config.Env array)",
+      "port_bindings": {
+        "8000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "62130"
+          }
+        ]
+      },
+      "published_ports": {
+        "8000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "62130"
+          }
+        ]
+      },
+      "mounts": [
+        {
+          "Type": "volume",
+          "Name": "jane-demo-operations-handler-runtime",
+          "Source": "/var/lib/docker/volumes/jane-demo-operations-handler-runtime/_data",
+          "Destination": "/var/lib/jane-operations",
+          "RW": true,
+          "Propagation": ""
+        },
+        {
+          "Type": "bind",
+          "Name": null,
+          "Source": "/run/host-services/docker.proxy.sock",
+          "Destination": "/var/run/docker.sock",
+          "RW": true,
+          "Propagation": "rprivate"
+        },
+        {
+          "Type": "volume",
+          "Name": "jane-demo_storage-data",
+          "Source": "/var/lib/docker/volumes/jane-demo_storage-data/_data",
+          "Destination": "/var/lib/jane/storage",
+          "RW": false,
+          "Propagation": ""
+        }
+      ],
+      "group_add": [
+        "0"
+      ],
+      "sources": {
+        "inspection": "Direct files from package specs/baseline-resolved paths; no module import or Settings()",
+        "jane_kit_operations": {
+          "auth.py": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+          "config.py": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+          "operations.py": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+          "service.py": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+        },
+        "module_files": {
+          "jane_handler_runtime.settings": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_handler_runtime/settings.py",
+            "sha256": "sha256:11073892b013ccdeb3ac5ca4aa7c50599832f70bcd781c0765adb1f8cbb4e974"
+          },
+          "jane_kit.auth": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/auth.py",
+            "sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6"
+          },
+          "jane_kit.config": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/config.py",
+            "sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3"
+          },
+          "jane_kit.operations": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/operations.py",
+            "sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e"
+          },
+          "jane_kit.service": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/service.py",
+            "sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+          }
+        }
+      },
+      "comparison_to_checkout": {
+        "collector": {},
+        "discovery": {},
+        "jane_kit": {
+          "auth.py": {
+            "runtime_sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+            "checkout_sha256": "sha256:391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c",
+            "matches_checkout": false
+          },
+          "config.py": {
+            "runtime_sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+            "checkout_sha256": "sha256:d0e126b418fd414fa8ea966ded39868ab596f6e0f66a7ff0d13f3362eafc5209",
+            "matches_checkout": false
+          },
+          "operations.py": {
+            "runtime_sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+            "checkout_sha256": null,
+            "matches_checkout": false
+          },
+          "service.py": {
+            "runtime_sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c",
+            "checkout_sha256": "sha256:95560025c33495e34d93540acd776d6df0b8878b8445a7dda1f0a570db8746dc",
+            "matches_checkout": false
+          }
+        }
+      },
+      "preservation_against_saved_reports": {},
+      "published_endpoint_urls": [
+        "http://127.0.0.1:62130"
+      ],
+      "primary_api_serving": true,
+      "serving_designation": "primary_published_api",
+      "info_configuration": {
+        "method": "GET",
+        "endpoint": "http://127.0.0.1:62130/v1/info",
+        "status_code": 200,
+        "captured_at": "2026-10-11T06:32:56.694004Z",
+        "available": true,
+        "scope": "Whitelisted numeric configured defaults and hard caps only",
+        "defaults": {
+          "concurrency": {
+            "max_parallel_invocations": 8
+          }
+        },
+        "hard_caps": {}
+      },
+      "capture_end": {
+        "image_id": "sha256:02fec1e58f14c235d8c9fb4deed5bd453e9b9d9c946315e2afa7e3b618cddb32",
+        "started_at": "2026-10-11T05:43:05.523735215Z",
+        "status": "running",
+        "health": "healthy"
+      },
+      "same_image_and_start_at_capture_end": true
+    },
+    {
+      "service": "proxy",
+      "container_name": "jane-demo-proxy-1",
+      "container_id": "sha256:194a5242af6e0fcc55a701ff1a0ba8731223ca20426890550103266d4cb30b48",
+      "image_reference": "caddy:2-alpine",
+      "image_id": "sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b",
+      "started_at": "2026-10-11T04:48:31.047558569Z",
+      "status": "running",
+      "health": "healthy",
+      "failing_streak": 0,
+      "env_hash": "sha256:f13e89949d941ad6c00eb5dd1f9beca5cb9e218913db5d1eaa38095cfbfa293a",
+      "env_hash_format": "sha256(compact JSON of sorted Config.Env array)",
+      "port_bindings": {
+        "8080/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "54347"
+          }
+        ]
+      },
+      "published_ports": {
+        "8080/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "54347"
+          }
+        ]
+      },
+      "mounts": [
+        {
+          "Type": "bind",
+          "Name": null,
+          "Source": "C:\\repos\\Jane\\.jane\\releases\\admin-585ce80c05a1b673",
+          "Destination": "/srv/admin",
+          "RW": false,
+          "Propagation": "rprivate"
+        },
+        {
+          "Type": "bind",
+          "Name": null,
+          "Source": "C:\\repos\\Jane\\infra\\proxy\\Caddyfile",
+          "Destination": "/etc/caddy/Caddyfile",
+          "RW": false,
+          "Propagation": "rprivate"
+        },
+        {
+          "Type": "bind",
+          "Name": null,
+          "Source": "C:\\repos\\Jane\\infra\\proxy\\admin-config.json",
+          "Destination": "/srv/config/config.json",
+          "RW": false,
+          "Propagation": "rprivate"
+        }
+      ],
+      "group_add": null,
+      "proxy_config": {
+        "path": "/etc/caddy/Caddyfile",
+        "sha256": "sha256:dccc30b7130a584a3e28618516f2b653dcd77ed312f033b6eba00196eba9d381"
+      },
+      "preservation_against_saved_reports": {},
+      "published_endpoint_urls": [
+        "http://127.0.0.1:54347"
+      ],
+      "primary_api_serving": true,
+      "serving_designation": "primary_published_api",
+      "capture_end": {
+        "image_id": "sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b",
+        "started_at": "2026-10-11T04:48:31.047558569Z",
+        "status": "running",
+        "health": "healthy"
+      },
+      "same_image_and_start_at_capture_end": true
+    },
+    {
+      "service": "orchestrator",
+      "container_name": "jane-demo-automarket-priority-worker",
+      "container_id": "sha256:9522b3a670903dcba6b7ed979310c6fc6385039731aea9dd6f7a3af12129a4d3",
+      "image_reference": "jane-automarket-orchestrator:e595c1c",
+      "image_id": "sha256:6ed92b88115eb6ef03480473f37e1fcba599d9c23aa78453dfac98a5f500dec2",
+      "started_at": "2026-10-11T04:46:17.39279839Z",
+      "status": "running",
+      "health": "not_configured",
+      "failing_streak": null,
+      "env_hash": "sha256:6f6e2712dc0321b9c9173395b10dd41916f14d14b2c6323c27a244949c94566f",
+      "env_hash_format": "sha256(compact JSON of sorted Config.Env array)",
+      "port_bindings": {},
+      "published_ports": {
+        "8000/tcp": null
+      },
+      "mounts": [],
+      "group_add": null,
+      "sources": {
+        "inspection": "Direct files from package specs/baseline-resolved paths; no module import or Settings()",
+        "jane_kit_operations": {
+          "auth.py": "sha256:391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c",
+          "config.py": "sha256:d0e126b418fd414fa8ea966ded39868ab596f6e0f66a7ff0d13f3362eafc5209",
+          "operations.py": null,
+          "service.py": "sha256:95560025c33495e34d93540acd776d6df0b8878b8445a7dda1f0a570db8746dc"
+        },
+        "module_files": {
+          "jane_kit.auth": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/auth.py",
+            "sha256": "sha256:391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c"
+          },
+          "jane_kit.config": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/config.py",
+            "sha256": "sha256:d0e126b418fd414fa8ea966ded39868ab596f6e0f66a7ff0d13f3362eafc5209"
+          },
+          "jane_kit.operations": {
+            "available": false,
+            "error_type": "FileNotFoundError"
+          },
+          "jane_kit.service": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/service.py",
+            "sha256": "sha256:95560025c33495e34d93540acd776d6df0b8878b8445a7dda1f0a570db8746dc"
+          },
+          "jane_orchestrator.settings": {
+            "path": "/app/.venv/lib/python3.12/site-packages/jane_orchestrator/settings.py",
+            "sha256": "sha256:46b58decf3c5f8cef1908b222730e238d6b5c44de8b6acb7fb3ee4468a96c137"
+          }
+        }
+      },
+      "comparison_to_checkout": {
+        "collector": {},
+        "discovery": {},
+        "jane_kit": {
+          "auth.py": {
+            "runtime_sha256": "sha256:391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c",
+            "checkout_sha256": "sha256:391325a84de76447213679d15ea7d894b1730dc80fa6ed79c1ffe38406d0549c",
+            "matches_checkout": true
+          },
+          "config.py": {
+            "runtime_sha256": "sha256:d0e126b418fd414fa8ea966ded39868ab596f6e0f66a7ff0d13f3362eafc5209",
+            "checkout_sha256": "sha256:d0e126b418fd414fa8ea966ded39868ab596f6e0f66a7ff0d13f3362eafc5209",
+            "matches_checkout": true
+          },
+          "operations.py": {
+            "runtime_sha256": null,
+            "checkout_sha256": null,
+            "matches_checkout": false
+          },
+          "service.py": {
+            "runtime_sha256": "sha256:95560025c33495e34d93540acd776d6df0b8878b8445a7dda1f0a570db8746dc",
+            "checkout_sha256": "sha256:95560025c33495e34d93540acd776d6df0b8878b8445a7dda1f0a570db8746dc",
+            "matches_checkout": true
+          }
+        }
+      },
+      "preservation_against_saved_reports": {},
+      "published_endpoint_urls": [],
+      "primary_api_serving": false,
+      "serving_designation": "unpublished_matching_container",
+      "capture_end": {
+        "image_id": "sha256:6ed92b88115eb6ef03480473f37e1fcba599d9c23aa78453dfac98a5f500dec2",
+        "started_at": "2026-10-11T04:46:17.39279839Z",
+        "status": "running",
+        "health": "not_configured"
+      },
+      "same_image_and_start_at_capture_end": true
+    }
+  ]
+}

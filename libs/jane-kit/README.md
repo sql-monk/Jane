@@ -1,5 +1,24 @@
 # jane-kit
 
+## Моніторинг і конфігурація модулів
+
+`create_app` установлює спільний [Operations API](../../contracts/docs/module-operations.md): `GET/PUT /v1/configuration`, `GET /v1/telemetry`. Модуль самостійно зберігає конфігурацію, журнал її змін і історію в SQLite; API не залежить від інших сервісів. Збережені параметри застосовуються під час наступного старту, із перевіркою типів, зв’язків і жорстких меж.
+
+| Налаштування `JaneSettings` | Типове значення |
+|---|---|
+| `operations_dir` | `.jane/operations/<service>` |
+| `operations_sample_interval_seconds` | 5 с, допустимо 1–300 |
+| `operations_retention_seconds` | 86400 с, допустимо 60–604800 |
+| `operations_max_points` | 720, допустимо 2–10000 |
+
+У контейнері задайте `<PREFIX>OPERATIONS_DIR` і окремий постійний том. API потребує `modules:read` / `modules:write`; конфігурація автентифікації та секрети не редагуються цим API.
+
+Перевірка з кореня репозиторію:
+
+```powershell
+uv run --no-project --with-editable libs/jane-kit --with pytest --with httpx pytest libs/jane-kit/tests/test_operations.py
+```
+
 Спільна бібліотека сервісів Jane. Дає однакову поведінку всім сервісам і реалізує конвенції контрактів
 WP-00 (скіл `jane-contracts`): модель помилок, ідемпотентність, асинхронні job, health/info, ліміти з
 успадкуванням, курсорна пагінація, `traceparent`, контрактні тести й моки, генерація клієнтів.
@@ -176,6 +195,12 @@ resolved.effective()  # {"limits": {...}, "provenance": {"crawl.max_depth": "tas
 `heartbeat_loop([store.heartbeat, ...], interval_s)` — фонова задача поновлення.
 
 ## Тести
+
+Для operations у Docker образ має створити writable `/var/lib/jane-operations` для користувача сервісу та задати `<PREFIX>OPERATIONS_DIR`. Штатні Dockerfile Jane це роблять; новий named volume успадковує права каталогу. Перевірка нового тому та наступного контейнера без запуску стека:
+
+```text
+python scripts/admin_operations_smoke.py --image jane-wp33-assistant:verified --settings-module jane_assistant.settings
+```
 
 ```
 just test jane-kit

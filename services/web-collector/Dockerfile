@@ -43,6 +43,8 @@ RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
 FROM runtime
 RUN useradd --system --uid 10001 --no-create-home jane \
  && mkdir -p /var/lib/jane-web-collector && chown jane /var/lib/jane-web-collector
+RUN mkdir -p /var/lib/jane-operations && chown jane /var/lib/jane-operations
+ENV JANE_WEB_COLLECTOR_OPERATIONS_DIR=/var/lib/jane-operations
 COPY --from=build /app/.venv /app/.venv
 COPY --from=build /src/contracts/openapi /app/contracts/openapi
 COPY --from=build /src/contracts/schemas /app/contracts/schemas

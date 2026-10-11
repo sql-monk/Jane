@@ -23,6 +23,8 @@ RUN uv sync --frozen --no-dev --no-editable --package jane-telegram-collector ${
 FROM ${PYTHON_IMAGE}
 RUN useradd --system --uid 10001 --no-create-home jane \
  && mkdir -p /var/lib/jane-telegram-collector && chown jane /var/lib/jane-telegram-collector
+RUN mkdir -p /var/lib/jane-operations && chown jane /var/lib/jane-operations
+ENV JANE_TELEGRAM_COLLECTOR_OPERATIONS_DIR=/var/lib/jane-operations
 COPY --from=build /app/.venv /app/.venv
 COPY --from=build /src/contracts/openapi /app/contracts/openapi
 COPY --from=build /src/contracts/schemas /app/contracts/schemas

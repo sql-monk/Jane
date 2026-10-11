@@ -5,7 +5,7 @@ import { useApi, useConfig } from "../app/context";
 import { unwrap } from "../api/client";
 import { useCursorList } from "../api/hooks";
 import { ApiError, toProblem } from "../api/problem";
-import type { StoredObject } from "../api/types";
+import type { StoredObject, MaterialTrace } from "../api/types";
 import { AttemptHistory } from "../components/AttemptHistory";
 import { useStorageConnections, storageName } from "../components/StorageConnections";
 import { ReprocessForm } from "../components/ReprocessForm";
@@ -23,6 +23,8 @@ import {
   Table,
 } from "../components/ui";
 import { formatBytes, formatDate, formatInstant, refLabel } from "../lib/format";
+import { resultsHref, entityTypeLabel } from "../lib/results-context";
+import { useSourceOptions } from "../lib/pickers";
 import "../materials-storage.css";
 
 export function formatMaterialContent(text: string): string {
@@ -40,6 +42,7 @@ function dateInputValue(value: string) {
 export function MaterialsPage() {
   const [params, setParams] = useSearchParams();
   const connections = useStorageConnections();
+  const sources = useSourceOptions();
   const connectionId = params.get("connection_id") ?? "";
   const sourceId = params.get("source_id") ?? "";
   const since = params.get("since") ?? "";
@@ -77,7 +80,7 @@ export function MaterialsPage() {
       actions={
         <>
           <Link className="btn" to="/results">
-            Розібрані дані
+            Усі розібрані дані
           </Link>
           <Link className="btn" to="/storages">
             Стан сховищ
@@ -104,7 +107,29 @@ export function MaterialsPage() {
           </select>
         </Field>
         <Field label="Джерело">
-          <input value={sourceId} onChange={(e) => update("source_id", e.target.value)} />
+          <input
+            list="material-sources"
+            value={sourceId}
+            onChange={(e) => update("source_id", e.target.value)}
+            placeholder="Назва або ідентифікатор джерела"
+          />
+          <datalist id="material-sources">
+            {sources.options.map((source) => (
+              <option key={source.value} value={source.value}>
+                {source.label}
+              </option>
+            ))}
+          </datalist>
+          {sources.hasMore ? (
+            <button
+              type="button"
+              className="btn btn-small"
+              onClick={sources.loadMore}
+              disabled={sources.loadingMore}
+            >
+              Більше джерел
+            </button>
+          ) : null}
         </Field>
         <Field label="Збережено з">
           <input
@@ -130,6 +155,7 @@ export function MaterialsPage() {
       </div>
       {connections.isLoading ? <Loading /> : null}
       <ErrorBox error={connections.error} />
+      <ErrorBox error={sources.error} title="Список джерел недоступний" />
       <LoadMore
         hasMore={connections.hasMore}
         loading={connections.loadingMore}
@@ -227,6 +253,8 @@ function StorageMaterials({
       <Table
         label={`Матеріали ${connectionId}`}
         rows={filtered}
+        loading={list.isLoading}
+        error={list.error}
         rowKey={(o) => o.object.object_id}
         empty={
           mediaType
@@ -438,10 +466,18 @@ export function MaterialTracePage() {
                       />
                     ),
                   },
-                  { header: "Виклик", cell: (s) => <code>{s.invocation_id ?? "—"}</code> },
+                  {
+                    header: "Виклик",
+                    cell: (s) => (
+                      <details>
+                        <summary>Діагностика</summary>
+                        <code>{s.invocation_id ?? "—"}</code>
+                      </details>
+                    ),
+                  },
                   {
                     header: "Виходи",
-                    cell: (s) => (s.outputs?.length ? <JsonView value={s.outputs} compact /> : "—"),
+                    cell: (s) => <TraceOutputs outputs={s.outputs} />,
                   },
                 ]}
               />
@@ -450,5 +486,63 @@ export function MaterialTracePage() {
         </>
       ) : null}
     </Page>
+  );
+}
+
+type TraceOutput = NonNullable<MaterialTrace["observations"][number]["stages"][number]["outputs"]>[number];
+
+export function TraceOutputs({ outputs }: { outputs: TraceOutput[] | undefined }) {
+  if (!outputs?.length) return <span className="muted">Немає зафіксованих виходів</span>;
+  const entities = outputs.filter((output) => output.kind === "entity").length;
+  const raw = outputs.filter((output) => output.kind === "stored_object").length;
+  return (
+    <div className="trace-outputs">
+      <span>
+        {entities ? `Посилань на сутності: ${entities}. ` : ""}
+        {raw ? `Збережених об'єктів: ${raw}.` : ""}
+      </span>
+      <details>
+        <summary>Відкрити результати й об'єкти</summary>
+        <ul>
+          {outputs.map((output, index) => {
+            // A scope may contain '|'. The exact key remains sufficient; no scope is guessed here.
+            return (
+              <li key={index}>
+                {output.write_status === "simulated" ? (
+                  <span>Імітований запис — робочі дані не збережено</span>
+                ) : output.kind === "entity" && output.entity_type && output.canonical_key ? (
+                  <Link
+                    to={resultsHref({
+                      ...(output.connection_id ? { connectionId: output.connection_id } : {}),
+                      entityType: output.entity_type,
+                      key: output.canonical_key,
+                    })}
+                  >
+                    {entityTypeLabel(output.entity_type)} · {output.canonical_key}{" "}
+                    {output.connection_id ? `(${output.connection_id})` : ""}
+                  </Link>
+                ) : output.kind === "stored_object" && output.connection_id && output.object_id ? (
+                  <Link
+                    to={`/materials?connection_id=${encodeURIComponent(output.connection_id)}&object_id=${encodeURIComponent(output.object_id)}`}
+                  >
+                    RAW {output.object_id} ({output.connection_id})
+                  </Link>
+                ) : (
+                  <span>Вихід {output.kind}: адреса перегляду недоступна</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <p className="muted">
+          Це зафіксовані посилання. Трасування обмежене налаштуванням сервісу; актуальні записи могли
+          змінитися після запуску.
+        </p>
+      </details>
+      <details>
+        <summary>Технічний JSON виходів</summary>
+        <JsonView value={outputs} compact />
+      </details>
+    </div>
   );
 }

@@ -1,0 +1,125 @@
+{
+  "verified_at": "2026-10-11T04:01:47.694965Z",
+  "execution": "Local extractor on live HTTP responses, not the deployed pipeline; the setup command records deployed RAW/storage separately.",
+  "sites": [
+    {
+      "site_id": "auto-ria",
+      "seed_url": "https://auto.ria.com/uk/search/?indexName=auto&sort[0].order=dates.created.desc",
+      "http_status": 200,
+      "robots_http_status": 200,
+      "robots_allowed_for": "JaneBot/1.0",
+      "robots_allowed": true,
+      "html_utf8_bytes": 1376209,
+      "html_utf8_sha256": "822c86e931d938d7043bdc5acb9ffa9f58d148e99370cd69cd4f48ff9b001332",
+      "extraction_status": "success",
+      "entity_count": 21,
+      "validated_entity_type": "classified_ad",
+      "sample_entities": [
+        {
+          "site": "auto.ria.com",
+          "listing_id": "39999975",
+          "title": "Volkswagen Golf R 2017",
+          "url": "https://auto.ria.com/uk/auto_volkswagen_golf-r_39999975.html",
+          "price": {
+            "amount": 21500.0,
+            "currency": "USD"
+          },
+          "location": "Мукачево"
+        },
+        {
+          "site": "auto.ria.com",
+          "listing_id": "40547538",
+          "title": "Skoda Octavia 2011",
+          "url": "https://auto.ria.com/uk/auto_skoda_octavia_40547538.html",
+          "price": {
+            "amount": 6500.0,
+            "currency": "USD"
+          },
+          "location": "Чернігів"
+        }
+      ]
+    },
+    {
+      "site_id": "dim-ria",
+      "seed_url": "https://dom.ria.com/uk/arenda-kvartir/kiev/",
+      "http_status": 200,
+      "robots_http_status": 200,
+      "robots_allowed_for": "JaneBot/1.0",
+      "robots_allowed": true,
+      "html_utf8_bytes": 793342,
+      "html_utf8_sha256": "25eacd12a8fa4505195e7d739792da4c27018ee8eae42ed49df8f1e48a21b98a",
+      "extraction_status": "success",
+      "entity_count": 22,
+      "validated_entity_type": "classified_ad",
+      "sample_entities": [
+        {
+          "site": "dom.ria.com",
+          "listing_id": "33683279",
+          "title": "Здається в оренду 1-кімнатна квартира 27 кв. м у Києві",
+          "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-borispolskaya-ulitsa-33683279.html",
+          "price": {
+            "amount": 9000.0,
+            "currency": "UAH"
+          },
+          "location": "Київ"
+        },
+        {
+          "site": "dom.ria.com",
+          "listing_id": "35018017",
+          "title": "Здається в оренду 1-кімнатна квартира 55 кв. м у Києві",
+          "url": "https://dom.ria.com/uk/realty-dolgosrochnaya-arenda-kvartira-kiev-darnitskiy-prichalnaya-ulitsa-35018017.html",
+          "price": {
+            "amount": 36000.0,
+            "currency": "UAH"
+          },
+          "location": "Київ"
+        }
+      ]
+    },
+    {
+      "site_id": "ria",
+      "seed_url": "https://www.ria.com/uk/c/mobile/",
+      "http_status": 200,
+      "robots_http_status": 200,
+      "robots_allowed_for": "JaneBot/1.0",
+      "robots_allowed": true,
+      "html_utf8_bytes": 707037,
+      "html_utf8_sha256": "6c98c416edc2aeafd1f8f129aad54d6fe962c7bde52a0e705213c78e091d359a",
+      "extraction_status": "success",
+      "entity_count": 20,
+      "validated_entity_type": "classified_ad",
+      "sample_entities": [
+        {
+          "site": "ria.com",
+          "listing_id": "238399796",
+          "title": "Повербанк Solar Power Bank F33W",
+          "url": "https://www.ria.com/uk/poverbank-solar-power-bank-f33w-238399796.html",
+          "price": {
+            "amount": 2900.0,
+            "currency": "UAH"
+          },
+          "location": "Шаповалівка"
+        },
+        {
+          "site": "ria.com",
+          "listing_id": "237984070",
+          "title": "Смартфон Realme C85 Pro 8/256GB Peacock Green (RMX5555) UA",
+          "url": "https://www.ria.com/uk/smartfon-realme-c85-pro-8-256gb-peacock-237984070.html",
+          "price": {
+            "amount": 11320.0,
+            "currency": "UAH"
+          },
+          "location": "Харків"
+        }
+      ]
+    }
+  ],
+  "checks": {
+    "contract_manifests": 6,
+    "contract_rules": 3,
+    "manifest_cases_passed": 6,
+    "manifest_cases_failed": 0,
+    "runtime_backend": "subprocess (trusted local CLI, unsafe-no-sandbox)",
+    "ruff": "All checks passed!"
+  }
+}

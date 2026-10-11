@@ -1,0 +1,73 @@
+{
+  "site": "auto-ria",
+  "source_id": "classified-auto-ria",
+  "run": {
+    "run_id": "run_01M4MM8KW2EYNKMKDYNVVWT6FG",
+    "task_id": "classifieds-auto-ria",
+    "trigger": "manual",
+    "status": "failed",
+    "started_at": "2026-10-11T04:41:53.085Z",
+    "finished_at": "2026-10-11T04:46:58.989Z",
+    "counters": {
+      "materials": 0,
+      "unknown_materials": 0
+    },
+    "stages": {
+      "collect": {
+        "counts": {}
+      },
+      "store-raw": {
+        "counts": {},
+        "handler": {
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+          "version": "1.0.0",
+          "package_id": "jane.storage-files"
+        }
+      },
+      "extract-ads": {
+        "counts": {},
+        "handler": {
+          "digest": "sha256:fc71c59913047e058bb3cf383947e8dcbe1f44a48e81ec36fb12f7beb710ef45",
+          "version": "1.0.0",
+          "package_id": "classifieds.auto-ria-ads"
+        }
+      },
+      "store-ads": {
+        "counts": {},
+        "handler": {
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+          "version": "1.0.0",
+          "package_id": "jane.storage-postgresql"
+        }
+      }
+    }
+  },
+  "verified": false,
+  "errors": [
+    "Run status failed",
+    "No actual entities were obtained and verified against persisted RAW."
+  ],
+  "samples": [],
+  "packages": {
+    "store-raw": {
+      "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+      "version": "1.0.0",
+      "package_id": "jane.storage-files"
+    },
+    "extract-ads": {
+      "digest": "sha256:fc71c59913047e058bb3cf383947e8dcbe1f44a48e81ec36fb12f7beb710ef45",
+      "version": "1.0.0",
+      "package_id": "classifieds.auto-ria-ads"
+    },
+    "store-ads": {
+      "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+      "version": "1.0.0",
+      "package_id": "jane.storage-postgresql"
+    }
+  },
+  "raw_objects": 0,
+  "persisted_entities": 0,
+  "extraction_items": 0,
+  "checked_entities": 0,
+  "checked_raw_objects": 0
+}

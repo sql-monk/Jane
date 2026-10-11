@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ModuleConfiguration",
+  "type": "object",
+  "required": [
+    "service",
+    "instance_id",
+    "revision",
+    "fields",
+    "overrides",
+    "pending_restart"
+  ],
+  "properties": {
+    "service": {
+      "type": "string"
+    },
+    "instance_id": {
+      "type": "string"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "updated_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "value",
+          "type",
+          "requires_restart",
+          "origin"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "description": "Значення, яке використовує поточний процес."
+          },
+          "configured_value": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "description": "Збережене перевизначення для наступного старту; відсутнє, якщо параметр успадковується."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "integer": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "requires_restart": {
+            "type": "boolean"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "minimum": {
+            "type": "number"
+          },
+          "maximum": {
+            "type": "number"
+          },
+          "exclusive_minimum": {
+            "type": "number"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            }
+          },
+          "inherited_value": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "description": "Ефективне початкове значення без перевизначення цього модуля."
+          }
+        }
+      }
+    },
+    "overrides": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
+      }
+    },
+    "pending_restart": {
+      "type": "boolean",
+      "description": "Активна конфігурація відрізняється від бажаної, включно з видаленими перевизначеннями."
+    }
+  },
+  "$defs": {
+    "Update": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "values"
+      ],
+      "properties": {
+        "values": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "description": "Повна заміна збережених перевизначень модуля. Відсутній ключ успадковує початкову конфігурацію після перезапуску; values={} скидає всі перевизначення."
+    }
+  }
+}

@@ -23,7 +23,9 @@ import {
   Table,
   Tabs,
 } from "../components/ui";
-import { formatDate, refLabel } from "../lib/format";
+import { formatDate, refLabel, statusLabel } from "../lib/format";
+import { useSourceOptions } from "../lib/pickers";
+import { useUnsavedChanges } from "../components/UnsavedChanges";
 
 const GROUP_STATUSES: ProblemGroupStatus[] = ["open", "in_progress", "unresolved", "resolved", "ignored"];
 
@@ -40,7 +42,12 @@ export function ProblemsPage() {
           ["unknown", "Невідомі матеріали"],
         ]}
         active={tab}
-        onChange={(t) => setParams({ tab: t })}
+        onChange={(t) => {
+          const next = new URLSearchParams(params);
+          next.set("tab", t);
+          next.delete("group_id");
+          setParams(next);
+        }}
       />
       {tab === "groups" ? <ProblemGroups /> : <UnknownMaterials />}
     </Page>
@@ -49,20 +56,27 @@ export function ProblemsPage() {
 
 function ProblemGroups() {
   const api = useApi();
+  const sources = useSourceOptions();
+  const navigation = useUnsavedChanges({ dirty: false });
   const [params, setParams] = useSearchParams();
   const rawStatus = params.get("status");
   const status = GROUP_STATUSES.includes(rawStatus as ProblemGroupStatus)
     ? (rawStatus as ProblemGroupStatus)
     : "";
   const sourceId = params.get("source_id") ?? "";
+  const groupId = params.get("group_id") ?? "";
   const updateFilter = (key: string, value: string) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
     else next.delete(key);
-    setParams(next);
+    next.delete("group_id");
+    navigation.confirmChange(() => {
+      setSelected(null);
+      setParams(next);
+    });
   };
   const [selected, setSelected] = useState<ProblemGroup | null>(null);
-  const list = useCursorList(["problem-groups", status, sourceId], (cursor, limit) =>
+  const list = useCursorList(["problem-groups", status, sourceId, groupId], (cursor, limit) =>
     unwrap(
       api.orchestrator.GET("/v1/problem-groups", {
         params: {
@@ -71,11 +85,17 @@ function ProblemGroups() {
             ...(cursor ? { cursor } : {}),
             ...(status ? { status } : {}),
             ...(sourceId ? { source_id: sourceId } : {}),
+            ...(groupId ? { group_id: groupId } : {}),
           },
         },
       }),
     ),
   );
+  const focused = groupId
+    ? selected?.group_id === groupId
+      ? selected
+      : list.items.find((group) => group.group_id === groupId)
+    : selected;
   return (
     <>
       <div className="filters">
@@ -84,13 +104,29 @@ function ProblemGroups() {
             <option value="">усі</option>
             {GROUP_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {statusLabel(s)}
               </option>
             ))}
           </select>
         </Field>
         <Field label="Джерело">
-          <input value={sourceId} onChange={(e) => updateFilter("source_id", e.target.value)} />
+          <input
+            list="problem-source-options"
+            value={sourceId}
+            onChange={(e) => updateFilter("source_id", e.target.value)}
+          />
+          <datalist id="problem-source-options">
+            {sources.options.map((source) => (
+              <option key={source.value} value={source.value}>
+                {source.label}
+              </option>
+            ))}
+          </datalist>
+          {sources.hasMore ? (
+            <button type="button" className="btn btn-small" onClick={sources.loadMore}>
+              Більше джерел
+            </button>
+          ) : null}
         </Field>
       </div>
       {list.isLoading ? <Loading /> : null}
@@ -98,6 +134,8 @@ function ProblemGroups() {
       <Table
         label="Групи проблем"
         rows={list.items}
+        loading={list.isLoading}
+        error={list.error}
         rowKey={(g) => g.group_id}
         columns={[
           { header: "Джерело", cell: (g) => g.source_id },
@@ -111,7 +149,11 @@ function ProblemGroups() {
           {
             header: "",
             cell: (g) => (
-              <button type="button" className="btn btn-small" onClick={() => setSelected(g)}>
+              <button
+                type="button"
+                className="btn btn-small"
+                onClick={() => navigation.confirmChange(() => setSelected(g))}
+              >
                 Відкрити
               </button>
             ),
@@ -119,9 +161,7 @@ function ProblemGroups() {
         ]}
       />
       <LoadMore hasMore={list.hasMore} loading={list.loadingMore} onClick={list.loadMore} />
-      {selected ? (
-        <ProblemGroupDetail key={selected.group_id} group={selected} onChanged={setSelected} />
-      ) : null}
+      {focused ? <ProblemGroupDetail key={focused.group_id} group={focused} onChanged={setSelected} /> : null}
     </>
   );
 }
@@ -172,6 +212,15 @@ function ProblemGroupDetail({
       onChanged(updated);
       void queryClient.invalidateQueries({ queryKey: ["problem-groups"] });
     },
+  });
+  useUnsavedChanges({
+    dirty: note !== (group.note ?? ""),
+    label: "Примітка до групи",
+    onSave: async () => {
+      await patch.mutateAsync({ note });
+      return true;
+    },
+    onDiscard: () => setNote(group.note ?? ""),
   });
 
   // A sample is usable when its stored RAW is known (stored_object_id) or can be found in the chosen storage
@@ -476,8 +525,16 @@ function listStored(
 
 function UnknownMaterials() {
   const api = useApi();
+  const sources = useSourceOptions();
+  const [params, setParams] = useSearchParams();
   const [forwarded, setForwarded] = useState<"" | "true" | "false">("");
-  const [sourceId, setSourceId] = useState("");
+  const sourceId = params.get("source_id") ?? "";
+  const setSourceId = (value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set("source_id", value);
+    else next.delete("source_id");
+    setParams(next);
+  };
   const list = useCursorList(["unknown-materials", forwarded, sourceId], (cursor, limit) =>
     unwrap(
       api.orchestrator.GET("/v1/unknown-materials", {
@@ -507,13 +564,31 @@ function UnknownMaterials() {
           </select>
         </Field>
         <Field label="Джерело">
-          <input value={sourceId} onChange={(e) => setSourceId(e.target.value)} />
+          <input
+            list="unknown-source-options"
+            value={sourceId}
+            onChange={(e) => setSourceId(e.target.value)}
+          />
+          <datalist id="unknown-source-options">
+            {sources.options.map((source) => (
+              <option key={source.value} value={source.value}>
+                {source.label}
+              </option>
+            ))}
+          </datalist>
+          {sources.hasMore ? (
+            <button type="button" className="btn btn-small" onClick={sources.loadMore}>
+              Більше джерел
+            </button>
+          ) : null}
         </Field>
       </div>
       <ErrorBox error={list.error} />
       <Table
         label="Невідомі матеріали"
         rows={list.items}
+        loading={list.isLoading}
+        error={list.error}
         rowKey={(m) => m.observation_id}
         columns={[
           { header: "URL", cell: (m) => m.url ?? m.material_id },
@@ -522,7 +597,17 @@ function UnknownMaterials() {
             cell: (m) => <Link to={`/sources/${encodeURIComponent(m.source_id)}`}>{m.source_id}</Link>,
           },
           { header: "Передано в LLM", cell: (m) => (m.forwarded_to_llm ? "так" : "ні") },
-          { header: "Причина", cell: (m) => m.reason ?? "—" },
+          {
+            header: "Причина",
+            cell: (m) =>
+              m.forwarded_to_llm
+                ? "Немає відповідного обробника; передано в LLM"
+                : m.reason?.includes("forward_unknown_to_llm=false")
+                  ? "Немає відповідного обробника; передавання в LLM вимкнено"
+                  : m.reason?.includes("no stage consumes")
+                    ? "Етап обробки невідомих матеріалів не налаштований"
+                    : "Немає відповідного обробника; перевірте прив’язки етапів",
+          },
           { header: "Зареєстровано", cell: (m) => formatDate(m.registered_at) },
           {
             header: "",

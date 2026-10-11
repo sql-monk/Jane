@@ -1,0 +1,9 @@
+F.                                                                       [100%]
+================================== FAILURES ===================================
+_______________ test_strategies_resume_after_kill[during-seeds] _______________
+services\web-collector\strategies\discovery\tests\test_resume.py:92: in test_strategies_resume_after_kill
+    assert site.requests["/sitemap.xml"] == 2
+E   assert 1 == 2
+=========================== short test summary info ===========================
+FAILED services/web-collector/strategies/discovery/tests/test_resume.py::test_strategies_resume_after_kill[during-seeds]
+1 failed, 1 passed in 22.37s

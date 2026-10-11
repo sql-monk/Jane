@@ -217,3 +217,32 @@ class StorageAdapter(Protocol):
     async def record_delivery(self, record: DeliveryRecord) -> bool:
         """Insert-if-absent. Returns False if the key already exists (used for object-only writes)."""
         ...
+
+
+@runtime_checkable
+class EntityDiscoveryAdapter(Protocol):
+    """Optional catalog/search capability. Legacy adapters keep StorageAdapter unchanged."""
+
+    async def list_entity_types(
+        self, *, scope: str | None = None, cursor: str | None = None, limit: int
+    ) -> tuple[Sequence[Mapping[str, Any]], str | None]: ...
+
+    async def search_entities(
+        self,
+        entity_type: str,
+        *,
+        search: str,
+        scope: str | None = None,
+        updated_since: datetime | None = None,
+        cursor: str | None = None,
+        limit: int,
+    ) -> tuple[Sequence[EntitySnapshot], str | None]: ...
+
+
+@runtime_checkable
+class StorageStatisticsAdapter(Protocol):
+    """Optional inventory primitives over the connection's own namespace only."""
+
+    async def object_statistics(self) -> Mapping[str, int]: ...
+
+    async def entity_statistics(self) -> Mapping[str, Any]: ...

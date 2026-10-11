@@ -1,0 +1,46 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "shafa.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "include": [
+      {"value": "shafa.ua/"},
+      {"value": "shafa.ua/uk/"}
+    ]
+  },
+  "strategies": [
+    {
+      "type": "seed_list",
+      "strategy_id": "public-home",
+      "urls": [
+        "https://shafa.ua/uk/"
+      ]
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "dedup": {
+    "use_link_rel_canonical": false
+  },
+  "fetch": {
+    "user_agent": "JaneBot/1.0"
+  },
+  "limits": {
+    "crawl": {
+      "max_depth": 0,
+      "max_pages_per_run": 1
+    },
+    "rate": {
+      "requests_per_second_per_host": 0.5,
+      "min_delay_ms_per_host": 2000
+    },
+    "concurrency": {
+      "max_parallel_fetches_per_host": 1
+    }
+  }
+}

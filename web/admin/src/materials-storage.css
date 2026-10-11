@@ -71,3 +71,17 @@
     flex: 0 0 42%;
   }
 }
+.trace-outputs {
+  min-width: 12rem;
+  max-width: 32rem;
+  overflow-wrap: anywhere;
+}
+.trace-outputs ul {
+  padding-left: 1.2rem;
+}
+.trace-outputs li {
+  margin-block: 0.5rem;
+}
+.trace-outputs details {
+  margin-block: 0.5rem;
+}

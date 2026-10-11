@@ -1,5 +1,5 @@
 import path from "node:path";
-import { captureRequest, expect, realServiceUrl, test } from "./fixtures";
+import { captureRequest, expect, realServiceUrl, selectCatalogOption, test } from "./fixtures";
 import { IMPROVE_IMPROVABLE_EXTRACTOR, TRIAGE_UNKNOWN_PAGES } from "./llm-scripts";
 import {
   ASSISTANT_MODEL_ALIASES,
@@ -144,7 +144,7 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
     const groups = admin.getByRole("table", { name: "Групи проблем" });
     const row = groups.getByRole("row", { name: new RegExp(sourceId) });
     await expect(row).toContainText(`${extractor.package_id}@1.0.0`);
-    await expect(row).toContainText("unrecognized");
+    await expect(row).toContainText("Не розпізнано");
     await expect(row).toContainText("unknown-availability");
     await expect(row).toContainText("open");
     const [filtered] = await Promise.all([
@@ -207,7 +207,7 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
 
     // the unresolved group is found by the filter and asks for a human decision
     await admin.getByLabel("Стан групи").selectOption("unresolved");
-    await expect(row).toContainText("unresolved");
+    await expect(row).toContainText("Не вирішено");
     await row.getByRole("button", { name: "Відкрити" }).click();
     await expect(admin.getByText("потрібне рішення людини")).toBeVisible();
     // the assistant's explanation is kept in the group (ProblemGroup.note, WP-17) and shown with it
@@ -263,7 +263,7 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
     );
     expect(ignored.body).toEqual({ status: "ignored" });
     await admin.getByLabel("Стан групи").selectOption("ignored");
-    await expect(row).toContainText("ignored");
+    await expect(row).toContainText("Ігноровано");
     await expect(admin.getByRole("alert")).toHaveCount(0);
 
     // ---- 3. the package forbids automatic changes (registry PATCH with If-Match from the package page): the
@@ -318,7 +318,11 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
 
     // ---- all runs of the group on the assistant page, read back from the assistant (R24), also after a reload
     await admin.goto("/assistant?tab=improvement");
-    await admin.getByLabel("Група проблем (problem_group_id)").fill(groupId);
+    await selectCatalogOption(
+      admin.getByRole("region", { name: "Запуски вдосконалення екстракторів", exact: true }),
+      admin.getByLabel("Група проблем (problem_group_id)", { exact: true }),
+      groupId,
+    );
     const runs = admin.getByRole("table", { name: "Запуски вдосконалення" });
     await expect(runs.getByRole("row")).toHaveCount(4);
     await expect(runs.getByRole("row", { name: /proposal_only/ })).toContainText("(не опубліковано)");
@@ -335,11 +339,11 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
 
     // ---- the published version passed its tests on every context (registry test_summary, WP-17)
     await admin.goto(`/packages/${extractor.package_id}?version=1.1.0`);
-    await expect(admin.getByTestId("test-summary-status")).toHaveText("passed");
+    await expect(admin.getByTestId("test-summary-status")).toHaveText("Пройдено");
     const contexts = admin.getByRole("table", { name: "Тести за контекстами" });
     await expect(
       contexts.getByRole("row", { name: new RegExp(`bindings:${taskId}/extract-products`) }),
-    ).toContainText("passed");
+    ).toContainText("Пройдено");
     await expect(contexts.getByRole("row", { name: /^tests/ })).toContainText("assistant");
     await expect(admin.getByRole("alert")).toHaveCount(0);
   });
@@ -462,8 +466,12 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
     await expect(
       admin.getByRole("heading", { name: `Ліміти платформи (профіль ${String(platformLimits["profile"])})` }),
     ).toBeVisible();
-    await admin.getByLabel("Завдання").fill(taskId);
-    await admin.getByLabel("Етап").fill("extract-products");
+    await selectCatalogOption(
+      admin.getByRole("region", { name: "Ефективні ліміти для контексту", exact: true }),
+      admin.getByLabel("Завдання", { exact: true }),
+      taskId,
+    );
+    await admin.getByLabel("Етап", { exact: true }).selectOption("extract-products");
     await admin.getByRole("button", { name: "Показати" }).click();
     const effective = admin.getByRole("table", { name: "Ефективні ліміти" });
     await expect(effective.getByRole("row", { name: /concurrency\.max_parallel_stage_items/ })).toContainText(
@@ -480,7 +488,7 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
     for (const p of unknownPaths) {
       const line = unknown.getByRole("row", { name: new RegExp(`${site}${p}`) });
       await expect(line).toContainText("ні");
-      await expect(line).toContainText("forward_unknown_to_llm=false");
+      await expect(line).toContainText("Немає відповідного обробника; передавання в LLM вимкнено");
     }
     await expect(unknown.getByRole("row")).toHaveCount(1 + unknownPaths.length);
 
@@ -548,7 +556,7 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
     ).toBeVisible();
     await expect(admin.getByText(`${site}/pages/careers`, { exact: true })).toBeVisible();
     const failedTrace = admin.getByRole("table", { name: `Етапи ${failedItem.observation_id} (${runId})` });
-    await expect(failedTrace.getByRole("row").filter({ hasText: "unknown-pages" })).toContainText("failed");
+    await expect(failedTrace.getByRole("row").filter({ hasText: "unknown-pages" })).toContainText("Помилка");
 
     // unknown materials: now forwarded; the trace leads to the LLM stage of run 2
     await admin.goto("/problems?tab=unknown");
@@ -585,7 +593,7 @@ test.describe("real problems, improvement, unknown materials and LLM costs @hybr
     await admin.getByRole("tab", { name: "Витрати" }).click();
     await admin.getByLabel("Групувати за").selectOption("purpose");
     await admin.getByLabel("Рівень").selectOption("source");
-    await admin.getByLabel("Ідентифікатор").fill(sourceId);
+    await selectCatalogOption(admin, admin.getByLabel("Джерело", { exact: true }), sourceId);
     await expect(admin.getByTestId("usage-total")).toHaveText(
       money(totals.cost.amount, totals.cost.currency),
     );

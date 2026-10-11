@@ -1,0 +1,46 @@
+{
+  "entities": [
+    {
+      "entity_type": "classified_ad",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "olx",
+          "listing_id": "916346980"
+        }
+      },
+      "fields": {
+        "site": "olx",
+        "listing_id": "916346980",
+        "title": "Ноутбук 14\" HP X360 1040 G8/ i5-1145G7, 16GB, 256/Win 11 Pro, Гарантія",
+        "url": "https://www.olx.ua/d/uk/obyavlenie/noutbuk-14-hp-x360-1040-g8-i5-1145g7-16gb-256-win-11-pro-garantya-ID100TI0.html",
+        "price": {
+          "amount": 22700.0,
+          "currency": "UAH"
+        },
+        "location": "Львів, Шевченківський"
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "olx",
+          "listing_id": "936776985"
+        }
+      },
+      "fields": {
+        "site": "olx",
+        "listing_id": "936776985",
+        "title": "Hp zbook Studio G7 i7 10850H 32 ddr4 T1000 with Max-Q Design 4gb 1tb Nvme",
+        "url": "https://www.olx.ua/d/uk/obyavlenie/hp-zbook-studio-g7-i7-10850h-32-ddr4-t1000-with-max-q-design-4gb-1tb-nvme-ID11oCud.html",
+        "price": {
+          "amount": 20400.0,
+          "currency": "UAH"
+        },
+        "location": "Миколаїв, Iнгульський"
+      }
+    }
+  ]
+}

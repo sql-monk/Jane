@@ -1,0 +1,72 @@
+{
+  "site": "olx",
+  "source_id": "classified-olx",
+  "run": {
+    "run_id": "run_01M4MRQXD4SDETA877MJ3MEY1J",
+    "task_id": "classifieds-olx",
+    "trigger": "schedule",
+    "status": "succeeded",
+    "started_at": "2026-10-11T06:00:02.566Z",
+    "finished_at": "2026-10-11T06:03:39.822Z",
+    "counters": {
+      "materials": 0,
+      "unknown_materials": 0
+    },
+    "stages": {
+      "collect": {
+        "counts": {}
+      },
+      "store-raw": {
+        "counts": {},
+        "handler": {
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+          "version": "1.0.0",
+          "package_id": "jane.storage-files"
+        }
+      },
+      "extract-ads": {
+        "counts": {},
+        "handler": {
+          "digest": "sha256:5ee4eeed59693e72cfd4379bffadca3686d1c6a7f004291ad7a02716df36b16d",
+          "version": "1.0.0",
+          "package_id": "classifieds.olx-ads"
+        }
+      },
+      "store-ads": {
+        "counts": {},
+        "handler": {
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+          "version": "1.0.0",
+          "package_id": "jane.storage-postgresql"
+        }
+      }
+    }
+  },
+  "verified": false,
+  "errors": [
+    "No actual entities were obtained and verified against persisted RAW."
+  ],
+  "samples": [],
+  "packages": {
+    "store-raw": {
+      "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+      "version": "1.0.0",
+      "package_id": "jane.storage-files"
+    },
+    "extract-ads": {
+      "digest": "sha256:5ee4eeed59693e72cfd4379bffadca3686d1c6a7f004291ad7a02716df36b16d",
+      "version": "1.0.0",
+      "package_id": "classifieds.olx-ads"
+    },
+    "store-ads": {
+      "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+      "version": "1.0.0",
+      "package_id": "jane.storage-postgresql"
+    }
+  },
+  "raw_objects": 0,
+  "persisted_entities": 0,
+  "extraction_items": 0,
+  "checked_entities": 0,
+  "checked_raw_objects": 0
+}

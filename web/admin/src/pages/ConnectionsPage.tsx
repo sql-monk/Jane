@@ -1,5 +1,8 @@
 // Managed connections (ТЗ §11, ADR-0006): only non-secret params and secret references are shown and edited.
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useUnsavedChanges } from "../components/UnsavedChanges";
+import type { Problem } from "../api/problem";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../app/context";
 import { ifMatch, unwrap, unwrapWithEtag } from "../api/client";
@@ -25,8 +28,12 @@ import { formatDate } from "../lib/format";
 
 export function ConnectionsPage() {
   const api = useApi();
+  const [params, setParams] = useSearchParams();
   const [kind, setKind] = useState("");
-  const [editing, setEditing] = useState<string | "new" | null>(null);
+  const editing = params.get("connection_id");
+  const guard = useUnsavedChanges({ dirty: false });
+  const setEditing = (value: string | null) =>
+    guard.confirmChange(() => setParams(value ? { connection_id: value } : {}));
   const list = useCursorList(["connections", kind], (cursor, limit) =>
     unwrap(
       api.orchestrator.GET("/v1/connections", {
@@ -57,6 +64,8 @@ export function ConnectionsPage() {
       <ErrorBox error={list.error} />
       <Table
         label="Підключення"
+        loading={list.isLoading}
+        error={list.error}
         rows={list.items.map(redactSecrets)}
         rowKey={(c) => c.connection.connection_id}
         columns={[
@@ -64,7 +73,8 @@ export function ConnectionsPage() {
             header: "Підключення",
             cell: (c) => (
               <button type="button" className="link" onClick={() => setEditing(c.connection.connection_id)}>
-                {c.connection.connection_id}
+                {c.connection.title || c.connection.connection_id}
+                <small className="muted"> · {c.connection.connection_id}</small>
               </button>
             ),
           },
@@ -107,6 +117,7 @@ function ExecutorsSync({ executors }: { executors: PlatformConnection["executors
       {executors.map((e) => (
         <li key={e.executor}>
           {e.executor}: <Status value={e.sync_status} />{" "}
+          <ErrorBox error={(e as typeof e & { error?: Problem }).error} title="Причина синхронізації" />
         </li>
       ))}
     </ul>
@@ -121,7 +132,8 @@ interface RefRow {
 function ConnectionEditor({ connectionId, onDone }: { connectionId: string | null; onDone: () => void }) {
   const api = useApi();
   const queryClient = useQueryClient();
-  const isNew = connectionId === null;
+  const [created, setCreated] = useState(false);
+  const isNew = connectionId === null && !created;
   const [id, setId] = useState(connectionId ?? "");
   const [kind, setKind] = useState("postgresql");
   const [title, setTitle] = useState("");
@@ -129,10 +141,11 @@ function ConnectionEditor({ connectionId, onDone }: { connectionId: string | nul
   const [refs, setRefs] = useState<RefRow[]>([]);
   const [etag, setEtag] = useState<string | null>(null);
   const [test, setTest] = useState<{ executor: string; result: ConnectionTestResult } | null>(null);
+  const [baseline, setBaseline] = useState(JSON.stringify([connectionId ?? "", "postgresql", "", "{}", []]));
 
   const loaded = useQuery({
     queryKey: ["connection", connectionId],
-    enabled: !isNew,
+    enabled: Boolean(connectionId),
     queryFn: async () => {
       const result = await unwrapWithEtag(
         api.orchestrator.GET("/v1/connections/{connection_id}", {
@@ -145,6 +158,15 @@ function ConnectionEditor({ connectionId, onDone }: { connectionId: string | nul
       setParamsText(toJsonText(c.params ?? {}));
       setRefs(Object.entries(c.secret_refs ?? {}).map(([name, ref]) => ({ name, ref })));
       setEtag(result.etag);
+      setBaseline(
+        JSON.stringify([
+          connectionId,
+          c.kind,
+          c.title ?? "",
+          toJsonText(c.params ?? {}),
+          Object.entries(c.secret_refs ?? {}).map(([name, ref]) => ({ name, ref })),
+        ]),
+      );
       return result;
     },
     staleTime: Infinity,
@@ -163,20 +185,34 @@ function ConnectionEditor({ connectionId, onDone }: { connectionId: string | nul
   } as Connection;
   const issues = [
     ...(params.parseError ? [`params: ${params.parseError}`] : []),
+    ...(!params.parseError &&
+    (!params.value || typeof params.value !== "object" || Array.isArray(params.value))
+      ? ["Параметри підключення мають бути JSON-об'єктом."]
+      : []),
+    ...(new Set(refs.filter((row) => row.name).map((row) => row.name)).size <
+    refs.filter((row) => row.name).length
+      ? ["Імена посилань на секрети мають бути унікальними."]
+      : []),
     ...validateConnectionSecrets((params.value as Record<string, unknown> | undefined) ?? {}, secretRefs),
     ...validateAgainst(SCHEMAS.connection, connection).map((i) => `${i.pointer} ${i.message}`),
   ];
 
   const save = useMutation({
-    mutationFn: () =>
-      unwrapWithEtag(
+    mutationFn: async () => {
+      const submitted = snapshot;
+      const result = await unwrapWithEtag(
         api.orchestrator.PUT("/v1/connections/{connection_id}", {
           params: { path: { connection_id: id }, header: ifMatch(etag) },
           body: connection,
         }),
-      ),
+      );
+      return { ...result, submitted };
+    },
     onSuccess: (result) => {
       setEtag(result.etag);
+      setCreated(true);
+      if (snapshot === result.submitted) guard.markSaved();
+      setBaseline(result.submitted);
       void queryClient.invalidateQueries({ queryKey: ["connections"] });
     },
   });
@@ -188,8 +224,21 @@ function ConnectionEditor({ connectionId, onDone }: { connectionId: string | nul
         }),
       ),
     onSuccess: () => {
+      guard.markSaved();
       void queryClient.invalidateQueries({ queryKey: ["connections"] });
       onDone();
+    },
+  });
+
+  const snapshot = JSON.stringify([id, kind, title, paramsText, refs]);
+  const dirty = snapshot !== baseline;
+  const guard = useUnsavedChanges({
+    dirty,
+    label: `Підключення ${title || id}`,
+    onSave: async () => {
+      if (issues.length) return false;
+      await save.mutateAsync();
+      return true;
     },
   });
   const runTest = useMutation({
@@ -208,9 +257,9 @@ function ConnectionEditor({ connectionId, onDone }: { connectionId: string | nul
 
   return (
     <Section
-      title={isNew ? "Нове підключення" : `Підключення ${connectionId}`}
+      title={isNew ? "Нове підключення" : `Підключення ${id}`}
       actions={
-        <button type="button" className="btn" onClick={onDone}>
+        <button type="button" className="btn" onClick={() => guard.confirmChange(onDone)}>
           Закрити
         </button>
       }
@@ -218,7 +267,10 @@ function ConnectionEditor({ connectionId, onDone }: { connectionId: string | nul
       {loaded.isLoading ? <Loading /> : null}
       <ErrorBox error={loaded.error} />
       <div className="grid-3">
-        <Field label="connection_id">
+        <Field
+          label="Ідентифікатор підключення"
+          hint="Латинські літери в нижньому регістрі, цифри, крапка, дефіс або підкреслення."
+        >
           <input value={id} disabled={!isNew} onChange={(e) => setId(e.target.value)} />
         </Field>
         <Field label="Тип">
@@ -244,14 +296,53 @@ function ConnectionEditor({ connectionId, onDone }: { connectionId: string | nul
           <input value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
       </div>
-      <Field label="Несекретні параметри (host, port, database, bucket…)">
-        <JsonEditor
-          text={paramsText}
-          onChange={setParamsText}
-          label="Параметри підключення"
-          minHeight="6rem"
-        />
-      </Field>
+      {params.ok && params.value && typeof params.value === "object" && !Array.isArray(params.value) ? (
+        <div className="grid-3">
+          {(kind === "filesystem"
+            ? [["base_path", "Каталог матеріалів"]]
+            : kind === "postgresql" || kind === "sqlserver" || kind === "mongodb"
+              ? [
+                  ["host", "Сервер"],
+                  ["port", "Порт"],
+                  ["database", "База даних"],
+                ]
+              : kind === "s3" || kind === "minio"
+                ? [
+                    ["endpoint", "Адреса сховища"],
+                    ["bucket", "Кошик"],
+                    ["prefix", "Префікс"],
+                  ]
+                : [["base_url", "Адреса API"]]
+          ).map(([key, label]) => (
+            <Field key={key} label={label ?? "Параметр"}>
+              <input
+                type={key === "port" ? "number" : "text"}
+                min={key === "port" ? 1 : undefined}
+                max={key === "port" ? 65535 : undefined}
+                value={String((params.value as Record<string, unknown>)[key ?? ""] ?? "")}
+                onChange={(event) => {
+                  const next = { ...(params.value as Record<string, unknown>) };
+                  if (!event.target.value) delete next[key ?? ""];
+                  else next[key ?? ""] = key === "port" ? Number(event.target.value) : event.target.value;
+                  setParamsText(toJsonText(next));
+                }}
+              />
+            </Field>
+          ))}
+        </div>
+      ) : null}
+      <details>
+        <summary>Додаткові несекретні параметри</summary>
+        <Field label="Несекретні параметри (host, port, database, bucket…)">
+          <JsonEditor
+            text={paramsText}
+            onChange={setParamsText}
+            label="Параметри підключення"
+            readOnly={save.isPending}
+            minHeight="6rem"
+          />
+        </Field>
+      </details>
       <h3>Посилання на секрети</h3>
       <p className="muted">
         Лише посилання: env:ЗМІННА, file:/шлях, vault:шлях#ключ. Самі значення тут не вводяться.
@@ -287,14 +378,14 @@ function ConnectionEditor({ connectionId, onDone }: { connectionId: string | nul
       >
         Додати посилання
       </button>
-      {issues.length ? (
+      {(dirty || !isNew) && issues.length ? (
         <ul className="error-inline" role="alert" aria-label="Помилки підключення">
           {issues.map((i) => (
             <li key={i}>{i}</li>
           ))}
         </ul>
       ) : null}
-      <div className="button-row">
+      <div className="button-row sticky-actions">
         <button
           type="button"
           className="btn btn-primary"
@@ -309,6 +400,7 @@ function ConnectionEditor({ connectionId, onDone }: { connectionId: string | nul
             confirmLabel="Видалити підключення"
             danger
             requireReason={false}
+            impact={`Видалити підключення «${title || id}» (${id}). Етапи, які посилаються на нього, втратять доступ до сховища.`}
             onConfirm={() => remove.mutate()}
           />
         ) : null}
@@ -330,6 +422,25 @@ function ConnectionEditor({ connectionId, onDone }: { connectionId: string | nul
               { header: "Стан", cell: (e) => <Status value={e.sync_status} /> },
               { header: "Синхронізовано", cell: (e) => formatDate(e.synced_at) },
               {
+                header: "Причина / наступна спроба",
+                cell: (e) => {
+                  const diagnostic = e as typeof e & {
+                    error?: Problem;
+                    attempts?: number;
+                    next_retry_at?: string | null;
+                  };
+                  return (
+                    <>
+                      <ErrorBox error={diagnostic.error} title="Синхронізація" />
+                      {diagnostic.attempts !== undefined ? <span>Спроб: {diagnostic.attempts}</span> : null}
+                      {diagnostic.next_retry_at ? (
+                        <p>Наступна: {formatDate(diagnostic.next_retry_at)}</p>
+                      ) : null}
+                    </>
+                  );
+                },
+              },
+              {
                 header: "",
                 cell: (e) => (
                   <button
@@ -345,6 +456,23 @@ function ConnectionEditor({ connectionId, onDone }: { connectionId: string | nul
             ]}
           />
         </>
+      ) : null}
+      {(
+        (save.data?.data ?? loaded.data?.data) as
+          | (PlatformConnection & { unsupported_executors?: Array<{ executor: string; reason: string }> })
+          | undefined
+      )?.unsupported_executors?.length ? (
+        <Notice>
+          Керовані підключення не підтримуються виконавцями:{" "}
+          {(
+            (save.data?.data ?? loaded.data?.data) as PlatformConnection & {
+              unsupported_executors: Array<{ executor: string }>;
+            }
+          ).unsupported_executors
+            .map((executor) => executor.executor)
+            .join(", ")}
+          . Вони не беруть участі в синхронізації.
+        </Notice>
       ) : null}
       <ErrorBox error={runTest.error} title="Перевірку не виконано" />
       {test ? (

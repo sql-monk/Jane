@@ -66,6 +66,8 @@ export function problemFrom(error: unknown): Problem | null {
 }
 
 const PROBLEM_MESSAGES: Record<string, string> = {
+  internal_error:
+    "Внутрішня помилка сервісу. Перевірте стан виконавця та журнал за ідентифікатором діагностики.",
   validation_failed: "Перевірка параметрів не пройдена. Виправте поля форми перед збереженням.",
   bad_request: "Некоректні параметри запиту. Перевірте налаштування.",
   unauthenticated: "Сесія завершилася. Увійдіть знову.",

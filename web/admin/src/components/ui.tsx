@@ -1,4 +1,14 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { ApiError, errorMessage, safeProblemCode, problemFrom } from "../api/problem";
 import { statusLabel } from "../lib/format";
@@ -84,11 +94,19 @@ export function ErrorBox({ error, title }: { error: unknown; title?: string }) {
             : ""}
         </span>
       ) : null}
+      {problem?.trace_id && /^[a-f0-9]{32}$/.test(problem.trace_id) ? (
+        <small className="muted">
+          Ідентифікатор діагностики: <code>{problem.trace_id}</code>
+        </small>
+      ) : null}
     </div>
   );
 }
 
 const STATUS_TONE: Record<string, string> = {
+  available: "ok",
+  unavailable: "bad",
+  unsupported: "muted",
   succeeded: "ok",
   success: "ok",
   completed: "ok",
@@ -272,12 +290,41 @@ export function Tabs<K extends string>({
 }
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  const id = useId();
+  let controlId: string | undefined;
+  const controls = Children.map(children, (child) => {
+    if (
+      !isValidElement(child) ||
+      typeof child.type !== "string" ||
+      !["input", "select", "textarea"].includes(child.type)
+    )
+      return child;
+    const control = child as ReactElement<{ id?: string; "aria-describedby"?: string }>;
+    const assignedId = control.props.id ?? id;
+    controlId ??= assignedId;
+    return cloneElement(control, {
+      id: assignedId,
+      ...(hint
+        ? { "aria-describedby": [control.props["aria-describedby"], `${id}-hint`].filter(Boolean).join(" ") }
+        : {}),
+    });
+  });
   return (
-    <label className="field">
-      <span className="field-label">{label}</span>
-      {children}
-      {hint ? <span className="field-hint">{hint}</span> : null}
-    </label>
+    <div className="field">
+      {controlId ? (
+        <label className="field-label" htmlFor={controlId}>
+          {label}
+        </label>
+      ) : (
+        <span className="field-label">{label}</span>
+      )}
+      {controls}
+      {hint ? (
+        <span className="field-hint" id={`${id}-hint`}>
+          {hint}
+        </span>
+      ) : null}
+    </div>
   );
 }
 

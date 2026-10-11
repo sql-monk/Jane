@@ -38,8 +38,10 @@ import {
   Table,
   Tabs,
 } from "../components/ui";
-import { formatDate, formatMoney, refLabel } from "../lib/format";
+import { formatDate, formatMoney, refLabel, PERIOD_LABELS, statusLabel } from "../lib/format";
+import { useSourceOptions } from "../lib/pickers";
 import { STRATEGY_LABELS } from "./RulesEditorPage";
+import { useUnsavedChanges } from "../components/UnsavedChanges";
 
 const ACTIVE_STATUSES = new Set(["resolving", "sampling", "analyzing", "applying"]);
 const ONBOARDING_STATUSES: OnboardingStatus[] = [
@@ -133,7 +135,7 @@ function OnboardingLimits() {
               "Макс. сторінок вибірки (max_onboarding_samples)",
               String(defaults?.max_onboarding_samples ?? "—"),
             ],
-            ["Бюджет LLM асистента", budget ? `${formatMoney(budget)} / ${budget.period}` : "—"],
+            ["Бюджет LLM асистента", budget ? `${formatMoney(budget)} ${PERIOD_LABELS[budget.period]}` : "—"],
             ["Профіль лімітів", info.data.limits?.profile ?? "—"],
           ]}
         />
@@ -163,6 +165,7 @@ function Onboarding({ sessionId, onOpen }: { sessionId: string | null; onOpen: (
     hints: "",
   });
   const hints = checkJson(form.hints);
+  const [baseline, setBaseline] = useState(JSON.stringify(form));
   const confidenceError =
     form.confidence &&
     (!Number.isFinite(Number(form.confidence)) || Number(form.confidence) <= 0 || Number(form.confidence) > 1)
@@ -204,11 +207,17 @@ function Onboarding({ sessionId, onOpen }: { sessionId: string | null; onOpen: (
       ) as Promise<Job>;
     },
     onSuccess: (job) => {
+      guard.markSaved();
+      setBaseline(JSON.stringify(form));
       setStartJob(job.job_id);
       void queryClient.invalidateQueries({ queryKey: ["onboarding-sessions"] });
       const id = sessionIdFromJob(job);
       if (id) onOpen(id);
     },
+  });
+  const guard = useUnsavedChanges({
+    dirty: JSON.stringify(form) !== baseline,
+    label: "Налаштування дослідження джерела",
   });
 
   return (
@@ -355,7 +364,7 @@ function SessionList({ selected, onOpen }: { selected: string | null; onOpen: (i
             <option value="">усі</option>
             {ONBOARDING_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {statusLabel(s)}
               </option>
             ))}
           </select>
@@ -381,6 +390,8 @@ function SessionList({ selected, onOpen }: { selected: string | null; onOpen: (i
       <ErrorBox error={list.error} title="Список сесій недоступний" />
       <Table
         label="Сесії підключення"
+        loading={list.isLoading}
+        error={list.error}
         rows={list.items}
         rowKey={(s) => s.session_id}
         empty="Сесій ще немає"
@@ -417,6 +428,23 @@ function SessionList({ selected, onOpen }: { selected: string | null; onOpen: (i
 function ImprovementRuns({ jobId, onOpen }: { jobId: string | null; onOpen: (id: string) => void }) {
   const api = useApi();
   const [filter, setFilter] = useState({ package_id: "", source_id: "", problem_group_id: "", status: "" });
+  const sources = useSourceOptions();
+  const packages = useCursorList(["packages", "assistant-picker"], (cursor, limit) =>
+    unwrap(api.registry.GET("/v1/packages", { params: { query: { limit, ...(cursor ? { cursor } : {}) } } })),
+  );
+  const groups = useCursorList(["problem-groups", "assistant-picker", filter.source_id], (cursor, limit) =>
+    unwrap(
+      api.orchestrator.GET("/v1/problem-groups", {
+        params: {
+          query: {
+            limit,
+            ...(cursor ? { cursor } : {}),
+            ...(filter.source_id ? { source_id: filter.source_id } : {}),
+          },
+        },
+      }),
+    ),
+  );
   return (
     <>
       <Section title="Запуски вдосконалення екстракторів">
@@ -425,34 +453,65 @@ function ImprovementRuns({ jobId, onOpen }: { jobId: string | null; onOpen: (id:
         </p>
         <div className="filters">
           <Field label="Пакет (package_id)">
-            <input
+            <select
               value={filter.package_id}
-              onChange={(e) => setFilter({ ...filter, package_id: e.target.value.trim() })}
-            />
+              onChange={(e) => setFilter({ ...filter, package_id: e.target.value })}
+            >
+              <option value="">Усі пакети</option>
+              {packages.items.map((pkg) => (
+                <option key={pkg.package_id} value={pkg.package_id}>
+                  {pkg.title} · {pkg.package_id}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Джерело (source_id)">
-            <input
+            <select
               value={filter.source_id}
-              onChange={(e) => setFilter({ ...filter, source_id: e.target.value.trim() })}
-            />
+              onChange={(e) => setFilter({ ...filter, source_id: e.target.value, problem_group_id: "" })}
+            >
+              <option value="">Усі джерела</option>
+              {sources.options.map((source) => (
+                <option key={source.value} value={source.value}>
+                  {source.label} · {source.value}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Група проблем (problem_group_id)">
-            <input
+            <select
               value={filter.problem_group_id}
-              onChange={(e) => setFilter({ ...filter, problem_group_id: e.target.value.trim() })}
-            />
+              onChange={(e) => setFilter({ ...filter, problem_group_id: e.target.value })}
+            >
+              <option value="">Усі групи</option>
+              {groups.items.map((group) => (
+                <option key={group.group_id} value={group.group_id}>
+                  {group.problem} · {group.group_id}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Стан job">
             <select value={filter.status} onChange={(e) => setFilter({ ...filter, status: e.target.value })}>
               <option value="">усі</option>
               {JOB_STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {statusLabel(s)}
                 </option>
               ))}
             </select>
           </Field>
         </div>
+        <ErrorBox error={sources.error ?? packages.error ?? groups.error} title="Каталог фільтрів" />
+        <LoadMore
+          hasMore={sources.hasMore || packages.hasMore || groups.hasMore}
+          loading={sources.loadingMore || packages.loadingMore || groups.loadingMore}
+          onClick={() => {
+            if (sources.hasMore) sources.loadMore();
+            if (packages.hasMore) packages.loadMore();
+            if (groups.hasMore) groups.loadMore();
+          }}
+        />
         <ImprovementRunList
           filter={{
             ...(filter.package_id ? { package_id: filter.package_id } : {}),

@@ -8,6 +8,7 @@ import { useCursorList } from "../api/hooks";
 import type { HandlerKind, Job, Package, PackageVersion, StatusChange, TestReport } from "../api/types";
 import { JobPanel, TestReportView } from "../components/JobPanel";
 import { UnifiedDiff } from "../components/UnifiedDiff";
+import { useUnsavedChanges } from "../components/UnsavedChanges";
 import {
   ErrorBox,
   Field,
@@ -23,7 +24,7 @@ import {
   Table,
   Tabs,
 } from "../components/ui";
-import { SEMVER_PATTERN, SLUG_PATTERN, formatBytes, formatDate, refLabel } from "../lib/format";
+import { SEMVER_PATTERN, SLUG_PATTERN, formatBytes, formatDate, refLabel, statusLabel } from "../lib/format";
 
 const KINDS: HandlerKind[] = ["extractor", "storage", "llm", "transform", "collector-rules"];
 const KIND_LABELS: Record<HandlerKind, string> = {
@@ -64,7 +65,21 @@ export function PackagesPage() {
           body: draft,
         }),
       ),
-    onSuccess: (pkg) => navigate(`/packages/${encodeURIComponent(pkg.package_id)}`),
+    onSuccess: (pkg) => {
+      guard.markSaved();
+      navigate(`/packages/${encodeURIComponent(pkg.package_id)}`);
+    },
+  });
+  const guard = useUnsavedChanges({
+    dirty:
+      creating &&
+      Boolean(draft.package_id || draft.title || draft.kind !== "extractor" || !draft.auto_changes_allowed),
+    label: "Новий пакет",
+    onSave: async () => {
+      if (!SLUG_PATTERN.test(draft.package_id) || !draft.title) return false;
+      await create.mutateAsync();
+      return true;
+    },
   });
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -76,7 +91,11 @@ export function PackagesPage() {
     <Page
       title="Пакети обробників і правила колекторів"
       actions={
-        <button type="button" className="btn btn-primary" onClick={() => setCreating((v) => !v)}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => guard.confirmChange(() => setCreating((v) => !v))}
+        >
           Новий пакет
         </button>
       }
@@ -144,6 +163,8 @@ export function PackagesPage() {
       <ErrorBox error={list.error} />
       <Table
         label="Пакети"
+        loading={list.isLoading}
+        error={list.error}
         rows={list.items}
         rowKey={(p) => p.package_id}
         columns={[
@@ -179,6 +200,7 @@ export function PackagePage() {
       ),
   });
   const data = pkg.data?.data;
+  const guard = useUnsavedChanges({ dirty: false });
   const tabs: Array<[PackageTab, string]> = [
     ["overview", "Огляд"],
     ["versions", "Версії й тести"],
@@ -192,7 +214,11 @@ export function PackagePage() {
       <ErrorBox error={pkg.error} />
       {data ? (
         <>
-          <Tabs<PackageTab> tabs={tabs} active={tab} onChange={setTab} />
+          <Tabs<PackageTab>
+            tabs={tabs}
+            active={tab}
+            onChange={(value) => guard.confirmChange(() => setTab(value))}
+          />
           {tab === "overview" ? <Overview pkg={data} etag={pkg.data?.etag ?? null} /> : null}
           {tab === "versions" ? <Versions pkg={data} initialVersion={params.get("version")} /> : null}
           {tab === "diff" ? <DiffTab pkg={data} /> : null}
@@ -265,6 +291,8 @@ function Overview({ pkg, etag }: { pkg: Package; etag: string | null }) {
         <ErrorBox error={forks.error} />
         <Table
           label="Форки"
+          loading={forks.isLoading}
+          error={forks.error}
           rows={forks.data?.items ?? []}
           rowKey={(p) => p.package_id}
           empty="Форків немає"
@@ -297,6 +325,8 @@ function Versions({ pkg, initialVersion }: { pkg: Package; initialVersion: strin
       <ErrorBox error={list.error} />
       <Table
         label="Версії"
+        loading={list.isLoading}
+        error={list.error}
         rows={list.items}
         rowKey={(v) => v.version}
         columns={[
@@ -308,8 +338,12 @@ function Versions({ pkg, initialVersion }: { pkg: Package; initialVersion: strin
               </button>
             ),
           },
-          { header: "Статус", cell: (v) => <Status value={v.status} /> },
-          { header: "Тести", cell: (v) => <Status value={v.test_status} /> },
+          { header: "Схвалення", cell: (v) => <Status value={v.status} /> },
+          {
+            header: "Тести",
+            cell: (v) =>
+              v.test_status === "unknown" ? "Немає записаного звіту" : <Status value={v.test_status} />,
+          },
           { header: "Автор", cell: (v) => v.created_by ?? "—" },
           { header: "Створено", cell: (v) => formatDate(v.created_at) },
         ]}
@@ -550,14 +584,10 @@ function DiffTab({ pkg }: { pkg: Package }) {
     <>
       <div className="filters">
         <Field label="Від (версія або parent:<версія>)">
-          <input
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            placeholder={pkg.fork_of ? `parent:${pkg.fork_of.version}` : "1.1.0"}
-          />
+          <VersionPicker pkg={pkg} value={from} onChange={setFrom} allowEmpty includeParent />
         </Field>
         <Field label="До версії">
-          <input value={to} onChange={(e) => setTo(e.target.value)} />
+          <VersionPicker pkg={pkg} value={to} onChange={setTo} />
         </Field>
         <button
           type="button"
@@ -609,7 +639,8 @@ export function DiffView({ diff }: { diff: import("../api/types").PackageDiff })
                       : "skipped"
               }
             />{" "}
-            {f.status}
+            {{ added: "Додано", removed: "Видалено", modified: "Змінено", unchanged: "Без змін" }[f.status] ??
+              f.status}
             {f.binary ? " (бінарний)" : ""}
           </p>
           {f.unified_diff ? <UnifiedDiff diff={f.unified_diff} label={`diff ${f.path}`} /> : null}
@@ -646,7 +677,30 @@ function ForkTab({ pkg }: { pkg: Package }) {
           },
         }),
       ),
-    onSuccess: (created) => navigate(`/packages/${encodeURIComponent(created.package_id)}`),
+    onSuccess: (created) => {
+      guard.markSaved();
+      navigate(`/packages/${encodeURIComponent(created.package_id)}`);
+    },
+  });
+  const guard = useUnsavedChanges({
+    dirty: Boolean(
+      draft.new_package_id ||
+      draft.initial_version ||
+      draft.title ||
+      draft.auto_changes_allowed ||
+      draft.from_version !== (pkg.latest_version ?? ""),
+    ),
+    label: "Форк пакета",
+    onSave: async () => {
+      if (
+        !SLUG_PATTERN.test(draft.new_package_id) ||
+        !SEMVER_PATTERN.test(draft.from_version) ||
+        (draft.initial_version && !SEMVER_PATTERN.test(draft.initial_version))
+      )
+        return false;
+      await fork.mutateAsync();
+      return true;
+    },
   });
   return (
     <Section title="Незалежний форк">
@@ -662,9 +716,10 @@ function ForkTab({ pkg }: { pkg: Package }) {
           />
         </Field>
         <Field label="Від версії">
-          <input
+          <VersionPicker
+            pkg={pkg}
             value={draft.from_version}
-            onChange={(e) => setDraft({ ...draft, from_version: e.target.value })}
+            onChange={(from_version) => setDraft({ ...draft, from_version })}
           />
         </Field>
         <Field label="Перша версія форку (необов'язково)">
@@ -691,6 +746,7 @@ function ForkTab({ pkg }: { pkg: Package }) {
         disabled={
           !SLUG_PATTERN.test(draft.new_package_id) ||
           !SEMVER_PATTERN.test(draft.from_version) ||
+          Boolean(draft.initial_version && !SEMVER_PATTERN.test(draft.initial_version)) ||
           fork.isPending
         }
         onClick={() => fork.mutate()}
@@ -699,6 +755,50 @@ function ForkTab({ pkg }: { pkg: Package }) {
       </button>
       <ErrorBox error={fork.error} title="Форк не створено" />
     </Section>
+  );
+}
+
+function VersionPicker({
+  pkg,
+  value,
+  onChange,
+  allowEmpty = false,
+  includeParent = false,
+}: {
+  pkg: Package;
+  value: string;
+  onChange: (value: string) => void;
+  allowEmpty?: boolean;
+  includeParent?: boolean;
+}) {
+  const api = useApi();
+  const list = useCursorList(["package-versions", pkg.package_id], (cursor, limit) =>
+    unwrap(
+      api.registry.GET("/v1/packages/{package_id}/versions", {
+        params: { path: { package_id: pkg.package_id }, query: { limit, ...(cursor ? { cursor } : {}) } },
+      }),
+    ),
+  );
+  return (
+    <span>
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{allowEmpty ? "Автоматично" : "Оберіть версію"}</option>
+        {list.items.map((version) => (
+          <option key={version.version} value={version.version}>
+            {version.version} · {statusLabel(version.status)}
+          </option>
+        ))}
+        {includeParent && pkg.fork_of ? (
+          <option value={`parent:${pkg.fork_of.version}`}>Батьківська {pkg.fork_of.version}</option>
+        ) : null}
+        {value && !list.items.some((version) => version.version === value) && !value.startsWith("parent:") ? (
+          <option value={value}>{value} (поза завантаженим каталогом)</option>
+        ) : null}
+      </select>
+      {list.isLoading ? <Loading what="Версії" /> : null}
+      <ErrorBox error={list.error} />
+      <LoadMore hasMore={list.hasMore} loading={list.loadingMore} onClick={list.loadMore} />
+    </span>
   );
 }
 

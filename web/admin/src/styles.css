@@ -1422,7 +1422,7 @@ td a {
     flex-wrap: wrap;
   }
 }
-@media (max-width: 760px) {
+@media (max-width: 1024px) {
   .layout {
     display: block;
   }
@@ -1511,6 +1511,93 @@ td a {
   .login {
     margin: 8vh 16px;
     padding: 24px;
+  }
+}
+.sticky-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.8rem 0;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+.audit-diff {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.page-header h1,
+.kv dd,
+.table-wrap td {
+  overflow-wrap: anywhere;
+}
+.page-header > div {
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  .audit-diff {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .table-wrap {
+    overflow: visible;
+  }
+  .table-wrap > table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .table-wrap > table > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    clip-path: inset(50%);
+    overflow: hidden;
+  }
+  .table-wrap > table > tbody {
+    display: grid;
+    gap: 0.8rem;
+  }
+  .table-wrap > table > tbody > tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    padding: 0.6rem;
+    min-width: 0;
+  }
+  .table-wrap > table > tbody > tr > td {
+    display: block;
+    padding: 0.4rem 0;
+    min-width: 0;
+    max-width: none;
+    white-space: normal;
+    border: 0;
+  }
+  .table-wrap > table > tbody > tr > td[data-label]:not([data-label=""])::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-bottom: 0.2rem;
+  }
+  .table-wrap .table-value {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .table-wrap .json-compact {
+    max-width: 100%;
+  }
+  .inline-form,
+  .filters {
+    align-items: stretch;
+  }
+  .inline-form > *,
+  .filters > * {
+    min-width: 0;
+    max-width: 100%;
   }
 }
 @media (prefers-reduced-motion: reduce) {

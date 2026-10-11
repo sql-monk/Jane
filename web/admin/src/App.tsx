@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { UnsavedChangesProvider } from "./components/UnsavedChanges";
+import { UnsavedChangesProvider, useUnsavedChanges } from "./components/UnsavedChanges";
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { Icon } from "./components/Icon";
 import { ThemeControl } from "./components/ThemeControl";
@@ -28,9 +28,12 @@ function Layout() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const guard = useUnsavedChanges({ dirty: false });
   const menuButton = useRef<HTMLButtonElement>(null);
+  const menuSearch = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!menuOpen) return;
+    menuSearch.current?.focus();
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setMenuOpen(false);
@@ -57,6 +60,7 @@ function Layout() {
           <Icon name="search" />
           <input
             aria-label="Знайти розділ"
+            ref={menuSearch}
             placeholder="Знайти розділ…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -107,7 +111,7 @@ function Layout() {
             </span>
           </div>
           {auth.mode !== "none" ? (
-            <button type="button" className="btn btn-small" onClick={auth.logout}>
+            <button type="button" className="btn btn-small" onClick={() => guard.confirmChange(auth.logout)}>
               Вийти
             </button>
           ) : null}

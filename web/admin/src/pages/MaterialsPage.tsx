@@ -75,9 +75,14 @@ export function MaterialsPage() {
     <Page
       title="Матеріали"
       actions={
-        <Link className="btn" to="/storages">
-          Стан сховищ
-        </Link>
+        <>
+          <Link className="btn" to="/results">
+            Розібрані дані
+          </Link>
+          <Link className="btn" to="/storages">
+            Стан сховищ
+          </Link>
+        </>
       }
     >
       <p className="muted">

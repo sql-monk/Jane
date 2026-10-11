@@ -260,6 +260,9 @@ export function SourcePage() {
             <Link className="btn" to={`/tasks?source_id=${encodeURIComponent(sourceId)}`}>
               Завдання джерела
             </Link>
+            <Link className="btn" to="/results">
+              Розібрані дані
+            </Link>
             <ReasonAction
               label="Видалити"
               confirmLabel="Видалити джерело"

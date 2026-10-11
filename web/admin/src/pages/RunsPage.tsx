@@ -222,16 +222,21 @@ export function RunPage() {
     <Page
       title={`Запуск ${runId}`}
       actions={
-        data && !TERMINAL_JOB_STATUSES.has(data.status) ? (
-          <ReasonAction
-            label="Скасувати запуск"
-            confirmLabel="Скасувати"
-            danger
-            busy={cancel.isPending}
-            requireReason={false}
-            onConfirm={(r) => cancel.mutate(r)}
-          />
-        ) : null
+        <>
+          <Link className="btn" to="/results">
+            Розібрані дані
+          </Link>
+          {data && !TERMINAL_JOB_STATUSES.has(data.status) ? (
+            <ReasonAction
+              label="Скасувати запуск"
+              confirmLabel="Скасувати"
+              danger
+              busy={cancel.isPending}
+              requireReason={false}
+              onConfirm={(r) => cancel.mutate(r)}
+            />
+          ) : null}
+        </>
       }
     >
       {run.isLoading ? <Loading /> : null}

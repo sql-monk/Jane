@@ -1,0 +1,36 @@
+.result-table {
+  min-width: 0;
+  max-width: 100%;
+}
+.result-table .result-title {
+  min-width: 15rem;
+  max-width: 24rem;
+  white-space: normal;
+}
+.result-table .result-title span {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.result-details {
+  min-width: 10rem;
+  max-width: 32rem;
+  overflow-wrap: anywhere;
+}
+.result-details summary {
+  cursor: pointer;
+  color: var(--accent);
+  white-space: normal;
+}
+.result-details .json {
+  max-width: 32rem;
+}
+
+.result-filters {
+  margin-bottom: 0.75rem;
+}
+.result-filters summary {
+  cursor: pointer;
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+}

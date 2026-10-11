@@ -317,13 +317,18 @@ export function TaskPage() {
       title={isNew ? "Нове завдання" : `Завдання ${taskId}`}
       actions={
         !isNew ? (
-          <ReasonAction
-            label="Видалити"
-            confirmLabel="Видалити завдання"
-            danger
-            requireReason={false}
-            onConfirm={() => remove.mutate()}
-          />
+          <>
+            <Link className="btn" to="/results">
+              Розібрані дані
+            </Link>
+            <ReasonAction
+              label="Видалити"
+              confirmLabel="Видалити завдання"
+              danger
+              requireReason={false}
+              onConfirm={() => remove.mutate()}
+            />
+          </>
         ) : null
       }
     >

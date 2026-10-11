@@ -1,0 +1,211 @@
+{
+  "site": "varus",
+  "group": "catalog",
+  "title": "VARUS: весь асортимент і періодичне оновлення цін",
+  "url": "https://varus.ua/",
+  "sources": [
+    {
+      "source_id": "varus",
+      "kind": "web",
+      "title": "VARUS — інтернет-супермаркет",
+      "description": "Увесь асортимент через публічне GraphQL API сайту: автоматичний обхід дерева категорій від головної ID 2, включно з усіма брендами, та всі сторінки кожної категорії до серверного повтору/порожньої відповіді. Поділ на категорії й бренди покриває товари поза першими 10 000 глобальних результатів. Усі властивості attributes(keys: []), ціни та наявність для регіону 0 без вибору магазину. robots.txt дотримується; 1 запит/с і один запит на хост.",
+      "locator": {
+        "url": "https://varus.ua/"
+      },
+      "collector_rules": "@pkg:catalog.varus-catalog-rules",
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "expected_entity_types": [
+        "product"
+      ],
+      "labels": {
+        "group": "catalog",
+        "site": "varus"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "catalog-varus",
+      "title": "varus: весь асортимент, ціни й характеристики",
+      "description": "Кожні 15 хвилин продовження обмеженого обходу всього асортименту; черга й стан між запусками зберігаються. Отримані повні картки та ціни записуються у results-pg, історія спостережень зберігається. Повторне читання відомих товарів після 24 годин; фактична тривалість циклу залежить від розміру каталогу та доступності сайту.",
+      "input": {
+        "source_id": "varus"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "extract-products",
+          "kind": "handler",
+          "handler": "@pkg:catalog.varus-product-extractor",
+          "params": {
+            "shop": "varus"
+          },
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "application/json"
+              }
+            }
+          ]
+        },
+        {
+          "stage_id": "store-products",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-products",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 900,
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 10000,
+          "max_pages_per_run": 100,
+          "max_bytes_per_run": 67108864,
+          "max_material_bytes": 33554432,
+          "max_links_per_page": 60000,
+          "max_frontier_size": 2000000,
+          "revisit_interval_seconds": 86400
+        },
+        "queue": {
+          "max_inflight_materials": 500
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "catalog",
+        "site": "varus",
+        "kind": "catalog"
+      }
+    },
+    {
+      "task_id": "prices-varus",
+      "title": "varus.ua: оновлення цін і наявності",
+      "description": "Ручне допоміжне завдання сумісності. Автоматичне оновлення всього асортименту виконує основне завдання catalog-varus.",
+      "input": {
+        "source_id": "varus"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "rules": "@pkg:catalog.varus-prices-rules",
+            "mode": "full"
+          }
+        },
+        {
+          "stage_id": "extract-prices",
+          "kind": "handler",
+          "handler": "@pkg:catalog.varus-price-extractor",
+          "params": {
+            "shop": "varus"
+          },
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "application/json"
+              }
+            }
+          ]
+        },
+        {
+          "stage_id": "store-prices",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-prices",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "manual"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 2,
+          "max_pages_per_run": 20,
+          "max_bytes_per_run": 20971520,
+          "max_material_bytes": 4194304,
+          "max_links_per_page": 2000
+        },
+        "queue": {
+          "max_inflight_materials": 500
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "catalog",
+        "site": "varus",
+        "kind": "prices"
+      }
+    }
+  ],
+  "verify": {
+    "varus": {
+      "product": {
+        "min": 800,
+        "required": [
+          "shop",
+          "product_id",
+          "title",
+          "url",
+          "currency",
+          "availability",
+          "completeness"
+        ]
+      }
+    }
+  }
+}

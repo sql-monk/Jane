@@ -1,0 +1,125 @@
+{
+  "schema_version": "1",
+  "package_id": "catalog.varus-price-extractor",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "varus.ua: price and availability from the catalog API",
+  "description": "Часткове оновлення товарів VARUS (varus.ua) з елементів каталожного API сайту (короткий запит: SKU, регіональні ціни, наявність): лише shop, product_id, price, currency, old_price, availability (completeness: partial) — інші поля повної картки не затираються. Товар без ціни оновлює лише availability.",
+  "tags": [
+    "catalog",
+    "varus",
+    "supermarket",
+    "prices"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_varus_price.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "application/json"
+    ],
+    "content_kinds": [
+      "json"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "product",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару varus.ua (часткове оновлення)"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "yogurt-on-sale",
+      "input": {
+        "file": "tests/yogurt-sale/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/yogurt-1-5-persik-yagotinskiy-ppl-750g"
+      },
+      "expected_status": "success",
+      "expected": "tests/yogurt-sale/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "pasta-regular-price",
+      "input": {
+        "file": "tests/pasta-regular-price/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/makaronni-virobi-golden-pasta-farfalle-400-g"
+      },
+      "expected_status": "success",
+      "expected": "tests/pasta-regular-price/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "pasta-out-of-stock-availability-only",
+      "input": {
+        "file": "tests/pasta-out-of-stock/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/vyroby-makaronni-origin-tofe-500-h"
+      },
+      "expected_status": "success",
+      "expected": "tests/pasta-out-of-stock/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "api-error-document-empty",
+      "input": {
+        "file": "tests/api-error/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/graphql"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "item-without-prices-unrecognized",
+      "input": {
+        "file": "tests/item-without-prices/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/napij-sofik-zi-smakom-persika-200-ml"
+      },
+      "expected_status": "unrecognized",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (examples/sites: varus)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Partial price and availability updates of varus.ua products."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "url_patterns": [
+      "/api/*"
+    ]
+  }
+}

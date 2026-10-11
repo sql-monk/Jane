@@ -1,0 +1,55 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "varus.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "api_feed",
+      "strategy_id": "all-products",
+      "url": "https://varus.ua/api/graphql?catalog=all-products",
+      "method": "POST",
+      "body": {
+        "operationName": "VarusCatalog",
+        "query": "query VarusCatalog($id: ID!, $page: Int!, $pageSize: Int) { category(id: $id, shopId: null, regionId: 0, locale: \"ua\", deliveryMethod: null) { id children { id } products(page: $page, pageSize: $pageSize, filters: [], sort: {code: NEWEST}) { total totalPages page pageSize items { sku name urlKey regionalPriceInfo { price specialPrice specialFrom specialTo } regionalAvailability { inStock available } } } } }",
+        "variables": {
+          "id": "2",
+          "page": 1,
+          "pageSize": 48
+        }
+      },
+      "items_path": "$.data.category.products.items[*]",
+      "url_path": "$.urlKey",
+      "emit_items_as_materials": true,
+      "pagination": {
+        "type": "page",
+        "body_page_path": "$.variables.page",
+        "page_param": "page"
+      },
+      "partitions": {
+        "items_path": "$.data.category.children[*].id",
+        "body_path": "$.variables.id",
+        "url_param": "category"
+      },
+      "item_url_base": "https://varus.ua/"
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "dedup": {
+    "key": "canonical_url",
+    "use_link_rel_canonical": false
+  },
+  "revisit": {
+    "mode": "interval"
+  }
+}

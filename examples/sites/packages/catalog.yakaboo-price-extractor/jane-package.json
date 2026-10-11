@@ -1,0 +1,115 @@
+{
+  "schema_version": "1",
+  "package_id": "catalog.yakaboo-price-extractor",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "yakaboo.ua: prices from category pages",
+  "description": "Оновлення цін yakaboo.ua зі сторінок розділів: з кожної картки книжки (div.category-card) — ціна, ціна до знижки й наявність (completeness: partial). Ключ — shop + product_id (код товару), той самий, що в повній картці catalog.yakaboo-book-extractor: сховище оновлює лише ці поля й зберігає решту. Картка без знижки очищує old_price; картка без ціни (немає в наявності) оновлює лише наявність.",
+  "tags": [
+    "catalog",
+    "yakaboo",
+    "books",
+    "prices"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_yakaboo_prices.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "product",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність книжки yakaboo.ua (часткове оновлення)"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": [
+      "lxml>=6"
+    ]
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "detective-category-first-page",
+      "input": {
+        "file": "tests/detective-page-1/page.html",
+        "media_type": "text/html",
+        "url": "https://www.yakaboo.ua/ua/knigi/hudozhestvennaja-literatura/detektiv/ukrains-kij-detektiv.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/detective-page-1/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "fantasy-category-last-page-out-of-stock",
+      "input": {
+        "file": "tests/fantasy-last-page/page.html",
+        "media_type": "text/html",
+        "url": "https://www.yakaboo.ua/ua/knigi/hudozhestvennaja-literatura/fjentezi/ukrains-ke-fentezi.html?p=8"
+      },
+      "expected_status": "success",
+      "expected": "tests/fantasy-last-page/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "product-page-empty",
+      "input": {
+        "file": "tests/product-page/page.html",
+        "media_type": "text/html",
+        "url": "https://www.yakaboo.ua/ua/pavuk.html"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "cards-without-code-unrecognized",
+      "input": {
+        "file": "tests/cards-without-code/page.html",
+        "media_type": "text/html",
+        "url": "https://www.yakaboo.ua/ua/knigi/hudozhestvennaja-literatura/fjentezi/ukrains-ke-fentezi.html?p=8"
+      },
+      "expected_status": "unrecognized",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (examples/sites: yakaboo)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Prices and availability of yakaboo.ua category cards for the price task every 4 hours."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "url_patterns": [
+      "www.yakaboo.ua/ua/knigi/**"
+    ]
+  }
+}

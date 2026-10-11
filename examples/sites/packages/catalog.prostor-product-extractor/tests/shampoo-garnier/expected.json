@@ -1,0 +1,35 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "2326",
+        "title": "Шампунь Garnier Fructis Заряд свіжості для нормального волосся, схильного до жирності 400 мл",
+        "price": 173.0,
+        "currency": "UAH",
+        "url": "https://prostor.ua/ua/product/shampun-garnier-fructis-zarjad-svizhosti-dlja-normal-nogo-volossja-shil-nogo-do-zhirnosti-400-ml/",
+        "completeness": "full",
+        "brand": "Garnier",
+        "category": "Шампуні",
+        "category_path": [
+          "Волосся",
+          "Шампуні"
+        ],
+        "old_price": 204.0,
+        "availability": "in_stock",
+        "sku": "132911",
+        "volume": 400.0,
+        "unit": "мл"
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "2326"
+        }
+      }
+    }
+  ]
+}

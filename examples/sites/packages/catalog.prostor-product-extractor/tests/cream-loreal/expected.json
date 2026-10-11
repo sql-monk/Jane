@@ -1,0 +1,58 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "981",
+        "title": "Крем для обличчя L'Oréal Paris Вік експерт 55+ денний 50 мл",
+        "price": 342.0,
+        "currency": "UAH",
+        "url": "https://prostor.ua/ua/product/antivozrastnoy-krem-loreal-paris-skin-expert-vozrast-ekspert-dnevnoy-ukhod-dlya-vsekh-tipov-kozhi-55-50-ml/",
+        "completeness": "full",
+        "brand": "L'Oreal Paris",
+        "category": "Крем для обличчя",
+        "category_path": [
+          "Обличчя",
+          "Догляд за обличчям",
+          "Крем для обличчя"
+        ],
+        "availability": "in_stock",
+        "image": "https://media.prostor.ua/catalog/product/i/m/image_1790151143_1.jpg?store=ua&image-type=image",
+        "sku": "091565",
+        "volume": 50.0,
+        "unit": "мл",
+        "rating": 4.6,
+        "reviews_count": 10,
+        "attributes": {
+          "Країна-виготовлення товару": "Німеччина",
+          "Brand": "L'Oreal Paris",
+          "Is 18+": "Ні",
+          "Клас косметики": "Не тестується на тваринах",
+          "Вид": "Крем",
+          "Стать": "Для жінок",
+          "Вік": "55+",
+          "Тип шкіри": "Всі типи шкіри",
+          "Час застосування": "Денний",
+          "Область застосування": "Обличчя",
+          "Призначення": "Антивіковий, Відновлення, Ліфтінг, Від зморшок, Живлення, Розгладжування, Зволоження, Пружність",
+          "Ступінь захисту": "Без SPF",
+          "Об'єм": "50 мл",
+          "Особливості": "Без мінеральних олій, Без парабенів, Без силіконів",
+          "Активні компоненти": "Бджолиний віск, Аргінін, Гліцерин, Камелія, Олія абрикосових кісточок, Пептиди, Саліцилова кислота, Токоферол"
+        }
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "981"
+        }
+      }
+    }
+  ]
+}

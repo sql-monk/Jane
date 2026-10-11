@@ -1,0 +1,104 @@
+{
+  "id": "102953",
+  "sku": "2665367",
+  "name": "Яблуко Бая Маріса вагове",
+  "urlKey": "yabluko-baia-marisa-vahove",
+  "weight": 0,
+  "volume": "0",
+  "regionalPriceInfo": {
+    "price": 49.9,
+    "specialPrice": null,
+    "specialFrom": null,
+    "specialTo": null
+  },
+  "regionalAvailability": {
+    "inStock": true,
+    "available": true
+  },
+  "qtyStep": {
+    "isDecimal": true
+  },
+  "brand": {
+    "name": "Без TM"
+  },
+  "primaryCategory": {
+    "name": "Яблука",
+    "urlKey": "yabluka"
+  },
+  "categories": [
+    {
+      "name": "Головна",
+      "urlKey": "glavnaja",
+      "level": 1,
+      "isProductCategory": true
+    },
+    {
+      "name": "Фрукти, овочі, горіхи",
+      "urlKey": "frukti-ovochi-gorihi",
+      "level": 2,
+      "isProductCategory": true
+    },
+    {
+      "name": "Фрукти свіжі",
+      "urlKey": "frukti-svizhi",
+      "level": 3,
+      "isProductCategory": true
+    },
+    {
+      "name": "Яблука",
+      "urlKey": "yabluka",
+      "level": 4,
+      "isProductCategory": true
+    }
+  ],
+  "gallery": {
+    "mainImageTimestamp": 1791308739
+  },
+  "attributes": [
+    {
+      "code": "pim_brand_id",
+      "label": "Бренд",
+      "option": {
+        "label": "Без TM"
+      }
+    },
+    {
+      "code": "countrymanufacturerforsite",
+      "label": "Країна виробництва",
+      "option": {
+        "label": "Україна"
+      }
+    },
+    {
+      "code": "sortApples",
+      "label": "Сорт",
+      "option": {
+        "label": "Бая Маріса"
+      }
+    },
+    {
+      "code": "colorOfApples",
+      "label": "Колір яблук",
+      "option": {
+        "label": "Червоні"
+      }
+    },
+    {
+      "code": "packagingApples",
+      "label": "Тип пакування",
+      "option": {
+        "label": "пакет"
+      }
+    },
+    {
+      "code": "ageWms",
+      "label": "Термін зберігання товару",
+      "textValue": "7"
+    },
+    {
+      "code": "weight",
+      "label": "Вага",
+      "numberValue": 0
+    }
+  ]
+}

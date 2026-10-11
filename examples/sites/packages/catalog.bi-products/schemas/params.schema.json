@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "catalog.bi-products params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "listing_prices": {
+      "description": "Сторінки категорій: часткове оновлення ціни й наявності кожного товару (completeness: partial). false — сторінки категорій лише навігація (empty), ціни — зі сторінок товарів.",
+      "type": "boolean",
+      "default": true
+    },
+    "default_currency": {
+      "description": "Валюта, якщо JSON-LD її не вказує.",
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "default": "UAH"
+    }
+  }
+}

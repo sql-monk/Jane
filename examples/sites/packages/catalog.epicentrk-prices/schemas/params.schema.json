@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "catalog.epicentrk-prices params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "shop": {
+      "description": "Значення поля shop (частина ключа товару); має збігатися з catalog.epicentrk-products.",
+      "type": "string",
+      "minLength": 1,
+      "default": "epicentrk.ua"
+    },
+    "currency": {
+      "description": "Валюта ціни, якщо картка її не вказує.",
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "default": "UAH"
+    }
+  }
+}

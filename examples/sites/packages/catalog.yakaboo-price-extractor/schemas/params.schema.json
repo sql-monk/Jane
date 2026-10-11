@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "catalog.yakaboo-price-extractor params",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "shop": {
+      "description": "Ідентифікатор магазину в ключі сутності (shop + product_id); той самий, що в catalog.yakaboo-book-extractor.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "default": "yakaboo"
+    },
+    "currency": {
+      "description": "Валюта цін карток (сайт показує «грн»).",
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "default": "UAH"
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "642570",
+        "title": "Самокат Kinderkraft Raket Beige",
+        "currency": "UAH",
+        "url": "https://bi.ua/ukr/product/samokat-kinderkraft-raket-beige-krrake00beg0000.html",
+        "availability": "out_of_stock",
+        "brand": "Kinderkraft",
+        "category": "Самокати",
+        "category_path": [
+          "Дитячий транспорт",
+          "Самокати"
+        ],
+        "image": "https://bi.ua/uploaded-images/products/642570_1.jpg",
+        "sku": "KRRAKE00BEG0000",
+        "weight": 4.3,
+        "unit": "кг",
+        "reviews_count": 0,
+        "attributes": {
+          "Артикул": "KRRAKE00BEG0000",
+          "Особливість": "З підсвічуванням",
+          "Колір": "Бежевий",
+          "Конструкція": "Регульоване кермо, Кошик, Триколісний",
+          "Тип товару": "Самокати",
+          "Країна-виробник": "Китай",
+          "Розмір пакунку": "15 x 31 x 62 см",
+          "Вага": "4 кг 300 г",
+          "Вік": "2 - 6 років",
+          "Стать": "Для хлопчиків, Для дівчаток"
+        }
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "642570"
+        }
+      }
+    }
+  ]
+}

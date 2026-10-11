@@ -1,0 +1,55 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "epicentrk.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/ua/shop/"
+    ],
+    "include": [
+      {
+        "type": "regex",
+        "value": "^https://epicentrk\\.ua/ua/shop/[a-z0-9-]+/(\\?PAGEN_1=[0-9]+)?$"
+      }
+    ]
+  },
+  "strategies": [
+    {
+      "type": "listing",
+      "strategy_id": "categories",
+      "start_urls": [
+        "https://epicentrk.ua/ua/shop/elektrorubanki/",
+        "https://epicentrk.ua/ua/shop/kiyanki/",
+        "https://epicentrk.ua/ua/shop/leyki/"
+      ],
+      "item_links": {
+        "value": "li[data-test-small-card] a[data-product-picture]"
+      },
+      "next_page": {
+        "value": "a[title=\"наступна сторінка\"]"
+      }
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "dedup": {
+    "use_link_rel_canonical": false
+  },
+  "sections": [
+    {
+      "section_id": "categories",
+      "title": "Сторінки категорій і пагінації",
+      "patterns": [
+        {
+          "type": "regex",
+          "value": "^https://epicentrk\\.ua/ua/shop/[a-z0-9-]+/(\\?PAGEN_1=[0-9]+)?$"
+        }
+      ]
+    }
+  ]
+}

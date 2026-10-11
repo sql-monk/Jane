@@ -1,0 +1,468 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "58519",
+        "price": 421.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 489.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "58519"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "43383",
+        "price": 429.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 573.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "43383"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "18711",
+        "price": 483.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "18711"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "43397",
+        "price": 699.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 955.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "43397"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "58380",
+        "price": 369.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 559.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "58380"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "61695",
+        "price": 799.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "61695"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "66789",
+        "price": 699.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 1074.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "66789"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "58521",
+        "price": 232.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 273.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "58521"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "43377",
+        "price": 629.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 987.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "43377"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "59293",
+        "price": 699.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 1555.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "59293"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "53398",
+        "price": 421.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 489.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "53398"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "41636",
+        "price": 629.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 987.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "41636"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "58359",
+        "price": 199.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 359.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "58359"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "53397",
+        "price": 421.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 489.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "53397"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "58728",
+        "price": 192.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 320.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "58728"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "24948",
+        "price": 799.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "24948"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "63913",
+        "price": 115.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 142.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "63913"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "66794",
+        "price": 719.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 1004.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "66794"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "43396",
+        "price": 699.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 955.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "43396"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "22668",
+        "price": 286.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 477.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "22668"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "63914",
+        "price": 115.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 142.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "63914"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "18553",
+        "price": 483.0,
+        "currency": "UAH",
+        "availability": "in_stock"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "18553"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "43401",
+        "price": 156.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 261.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "43401"
+        }
+      }
+    },
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "58376",
+        "price": 669.0,
+        "currency": "UAH",
+        "availability": "in_stock",
+        "old_price": 1024.0
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "58376"
+        }
+      }
+    }
+  ]
+}

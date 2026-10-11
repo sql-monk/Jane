@@ -1,0 +1,230 @@
+{
+  "site": "yakaboo",
+  "group": "catalog",
+  "title": "Yakaboo: весь асортимент і періодичне оновлення цін",
+  "url": "https://www.yakaboo.ua/",
+  "sources": [
+    {
+      "source_id": "yakaboo",
+      "kind": "web",
+      "title": "Yakaboo — інтернет-магазин книжок",
+      "description": "Усі українські товарні URL з оприлюдненого sitemap index, включно з паперовими, електронними, аудіокнижками та іншими товарами. Ціни й наявні властивості читаються зі сторінок. robots.txt дотримується. Великий каталог обходиться поступово із збереженням черги; повторне читання після 24 годин не є гарантією добового завершення всього циклу.",
+      "locator": {
+        "url": "https://www.yakaboo.ua/ua/"
+      },
+      "collector_rules": "@pkg:catalog.yakaboo-catalog-rules",
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "burst_per_host": 1,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "expected_entity_types": [
+        "product"
+      ],
+      "labels": {
+        "group": "catalog",
+        "site": "yakaboo"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "catalog-yakaboo",
+      "title": "yakaboo: весь асортимент, ціни й характеристики",
+      "description": "Кожні 15 хвилин продовження обмеженого обходу всього асортименту; черга й стан між запусками зберігаються. Отримані повні картки та ціни записуються у results-pg, історія спостережень зберігається. Повторне читання відомих товарів після 24 годин; фактична тривалість циклу залежить від розміру каталогу та доступності сайту.",
+      "input": {
+        "source_id": "yakaboo"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "extract-books",
+          "kind": "handler",
+          "handler": "@pkg:catalog.yakaboo-book-extractor",
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "text/html"
+              }
+            }
+          ],
+          "bindings": [
+            {
+              "sections": [
+                "books"
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "store-books",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-books",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "in",
+                "value": [
+                  "success",
+                  "unrecognized"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 900,
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 4,
+          "max_pages_per_run": 400,
+          "max_bytes_per_run": 4294967296,
+          "max_material_bytes": 33554432,
+          "max_links_per_page": 60000,
+          "max_frontier_size": 2000000,
+          "revisit_interval_seconds": 86400
+        },
+        "queue": {
+          "max_inflight_materials": 500
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "catalog",
+        "site": "yakaboo",
+        "kind": "catalog"
+      }
+    },
+    {
+      "task_id": "prices-yakaboo",
+      "title": "yakaboo.ua: оновлення цін і наявності зі сторінок розділів",
+      "description": "Ручне допоміжне завдання сумісності. Автоматичне оновлення всього асортименту виконує основне завдання catalog-yakaboo.",
+      "input": {
+        "source_id": "yakaboo"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "full",
+            "rules": "@pkg:catalog.yakaboo-prices-rules"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-files",
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "extract-prices",
+          "kind": "handler",
+          "handler": "@pkg:catalog.yakaboo-price-extractor",
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "text/html"
+              }
+            }
+          ],
+          "bindings": [
+            {
+              "sections": [
+                "categories"
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "store-prices",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-prices",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "manual"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 40,
+          "max_pages_per_run": 100
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "catalog",
+        "site": "yakaboo",
+        "kind": "prices"
+      }
+    }
+  ],
+  "verify": {
+    "yakaboo": {
+      "product": {
+        "min": 500,
+        "required": [
+          "shop",
+          "product_id",
+          "title",
+          "price",
+          "currency",
+          "url",
+          "completeness"
+        ]
+      }
+    }
+  }
+}

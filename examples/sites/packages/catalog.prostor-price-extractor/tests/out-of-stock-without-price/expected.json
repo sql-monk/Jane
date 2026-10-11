@@ -1,0 +1,20 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "prostor",
+        "product_id": "43400",
+        "availability": "out_of_stock"
+      },
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "prostor",
+          "product_id": "43400"
+        }
+      },
+      "completeness": "partial"
+    }
+  ]
+}

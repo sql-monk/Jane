@@ -1,0 +1,47 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "bi.ua",
+        "product_id": "593738",
+        "title": "Самокат Miqilong Havoc рожевий",
+        "price": 1099.0,
+        "currency": "UAH",
+        "url": "https://bi.ua/ukr/product/samokat-miqilong-havoc-rozovyy-havoc-125-pink.html",
+        "availability": "in_stock",
+        "old_price": 1659.0,
+        "brand": "Miqilong",
+        "category": "Самокати",
+        "category_path": [
+          "Дитячий транспорт",
+          "Самокати"
+        ],
+        "image": "https://bi.ua/uploaded-images/products/593738_1.jpg",
+        "sku": "HAVOC-125-PINK",
+        "weight": 5.0,
+        "unit": "кг",
+        "reviews_count": 0,
+        "attributes": {
+          "Артикул": "HAVOC-125-PINK",
+          "Колір": "Рожевий",
+          "Конструкція": "Регульоване кермо, Двоколісний",
+          "Тип товару": "Самокати",
+          "Країна-виробник": "Китай",
+          "Розмір пакунку": "11 x 20 x 64 см",
+          "Вага": "5 кг",
+          "Вік": "3 - 6 років",
+          "Стать": "Для дівчаток"
+        }
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "bi.ua",
+          "product_id": "593738"
+        }
+      }
+    }
+  ]
+}

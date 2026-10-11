@@ -1,0 +1,35 @@
+{
+  "schema_version": "1",
+  "package_id": "catalog.epicentrk-catalog-rules",
+  "version": "1.1.1",
+  "kind": "collector-rules",
+  "title": "epicentrk.ua: entire Ukrainian product assortment from sitemaps",
+  "description": "Повний асортимент: товари для дому, ремонту, саду, спорту, одяг, продукти, техніка та всі інші товарні розділи власного магазину й маркетплейсу. обидва повні українські product sitemap, оголошені robots.txt; регіональні SEO-сторінки та мовні дублікати не збираються. Усі товарні URL із повних sitemap, без обмеження категорій; incremental-черга продовжується між запусками, повторні відвідування карток оновлюють ціну, наявність і властивості. Ліміти визначаються джерелом і завданням; robots.txt дотримується.",
+  "tags": [
+    "sites",
+    "catalog",
+    "epicentrk"
+  ],
+  "entry": {
+    "collector": "web",
+    "rules": "rules.json"
+  },
+  "tests": [],
+  "provenance": {
+    "created_by": "llm",
+    "authors": [
+      "Claude (examples/sites)",
+      "Codex: full assortment catalog configuration"
+    ],
+    "created_at": "2026-10-11T03:57:25.357095Z",
+    "change_summary": "Replace three-category listing discovery with complete Ukrainian product sitemaps and periodic resumable product-card refresh. Reproducible Git LF bytes: normalize CRLF to LF without behavior changes.",
+    "based_on": {
+      "package_id": "catalog.epicentrk-catalog-rules",
+      "version": "1.1.0"
+    },
+    "llm": {
+      "model": "Codex",
+      "reason": "improvement"
+    }
+  }
+}

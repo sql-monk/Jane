@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "product (повна картка книжки yakaboo.ua)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "shop",
+    "product_id",
+    "title",
+    "url"
+  ],
+  "properties": {
+    "shop": {
+      "type": "string",
+      "minLength": 1
+    },
+    "product_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Код товару в магазині («Код товару» на сторінці; той самий код у картках сторінок розділів)."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Поточна ціна, грн (для книжки, якої немає в наявності, — ціна з schema.org Offer сторінки)."
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "completeness": {
+      "type": "string",
+      "enum": [
+        "full",
+        "partial"
+      ],
+      "description": "full — повна картка (записує лише завдання каталогу; оновлення цін це поле не змінює)."
+    },
+    "brand": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Видавництво."
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category_path": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "old_price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Ціна до знижки, грн."
+    },
+    "availability": {
+      "type": "string",
+      "enum": [
+        "in_stock",
+        "out_of_stock",
+        "preorder",
+        "unknown"
+      ]
+    },
+    "image": {
+      "type": "string",
+      "format": "uri"
+    },
+    "sku": {
+      "type": "string",
+      "minLength": 1
+    },
+    "barcode": {
+      "type": "string",
+      "pattern": "^([0-9]{13}|[0-9]{9}[0-9X])$",
+      "description": "ISBN без дефісів (ISBN-13 — штрихкод EAN-13 книжки)."
+    },
+    "rating": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "reviews_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "attributes": {
+      "type": "object",
+      "description": "Характеристики сторінки: Автор, Видавництво, Кількість сторінок, Рік видання, Мова, Тип, Тип обкладинки, ISBN, Формат…",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

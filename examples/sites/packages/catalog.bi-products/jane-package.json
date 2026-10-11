@@ -1,0 +1,179 @@
+{
+  "schema_version": "1",
+  "package_id": "catalog.bi-products",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "bi.ua: product cards and category prices",
+  "description": "Товари bi.ua («Будинок іграшок») зі schema.org JSON-LD: сторінка товару — повна картка (назва, ціна, стара ціна, наявність, бренд, артикул, категорії, зображення, рейтинг, характеристики, вага; completeness: full); сторінка категорії — часткове оновлення ціни, старої ціни й наявності кожного товару (completeness: partial). Ключ — магазин + код товару.",
+  "tags": [
+    "catalog",
+    "bi-ua",
+    "toys",
+    "products",
+    "prices",
+    "json-ld"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_bi_products.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "product",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину: повна картка або часткове оновлення ціни"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": [
+      "lxml>=6"
+    ]
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "product-in-stock-discount",
+      "input": {
+        "file": "tests/product-havoc-pink/page.html",
+        "media_type": "text/html",
+        "url": "https://bi.ua/ukr/product/samokat-miqilong-havoc-rozovyy-havoc-125-pink.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-havoc-pink/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "product-out-of-stock-with-reviews",
+      "input": {
+        "file": "tests/product-nixor/page.html",
+        "media_type": "text/html",
+        "url": "https://bi.ua/ukr/product/samokat-nixor-sports-professional-na01081.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-nixor/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "product-in-stock-no-discount-clears-old-price",
+      "input": {
+        "file": "tests/product-highwaykick/page.html",
+        "media_type": "text/html",
+        "url": "https://bi.ua/ukr/product/samokat-scootride-highwaykick-svetlo-seryy-sr-160629-ash.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-highwaykick/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "product-without-price-partial",
+      "input": {
+        "file": "tests/product-raket-no-price/page.html",
+        "media_type": "text/html",
+        "url": "https://bi.ua/ukr/product/samokat-kinderkraft-raket-beige-krrake00beg0000.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-raket-no-price/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "category-page-1-prices",
+      "input": {
+        "file": "tests/category-scooters-1/page.html",
+        "media_type": "text/html",
+        "url": "https://bi.ua/ukr/detskij-transport/samokatyi/"
+      },
+      "expected_status": "success",
+      "expected": "tests/category-scooters-1/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "category-last-page-out-of-stock",
+      "input": {
+        "file": "tests/category-scooters-11/page.html",
+        "media_type": "text/html",
+        "url": "https://bi.ua/ukr/detskij-transport/samokatyi/?page=11"
+      },
+      "expected_status": "success",
+      "expected": "tests/category-scooters-11/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "category-page-navigation-only-empty",
+      "input": {
+        "file": "tests/category-scooters-1/page.html",
+        "media_type": "text/html",
+        "url": "https://bi.ua/ukr/detskij-transport/samokatyi/"
+      },
+      "params": {
+        "listing_prices": false
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "help-page-empty",
+      "input": {
+        "file": "tests/help-page/page.html",
+        "media_type": "text/html",
+        "url": "https://bi.ua/ukr/help/how_to_order/"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "product-page-without-json-ld-unrecognized",
+      "input": {
+        "file": "tests/product-no-json-ld/page.html",
+        "media_type": "text/html",
+        "url": "https://bi.ua/ukr/product/samokat-miqilong-havoc-rozovyy-havoc-125-pink.html"
+      },
+      "expected_status": "unrecognized",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (examples/sites: bi.ua)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "bi.ua products: full cards from product pages, partial price updates from category pages."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "url_patterns": [
+      "bi.ua/ukr/product/*",
+      "bi.ua/ukr/**"
+    ]
+  }
+}

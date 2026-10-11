@@ -1,0 +1,60 @@
+{
+  "collector": "web",
+  "scope": {
+    "allowed_domains": [
+      "bi.ua"
+    ],
+    "allowed_schemes": [
+      "https"
+    ],
+    "path_prefixes": [
+      "/ukr/detskij-transport/samokatyi/",
+      "/ukr/detskij-transport/begovelyi/",
+      "/ukr/detskij-transport/velosipedyi/"
+    ]
+  },
+  "strategies": [
+    {
+      "type": "listing",
+      "strategy_id": "categories",
+      "start_urls": [
+        "https://bi.ua/ukr/detskij-transport/samokatyi/",
+        "https://bi.ua/ukr/detskij-transport/begovelyi/",
+        "https://bi.ua/ukr/detskij-transport/velosipedyi/"
+      ],
+      "item_links": {
+        "type": "css",
+        "value": "a.goodsItemLink.good"
+      },
+      "next_page": {
+        "type": "css",
+        "value": "div.pagin a.pagLink.ac + a.pagLink"
+      }
+    }
+  ],
+  "robots": {
+    "mode": "respect"
+  },
+  "normalization": {
+    "strip_query_params": [
+      "utm_*"
+    ]
+  },
+  "sections": [
+    {
+      "section_id": "categories",
+      "title": "Сторінки категорій (з пагінацією ?page=N)",
+      "patterns": [
+        {
+          "value": "bi.ua/ukr/detskij-transport/samokatyi/**"
+        },
+        {
+          "value": "bi.ua/ukr/detskij-transport/begovelyi/**"
+        },
+        {
+          "value": "bi.ua/ukr/detskij-transport/velosipedyi/**"
+        }
+      ]
+    }
+  ]
+}

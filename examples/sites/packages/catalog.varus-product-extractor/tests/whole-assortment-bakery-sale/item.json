@@ -1,0 +1,154 @@
+{
+  "id": "102936",
+  "sku": "2665342",
+  "name": "Пряник Хлібодар На ходу-на меду 30 г",
+  "urlKey": "prianyk-khlibodar-na-khodu-na-medu-30-h",
+  "weight": 30,
+  "volume": "0",
+  "regionalPriceInfo": {
+    "price": 8.9,
+    "specialPrice": 4.9,
+    "specialFrom": "2026-10-06",
+    "specialTo": "2026-10-19"
+  },
+  "regionalAvailability": {
+    "inStock": true,
+    "available": true
+  },
+  "qtyStep": {
+    "isDecimal": false
+  },
+  "brand": {
+    "name": "Хлібодар"
+  },
+  "primaryCategory": {
+    "name": "Пряники",
+    "urlKey": "pryaniki"
+  },
+  "categories": [
+    {
+      "name": "Головна",
+      "urlKey": "glavnaja",
+      "level": 1,
+      "isProductCategory": true
+    },
+    {
+      "name": "Замовляй Новою поштою",
+      "urlKey": "zamovlyaj-novoyu-poshtoyu",
+      "level": 2,
+      "isProductCategory": false
+    },
+    {
+      "name": "Кондитерські вироби та солодощі",
+      "urlKey": "konditerski-virobi-ta-solodoschi",
+      "level": 2,
+      "isProductCategory": true
+    },
+    {
+      "name": "Кондитерська випічка",
+      "urlKey": "konditerska-vipichka",
+      "level": 3,
+      "isProductCategory": true
+    },
+    {
+      "name": "Пряники",
+      "urlKey": "pryaniki",
+      "level": 4,
+      "isProductCategory": true
+    }
+  ],
+  "gallery": {
+    "mainImageTimestamp": 1790874532
+  },
+  "attributes": [
+    {
+      "code": "pim_brand_id",
+      "label": "Бренд",
+      "option": {
+        "label": "Хлібодар"
+      }
+    },
+    {
+      "code": "countrymanufacturerforsite",
+      "label": "Країна виробництва",
+      "option": {
+        "label": "Україна"
+      }
+    },
+    {
+      "code": "glazeGingerbread",
+      "label": "Глазур",
+      "option": {
+        "label": "цукрова"
+      }
+    },
+    {
+      "code": "fillingGingerbread",
+      "label": "Начинка",
+      "option": {
+        "label": "без начинки"
+      }
+    },
+    {
+      "code": "lactoseFreeGingerbread",
+      "label": "Вміст лактози",
+      "option": {
+        "label": "з лактозою"
+      }
+    },
+    {
+      "code": "glutenFreeGingerbread",
+      "label": "Вміст глютену",
+      "option": {
+        "label": "з глютеном"
+      }
+    },
+    {
+      "code": "sugarFreeGingerbread",
+      "label": "Вміст цукру",
+      "option": {
+        "label": "з цукром"
+      }
+    },
+    {
+      "code": "fat",
+      "label": "Жири",
+      "textValue": "5.7 г/100 г"
+    },
+    {
+      "code": "carb",
+      "label": "Вуглеводи",
+      "textValue": "72.9 г/100 г"
+    },
+    {
+      "code": "protein",
+      "label": "Білки",
+      "textValue": "5 г/100 г"
+    },
+    {
+      "code": "energyKcal",
+      "label": "Калорійність ккал",
+      "textValue": "363 ккал/100 г"
+    },
+    {
+      "code": "storageHumidity",
+      "label": "Вологість",
+      "textValue": "до 75 %"
+    },
+    {
+      "code": "ageWms",
+      "label": "Термін зберігання товару",
+      "textValue": "180"
+    },
+    {
+      "code": "temperature",
+      "label": "Температура зберігання ",
+      "textValue": "+18 (+-5) ºC"
+    },
+    {
+      "code": "ingredients",
+      "label": "Склад",
+      "textValue": "Борошно пшеничне вс, цукор, сироп глюкозно-фруктозний, вода питна, жир рослинний (олія пальмова та її фракції рафіновані дезодоровані, в натуральному вигляді), мед натуральний (2%), паленка (цукор, вода питна), клітковина, розпушувачі тіста: гідрокарбонат амонію, бікарбонат натрію, імбир мелений (0.3%), прянощі (0.3%) (перець духмяний, кориця, мускатний горіх, гвоздика, імбир, перець чорний, кардамон), сіль кухонна, препарат для обробки борошна (концентрат ферментів, борошно пшеничне термічно оброблене, аскорбінова кислота)"
+    }
+  ]
+}

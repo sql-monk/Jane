@@ -1,0 +1,32 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "varus",
+        "product_id": "2665367",
+        "sku": "2665367",
+        "currency": "UAH",
+        "availability": "in_stock",
+        "completeness": "full",
+        "title": "Яблуко Бая Маріса вагове",
+        "price": 49.9,
+        "unit": "кг",
+        "category": "Яблука",
+        "country": "Україна",
+        "attributes": {
+          "Сорт": "Бая Маріса",
+          "Колір яблук": "Червоні",
+          "Вага": "0"
+        }
+      },
+      "key": {
+        "natural": {
+          "shop": "varus",
+          "product_id": "2665367"
+        }
+      },
+      "completeness": "full"
+    }
+  ]
+}

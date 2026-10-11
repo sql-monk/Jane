@@ -1,0 +1,139 @@
+{
+  "schema_version": "1",
+  "package_id": "catalog.yakaboo-book-extractor",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "yakaboo.ua: full book cards",
+  "description": "Повні картки книжок yakaboo.ua зі сторінок товарів: назва, ціна й ціна до знижки, наявність (статус сторінки: в наявності / доставка від постачальника / очікується / немає), видавництво, категорія й шлях категорій (хлібні крихти), зображення, код товару, ISBN (barcode), рейтинг і кількість відгуків, характеристики (автор, мова, рік, сторінки, обкладинка, формат…) — completeness: full. Ключ — shop + product_id (код товару, той самий, що в картках сторінок розділів). Відгуки покупців (імена) не читаються.",
+  "tags": [
+    "catalog",
+    "yakaboo",
+    "books",
+    "products"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_yakaboo_book.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "product",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка книжки yakaboo.ua"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": [
+      "lxml>=6"
+    ]
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "paper-book-discount-rating",
+      "input": {
+        "file": "tests/pavuk-discount/page.html",
+        "media_type": "text/html",
+        "url": "https://www.yakaboo.ua/ua/pavuk.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/pavuk-discount/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "paper-book-expected-preorder",
+      "input": {
+        "file": "tests/preorder-dvi-taemnici/page.html",
+        "media_type": "text/html",
+        "url": "https://www.yakaboo.ua/ua/dvi-taemnici-odnogo-lita.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/preorder-dvi-taemnici/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "ebook-without-stock-status",
+      "input": {
+        "file": "tests/ebook-lvivskyi-gambit/page.html",
+        "media_type": "text/html",
+        "url": "https://www.yakaboo.ua/ua/l-vivs-kij-gambit-kniga-4-3452504.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/ebook-lvivskyi-gambit/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "paper-book-out-of-stock",
+      "input": {
+        "file": "tests/out-of-stock-arkan-vovkiv/page.html",
+        "media_type": "text/html",
+        "url": "https://www.yakaboo.ua/ua/arkan-vovkiv-kniga-1.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/out-of-stock-arkan-vovkiv/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "category-page-empty",
+      "input": {
+        "file": "tests/category-page/page.html",
+        "media_type": "text/html",
+        "url": "https://www.yakaboo.ua/ua/knigi/hudozhestvennaja-literatura/detektiv/ukrains-kij-detektiv.html"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "product-without-price-unrecognized",
+      "input": {
+        "file": "tests/product-without-price/page.html",
+        "media_type": "text/html",
+        "url": "https://www.yakaboo.ua/ua/pavuk.html"
+      },
+      "expected_status": "unrecognized",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (examples/sites: yakaboo)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Full book cards of yakaboo.ua product pages for the nightly catalog task."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "url_patterns": [
+      "www.yakaboo.ua/ua/*.html"
+    ]
+  }
+}

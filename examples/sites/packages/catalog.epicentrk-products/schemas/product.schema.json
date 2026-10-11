@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "product (повна картка товару epicentrk.ua)",
+  "description": "Повна картка зі сторінки товару. Ціни — числа в одиницях currency (грн). Товар, якого немає в наявності, сайт показує без ціни: поле price тоді відсутнє (лишається остання відома ціна).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "shop",
+    "product_id",
+    "title",
+    "url",
+    "availability"
+  ],
+  "properties": {
+    "shop": {
+      "type": "string",
+      "minLength": 1
+    },
+    "product_id": {
+      "description": "Slug канонічного URL товару (/ua/shop/<slug>.html).",
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "price": {
+      "type": "number",
+      "minimum": 0
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "old_price": {
+      "description": "Закреслена ціна до знижки.",
+      "type": "number",
+      "minimum": 0
+    },
+    "availability": {
+      "type": "string",
+      "enum": [
+        "in_stock",
+        "out_of_stock",
+        "preorder",
+        "unknown"
+      ]
+    },
+    "brand": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category_path": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "sku": {
+      "description": "Код товару магазину («КОД»).",
+      "type": "string",
+      "minLength": 1
+    },
+    "barcode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "unit": {
+      "description": "Одиниця ціни («шт.», «м²»…).",
+      "type": "string",
+      "minLength": 1
+    },
+    "rating": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "Середня оцінка (1–5)."
+    },
+    "reviews_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Кількість оцінок товару (aggregateRating: ratingCount або reviewCount)."
+    },
+    "seller": {
+      "description": "Продавець: магазин або продавець маркетплейсу (не ФОП).",
+      "type": "string",
+      "minLength": 1
+    },
+    "attributes": {
+      "description": "Характеристики: назва → значення (кілька значень — через кому).",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "dependentRequired": {
+    "price": [
+      "currency"
+    ],
+    "old_price": [
+      "price"
+    ]
+  },
+  "if": {
+    "required": [
+      "availability"
+    ],
+    "properties": {
+      "availability": {
+        "enum": [
+          "in_stock",
+          "preorder"
+        ]
+      }
+    }
+  },
+  "then": {
+    "required": [
+      "price",
+      "currency"
+    ]
+  }
+}

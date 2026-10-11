@@ -1,0 +1,139 @@
+{
+  "schema_version": "1",
+  "package_id": "catalog.epicentrk-products",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "Epicentr K: full product cards",
+  "description": "Повна картка товару epicentrk.ua зі сторінки товару (/ua/shop/<slug>.html): назва, ціна й стара ціна (грн), наявність, бренд, категорія й шлях категорій, код товару, одиниця, рейтинг, продавець, зображення, характеристики (completeness: full). Ключ — shop + product_id (slug URL), той самий, що й у catalog.epicentrk-prices.",
+  "tags": [
+    "sites",
+    "catalog",
+    "epicentrk",
+    "products"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "jane_sites_epicentrk_products.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "product",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину"
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": [
+      "lxml>=6"
+    ]
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "product-epicentr-discount",
+      "input": {
+        "file": "tests/product-epicentr-discount/page.html",
+        "media_type": "text/html",
+        "url": "https://epicentrk.ua/ua/shop/elektrorubanok-zenit-zr-780-841510.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-epicentr-discount/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "product-marketplace-seller",
+      "input": {
+        "file": "tests/product-marketplace/page.html",
+        "media_type": "text/html",
+        "url": "https://epicentrk.ua/ua/shop/mplc-rubanok-elektricnij-procraft-pe-1150-1f1068d4-d051-6166-a540-bb7c0f733e59.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-marketplace/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "product-out-of-stock-without-price",
+      "input": {
+        "file": "tests/product-out-of-stock/page.html",
+        "media_type": "text/html",
+        "url": "https://epicentrk.ua/ua/shop/-makita-m1902.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-out-of-stock/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "product-garden-no-discount",
+      "input": {
+        "file": "tests/product-garden/page.html",
+        "media_type": "text/html",
+        "url": "https://epicentrk.ua/ua/shop/liika-sadova-lemira-10-l.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-garden/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "category-page-empty",
+      "input": {
+        "file": "tests/category-page/page.html",
+        "media_type": "text/html",
+        "url": "https://epicentrk.ua/ua/shop/elektrorubanki/?PAGEN_1=7"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "product-in-stock-without-price-unrecognized",
+      "input": {
+        "file": "tests/product-without-price/page.html",
+        "media_type": "text/html",
+        "url": "https://epicentrk.ua/ua/shop/liika-sadova-lemira-10-l.html"
+      },
+      "expected_status": "unrecognized",
+      "origin": "problem_sample"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Claude (examples/sites)"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Full product cards of epicentrk.ua for the nightly catalog scan."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "url_patterns": [
+      "epicentrk.ua/ua/shop/*.html"
+    ]
+  }
+}

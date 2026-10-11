@@ -350,7 +350,9 @@ class Engine:
             raise NotFound(f"collection {cid} not found")
         stats = {**new_stats(), **(record.get("stats") or {})}
         counts = self.state.frontier_counts(cid)
-        stats["frontier_size"] = counts.get("pending", 0) + counts.get("inflight", 0)
+        stats["frontier_size"] = sum(
+            counts.get(k, 0) for k in ("pending", "inflight", "deferred", "overflow")
+        )
         stats["unacked"] = self.state.unacked_count(cid)
         stats["acknowledged"] = max(0, self.state.emitted_count(cid) - stats["unacked"])
         request = record.get("request") or {}

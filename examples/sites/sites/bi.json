@@ -1,0 +1,241 @@
+{
+  "site": "bi",
+  "group": "catalog",
+  "title": "bi.ua Будинок іграшок: весь асортимент, властивості товарів і періодичні ціни",
+  "url": "https://bi.ua/",
+  "sources": [
+    {
+      "source_id": "bi-ua",
+      "kind": "web",
+      "title": "bi.ua — Будинок іграшок",
+      "description": "Весь асортимент: іграшки, дитячий транспорт, творчість, книги, одяг та всі інші товарні розділи. Discovery: 118 580 унікальних українських товарних URL у шести sitemap станом на 11.10.2026. Звичайний HTTP, robots.txt дотримується, не частіше одного запиту за секунду та один одночасний запит до хоста. Картки товарів містять ціни й усі доступні характеристики.",
+      "locator": {
+        "url": "https://bi.ua/"
+      },
+      "collector_rules": "@pkg:catalog.bi-catalog-rules",
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        },
+        "crawl": {
+          "max_links_per_page": 60000,
+          "max_frontier_size": 200000,
+          "max_material_bytes": 33554432,
+          "revisit_interval_seconds": 86400
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "expected_entity_types": [
+        "product"
+      ],
+      "change_policy": {
+        "llm_versions": "manual_approval"
+      },
+      "labels": {
+        "site": "bi",
+        "group": "catalog"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "catalog-bi",
+      "title": "bi.ua Будинок іграшок: весь асортимент і періодичне оновлення цін",
+      "description": "Кожні 15 хв продовжується збережена черга всіх українських товарних URL із sitemap, до 400 сторінок за запуск. Нові картки збираються до завершення первинного обходу; відомі повторно перевіряються після 24 год, фактична свіжість залежить від довжини черги. Повний обхід великого асортименту може тривати від діб до місяців; завершення визначається станом усієї черги, а не успіхом окремого запуску. Ціна, наявність і всі доступні властивості оновлюються з картки, Сутності товарів та історія змін зберігаються у PostgreSQL; повний HTML кожного циклу не накопичується. Ліміти черги й sitemap перевищують виміряний каталог; досягнення лімітів не є повнотою каталогу.",
+      "input": {
+        "source_id": "bi-ua"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "rules": "@pkg:catalog.bi-catalog-rules",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "extract-products",
+          "kind": "handler",
+          "handler": "@pkg:catalog.bi-products",
+          "params": {
+            "listing_prices": false
+          },
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "text/html"
+              }
+            }
+          ],
+          "bindings": [
+            {
+              "sections": [
+                "products"
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "store-products",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-products",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 900,
+        "timezone": "Europe/Kyiv",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_links_per_page": 60000,
+          "max_frontier_size": 200000,
+          "max_material_bytes": 33554432,
+          "revisit_interval_seconds": 86400,
+          "max_depth": 40,
+          "max_pages_per_run": 400,
+          "max_bytes_per_run": 536870912
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "site": "bi",
+        "group": "catalog",
+        "kind": "catalog"
+      }
+    },
+    {
+      "task_id": "prices-bi",
+      "title": "bi.ua Будинок іграшок: ручна перевірка цін попередньої добірки",
+      "description": "Попереднє завдання для обмеженої добірки категорій залишено лише для ручної діагностики. Автоматичне оновлення цін усього асортименту виконує catalog-завдання із повними product sitemap та повторними відвідуваннями карток.",
+      "input": {
+        "source_id": "bi-ua"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "rules": "@pkg:catalog.bi-prices-rules",
+            "mode": "full"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-files",
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "extract-products",
+          "kind": "handler",
+          "handler": "@pkg:catalog.bi-products",
+          "params": {
+            "listing_prices": true
+          },
+          "inputs": [
+            {
+              "from": "collect",
+              "when": {
+                "field": "material.format.media_type",
+                "op": "eq",
+                "value": "text/html"
+              }
+            }
+          ],
+          "bindings": [
+            {
+              "sections": [
+                "categories",
+                "products"
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "store-products",
+          "kind": "handler",
+          "handler": "@pkg:jane.storage-postgresql",
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "extract-products",
+              "select": "output",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ]
+        }
+      ],
+      "schedule": {
+        "type": "manual",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 40,
+          "max_pages_per_run": 150
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "site": "bi",
+        "group": "catalog",
+        "kind": "prices"
+      }
+    }
+  ],
+  "verify": {
+    "bi-ua": {
+      "product": {
+        "min": 700,
+        "required": [
+          "shop",
+          "product_id",
+          "title",
+          "currency",
+          "url",
+          "availability"
+        ]
+      }
+    }
+  }
+}

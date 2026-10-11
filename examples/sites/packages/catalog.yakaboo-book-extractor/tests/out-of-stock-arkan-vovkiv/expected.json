@@ -1,0 +1,55 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "yakaboo",
+        "product_id": "1500151",
+        "title": "Аркан вовків. Книга 1",
+        "price": 650.0,
+        "currency": "UAH",
+        "url": "https://www.yakaboo.ua/ua/arkan-vovkiv-kniga-1.html",
+        "brand": "Видавництво Старого Лева",
+        "category": "Фентезі",
+        "category_path": [
+          "Книжки",
+          "Художня література",
+          "Фентезі",
+          "Фентезі"
+        ],
+        "availability": "out_of_stock",
+        "image": "https://static.yakaboo.ua/media/cloudflare/product/webp/600x840/2/8/281_13.jpg",
+        "sku": "1500151",
+        "barcode": "9789664484517",
+        "rating": 4.9,
+        "reviews_count": 28,
+        "attributes": {
+          "Автор": "Павло Дерев'янко",
+          "Видавництво": "Видавництво Старого Лева",
+          "Кількість сторінок": "520",
+          "Рік видання": "2025",
+          "Мова": "Українська",
+          "Ілюстрації": "Немає ілюстрацій",
+          "Тип": "Паперова",
+          "Тип обкладинки": "Тверда",
+          "Серія книг": "Літопис Сірого Ордену",
+          "ISBN": "978-966-448-451-7",
+          "Формат": "130х200 мм",
+          "Папір": "Офсетний"
+        },
+        "completeness": "full"
+      },
+      "cleared": [
+        "old_price"
+      ],
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "yakaboo",
+          "product_id": "1500151"
+        }
+      }
+    }
+  ]
+}

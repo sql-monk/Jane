@@ -1,0 +1,40 @@
+{
+  "entities": [
+    {
+      "entity_type": "product",
+      "fields": {
+        "shop": "varus",
+        "product_id": "2664939",
+        "title": "Вироби макаронні Origin Тофе 500 г",
+        "url": "https://varus.ua/vyroby-makaronni-origin-tofe-500-h",
+        "currency": "UAH",
+        "availability": "out_of_stock",
+        "brand": "Origin",
+        "category": "Макаронні вироби",
+        "category_path": [
+          "Бакалія",
+          "Макаронні вироби"
+        ],
+        "image": "https://varus.ua/img/product/1140/1140/2664939",
+        "sku": "2664939",
+        "unit": "шт",
+        "weight": "500 г",
+        "country": "Італія",
+        "attributes": {
+          "Тип борошна": "пшенична",
+          "Вміст глютену": "з глютеном",
+          "Термін зберігання товару": "1095"
+        },
+        "completeness": "full"
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "shop": "varus",
+          "product_id": "2664939"
+        }
+      }
+    }
+  ]
+}

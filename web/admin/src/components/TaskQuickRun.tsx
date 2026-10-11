@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useApi } from "../app/context";
 import { newIdempotencyKey, unwrap } from "../api/client";
@@ -13,6 +13,12 @@ export function TaskQuickRun({ taskId }: { taskId: string }) {
   const [open, setOpen] = useState(false);
   const [testMode, setTestMode] = useState(true);
   const [reason, setReason] = useState("");
+  const task = useQuery({
+    queryKey: ["task", taskId],
+    enabled: open,
+    queryFn: () =>
+      unwrap(api.orchestrator.GET("/v1/tasks/{task_id}", { params: { path: { task_id: taskId } } })),
+  });
   const start = useMutation({
     mutationFn: () =>
       unwrap(
@@ -62,6 +68,13 @@ export function TaskQuickRun({ taskId }: { taskId: string }) {
             if (!start.isPending) start.mutate();
           }}
         >
+          {task.data ? (
+            <p>
+              Завдання: <strong>{task.data.title}</strong>. Джерело: {task.data.input?.source_id}. Етапів:{" "}
+              {task.data.stages?.length ?? "Недоступно"}.
+            </p>
+          ) : null}
+          <ErrorBox error={task.error} title="Налаштування завдання недоступні" />
           <Field label="Режим запуску">
             <select
               value={testMode ? "test" : "live"}

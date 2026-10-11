@@ -8,7 +8,7 @@ import { useApi } from "../app/context";
 import { newIdempotencyKey, unwrap } from "../api/client";
 import type { Activation, ActivationRequest, PackageRef, Stage, TaskConfig } from "../api/types";
 import { formatDate, refLabel } from "../lib/format";
-import { ErrorBox, Field, Notice, ReasonAction, Section, Table } from "./ui";
+import { ErrorBox, Field, Notice, ReasonAction, Section, Status, Table } from "./ui";
 
 export function StageVersions({ task }: { task: TaskConfig }) {
   const api = useApi();
@@ -120,8 +120,16 @@ function StageVersionCard({
     },
   });
 
-  const approved = versions.data?.items ?? [];
+  const approved = (versions.data?.items ?? []).filter((candidate) => candidate.status === "approved");
   const selected = approved.find((v) => v.version === version);
+  const canRollback = Boolean(history.data?.items[0]?.previous);
+  const testStatus = selected?.test_summary?.status ?? selected?.test_status;
+  const testLabel =
+    testStatus === "passed"
+      ? "пройдено"
+      : testStatus === "failed"
+        ? "є невдалі тести"
+        : "результати невідомі або тести ще не запускали";
 
   return (
     <Section
@@ -179,7 +187,7 @@ function StageVersionCard({
             <option value="">—</option>
             {approved.map((v) => (
               <option key={v.version} value={v.version}>
-                {v.version} ({v.test_summary?.status ?? v.test_status})
+                {v.version} — погоджено
               </option>
             ))}
           </select>
@@ -205,10 +213,19 @@ function StageVersionCard({
           label="Відкотити"
           confirmLabel="Відкотити до попередньої"
           danger
-          busy={activate.isPending}
+          busy={activate.isPending || history.isLoading || !canRollback}
           onConfirm={(reason) => activate.mutate({ kind: "rollback", ...(reason ? { reason } : {}) })}
         />
       </div>
+      {selected ? (
+        <p>
+          Погодження: <Status value={selected.status} />. Тести: {testLabel}. Погодження версії та результати
+          тестів — окремі стани.
+        </p>
+      ) : null}
+      {!history.isLoading && !canRollback ? (
+        <p className="muted">Відкат недоступний: попередньої активації немає.</p>
+      ) : null}
       <ErrorBox error={versions.error} />
       <ErrorBox error={activate.error} title="Активацію не виконано" />
       {last ? (
@@ -221,11 +238,21 @@ function StageVersionCard({
       <Table
         label={`Історія активацій ${stage.stage_id}`}
         rows={history.data?.items ?? []}
+        loading={history.isLoading}
+        error={history.error}
         rowKey={(a) => a.activation_id}
         empty="Активацій ще не було"
         columns={[
           { header: "Коли", cell: (a) => formatDate(a.activated_at) },
-          { header: "Тип", cell: (a) => a.kind },
+          {
+            header: "Дія",
+            cell: (a) =>
+              a.kind === "rollback"
+                ? "Відкат"
+                : a.kind === "auto_activate"
+                  ? "Автоматична активація"
+                  : "Активація",
+          },
           { header: "Версія", cell: (a) => refLabel(a.package) },
           { header: "Попередня", cell: (a) => refLabel(a.previous) },
           { header: "Хто", cell: (a) => a.activated_by ?? "—" },

@@ -2,12 +2,14 @@
 // `stored_materials` (task-config.schema.json TaskInput): `material_ids` takes every stored observation of these
 // materials in the since/until window; the exact choice is `object_ids` (these stored RAW) or `observation_ids`.
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useApi } from "../app/context";
 import { newIdempotencyKey, unwrap } from "../api/client";
 import type { Job, ReprocessRequest } from "../api/types";
-import { ErrorBox, Field } from "./ui";
+import { ErrorBox, Field, Notice } from "./ui";
+import { ConnectionPicker } from "./ConnectionPicker";
+import { useCursorList } from "../api/hooks";
 
 /** One stored RAW object (storage.v1 StoredObject) the user picked, e.g. a row of the materials page. */
 export interface StoredSelection {
@@ -50,6 +52,7 @@ export function ReprocessForm({
   const api = useApi();
   const navigate = useNavigate();
   const [task, setTask] = useState(taskId);
+  const [taskSearch, setTaskSearch] = useState("");
   const [connection, setConnection] = useState(storageConnectionId);
   const [fromStage, setFromStage] = useState("");
   const [since, setSince] = useState("");
@@ -65,8 +68,21 @@ export function ReprocessForm({
         ...(stored.material_id && stored.observation_id ? (["observation"] as const) : []),
       ]
     : [];
-  // The default keeps the long-standing meaning of the row action (all observations of the material).
-  const [mode, setMode] = useState<SelectionMode>(modes[0] ?? "object");
+  // A row action selects exactly the RAW the user clicked. A wider scope is an explicit choice.
+  const [mode, setMode] = useState<SelectionMode>("object");
+  const [confirmAll, setConfirmAll] = useState(false);
+  const tasks = useCursorList(["tasks", "reprocess-picker"], (cursor, limit) =>
+    unwrap(
+      api.orchestrator.GET("/v1/tasks", { params: { query: { limit, ...(cursor ? { cursor } : {}) } } }),
+    ),
+  );
+  const selectedTask = useQuery({
+    queryKey: ["task", task],
+    enabled: Boolean(task),
+    queryFn: () =>
+      unwrap(api.orchestrator.GET("/v1/tasks/{task_id}", { params: { path: { task_id: task } } })),
+  });
+  const stages = selectedTask.data?.stages.filter((stage) => stage.kind === "handler") ?? [];
 
   const start = useMutation({
     mutationFn: (body: ReprocessRequest) =>
@@ -80,8 +96,19 @@ export function ReprocessForm({
   });
 
   const fixed = Boolean(stored || materialIds?.length || objectIds?.length);
+  const selectedCount = stored && mode === "object" ? 1 : objectIds?.length || idList(exactObjects).length;
+  const broadSelection = Boolean(
+    (stored && mode === "material") ||
+    materialIds?.length ||
+    (!fixed && !idList(exactObjects).length && !idList(exactObservations).length),
+  );
+  const datesValid = !since || !until || new Date(since) < new Date(until);
+  const ready = Boolean(
+    task && selectedTask.data && connection && datesValid && (!broadSelection || confirmAll),
+  );
 
   const submit = () => {
+    if (!ready) return;
     const selection: ReprocessRequest["stored_materials"] = {};
     if (connection) selection.storage_connection_id = connection;
     if (stored) {
@@ -94,8 +121,8 @@ export function ReprocessForm({
     } else if (materialIds?.length) {
       selection.material_ids = materialIds;
     } else {
-      if (since) selection.since = since;
-      if (until) selection.until = until;
+      if (since) selection.since = new Date(since).toISOString();
+      if (until) selection.until = new Date(until).toISOString();
       if (idList(exactObjects).length) selection.object_ids = idList(exactObjects);
       if (idList(exactObservations).length) selection.observation_ids = idList(exactObservations);
     }
@@ -118,18 +145,62 @@ export function ReprocessForm({
       }}
     >
       <div className="grid-3">
-        <Field label="Завдання">
-          <input value={task} onChange={(e) => setTask(e.target.value)} required />
-        </Field>
-        <Field label="Сховище RAW (connection_id)">
-          <input value={connection} onChange={(e) => setConnection(e.target.value)} />
-        </Field>
-        <Field label="Почати з етапу">
+        <Field label="Пошук завдання">
           <input
-            value={fromStage}
-            onChange={(e) => setFromStage(e.target.value)}
-            placeholder="extract-products"
+            aria-label="Пошук завдання"
+            value={taskSearch}
+            onChange={(e) => setTaskSearch(e.target.value)}
+            placeholder="Пошук за назвою або ідентифікатором"
           />
+        </Field>
+        <Field label="Завдання" hint="Виберіть наявний ланцюжок для повторної обробки">
+          <select
+            value={task}
+            onChange={(e) => {
+              setTask(e.target.value);
+              setFromStage("");
+            }}
+            required
+          >
+            <option value="">Оберіть завдання</option>
+            {task && !tasks.items.some((item) => item.task_id === task) ? (
+              <option value={task}>{task}</option>
+            ) : null}
+            {tasks.items
+              .filter(
+                (item) =>
+                  item.task_id === task ||
+                  `${item.title} ${item.task_id}`
+                    .toLocaleLowerCase()
+                    .includes(taskSearch.toLocaleLowerCase()),
+              )
+              .map((item) => (
+                <option key={item.task_id} value={item.task_id}>
+                  {item.title} ({item.task_id})
+                </option>
+              ))}
+          </select>
+          {tasks.hasMore ? (
+            <button
+              type="button"
+              className="btn btn-small"
+              onClick={tasks.loadMore}
+              disabled={tasks.loadingMore}
+            >
+              Більше завдань
+            </button>
+          ) : null}
+        </Field>
+        <ConnectionPicker label="Сховище RAW" value={connection} onChange={setConnection} />
+        <Field label="Почати з етапу">
+          <select value={fromStage} onChange={(e) => setFromStage(e.target.value)}>
+            <option value="">За ланцюжком завдання</option>
+            {stages.map((stage) => (
+              <option key={stage.stage_id} value={stage.stage_id}>
+                {stage.stage_id}
+              </option>
+            ))}
+          </select>
         </Field>
         {stored ? (
           <>
@@ -147,7 +218,13 @@ export function ReprocessForm({
               ) : null}
             </p>
             <Field label="Що обробити">
-              <select value={mode} onChange={(e) => setMode(e.target.value as SelectionMode)}>
+              <select
+                value={mode}
+                onChange={(e) => {
+                  setMode(e.target.value as SelectionMode);
+                  setConfirmAll(false);
+                }}
+              >
                 {modes.map((m) => (
                   <option key={m} value={m}>
                     {MODE_LABELS[m]}
@@ -167,15 +244,11 @@ export function ReprocessForm({
         ) : null}
         {!fixed ? (
           <>
-            <Field label="Збережені з (RFC 3339)">
-              <input
-                value={since}
-                onChange={(e) => setSince(e.target.value)}
-                placeholder="2026-09-20T00:00:00Z"
-              />
+            <Field label="Збережені з" hint="Час у часовій зоні вашого браузера">
+              <input type="datetime-local" value={since} onChange={(e) => setSince(e.target.value)} />
             </Field>
-            <Field label="Збережені до (RFC 3339)">
-              <input value={until} onChange={(e) => setUntil(e.target.value)} />
+            <Field label="Збережені до (не включно)">
+              <input type="datetime-local" value={until} onChange={(e) => setUntil(e.target.value)} />
             </Field>
             <Field label="Точний вибір: RAW object_ids" hint="через кому або пробіл; необов'язково">
               <input value={exactObjects} onChange={(e) => setExactObjects(e.target.value)} />
@@ -193,7 +266,26 @@ export function ReprocessForm({
           Тестовий режим (без запису в робочі дані)
         </label>
       </div>
-      <button type="submit" className="btn btn-primary" disabled={!task || start.isPending}>
+      <Notice>
+        {selectedCount
+          ? `Точна вибірка: ${selectedCount} збережених RAW.`
+          : stored && mode === "observation"
+            ? "Одне спостереження вибраного матеріалу."
+            : idList(exactObservations).length
+              ? `Вибрано спостережень: ${idList(exactObservations).length}.`
+              : "Широка вибірка: усі відповідні збережені спостереження. Кількість до виконання невідома."}
+        {broadSelection ? " Один матеріал може мати багато збережених версій." : null}
+        {testMode ? " Тестовий режим без запису результатів." : " Результати буде записано в робочі сховища."}
+      </Notice>
+      {broadSelection ? (
+        <label className="checkbox">
+          <input type="checkbox" checked={confirmAll} onChange={(e) => setConfirmAll(e.target.checked)} />
+          Підтверджую обробку всієї цієї вибірки
+        </label>
+      ) : null}
+      {!datesValid ? <p role="alert">Початок періоду має бути раніше його кінця.</p> : null}
+      <ErrorBox error={tasks.error ?? selectedTask.error} title="Завдання недоступні" />
+      <button type="submit" className="btn btn-primary" disabled={!ready || start.isPending}>
         Обробити повторно
       </button>
       <ErrorBox error={start.error} title="Не вдалося запустити повторну обробку" />

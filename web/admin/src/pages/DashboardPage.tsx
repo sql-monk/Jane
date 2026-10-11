@@ -7,7 +7,7 @@ import { pollDelay } from "../api/hooks";
 import { ErrorBox, Loading, Page, Section, Status, Table } from "../components/ui";
 import { Icon, type IconName } from "../components/Icon";
 import { TaskQuickRun } from "../components/TaskQuickRun";
-import { formatDate, formatMoney } from "../lib/format";
+import { formatDate, formatMoney, formatDuration, statusLabel } from "../lib/format";
 
 function Metric({
   label,
@@ -97,7 +97,14 @@ export function DashboardPage() {
       );
     },
   });
-  const queries = [executors, sources, tasks, runs, problems, usage];
+  const unknown = useQuery({
+    queryKey: ["unknown-materials", "dashboard", config.page_size],
+    queryFn: () =>
+      unwrap(
+        api.orchestrator.GET("/v1/unknown-materials", { params: { query: { limit: config.page_size } } }),
+      ),
+  });
+  const queries = [executors, sources, tasks, runs, problems, usage, unknown];
   const fetching = queries.some((query) => query.isFetching);
   const refresh = () => {
     void Promise.all(queries.map((query) => query.refetch()));
@@ -140,7 +147,7 @@ export function DashboardPage() {
         <div className="overview-updated">
           <span className={`status-dot ${refreshedAt ? "dot-ok" : "dot-warn"}`} />
           {refreshedAt
-            ? `Оновлено ${new Date(refreshedAt).toLocaleTimeString("uk-UA")}`
+            ? `Оновлено ${formatDate(new Date(refreshedAt).toISOString())}`
             : queries.some((query) => query.isError)
               ? "Частина даних недоступна"
               : "Очікуємо дані сервісів"}
@@ -174,12 +181,27 @@ export function DashboardPage() {
           tone="info"
         />
         <Metric
-          label="Відкриті проблеми"
+          label="Відкриті групи проблем матеріалів"
           value={countLabel(problems.data?.items, problems.data?.next_cursor, problems.isError)}
-          note="Групи, що потребують уваги"
+          note="Групи схожих помилок або нерозпізнаних форматів"
           to="/problems?status=open"
           icon="problems"
           tone={groups.length ? "warn" : "neutral"}
+        />
+        <Metric
+          label="Невдалі запуски"
+          value={runs.isSuccess ? `${failedRuns.length}${runs.data.next_cursor ? "+" : ""}` : "—"}
+          note="Серед останніх запусків; окремо від груп матеріалів"
+          to="/runs?status=failed"
+          icon="runs"
+          tone={failedRuns.length ? "warn" : "neutral"}
+        />
+        <Metric
+          label="Невідомі матеріали"
+          value={countLabel(unknown.data?.items, unknown.data?.next_cursor, unknown.isError)}
+          note="Зареєстровані спостереження; це не завжди збій запуску"
+          to="/problems?tab=unknown"
+          icon="materials"
         />
       </div>
       <p className="sample-note">
@@ -318,7 +340,7 @@ export function DashboardPage() {
                           <span
                             key={stage.stage_id}
                             title={Object.entries(stage.counts ?? {})
-                              .map(([status, count]) => `${status}: ${count}`)
+                              .map(([status, count]) => `${statusLabel(status)}: ${count}`)
                               .join(" · ")}
                           >
                             {stage.stage_id}
@@ -333,6 +355,8 @@ export function DashboardPage() {
                     ),
                 },
                 { header: "Створено", cell: (run) => formatDate(run.created_at) },
+                { header: "Тривалість", cell: (run) => formatDuration(run.started_at, run.finished_at) },
+                { header: "Останній прогрес", cell: (run) => formatDate(run.updated_at) },
               ]}
             />
           </Section>
@@ -442,7 +466,18 @@ export function DashboardPage() {
                             />
                             <div>
                               <strong>{executor.executor}</strong>
-                              <small>{executor.role}</small>
+                              <small>
+                                {(
+                                  {
+                                    collector: "Колектор",
+                                    handler: "Обробник",
+                                    storage_read: "Читання сховищ",
+                                    registry: "Репозиторій пакетів",
+                                    llm: "LLM-шлюз",
+                                    assistant: "Асистент",
+                                  } as Record<string, string>
+                                )[executor.role] ?? executor.role}
+                              </small>
                             </div>
                           </div>
                         </td>
@@ -482,6 +517,7 @@ export function DashboardPage() {
         </aside>
       </div>
       <ErrorBox error={sources.error} title="Джерела недоступні" />
+      <ErrorBox error={unknown.error} title="Невідомі матеріали недоступні" />
     </Page>
   );
 }

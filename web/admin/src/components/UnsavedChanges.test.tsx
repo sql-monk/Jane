@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useState } from "react";
+import { StrictMode, useState } from "react";
 import { BrowserRouter, Link, Route, Routes, useNavigate } from "react-router-dom";
 import { UnsavedChangesProvider, useUnsavedChanges } from "./UnsavedChanges";
 
@@ -43,15 +43,17 @@ function Draft({ save }: { save: () => Promise<boolean> }) {
 }
 function app(save: () => Promise<boolean>) {
   return render(
-    <BrowserRouter>
-      <UnsavedChangesProvider>
-        <Routes>
-          <Route path="/start" element={<Link to="/draft">Редагувати</Link>} />
-          <Route path="/draft" element={<Draft save={save} />} />
-          <Route path="/end" element={<h1>Інший розділ відкрито</h1>} />
-        </Routes>
-      </UnsavedChangesProvider>
-    </BrowserRouter>,
+    <StrictMode>
+      <BrowserRouter>
+        <UnsavedChangesProvider>
+          <Routes>
+            <Route path="/start" element={<Link to="/draft">Редагувати</Link>} />
+            <Route path="/draft" element={<Draft save={save} />} />
+            <Route path="/end" element={<h1>Інший розділ відкрито</h1>} />
+          </Routes>
+        </UnsavedChangesProvider>
+      </BrowserRouter>
+    </StrictMode>,
   );
 }
 

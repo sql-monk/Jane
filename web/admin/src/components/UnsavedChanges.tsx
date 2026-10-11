@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -79,7 +80,7 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
       confirmChange,
     };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const push = navigator.push.bind(navigator);
     const replace = navigator.replace.bind(navigator);
     const go = navigator.go.bind(navigator);
@@ -122,6 +123,8 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
       event.preventDefault();
       event.returnValue = "";
     };
+    // Mount before BrowserRouter's parent layout listener; Window-target events can
+    // otherwise reach that listener and unmount the dirty form before this guard.
     window.addEventListener("popstate", pop, true);
     window.addEventListener("beforeunload", unload);
     const updateIndex = () => {

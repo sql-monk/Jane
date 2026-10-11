@@ -403,11 +403,14 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         request: Request,
         source_id: str | None = None,
         status: str | None = None,
+        group_id: str | None = None,
         cursor: str | None = None,
         limit: int | None = Query(None, ge=1),
     ) -> dict[str, Any]:
         principal(request, READ)
-        return page(*await threaded(admin().list_problem_groups, source_id, status, cursor, lim(limit)))
+        return page(
+            *await threaded(admin().list_problem_groups, source_id, status, cursor, lim(limit), group_id)
+        )
 
     @app.patch("/v1/problem-groups/{group_id}", tags=["problems"])
     async def update_problem_group(request: Request, group_id: str) -> dict[str, Any]:
@@ -490,10 +493,18 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         request: Request,
         subject_type: str | None = None,
         subject_id: str | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
         cursor: str | None = None,
         limit: int | None = Query(None, ge=1),
     ) -> dict[str, Any]:
         principal(request, READ)
-        return page(*await threaded(admin().list_audit, subject_type, subject_id, cursor, lim(limit)))
+        if (since and since.tzinfo is None) or (until and until.tzinfo is None):
+            raise BadRequest("audit timestamps require an explicit timezone")
+        if since and until and since >= until:
+            raise BadRequest("since must precede until")
+        return page(
+            *await threaded(admin().list_audit, subject_type, subject_id, cursor, lim(limit), since, until)
+        )
 
     return app

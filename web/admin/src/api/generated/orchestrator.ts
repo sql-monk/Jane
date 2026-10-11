@@ -564,6 +564,13 @@ export interface components {
       task_id: components["schemas"]["Slug"];
       /** @description Версія конфігурації завдання, з якою виконується запуск. */
       task_etag?: string;
+      /** @description Джерело з незмінного знімка конфігурації запуску. */
+      source_id?: string;
+      /** @description Тип колектора з незмінного знімка конфігурації (наприклад web або telegram). */
+      collector_kind?: string;
+      /** @description Остання зміна стану запуску або його елементів; не лише початок збору. */
+      updated_at?: components["schemas"]["Timestamp"];
+      summary?: components["schemas"]["RunOutputSummary"];
       status: components["schemas"]["JobStatus"];
       /** @enum {string} */
       trigger: "manual" | "schedule" | "reprocess" | "assistant" | "api";
@@ -583,6 +590,28 @@ export interface components {
         llm?: components["schemas"]["Money"];
       };
       error?: components["schemas"]["problem.schema"];
+    };
+    /**
+     * @description Унікальні сутності з фактичних виходів обробників цього запуску. Не статистика таблиць сховища.
+     *     Історичне обрізане трасування має complete=false, legacy_trace=true, кількості недоступні.
+     *     Для entities_ref без inline-сутностей complete=false; зафіксовані кількості є нижньою межею.
+     *     Записи у двох різних підключеннях рахуються окремо.
+     *     Імітовані записи тестового режиму не включено до saved_records.
+     */
+    RunOutputSummary: {
+      /** @example recorded_handler_outputs */
+      basis?: string;
+      complete?: boolean;
+      legacy_trace?: boolean;
+      extracted_entities?: number;
+      saved_records?: number;
+      /** @description Актуальні результати за підтвердженими типом, scope та сховищем; не фільтр за запуском. */
+      result_groups?: {
+        connection_id?: string;
+        entity_type?: string;
+        scope?: string;
+        count?: number;
+      }[];
     };
     StageItem: {
       item_id: components["schemas"]["Id"];
@@ -661,6 +690,8 @@ export interface components {
             canonical_key?: string;
             object_id?: string;
             connection_id?: string;
+            /** @description Стан підтвердження запису; simulated не означає збережені робочі дані. */
+            write_status?: string;
           }[];
         }[];
       }[];
@@ -723,6 +754,15 @@ export interface components {
         sync_status: "pending" | "synced" | "failed";
         synced_at?: components["schemas"]["Timestamp"];
         message?: string;
+        attempts?: number;
+        next_retry_at?: components["schemas"]["Timestamp"];
+        error?: components["schemas"]["problem.schema"];
+      }[];
+      /** @description Виконавці з 501 not_implemented для керованих підключень; це не збій синхронізації. */
+      unsupported_executors?: {
+        executor?: string;
+        /** @example managed_connections_not_supported */
+        reason?: string;
       }[];
     };
     ActivationRequest: {
@@ -771,6 +811,7 @@ export interface components {
       action: string;
       subject_type: string;
       subject_id: string;
+      /** @description Для оновлень changed містить змінені поля; before та after — їх фактичні значення із прихованими секретами. Старі події можуть містити лише назви полів. */
       details?: Record<string, unknown>;
     };
     Health: {
@@ -1431,6 +1472,15 @@ export interface components {
     };
     /** @description Бракує прав (`forbidden`) або дію заборонено політикою (`access_denied_by_policy`). */
     Forbidden: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/problem+json": components["schemas"]["problem.schema"];
+      };
+    };
+    /** @description Некоректний синтаксис запиту (`bad_request`). */
+    BadRequest: {
       headers: {
         [name: string]: unknown;
       };
@@ -2170,6 +2220,8 @@ export interface operations {
   listProblemGroups: {
     parameters: {
       query?: {
+        /** @description Точний вибір групи, зокрема для посилання з журналу аудиту. */
+        group_id?: string;
         source_id?: string;
         status?: components["schemas"]["ProblemGroupStatus"];
         /** @description Непрозорий курсор з `next_cursor` попередньої сторінки. */
@@ -2482,6 +2534,10 @@ export interface operations {
   listAuditEvents: {
     parameters: {
       query?: {
+        /** @description Події від цього часу включно (UTC RFC 3339). */
+        since?: components["schemas"]["Timestamp"];
+        /** @description Події до цього часу, не включно (UTC RFC 3339). */
+        until?: components["schemas"]["Timestamp"];
         subject_type?: "source" | "task" | "stage" | "connection" | "limits" | "problem_group";
         subject_id?: string;
         /** @description Непрозорий курсор з `next_cursor` попередньої сторінки. */
@@ -2507,6 +2563,7 @@ export interface operations {
           };
         };
       };
+      400: components["responses"]["BadRequest"];
       401: components["responses"]["Unauthenticated"];
     };
   };

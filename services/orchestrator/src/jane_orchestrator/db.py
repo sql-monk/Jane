@@ -272,6 +272,25 @@ MIGRATIONS: list[str] = [
     ALTER TABLE idempotency_keys ADD COLUMN IF NOT EXISTS token text;
     CREATE INDEX IF NOT EXISTS idempotency_keys_expires_at ON idempotency_keys (expires_at);
     """,
+    # 8 — exact output identities apart from the bounded trace; safe connection diagnostics.
+    """
+    ALTER TABLE items ADD COLUMN outputs_complete boolean;
+    ALTER TABLE connection_sync ADD COLUMN error jsonb;
+    CREATE TABLE connection_unsupported (
+        connection_id text NOT NULL,
+        executor text NOT NULL,
+        PRIMARY KEY (connection_id, executor)
+    );
+    CREATE TABLE run_output_identities (
+        run_id text NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
+        category text NOT NULL,
+        connection_id text NOT NULL DEFAULT '',
+        entity_type text NOT NULL,
+        canonical_key text NOT NULL,
+        key_digest text NOT NULL,
+        PRIMARY KEY (run_id, category, key_digest)
+    );
+    """,
 ]
 
 

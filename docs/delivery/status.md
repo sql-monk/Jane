@@ -9,10 +9,10 @@
 | WP | Обсяг | Стан | Доказ / наступний крок |
 |---|---|---|---|
 | 28 | Каталог фактичних результатів, серверний пошук, статистика сутностей | accepted R2 | `4f1fcf9`: configured timeout та припинення файлового обходу перевірені незалежно; merge `cece3f7` |
-| 29 | Безпечні форми, грід JSON/масивів, редактор ланцюжків | accepted | `b037d49`: 36 unit / 20 Chromium, незалежне приймання; merge `052d98d` |
+| 29 | Безпечні форми, грід JSON/масивів, редактор ланцюжків | accepted | `b037d49`: 36 unit / 20 Chromium; merge `052d98d`. Handler version label `1217732` і required connections help/validation `e930be28` прийняті незалежно та інтегровані; фінальний exact CI `e0fb0ff` 14/14 |
 | 30 | Підсумки запусків, діагностика, точне повторне опрацювання та походження | accepted R2 | `d480831`: секрет відсутній у всій події аудиту, міграція 7→8 збережена; merge `e2e62d2` |
 | 31 | Налаштування, аудит, адаптивність, зрозумілі стани | accepted R2 | `e9dcac2`: pending форми, застарілий provider GET і вкладені підписи виправлено; merge `3efe64f` |
-| 32 | Інтеграція, повний CI, робочий стек, GitHub main | active | [Звіт WP32](WP-32.md); CI `38119465549` 14/14 success на `90799c9`; backup 8/8 ok; pre-mutation orphan-image blocker виправлено й R5 accepted (33 tests); accepted Collector `e68352e` включено; новий повний CI, deployment/UI/main очікуються |
+| 32 | Інтеграція, повний CI, робочий стек, GitHub main | accepted; full CI; deployed | [Звіт WP32](WP-32.md); exact `e0fb0ff`: CI `38126884255` 14/14, deployed `c10bd326`, remote main підтверджено; незалежне приймання accepted. 8/8 Operations збережено, 5 durable IDs не скасовано; final UI run RAW2/products2, 899/999 UAH, JSON/масиви/target guard, HP 54999 UAH. Фінальний суфікс docs-only. Попередній Prostor runtime-ризик описано окремо |
 
 Спільний `jane-demo` також використовується перевіркою новин. Оновлення бекенду цього продовження відбудеться після CI з актуальним `origin/main` і збереженням чинних налаштувань, портів, підключень та даних.
 

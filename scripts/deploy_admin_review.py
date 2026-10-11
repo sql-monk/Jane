@@ -273,7 +273,16 @@ class Deploy:
         self.key: str = self.state["services"]["auth"]["admin_api_key"]
         self.http = urllib.request.build_opener(NoRedirect())
         ids = (
-            run(["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={self.project}"])
+            run(
+                [
+                    "docker",
+                    "ps",
+                    "-aq",
+                    "--no-trunc",
+                    "--filter",
+                    f"label=com.docker.compose.project={self.project}",
+                ]
+            )
             .decode()
             .split()
         )
@@ -761,7 +770,16 @@ class Deploy:
 
     def assert_stack_unchanged(self) -> None:
         ids = (
-            run(["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={self.project}"])
+            run(
+                [
+                    "docker",
+                    "ps",
+                    "-aq",
+                    "--no-trunc",
+                    "--filter",
+                    f"label=com.docker.compose.project={self.project}",
+                ]
+            )
             .decode()
             .split()
         )

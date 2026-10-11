@@ -11,7 +11,11 @@ import { PropertyGrid, PropertyIssuesContext, PropertyDraftsBlockedContext } fro
 import { ErrorBox, Field, JsonView, LoadMore } from "./ui";
 import { ConnectionPicker } from "./ConnectionPicker";
 import { conditionPropertyChoices, stagePropertyChoices } from "../lib/property-help";
-import { useStagePropertyHelp } from "./useStagePropertyHelp";
+import {
+  connectionRequirementHelp,
+  useRequiredStageConnections,
+  useStagePropertyHelp,
+} from "./useStagePropertyHelp";
 import "../chain-editor.css";
 
 export function ChainEditor({
@@ -45,6 +49,8 @@ export function ChainEditor({
             ))),
     );
   const stages = valid ? (parsed.value as Stage[]) : [];
+  const connections = useRequiredStageConnections(stages);
+  const connectionsValid = !connections.loading && !connections.issues.length;
   const [selected, setSelected] = useState<string | null>(null);
   const [raw, setRaw] = useState(false);
   const [error, setError] = useState("");
@@ -64,8 +70,8 @@ export function ChainEditor({
     [],
   );
   useEffect(
-    () => onValidityChange?.(!error && Object.keys(propertyIssues).length === 0),
-    [error, propertyIssues, onValidityChange],
+    () => onValidityChange?.(!error && Object.keys(propertyIssues).length === 0 && connectionsValid),
+    [error, propertyIssues, connectionsValid, onValidityChange],
   );
   const stage = stages.find((s) => s.stage_id === selected) ?? stages[0];
   const update = (next: Stage[]) => {
@@ -117,6 +123,23 @@ export function ChainEditor({
               Додати збір
             </button>
           </div>
+          {connections.loading ? (
+            <p className="muted" role="status">
+              Перевіряємо вимоги підключень пакетів…
+            </p>
+          ) : null}
+          {connections.issues.length ? (
+            <ul className="error-inline" role="alert" aria-label="Обов’язкові підключення етапів">
+              {connections.issues.map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+            </ul>
+          ) : null}
+          {connections.unavailable ? (
+            <p className="muted">
+              Вимоги підключень частини пакетів недоступні; перевірте конфігурацію в оркестраторі.
+            </p>
+          ) : null}
           {raw ? (
             <JsonEditor
               text={text}
@@ -256,6 +279,22 @@ function StagePropertyGrid({ stage, onChange }: { stage: Stage; onChange: (stage
         </p>
       ) : null}
       {help.error ? <p className="muted">Описи параметрів пакета наразі недоступні.</p> : null}
+      {help.manifestUnavailable ? (
+        <p className="muted">Маніфест пакета недоступний; вимоги підключень перевірить оркестратор.</p>
+      ) : null}
+      {help.requirements.length ? (
+        <>
+          <p className="muted">
+            У connections використовуйте логічні імена пакета як назви полів, а ідентифікатори підключень — як
+            значення.
+          </p>
+          <ul aria-label="Підключення пакета">
+            {help.requirements.map((requirement) => (
+              <li key={requirement.name}>{connectionRequirementHelp(requirement)}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
       <PropertyGrid
         objectRoot
         describe={help.describe}
@@ -390,7 +429,7 @@ export function ChainPackagePicker({
           onChange={(e) => setRef({ package_id: packageId, version: e.target.value })}
         >
           <option value="">
-            {!packageId && source?.collector_rules
+            {stage.kind === "collect" && inherit && !packageId && source?.collector_rules
               ? `Із джерела: ${source.collector_rules.version}`
               : "Виберіть версію"}
           </option>

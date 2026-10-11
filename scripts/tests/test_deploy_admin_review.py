@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
+import io
 import json
 import subprocess
 import sys
+import tarfile
 from argparse import Namespace
 from pathlib import Path
 from typing import Any
@@ -401,7 +404,7 @@ def test_pre_stop_drift_guard_aborts_without_container_mutation(
     with pytest.raises(deploy.DeploymentError, match="no containers were stopped"):
         instance.assert_stack_unchanged()
     assert calls == [
-        ["docker", "ps", "-aq", "--filter", "label=com.docker.compose.project=jane-demo"],
+        ["docker", "ps", "-aq", "--no-trunc", "--filter", "label=com.docker.compose.project=jane-demo"],
         ["docker", "inspect", original["Id"]],
     ]
 
@@ -428,7 +431,11 @@ def test_new_shared_writer_during_build_aborts_before_mutation(
 
 
 def image_snapshot_fixture(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, missing: str | None = None
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    missing: str | None = None,
+    *,
+    build_success: bool = False,
 ) -> tuple[Any, list[list[str]], list[dict[str, Any]], list[str]]:
     """Run the actual apply/CI/build boundary against external command neighbors only."""
     originals = []
@@ -443,7 +450,7 @@ def image_snapshot_fixture(
         "stopped",
     ):
         original = container()
-        original["Id"] = "old-" + kind
+        original["Id"] = hashlib.sha256(kind.encode()).hexdigest()
         original["Name"] = "/jane-demo-" + kind + ("-1" if kind != "priority" else "")
         original["Image"] = "image-" + ("priority" if kind == "priority-copy" else kind)
         original["Config"]["Image"] = "current-tag-" + kind
@@ -453,6 +460,8 @@ def image_snapshot_fixture(
             original["Config"]["Cmd"] = ["python", "-m", "jane_orchestrator"]
         if kind == "stopped":
             original["State"]["Running"] = False
+        if kind == "postgres":
+            original["Config"]["Env"].append("POSTGRES_USER=test-user")
         originals.append(original)
     mandatory = sorted({"image-storage", "image-orchestrator", "image-priority", "image-proxy"})
     image_metadata = {image: {"Id": image, "RepoTags": ["retained-" + image]} for image in mandatory}
@@ -460,6 +469,7 @@ def image_snapshot_fixture(
         del image_metadata["image-" + missing]
     sha = "b" * 40
     calls: list[list[str]] = []
+    migration_source = "MIGRATIONS: list[str] = ['CREATE TABLE old (a integer);']"
 
     def execute(args: list[str], **kwargs: Any) -> Any:
         calls.append(args)
@@ -471,9 +481,12 @@ def image_snapshot_fixture(
         elif args[0] == "icacls":
             pass
         elif args[:2] == ["docker", "ps"]:
-            output = "\n".join(c["Id"] for c in originals).encode()
+            output = "\n".join(c["Id"] if "--no-trunc" in args else c["Id"][:12] for c in originals).encode()
         elif args[:2] == ["docker", "inspect"]:
-            output = json.dumps(originals).encode()
+            inspected = [
+                next(c for c in originals if c["Id"].startswith(identifier)) for identifier in args[2:]
+            ]
+            output = json.dumps(inspected).encode()
         elif args[:3] == ["docker", "image", "inspect"]:
             assert args[3:] == mandatory, (
                 "inspect only exact rollback image IDs, deterministically deduplicated"
@@ -491,7 +504,36 @@ def image_snapshot_fixture(
         elif args[:2] == ["git", "merge-base"]:
             assert args[2:] == ["--is-ancestor", "c" * 40, sha]
         elif args[:2] == ["git", "archive"]:
-            code, stderr = 1, b"Injected build-neighbor archive failure\n"
+            if not build_success:
+                code, stderr = 1, b"Injected build-neighbor archive failure\n"
+            else:
+                files = {
+                    "services/orchestrator/src/jane_orchestrator/db.py": migration_source,
+                    "services/orchestrator/Dockerfile": "FROM scratch\n",
+                    "services/storage/Dockerfile": "FROM scratch\n",
+                    "web/admin/package.json": "{}",
+                }
+                with tarfile.open(fileobj=kwargs["stdout"], mode="w") as archive:
+                    for name, content in files.items():
+                        data = content.encode()
+                        entry = tarfile.TarInfo(name)
+                        entry.size = len(data)
+                        archive.addfile(entry, io.BytesIO(data))
+        elif build_success and args[:2] == ["docker", "exec"]:
+            if args[3] == "python":
+                output = migration_source.encode()
+            else:
+                assert args[3] == "sh" and "pg_dump" in args[5]
+                code, stderr = 1, b"Injected pre-pause backup-neighbor failure\n"
+        elif build_success and args[:2] == ["corepack", "pnpm"]:
+            if args[-1] == "build":
+                dist = kwargs["cwd"] / "dist"
+                dist.mkdir()
+                (dist / "index.html").write_text("accepted-ui", encoding="utf-8")
+            else:
+                assert args[2:] == ["install", "--frozen-lockfile"]
+        elif build_success and args[:2] == ["docker", "build"]:
+            assert Path(args[args.index("--file") + 1]).is_file()
         elif args[:2] == ["gh", "api"]:
             endpoint = args[2]
             if endpoint.endswith("/jobs?per_page=100"):
@@ -515,6 +557,8 @@ def image_snapshot_fixture(
         return subprocess.CompletedProcess(args, code, stdout=output, stderr=stderr)
 
     monkeypatch.setattr(deploy.subprocess, "run", execute)
+    if build_success:
+        monkeypatch.setattr(deploy.shutil, "which", lambda _name: "corepack")
     state_path = tmp_path / ".jane" / "stack-state.json"
     state_path.parent.mkdir()
     state_path.write_text(
@@ -524,6 +568,8 @@ def image_snapshot_fixture(
                 "services": {
                     "proxy": {"url": "http://127.0.0.1:54347"},
                     "auth": {"admin_api_key": "private-test-token"},
+                    "db-orchestrator": {"db_name": "orchestrator"},
+                    "db-storage-results": {"db_name": "storage-results"},
                 },
             }
         ),
@@ -538,6 +584,72 @@ def image_snapshot_fixture(
 
     monkeypatch.setattr(instance.http, "open", reject_http)
     return instance, calls, originals, mandatory
+
+
+def test_actual_apply_passes_full_id_drift_guard_after_successful_build(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    instance, calls, originals, _mandatory = image_snapshot_fixture(tmp_path, monkeypatch, build_success=True)
+    before = copy.deepcopy(originals)
+    with pytest.raises(deploy.DeploymentError, match="docker operation failed"):
+        instance.apply()
+    ps_calls = [call for call in calls if call[:2] == ["docker", "ps"]]
+    assert len(ps_calls) == 2 and all("--no-trunc" in call for call in ps_calls)
+    inspections = [call for call in calls if call[:2] == ["docker", "inspect"]]
+    assert len(inspections) == 2
+    assert all(len(identifier) == 64 for call in inspections for identifier in call[2:])
+    builds = [call for call in calls if call[:2] == ["docker", "build"]]
+    assert len(builds) == 2
+    backup_call = next(call for call in calls if call[:2] == ["docker", "exec"] and call[3] == "sh")
+    guard_index = max(index for index, call in enumerate(calls) if call[:2] == ["docker", "ps"])
+    assert calls.index(builds[-1]) < guard_index < calls.index(backup_call)
+    assert originals == before
+    assert "Injected pre-pause backup-neighbor failure" in instance.log.read_text()
+    assert len(list((tmp_path / ".jane/releases").glob("*/index.html"))) == 1
+    assert not any(call[:2] == ["docker", "stop"] for call in calls)
+
+
+def test_docker_neighbor_reproduces_legacy_short_id_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    instance, _calls, originals, _mandatory = image_snapshot_fixture(tmp_path, monkeypatch)
+    short_ids = (
+        deploy.run(["docker", "ps", "-aq", "--filter", "label=com.docker.compose.project=jane-demo"])
+        .decode()
+        .split()
+    )
+    assert len(short_ids) == len(originals) and all(len(identifier) == 12 for identifier in short_ids)
+    inspected = deploy.inspect(short_ids)
+    assert all(len(c["Id"]) == 64 for c in inspected)
+    assert set(short_ids) != {c["Id"] for c in instance.containers}
+    assert inspected == originals
+
+
+@pytest.mark.parametrize("drift", ["id", "running", "config", "aliases", "ipam", "network"])
+def test_real_constructor_full_id_guard_still_rejects_genuine_stack_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, drift: str
+) -> None:
+    instance, calls, originals, _mandatory = image_snapshot_fixture(tmp_path, monkeypatch)
+    current = originals[0]
+    if drift == "id":
+        current["Id"] = "f" * 64
+    elif drift == "running":
+        current["State"]["Running"] = False
+    elif drift == "config":
+        current["Config"]["Env"].append("USER_SETTING=changed")
+    elif drift == "aliases":
+        current["NetworkSettings"]["Networks"]["jane-demo_default"]["Aliases"] = ["changed-alias"]
+    elif drift == "ipam":
+        current["NetworkSettings"]["Networks"]["jane-demo_default"]["IPAMConfig"] = {
+            "IPv4Address": "172.17.0.17"
+        }
+    else:
+        current["NetworkSettings"]["Networks"] = {}
+    with pytest.raises(deploy.DeploymentError, match="no containers were stopped"):
+        instance.assert_stack_unchanged()
+    assert not any(
+        call[:2] in (["git", "archive"], ["docker", "build"], ["docker", "stop"]) for call in calls
+    )
 
 
 def test_apply_ignores_orphaned_unrelated_images_and_keeps_full_container_snapshot(

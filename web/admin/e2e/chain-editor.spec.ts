@@ -1,5 +1,5 @@
 import { captureRequest, expect, fulfillJson, openapiExample, test } from "./fixtures";
-import type { TaskConfig } from "../src/api/types";
+import type { PackageManifest, PackageVersion, TaskConfig } from "../src/api/types";
 
 test("visual chain preserves nested properties, refs and branches through save @mock", async ({ admin }) => {
   await admin.goto("/tasks/shop-catalog");
@@ -57,8 +57,17 @@ test("new visual task picks registry package/version and creates branches @mock"
   await admin.getByLabel("Назва", { exact: true }).fill("Visual Task");
   await admin.getByLabel("Джерело (source_id)").fill("shop-example");
   await admin.getByRole("tab", { name: "Ланцюжок" }).click();
+  const version = admin.getByLabel("Версія пакета");
+  await expect(admin.getByLabel("Пакет правил")).toHaveValue("");
+  await expect(version).toBeDisabled();
+  await expect(version.locator("option:checked")).toHaveText("Із джерела: 1.0.0");
   await admin.getByRole("button", { name: "Додати етап-обробник" }).click();
+  await expect(admin.getByLabel("Пакет обробника")).toHaveValue("");
+  await expect(version).toBeDisabled();
+  await expect(version.locator("option:checked")).toHaveText("Виберіть версію");
   await admin.getByLabel("Пакет обробника").selectOption("shop-example.product-extractor");
+  await expect(version).toBeEnabled();
+  await expect(version.locator("option:checked")).toHaveText("Виберіть версію");
   await admin.getByLabel("Версія пакета").selectOption("1.2.0");
   await admin.getByTestId("dag-node-collect").click();
   await admin.getByRole("button", { name: "Додати етап-обробник" }).click();
@@ -83,6 +92,108 @@ test("new visual task picks registry package/version and creates branches @mock"
       when: { field: "result.status", op: "eq", value: "success" },
     },
   ]);
+});
+
+test("storage connection requirements explain logical names and block incomplete mappings @mock", async ({
+  admin,
+  apiRequests,
+}) => {
+  const task = openapiExample<TaskConfig>("task-catalog");
+  const destination = task.stages.find((stage) => stage.stage_id === "store-products")!;
+  destination.connections = { storage: "results-pg" };
+  await fulfillJson(admin, "/api/orchestrator/v1/tasks/shop-catalog", task);
+  let releaseManifest!: () => void;
+  const manifestReady = new Promise<void>((resolve) => (releaseManifest = resolve));
+  await admin.route("**/api/registry/v1/packages/jane.storage-postgresql/versions/1.0.0", async (route) => {
+    await manifestReady;
+    const response = await route.fetch();
+    const version = (await response.json()) as PackageVersion;
+    await route.fulfill({ response, json: { ...version, manifest: openapiExample("manifest-storage-pg") } });
+  });
+  await admin.goto("/tasks/shop-catalog");
+  await admin.getByRole("tab", { name: "Ланцюжок" }).click();
+  const issues = admin.getByRole("alert", { name: "Обов’язкові підключення етапів" });
+  const save = admin.getByRole("button", { name: "Зберегти", exact: true });
+  const validate = admin.getByRole("button", { name: "Перевірити в оркестраторі", exact: true });
+  await expect(save).toBeDisabled();
+  await expect(validate).toBeDisabled();
+  await expect(admin.getByText("Перевіряємо вимоги підключень пакетів…", { exact: true })).toBeVisible();
+  await expect(issues).toHaveCount(0);
+  releaseManifest();
+  await expect(issues).toContainText("store-products");
+  await expect(issues).toContainText("connections.target");
+  await expect(save).toBeDisabled();
+  await expect(validate).toBeDisabled();
+  // Validate the entire chain even while a different stage is selected.
+  await expect(admin.getByLabel("Ідентифікатор етапу")).toHaveValue("collect");
+  await admin.getByTestId("dag-node-store-products").click();
+  const requirements = admin.getByRole("list", { name: "Підключення пакета" });
+  await expect(requirements).toContainText("target");
+  await expect(requirements).toContainText("postgresql");
+  await expect(requirements).toContainText("база для результатів");
+  const grid = admin.getByRole("table", { name: "Властивості", exact: true });
+  const name = grid.getByLabel("Назва $.connections.storage", { exact: true });
+  await name.fill("target");
+  await name.blur();
+  await expect(grid.getByLabel("Назва $.connections.target", { exact: true })).toHaveAccessibleDescription(
+    /target.*postgresql.*база для результатів/,
+  );
+  await expect(issues).toHaveCount(0);
+  await expect(save).toBeEnabled();
+  const connection = grid.getByLabel("Значення $.connections.target", { exact: true });
+  await connection.fill("");
+  await expect(issues).toContainText("connections.target");
+  await expect(save).toBeDisabled();
+  await expect(validate).toBeDisabled();
+  expect(apiRequests.filter((request) => ["PUT", "POST"].includes(request.method()))).toHaveLength(0);
+  await connection.fill("results-pg");
+  await expect(issues).toHaveCount(0);
+  await expect(save).toBeEnabled();
+  await expect(validate).toBeEnabled();
+  const { body } = await captureRequest(admin, "PUT", "/api/orchestrator/v1/tasks/shop-catalog", () =>
+    save.click(),
+  );
+  expect(
+    (body["stages"] as TaskConfig["stages"]).find((stage) => stage.stage_id === "store-products")
+      ?.connections,
+  ).toEqual({ target: "results-pg" });
+});
+
+test("optional connections and a version without manifest do not invent required mappings @mock", async ({
+  admin,
+}) => {
+  const task = openapiExample<TaskConfig>("task-catalog");
+  delete task.stages.find((stage) => stage.stage_id === "store-products")!.connections;
+  await fulfillJson(admin, "/api/orchestrator/v1/tasks/shop-catalog", task);
+  let includeManifest = true;
+  await admin.route("**/api/registry/v1/packages/jane.storage-postgresql/versions/1.0.0", async (route) => {
+    const response = await route.fetch();
+    const version = (await response.json()) as PackageVersion;
+    delete version.manifest;
+    if (includeManifest) {
+      const manifest = openapiExample<PackageManifest>("manifest-storage-pg");
+      manifest.required_connections!.forEach((requirement) => (requirement.optional = true));
+      version.manifest = manifest;
+    }
+    await route.fulfill({ response, json: version });
+  });
+  await admin.goto("/tasks/shop-catalog");
+  await admin.getByRole("tab", { name: "Ланцюжок" }).click();
+  await admin.getByTestId("dag-node-store-products").click();
+  await expect(admin.getByRole("list", { name: "Підключення пакета" })).toContainText("Необов’язкове");
+  await expect(admin.getByRole("alert", { name: "Обов’язкові підключення етапів" })).toHaveCount(0);
+  await expect(admin.getByRole("button", { name: "Зберегти", exact: true })).toBeEnabled();
+  includeManifest = false;
+  await admin.reload();
+  await admin.getByRole("tab", { name: "Ланцюжок" }).click();
+  await admin.getByTestId("dag-node-store-products").click();
+  await expect(
+    admin.getByText("Маніфест пакета недоступний; вимоги підключень перевірить оркестратор.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(admin.getByRole("alert", { name: "Обов’язкові підключення етапів" })).toHaveCount(0);
+  await expect(admin.getByRole("button", { name: "Зберегти", exact: true })).toBeEnabled();
 });
 
 test("visual chain blocks cycle and permits removing directed link @mock", async ({ admin }) => {

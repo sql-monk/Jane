@@ -1,6 +1,6 @@
 # WP-14: періодичний каталог авторинку
 
-Стан: review, фінальне приймання. Runtime receipt для 20 сутностей готовий, WP-09 accepted та застосований. Базова ревізія: `0b554fce30bce5aa7def84d351575e23862f66b8`.
+Стан: accepted, незалежний WP-reviewer прийняв код `13294ee` та живі докази 20/20 сутностей. WP-09 accepted та застосований. Базова ревізія: `0b554fce30bce5aa7def84d351575e23862f66b8`.
 
 ## Результат
 
@@ -25,7 +25,6 @@ uv run ruff check examples/automarket examples/tests/test_automarket.py examples
 uv run ruff format --check examples/automarket examples/tests/test_automarket.py examples/tests/test_automarket_navigation.py
 uv run mypy examples/jane_examples.py examples/automarket examples/tests/test_automarket.py examples/tests/test_automarket_navigation.py --show-error-codes
 gitleaks dir examples/automarket --redact --no-banner
-python .claude/hooks/jane_wp.py check-diff 0b554fce30bce5aa7def84d351575e23862f66b8 --wp 14
 ```
 
 Фактичний вивід поточного етапу:
@@ -38,9 +37,9 @@ All checks passed!
 Success: no issues found in 13 source files
 scanned ~821280 bytes (821.28 KB)
 no leaks found
-WP-14 до координаторського об'єднання: 78 changed files, 0 outside ownership
-WP-09: 5 changed files, 0 outside ownership
 ```
+
+Власність перевірено до координаторського об'єднання командою `python .claude/hooks/jane_wp.py check-diff 0b554fce30bce5aa7def84d351575e23862f66b8 --wp <номер>` у відповідних checkout: WP-14 на `3e660a3` — 78 changed files, 0 outside ownership; WP-09 на `28c2291` — 5 changed files, 0 outside ownership. Об'єднаний checkout додатково містить прийнятий WP-09 та окреме координаторське CI-виправлення.
 
 Незалежне рев'ю пакетів повторило 12 fixtures AUTO.RIA, 11 RST, SHA та по три порівняння вихідних сторінок. Реальні HTTP test-runs у Handler Runtime: AUTO.RIA ad 9 passed/0 failed, search 3/0, RST ad 11/0. До затвердження звіти записано в Registry. GET підтвердив `auto_changes_allowed=false` для чотирьох змінених пакетів; тимчасовий дозвіл upload відновлюється також після обриву відповіді PATCH.
 
@@ -63,6 +62,6 @@ WP-09: 5 changed files, 0 outside ownership
 
 ## Запити до інших власників
 
-Запит до WP-09 закрито accepted-кодом та його живим застосуванням. Нових API-контрактів немає. Фінальне незалежне приймання перевіряє receipt та звіт.
+Запит до WP-09 закрито accepted-кодом та його живим застосуванням. Нових API-контрактів немає. Фінальне незалежне приймання перечитало через API всі 20 сутностей та RAW, звірило exact digest, поля replay, розклади й стан Avtobazar; verdict accepted. Вузький незалежний прогін нових сценаріїв — 6 passed; lint/types/secret scan також пройшли.
 
 На базовій ревізії CI `38105687057` був невдалим через шість спрацювань gitleaks у згенерованій документації історичного `dd99d227`. Координатор додав лише шість точних fingerprint у `.gitleaksignore`: explorer звірив значення з публічними ключами ідемпотентності контрактних прикладів. Нові коміти й значення продовжують скануватися. `gitleaks git --log-opts='dd99d227^..dd99d227' --redact --no-banner`: 1 commit, 17.15 MB, no leaks found. Власні артефакти також без витоків. Це окреме координаторське CI-виправлення; незавершені зміни документації основного checkout не включено.

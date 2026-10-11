@@ -923,3 +923,14 @@ r1 → виправлення на `origin/wp/01g2-service-auth`, CI 37857870977
 | 27 | Інтеграція та приймання | accepted; full CI; deployed | codex/admin-materials-chains |
 
 Інтеграція: 74 unit passed, typecheck/lint/build exit 0, реальний filesystem browser smoke 1 passed. Незалежні WP-reviewer прийняли всі три WP; контрактний guardian підтвердив сумісність. [Підсумковий звіт і межі перевірки](WP-27.md). Повний CI `38096339188`: 14/14 success, mandatory e2e 79 passed. Перевірений код `ada3586` розгорнуто в jane-demo; реальний browser smoke пройшов. [CI, виправлення, розгортання й межі](WP-27-ci-deployment.md).
+
+## Каталог авторинку (2026-10-11)
+
+Користувач доручив налаштувати поточний `jane-demo` та зберегти зміни в GitHub main. AUTO.RIA і RST.ua мають активний інтервал 21600 секунд; Avtobazar.ua позначено недоступним, його скан вимкнено. Початкові 10+10 детальних оголошень збережено в `results-pg`, RAW — у `raw-files`.
+
+| Доповнення | Статус | Докази |
+|---|---|---|
+| WP-14: детальні пакети, конфігурації та каталог | accepted, незалежне live-приймання | 21 unit; 23 runtime package tests; 20/20 сутностей і RAW SHA/full-field replay |
+| WP-09: окремий consumer за task allowlist | accepted, застосований | 10 targeted PostgreSQL tests; 47 unit/contract; незалежний повтор contract 1 passed |
+
+[Звіт WP-14 та межі](WP-14/automarket.md), [звіт WP-09](WP-09/automarket-worker.md), [поточні сутності й RAW](../../examples/automarket/evidence/runtime.json). Незалежний reviewer прийняв код `13294ee`; фінальний commit додає лише цей запис приймання. Контракти, чужі завдання та незавершена перебудова документації основного checkout не змінювалися.

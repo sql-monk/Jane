@@ -6,6 +6,7 @@ import hashlib
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
@@ -95,7 +96,7 @@ def main() -> None:
         samples.append({"source": metadata, "fields": fields})
     print("PASS live values, source SHA-256, omitted unavailable fields and configured limits")
     print(f"{len(cases)} passed; entity_schema_errors=0; verified_live_entities={len(samples)}")
-    evidence = {
+    evidence: dict[str, Any] = {
         "site": "rst.ua",
         "status": "verified",
         "package": {"package_id": "autos.rst-car-ads", "version": "1.1.0"},

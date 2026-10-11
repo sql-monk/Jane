@@ -182,7 +182,6 @@
         "services/**",
         "templates/service/**",
         "infra/compose.yaml",
-        "infra/tests/test_auth_config.py",
         "contracts/**",
         "web/admin/src/api/generated/**"
       ]
@@ -294,6 +293,7 @@
         "contracts/**",
         "web/admin/**",
         "infra/compose.yaml",
+        "infra/tests/test_auth_config.py",
         ".claude/wp-paths.json",
         "plan.md",
         "docs/adr/0005-authentication.md",

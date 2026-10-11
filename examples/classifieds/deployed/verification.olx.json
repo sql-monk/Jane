@@ -2,22 +2,27 @@
   "site": "olx",
   "source_id": "classified-olx",
   "run": {
-    "run_id": "run_01M4MQXJ08Z5C001W85KVWE90H",
+    "run_id": "run_01M4MT7Q936YWM5MF2Z34R3P9B",
     "task_id": "classifieds-olx",
     "trigger": "manual",
-    "status": "failed",
-    "started_at": "2026-10-11T05:45:38.420Z",
-    "finished_at": "2026-10-11T05:50:38.860Z",
+    "status": "succeeded",
+    "started_at": "2026-10-11T06:26:07.304Z",
+    "finished_at": "2026-10-11T06:26:20.031Z",
     "counters": {
-      "materials": 0,
+      "materials": 1,
       "unknown_materials": 0
     },
     "stages": {
       "collect": {
-        "counts": {}
+        "counts": {
+          "completed": 1
+        }
       },
       "store-raw": {
-        "counts": {},
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
         "handler": {
           "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
           "version": "1.0.0",
@@ -25,7 +30,10 @@
         }
       },
       "extract-ads": {
-        "counts": {},
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
         "handler": {
           "digest": "sha256:5ee4eeed59693e72cfd4379bffadca3686d1c6a7f004291ad7a02716df36b16d",
           "version": "1.0.0",
@@ -33,7 +41,10 @@
         }
       },
       "store-ads": {
-        "counts": {},
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
         "handler": {
           "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
           "version": "1.0.0",
@@ -42,12 +53,100 @@
       }
     }
   },
-  "verified": false,
-  "errors": [
-    "Run status failed",
-    "No actual entities were obtained and verified against persisted RAW."
+  "verified": true,
+  "errors": [],
+  "samples": [
+    {
+      "fields": {
+        "url": "https://www.olx.ua/d/uk/obyavlenie/noutbuk-toshiba-satellite-l855-122-yaponya-15-6-core-i5-2450m-ram-8-gb-ssd-250-gb-amd-radeon-hd-7670m-robocha-batareya-ID11qq8m.html",
+        "site": "olx",
+        "price": {
+          "amount": 4800.0,
+          "currency": "UAH"
+        },
+        "title": "Ноутбук Тoshiba satellite l855-122 (Японія) / 15,6\"/ Core i5-2450M /RAM 8 GB /SSD 250 GB / AMD Radeon HD 7670M/ робоча батарея.",
+        "location": "Козятин",
+        "listing_id": "937206158"
+      },
+      "observation": {
+        "material_id": "web:ad1f0724cbde62df24983b185c297379",
+        "observed_at": "2026-10-11T06:26:13Z",
+        "content_sha256": "cef34300cea0503a00ae9d1a963ad28116647df043c885e687a32788a8ff90a2",
+        "observation_id": "obs_01a129a3f57f00002c76ad6f"
+      },
+      "raw_object_id": "obj_79405e4e3b16f818e7798d6e68da13ca",
+      "verified": true,
+      "evidence_kind": "html",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price",
+        "location"
+      ]
+    },
+    {
+      "fields": {
+        "url": "https://www.olx.ua/d/uk/obyavlenie/noutbuk-14-acer-travelmate-na-intel-i5-8250u-s-8ozu-256ssd-fullhd-ID10cCYe.html",
+        "site": "olx",
+        "price": {
+          "amount": 7000.0,
+          "currency": "UAH"
+        },
+        "title": "Ноутбук 14\" Acer TravelMate на Intel i5-8250U с 8ОЗУ/256SSD/FullHD",
+        "location": "Харків, Основ'янський",
+        "listing_id": "919142574"
+      },
+      "observation": {
+        "material_id": "web:ad1f0724cbde62df24983b185c297379",
+        "observed_at": "2026-10-11T06:26:13Z",
+        "content_sha256": "cef34300cea0503a00ae9d1a963ad28116647df043c885e687a32788a8ff90a2",
+        "observation_id": "obs_01a129a3f57f00002c76ad6f"
+      },
+      "raw_object_id": "obj_79405e4e3b16f818e7798d6e68da13ca",
+      "verified": true,
+      "evidence_kind": "html",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price",
+        "location"
+      ]
+    },
+    {
+      "fields": {
+        "url": "https://www.olx.ua/d/uk/obyavlenie/moschnyy-noutbuk-cepter-n490-intel-core-i5-11gen-nvme-128-8-ram-batareya-5-chasov-garaniiya-ID10CXtG.html",
+        "site": "olx",
+        "price": {
+          "amount": 10500.0,
+          "currency": "UAH"
+        },
+        "title": "Мощный Ноутбук Cepter N490, Intel Core i5/ 11Gen/ NVMe 128/ 8 RAM/ Батарея 5 часов/ ГАРАНИИЯ",
+        "location": "Ізмаїл",
+        "listing_id": "925417932"
+      },
+      "observation": {
+        "material_id": "web:ad1f0724cbde62df24983b185c297379",
+        "observed_at": "2026-10-11T06:26:13Z",
+        "content_sha256": "cef34300cea0503a00ae9d1a963ad28116647df043c885e687a32788a8ff90a2",
+        "observation_id": "obs_01a129a3f57f00002c76ad6f"
+      },
+      "raw_object_id": "obj_79405e4e3b16f818e7798d6e68da13ca",
+      "verified": true,
+      "evidence_kind": "html",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price",
+        "location"
+      ]
+    }
   ],
-  "samples": [],
   "packages": {
     "store-raw": {
       "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
@@ -65,9 +164,9 @@
       "package_id": "jane.storage-postgresql"
     }
   },
-  "raw_objects": 0,
-  "persisted_entities": 0,
-  "extraction_items": 0,
-  "checked_entities": 0,
-  "checked_raw_objects": 0
+  "raw_objects": 1,
+  "persisted_entities": 52,
+  "extraction_items": 1,
+  "checked_entities": 52,
+  "checked_raw_objects": 1
 }

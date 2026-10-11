@@ -281,6 +281,75 @@ def test_olx_numeric_dom_id_and_timestamp_location_are_corroborated() -> None:
     assert not setup.raw_field_check(entity, raw, "https://www.olx.ua/uk/")["verified"]
 
 
+def olx_fields() -> dict[str, Any]:
+    return {
+        "site": "olx",
+        "listing_id": "12345",
+        "title": "ThinkPad Core i5 Gen8",
+        "url": "https://www.olx.ua/d/uk/obyavlenie/thinkpad-IDabcde.html",
+        "location": "Київ",
+        "price": {"amount": 5000, "currency": "UAH"},
+    }
+
+
+def olx_card(entity: dict[str, Any], monetary_slot: str) -> bytes:
+    return (
+        f'<div data-testid="l-card" id="{entity["listing_id"]}">'
+        f'<a data-testid="card-title-link" href="{entity["url"]}">{entity["title"]}</a>'
+        f'<p data-testid="ad-price">{monetary_slot}</p>'
+        '<p data-testid="location-date">Київ - Сьогодні о 14:00</p></div>'
+    ).encode()
+
+
+@pytest.mark.parametrize(("model", "price"), [("Gen8", 5000), ("Precision 7520", 12000)])
+def test_olx_price_slot_does_not_merge_trailing_model_digits(model: str, price: int) -> None:
+    entity = olx_fields()
+    entity.update({"title": f"Ноутбук {model}", "price": {"amount": price, "currency": "UAH"}})
+    raw = olx_card(entity, f"<span>{price:,}</span><span>грн.</span>".replace(",", " "))
+    assert setup.raw_field_check(entity, raw, "https://www.olx.ua/uk/")["verified"]
+
+
+def test_olx_inline_styles_do_not_overflow_visible_card_cap() -> None:
+    entity = olx_fields()
+    entity["price"]["amount"] = 4800
+    raw = olx_card(entity, "4 800 грн." + "<style>" + ".card{margin:5000px}" * 500 + "</style>")
+    assert len(setup.RawDocument(raw).root.text()) > 5000
+    check = setup.raw_field_check(entity, raw, "https://www.olx.ua/uk/")
+    assert check["verified"]
+    assert set(check["checked_fields"]) == set(entity)
+
+
+@pytest.mark.parametrize("change", ["listing_id", "title", "url", "location", "amount", "currency"])
+def test_olx_structural_price_verification_preserves_other_field_checks(change: str) -> None:
+    entity = olx_fields()
+    raw = olx_card(entity, "5 000 грн. Договірна")
+    if change == "amount":
+        entity["price"]["amount"] = 85000
+    elif change == "currency":
+        entity["price"]["currency"] = "USD"
+    elif change == "url":
+        entity["url"] = "https://www.olx.ua/d/uk/obyavlenie/different-IDabcde.html"
+    else:
+        entity[change] = "Інше значення"
+    assert not setup.raw_field_check(entity, raw, "https://www.olx.ua/uk/")["verified"]
+
+
+def test_olx_title_and_another_card_price_cannot_override_own_monetary_slot() -> None:
+    entity = olx_fields()
+    entity["title"] = "Ноутбук, попередня ціна 5000 грн"
+    other = olx_fields()
+    other.update({"listing_id": "67890", "url": "https://www.olx.ua/d/uk/obyavlenie/other-IDother.html"})
+    raw = olx_card(entity, "999 грн") + olx_card(other, "5 000 грн")
+    assert not setup.raw_field_check(entity, raw, "https://www.olx.ua/uk/")["verified"]
+
+
+@pytest.mark.parametrize("tag", ["style", "script", "svg"])
+def test_olx_nonvisible_markup_cannot_corroborate_a_price(tag: str) -> None:
+    entity = olx_fields()
+    raw = olx_card(entity, f"999 грн<{tag}>5 000 грн</{tag}>")
+    assert not setup.raw_field_check(entity, raw, "https://www.olx.ua/uk/")["verified"]
+
+
 def test_polling_retries_get_transport_failure_and_preserves_job() -> None:
     requests: list[httpx.Request] = []
 

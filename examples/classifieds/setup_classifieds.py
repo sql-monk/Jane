@@ -445,6 +445,14 @@ class RawNode:
             child.text(separator) if isinstance(child, RawNode) else child for child in self.content
         )
 
+    def visible_text(self, separator: str = "") -> str:
+        """DOM evidence excludes markup text; text() retains script bodies for JSON parsing."""
+        return separator.join(
+            child.visible_text(separator) if isinstance(child, RawNode) else child
+            for child in self.content
+            if not isinstance(child, RawNode) or child.tag not in {"style", "script", "svg"}
+        )
+
 
 class RawDocument(HTMLParser):
     def __init__(self, content: bytes) -> None:
@@ -540,7 +548,32 @@ def ria_price_matches(candidate: RawNode, expected: dict[str, Any], listing_id: 
             continue
         match = re.fullmatch(
             r"(\d(?:[\d\s.,]*\d)?)\s*(uah|грн\.?|₴|usd|\$|дол\.?|eur|€|євро)",
-            normalize(slot.text(separator=" ")),
+            normalize(slot.visible_text(separator=" ")),
+        )
+        if (
+            match is not None
+            and amount(match.group(1)) == amount(expected["amount"])
+            and currency_code(match.group(2).rstrip(".")) == expected["currency"]
+        ):
+            return True
+    return False
+
+
+def olx_price_matches(candidate: RawNode, expected: dict[str, Any], listing_id: str) -> bool:
+    """An OLX price starts its own monetary slot; model numbers and nearby cards cannot corroborate it."""
+    for slot in candidate.nodes("p"):
+        if slot.attributes.get("data-testid") != "ad-price":
+            continue
+        owner = slot.parent
+        while owner is not None and not (
+            owner.attributes.get("data-testid") == "l-card" or owner.attributes.get("data-cy") == "l-card"
+        ):
+            owner = owner.parent
+        if owner is None or owner.attributes.get("id") != listing_id:
+            continue
+        match = re.match(
+            r"^(\d(?:[\d\s.,]*\d)?)\s*(uah|грн\.?|₴|usd|\$|дол\.?|eur|€|євро)(?!\w)",
+            normalize(slot.visible_text(separator=" ")),
         )
         if (
             match is not None
@@ -573,10 +606,10 @@ def location_matches(candidate: Any, kind: str, location: str, host: str) -> boo
         if host == "ria.com" and {"address", "js-state-city"} <= set(
             node.attributes.get("class", "").split()
         ):
-            if normalize(node.text(separator=" ")) == expected:
+            if normalize(node.visible_text(separator=" ")) == expected:
                 return True
         elif host == "olx.ua" and node.attributes.get("data-testid") == "location-date":
-            observed = re.split(r"\s+-\s+", node.text(separator=" "), maxsplit=1)[0]
+            observed = re.split(r"\s+-\s+", node.visible_text(separator=" "), maxsplit=1)[0]
             if normalize(observed) == expected:
                 return True
     return False
@@ -667,7 +700,7 @@ def raw_field_check(fields: dict[str, Any], content: bytes, url: str) -> dict[st
         for _ in range(6):
             if current_node is None:
                 break
-            text = normalize(current_node.text(separator=" "))
+            text = normalize(current_node.visible_text(separator=" "))
             links = {
                 canonical_url(a.attributes["href"], url)
                 for a in current_node.nodes("a")
@@ -694,7 +727,9 @@ def raw_field_check(fields: dict[str, Any], content: bytes, url: str) -> dict[st
             current_node = current_node.parent
     for kind, candidate in candidates:
         evidence = (
-            json.dumps(candidate, ensure_ascii=False) if kind == "json" else candidate.text(separator=" ")
+            json.dumps(candidate, ensure_ascii=False)
+            if kind == "json"
+            else candidate.visible_text(separator=" ")
         )
         if (
             not re.search(r"(?<![\w])" + re.escape(listing_id) + r"(?![\w])", fields["url"])
@@ -714,6 +749,8 @@ def raw_field_check(fields: dict[str, Any], content: bytes, url: str) -> dict[st
                 price_ok = json_price_matches(candidate, price, host)
             elif host == "ria.com":
                 price_ok = ria_price_matches(candidate, price, listing_id)
+            elif host == "olx.ua":
+                price_ok = olx_price_matches(candidate, price, listing_id)
             else:
                 compact = normalize(evidence)
                 pattern = (

@@ -1,0 +1,184 @@
+{
+  "captured_at": "2026-10-11T06:25:57.025477Z",
+  "metadata": {
+    "container_id": "sha256:8498960bc3372f49e20a47e73ba3ace8c88bb3759a1f453e2acffbe372f44f1c",
+    "image_id": "sha256:82ad1d201b6656a5f36d7f1d3c4358da19f5e9adf5166a37718c95f67154c786",
+    "image_reference": "jane-demo-classifieds-browser-guard:15bb32d-947803d4",
+    "env_hash": "sha256:ff82dc8c988f2efa7290a7ae30aa0ce2eacd638fb4c2d9da9784eea5510f531f",
+    "ports": {
+      "8101/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "55683"
+        }
+      ]
+    },
+    "mounts": [
+      {
+        "Type": "volume",
+        "Name": "jane-demo-operations-web-collector",
+        "Source": "/var/lib/docker/volumes/jane-demo-operations-web-collector/_data",
+        "Destination": "/var/lib/jane-operations",
+        "RW": true,
+        "Propagation": ""
+      },
+      {
+        "Type": "volume",
+        "Name": "jane-demo_web-collector-data",
+        "Source": "/var/lib/docker/volumes/jane-demo_web-collector-data/_data",
+        "Destination": "/var/lib/jane-web-collector",
+        "RW": true,
+        "Propagation": ""
+      }
+    ],
+    "networks": {
+      "jane-demo_default": [
+        "jane-demo-web-collector-1",
+        "web-collector"
+      ]
+    },
+    "group_add": null,
+    "healthcheck": {
+      "Test": [
+        "CMD",
+        "python",
+        "-c",
+        "import os, urllib.request; urllib.request.urlopen(f\"http://127.0.0.1:{os.environ['JANE_WEB_COLLECTOR_PORT']}/v1/health\", timeout=2)"
+      ],
+      "Interval": 10000000000,
+      "Timeout": 3000000000,
+      "StartPeriod": 5000000000,
+      "Retries": 5
+    },
+    "entrypoint": null,
+    "command": [
+      "python",
+      "-m",
+      "jane_web_collector"
+    ],
+    "user": "jane",
+    "restart": {
+      "Name": "no",
+      "MaximumRetryCount": 0
+    },
+    "shm_size": 67108864,
+    "health": "healthy"
+  },
+  "sources": {
+    "api_feed_paths": {
+      "/app/strategies/discovery/api_feed.py": "sha256:2e29fe68989cf899e511baf419d756913bdc35adc07db9f1f73e3863930d8321"
+    },
+    "collector_schema_canonical_sha256": "sha256:648552887a3e22a4aa05ca8f08f13b65b34d0034748aaa3c9cc9291df89de76b",
+    "collector_schema_hash": "sha256:0ab3cc6a0d6b52e0dc13c02999ca523771371d2259d36942e1e98f0fde3ad695",
+    "collector_schema_path": "/app/contracts/schemas/collector-rules.schema.json",
+    "collector_settings_hash": "sha256:3c2ed26dd0f2aae983acaa31804cf268756b3641f27ed0a38dced5467c376f1b",
+    "collector_source_root": "/app/.venv/lib/python3.12/site-packages/jane_web_collector",
+    "collector_sources": {
+      "crawler.py": "sha256:c35d963cf1b0105b6105ed39ace1dad399b5a8cee6a3d6d715fef186e82991f4",
+      "engine.py": "sha256:b6990911d1fe95998232df77544f9a2e0b4f3431d647d74345a5ea87fd68c263",
+      "fetcher.py": "sha256:78499a210f6d59cfedf9f172261edcf38da9f64f7a382f8a35749a64a4a6e6fe",
+      "render.py": "sha256:3b23561722395d1e2678da99767cdc91082f2b643c348fc0526e97e44b107e39",
+      "state.py": "sha256:fad0f2d5968ad761aee22cd31eb64c03c7ea378c2b4f9040c08e4f3f0784c458"
+    },
+    "current_settings": {
+      "heartbeat_interval_ms": 500,
+      "jobs": {
+        "job_retention_seconds": 86400,
+        "job_timeout_ms": 14400000,
+        "max_concurrent_jobs": 32,
+        "max_queued_jobs": 1000,
+        "queue_full_retry_after_seconds": 1
+      },
+      "lease_seconds": 30,
+      "state_busy_timeout_ms": 10000
+    },
+    "effective_discovery_path": "/app/strategies/discovery",
+    "jane_kit_operations": {
+      "auth.py": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6",
+      "config.py": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3",
+      "operations.py": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e",
+      "service.py": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+    },
+    "module_files": {
+      "jane_kit.auth": {
+        "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/auth.py",
+        "sha256": "sha256:3448068ae3a9c6056cc186ba1c2decd5f02bf741bf4b55a093e5f3456c6a7ff6"
+      },
+      "jane_kit.config": {
+        "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/config.py",
+        "sha256": "sha256:50fe200f430d069c4fb3a3d2cc5020f35164c9e6b7d284ff0d44b92b0d5ea3e3"
+      },
+      "jane_kit.operations": {
+        "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/operations.py",
+        "sha256": "sha256:40bab0fd314bcac8f1ce4d58dbebb9704c43a19e9fd9f82f4cd2de4ea557146e"
+      },
+      "jane_kit.service": {
+        "path": "/app/.venv/lib/python3.12/site-packages/jane_kit/service.py",
+        "sha256": "sha256:950255e01337a09e271616800a4b01eb6dfa05df06bdaaea71457137a323502c"
+      },
+      "jane_web_collector.crawler": {
+        "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/crawler.py",
+        "sha256": "sha256:c35d963cf1b0105b6105ed39ace1dad399b5a8cee6a3d6d715fef186e82991f4"
+      },
+      "jane_web_collector.engine": {
+        "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/engine.py",
+        "sha256": "sha256:b6990911d1fe95998232df77544f9a2e0b4f3431d647d74345a5ea87fd68c263"
+      },
+      "jane_web_collector.fetcher": {
+        "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/fetcher.py",
+        "sha256": "sha256:78499a210f6d59cfedf9f172261edcf38da9f64f7a382f8a35749a64a4a6e6fe"
+      },
+      "jane_web_collector.render": {
+        "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/render.py",
+        "sha256": "sha256:3b23561722395d1e2678da99767cdc91082f2b643c348fc0526e97e44b107e39"
+      },
+      "jane_web_collector.settings": {
+        "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/settings.py",
+        "sha256": "sha256:3c2ed26dd0f2aae983acaa31804cf268756b3641f27ed0a38dced5467c376f1b"
+      },
+      "jane_web_collector.state": {
+        "path": "/app/.venv/lib/python3.12/site-packages/jane_web_collector/state.py",
+        "sha256": "sha256:fad0f2d5968ad761aee22cd31eb64c03c7ea378c2b4f9040c08e4f3f0784c458"
+      },
+      "jane_web_collector_discovery.api_feed": {
+        "path": "/app/strategies/discovery/api_feed.py",
+        "sha256": "sha256:2e29fe68989cf899e511baf419d756913bdc35adc07db9f1f73e3863930d8321"
+      },
+      "jane_web_collector_discovery.sitemap": {
+        "path": "/app/strategies/discovery/sitemap.py",
+        "sha256": "sha256:9376bd54b693bd7fa10ae9f55d29feb9378ee962ff54219340d25c402486fe94"
+      }
+    },
+    "sitemap_paths": {
+      "/app/strategies/discovery/sitemap.py": "sha256:9376bd54b693bd7fa10ae9f55d29feb9378ee962ff54219340d25c402486fe94"
+    },
+    "settings_measurement": "Prior baseline snapshot; no settings constructor is invoked by this guard audit. Effective ALLENV and volume/configuration preservation are checked separately."
+  },
+  "checks": {
+    "env_hash": true,
+    "ports": true,
+    "mounts": true,
+    "networks": true,
+    "group_add": true,
+    "healthcheck": true,
+    "entrypoint": true,
+    "command": true,
+    "user": true,
+    "restart": true,
+    "shm_size": true,
+    "candidate_image": true,
+    "healthy": true,
+    "jane_kit_operations": true,
+    "collector_settings_hash": true,
+    "api_feed_paths": true,
+    "sitemap_paths": true,
+    "collector_schema_hash": true,
+    "collector_schema_canonical_sha256": true,
+    "crawler.py": true,
+    "engine.py": true,
+    "state.py": true,
+    "fetcher.py": true,
+    "render.py": true,
+    "all_required_hashes_present": true
+  }
+}

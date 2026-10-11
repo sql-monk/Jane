@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { UnsavedChangesProvider } from "./components/UnsavedChanges";
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { Icon } from "./components/Icon";
 import { ThemeControl } from "./components/ThemeControl";
@@ -27,6 +28,18 @@ function Layout() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const menuButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        menuButton.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [menuOpen]);
   const active = navigationFor(location.pathname);
   return (
     <div className={menuOpen ? "layout menu-open" : "layout"}>
@@ -52,7 +65,7 @@ function Layout() {
         <div className="nav-groups">
           {NAV_GROUPS.map((group) => {
             const items = group.items.filter((item) =>
-              `${item.label} ${item.description}`
+              `${group.label} ${item.label} ${item.description}`
                 .toLocaleLowerCase("uk")
                 .includes(search.toLocaleLowerCase("uk")),
             );
@@ -77,7 +90,7 @@ function Layout() {
           {search &&
           !NAV_GROUPS.some((group) =>
             group.items.some((item) =>
-              `${item.label} ${item.description}`
+              `${group.label} ${item.label} ${item.description}`
                 .toLocaleLowerCase("uk")
                 .includes(search.toLocaleLowerCase("uk")),
             ),
@@ -106,6 +119,7 @@ function Layout() {
             <button
               type="button"
               className="btn menu-toggle"
+              ref={menuButton}
               aria-label={menuOpen ? "Закрити меню" : "Відкрити меню"}
               aria-expanded={menuOpen}
               aria-controls="main-navigation"
@@ -151,35 +165,37 @@ function RequireAuth() {
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/auth/callback" element={<OidcCallbackPage />} />
-      <Route element={<RequireAuth />}>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/sources" element={<SourcesPage />} />
-        <Route path="/sources/new" element={<SourcePage />} />
-        <Route path="/sources/:sourceId" element={<SourcePage />} />
-        <Route path="/tasks" element={<TasksPage />} />
-        <Route path="/tasks/new" element={<TaskPage />} />
-        <Route path="/tasks/:taskId" element={<TaskPage />} />
-        <Route path="/runs" element={<RunsPage />} />
-        <Route path="/runs/:runId" element={<RunPage />} />
-        <Route path="/materials" element={<MaterialsPage />} />
-        <Route path="/storages" element={<StoragesPage />} />
-        <Route path="/materials/:materialId/trace" element={<MaterialTracePage />} />
-        <Route path="/results" element={<ResultsPage />} />
-        <Route path="/problems" element={<ProblemsPage />} />
-        <Route path="/packages" element={<PackagesPage />} />
-        <Route path="/packages/:packageId" element={<PackagePage />} />
-        <Route path="/packages/:packageId/versions/:version/edit" element={<PackageEditorPage />} />
-        <Route path="/packages/:packageId/versions/:version/rules" element={<RulesEditorPage />} />
-        <Route path="/assistant" element={<AssistantPage />} />
-        <Route path="/connections" element={<ConnectionsPage />} />
-        <Route path="/llm" element={<LlmPage />} />
-        <Route path="/limits" element={<LimitsPage />} />
-        <Route path="/audit" element={<AuditPage />} />
-        <Route path="*" element={<p>Сторінку не знайдено</p>} />
-      </Route>
-    </Routes>
+    <UnsavedChangesProvider>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/auth/callback" element={<OidcCallbackPage />} />
+        <Route element={<RequireAuth />}>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/sources" element={<SourcesPage />} />
+          <Route path="/sources/new" element={<SourcePage />} />
+          <Route path="/sources/:sourceId" element={<SourcePage />} />
+          <Route path="/tasks" element={<TasksPage />} />
+          <Route path="/tasks/new" element={<TaskPage />} />
+          <Route path="/tasks/:taskId" element={<TaskPage />} />
+          <Route path="/runs" element={<RunsPage />} />
+          <Route path="/runs/:runId" element={<RunPage />} />
+          <Route path="/materials" element={<MaterialsPage />} />
+          <Route path="/storages" element={<StoragesPage />} />
+          <Route path="/materials/:materialId/trace" element={<MaterialTracePage />} />
+          <Route path="/results" element={<ResultsPage />} />
+          <Route path="/problems" element={<ProblemsPage />} />
+          <Route path="/packages" element={<PackagesPage />} />
+          <Route path="/packages/:packageId" element={<PackagePage />} />
+          <Route path="/packages/:packageId/versions/:version/edit" element={<PackageEditorPage />} />
+          <Route path="/packages/:packageId/versions/:version/rules" element={<RulesEditorPage />} />
+          <Route path="/assistant" element={<AssistantPage />} />
+          <Route path="/connections" element={<ConnectionsPage />} />
+          <Route path="/llm" element={<LlmPage />} />
+          <Route path="/limits" element={<LimitsPage />} />
+          <Route path="/audit" element={<AuditPage />} />
+          <Route path="*" element={<p>Сторінку не знайдено</p>} />
+        </Route>
+      </Routes>
+    </UnsavedChangesProvider>
   );
 }

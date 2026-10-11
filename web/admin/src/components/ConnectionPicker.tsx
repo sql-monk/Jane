@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { useApi, useConfig } from "../app/context";
+import { useId } from "react";
+import { useApi } from "../app/context";
+import { useCursorList } from "../api/hooks";
 import { unwrap } from "../api/client";
-import { Field } from "./ui";
+import { ErrorBox, Field, Loading, LoadMore } from "./ui";
 
 /** Picks a platform connection (orchestrator registry) by id; free text is allowed as well. */
 export function ConnectionPicker({
@@ -14,23 +15,33 @@ export function ConnectionPicker({
   onChange: (value: string) => void;
 }) {
   const api = useApi();
-  const { page_size } = useConfig();
-  const connections = useQuery({
-    queryKey: ["connections", "picker", page_size],
-    queryFn: () =>
-      unwrap(api.orchestrator.GET("/v1/connections", { params: { query: { limit: page_size } } })),
-  });
-  const id = `conn-${label.replace(/\W+/g, "-")}`;
+  const connections = useCursorList(["connections", "picker"], (cursor, limit) =>
+    unwrap(
+      api.orchestrator.GET("/v1/connections", {
+        params: { query: { limit, ...(cursor ? { cursor } : {}) } },
+      }),
+    ),
+  );
+  const id = useId();
   return (
-    <Field label={label}>
-      <input list={id} value={value} onChange={(e) => onChange(e.target.value)} />
-      <datalist id={id}>
-        {(connections.data?.items ?? []).map((c) => (
-          <option key={c.connection.connection_id} value={c.connection.connection_id}>
-            {c.connection.kind}
-          </option>
-        ))}
-      </datalist>
-    </Field>
+    <div>
+      <Field label={label} hint="Виберіть підключення за назвою або введіть його ідентифікатор.">
+        <input list={id} value={value} onChange={(e) => onChange(e.target.value)} />
+        <datalist id={id}>
+          {connections.items.map((c) => (
+            <option key={c.connection.connection_id} value={c.connection.connection_id}>
+              {c.connection.title || c.connection.connection_id} · {c.connection.kind}
+            </option>
+          ))}
+        </datalist>
+      </Field>
+      {connections.isLoading ? <Loading what="Підключення" /> : null}
+      <ErrorBox error={connections.error} />
+      <LoadMore
+        hasMore={connections.hasMore}
+        loading={connections.loadingMore}
+        onClick={connections.loadMore}
+      />
+    </div>
   );
 }

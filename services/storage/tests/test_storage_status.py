@@ -183,3 +183,16 @@ def test_slow_inventory_is_background(
             time.sleep(0.01)
         assert completed["status"] == "succeeded", completed
         assert completed["result"]["statistics"]["object_count"] == 0
+
+
+def test_entity_inventory_separate_from_raw(client: TestClient, h: SimpleNamespace) -> None:
+    entity = h.entity()
+    response = h.post(client, h.invocation([{"kind": "entities", "entities": [entity]}], "status-entity"))
+    assert response.json()["status"] == "success"
+    state = inventory(client)
+    assert state["statistics"]["object_count"] == 0
+    assert state["entity_statistics"]["entity_count"] == 1
+    assert state["entity_statistics"]["total_size_bytes"] > 0
+    assert state["entity_statistics"]["size_basis"] == "snapshot_documents"
+    assert state["entity_statistics"]["types"] == [{"entity_type": "product", "entity_count": 1}]
+    assert state["entity_statistics"]["unavailable_reason"] is None

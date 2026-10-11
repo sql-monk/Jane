@@ -451,7 +451,80 @@ class PostgresAdapter:
         cursor: str | None = None,
         limit: int,
     ) -> tuple[Sequence[EntitySnapshot], str | None]:
+        return await self._list_entities(
+            entity_type, scope=scope, updated_since=updated_since, cursor=cursor, limit=limit
+        )
+
+    async def search_entities(
+        self,
+        entity_type: str,
+        *,
+        search: str,
+        scope: str | None = None,
+        updated_since: datetime | None = None,
+        cursor: str | None = None,
+        limit: int,
+    ) -> tuple[Sequence[EntitySnapshot], str | None]:
+        return await self._list_entities(
+            entity_type, search=search, scope=scope, updated_since=updated_since, cursor=cursor, limit=limit
+        )
+
+    async def list_entity_types(
+        self, *, scope: str | None = None, cursor: str | None = None, limit: int
+    ) -> tuple[Sequence[Mapping[str, Any]], str | None]:
+        where, args = ["TRUE"], list[Any]()
+        if scope is not None:
+            args.append(scope)
+            where.append(f"scope = ${len(args)}")
+        if cursor is not None:
+            args.append(str(_uncursor(cursor)))
+            where.append(f'entity_type COLLATE "C" > ${len(args)}')
+        args.append(limit + 1)
+        async with self._con() as con:
+            rows = await con.fetch(
+                f'SELECT entity_type, COUNT(*) AS entity_count FROM {self._t("entities")} WHERE {" AND ".join(where)} GROUP BY entity_type ORDER BY entity_type COLLATE "C" LIMIT ${len(args)}',
+                *args,
+            )
+        items = [dict(row) for row in rows[:limit]]
+        return items, _cursor(items[-1]["entity_type"]) if len(rows) > limit and items else None
+
+    async def object_statistics(self) -> dict[str, int]:
+        async with self._con() as con:
+            row = await con.fetchrow(
+                f"SELECT COUNT(*) AS object_count, COALESCE(SUM(size_bytes), 0) AS total_size_bytes FROM {self._t('objects')}"
+            )
+        return {k: int(row[k]) for k in ("object_count", "total_size_bytes")}
+
+    async def entity_statistics(self) -> dict[str, Any]:
+        async with self._con() as con, con.transaction(isolation="repeatable_read", readonly=True):
+            rows = await con.fetch(
+                f'SELECT entity_type, COUNT(*) AS entity_count FROM {self._t("entities")} GROUP BY entity_type ORDER BY entity_type COLLATE "C"'
+            )
+            size = await con.fetchval("SELECT pg_total_relation_size($1::regclass)", self._t("entities"))
+        types = [dict(row) for row in rows]
+        return {
+            "entity_count": sum(int(row["entity_count"]) for row in types),
+            "total_size_bytes": int(size),
+            "size_basis": "postgresql_relation_with_indexes",
+            "types": types,
+        }
+
+    async def _list_entities(
+        self,
+        entity_type: str,
+        *,
+        search: str = "",
+        scope: str | None = None,
+        updated_since: datetime | None = None,
+        cursor: str | None = None,
+        limit: int,
+    ) -> tuple[Sequence[EntitySnapshot], str | None]:
         where, args = ["entity_type = $1"], list[Any]([entity_type])
+        if search:
+            args.append(search)
+            where.append(
+                f"strpos(lower(canonical_key || key::text || fields::text), lower(${len(args)})) > 0"
+            )
         if scope is not None:
             args.append(scope)
             where.append(f"scope = ${len(args)}")

@@ -8,6 +8,7 @@ import { ApiError } from "../api/problem";
 import type { StorageConnection } from "../api/types";
 import { storageName, useStorageConnections } from "../components/StorageConnections";
 import { ErrorBox, KeyValue, Loading, LoadMore, Notice, Page, Section } from "../components/ui";
+import { entityTypeLabel, resultsHref } from "../lib/results-context";
 import { formatBytes, formatDate } from "../lib/format";
 import "../materials-storage.css";
 
@@ -82,7 +83,7 @@ function StorageCard({ connection }: { connection: StorageConnection }) {
         <Link className="btn" to={`/materials?connection_id=${encodeURIComponent(id)}`}>
           Матеріали
         </Link>
-        <Link className="btn" to={`/results?connection_id=${encodeURIComponent(id)}`}>
+        <Link className="btn" to={resultsHref({ connectionId: id })}>
           Результати
         </Link>
         <button
@@ -137,11 +138,11 @@ function StorageCard({ connection }: { connection: StorageConnection }) {
           ["Остання перевірка", data?.checked_at ? formatDate(data.checked_at) : "Не перевірено"],
           ["Діагностика", data?.message ?? "—"],
           [
-            "Кількість об'єктів",
+            "RAW і документи результатів",
             data?.statistics.object_count == null ? "Невідомо" : String(data.statistics.object_count),
           ],
           [
-            "Обсяг",
+            "Обсяг вмісту RAW і документів",
             data?.statistics.total_size_bytes == null
               ? "Невідомо"
               : formatBytes(data.statistics.total_size_bytes),
@@ -152,6 +153,50 @@ function StorageCard({ connection }: { connection: StorageConnection }) {
           ],
         ]}
       />
+      <h3>Розібрані дані</h3>
+      <KeyValue
+        rows={[
+          [
+            "Кількість сутностей",
+            data?.entity_statistics?.entity_count == null
+              ? "Недоступно"
+              : data.entity_statistics.entity_count.toLocaleString("uk-UA"),
+          ],
+          [
+            "Обсяг актуальних станів",
+            data?.entity_statistics?.total_size_bytes == null
+              ? "Недоступно"
+              : formatBytes(data.entity_statistics.total_size_bytes),
+          ],
+          [
+            "Облік обсягу",
+            data?.entity_statistics?.size_basis === "postgresql_relation_with_indexes"
+              ? "Таблиця актуальних станів з індексами"
+              : data?.entity_statistics?.size_basis === "snapshot_documents"
+                ? "Файли актуальних станів"
+                : "Недоступно",
+          ],
+        ]}
+      />
+      {data?.entity_statistics?.types?.length ? (
+        <div className="button-row">
+          {data.entity_statistics.types.map((row) => (
+            <Link
+              key={row.entity_type}
+              className="btn"
+              to={resultsHref({ connectionId: id, entityType: row.entity_type })}
+            >
+              {entityTypeLabel(row.entity_type)}: {row.entity_count.toLocaleString("uk-UA")}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+      {data?.entity_statistics?.unavailable_reason ? (
+        <p className="muted">
+          Статистика сутностей недоступна: {statisticsReasonLabel(data.entity_statistics.unavailable_reason)}
+        </p>
+      ) : null}
+      <p className="muted">Обсяг актуальних станів не включає історію оновлень, RAW та записи доставки.</p>
       {data?.statistics.unavailable_reason ? (
         <p className="muted">
           Статистика недоступна: {statisticsReasonLabel(data.statistics.unavailable_reason)}

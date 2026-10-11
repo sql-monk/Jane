@@ -182,6 +182,7 @@
         "services/**",
         "templates/service/**",
         "infra/compose.yaml",
+        "infra/tests/test_auth_config.py",
         "contracts/**",
         "web/admin/src/api/generated/**"
       ]

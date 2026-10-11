@@ -20,7 +20,7 @@ import pytest
 import yaml
 
 from jane_kit.auth import AUTHENTICATED, BUILTIN_SCOPES, OPEN_PATHS, SCOPE_RE
-from jane_kit.auth_scopes import COLLECTOR, HANDLER, LLM, ORCHESTRATOR, TABLES, merge
+from jane_kit.auth_scopes import COLLECTOR, HANDLER, LLM, OPERATIONS, ORCHESTRATOR, TABLES, merge
 from jane_kit.contracts import contracts_dir
 
 pytestmark = pytest.mark.contract
@@ -49,6 +49,8 @@ ADR_SCOPES = {
     "llm:invoke",
     "llm:admin",
     "assistant:use",
+    "modules:read",
+    "modules:write",
 }
 # Services that implement several contracts pass merge() of their tables to create_app (auth_scopes docstring).
 MERGED_SERVICES = {"storage": ("handler", "storage"), "llm": ("handler", "llm")}
@@ -176,6 +178,13 @@ def test_table_scopes_equal_contract(api: str) -> None:
     assert scope_mismatches(TABLES[api], contract_scopes(api)) == {}
 
 
+def test_builtin_operations_table_equals_supplemental_contract() -> None:
+    # Operations supplements every service API; health/info remain in its existing API contract.
+    assert set(OPERATIONS) == operations("operations")
+    assert scope_mismatches(OPERATIONS, contract_scopes("operations")) == {}
+    assert all(any_of(BUILTIN_SCOPES[key]) == any_of(value) for key, value in OPERATIONS.items())
+
+
 @pytest.mark.parametrize("service", sorted(MERGED_SERVICES))
 def test_merged_service_table_equals_union_of_its_contracts(service: str) -> None:
     """An operation present in several contracts of one service (``/v1/jobs`` of llm + handler) gets the union."""
@@ -246,7 +255,10 @@ def test_comparison_catches_changed_scopes() -> None:
 
 def test_only_adr_scopes_are_used() -> None:
     used = {
-        s for table in TABLES.values() for v in table.values() for s in ((v,) if isinstance(v, str) else v)
+        s
+        for table in [*TABLES.values(), OPERATIONS]
+        for v in table.values()
+        for s in ((v,) if isinstance(v, str) else v)
     }
     assert used <= ADR_SCOPES and all(SCOPE_RE.match(s) for s in used)
     assert all(v for table in TABLES.values() for v in table.values())  # no "any token" operation

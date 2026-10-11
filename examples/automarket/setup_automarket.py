@@ -722,7 +722,13 @@ def main(argv: list[str] | None = None) -> int:
                     ok=(202,),
                     json={
                         "reason": "automarket: first real detailed catalog verification",
-                        "limits": {"crawl": {"max_pages_per_run": args.validation_pages, "max_depth": 1}},
+                        "limits": {
+                            "crawl": {
+                                "max_pages_per_run": args.validation_pages,
+                                "max_depth": 1,
+                                "revisit_interval_seconds": 0,
+                            }
+                        },
                     },
                     headers={"Idempotency-Key": ex.key()},
                 ).json()

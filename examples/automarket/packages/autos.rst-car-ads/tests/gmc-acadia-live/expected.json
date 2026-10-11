@@ -1,0 +1,43 @@
+{
+  "entities": [{
+    "entity_type": "car_ad",
+    "key": {"scope": "local", "natural": {"site": "rst.ua", "ad_id": "15481914"}},
+    "fields": {
+      "site": "rst.ua", "ad_id": "15481914",
+      "url": "https://rst.ua/ukr/oldcars/gmc/acadia/gmc_acadia_15481914.html",
+      "title": "GMC Acadia Denali", "make": "GMC", "model": "Acadia", "trim": "Denali",
+      "price": 43000, "currency": "USD", "price_uah": 1937200,
+      "year": 2025, "mileage_km": 33000, "engine_l": 2.5,
+      "fuel": "petrol", "transmission": "automatic", "drive": "awd",
+      "body_type": "suv", "color": "білий", "city": "Київ",
+      "region": "Київська область", "vin": "1GKENRRS5SJ150638",
+      "raw_specs": {"рік": "2025", "пробiг": "33'000 km", "двигун": "2.5 • Бензин", "КПП": "Автомат • Повний пр.", "кузов": "Позашляховик Білий"},
+      "equipment": [
+        "повний привід AWD", "2.5-літровий турбодвигун", "автоматична коробка передач",
+        "преміальний шкіряний салон Denali", "перфорована шкіра та фірмова прострочка",
+        "електрорегулювання передніх сидінь", "підігрів та вентиляція передніх сидінь",
+        "підігрів керма", "чорна стеля", "великий вертикальний мультимедійний дисплей",
+        "цифрова панель приладів", "навігація / Google Maps", "Apple CarPlay / Android Auto",
+        "бездротова зарядка", "багатозонний клімат-контроль", "адаптивний круїз-контроль",
+        "камери кругового огляду", "контроль сліпих зон", "утримання в смузі руху",
+        "системи попередження та запобігання зіткненням", "парктроніки", "безключовий доступ",
+        "запуск двигуна кнопкою", "електропривід кришки багажника", "LED-оптика",
+        "оригінальні багатоспицеві диски Denali 20", "три ряди сидінь",
+        "трансформація задніх сидінь та великий багажний відсік."
+      ],
+      "photos": [
+        "https://i2.rst.ua/oldcars/gmc/acadia/15481914-14.jpg",
+        "https://i2.rst.ua/oldcars/gmc/acadia/15481914-23.jpg",
+        "https://i2.rst.ua/oldcars/gmc/acadia/15481914-15.jpg",
+        "https://i2.rst.ua/oldcars/gmc/acadia/15481914-16.jpg",
+        "https://i2.rst.ua/oldcars/gmc/acadia/15481914-17.jpg",
+        "https://i2.rst.ua/oldcars/gmc/acadia/15481914-18.jpg",
+        "https://i2.rst.ua/oldcars/gmc/acadia/15481914-19.jpg",
+        "https://i2.rst.ua/oldcars/gmc/acadia/15481914-20.jpg",
+        "https://i2.rst.ua/oldcars/gmc/acadia/15481914-21.jpg",
+        "https://i2.rst.ua/oldcars/gmc/acadia/15481914-22.jpg",
+        "https://i2.rst.ua/oldcars/gmc/acadia/15481914-24.jpg"
+      ]
+    }
+  }]
+}

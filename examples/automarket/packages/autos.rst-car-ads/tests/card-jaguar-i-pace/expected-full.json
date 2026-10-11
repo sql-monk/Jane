@@ -1,0 +1,19 @@
+{
+  "entities": [
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "rst.ua",
+        "ad_id": "15478392",
+        "fuel": "electric",
+        "power_kw": 400,
+        "battery_kwh": 90,
+        "range_km": 400,
+        "raw_specs": {
+          "Батарея": "90 кВт/год - ємність",
+          "Запас ходу": "400 км - запас ходу"
+        }
+      }
+    }
+  ]
+}

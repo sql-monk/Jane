@@ -1,0 +1,82 @@
+{
+  "site": "avtobazar.ua",
+  "status": "unavailable",
+  "reason": "Сайт перенаправляє головну, robots.txt та відомі сторінки автомобілів на новинний Autocentre; транспортні сутності не отримані.",
+  "verified_entities": 0,
+  "samples": [
+    {
+      "requested_url": "https://www.avtobazar.ua/",
+      "fetched_at": "2026-10-11T03:46:45.958443+00:00",
+      "status": 200,
+      "final_url": "https://www.autocentre.ua/",
+      "redirect_history": [
+        {
+          "url": "https://www.avtobazar.ua/",
+          "status": 301,
+          "location": "https://www.autocentre.ua/"
+        }
+      ],
+      "content_type": "text/html; charset=utf-8",
+      "encoding": "utf-8",
+      "bytes": 108373,
+      "sha256": "1ff1cb3c15fb4ab5c4ebcd9ce99db9afee9e218307a822b71cff878e1f34ad33",
+      "title": "Автоцентр.ua: автоновини - Автомобільний сайт N1 в Україні"
+    },
+    {
+      "requested_url": "https://www.avtobazar.ua/robots.txt",
+      "fetched_at": "2026-10-11T03:46:46.302551+00:00",
+      "status": 200,
+      "final_url": "https://www.autocentre.ua/",
+      "redirect_history": [
+        {
+          "url": "https://www.avtobazar.ua/robots.txt",
+          "status": 301,
+          "location": "https://www.autocentre.ua/"
+        }
+      ],
+      "content_type": "text/html; charset=utf-8",
+      "encoding": "utf-8",
+      "bytes": 108373,
+      "sha256": "9fe71e7baee59fc295742c1390ef987d8bdb97f815621f716e07e71ce5b0306f",
+      "title": "Автоцентр.ua: автоновини - Автомобільний сайт N1 в Україні"
+    },
+    {
+      "requested_url": "https://avtobazar.ua/renault-logan-2010-kiev-1-11053455-1.html",
+      "fetched_at": "2026-10-11T03:51:56.509196+00:00",
+      "status": 200,
+      "final_url": "https://www.autocentre.ua/",
+      "redirect_history": [
+        {
+          "url": "https://avtobazar.ua/renault-logan-2010-kiev-1-11053455-1.html",
+          "status": 301,
+          "location": "https://www.autocentre.ua/"
+        }
+      ],
+      "content_type": "text/html; charset=utf-8",
+      "encoding": "utf-8",
+      "bytes": 108373,
+      "sha256": "6b9a17d89ce1cd8e6368f86497a60cfdc01405c197280054005ce02ee45686c0",
+      "title": "Автоцентр.ua: автоновини - Автомобільний сайт N1 в Україні"
+    },
+    {
+      "requested_url": "https://www.avtobazar.ua/renault-logan-2010-kiev-1-11053455-1.html",
+      "fetched_at": "2026-10-11T03:51:56.537925+00:00",
+      "status": 200,
+      "final_url": "https://www.autocentre.ua/",
+      "redirect_history": [
+        {
+          "url": "https://www.avtobazar.ua/renault-logan-2010-kiev-1-11053455-1.html",
+          "status": 301,
+          "location": "https://www.autocentre.ua/"
+        }
+      ],
+      "content_type": "text/html; charset=utf-8",
+      "encoding": "utf-8",
+      "bytes": 108373,
+      "sha256": "370ec46e4f66455fe3bfee1102945afc9629e9b417bf7769c86c01c329a439fe",
+      "title": "Автоцентр.ua: автоновини - Автомобільний сайт N1 в Україні"
+    }
+  ],
+  "replacement_source": null,
+  "schedule_enabled": false
+}

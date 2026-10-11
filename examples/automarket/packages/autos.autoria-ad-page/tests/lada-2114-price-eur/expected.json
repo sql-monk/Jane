@@ -1,0 +1,52 @@
+{
+  "entities": [
+    {
+      "entity_type": "car_ad",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "39595407",
+        "url": "https://auto.ria.com/uk/auto_vaz-lada_2114-samara_39595407.html",
+        "title": "ВАЗ / Lada 2114 Samara 2007",
+        "price": 1100.0,
+        "currency": "EUR",
+        "make": "ВАЗ / Lada",
+        "model": "2114 Samara",
+        "year": 2007,
+        "price_usd": 1244.0,
+        "price_uah": 55979.0,
+        "mileage_km": 267000,
+        "transmission": "Ручна / Механіка",
+        "fuel": "Бензин",
+        "engine_l": 1.6,
+        "body_type": "Хетчбек",
+        "drive": "Передній",
+        "color": "Сірий металік",
+        "region": "Київська обл.",
+        "city": "Київ",
+        "seller_type": "private",
+        "condition": "used",
+        "published_at": "2026-10-11",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/vaz-lada_2114-samara__634627950fx.webp",
+        "status": "active",
+        "description": "Машина добре заводиться. Зберігалась в гаражі. Передні скло підйомники. Масло міняли своєчасно, за регламентом. Двигун в гарному стані. БЕЗ ДТП. Кузов видно на фото. В машини був ОДИН власник, але було одне переоформлення в межах родини.",
+        "doors": 5,
+        "seats": 5,
+        "inspection_ready": true
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "39595407"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_589398f7d4ba382dae1c2b36",
+        "observed_at": "2026-10-11T02:50:05Z",
+        "material_id": "web:a8d64415c8c1d27e7dee52903dbb5524",
+        "content_sha256": "589398f7d4ba382dae1c2b36d3739841b44da12013a8450db85dc4de30f02324"
+      }
+    }
+  ]
+}

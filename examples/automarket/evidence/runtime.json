@@ -1,0 +1,1854 @@
+{
+  "sites": {
+    "autoria": {
+      "run_id": "run_01M4MMPS6G389RC254QTS9J7BC",
+      "schedule": {
+        "type": "interval",
+        "enabled": true,
+        "overlap": "skip",
+        "interval_seconds": 21600
+      },
+      "verified_entity_count": 10,
+      "total_entity_count": 10,
+      "raw_object_count": 111,
+      "verified_raw_object_count": 10,
+      "raw_checks": [
+        {
+          "object_id": "obj_d8699c269d0226297c09bb234d38b87f",
+          "observation_id": "obs_01a1294b7c1100005295e66d",
+          "sha256": "74ed1f6e0c6735627221bccb5b06aeae1d3100ffe840f6a2054f1bef8f528588",
+          "size_bytes": 479053,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_795e64f2ce0d5e745acef13ea28155f1",
+          "observation_id": "obs_01a1294b815d0000c2acc9e6",
+          "sha256": "285a226aca7e6295a3ec5a472aae15efe4cdbd86b29fa21ce63327a798e00ed9",
+          "size_bytes": 557529,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_815047eb5fc8a7eab70a1b87de609e5a",
+          "observation_id": "obs_01a1294b851d0000b8e0141a",
+          "sha256": "f31ac847e95bae3a09b020c7e7144195b5aa8ccb42efc067b26528ecf3e85e8f",
+          "size_bytes": 577157,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_c22fca845d52933f438ec252835de831",
+          "observation_id": "obs_01a1294b88f00000c32f6812",
+          "sha256": "8feaef6462d7119af8ca17377beb866f65ee74fb8ffff497a4f61f9fdf4e57e0",
+          "size_bytes": 606314,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_f6f55fae6cb5f025ca67781d36a54d17",
+          "observation_id": "obs_01a1294b8c580000a5b23060",
+          "sha256": "5161c2c882e24e566d0d31696bf7d39eeeba1bf8f05507b84b6ce54be6d888d6",
+          "size_bytes": 421381,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_99a8d3f58c6e75c14e40051fdf8771ba",
+          "observation_id": "obs_01a1294b8ffe000067e20ded",
+          "sha256": "b62b403f7caca893a056cfc09aaadde40a92658f53f16ba942613feca3206d54",
+          "size_bytes": 594721,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_ff7083a7c360ef5a4d14a7416a2acda7",
+          "observation_id": "obs_01a1294b93970000e33aa380",
+          "sha256": "1bd7320ebbb0d4ffdd1ea453e9833f2b5bc0518dcdff458cf81d297063a93895",
+          "size_bytes": 496549,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_c19f2eafdcc74e0072daf6b3f70032d3",
+          "observation_id": "obs_01a1294b97ad0000f211d9cd",
+          "sha256": "763f0c4f851adf85659095f0a05a5019d35fc4bf51745ffb33a6c728e7283491",
+          "size_bytes": 515125,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_35779c03763a9bd9e48700bacf84f5bf",
+          "observation_id": "obs_01a1294b9b1f0000b98e5c2a",
+          "sha256": "02514a79154e295a0455cafc8a7f21bdf5e79f635f787ea3a2378f61b7e9f783",
+          "size_bytes": 603062,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_cdd6728c4c973687a73ec73989c061ba",
+          "observation_id": "obs_01a1294b9f2b0000881a3b9f",
+          "sha256": "e7a394496e8ff040f03902f3781f8414c4e0dadf01ed4b0b459c01a6fd044edb",
+          "size_bytes": 507200,
+          "fields_replayed": true
+        }
+      ],
+      "entities": [
+        {
+          "key": {
+            "scope": "autoria-cars",
+            "natural": {
+              "site": "auto.ria.com",
+              "ad_id": "39192379"
+            }
+          },
+          "fields": {
+            "url": "https://auto.ria.com/uk/auto_hyundai_sonata_39192379.html",
+            "city": "Бровари",
+            "fuel": "Бензин",
+            "make": "Hyundai",
+            "site": "auto.ria.com",
+            "year": 2015,
+            "ad_id": "39192379",
+            "color": "Чорний",
+            "image": "https://cdn0.riastatic.com/photosnew/auto/photo/hyundai_sonata__624662591fx.webp",
+            "model": "Sonata",
+            "price": 11900.0,
+            "title": "Hyundai Sonata 2015",
+            "region": "Київська обл.",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 2.4,
+            "body_type": "Седан",
+            "condition": "used",
+            "price_uah": 535500.0,
+            "price_usd": 11900.0,
+            "mileage_km": 150000,
+            "description": "Авто в гарному стані! Вся інформація по телефону",
+            "seller_type": "private",
+            "published_at": "2026-10-11",
+            "transmission": "Автомат"
+          },
+          "observation": {
+            "material_id": "web:93058a3594fa94909157a4acc5e7b4d4",
+            "observed_at": "2026-10-11T04:49:37Z",
+            "content_sha256": "f31ac847e95bae3a09b020c7e7144195b5aa8ccb42efc067b26528ecf3e85e8f",
+            "observation_id": "obs_01a1294b851d0000b8e0141a"
+          },
+          "provenance": {
+            "run_id": "run_01M4MMPS6G389RC254QTS9J7BC",
+            "package": {
+              "digest": "sha256:03b847ed72e1daeff05d76b7f9e8daffb7bd971171eabb7b7bd1c636474cea8e",
+              "version": "1.1.1",
+              "package_id": "autos.autoria-ad-page"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_10ba4764e74245d9bb494c7e0705ad98"
+          }
+        },
+        {
+          "key": {
+            "scope": "autoria-cars",
+            "natural": {
+              "site": "auto.ria.com",
+              "ad_id": "39876974"
+            }
+          },
+          "fields": {
+            "url": "https://auto.ria.com/uk/auto_mitsubishi_grandis_39876974.html",
+            "city": "Миколаїв",
+            "fuel": "Бензин",
+            "make": "Mitsubishi",
+            "site": "auto.ria.com",
+            "trim": "Base",
+            "year": 2006,
+            "ad_id": "39876974",
+            "color": "Чорний металік",
+            "drive": "Передній",
+            "image": "https://cdn0.riastatic.com/photosnew/auto/photo/mitsubishi_grandis__642594201fx.webp",
+            "model": "Grandis",
+            "price": 5800.0,
+            "seats": 7,
+            "title": "Mitsubishi Grandis 2006",
+            "region": "Миколаївська обл.",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 2.4,
+            "power_hp": 165.0,
+            "power_kw": 121.0,
+            "body_type": "Мінівен",
+            "condition": "used",
+            "equipment": {
+              "safety": [
+                "Центральний замок",
+                "Антиблокувальна система (ABS)",
+                "Імобілайзер",
+                "Антипробуксовочна система (ASR)",
+                "Розподіл гальмівних зусиль (BAS, EBD)",
+                "Система кріплення IsoFix",
+                "Блокування замків задніх дверей"
+              ],
+              "airbags": [
+                "Водія",
+                "Пасажира",
+                "Бічні задні",
+                "Віконні (шторки)"
+              ],
+              "comfort": [
+                "Бортовий комп'ютер",
+                "Датчик дощу",
+                "Підігрів дзеркал",
+                "Тоновані вікна",
+                "Складане заднє сидіння",
+                "Функція складання спинки сидіння пасажира",
+                "Третій ряд сидінь",
+                "Оздоблення керма шкірою",
+                "Декоративне підсвічування салону",
+                "Електропривід дзеркал",
+                "Електроскладання дзеркал",
+                "Підкурювач і попільничка",
+                "Круїз контроль"
+              ],
+              "lighting": [
+                "Денні ходові вогні",
+                "Протитуманні фари",
+                "Система адаптивного освітлення"
+              ],
+              "headlights": [
+                "Ксенонові/Біксенонові"
+              ],
+              "multimedia": [
+                "Акустика",
+                "Навігаційна система",
+                "Мультимедіа система з LCD-екраном",
+                "AUX",
+                "Bluetooth",
+                "USB",
+                "CarPlay"
+              ],
+              "spare_wheel": [
+                "Докатка"
+              ],
+              "interior_color": [
+                "Темний"
+              ],
+              "power_steering": [
+                "Гідро"
+              ],
+              "climate_control": [
+                "Кондиціонер"
+              ],
+              "seat_adjustment": [
+                "Ручне регулювання передніх сидінь"
+              ],
+              "electric_windows": [
+                "Передні та задні"
+              ],
+              "body_and_interior": [
+                "Накладки на пороги",
+                "Захист картера",
+                "Захист коробки",
+                "Фаркоп"
+              ],
+              "interior_materials": [
+                "Тканина"
+              ],
+              "parking_assistance": [
+                "Парктронік задній"
+              ],
+              "steering_adjustment": [
+                "По висоті"
+              ]
+            },
+            "price_uah": 261000.0,
+            "price_usd": 5800.0,
+            "generation": "I поколiння",
+            "mileage_km": 291000,
+            "description": "Продам Грандіса в дуже не поганому стані,БЕЗ ЖОДНОГО ПІДКРАСУ,ремні ролики все поміняно,працює кожна кнопка,лобове ОРІГІНАЛ,оптика зроблена та заброньована на 500$,салон чистий не затертий в машині не курили!!!Два комплекта коліс гарне літо і не погана зима!Кого цікавить дзвоніть будемо розмовляти…Всім гарних покупок і мірного неба!!!!",
+            "seller_type": "private",
+            "modification": "2.4 МТ (165 к.с.)",
+            "published_at": "2026-10-11",
+            "transmission": "Ручна / Механіка",
+            "paint_condition": "Невиправлені сліди використання",
+            "technical_state": "Повністю непошкоджене",
+            "inspection_ready": true,
+            "condition_options": [
+              "Гаражне зберігання",
+              "Сервісна книжка"
+            ],
+            "emission_standard": "Євро-2",
+            "modification_power_hp": 165.0,
+            "fuel_consumption_l_per_100km": {
+              "city": 13.0,
+              "highway": 10.0,
+              "combined": 12.0
+            }
+          },
+          "observation": {
+            "material_id": "web:e4351ef789ee3204d0999cb32c130b9f",
+            "observed_at": "2026-10-11T04:49:40Z",
+            "content_sha256": "b62b403f7caca893a056cfc09aaadde40a92658f53f16ba942613feca3206d54",
+            "observation_id": "obs_01a1294b8ffe000067e20ded"
+          },
+          "provenance": {
+            "run_id": "run_01M4MMPS6G389RC254QTS9J7BC",
+            "package": {
+              "digest": "sha256:03b847ed72e1daeff05d76b7f9e8daffb7bd971171eabb7b7bd1c636474cea8e",
+              "version": "1.1.1",
+              "package_id": "autos.autoria-ad-page"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_b06fe43c62da490fb0940147bde73bc5"
+          }
+        },
+        {
+          "key": {
+            "scope": "autoria-cars",
+            "natural": {
+              "site": "auto.ria.com",
+              "ad_id": "39965695"
+            }
+          },
+          "fields": {
+            "url": "https://auto.ria.com/uk/auto_nissan_sunny_39965695.html",
+            "city": "Черкаси",
+            "fuel": "Газ/Бензин",
+            "make": "Nissan",
+            "site": "auto.ria.com",
+            "year": 1993,
+            "ad_id": "39965695",
+            "color": "Коричневий",
+            "image": "https://cdn0.riastatic.com/photosnew/auto/photo/nissan_sunny__645040873fx.webp",
+            "model": "Sunny",
+            "price": 1500.0,
+            "title": "Nissan Sunny 1993",
+            "region": "Черкаська обл.",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 1.4,
+            "body_type": "Седан",
+            "condition": "used",
+            "price_uah": 67500.0,
+            "price_usd": 1500.0,
+            "mileage_km": 500000,
+            "description": "пропоную до покупки хорошого нісанчика! на свої роки машина в гарному стані! по кузова гарна варити красити не потрібно! по мотору норм! робить рівненько і на газу і на бензині не троїть не димить !по ходовій теж нормально спеціально діагностику не робив але машина їде рівно нікуди не тягне нічого не гупає шруси не хрустить ! коротше нормальний конь на свої роки і гроші!",
+            "seller_type": "private",
+            "published_at": "2026-10-11",
+            "transmission": "Ручна / Механіка"
+          },
+          "observation": {
+            "material_id": "web:ce54817f61fcf11c1211d50d618d37aa",
+            "observed_at": "2026-10-11T04:49:44Z",
+            "content_sha256": "e7a394496e8ff040f03902f3781f8414c4e0dadf01ed4b0b459c01a6fd044edb",
+            "observation_id": "obs_01a1294b9f2b0000881a3b9f"
+          },
+          "provenance": {
+            "run_id": "run_01M4MMPS6G389RC254QTS9J7BC",
+            "package": {
+              "digest": "sha256:03b847ed72e1daeff05d76b7f9e8daffb7bd971171eabb7b7bd1c636474cea8e",
+              "version": "1.1.1",
+              "package_id": "autos.autoria-ad-page"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_a0891e67e314439b97e49eb980d100d1"
+          }
+        },
+        {
+          "key": {
+            "scope": "autoria-cars",
+            "natural": {
+              "site": "auto.ria.com",
+              "ad_id": "40080357"
+            }
+          },
+          "fields": {
+            "url": "https://auto.ria.com/uk/auto_mitsubishi_pajero_40080357.html",
+            "city": "Київ",
+            "fuel": "Бензин",
+            "make": "Mitsubishi",
+            "site": "auto.ria.com",
+            "year": 2006,
+            "ad_id": "40080357",
+            "color": "Білий металік",
+            "doors": 5,
+            "drive": "Повний",
+            "image": "https://cdn0.riastatic.com/photosnew/auto/photo/mitsubishi_pajero__648175370fx.webp",
+            "model": "Pajero",
+            "price": 7200.0,
+            "seats": 5,
+            "title": "Mitsubishi Pajero 2006",
+            "region": "Київська обл.",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 2.0,
+            "power_hp": 136.0,
+            "power_kw": 100.0,
+            "body_type": "Позашляховик / Кросовер",
+            "condition": "used",
+            "equipment": {
+              "safety": [
+                "Центральний замок",
+                "Антиблокувальна система (ABS)",
+                "Імобілайзер",
+                "Блокування замків задніх дверей"
+              ],
+              "airbags": [
+                "Водія",
+                "Пасажира",
+                "Бічні передні",
+                "Бічні задні",
+                "Віконні (шторки)",
+                "Колін водія"
+              ],
+              "comfort": [
+                "Підігрів дзеркал",
+                "Тоновані вікна",
+                "Складане заднє сидіння",
+                "Передній центральний підлокітник",
+                "Декоративне підсвічування салону",
+                "Розетка 12V",
+                "Електропривід дзеркал",
+                "Електроскладання дзеркал",
+                "Підкурювач і попільничка"
+              ],
+              "lighting": [
+                "Денні ходові вогні",
+                "Протитуманні фари"
+              ],
+              "headlights": [
+                "Галогенні"
+              ],
+              "multimedia": [
+                "Навігаційна система",
+                "Мультимедіа система з LCD-екраном",
+                "Bluetooth"
+              ],
+              "spare_wheel": [
+                "Повнорозмірне"
+              ],
+              "interior_color": [
+                "Світлий"
+              ],
+              "power_steering": [
+                "Гідро"
+              ],
+              "climate_control": [
+                "Клімат-контроль 1-зонний"
+              ],
+              "seat_adjustment": [
+                "Ручне регулювання передніх сидінь"
+              ],
+              "electric_windows": [
+                "Передні та задні"
+              ],
+              "body_and_interior": [
+                "Накладки на пороги",
+                "Захист картера",
+                "Захист коробки",
+                "Фаркоп"
+              ],
+              "interior_materials": [
+                "Велюр"
+              ],
+              "parking_assistance": [
+                "Задня камера"
+              ],
+              "steering_adjustment": [
+                "По висоті"
+              ]
+            },
+            "price_uah": 324000.0,
+            "price_usd": 7200.0,
+            "generation": "III покоління (FL)",
+            "mileage_km": 135000,
+            "description": "Кермо з правої сторони, авто припливло з Японії! Pajero iO. (Pajero Pinin). Коротка база, великий дорожній просвіт, приємне в керуванні авто. Можна перемикати режими: задній привід, повний привід, повний привід та між осьове блокування і понижена передача. SuperSelect. Встановлена багажна система Thule (можна поставити автобокс, намет).Гума Roadcruza RA1100AT проїхала 3000км. Масло міняв 1000км тому. Новий паливний насос + фільтр. Нові подушки двигуна і коробки. Робив чистку форсунок на стенді.…",
+            "seller_type": "private",
+            "published_at": "2026-10-11",
+            "transmission": "Автомат",
+            "paint_condition": "Невиправлені сліди використання",
+            "inspection_ready": true,
+            "condition_options": [
+              "Гаражне зберігання",
+              "Сервісна книжка",
+              "Перший власник",
+              "Перша реєстрація"
+            ]
+          },
+          "observation": {
+            "material_id": "web:766ffc134345f969888500d018dcf95d",
+            "observed_at": "2026-10-11T04:49:38Z",
+            "content_sha256": "8feaef6462d7119af8ca17377beb866f65ee74fb8ffff497a4f61f9fdf4e57e0",
+            "observation_id": "obs_01a1294b88f00000c32f6812"
+          },
+          "provenance": {
+            "run_id": "run_01M4MMPS6G389RC254QTS9J7BC",
+            "package": {
+              "digest": "sha256:03b847ed72e1daeff05d76b7f9e8daffb7bd971171eabb7b7bd1c636474cea8e",
+              "version": "1.1.1",
+              "package_id": "autos.autoria-ad-page"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_b43389f31abe4f58ae97967ae71cf19b"
+          }
+        },
+        {
+          "key": {
+            "scope": "autoria-cars",
+            "natural": {
+              "site": "auto.ria.com",
+              "ad_id": "40297885"
+            }
+          },
+          "fields": {
+            "url": "https://auto.ria.com/uk/auto_mazda_323_40297885.html",
+            "city": "Павлоград",
+            "fuel": "Бензин",
+            "make": "Mazda",
+            "site": "auto.ria.com",
+            "year": 1991,
+            "ad_id": "40297885",
+            "color": "Сірий",
+            "doors": 4,
+            "drive": "Передній",
+            "image": "https://cdn0.riastatic.com/photosnew/auto/photo/mazda_323__654066152fx.webp",
+            "model": "323",
+            "price": 1250.0,
+            "seats": 4,
+            "title": "Mazda 323 1991",
+            "region": "Дніпропетровська обл.",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 1.3,
+            "body_type": "Седан",
+            "condition": "used",
+            "price_uah": 56250.0,
+            "price_usd": 1250.0,
+            "mileage_km": 960000,
+            "description": "Продам авто,для своїх років в не поганому стані, мотор робить добре,ходова частина в робочому стані,електрика робоча,так як роки беруть своє начали гнить пороги,дно ціле,**********",
+            "seller_type": "private",
+            "published_at": "2026-10-11",
+            "transmission": "Ручна / Механіка",
+            "fuel_consumption_l_per_100km": {
+              "city": 10.0,
+              "highway": 8.0,
+              "combined": 8.0
+            }
+          },
+          "observation": {
+            "material_id": "web:c45b6e059fc90290d0bcfd86e03d3ce5",
+            "observed_at": "2026-10-11T04:49:39Z",
+            "content_sha256": "5161c2c882e24e566d0d31696bf7d39eeeba1bf8f05507b84b6ce54be6d888d6",
+            "observation_id": "obs_01a1294b8c580000a5b23060"
+          },
+          "provenance": {
+            "run_id": "run_01M4MMPS6G389RC254QTS9J7BC",
+            "package": {
+              "digest": "sha256:03b847ed72e1daeff05d76b7f9e8daffb7bd971171eabb7b7bd1c636474cea8e",
+              "version": "1.1.1",
+              "package_id": "autos.autoria-ad-page"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_4e6d2b9cc9db4395b481b65707fb3de0"
+          }
+        },
+        {
+          "key": {
+            "scope": "autoria-cars",
+            "natural": {
+              "site": "auto.ria.com",
+              "ad_id": "40301286"
+            }
+          },
+          "fields": {
+            "url": "https://auto.ria.com/uk/auto_volkswagen_golf_40301286.html",
+            "city": "Сарни",
+            "fuel": "Дизель",
+            "make": "Volkswagen",
+            "site": "auto.ria.com",
+            "year": 2009,
+            "ad_id": "40301286",
+            "color": "Сірий",
+            "doors": 5,
+            "drive": "Передній",
+            "image": "https://cdn0.riastatic.com/photosnew/auto/photo/volkswagen_golf__654168269fx.webp",
+            "model": "Golf",
+            "price": 6100.0,
+            "seats": 5,
+            "title": "Volkswagen Golf 2009",
+            "region": "Рівненська обл.",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 1.6,
+            "body_type": "Універсал",
+            "condition": "used",
+            "equipment": {
+              "safety": [
+                "Центральний замок",
+                "Антиблокувальна система (ABS)",
+                "Система стабілізації (ESP)",
+                "Імобілайзер",
+                "Антипробуксовочна система (ASR)",
+                "Блокування замків задніх дверей"
+              ],
+              "airbags": [
+                "Водія",
+                "Пасажира",
+                "Бічні передні",
+                "Бічні задні"
+              ],
+              "comfort": [
+                "Бортовий комп'ютер",
+                "Підігрів дзеркал",
+                "Складане заднє сидіння",
+                "Електропривід дзеркал"
+              ],
+              "multimedia": [
+                "Акустика",
+                "Навігаційна система",
+                "AUX",
+                "Bluetooth",
+                "USB",
+                "Android Auto"
+              ],
+              "interior_color": [
+                "Темний"
+              ],
+              "climate_control": [
+                "Кондиціонер"
+              ],
+              "electric_windows": [
+                "Передні та задні"
+              ],
+              "body_and_interior": [
+                "Довга база",
+                "Фаркоп"
+              ],
+              "interior_materials": [
+                "Тканина"
+              ],
+              "steering_adjustment": [
+                "По висоті та по вильоту"
+              ]
+            },
+            "price_uah": 274500.0,
+            "price_usd": 6100.0,
+            "generation": "VI покоління/Typ 5K",
+            "mileage_km": 227000,
+            "description": "Свіжопригнане авто з Німеччини",
+            "seller_type": "private",
+            "published_at": "2026-10-11",
+            "transmission": "Ручна / Механіка"
+          },
+          "observation": {
+            "material_id": "web:a791193d3e0b1a078fd09bd3be0f1426",
+            "observed_at": "2026-10-11T04:49:36Z",
+            "content_sha256": "285a226aca7e6295a3ec5a472aae15efe4cdbd86b29fa21ce63327a798e00ed9",
+            "observation_id": "obs_01a1294b815d0000c2acc9e6"
+          },
+          "provenance": {
+            "run_id": "run_01M4MMPS6G389RC254QTS9J7BC",
+            "package": {
+              "digest": "sha256:03b847ed72e1daeff05d76b7f9e8daffb7bd971171eabb7b7bd1c636474cea8e",
+              "version": "1.1.1",
+              "package_id": "autos.autoria-ad-page"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_eafc537eb6ea4e1f8c2c7e61afec4c39"
+          }
+        },
+        {
+          "key": {
+            "scope": "autoria-cars",
+            "natural": {
+              "site": "auto.ria.com",
+              "ad_id": "40547328"
+            }
+          },
+          "fields": {
+            "url": "https://auto.ria.com/uk/auto_chevrolet_lacetti_40547328.html",
+            "city": "Київ",
+            "fuel": "Газ/Бензин",
+            "make": "Chevrolet",
+            "site": "auto.ria.com",
+            "trim": "CDX",
+            "year": 2007,
+            "ad_id": "40547328",
+            "color": "Сірий",
+            "doors": 4,
+            "drive": "Передній",
+            "image": "https://cdn0.riastatic.com/photosnew/auto/photo/chevrolet_lacetti__660894717fx.webp",
+            "model": "Lacetti",
+            "price": 4800.0,
+            "seats": 5,
+            "title": "Chevrolet Lacetti 2007",
+            "region": "Київська обл.",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 1.8,
+            "power_hp": 166.0,
+            "power_kw": 122.0,
+            "body_type": "Седан",
+            "condition": "used",
+            "equipment": {
+              "headlights": [
+                "Світлодіодні"
+              ],
+              "heated_seats": [
+                "Передні сидіння"
+              ],
+              "climate_control": [
+                "Клімат-контроль 1-зонний"
+              ],
+              "electric_windows": [
+                "Передні та задні"
+              ]
+            },
+            "price_uah": 216000.0,
+            "price_usd": 4800.0,
+            "generation": "I покоління",
+            "mileage_km": 228000,
+            "description": "Сімейний автомобіль.Доглянутий салон,підігрів передніх сидінь.З максимальною комплектацією!!! Повністю перебрана ходова частина,замінений ремінь ГРМ з помпою на пробігу 220 тис.Антикорозійна обробка кузова,шумоізоляція салону.Зимова гума.",
+            "seller_type": "private",
+            "modification": "1.8 AT (122 л,с.)",
+            "published_at": "2026-10-11",
+            "transmission": "Автомат",
+            "paint_condition": "Невиправлені сліди використання",
+            "fuel_consumption_l_per_100km": {
+              "city": 11.0,
+              "highway": 9.0,
+              "combined": 10.0
+            }
+          },
+          "observation": {
+            "material_id": "web:1108196d9fa120008ba89d6266f73ed5",
+            "observed_at": "2026-10-11T04:49:42Z",
+            "content_sha256": "763f0c4f851adf85659095f0a05a5019d35fc4bf51745ffb33a6c728e7283491",
+            "observation_id": "obs_01a1294b97ad0000f211d9cd"
+          },
+          "provenance": {
+            "run_id": "run_01M4MMPS6G389RC254QTS9J7BC",
+            "package": {
+              "digest": "sha256:03b847ed72e1daeff05d76b7f9e8daffb7bd971171eabb7b7bd1c636474cea8e",
+              "version": "1.1.1",
+              "package_id": "autos.autoria-ad-page"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_7dedc12b20de471f9f74bba96ab7bf12"
+          }
+        },
+        {
+          "key": {
+            "scope": "autoria-cars",
+            "natural": {
+              "site": "auto.ria.com",
+              "ad_id": "40547568"
+            }
+          },
+          "fields": {
+            "url": "https://auto.ria.com/uk/auto_nissan_juke_40547568.html",
+            "city": "Полтава",
+            "fuel": "Бензин",
+            "make": "Nissan",
+            "site": "auto.ria.com",
+            "year": 2015,
+            "ad_id": "40547568",
+            "color": "Сірий металік",
+            "drive": "Повний",
+            "image": "https://cdn0.riastatic.com/photosnew/auto/photo/nissan_juke__660901548fx.webp",
+            "model": "Juke",
+            "price": 9700.0,
+            "title": "Nissan Juke 2015",
+            "region": "Полтавська обл.",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 1.6,
+            "body_type": "Позашляховик / Кросовер",
+            "condition": "used",
+            "equipment": {
+              "safety": [
+                "Центральний замок",
+                "Антиблокувальна система (ABS)",
+                "Сигналізація",
+                "Система стабілізації (ESP)",
+                "Імобілайзер",
+                "Антипробуксовочна система (ASR)",
+                "Датчик тиску в шинах",
+                "Система кріплення IsoFix",
+                "Блокування замків задніх дверей"
+              ],
+              "headlights": [
+                "Ксенонові/Біксенонові"
+              ],
+              "multimedia": [
+                "Акустика",
+                "Навігаційна система",
+                "Мультимедіа система з LCD-екраном",
+                "AUX",
+                "Bluetooth",
+                "USB"
+              ],
+              "heated_seats": [
+                "Передні сидіння"
+              ],
+              "climate_control": [
+                "Клімат-контроль 1-зонний"
+              ],
+              "interior_materials": [
+                "Велюр"
+              ],
+              "parking_assistance": [
+                "Камера 360"
+              ]
+            },
+            "price_uah": 436500.0,
+            "price_usd": 9700.0,
+            "generation": "II покоління",
+            "mileage_km": 163000,
+            "description": "ТЕХНІЧНО В ІДЕАЛЬНОМУ СТАНІ. КОМПЛЕКТАЦІЯ SV : КАМЕРИ 360,КЛІМАТ КОНТРОЛЬ, ДАТЧИК СВІТЛА ТА ДОЩУ, ПІДКЛЮЧАЄМИЙ ПОВНИЙ ПРИВІД, БЕЗКЛЮЧОВИЙ ДОСТУП, ВИБІР РЕЖИМУ РУХУ, АКУСТИКА ROCKFORD + САБ , ЛІНЗОВАНА ОПТИКА, САЛОН ВЕЛЮР, ЛЮК,КРУЇЗ КОНТРОЛЬ,КЛІМАТ КОНТРОЛЬ. ВКЛАДЕНЬ НЕ ПОТРЕБУЄ. ПРОЙДЕНА СЕРТИФІКАЦІЯ. ВСТАНОВЛЕНО НОВЕ КРИЛО ТА БАМПЕР.",
+            "seller_type": "private",
+            "published_at": "2026-10-11",
+            "transmission": "Варіатор"
+          },
+          "observation": {
+            "material_id": "web:c772d5c1c5f664bb4bf7cc473a120f31",
+            "observed_at": "2026-10-11T04:49:43Z",
+            "content_sha256": "02514a79154e295a0455cafc8a7f21bdf5e79f635f787ea3a2378f61b7e9f783",
+            "observation_id": "obs_01a1294b9b1f0000b98e5c2a"
+          },
+          "provenance": {
+            "run_id": "run_01M4MMPS6G389RC254QTS9J7BC",
+            "package": {
+              "digest": "sha256:03b847ed72e1daeff05d76b7f9e8daffb7bd971171eabb7b7bd1c636474cea8e",
+              "version": "1.1.1",
+              "package_id": "autos.autoria-ad-page"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_902b26f5285441ebb1c45071625c7d61"
+          }
+        },
+        {
+          "key": {
+            "scope": "autoria-cars",
+            "natural": {
+              "site": "auto.ria.com",
+              "ad_id": "40547569"
+            }
+          },
+          "fields": {
+            "url": "https://auto.ria.com/uk/auto_tesla_model-y_40547569.html",
+            "city": "Київ",
+            "fuel": "Електро",
+            "make": "Tesla",
+            "site": "auto.ria.com",
+            "year": 2021,
+            "ad_id": "40547569",
+            "color": "Білий",
+            "doors": 5,
+            "drive": "Повний",
+            "image": "https://cdn0.riastatic.com/photosnew/auto/photo/tesla_model-y__660901747fx.webp",
+            "model": "Model Y",
+            "price": 26000.0,
+            "seats": 5,
+            "title": "Tesla Model Y 2021",
+            "region": "Київська обл.",
+            "status": "active",
+            "currency": "USD",
+            "body_type": "Позашляховик / Кросовер",
+            "condition": "used",
+            "equipment": {
+              "climate_control": [
+                "Клімат-контроль багатозонний"
+              ]
+            },
+            "price_uah": 1170000.0,
+            "price_usd": 26000.0,
+            "generation": "I покоління",
+            "mileage_km": 42000,
+            "description": "Залишок батареї 92% Резина всесезонна continental",
+            "seller_type": "private",
+            "published_at": "2026-10-11",
+            "transmission": "Автомат",
+            "paint_condition": "Як нове",
+            "technical_state": "Повністю непошкоджене"
+          },
+          "observation": {
+            "material_id": "web:5da12e1135c33dd0be895cd392b59242",
+            "observed_at": "2026-10-11T04:49:35Z",
+            "content_sha256": "74ed1f6e0c6735627221bccb5b06aeae1d3100ffe840f6a2054f1bef8f528588",
+            "observation_id": "obs_01a1294b7c1100005295e66d"
+          },
+          "provenance": {
+            "run_id": "run_01M4MMPS6G389RC254QTS9J7BC",
+            "package": {
+              "digest": "sha256:03b847ed72e1daeff05d76b7f9e8daffb7bd971171eabb7b7bd1c636474cea8e",
+              "version": "1.1.1",
+              "package_id": "autos.autoria-ad-page"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_86ade76156fa4327ba8a4575b11c5506"
+          }
+        },
+        {
+          "key": {
+            "scope": "autoria-cars",
+            "natural": {
+              "site": "auto.ria.com",
+              "ad_id": "40547571"
+            }
+          },
+          "fields": {
+            "url": "https://auto.ria.com/uk/auto_opel_combo_40547571.html",
+            "city": "Калуш",
+            "fuel": "Газ/Бензин",
+            "make": "Opel",
+            "site": "auto.ria.com",
+            "year": 2007,
+            "ad_id": "40547571",
+            "color": "Білий металік",
+            "doors": 5,
+            "drive": "Передній",
+            "image": "https://cdn0.riastatic.com/photosnew/auto/photo/opel_combo__660901977fx.webp",
+            "model": "Combo",
+            "price": 2999.0,
+            "seats": 5,
+            "title": "Opel Combo 2007",
+            "region": "Івано-Франківська обл.",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 1.36,
+            "body_type": "Мінівен",
+            "condition": "used",
+            "price_uah": 134955.0,
+            "price_usd": 2999.0,
+            "generation": "II покоління/C (FL)",
+            "mileage_km": 255000,
+            "description": "Продам власне сімейне авто opel combo 2007 року випуску з самим надійним та простим двигуном 1.4 газ бензин. Газ вписаний в техпаспорт та працює відмінно. Автомобіль в користуванні 10 років, останні 2 роки більше стоїть.Нові зимові шини 22-го року. Кузов весь в рідній фарбі без корозії дир та ДТП. Ходова частина та коробка передач також в хорошому стані. З документами повний порядок.оригінал пасажир!!!",
+            "seller_type": "private",
+            "published_at": "2026-10-11",
+            "transmission": "Ручна / Механіка",
+            "inspection_ready": true,
+            "condition_options": [
+              "Гаражне зберігання",
+              "Сервісна книжка",
+              "Перший власник",
+              "Перша реєстрація"
+            ]
+          },
+          "observation": {
+            "material_id": "web:92ad31c22ef108360104bffcd5a58f73",
+            "observed_at": "2026-10-11T04:49:41Z",
+            "content_sha256": "1bd7320ebbb0d4ffdd1ea453e9833f2b5bc0518dcdff458cf81d297063a93895",
+            "observation_id": "obs_01a1294b93970000e33aa380"
+          },
+          "provenance": {
+            "run_id": "run_01M4MMPS6G389RC254QTS9J7BC",
+            "package": {
+              "digest": "sha256:03b847ed72e1daeff05d76b7f9e8daffb7bd971171eabb7b7bd1c636474cea8e",
+              "version": "1.1.1",
+              "package_id": "autos.autoria-ad-page"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_7c33b304c9f949c384ac2ba02b0d4553"
+          }
+        }
+      ]
+    },
+    "rst": {
+      "run_id": "run_01M4MN6R1YDVWBWYNTP61KQ0QM",
+      "schedule": {
+        "type": "interval",
+        "enabled": true,
+        "overlap": "skip",
+        "interval_seconds": 21600
+      },
+      "verified_entity_count": 10,
+      "total_entity_count": 10,
+      "raw_object_count": 112,
+      "verified_raw_object_count": 10,
+      "raw_checks": [
+        {
+          "object_id": "obj_a9651c408e600e38bbc7c229b29e9003",
+          "observation_id": "obs_01a1295368e20000ec83e208",
+          "sha256": "a0d43b5bdfb8e0d9c7eb91f831d631a20f64134076a0ac696409b8b0d31aa96a",
+          "size_bytes": 38001,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_b3fee4b54137d75c8f2384bc1fbac91f",
+          "observation_id": "obs_01a129536cd60000ef3d8432",
+          "sha256": "e4ef7fe02359114899fac1ca92b72976954aef0d65acc576d4abc94811b149b7",
+          "size_bytes": 35133,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_2bf46ce3fcb6bc27e6ce39c4afe80e95",
+          "observation_id": "obs_01a1295370b70000f9c2cab0",
+          "sha256": "ade27a0ab53079365ed76a515f256ca9cb85c97b57240a438f6bbdd7d106fc43",
+          "size_bytes": 37859,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_95c63c33b36dcf9269f89e1cbb4332d2",
+          "observation_id": "obs_01a1295374a1000008259985",
+          "sha256": "8f6992237c04487d0a2ee242a292b1763f280067f6d0676eac00965a44f4df21",
+          "size_bytes": 35317,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_cace7cb18fe89bbc74f124ee0a81f229",
+          "observation_id": "obs_01a1295378900000bf6ca1ed",
+          "sha256": "2546e3f1d2eb3b8acb49a5e33b940a8fd6daaa44d8142d5f0a1cae55f4aff2da",
+          "size_bytes": 37189,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_9e226b0f49c4d38ff82f405ed8035141",
+          "observation_id": "obs_01a129537c800000e821b79d",
+          "sha256": "311226742e7cc5c3485a913abc2c05369eb7324a8ce844b97c1bdb7c3fd8f4fe",
+          "size_bytes": 37548,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_08b35a2ac66e30157bff1d3181f66c26",
+          "observation_id": "obs_01a1295380740000225d16b6",
+          "sha256": "a0f64b7fdbb6e3ed616acae5cc98dab9652f49bdb02ba847f8dc85aa24adbb67",
+          "size_bytes": 34206,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_f1bb6fa1095445211275df4467eeca0d",
+          "observation_id": "obs_01a1295384600000f2511e37",
+          "sha256": "dfb363b859359efd1a5dca45628cbee4d01acb9da68195b348aa533512ae5483",
+          "size_bytes": 34618,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_9f6abe96a915eceee59af967931e41d9",
+          "observation_id": "obs_01a12953884600006a42c9cc",
+          "sha256": "37b1eb1d257788ee8a435cef078cbad2280be83f7b0fa79ef0a2a9c09b9d37c3",
+          "size_bytes": 37366,
+          "fields_replayed": true
+        },
+        {
+          "object_id": "obj_c39858804de8e6f49269cd18b50bc77e",
+          "observation_id": "obs_01a129538c2c000088fb6ec4",
+          "sha256": "431cbfac2dec4eeec52d732ede92abf4cbd6026f713821631f780c23399b32bc",
+          "size_bytes": 42390,
+          "fields_replayed": true
+        }
+      ],
+      "entities": [
+        {
+          "key": {
+            "scope": "autos-rst",
+            "natural": {
+              "site": "rst.ua",
+              "ad_id": "15275865"
+            }
+          },
+          "fields": {
+            "url": "https://rst.ua/ukr/oldcars/hyundai/santafe/hyundai_santafe_15275865.html",
+            "city": "Одеса",
+            "fuel": "petrol",
+            "make": "HYUNDAI",
+            "site": "rst.ua",
+            "trim": "Limited",
+            "year": 2024,
+            "ad_id": "15275865",
+            "color": "червоний",
+            "drive": "awd",
+            "image": "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-1.jpg",
+            "model": "Santa Fe",
+            "price": 35500,
+            "title": "HYUNDAI Santa Fe Limited",
+            "photos": [
+              "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-1.jpg",
+              "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-3.jpg",
+              "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-4.jpg",
+              "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-5.jpg",
+              "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-7.jpg",
+              "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-9.jpg",
+              "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-11.jpg",
+              "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-13.jpg",
+              "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-14.jpg",
+              "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-15.jpg",
+              "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-16.jpg",
+              "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-17.jpg",
+              "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-18.jpg",
+              "https://i0.rst.ua/oldcars/hyundai/santafe/15275865-19.jpg"
+            ],
+            "region": "Одеська область",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 2.5,
+            "body_type": "suv",
+            "condition": "used",
+            "equipment": [
+              "3 ряди сидінь / 7 повноцінних місць",
+              "Вентиляція та підігрів передніх сидінь",
+              "Підігрів задніх сидінь",
+              "Панорамний дах",
+              "Заводські шторки на задніх дверях",
+              "Преміальна мультимедіа, цифрова панель приладів",
+              "Повний пакет систем безпеки та асистентів водія (адаптивний круїз, утримання в смузі, контроль сліпих зон тощо)",
+              "2 оригінальні ключі"
+            ],
+            "price_uah": 1599300,
+            "price_usd": 35500,
+            "raw_specs": {
+              "КПП": "Автомат • Повний пр.",
+              "рік": "2024",
+              "кузов": "Позашляховик Червоний",
+              "пробiг": "11'000 km",
+              "двигун": "2.5 • Бензин"
+            },
+            "mileage_km": 11000,
+            "vin_masked": "5NM*****030920",
+            "description": "Hyundai Santa Fe 2024 Limited - майже новий, топ-комплектація, 7 місць • Практично новий автомобіль, який уже пройшов обкатку (11 000 км) • За технічним і візуальним станом нічим не відрізняється від авто з автосалону, але без переплати за «нульовий» кілометраж • Комплектація Limited - одна з наймаксимальніших для Santa Fe: • 3 ряди сидінь / 7 повноцінних місць • Вентиляція та підігрів передніх сидінь • Підігрів задніх сидінь • Панорамний дах • Заводські шторки на задніх дверях • Преміальна мул…",
+            "transmission": "automatic",
+            "description_full": "Hyundai Santa Fe 2024 Limited - майже новий, топ-комплектація, 7 місць • Практично новий автомобіль, який уже пройшов обкатку (11 000 км) • За технічним і візуальним станом нічим не відрізняється від авто з автосалону, але без переплати за «нульовий» кілометраж • Комплектація Limited - одна з наймаксимальніших для Santa Fe: • 3 ряди сидінь / 7 повноцінних місць • Вентиляція та підігрів передніх сидінь • Підігрів задніх сидінь • Панорамний дах • Заводські шторки на задніх дверях • Преміальна мультимедіа, цифрова панель приладів • Повний пакет систем безпеки та асистентів водія (адаптивний круїз, утримання в смузі, контроль сліпих зон тощо) • 2 оригінальні ключі • Стан - «сів і поїхав», вкладень не потребує • VIN відкритий, історія прозора, будь-які перевірки на СТО вітаються.",
+            "registration_history": [
+              "В Україні з 24.12.2025",
+              "1-й власник в Укр."
+            ]
+          },
+          "observation": {
+            "material_id": "web:55817a373b9a13f6d5e8e52faa8563cd",
+            "observed_at": "2026-10-11T04:58:14Z",
+            "content_sha256": "a0d43b5bdfb8e0d9c7eb91f831d631a20f64134076a0ac696409b8b0d31aa96a",
+            "observation_id": "obs_01a1295368e20000ec83e208"
+          },
+          "provenance": {
+            "run_id": "run_01M4MN6R1YDVWBWYNTP61KQ0QM",
+            "package": {
+              "digest": "sha256:b0084422fa860923a2744cf42eca4cea798b72321d8e5c5a9e6078f07ede85c9",
+              "version": "1.1.0",
+              "package_id": "autos.rst-car-ads"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_41650687f1f14bf0aad521171fdc9ff3"
+          }
+        },
+        {
+          "key": {
+            "scope": "autos-rst",
+            "natural": {
+              "site": "rst.ua",
+              "ad_id": "15307308"
+            }
+          },
+          "fields": {
+            "url": "https://rst.ua/ukr/oldcars/mercedes/sprinter/mercedes_sprinter_15307308.html",
+            "city": "Харків",
+            "fuel": "diesel",
+            "make": "MERCEDES",
+            "site": "rst.ua",
+            "year": 2021,
+            "ad_id": "15307308",
+            "color": "білий",
+            "drive": "rear",
+            "image": "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-18.jpg",
+            "model": "Sprinter",
+            "price": 37000,
+            "title": "MERCEDES Sprinter",
+            "photos": [
+              "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-18.jpg",
+              "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-14.jpg",
+              "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-7.jpg",
+              "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-13.jpg",
+              "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-15.jpg",
+              "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-8.jpg",
+              "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-9.jpg",
+              "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-10.jpg",
+              "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-16.jpg",
+              "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-17.jpg",
+              "https://i0.rst.ua/oldcars/mercedes/sprinter/15307308-19.jpg"
+            ],
+            "region": "Харківська область",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 2.0,
+            "body_type": "minibus",
+            "condition": "used",
+            "price_uah": 1666900,
+            "price_usd": 37000,
+            "raw_specs": {
+              "КПП": "Автомат • Задній пр.",
+              "рік": "2021 • 5 років",
+              "кузов": "Мікробус пасажир Білий",
+              "пробiг": "521'000 km • 104 тис/рік",
+              "двигун": "2.0 • Дизель"
+            },
+            "mileage_km": 521000,
+            "vin_masked": "W1V*****352202",
+            "description": "Легковой 8 + 1 все в полном порядке два климата по роботе коробке двигателя ходовой идеально, любое ваше сто любые проверки",
+            "transmission": "automatic",
+            "description_full": "Легковой 8 + 1 все в полном порядке два климата по роботе коробке двигателя ходовой идеально, любое ваше сто любые проверки",
+            "registration_history": [
+              "В Україні з 01.03.2024",
+              "2-й власник в Укр.",
+              "2 роки у власника"
+            ]
+          },
+          "observation": {
+            "material_id": "web:8a24cd49b9f4ac0ee8534f7208c6dad6",
+            "observed_at": "2026-10-11T04:58:21Z",
+            "content_sha256": "dfb363b859359efd1a5dca45628cbee4d01acb9da68195b348aa533512ae5483",
+            "observation_id": "obs_01a1295384600000f2511e37"
+          },
+          "provenance": {
+            "run_id": "run_01M4MN6R1YDVWBWYNTP61KQ0QM",
+            "package": {
+              "digest": "sha256:b0084422fa860923a2744cf42eca4cea798b72321d8e5c5a9e6078f07ede85c9",
+              "version": "1.1.0",
+              "package_id": "autos.rst-car-ads"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_10b886dfca644e1a85270ef41274b707"
+          }
+        },
+        {
+          "key": {
+            "scope": "autos-rst",
+            "natural": {
+              "site": "rst.ua",
+              "ad_id": "15400674"
+            }
+          },
+          "fields": {
+            "url": "https://rst.ua/ukr/oldcars/volkswagen/passat/volkswagen_passat_15400674.html",
+            "city": "Львів",
+            "fuel": "diesel",
+            "make": "VOLKSWAGEN",
+            "site": "rst.ua",
+            "year": 2013,
+            "ad_id": "15400674",
+            "color": "чорний",
+            "drive": "front",
+            "image": "https://i2.rst.ua/oldcars/volkswagen/passat/15400674-17.jpg",
+            "model": "Passat",
+            "price": 9300,
+            "title": "VOLKSWAGEN Passat",
+            "photos": [
+              "https://i2.rst.ua/oldcars/volkswagen/passat/15400674-17.jpg",
+              "https://i2.rst.ua/oldcars/volkswagen/passat/15400674-58.jpg",
+              "https://i2.rst.ua/oldcars/volkswagen/passat/15400674-57.jpg",
+              "https://i2.rst.ua/oldcars/volkswagen/passat/15400674-52.jpg",
+              "https://i2.rst.ua/oldcars/volkswagen/passat/15400674-45.jpg",
+              "https://i2.rst.ua/oldcars/volkswagen/passat/15400674-62.jpg",
+              "https://i2.rst.ua/oldcars/volkswagen/passat/15400674-53.jpg",
+              "https://i2.rst.ua/oldcars/volkswagen/passat/15400674-60.jpg",
+              "https://i2.rst.ua/oldcars/volkswagen/passat/15400674-61.jpg",
+              "https://i2.rst.ua/oldcars/volkswagen/passat/15400674-55.jpg",
+              "https://i2.rst.ua/oldcars/volkswagen/passat/15400674-50.jpg",
+              "https://i2.rst.ua/oldcars/volkswagen/passat/15400674-49.jpg",
+              "https://i2.rst.ua/oldcars/volkswagen/passat/15400674-59.jpg"
+            ],
+            "region": "Львівська область",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 2.0,
+            "body_type": "wagon",
+            "condition": "used",
+            "price_uah": 419000,
+            "price_usd": 9300,
+            "raw_specs": {
+              "КПП": "Автомат • Передній пр.",
+              "рік": "2013 • 13 років",
+              "кузов": "Універсал Чорний",
+              "пробiг": "341'000 km • 26 тис/рік",
+              "двигун": "2.0 • Дизель"
+            },
+            "mileage_km": 341000,
+            "vin_masked": "WVW*****134465",
+            "description": "Продам власний Volkswagen Passat B7, 2.0 TDI • 177 k.c., DSG, 2013 p.в . Пригнаний з Німеччини • Aвтомобіль чесний, пробіг 341к км • Авто повністю обслужене та не потребує вкладень. Двигун чистий, сухий, не димить. Нові свічки розжарювання . DSG перемикає чотко, плавно • Замінено ГРМ • Замінено щеплення та демпфер • Замінено оливу в DSG . Додатково комплект зимової гуми Continental • Перебрана ходовка в цьому році • Нещодавно оформлене страхування, є звіт CarVertical від попереднього власника •…",
+            "transmission": "automatic",
+            "description_full": "Продам власний Volkswagen Passat B7, 2.0 TDI • 177 k.c., DSG, 2013 p.в . Пригнаний з Німеччини • Aвтомобіль чесний, пробіг 341к км • Авто повністю обслужене та не потребує вкладень. Двигун чистий, сухий, не димить. Нові свічки розжарювання . DSG перемикає чотко, плавно • Замінено ГРМ • Замінено щеплення та демпфер • Замінено оливу в DSG . Додатково комплект зимової гуми Continental • Перебрана ходовка в цьому році • Нещодавно оформлене страхування, є звіт CarVertical від попереднього власника • Автомобіль доглянутий, технічно справний, готовий до будь яких перевірок на СТО, відповім на всі запитання •",
+            "registration_history": [
+              "1 рік у власника"
+            ]
+          },
+          "observation": {
+            "material_id": "web:afa34b317035a841d015437954fcee0e",
+            "observed_at": "2026-10-11T04:58:19Z",
+            "content_sha256": "311226742e7cc5c3485a913abc2c05369eb7324a8ce844b97c1bdb7c3fd8f4fe",
+            "observation_id": "obs_01a129537c800000e821b79d"
+          },
+          "provenance": {
+            "run_id": "run_01M4MN6R1YDVWBWYNTP61KQ0QM",
+            "package": {
+              "digest": "sha256:b0084422fa860923a2744cf42eca4cea798b72321d8e5c5a9e6078f07ede85c9",
+              "version": "1.1.0",
+              "package_id": "autos.rst-car-ads"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_64f45b8f8f0b48e0857302af10d7ecf1"
+          }
+        },
+        {
+          "key": {
+            "scope": "autos-rst",
+            "natural": {
+              "site": "rst.ua",
+              "ad_id": "15431541"
+            }
+          },
+          "fields": {
+            "url": "https://rst.ua/ukr/oldcars/mercedes/gls/mercedes_gls_15431541.html",
+            "city": "Київ",
+            "fuel": "petrol",
+            "make": "MERCEDES",
+            "site": "rst.ua",
+            "year": 2017,
+            "ad_id": "15431541",
+            "color": "синій",
+            "drive": "awd",
+            "image": "https://i1.rst.ua/oldcars/mercedes/gls/15431541-10.jpg",
+            "model": "GLS",
+            "price": 26500,
+            "title": "MERCEDES GLS",
+            "photos": [
+              "https://i1.rst.ua/oldcars/mercedes/gls/15431541-10.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/gls/15431541-1.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/gls/15431541-2.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/gls/15431541-3.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/gls/15431541-4.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/gls/15431541-5.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/gls/15431541-6.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/gls/15431541-7.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/gls/15431541-8.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/gls/15431541-9.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/gls/15431541-11.jpg"
+            ],
+            "region": "Київська область",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 3.0,
+            "body_type": "suv",
+            "condition": "used",
+            "price_uah": 1193900,
+            "price_usd": 26500,
+            "raw_specs": {
+              "КПП": "Автомат • Повний пр.",
+              "рік": "2017 • 9 років",
+              "кузов": "Позашляховик Синій",
+              "пробiг": "112'000 km • 12 тис/рік",
+              "двигун": "3.0 • Бензин"
+            },
+            "mileage_km": 112000,
+            "vin_masked": "4JG*****038563",
+            "description": "Автомобиль не использовался в Украине, ездит дорогами Австрии. Идеальное состояние, обслуживался в официальном сервисном центре Mercedes • Возможен обмен на недвижимость • Выполнено полное расширенное ТО согласно регламенту. Android auto и Carplay, радио на парных и непарных частотах, км/ч, музыка Harman Kardon. 7-местный салон, автоматически складываются 2-й и 3-й ряд сидений. 4 камеры, 360° обзор. В мае 2023 года сделан детейлинг авто, кузов покрыт керамикой. По машине нет никаких вопросов, в…",
+            "transmission": "automatic",
+            "description_full": "Автомобиль не использовался в Украине, ездит дорогами Австрии. Идеальное состояние, обслуживался в официальном сервисном центре Mercedes • Возможен обмен на недвижимость • Выполнено полное расширенное ТО согласно регламенту. Android auto и Carplay, радио на парных и непарных частотах, км/ч, музыка Harman Kardon. 7-местный салон, автоматически складываются 2-й и 3-й ряд сидений. 4 камеры, 360° обзор. В мае 2023 года сделан детейлинг авто, кузов покрыт керамикой. По машине нет никаких вопросов, все работает как швейцарские часы. Авто обуто в новую летнюю резину Pirelli • Возможен обмен на недвижимость.",
+            "registration_history": [
+              "2 роки у власника"
+            ]
+          },
+          "observation": {
+            "material_id": "web:4e2515388f6157f63ab8f966bfef930a",
+            "observed_at": "2026-10-11T04:58:18Z",
+            "content_sha256": "2546e3f1d2eb3b8acb49a5e33b940a8fd6daaa44d8142d5f0a1cae55f4aff2da",
+            "observation_id": "obs_01a1295378900000bf6ca1ed"
+          },
+          "provenance": {
+            "run_id": "run_01M4MN6R1YDVWBWYNTP61KQ0QM",
+            "package": {
+              "digest": "sha256:b0084422fa860923a2744cf42eca4cea798b72321d8e5c5a9e6078f07ede85c9",
+              "version": "1.1.0",
+              "package_id": "autos.rst-car-ads"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_373905be4a884e3eba53bf70bcf7d73f"
+          }
+        },
+        {
+          "key": {
+            "scope": "autos-rst",
+            "natural": {
+              "site": "rst.ua",
+              "ad_id": "15449338"
+            }
+          },
+          "fields": {
+            "url": "https://rst.ua/ukr/oldcars/mazda/cx-90/mazda_cx-90_15449338.html",
+            "city": "Київ",
+            "fuel": "hybrid",
+            "make": "MAZDA",
+            "site": "rst.ua",
+            "trim": "Premium Plus MHEV",
+            "year": 2024,
+            "ad_id": "15449338",
+            "color": "сірий",
+            "drive": "awd",
+            "image": "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-1.jpg",
+            "model": "CX-90",
+            "price": 39999,
+            "title": "MAZDA CX-90 Premium Plus MHEV",
+            "photos": [
+              "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-1.jpg",
+              "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-4.jpg",
+              "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-5.jpg",
+              "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-8.jpg",
+              "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-6.jpg",
+              "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-7.jpg",
+              "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-9.jpg",
+              "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-10.jpg",
+              "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-11.jpg",
+              "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-13.jpg",
+              "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-14.jpg",
+              "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-15.jpg",
+              "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-16.jpg",
+              "https://i0.rst.ua/oldcars/mazda/cx-90/15449338-17.jpg"
+            ],
+            "region": "Київська область",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 3.3,
+            "body_type": "suv",
+            "condition": "used",
+            "price_uah": 1802000,
+            "price_usd": 39999,
+            "raw_specs": {
+              "КПП": "Автомат • Повний пр.",
+              "рік": "2024",
+              "кузов": "Позашляховик Сірий",
+              "пробiг": "16'000 km",
+              "двигун": "3.3 • Гібрид"
+            },
+            "mileage_km": 16000,
+            "description": "Авто в Запоріжжі! Для показу можливе Дніпро • Mazda CX-90 3.3 Turbo S Premium Plus 2024 — максимальна комплектація + допи! • Привіз та робив для дружини з усією любовью не економлячи ні на чому, та коли проїхалась виявилось що для неї завелика… вона боїться на такій їздити • Показати можу в Запоріжжі або раз на тиждень буваю в Дніпрі! • ПО оновлено у офіційного дилера! Всі три блоки • Будь які СТО перевірки чого завгодно • В авто не курили пахне новою машиною! • Авто: • Чиста Японка (Хіросіма,…",
+            "transmission": "automatic",
+            "description_full": "Авто в Запоріжжі! Для показу можливе Дніпро • Mazda CX-90 3.3 Turbo S Premium Plus 2024 — максимальна комплектація + допи! • Привіз та робив для дружини з усією любовью не економлячи ні на чому, та коли проїхалась виявилось що для неї завелика… вона боїться на такій їздити • Показати можу в Запоріжжі або раз на тиждень буваю в Дніпрі! • ПО оновлено у офіційного дилера! Всі три блоки • Будь які СТО перевірки чого завгодно • В авто не курили пахне новою машиною! • Авто: • Чиста Японка (Хіросіма, 10/2023) • модельний ряд 24 року, всі прошивки оновлені у офіціалів до версії 2026 року • Пробіг 15000 тис. км поки ви думаєте я накатаю вам пробіг)) • Максимальна комплектація!!! Не плутайте з мотором 2,5 різниця колосальна! • І навіть з premium line комплектація, тут більше безпеки інши матеріали салона більше плюшок та комфорту, це найдорожчий, найбільший і наразі найкращій кросовер Мазда • Рядна «шістка» 3.3 turbo: 340 к.с. і 500 Нм уже з 2000 об/хв — найпотужніший серійний двигун в історії Mazda • 6,2 секунди до 0-100 км • Він дарує емоції та можливості! • Для людей що дійсьно цінують комфорт естетику та емоції! • Обмін реальний з вашою доплатою! • Розглядаю • Mazda cx-60 свіжий тільки максимальна комплектація на 3,3 двигун • Mazda cx-30 2,5 turbo premium plus свіжа • Acura RDX advanced і вище - свіжа • можливо Mazda miata • Більше на обмін нічого не розглядаю! • З допів вже зроблено • Полка багажника, якісні сітки, органайзер, • Бронювання фар порогів кромок дверей • Поліровка - кераміка (якась на 3 роки вартість 500$) • Привʼязана мітка, • Атермальне тонування • Вже укомплектований дрібницями типу вогнигасник аптечка трос і тд • Авто не те що не потребує вкладень з авто вже все зроблено за вас навіть те чого ви не очікуєте і не збиралися! • Не треба ні шукати ні платити додатково за щось ні витрачати час, сідай та кайфуй • За необхідності без проблем доставлю або привезу в будь яке місто України і навіть Європи • В авто не курили авто пахне новим • Оренда можлива тільки з водієм як міжміський або міжнародний трансфер",
+            "registration_history": [
+              "пропозицій - 1"
+            ]
+          },
+          "observation": {
+            "material_id": "web:0c0052fcc940ffdb6a902f6e3f500d4e",
+            "observed_at": "2026-10-11T04:58:23Z",
+            "content_sha256": "431cbfac2dec4eeec52d732ede92abf4cbd6026f713821631f780c23399b32bc",
+            "observation_id": "obs_01a129538c2c000088fb6ec4"
+          },
+          "provenance": {
+            "run_id": "run_01M4MN6R1YDVWBWYNTP61KQ0QM",
+            "package": {
+              "digest": "sha256:b0084422fa860923a2744cf42eca4cea798b72321d8e5c5a9e6078f07ede85c9",
+              "version": "1.1.0",
+              "package_id": "autos.rst-car-ads"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_1928e0fb06e64c89a55e363020e8fce0"
+          }
+        },
+        {
+          "key": {
+            "scope": "autos-rst",
+            "natural": {
+              "site": "rst.ua",
+              "ad_id": "15469291"
+            }
+          },
+          "fields": {
+            "url": "https://rst.ua/ukr/oldcars/renault/kangoo/renault_kangoo_15469291.html",
+            "city": "Новоархангельськ",
+            "fuel": "diesel",
+            "make": "RENAULT",
+            "site": "rst.ua",
+            "year": 2015,
+            "ad_id": "15469291",
+            "color": "білий",
+            "drive": "front",
+            "image": "https://i1.rst.ua/oldcars/renault/kangoo/15469291-1.jpg",
+            "model": "Kangoo",
+            "price": 11500,
+            "title": "RENAULT Kangoo",
+            "photos": [
+              "https://i1.rst.ua/oldcars/renault/kangoo/15469291-1.jpg",
+              "https://i1.rst.ua/oldcars/renault/kangoo/15469291-2.jpg",
+              "https://i1.rst.ua/oldcars/renault/kangoo/15469291-3.jpg",
+              "https://i1.rst.ua/oldcars/renault/kangoo/15469291-4.jpg",
+              "https://i1.rst.ua/oldcars/renault/kangoo/15469291-5.jpg",
+              "https://i1.rst.ua/oldcars/renault/kangoo/15469291-6.jpg",
+              "https://i1.rst.ua/oldcars/renault/kangoo/15469291-7.jpg",
+              "https://i1.rst.ua/oldcars/renault/kangoo/15469291-8.jpg",
+              "https://i1.rst.ua/oldcars/renault/kangoo/15469291-11.jpg",
+              "https://i1.rst.ua/oldcars/renault/kangoo/15469291-9.jpg",
+              "https://i1.rst.ua/oldcars/renault/kangoo/15469291-10.jpg",
+              "https://i1.rst.ua/oldcars/renault/kangoo/15469291-12.jpg",
+              "https://i1.rst.ua/oldcars/renault/kangoo/15469291-13.jpg",
+              "https://i1.rst.ua/oldcars/renault/kangoo/15469291-14.jpg"
+            ],
+            "region": "Кіровоградська область",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 1.5,
+            "body_type": "фургон пасажир",
+            "condition": "used",
+            "price_uah": 518100,
+            "price_usd": 11500,
+            "raw_specs": {
+              "КПП": "Механіка • Передній пр.",
+              "рік": "2015 • 11 років",
+              "кузов": "Фургон пасажир Білий",
+              "пробiг": "171'000 km • 16 тис/рік",
+              "двигун": "1.5 • Дизель"
+            },
+            "mileage_km": 171000,
+            "description": "Свіжа тільки заїхала!Без пробігу по Україні! К9К 66кv.90л.с. 5-ступка! Колір просто Суперовий Стильний і Тойже час Практичний Біла як Наречена!Машина просто Супер з Малим і Рідним Пробігом! Еко режим Круіз-Контроль Bluetooth, AUX! Автомобіль а хорошому збереженому стані! Стан як візуально, так і технічно добре збереженого авто! ЄVA-килимки і гумові в комплекті!Без ДТП! Без ушкоджень лакофарбових! Автомобіль 100% Розмитнений та зроблений сертифікат готовий до постановки Український облік! Кондиц…",
+            "transmission": "manual",
+            "description_full": "Свіжа тільки заїхала!Без пробігу по Україні! К9К 66кv.90л.с. 5-ступка! Колір просто Суперовий Стильний і Тойже час Практичний Біла як Наречена!Машина просто Супер з Малим і Рідним Пробігом! Еко режим Круіз-Контроль Bluetooth, AUX! Автомобіль а хорошому збереженому стані! Стан як візуально, так і технічно добре збереженого авто! ЄVA-килимки і гумові в комплекті!Без ДТП! Без ушкоджень лакофарбових! Автомобіль 100% Розмитнений та зроблений сертифікат готовий до постановки Український облік! Кондиционер заправлений та працює!Ел. склопідйомники, ел. дзеркала з підігрівом! Тюнінг! Двигун працює як годинник не димить не сопунить заводиться з пів оберту! Коробка працює чітко! По ходовій все в повному порядку! Стан машинки збережений взагалі сів і поїхав! Електро дзеркала! Гарний акумулятор! Гарна Гума ! Гарний Стильний Економний у Гарній Максимальній комплектації автомобіль! Салон чистий доглянутий не затертий! Про автомобіль писати можна багато але його треба бачити! З документами повний порядок! Детальніше під час зустрічі! Торг біля капота!"
+          },
+          "observation": {
+            "material_id": "web:22d477085ea20ff2c9af6f40f29b31da",
+            "observed_at": "2026-10-11T04:58:22Z",
+            "content_sha256": "37b1eb1d257788ee8a435cef078cbad2280be83f7b0fa79ef0a2a9c09b9d37c3",
+            "observation_id": "obs_01a12953884600006a42c9cc"
+          },
+          "provenance": {
+            "run_id": "run_01M4MN6R1YDVWBWYNTP61KQ0QM",
+            "package": {
+              "digest": "sha256:b0084422fa860923a2744cf42eca4cea798b72321d8e5c5a9e6078f07ede85c9",
+              "version": "1.1.0",
+              "package_id": "autos.rst-car-ads"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_58cb384ac30943039a61f96cae2477b9"
+          }
+        },
+        {
+          "key": {
+            "scope": "autos-rst",
+            "natural": {
+              "site": "rst.ua",
+              "ad_id": "15478335"
+            }
+          },
+          "fields": {
+            "url": "https://rst.ua/ukr/oldcars/maserati/levante/maserati_levante_15478335.html",
+            "city": "Харків",
+            "fuel": "petrol",
+            "make": "MASERATI",
+            "site": "rst.ua",
+            "trim": "GRANSPORT SQ4",
+            "year": 2019,
+            "ad_id": "15478335",
+            "color": "білий",
+            "drive": "awd",
+            "image": "https://i0.rst.ua/oldcars/maserati/levante/15478335-1.jpg",
+            "model": "Levante",
+            "price": 27900,
+            "title": "MASERATI Levante GRANSPORT SQ4",
+            "photos": [
+              "https://i0.rst.ua/oldcars/maserati/levante/15478335-1.jpg",
+              "https://i0.rst.ua/oldcars/maserati/levante/15478335-2.jpg",
+              "https://i0.rst.ua/oldcars/maserati/levante/15478335-3.jpg",
+              "https://i0.rst.ua/oldcars/maserati/levante/15478335-4.jpg",
+              "https://i0.rst.ua/oldcars/maserati/levante/15478335-5.jpg",
+              "https://i0.rst.ua/oldcars/maserati/levante/15478335-6.jpg",
+              "https://i0.rst.ua/oldcars/maserati/levante/15478335-7.jpg",
+              "https://i0.rst.ua/oldcars/maserati/levante/15478335-8.jpg",
+              "https://i0.rst.ua/oldcars/maserati/levante/15478335-9.jpg",
+              "https://i0.rst.ua/oldcars/maserati/levante/15478335-10.jpg",
+              "https://i0.rst.ua/oldcars/maserati/levante/15478335-11.jpg",
+              "https://i0.rst.ua/oldcars/maserati/levante/15478335-12.jpg",
+              "https://i0.rst.ua/oldcars/maserati/levante/15478335-13.jpg"
+            ],
+            "region": "Харківська область",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 3.0,
+            "body_type": "suv",
+            "condition": "used",
+            "price_uah": 1256900,
+            "price_usd": 27900,
+            "raw_specs": {
+              "КПП": "Автомат • Повний пр.",
+              "рік": "2019 • 7 років",
+              "кузов": "Позашляховик Білий",
+              "пробiг": "70'000 km • 10 тис/рік",
+              "двигун": "3.0 • Бензин"
+            },
+            "mileage_km": 70000,
+            "description": "Машина купувалася для себе. Все замінено на оригінальні запчастини. Музика bowers&wilkins • Червоний шкіряний салон, пневма, панорама, вентиляція сидінь. Все працює, жодних проблем немає. Комплектація Gransport. Справжні 430 коней. SQ4. По Україні накатали від сили 2-3 т км.",
+            "transmission": "automatic",
+            "description_full": "Машина купувалася для себе. Все замінено на оригінальні запчастини. Музика bowers&wilkins • Червоний шкіряний салон, пневма, панорама, вентиляція сидінь. Все працює, жодних проблем немає. Комплектація Gransport. Справжні 430 коней. SQ4. По Україні накатали від сили 2-3 т км."
+          },
+          "observation": {
+            "material_id": "web:14c286e53f4a764bd18cffa5fd28cbae",
+            "observed_at": "2026-10-11T04:58:15Z",
+            "content_sha256": "e4ef7fe02359114899fac1ca92b72976954aef0d65acc576d4abc94811b149b7",
+            "observation_id": "obs_01a129536cd60000ef3d8432"
+          },
+          "provenance": {
+            "run_id": "run_01M4MN6R1YDVWBWYNTP61KQ0QM",
+            "package": {
+              "digest": "sha256:b0084422fa860923a2744cf42eca4cea798b72321d8e5c5a9e6078f07ede85c9",
+              "version": "1.1.0",
+              "package_id": "autos.rst-car-ads"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_6ee192fd4b6f4ef49218e181aedef9d2"
+          }
+        },
+        {
+          "key": {
+            "scope": "autos-rst",
+            "natural": {
+              "site": "rst.ua",
+              "ad_id": "15481290"
+            }
+          },
+          "fields": {
+            "url": "https://rst.ua/ukr/oldcars/mercedes/vito/mercedes_vito_15481290.html",
+            "city": "Миколаїв",
+            "fuel": "diesel",
+            "make": "MERCEDES",
+            "site": "rst.ua",
+            "year": 2007,
+            "ad_id": "15481290",
+            "color": "чорний",
+            "drive": "rear",
+            "image": "https://i1.rst.ua/oldcars/mercedes/vito/15481290-1.jpg",
+            "model": "Vito",
+            "price": 17000,
+            "title": "MERCEDES Vito",
+            "photos": [
+              "https://i1.rst.ua/oldcars/mercedes/vito/15481290-1.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/vito/15481290-2.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/vito/15481290-3.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/vito/15481290-4.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/vito/15481290-5.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/vito/15481290-6.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/vito/15481290-7.jpg",
+              "https://i1.rst.ua/oldcars/mercedes/vito/15481290-8.jpg"
+            ],
+            "region": "Миколаївська область",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 3.0,
+            "body_type": "minibus",
+            "condition": "used",
+            "price_uah": 765900,
+            "price_usd": 17000,
+            "raw_specs": {
+              "КПП": "Автомат • Задній пр.",
+              "рік": "2007 • 19 років",
+              "кузов": "Мікробус пасажир Чорний",
+              "пробiг": "350'000 km • 18 тис/рік",
+              "двигун": "3.0 • Дизель"
+            },
+            "mileage_km": 350000,
+            "description": "опис відсутній",
+            "transmission": "automatic",
+            "description_full": "опис відсутній",
+            "registration_history": [
+              "пропозицій - 18"
+            ]
+          },
+          "observation": {
+            "material_id": "web:50a47ef774232237c81b3caa769c2495",
+            "observed_at": "2026-10-11T04:58:20Z",
+            "content_sha256": "a0f64b7fdbb6e3ed616acae5cc98dab9652f49bdb02ba847f8dc85aa24adbb67",
+            "observation_id": "obs_01a1295380740000225d16b6"
+          },
+          "provenance": {
+            "run_id": "run_01M4MN6R1YDVWBWYNTP61KQ0QM",
+            "package": {
+              "digest": "sha256:b0084422fa860923a2744cf42eca4cea798b72321d8e5c5a9e6078f07ede85c9",
+              "version": "1.1.0",
+              "package_id": "autos.rst-car-ads"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_20f70dd9776646de8ed0aeb096fd0c16"
+          }
+        },
+        {
+          "key": {
+            "scope": "autos-rst",
+            "natural": {
+              "site": "rst.ua",
+              "ad_id": "15481914"
+            }
+          },
+          "fields": {
+            "url": "https://rst.ua/ukr/oldcars/gmc/acadia/gmc_acadia_15481914.html",
+            "vin": "1GKENRRS5SJ150638",
+            "city": "Київ",
+            "fuel": "petrol",
+            "make": "GMC",
+            "site": "rst.ua",
+            "trim": "Denali",
+            "year": 2025,
+            "ad_id": "15481914",
+            "color": "білий",
+            "drive": "awd",
+            "image": "https://i2.rst.ua/oldcars/gmc/acadia/15481914-14.jpg",
+            "model": "Acadia",
+            "price": 43000,
+            "title": "GMC Acadia Denali",
+            "photos": [
+              "https://i2.rst.ua/oldcars/gmc/acadia/15481914-14.jpg",
+              "https://i2.rst.ua/oldcars/gmc/acadia/15481914-23.jpg",
+              "https://i2.rst.ua/oldcars/gmc/acadia/15481914-15.jpg",
+              "https://i2.rst.ua/oldcars/gmc/acadia/15481914-16.jpg",
+              "https://i2.rst.ua/oldcars/gmc/acadia/15481914-17.jpg",
+              "https://i2.rst.ua/oldcars/gmc/acadia/15481914-18.jpg",
+              "https://i2.rst.ua/oldcars/gmc/acadia/15481914-19.jpg",
+              "https://i2.rst.ua/oldcars/gmc/acadia/15481914-20.jpg",
+              "https://i2.rst.ua/oldcars/gmc/acadia/15481914-21.jpg",
+              "https://i2.rst.ua/oldcars/gmc/acadia/15481914-22.jpg",
+              "https://i2.rst.ua/oldcars/gmc/acadia/15481914-24.jpg"
+            ],
+            "region": "Київська область",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 2.5,
+            "body_type": "suv",
+            "condition": "used",
+            "equipment": [
+              "повний привід AWD",
+              "2.5-літровий турбодвигун",
+              "автоматична коробка передач",
+              "преміальний шкіряний салон Denali",
+              "перфорована шкіра та фірмова прострочка",
+              "електрорегулювання передніх сидінь",
+              "підігрів та вентиляція передніх сидінь",
+              "підігрів керма",
+              "чорна стеля",
+              "великий вертикальний мультимедійний дисплей",
+              "цифрова панель приладів",
+              "навігація / Google Maps",
+              "Apple CarPlay / Android Auto",
+              "бездротова зарядка",
+              "багатозонний клімат-контроль",
+              "адаптивний круїз-контроль",
+              "камери кругового огляду",
+              "контроль сліпих зон",
+              "утримання в смузі руху",
+              "системи попередження та запобігання зіткненням",
+              "парктроніки",
+              "безключовий доступ",
+              "запуск двигуна кнопкою",
+              "електропривід кришки багажника",
+              "LED-оптика",
+              "оригінальні багатоспицеві диски Denali 20",
+              "три ряди сидінь",
+              "трансформація задніх сидінь та великий багажний відсік."
+            ],
+            "price_uah": 1937200,
+            "price_usd": 43000,
+            "raw_specs": {
+              "КПП": "Автомат • Повний пр.",
+              "рік": "2025",
+              "кузов": "Позашляховик Білий",
+              "пробiг": "33'000 km",
+              "двигун": "2.5 • Бензин"
+            },
+            "mileage_km": 33000,
+            "description": "GMC Acadia Denali 2025 | AWD | 2.5 Turbo | 35 тис. км | Максимальна комплектація • Продається GMC Acadia Denali 2025 року нового покоління — великий, потужний та технологічний преміальний SUV. Максимальна комплектація Denali, повний привід AWD, 2.5 Turbo • VIN: 1GKENRRS5SJ150638 — відкритий для будь-яких перевірок • Оснащення Denali • повний привід AWD • 2.5-літровий турбодвигун • автоматична коробка передач • преміальний шкіряний салон Denali • перфорована шкіра та фірмова прострочка • електро…",
+            "transmission": "automatic",
+            "description_full": "GMC Acadia Denali 2025 | AWD | 2.5 Turbo | 35 тис. км | Максимальна комплектація • Продається GMC Acadia Denali 2025 року нового покоління — великий, потужний та технологічний преміальний SUV. Максимальна комплектація Denali, повний привід AWD, 2.5 Turbo • VIN: 1GKENRRS5SJ150638 — відкритий для будь-яких перевірок • Оснащення Denali • повний привід AWD • 2.5-літровий турбодвигун • автоматична коробка передач • преміальний шкіряний салон Denali • перфорована шкіра та фірмова прострочка • електрорегулювання передніх сидінь • підігрів та вентиляція передніх сидінь • підігрів керма • чорна стеля • великий вертикальний мультимедійний дисплей • цифрова панель приладів • навігація / Google Maps • Apple CarPlay / Android Auto • бездротова зарядка • багатозонний клімат-контроль • адаптивний круїз-контроль • камери кругового огляду • контроль сліпих зон • утримання в смузі руху • системи попередження та запобігання зіткненням • парктроніки • безключовий доступ • запуск двигуна кнопкою • електропривід кришки багажника • LED-оптика • оригінальні багатоспицеві диски Denali 20 • три ряди сидінь • трансформація задніх сидінь та великий багажний відсік."
+          },
+          "observation": {
+            "material_id": "web:b1dc585f96d3d34d5eae82010d8120b3",
+            "observed_at": "2026-10-11T04:58:16Z",
+            "content_sha256": "ade27a0ab53079365ed76a515f256ca9cb85c97b57240a438f6bbdd7d106fc43",
+            "observation_id": "obs_01a1295370b70000f9c2cab0"
+          },
+          "provenance": {
+            "run_id": "run_01M4MN6R1YDVWBWYNTP61KQ0QM",
+            "package": {
+              "digest": "sha256:b0084422fa860923a2744cf42eca4cea798b72321d8e5c5a9e6078f07ede85c9",
+              "version": "1.1.0",
+              "package_id": "autos.rst-car-ads"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_4aefce9bf022437495916197de007dc4"
+          }
+        },
+        {
+          "key": {
+            "scope": "autos-rst",
+            "natural": {
+              "site": "rst.ua",
+              "ad_id": "15485005"
+            }
+          },
+          "fields": {
+            "url": "https://rst.ua/ukr/oldcars/nissan/rogue/nissan_rogue_15485005.html",
+            "city": "Люботин",
+            "fuel": "petrol",
+            "make": "NISSAN",
+            "site": "rst.ua",
+            "trim": "SL",
+            "year": 2016,
+            "ad_id": "15485005",
+            "color": "синій",
+            "drive": "awd",
+            "image": "https://i0.rst.ua/oldcars/nissan/rogue/15485005-1.jpg",
+            "model": "Rogue",
+            "price": 15000,
+            "title": "NISSAN Rogue SL",
+            "photos": [
+              "https://i0.rst.ua/oldcars/nissan/rogue/15485005-1.jpg",
+              "https://i0.rst.ua/oldcars/nissan/rogue/15485005-2.jpg",
+              "https://i0.rst.ua/oldcars/nissan/rogue/15485005-3.jpg",
+              "https://i0.rst.ua/oldcars/nissan/rogue/15485005-5.jpg",
+              "https://i0.rst.ua/oldcars/nissan/rogue/15485005-6.jpg",
+              "https://i0.rst.ua/oldcars/nissan/rogue/15485005-4.jpg",
+              "https://i0.rst.ua/oldcars/nissan/rogue/15485005-7.jpg",
+              "https://i0.rst.ua/oldcars/nissan/rogue/15485005-8.jpg",
+              "https://i0.rst.ua/oldcars/nissan/rogue/15485005-9.jpg",
+              "https://i0.rst.ua/oldcars/nissan/rogue/15485005-10.jpg",
+              "https://i0.rst.ua/oldcars/nissan/rogue/15485005-11.jpg",
+              "https://i0.rst.ua/oldcars/nissan/rogue/15485005-12.jpg",
+              "https://i0.rst.ua/oldcars/nissan/rogue/15485005-13.jpg"
+            ],
+            "region": "Харківська область",
+            "status": "active",
+            "currency": "USD",
+            "engine_l": 2.5,
+            "body_type": "suv",
+            "condition": "used",
+            "price_uah": 675800,
+            "price_usd": 15000,
+            "raw_specs": {
+              "КПП": "Автомат • Повний пр.",
+              "рік": "2016 • 10 років",
+              "кузов": "Позашляховик Синій",
+              "пробiг": "пробіг не вказано",
+              "двигун": "2.5 • Бензин"
+            },
+            "description": "Всі питання по тел, [телефон] • цікавить обмін на Ниву",
+            "transmission": "automatic",
+            "description_full": "Всі питання по тел, [телефон] • цікавить обмін на Ниву",
+            "registration_history": [
+              "пропозицій - 1"
+            ]
+          },
+          "observation": {
+            "material_id": "web:7df1deb025d82eaa32842662830e2cde",
+            "observed_at": "2026-10-11T04:58:17Z",
+            "content_sha256": "8f6992237c04487d0a2ee242a292b1763f280067f6d0676eac00965a44f4df21",
+            "observation_id": "obs_01a1295374a1000008259985"
+          },
+          "provenance": {
+            "run_id": "run_01M4MN6R1YDVWBWYNTP61KQ0QM",
+            "package": {
+              "digest": "sha256:b0084422fa860923a2744cf42eca4cea798b72321d8e5c5a9e6078f07ede85c9",
+              "version": "1.1.0",
+              "package_id": "autos.rst-car-ads"
+            },
+            "stage_id": "extract-ad",
+            "invocation_id": "inv_3026d0802baa4f7686c859b516541885"
+          }
+        }
+      ]
+    }
+  },
+  "unavailable": {
+    "avtobazar.ua": {
+      "source_id": "autos-avtobazar",
+      "locator": {
+        "url": "https://avtobazar.ua/"
+      },
+      "availability": "unavailable",
+      "schedule": {
+        "type": "manual",
+        "enabled": false
+      },
+      "reason": "redirects_to_news; user declined InfoCar"
+    }
+  }
+}

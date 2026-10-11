@@ -18,7 +18,7 @@ import logging
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from jane_kit.auth import resolve_secret_ref
@@ -110,6 +110,21 @@ class EngineLimits(Limits):
 
     workers: int = Field(default=2, ge=0)
     """Worker threads per process (0 — API only)."""
+    task_ids: list[str] = Field(default_factory=list)
+    """Optional task allowlist for this process's workers, schedules and run housekeeping. Empty means all
+    tasks. Env accepts a JSON array or CSV; the shared queue's leases and delivery keys stay unchanged."""
+
+    @field_validator("task_ids", mode="before")
+    @classmethod
+    def _task_ids(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            value = json.loads(value) if value.lstrip().startswith("[") else value.split(",")
+        if isinstance(value, list):
+            value = [item.strip() if isinstance(item, str) else item for item in value]
+            if any(item == "" for item in value):
+                raise ValueError("task_ids must not contain empty identifiers; use [] for all tasks")
+        return value
+
     lease_ms: int = Field(default=30_000, ge=100)
     """Lease of a claimed item / collection feed; extended by heartbeats while a call runs."""
     heartbeat_ms: int = Field(default=10_000, ge=50)

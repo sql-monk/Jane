@@ -1,0 +1,2414 @@
+{
+  "packages": {
+    "news.article-analysis": {
+      "package_id": "news.article-analysis",
+      "version": "1.1.1",
+      "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98"
+    },
+    "news.article-normalize": {
+      "package_id": "news.article-normalize",
+      "version": "1.1.2",
+      "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1"
+    },
+    "news.telegram-public-dwglavnoe-rules": {
+      "package_id": "news.telegram-public-dwglavnoe-rules",
+      "version": "1.0.0",
+      "digest": "sha256:601eb6acc41defb68e4ca532da23cfa77fa0efa5b3545d2b22d7b75c3ac0377a"
+    },
+    "news.telegram-public-golosameriki-rules": {
+      "package_id": "news.telegram-public-golosameriki-rules",
+      "version": "1.0.0",
+      "digest": "sha256:f0924f648010bea9ee93ac9fe31ea76a695a4df389247bca446a73ca5423e63e"
+    },
+    "news.telegram-public-posts": {
+      "package_id": "news.telegram-public-posts",
+      "version": "1.0.1",
+      "digest": "sha256:9c17eb10b74ef3fa5df26b458ca992f64333b33bd9741229528afb0bdbddcac3"
+    },
+    "news.telegram-public-suspilnenews-rules": {
+      "package_id": "news.telegram-public-suspilnenews-rules",
+      "version": "1.0.0",
+      "digest": "sha256:1d1308f8f23702e448705bfe877ecaae20e75ecbdead27ed2bfb7f2ed0b36a0b"
+    },
+    "news.telegram-public-tass-agency-rules": {
+      "package_id": "news.telegram-public-tass-agency-rules",
+      "version": "1.0.0",
+      "digest": "sha256:80f95cbbb8b3e5b05bca8ab2e4904cf8e1ee9ef4e62e30f9ed63b224b105badc"
+    },
+    "news.web-article": {
+      "package_id": "news.web-article",
+      "version": "1.0.2",
+      "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3"
+    },
+    "news.web-rules-abc": {
+      "package_id": "news.web-rules-abc",
+      "version": "1.0.0",
+      "digest": "sha256:713bc6cb43f33b60de003b0668f412a37e09771357bcac7c88b01599581ffc36"
+    },
+    "news.web-rules-bbc": {
+      "package_id": "news.web-rules-bbc",
+      "version": "1.0.0",
+      "digest": "sha256:11599c994eb3c9ba53d754505f09651d4286cc3188332bcaf5fdfcf285a92f7f"
+    },
+    "news.web-rules-guardian": {
+      "package_id": "news.web-rules-guardian",
+      "version": "1.0.0",
+      "digest": "sha256:2b662c67a5300e645e9e96ce427fbe4f5a18098bd0c06de3803cc1f3adc20cd2"
+    },
+    "news.web-rules-npr": {
+      "package_id": "news.web-rules-npr",
+      "version": "1.0.0",
+      "digest": "sha256:07ad98006805c3ec8d76864fbdd57237a75617f21153e1783cc29444e61ef6ab"
+    },
+    "news.web-rules-pravda": {
+      "package_id": "news.web-rules-pravda",
+      "version": "1.0.0",
+      "digest": "sha256:b0b664e1139ee899469b9cfef4d565606a3fc28f5eaa67864699c5a817056bc2"
+    },
+    "news.web-rules-ria": {
+      "package_id": "news.web-rules-ria",
+      "version": "1.0.0",
+      "digest": "sha256:1899c1fedac959c98cba207eea28396f693c30e63b2df82fa5872a4eec0491e6"
+    },
+    "news.web-rules-rt": {
+      "package_id": "news.web-rules-rt",
+      "version": "1.0.0",
+      "digest": "sha256:f02374b70c3f5bcd75ae8e8db79c17124ec0ced5f6934d91cb873f70f1f793bd"
+    },
+    "news.web-rules-ukrinform": {
+      "package_id": "news.web-rules-ukrinform",
+      "version": "1.0.0",
+      "digest": "sha256:2d49fcedb827c209d1edfb3f234ad732a18ca23431fc77ff1db3d53786fc2a02"
+    },
+    "jane.storage-files": {
+      "package_id": "jane.storage-files",
+      "version": "1.0.0",
+      "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+    },
+    "jane.storage-postgresql": {
+      "package_id": "jane.storage-postgresql",
+      "version": "1.0.0",
+      "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+    }
+  },
+  "sources": [
+    {
+      "source_id": "news-web-pravda",
+      "kind": "web",
+      "title": "Українська правда",
+      "description": "Щогодинний розбір новин: ukraine; rss; https://www.pravda.com.ua/rss/",
+      "locator": {
+        "url": "https://www.pravda.com.ua/rss/"
+      },
+      "collector_rules": {
+        "package_id": "news.web-rules-pravda",
+        "version": "1.0.0",
+        "digest": "sha256:b0b664e1139ee899469b9cfef4d565606a3fc28f5eaa67864699c5a817056bc2"
+      },
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "expected_entity_types": [
+        "news_article",
+        "news_event"
+      ],
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "ukraine",
+        "transport": "rss"
+      }
+    },
+    {
+      "source_id": "news-web-ukrinform",
+      "kind": "web",
+      "title": "Укрінформ",
+      "description": "Щогодинний розбір новин: ukraine; rss; https://www.ukrinform.ua/rss/block-lastnews",
+      "locator": {
+        "url": "https://www.ukrinform.ua/rss/block-lastnews"
+      },
+      "collector_rules": {
+        "package_id": "news.web-rules-ukrinform",
+        "version": "1.0.0",
+        "digest": "sha256:2d49fcedb827c209d1edfb3f234ad732a18ca23431fc77ff1db3d53786fc2a02"
+      },
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "expected_entity_types": [
+        "news_article",
+        "news_event"
+      ],
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "ukraine",
+        "transport": "rss"
+      }
+    },
+    {
+      "source_id": "news-web-bbc",
+      "kind": "web",
+      "title": "BBC News",
+      "description": "Щогодинний розбір новин: europe; rss; https://feeds.bbci.co.uk/news/world/rss.xml",
+      "locator": {
+        "url": "https://feeds.bbci.co.uk/news/world/rss.xml"
+      },
+      "collector_rules": {
+        "package_id": "news.web-rules-bbc",
+        "version": "1.0.0",
+        "digest": "sha256:11599c994eb3c9ba53d754505f09651d4286cc3188332bcaf5fdfcf285a92f7f"
+      },
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "expected_entity_types": [
+        "news_article",
+        "news_event"
+      ],
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "europe",
+        "transport": "rss"
+      }
+    },
+    {
+      "source_id": "news-web-guardian",
+      "kind": "web",
+      "title": "The Guardian",
+      "description": "Щогодинний розбір новин: europe; rss; https://www.theguardian.com/world/rss",
+      "locator": {
+        "url": "https://www.theguardian.com/world/rss"
+      },
+      "collector_rules": {
+        "package_id": "news.web-rules-guardian",
+        "version": "1.0.0",
+        "digest": "sha256:2b662c67a5300e645e9e96ce427fbe4f5a18098bd0c06de3803cc1f3adc20cd2"
+      },
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "expected_entity_types": [
+        "news_article",
+        "news_event"
+      ],
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "europe",
+        "transport": "rss"
+      }
+    },
+    {
+      "source_id": "news-web-npr",
+      "kind": "web",
+      "title": "NPR",
+      "description": "Щогодинний розбір новин: usa; rss; https://feeds.npr.org/1001/rss.xml",
+      "locator": {
+        "url": "https://feeds.npr.org/1001/rss.xml"
+      },
+      "collector_rules": {
+        "package_id": "news.web-rules-npr",
+        "version": "1.0.0",
+        "digest": "sha256:07ad98006805c3ec8d76864fbdd57237a75617f21153e1783cc29444e61ef6ab"
+      },
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "expected_entity_types": [
+        "news_article",
+        "news_event"
+      ],
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "usa",
+        "transport": "rss"
+      }
+    },
+    {
+      "source_id": "news-web-abc",
+      "kind": "web",
+      "title": "ABC News",
+      "description": "Щогодинний розбір новин: usa; rss; https://abcnews.go.com/abcnews/internationalheadlines",
+      "locator": {
+        "url": "https://abcnews.go.com/abcnews/internationalheadlines"
+      },
+      "collector_rules": {
+        "package_id": "news.web-rules-abc",
+        "version": "1.0.0",
+        "digest": "sha256:713bc6cb43f33b60de003b0668f412a37e09771357bcac7c88b01599581ffc36"
+      },
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "expected_entity_types": [
+        "news_article",
+        "news_event"
+      ],
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "usa",
+        "transport": "rss"
+      }
+    },
+    {
+      "source_id": "news-web-ria",
+      "kind": "web",
+      "title": "РИА Новости",
+      "description": "Щогодинний розбір новин: russia; rss; https://ria.ru/export/rss2/archive/index.xml",
+      "locator": {
+        "url": "https://ria.ru/export/rss2/archive/index.xml"
+      },
+      "collector_rules": {
+        "package_id": "news.web-rules-ria",
+        "version": "1.0.0",
+        "digest": "sha256:1899c1fedac959c98cba207eea28396f693c30e63b2df82fa5872a4eec0491e6"
+      },
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "expected_entity_types": [
+        "news_article",
+        "news_event"
+      ],
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "russia",
+        "transport": "rss"
+      }
+    },
+    {
+      "source_id": "news-web-rt",
+      "kind": "web",
+      "title": "RT на русском",
+      "description": "Щогодинний розбір новин: russia; rss; https://russian.rt.com/rss",
+      "locator": {
+        "url": "https://russian.rt.com/rss"
+      },
+      "collector_rules": {
+        "package_id": "news.web-rules-rt",
+        "version": "1.0.0",
+        "digest": "sha256:f02374b70c3f5bcd75ae8e8db79c17124ec0ced5f6934d91cb873f70f1f793bd"
+      },
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "expected_entity_types": [
+        "news_article",
+        "news_event"
+      ],
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "russia",
+        "transport": "rss"
+      }
+    },
+    {
+      "source_id": "news-tg-suspilnenews",
+      "kind": "web",
+      "title": "Суспільне Новини",
+      "description": "Щогодинний розбір новин: ukraine; telegram_public_web; https://t.me/s/suspilnenews",
+      "locator": {
+        "url": "https://t.me/s/suspilnenews"
+      },
+      "collector_rules": {
+        "package_id": "news.telegram-public-suspilnenews-rules",
+        "version": "1.0.0",
+        "digest": "sha256:1d1308f8f23702e448705bfe877ecaae20e75ecbdead27ed2bfb7f2ed0b36a0b"
+      },
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "expected_entity_types": [
+        "news_article",
+        "news_event"
+      ],
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "ukraine",
+        "transport": "telegram_public_web"
+      }
+    },
+    {
+      "source_id": "news-tg-dwglavnoe",
+      "kind": "web",
+      "title": "DW Главное",
+      "description": "Щогодинний розбір новин: europe; telegram_public_web; https://t.me/s/dwglavnoe",
+      "locator": {
+        "url": "https://t.me/s/dwglavnoe"
+      },
+      "collector_rules": {
+        "package_id": "news.telegram-public-dwglavnoe-rules",
+        "version": "1.0.0",
+        "digest": "sha256:601eb6acc41defb68e4ca532da23cfa77fa0efa5b3545d2b22d7b75c3ac0377a"
+      },
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "expected_entity_types": [
+        "news_article",
+        "news_event"
+      ],
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "europe",
+        "transport": "telegram_public_web"
+      }
+    },
+    {
+      "source_id": "news-tg-golosameriki",
+      "kind": "web",
+      "title": "Голос Америки (VOA)",
+      "description": "Щогодинний розбір новин: usa; telegram_public_web; https://t.me/s/golosameriki",
+      "locator": {
+        "url": "https://t.me/s/golosameriki"
+      },
+      "collector_rules": {
+        "package_id": "news.telegram-public-golosameriki-rules",
+        "version": "1.0.0",
+        "digest": "sha256:f0924f648010bea9ee93ac9fe31ea76a695a4df389247bca446a73ca5423e63e"
+      },
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "expected_entity_types": [
+        "news_article",
+        "news_event"
+      ],
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "usa",
+        "transport": "telegram_public_web"
+      }
+    },
+    {
+      "source_id": "news-tg-tass-agency",
+      "kind": "web",
+      "title": "ТАСС",
+      "description": "Щогодинний розбір новин: russia; telegram_public_web; https://t.me/s/tass_agency",
+      "locator": {
+        "url": "https://t.me/s/tass_agency"
+      },
+      "collector_rules": {
+        "package_id": "news.telegram-public-tass-agency-rules",
+        "version": "1.0.0",
+        "digest": "sha256:80f95cbbb8b3e5b05bca8ab2e4904cf8e1ee9ef4e62e30f9ed63b224b105badc"
+      },
+      "limits": {
+        "rate": {
+          "requests_per_second_per_host": 1,
+          "min_delay_ms_per_host": 1000,
+          "respect_crawl_delay": true
+        },
+        "concurrency": {
+          "max_parallel_fetches_per_host": 1
+        }
+      },
+      "expected_entity_types": [
+        "news_article",
+        "news_event"
+      ],
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "russia",
+        "transport": "telegram_public_web"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "news-web-pravda",
+      "title": "Українська правда: аналіз новин щогодини",
+      "enabled": true,
+      "description": "RAW → текст → багатомовний LLM → перевірені цитати, тональність і події → PostgreSQL.",
+      "input": {
+        "source_id": "news-web-pravda"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-files",
+            "version": "1.0.0",
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+          },
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "prepare",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.web-article",
+            "version": "1.0.2",
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3"
+          },
+          "params": {
+            "source_name": "Українська правда",
+            "region": "ukraine",
+            "language": "uk",
+            "source_id": "news-web-pravda"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "analyse",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-analysis",
+            "version": "1.1.1",
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98"
+          },
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "verify",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-normalize",
+            "version": "1.1.2",
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1"
+          },
+          "params": {
+            "source_id": "news-web-pravda",
+            "source_name": "Українська правда",
+            "region": "ukraine",
+            "source_kind": "web",
+            "transport": "rss_article",
+            "min_grouping_confidence": 0.75
+          },
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "store-news",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-postgresql",
+            "version": "1.0.0",
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+          },
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "timezone": "Europe/Kyiv",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 1,
+          "max_pages_per_run": 4,
+          "max_links_per_page": 3,
+          "max_material_bytes": 2000000
+        },
+        "transfer": {
+          "inline_max_bytes": 2000000
+        },
+        "llm": {
+          "max_input_tokens_per_request": 40000,
+          "max_output_tokens_per_request": 8192
+        },
+        "concurrency": {
+          "max_parallel_runs_per_task": 1,
+          "max_parallel_stage_items": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "ukraine",
+        "transport": "rss"
+      }
+    },
+    {
+      "task_id": "news-web-ukrinform",
+      "title": "Укрінформ: аналіз новин щогодини",
+      "enabled": true,
+      "description": "RAW → текст → багатомовний LLM → перевірені цитати, тональність і події → PostgreSQL.",
+      "input": {
+        "source_id": "news-web-ukrinform"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-files",
+            "version": "1.0.0",
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+          },
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "prepare",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.web-article",
+            "version": "1.0.2",
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3"
+          },
+          "params": {
+            "source_name": "Укрінформ",
+            "region": "ukraine",
+            "language": "uk",
+            "source_id": "news-web-ukrinform"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "analyse",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-analysis",
+            "version": "1.1.1",
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98"
+          },
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "verify",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-normalize",
+            "version": "1.1.2",
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1"
+          },
+          "params": {
+            "source_id": "news-web-ukrinform",
+            "source_name": "Укрінформ",
+            "region": "ukraine",
+            "source_kind": "web",
+            "transport": "rss_article",
+            "min_grouping_confidence": 0.75
+          },
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "store-news",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-postgresql",
+            "version": "1.0.0",
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+          },
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "timezone": "Europe/Kyiv",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 1,
+          "max_pages_per_run": 4,
+          "max_links_per_page": 3,
+          "max_material_bytes": 2000000
+        },
+        "transfer": {
+          "inline_max_bytes": 2000000
+        },
+        "llm": {
+          "max_input_tokens_per_request": 40000,
+          "max_output_tokens_per_request": 8192
+        },
+        "concurrency": {
+          "max_parallel_runs_per_task": 1,
+          "max_parallel_stage_items": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "ukraine",
+        "transport": "rss"
+      }
+    },
+    {
+      "task_id": "news-web-bbc",
+      "title": "BBC News: аналіз новин щогодини",
+      "enabled": true,
+      "description": "RAW → текст → багатомовний LLM → перевірені цитати, тональність і події → PostgreSQL.",
+      "input": {
+        "source_id": "news-web-bbc"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-files",
+            "version": "1.0.0",
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+          },
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "prepare",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.web-article",
+            "version": "1.0.2",
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3"
+          },
+          "params": {
+            "source_name": "BBC News",
+            "region": "europe",
+            "language": "en",
+            "source_id": "news-web-bbc"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "analyse",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-analysis",
+            "version": "1.1.1",
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98"
+          },
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "verify",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-normalize",
+            "version": "1.1.2",
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1"
+          },
+          "params": {
+            "source_id": "news-web-bbc",
+            "source_name": "BBC News",
+            "region": "europe",
+            "source_kind": "web",
+            "transport": "rss_article",
+            "min_grouping_confidence": 0.75
+          },
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "store-news",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-postgresql",
+            "version": "1.0.0",
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+          },
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "timezone": "Europe/Kyiv",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 1,
+          "max_pages_per_run": 4,
+          "max_links_per_page": 3,
+          "max_material_bytes": 2000000
+        },
+        "transfer": {
+          "inline_max_bytes": 2000000
+        },
+        "llm": {
+          "max_input_tokens_per_request": 40000,
+          "max_output_tokens_per_request": 8192
+        },
+        "concurrency": {
+          "max_parallel_runs_per_task": 1,
+          "max_parallel_stage_items": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "europe",
+        "transport": "rss"
+      }
+    },
+    {
+      "task_id": "news-web-guardian",
+      "title": "The Guardian: аналіз новин щогодини",
+      "enabled": true,
+      "description": "RAW → текст → багатомовний LLM → перевірені цитати, тональність і події → PostgreSQL.",
+      "input": {
+        "source_id": "news-web-guardian"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-files",
+            "version": "1.0.0",
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+          },
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "prepare",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.web-article",
+            "version": "1.0.2",
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3"
+          },
+          "params": {
+            "source_name": "The Guardian",
+            "region": "europe",
+            "language": "en",
+            "source_id": "news-web-guardian"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "analyse",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-analysis",
+            "version": "1.1.1",
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98"
+          },
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "verify",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-normalize",
+            "version": "1.1.2",
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1"
+          },
+          "params": {
+            "source_id": "news-web-guardian",
+            "source_name": "The Guardian",
+            "region": "europe",
+            "source_kind": "web",
+            "transport": "rss_article",
+            "min_grouping_confidence": 0.75
+          },
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "store-news",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-postgresql",
+            "version": "1.0.0",
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+          },
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "timezone": "Europe/Kyiv",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 1,
+          "max_pages_per_run": 4,
+          "max_links_per_page": 3,
+          "max_material_bytes": 2000000
+        },
+        "transfer": {
+          "inline_max_bytes": 2000000
+        },
+        "llm": {
+          "max_input_tokens_per_request": 40000,
+          "max_output_tokens_per_request": 8192
+        },
+        "concurrency": {
+          "max_parallel_runs_per_task": 1,
+          "max_parallel_stage_items": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "europe",
+        "transport": "rss"
+      }
+    },
+    {
+      "task_id": "news-web-npr",
+      "title": "NPR: аналіз новин щогодини",
+      "enabled": true,
+      "description": "RAW → текст → багатомовний LLM → перевірені цитати, тональність і події → PostgreSQL.",
+      "input": {
+        "source_id": "news-web-npr"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-files",
+            "version": "1.0.0",
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+          },
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "prepare",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.web-article",
+            "version": "1.0.2",
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3"
+          },
+          "params": {
+            "source_name": "NPR",
+            "region": "usa",
+            "language": "en",
+            "source_id": "news-web-npr"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "analyse",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-analysis",
+            "version": "1.1.1",
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98"
+          },
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "verify",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-normalize",
+            "version": "1.1.2",
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1"
+          },
+          "params": {
+            "source_id": "news-web-npr",
+            "source_name": "NPR",
+            "region": "usa",
+            "source_kind": "web",
+            "transport": "rss_article",
+            "min_grouping_confidence": 0.75
+          },
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "store-news",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-postgresql",
+            "version": "1.0.0",
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+          },
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "timezone": "Europe/Kyiv",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 1,
+          "max_pages_per_run": 4,
+          "max_links_per_page": 3,
+          "max_material_bytes": 2000000
+        },
+        "transfer": {
+          "inline_max_bytes": 2000000
+        },
+        "llm": {
+          "max_input_tokens_per_request": 40000,
+          "max_output_tokens_per_request": 8192
+        },
+        "concurrency": {
+          "max_parallel_runs_per_task": 1,
+          "max_parallel_stage_items": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "usa",
+        "transport": "rss"
+      }
+    },
+    {
+      "task_id": "news-web-abc",
+      "title": "ABC News: аналіз новин щогодини",
+      "enabled": true,
+      "description": "RAW → текст → багатомовний LLM → перевірені цитати, тональність і події → PostgreSQL.",
+      "input": {
+        "source_id": "news-web-abc"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-files",
+            "version": "1.0.0",
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+          },
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "prepare",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.web-article",
+            "version": "1.0.2",
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3"
+          },
+          "params": {
+            "source_name": "ABC News",
+            "region": "usa",
+            "language": "en",
+            "source_id": "news-web-abc"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "analyse",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-analysis",
+            "version": "1.1.1",
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98"
+          },
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "verify",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-normalize",
+            "version": "1.1.2",
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1"
+          },
+          "params": {
+            "source_id": "news-web-abc",
+            "source_name": "ABC News",
+            "region": "usa",
+            "source_kind": "web",
+            "transport": "rss_article",
+            "min_grouping_confidence": 0.75
+          },
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "store-news",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-postgresql",
+            "version": "1.0.0",
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+          },
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "timezone": "Europe/Kyiv",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 1,
+          "max_pages_per_run": 4,
+          "max_links_per_page": 3,
+          "max_material_bytes": 2000000
+        },
+        "transfer": {
+          "inline_max_bytes": 2000000
+        },
+        "llm": {
+          "max_input_tokens_per_request": 40000,
+          "max_output_tokens_per_request": 8192
+        },
+        "concurrency": {
+          "max_parallel_runs_per_task": 1,
+          "max_parallel_stage_items": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "usa",
+        "transport": "rss"
+      }
+    },
+    {
+      "task_id": "news-web-ria",
+      "title": "РИА Новости: аналіз новин щогодини",
+      "enabled": true,
+      "description": "RAW → текст → багатомовний LLM → перевірені цитати, тональність і події → PostgreSQL.",
+      "input": {
+        "source_id": "news-web-ria"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-files",
+            "version": "1.0.0",
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+          },
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "prepare",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.web-article",
+            "version": "1.0.2",
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3"
+          },
+          "params": {
+            "source_name": "РИА Новости",
+            "region": "russia",
+            "language": "ru",
+            "source_id": "news-web-ria"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "analyse",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-analysis",
+            "version": "1.1.1",
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98"
+          },
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "verify",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-normalize",
+            "version": "1.1.2",
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1"
+          },
+          "params": {
+            "source_id": "news-web-ria",
+            "source_name": "РИА Новости",
+            "region": "russia",
+            "source_kind": "web",
+            "transport": "rss_article",
+            "min_grouping_confidence": 0.75
+          },
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "store-news",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-postgresql",
+            "version": "1.0.0",
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+          },
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "timezone": "Europe/Kyiv",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 1,
+          "max_pages_per_run": 4,
+          "max_links_per_page": 3,
+          "max_material_bytes": 2000000
+        },
+        "transfer": {
+          "inline_max_bytes": 2000000
+        },
+        "llm": {
+          "max_input_tokens_per_request": 40000,
+          "max_output_tokens_per_request": 8192
+        },
+        "concurrency": {
+          "max_parallel_runs_per_task": 1,
+          "max_parallel_stage_items": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "russia",
+        "transport": "rss"
+      }
+    },
+    {
+      "task_id": "news-web-rt",
+      "title": "RT на русском: аналіз новин щогодини",
+      "enabled": true,
+      "description": "RAW → текст → багатомовний LLM → перевірені цитати, тональність і події → PostgreSQL.",
+      "input": {
+        "source_id": "news-web-rt"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-files",
+            "version": "1.0.0",
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+          },
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "prepare",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.web-article",
+            "version": "1.0.2",
+            "digest": "sha256:2ab3cf6db3fbdb9548cfa24f1b43a33579acb534aa55675e8973303eb688dce3"
+          },
+          "params": {
+            "source_name": "RT на русском",
+            "region": "russia",
+            "language": "ru",
+            "source_id": "news-web-rt"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "analyse",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-analysis",
+            "version": "1.1.1",
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98"
+          },
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "verify",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-normalize",
+            "version": "1.1.2",
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1"
+          },
+          "params": {
+            "source_id": "news-web-rt",
+            "source_name": "RT на русском",
+            "region": "russia",
+            "source_kind": "web",
+            "transport": "rss_article",
+            "min_grouping_confidence": 0.75
+          },
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "store-news",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-postgresql",
+            "version": "1.0.0",
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+          },
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "timezone": "Europe/Kyiv",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 1,
+          "max_pages_per_run": 4,
+          "max_links_per_page": 3,
+          "max_material_bytes": 2000000
+        },
+        "transfer": {
+          "inline_max_bytes": 2000000
+        },
+        "llm": {
+          "max_input_tokens_per_request": 40000,
+          "max_output_tokens_per_request": 8192
+        },
+        "concurrency": {
+          "max_parallel_runs_per_task": 1,
+          "max_parallel_stage_items": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "russia",
+        "transport": "rss"
+      }
+    },
+    {
+      "task_id": "news-tg-suspilnenews",
+      "title": "Суспільне Новини: аналіз новин щогодини",
+      "enabled": true,
+      "description": "RAW → текст → багатомовний LLM → перевірені цитати, тональність і події → PostgreSQL.",
+      "input": {
+        "source_id": "news-tg-suspilnenews"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-files",
+            "version": "1.0.0",
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+          },
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "prepare",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.telegram-public-posts",
+            "version": "1.0.1",
+            "digest": "sha256:9c17eb10b74ef3fa5df26b458ca992f64333b33bd9741229528afb0bdbddcac3"
+          },
+          "params": {
+            "source_name": "Суспільне Новини",
+            "region": "ukraine",
+            "language": "uk",
+            "max_posts": 3
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "analyse",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-analysis",
+            "version": "1.1.1",
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98"
+          },
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "verify",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-normalize",
+            "version": "1.1.2",
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1"
+          },
+          "params": {
+            "source_id": "news-tg-suspilnenews",
+            "source_name": "Суспільне Новини",
+            "region": "ukraine",
+            "source_kind": "telegram",
+            "transport": "telegram_public_web",
+            "min_grouping_confidence": 0.75
+          },
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "store-news",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-postgresql",
+            "version": "1.0.0",
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+          },
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "timezone": "Europe/Kyiv",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 1,
+          "max_pages_per_run": 1,
+          "max_links_per_page": 3,
+          "max_material_bytes": 2000000
+        },
+        "transfer": {
+          "inline_max_bytes": 2000000
+        },
+        "llm": {
+          "max_input_tokens_per_request": 40000,
+          "max_output_tokens_per_request": 8192
+        },
+        "concurrency": {
+          "max_parallel_runs_per_task": 1,
+          "max_parallel_stage_items": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "ukraine",
+        "transport": "telegram_public_web"
+      }
+    },
+    {
+      "task_id": "news-tg-dwglavnoe",
+      "title": "DW Главное: аналіз новин щогодини",
+      "enabled": true,
+      "description": "RAW → текст → багатомовний LLM → перевірені цитати, тональність і події → PostgreSQL.",
+      "input": {
+        "source_id": "news-tg-dwglavnoe"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-files",
+            "version": "1.0.0",
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+          },
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "prepare",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.telegram-public-posts",
+            "version": "1.0.1",
+            "digest": "sha256:9c17eb10b74ef3fa5df26b458ca992f64333b33bd9741229528afb0bdbddcac3"
+          },
+          "params": {
+            "source_name": "DW Главное",
+            "region": "europe",
+            "language": "ru",
+            "max_posts": 3
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "analyse",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-analysis",
+            "version": "1.1.1",
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98"
+          },
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "verify",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-normalize",
+            "version": "1.1.2",
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1"
+          },
+          "params": {
+            "source_id": "news-tg-dwglavnoe",
+            "source_name": "DW Главное",
+            "region": "europe",
+            "source_kind": "telegram",
+            "transport": "telegram_public_web",
+            "min_grouping_confidence": 0.75
+          },
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "store-news",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-postgresql",
+            "version": "1.0.0",
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+          },
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "timezone": "Europe/Kyiv",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 1,
+          "max_pages_per_run": 1,
+          "max_links_per_page": 3,
+          "max_material_bytes": 2000000
+        },
+        "transfer": {
+          "inline_max_bytes": 2000000
+        },
+        "llm": {
+          "max_input_tokens_per_request": 40000,
+          "max_output_tokens_per_request": 8192
+        },
+        "concurrency": {
+          "max_parallel_runs_per_task": 1,
+          "max_parallel_stage_items": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "europe",
+        "transport": "telegram_public_web"
+      }
+    },
+    {
+      "task_id": "news-tg-golosameriki",
+      "title": "Голос Америки (VOA): аналіз новин щогодини",
+      "enabled": true,
+      "description": "RAW → текст → багатомовний LLM → перевірені цитати, тональність і події → PostgreSQL.",
+      "input": {
+        "source_id": "news-tg-golosameriki"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-files",
+            "version": "1.0.0",
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+          },
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "prepare",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.telegram-public-posts",
+            "version": "1.0.1",
+            "digest": "sha256:9c17eb10b74ef3fa5df26b458ca992f64333b33bd9741229528afb0bdbddcac3"
+          },
+          "params": {
+            "source_name": "Голос Америки (VOA)",
+            "region": "usa",
+            "language": "ru",
+            "max_posts": 3
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "analyse",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-analysis",
+            "version": "1.1.1",
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98"
+          },
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "verify",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-normalize",
+            "version": "1.1.2",
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1"
+          },
+          "params": {
+            "source_id": "news-tg-golosameriki",
+            "source_name": "Голос Америки (VOA)",
+            "region": "usa",
+            "source_kind": "telegram",
+            "transport": "telegram_public_web",
+            "min_grouping_confidence": 0.75
+          },
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "store-news",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-postgresql",
+            "version": "1.0.0",
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+          },
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "timezone": "Europe/Kyiv",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 1,
+          "max_pages_per_run": 1,
+          "max_links_per_page": 3,
+          "max_material_bytes": 2000000
+        },
+        "transfer": {
+          "inline_max_bytes": 2000000
+        },
+        "llm": {
+          "max_input_tokens_per_request": 40000,
+          "max_output_tokens_per_request": 8192
+        },
+        "concurrency": {
+          "max_parallel_runs_per_task": 1,
+          "max_parallel_stage_items": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "usa",
+        "transport": "telegram_public_web"
+      }
+    },
+    {
+      "task_id": "news-tg-tass-agency",
+      "title": "ТАСС: аналіз новин щогодини",
+      "enabled": true,
+      "description": "RAW → текст → багатомовний LLM → перевірені цитати, тональність і події → PostgreSQL.",
+      "input": {
+        "source_id": "news-tg-tass-agency"
+      },
+      "stages": [
+        {
+          "stage_id": "collect",
+          "kind": "collect",
+          "collector": {
+            "collector": "web",
+            "mode": "incremental"
+          }
+        },
+        {
+          "stage_id": "store-raw",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-files",
+            "version": "1.0.0",
+            "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f"
+          },
+          "connections": {
+            "target": "raw-files"
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ]
+        },
+        {
+          "stage_id": "prepare",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.telegram-public-posts",
+            "version": "1.0.1",
+            "digest": "sha256:9c17eb10b74ef3fa5df26b458ca992f64333b33bd9741229528afb0bdbddcac3"
+          },
+          "params": {
+            "source_name": "ТАСС",
+            "region": "russia",
+            "language": "ru",
+            "max_posts": 3
+          },
+          "inputs": [
+            {
+              "from": "collect"
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "analyse",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-analysis",
+            "version": "1.1.1",
+            "digest": "sha256:e69d7f509d9d925a03bb7e2a9bb2e0536e5684621fa1fb08007ec26719f78c98"
+          },
+          "inputs": [
+            {
+              "from": "prepare",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "verify",
+          "kind": "handler",
+          "handler": {
+            "package_id": "news.article-normalize",
+            "version": "1.1.2",
+            "digest": "sha256:83659b05af028bda7dc65b90d18dcfaa69320b28ed92cc802f5a54dbe02a82b1"
+          },
+          "params": {
+            "source_id": "news-tg-tass-agency",
+            "source_name": "ТАСС",
+            "region": "russia",
+            "source_kind": "telegram",
+            "transport": "telegram_public_web",
+            "min_grouping_confidence": 0.75
+          },
+          "inputs": [
+            {
+              "from": "analyse",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        },
+        {
+          "stage_id": "store-news",
+          "kind": "handler",
+          "handler": {
+            "package_id": "jane.storage-postgresql",
+            "version": "1.0.0",
+            "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b"
+          },
+          "connections": {
+            "target": "results-pg"
+          },
+          "inputs": [
+            {
+              "from": "verify",
+              "when": {
+                "field": "result.status",
+                "op": "eq",
+                "value": "success"
+              }
+            }
+          ],
+          "on_failure": "fail_run"
+        }
+      ],
+      "schedule": {
+        "type": "interval",
+        "interval_seconds": 3600,
+        "timezone": "Europe/Kyiv",
+        "overlap": "skip"
+      },
+      "limits": {
+        "crawl": {
+          "max_depth": 1,
+          "max_pages_per_run": 1,
+          "max_links_per_page": 3,
+          "max_material_bytes": 2000000
+        },
+        "transfer": {
+          "inline_max_bytes": 2000000
+        },
+        "llm": {
+          "max_input_tokens_per_request": 40000,
+          "max_output_tokens_per_request": 8192
+        },
+        "concurrency": {
+          "max_parallel_runs_per_task": 1,
+          "max_parallel_stage_items": 1
+        }
+      },
+      "forward_unknown_to_llm": false,
+      "labels": {
+        "group": "news-analysis",
+        "region": "russia",
+        "transport": "telegram_public_web"
+      }
+    }
+  ]
+}

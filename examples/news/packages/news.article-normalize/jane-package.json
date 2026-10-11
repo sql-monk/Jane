@@ -1,0 +1,84 @@
+{
+  "schema_version": "1",
+  "package_id": "news.article-normalize",
+  "version": "1.1.2",
+  "kind": "transform",
+  "title": "Перевірка новин та групування конкретних подій",
+  "description": "Перевіряє цитати, додає метадані джерела і групує лише повні точні канонічні ідентичності подій. Невідомі дата чи місце залишають матеріал ungrouped.",
+  "tags": [
+    "news",
+    "events",
+    "provenance"
+  ],
+  "entry": {
+    "runtime": "python",
+    "module": "news_article_normalize.main",
+    "callable": "normalize"
+  },
+  "input": {
+    "accepts": [
+      "entities"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "news_article",
+        "schema": "schemas/news_article.schema.json",
+        "key_fields": [
+          "url"
+        ]
+      },
+      {
+        "entity_type": "news_event",
+        "schema": "schemas/news_event.schema.json",
+        "key_fields": [
+          "event_id"
+        ]
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "empty-entities",
+      "input": {
+        "entities": "tests/empty/entities.json"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    },
+    {
+      "name": "ungrouped-without-original-material",
+      "input": {
+        "entities": "tests/unavailable/entities.json"
+      },
+      "params": {
+        "require_verified_evidence": false
+      },
+      "expected_status": "success",
+      "expected": "tests/unavailable/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Jane news monitoring"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Clear a prior persisted event_id when an article becomes ungrouped; preserve unrelated clear markers.",
+    "based_on": {
+      "package_id": "news.article-normalize",
+      "version": "1.1.1"
+    }
+  }
+}

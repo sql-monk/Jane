@@ -1,0 +1,13 @@
+{
+  "source_id": "news-web-rt",
+  "feed_url": "https://russian.rt.com/rss",
+  "article_url": "https://russian.rt.com/world/news/1693257-avstriya-taynyy-gruz",
+  "fetched_at": "2026-10-11T03:56:54.908723Z",
+  "feed_http_status": 200,
+  "article_http_status": 200,
+  "robots_allowed": true,
+  "feed_entries": 50,
+  "title": "Оппозиция Австрии потребовала данные о тайном грузе Киева",
+  "excerpt": "Оппозиция Австрии потребовала данные о тайном грузе Киева - Читайте подробнее на сайте РТ на русском.",
+  "capture_method": "live HTTP in running Linux web-collector container; normal TLS verification; metadata excerpt only"
+}

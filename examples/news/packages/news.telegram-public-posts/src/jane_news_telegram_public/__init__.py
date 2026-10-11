@@ -1,0 +1,1 @@
+"""Public Telegram news preparation."""

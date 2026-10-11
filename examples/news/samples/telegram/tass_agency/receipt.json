@@ -1,0 +1,20 @@
+{
+  "source_url": "https://t.me/s/tass_agency",
+  "post_url": "https://t.me/tass_agency/399744",
+  "captured_at": "2026-10-11T03:54:43.550126Z",
+  "http_status": 200,
+  "observed_text_posts": 20,
+  "excerpt_words": 18,
+  "published_at": "2026-10-11T03:53:01Z",
+  "snippet_is_partial": true,
+  "live_prep_validation": {
+    "checked_at": "2026-10-11T03:57:54.922565Z",
+    "entity_count": 3,
+    "schema_valid": true,
+    "message_urls": [
+      "https://t.me/tass_agency/399742",
+      "https://t.me/tass_agency/399743",
+      "https://t.me/tass_agency/399744"
+    ]
+  }
+}

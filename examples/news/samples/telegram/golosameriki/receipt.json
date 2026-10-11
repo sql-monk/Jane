@@ -1,0 +1,20 @@
+{
+  "source_url": "https://t.me/s/golosameriki",
+  "post_url": "https://t.me/golosameriki/44238",
+  "captured_at": "2026-10-11T03:54:42.001385Z",
+  "http_status": 200,
+  "observed_text_posts": 20,
+  "excerpt_words": 18,
+  "published_at": "2026-10-09T20:39:27Z",
+  "snippet_is_partial": true,
+  "live_prep_validation": {
+    "checked_at": "2026-10-11T03:57:54.357866Z",
+    "entity_count": 3,
+    "schema_valid": true,
+    "message_urls": [
+      "https://t.me/golosameriki/44236",
+      "https://t.me/golosameriki/44237",
+      "https://t.me/golosameriki/44238"
+    ]
+  }
+}

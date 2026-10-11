@@ -1,0 +1,13 @@
+{
+  "source_id": "news-web-bbc",
+  "feed_url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+  "article_url": "https://www.bbc.co.uk/news/articles/cqe8r5l7n92jo",
+  "fetched_at": "2026-10-11T03:56:55.429134Z",
+  "feed_http_status": 200,
+  "article_http_status": 200,
+  "robots_allowed": true,
+  "feed_entries": 32,
+  "title": "'Time for Ukraine to get new president,' says Trump after Zelensky condemns diesel deal",
+  "excerpt": "Ukraine's leader had said the deal with Russia to release diesel into the US would help Moscow fund the war.",
+  "capture_method": "live HTTP in running Linux web-collector container; normal TLS verification; metadata excerpt only"
+}

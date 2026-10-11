@@ -1,0 +1,82 @@
+[
+  {
+    "source_id": "news-web-pravda",
+    "title": "Українська правда",
+    "region": "ukraine",
+    "url": "https://www.pravda.com.ua/rss/",
+    "language": "uk",
+    "transport": "rss",
+    "rules_package_id": "news.web-rules-pravda",
+    "article_url": "https://www.pravda.com.ua/news/2026/10/11/8057417/"
+  },
+  {
+    "source_id": "news-web-ukrinform",
+    "title": "Укрінформ",
+    "region": "ukraine",
+    "url": "https://www.ukrinform.ua/rss/block-lastnews",
+    "language": "uk",
+    "transport": "rss",
+    "rules_package_id": "news.web-rules-ukrinform",
+    "article_url": "https://www.ukrinform.ua/rubric-regions/4173138-zitelku-rivnensini-pidozruut-u-samovilnomu-zahoplenni-zemel-oboroni.html"
+  },
+  {
+    "source_id": "news-web-bbc",
+    "title": "BBC News",
+    "region": "europe",
+    "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+    "language": "en",
+    "transport": "rss",
+    "rules_package_id": "news.web-rules-bbc",
+    "article_url": "https://www.bbc.co.uk/news/articles/cqe8r5l7n92jo"
+  },
+  {
+    "source_id": "news-web-guardian",
+    "title": "The Guardian",
+    "region": "europe",
+    "url": "https://www.theguardian.com/world/rss",
+    "language": "en",
+    "transport": "rss",
+    "rules_package_id": "news.web-rules-guardian",
+    "article_url": "https://www.theguardian.com/society/2026/oct/09/vaccine-trial-guinea-bissau-rfk-jr"
+  },
+  {
+    "source_id": "news-web-npr",
+    "title": "NPR",
+    "region": "usa",
+    "url": "https://feeds.npr.org/1001/rss.xml",
+    "language": "en",
+    "transport": "rss",
+    "rules_package_id": "news.web-rules-npr",
+    "article_url": "https://www.npr.org/2026/10/10/g-s1-147682/attack-on-riyadh-airport-killed-12-people-and-wounded-over-300-more-saudi-authorities-say"
+  },
+  {
+    "source_id": "news-web-abc",
+    "title": "ABC News",
+    "region": "usa",
+    "url": "https://abcnews.go.com/abcnews/internationalheadlines",
+    "language": "en",
+    "transport": "rss",
+    "rules_package_id": "news.web-rules-abc",
+    "article_url": "https://abcnews.com/International/wireStory/ethiopia-tells-acting-defense-eritrea-137153814"
+  },
+  {
+    "source_id": "news-web-ria",
+    "title": "РИА Новости",
+    "region": "russia",
+    "url": "https://ria.ru/export/rss2/archive/index.xml",
+    "language": "ru",
+    "transport": "rss",
+    "rules_package_id": "news.web-rules-ria",
+    "article_url": "https://ria.ru/20261011/opasnost-2123756148.html"
+  },
+  {
+    "source_id": "news-web-rt",
+    "title": "RT на русском",
+    "region": "russia",
+    "url": "https://russian.rt.com/rss",
+    "language": "ru",
+    "transport": "rss",
+    "rules_package_id": "news.web-rules-rt",
+    "article_url": "https://russian.rt.com/world/news/1693257-avstriya-taynyy-gruz"
+  }
+]

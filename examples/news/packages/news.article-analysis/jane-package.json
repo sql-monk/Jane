@@ -1,0 +1,82 @@
+{
+  "schema_version": "1",
+  "package_id": "news.article-analysis",
+  "version": "1.1.1",
+  "kind": "llm",
+  "title": "Багатомовний аналіз новин",
+  "description": "Заголовок, інфопривід, тональність, сутності та ставлення до них із цитатами першоджерела. Вихід українською; джерело є недовіреними даними.",
+  "tags": [
+    "news",
+    "sentiment",
+    "entities"
+  ],
+  "entry": {
+    "executor": "llm",
+    "instructions": "prompts/instructions.md",
+    "output_schema": "schemas/output.schema.json",
+    "model": "cheap",
+    "temperature": 0,
+    "max_output_tokens": 8192
+  },
+  "input": {
+    "accepts": [
+      "entities",
+      "material"
+    ],
+    "media_types": [
+      "text/*",
+      "application/xhtml+xml",
+      "application/json"
+    ]
+  },
+  "output": {
+    "entities": [
+      {
+        "entity_type": "news_article",
+        "schema": "schemas/news_article.schema.json",
+        "key_fields": [
+          "url"
+        ]
+      }
+    ],
+    "data_schema": "schemas/output.schema.json"
+  },
+  "tests": [
+    {
+      "name": "neutral-bad-news",
+      "input": {
+        "material": "tests/neutral-bad-news/material.json"
+      },
+      "expected_status": "success",
+      "expected": "tests/neutral-bad-news/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "prompt-injection-is-data",
+      "input": {
+        "material": "tests/injection/material.json"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "human",
+    "authors": [
+      "Jane news monitoring"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Name the primary affected facility for a single incident; preserve component discriminators or leave distinct/ambiguous acts ungrouped.",
+    "based_on": {
+      "package_id": "news.article-analysis",
+      "version": "1.1.0"
+    }
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web",
+      "telegram"
+    ]
+  }
+}

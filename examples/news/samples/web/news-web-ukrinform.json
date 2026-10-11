@@ -1,0 +1,13 @@
+{
+  "source_id": "news-web-ukrinform",
+  "feed_url": "https://www.ukrinform.ua/rss/block-lastnews",
+  "article_url": "https://www.ukrinform.ua/rubric-regions/4173138-zitelku-rivnensini-pidozruut-u-samovilnomu-zahoplenni-zemel-oboroni.html",
+  "fetched_at": "2026-10-11T03:57:36.342263Z",
+  "feed_http_status": 200,
+  "article_http_status": 200,
+  "robots_allowed": true,
+  "feed_entries": 30,
+  "title": "Жительку Рівненщини підозрюють у самовільному захопленні земель оборони",
+  "excerpt": "Жительці Рівненської області повідомили про підозру у самовільному захопленні земель оборони та незаконному будівництві. — Укрінформ.",
+  "capture_method": "live HTTP in running Linux web-collector container; normal TLS verification; metadata excerpt only"
+}

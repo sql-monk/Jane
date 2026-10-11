@@ -34,7 +34,7 @@ HTML = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*(\s[^<>]*)?/?>")
 def slug(text: str) -> str:
     """GitHub heading anchor: markup removed, lowercase, punctuation dropped, spaces to hyphens."""
     text = re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", text)
-    text = re.sub(r"[`*_]{1,3}([^`*_]+)[`*_]{1,3}", r"\1", text).strip().lower()
+    text = text.replace("`", "").strip().lower()
     kept = "".join(ch for ch in text if ch in " -_" or unicodedata.category(ch)[0] in "LNM")
     return kept.replace(" ", "-")
 
@@ -93,7 +93,7 @@ def check_file(path: Path) -> list[str]:
     slugs: dict[str, int] = {}
     images: list[tuple[int, str]] = []
     for number, line in text_lines:
-        bare = re.sub(r"`[^`]*`", "", line)
+        bare = re.sub(r"(`+)(.+?)\1", "", line)
         for m in HTML.finditer(bare):
             errors.append(f"{number}: raw HTML {m.group(0)!r}")
         h = HEADING.match(line)

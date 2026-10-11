@@ -250,7 +250,7 @@ async def test_browser_transport_page_pool_timeout_starts_no_resources(
         assert renderer._browser is None and renderer._playwright is None
         assert requests == {}
         [record] = [r for r in caplog.records if r.message == "browser page pool timeout"]
-        assert record.host == "127.0.0.1" and record.request_timeout_ms == 40
+        assert record.__dict__["host"] == "127.0.0.1" and record.__dict__["request_timeout_ms"] == 40
         assert "private=value" not in caplog.text
         assert renderer._pages.locked()
     finally:

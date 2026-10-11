@@ -7,7 +7,7 @@ import { AppProvider } from "../app/context";
 import { DEFAULT_CONFIG } from "../config";
 import { LlmPage, validProvider } from "../pages/LlmPage";
 import { ConnectionsPage } from "../pages/ConnectionsPage";
-import { ErrorBox, ReasonAction, Table } from "./ui";
+import { ErrorBox, Field, ReasonAction, Table } from "./ui";
 import { UnsavedChangesProvider } from "./UnsavedChanges";
 import { openapiExample } from "../test/contracts";
 import type { Connection, Source } from "../api/types";
@@ -45,6 +45,19 @@ function dialogSupport() {
 }
 
 describe("admin settings review regressions", () => {
+  it("gives selects an exact field name and associates hints and field errors separately", () => {
+    render(
+      <Field label="Рівень" hint="Область дії бюджету" error="Виберіть джерело">
+        <select defaultValue="source">
+          <option value="platform">Платформа</option>
+          <option value="source">Джерело</option>
+        </select>
+      </Field>,
+    );
+    const control = screen.getByRole("combobox", { name: "Рівень", exact: true });
+    expect(control).toHaveAttribute("aria-invalid", "true");
+    expect(control).toHaveAccessibleDescription("Область дії бюджету Виберіть джерело");
+  });
   it("distinguishes initial loading, failed load and a genuinely empty table", () => {
     const props = {
       rows: [] as string[],

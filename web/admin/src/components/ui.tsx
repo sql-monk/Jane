@@ -289,7 +289,17 @@ export function Tabs<K extends string>({
   );
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function Field({
+  label,
+  hint,
+  error,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  error?: string | undefined;
+  children: ReactNode;
+}) {
   const id = useId();
   let controlId: string | undefined;
   const controls = Children.map(children, (child) => {
@@ -299,14 +309,27 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
       !["input", "select", "textarea"].includes(child.type)
     )
       return child;
-    const control = child as ReactElement<{ id?: string; "aria-describedby"?: string }>;
+    const control = child as ReactElement<{
+      id?: string;
+      "aria-describedby"?: string;
+      "aria-invalid"?: boolean;
+    }>;
     const assignedId = control.props.id ?? id;
     controlId ??= assignedId;
     return cloneElement(control, {
       id: assignedId,
-      ...(hint
-        ? { "aria-describedby": [control.props["aria-describedby"], `${id}-hint`].filter(Boolean).join(" ") }
+      ...(hint || error
+        ? {
+            "aria-describedby": [
+              control.props["aria-describedby"],
+              hint ? `${id}-hint` : null,
+              error ? `${id}-error` : null,
+            ]
+              .filter(Boolean)
+              .join(" "),
+          }
         : {}),
+      ...(error ? { "aria-invalid": true } : {}),
     });
   });
   return (
@@ -322,6 +345,11 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
       {hint ? (
         <span className="field-hint" id={`${id}-hint`}>
           {hint}
+        </span>
+      ) : null}
+      {error ? (
+        <span className="error-inline" id={`${id}-error`} role="alert">
+          {error}
         </span>
       ) : null}
     </div>

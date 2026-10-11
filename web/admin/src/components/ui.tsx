@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ApiError, errorMessage, safeProblemCode } from "../api/problem";
+import { ApiError, errorMessage, safeProblemCode, problemFrom } from "../api/problem";
+import { statusLabel } from "../lib/format";
 import { redactSecrets } from "../lib/secrets";
 import { useLocation } from "react-router-dom";
 import { navigationFor } from "../lib/navigation";
@@ -60,11 +61,13 @@ export function Loading({ what = "Завантаження" }: { what?: string }
 
 export function ErrorBox({ error, title }: { error: unknown; title?: string }) {
   if (!error) return null;
-  const problem = error instanceof ApiError ? error.problem : null;
+  const problem = problemFrom(error);
   const httpStatus =
     error instanceof ApiError && Number.isInteger(error.status) && error.status >= 400 && error.status <= 599
       ? error.status
-      : null;
+      : problem?.status && problem.status >= 400 && problem.status <= 599
+        ? problem.status
+        : null;
   return (
     <div className="error-box" role="alert">
       <strong>{title ?? "Помилка"}</strong>
@@ -74,6 +77,11 @@ export function ErrorBox({ error, title }: { error: unknown; title?: string }) {
           {" "}
           (<code>{safeProblemCode(problem.code)}</code>
           {httpStatus ? `, HTTP ${httpStatus}` : ""})
+          {typeof problem.retryable === "boolean"
+            ? problem.retryable
+              ? " · Можна повторити"
+              : " · Спершу виправте причину"
+            : ""}
         </span>
       ) : null}
     </div>
@@ -126,7 +134,11 @@ const STATUS_TONE: Record<string, string> = {
 
 export function Status({ value }: { value: string | null | undefined }) {
   if (!value) return <span className="muted">—</span>;
-  return <span className={`badge badge-${STATUS_TONE[value] ?? "muted"}`}>{value}</span>;
+  return (
+    <span className={`badge badge-${STATUS_TONE[value] ?? "muted"}`} title={value} data-status={value}>
+      {statusLabel(value)}
+    </span>
+  );
 }
 
 /** Pretty JSON of API data; secret-looking values are always masked (ТЗ §11). */
@@ -173,13 +185,19 @@ export function Table<T>({
   rowKey,
   empty = "Немає даних",
   label,
+  loading = false,
+  error,
 }: {
   rows: readonly T[];
   columns: ReadonlyArray<Column<T>>;
   rowKey: (row: T, index: number) => string;
   empty?: string;
   label?: string;
+  loading?: boolean;
+  error?: unknown;
 }) {
+  if (rows.length === 0 && loading) return <Loading />;
+  if (rows.length === 0 && error) return null;
   if (rows.length === 0) return <p className="muted">{empty}</p>;
   return (
     <div className="table-wrap">
@@ -197,7 +215,7 @@ export function Table<T>({
           {rows.map((row, i) => (
             <tr key={rowKey(row, i)}>
               {columns.map((c) => (
-                <td key={c.header} className={c.className}>
+                <td key={c.header} className={c.className} data-label={c.header}>
                   <TableValue value={c.cell(row)} />
                 </td>
               ))}
@@ -309,7 +327,8 @@ export function ReasonAction({
   busy,
   danger = false,
   requireReason = true,
-  modal = false,
+  modal = true,
+  impact,
 }: {
   label: string;
   confirmLabel?: string;
@@ -318,6 +337,7 @@ export function ReasonAction({
   danger?: boolean;
   requireReason?: boolean;
   modal?: boolean;
+  impact?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -367,6 +387,7 @@ export function ReasonAction({
           if (!busy) setOpen(false);
         }}
       >
+        {impact ? <p>{impact}</p> : null}
         {confirmation}
       </ActionDialog>
     </>

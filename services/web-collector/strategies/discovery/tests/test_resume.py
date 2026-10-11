@@ -6,6 +6,9 @@ Killed while the strategies read their navigation documents (``seeds``: sitemaps
 pages) or later, while listing chains are followed from the saved strategy state — in both cases the result is
 exactly the expected union, every URL once, acknowledged materials are not delivered again.
 
+This resumes the same collection ID: completed navigation reads may use its persisted successful-response
+cache, while a request held at the kill has no completed response to reuse and must be requested again.
+
 The kill is placed by holding a request on the test site until the process is dead (:class:`.helpers.Hold`: the
 held request and every later one wait), not by polling ``stats.fetched`` and killing afterwards: the sitemap
 strategy finishes about 70 ms after its third fetch at 15 req/s, so on a loaded machine the "during seeds" kill
@@ -77,8 +80,8 @@ def test_strategies_resume_after_kill(
     want = union(expected_sets, "sitemap", "categories", "template:/archive/{n}", "api")
     assert set(urls) == site.canonical(want)
     assert not {m["observation_id"] for m in acked} & {m["observation_id"] for m in rest}
-    # materials are fetched again only if they were in flight at the kill (navigation documents and misses of
-    # an unfinished seeds() step are re-read by design)
+    # Materials are fetched again only if they were in flight at the kill. Successful navigation reads can
+    # reuse this collection ID's persisted cache; unfinished reads and template 404 misses are retried.
     refetched = {
         p: n
         for p, n in site.requests.items()
@@ -87,9 +90,10 @@ def test_strategies_resume_after_kill(
     assert len(refetched) <= SLOW_LIMITS["concurrency"]["max_parallel_fetches"], refetched
     assert site.requests[held] == 2, dict(site.requests)  # in flight at the kill: requested again
     if held == SEEDS_HOLD:
-        # killed inside seeds() of the sitemap strategy: the new process re-read the sitemaps
+        # The unfinished seeds() walk restarts, reusing the successful root read from the same-CID cache.
+        # The held child has no completed response and is requested twice (asserted above).
         assert fetched_before < SEED_FETCHES, view
-        assert site.requests["/sitemap.xml"] == 2
+        assert site.requests["/sitemap.xml"] == 1
     else:  # killed in the crawl: seeds() was complete and is not repeated, listing chains continued
         assert fetched_before >= SEED_FETCHES, view
         navigation = [p for p in site.requests if p.startswith(NAVIGATION_PREFIXES) and p != "/robots.txt"]

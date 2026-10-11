@@ -62,11 +62,16 @@ def _glob_to_regex(pattern: str) -> re.Pattern[str]:
 
 
 def load_rules(root: Path, wp: str) -> tuple[list[str], list[str]] | None:
-    map_path = root / MAP_FILE
+    map_path = root / Path(".Codex/wp-paths.json")
+    if not map_path.is_file():
+        map_path = root / MAP_FILE
     if not map_path.is_file():
         return None
     data = json.loads(map_path.read_text(encoding="utf-8"))
     pkg = data.get("packages", {}).get(wp)
+    if pkg is None and map_path != root / MAP_FILE and (root / MAP_FILE).is_file():
+        data = json.loads((root / MAP_FILE).read_text(encoding="utf-8"))
+        pkg = data.get("packages", {}).get(wp)
     if pkg is None:
         return None
     allow = [p.replace("{wp}", wp) for p in data.get("common_allow", []) + pkg.get("allow", [])]

@@ -899,6 +899,12 @@ export interface components {
         patterns: components["schemas"]["UrlPattern"][];
       }[];
       fetch?: {
+        /**
+         * @description Транспорт початкового GET-запиту: http — звичайний HTTP-клієнт; browser — мережевий стек Chromium через контрольований egress proxy. Для browser повертаються оригінальні байти відповіді, JavaScript під час завантаження вимкнено; render_js окремо визначає потребу рендерингу. Межі, robots.txt, переадресації, ліміти, тайм-аути та перевірки вихідних адрес залишаються обов'язковими. Потрібна збірка Web Collector з Chromium; за відсутності підтримки — not_implemented. POST та автентифіковані запити через цей транспорт не підтримуються.
+         * @default http
+         * @enum {string}
+         */
+        transport?: "http" | "browser";
         user_agent?: string;
         /** @description Додаткові несекретні заголовки. Автентифікація до сайту — лише через connection_id. */
         headers?: {

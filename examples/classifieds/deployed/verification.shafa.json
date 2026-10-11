@@ -1,0 +1,166 @@
+{
+  "site": "shafa",
+  "source_id": "classified-shafa",
+  "run": {
+    "run_id": "run_01M4MNESS6CAJ6FPV8AKW0D4BZ",
+    "task_id": "classifieds-shafa",
+    "trigger": "manual",
+    "status": "succeeded",
+    "started_at": "2026-10-11T05:02:36.622Z",
+    "finished_at": "2026-10-11T05:03:28.007Z",
+    "counters": {
+      "materials": 1,
+      "unknown_materials": 0
+    },
+    "stages": {
+      "collect": {
+        "counts": {
+          "completed": 1
+        }
+      },
+      "store-raw": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+          "version": "1.0.0",
+          "package_id": "jane.storage-files"
+        }
+      },
+      "extract-ads": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce",
+          "version": "1.0.0",
+          "package_id": "classifieds.shafa-ads"
+        }
+      },
+      "store-ads": {
+        "counts": {
+          "completed": 1,
+          "success": 1
+        },
+        "handler": {
+          "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+          "version": "1.0.0",
+          "package_id": "jane.storage-postgresql"
+        }
+      }
+    }
+  },
+  "verified": true,
+  "errors": [],
+  "samples": [
+    {
+      "fields": {
+        "url": "https://shafa.ua/item/220524560-zhinochiy-puhovik-weekday-z-kvitkovim-printom",
+        "site": "shafa",
+        "price": {
+          "amount": 3500.0,
+          "currency": "UAH"
+        },
+        "title": "Шикарный пуховик шведского бренда weekday оригинал. s идёт как оверсайз",
+        "listing_id": "220524560"
+      },
+      "observation": {
+        "material_id": "web:2bf5eea65b4e702b5c53d30d18a086f8",
+        "observed_at": "2026-10-11T05:02:59Z",
+        "content_sha256": "9cf7e496feaa1fd09b1ac77021de426e5275f171b53b4672073820e70f8ba7e0",
+        "observation_id": "obs_01a12957c1a80000f4d96aca"
+      },
+      "raw_object_id": "obj_04f896db2d013e19d7d6ece075d11ddd",
+      "verified": true,
+      "evidence_kind": "html",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price"
+      ]
+    },
+    {
+      "fields": {
+        "url": "https://shafa.ua/kids/dlya-devochek/sportivnye-kostiumy/215753412-kostyum-triyka-na-divchinku-2-roki",
+        "site": "shafa",
+        "price": {
+          "amount": 650.0,
+          "currency": "UAH"
+        },
+        "title": "Костюм трійка на дівчинку 2 роки",
+        "listing_id": "215753412"
+      },
+      "observation": {
+        "material_id": "web:2bf5eea65b4e702b5c53d30d18a086f8",
+        "observed_at": "2026-10-11T05:02:59Z",
+        "content_sha256": "9cf7e496feaa1fd09b1ac77021de426e5275f171b53b4672073820e70f8ba7e0",
+        "observation_id": "obs_01a12957c1a80000f4d96aca"
+      },
+      "raw_object_id": "obj_04f896db2d013e19d7d6ece075d11ddd",
+      "verified": true,
+      "evidence_kind": "html",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price"
+      ]
+    },
+    {
+      "fields": {
+        "url": "https://shafa.ua/item/221576272-trendovi-cholovichi-krosivki-salomon-s-lab-xt-6-nocturne-vision",
+        "site": "shafa",
+        "price": {
+          "amount": 2940.0,
+          "currency": "UAH"
+        },
+        "title": "Трендові чоловічі кросівки salomon s lab xt-6 nocturne vision black nd | 41–45",
+        "listing_id": "221576272"
+      },
+      "observation": {
+        "material_id": "web:2bf5eea65b4e702b5c53d30d18a086f8",
+        "observed_at": "2026-10-11T05:02:59Z",
+        "content_sha256": "9cf7e496feaa1fd09b1ac77021de426e5275f171b53b4672073820e70f8ba7e0",
+        "observation_id": "obs_01a12957c1a80000f4d96aca"
+      },
+      "raw_object_id": "obj_04f896db2d013e19d7d6ece075d11ddd",
+      "verified": true,
+      "evidence_kind": "html",
+      "checked_fields": [
+        "site",
+        "listing_id",
+        "title",
+        "url",
+        "price"
+      ]
+    }
+  ],
+  "packages": {
+    "store-raw": {
+      "digest": "sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f",
+      "version": "1.0.0",
+      "package_id": "jane.storage-files"
+    },
+    "extract-ads": {
+      "digest": "sha256:1ab7d5e0951af02716f20c9900b10c13711719184b1074c09331ddd212c796ce",
+      "version": "1.0.0",
+      "package_id": "classifieds.shafa-ads"
+    },
+    "store-ads": {
+      "digest": "sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b",
+      "version": "1.0.0",
+      "package_id": "jane.storage-postgresql"
+    }
+  },
+  "raw_objects": 1,
+  "persisted_entities": 24,
+  "extraction_items": 1,
+  "checked_entities": 24,
+  "checked_raw_objects": 1
+}

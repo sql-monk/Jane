@@ -1,0 +1,49 @@
+{
+  "project": "jane-demo",
+  "captured_at": "2026-10-11T04:59:43.187998+00:00",
+  "collector_source_sha256": {
+    "crawler.py": "72d451c9ff12d90f16f2a494e7ae9b63f7685c17daf33f5e7aaf2ff79b5181ca",
+    "engine.py": "89958bae6767d625ebfe401b0e98e1f6dbbf0e421f8f870fd66123190ca239ff",
+    "fetcher.py": "08377df3738f93e89ea1fc43c2cfccb60aeb119fcf1346ef16b9a62d33341e0d",
+    "render.py": "dc15dfcd7154733053623d3bce92188ed5cae5cd566c6362ed51b544b7e0de25"
+  },
+  "checkout_source_sha256": {
+    "crawler.py": "888cae2574488446aa9f65c301b37438faf66e364d476bee9f1a7b2288e7f27b",
+    "engine.py": "934b6addf648ddd0c4fa1e5af50aaddeeefd1db500308ee08767c9fb8952d4c9",
+    "fetcher.py": "78499a210f6d59cfedf9f172261edcf38da9f64f7a382f8a35749a64a4a6e6fe",
+    "render.py": "6bdc2937f11d5d15fc8e41e16591fd68c2d08102afc04cc2d7859d07d228e3cb"
+  },
+  "collector_matches_checkout": false,
+  "pending_image": "jane-classifieds-web-collector:20261011-r2",
+  "admin_bundle": "index-BCIqREjx.js",
+  "services": [
+    {
+      "service": "registry",
+      "image": "jane-demo-catalog-registry:latest",
+      "image_id": "sha256:f992bed9672c5d5676fbed0fa7b854f429492421b7a5465bd3bc362fbffa9404",
+      "status": "running",
+      "health": "healthy"
+    },
+    {
+      "service": "assistant",
+      "image": "jane-classifieds-assistant:20261011",
+      "image_id": "sha256:64ef56c835cb0daedef138c0da12fd0ae07ac26b0fa0a35dac9448507850502d",
+      "status": "running",
+      "health": "healthy"
+    },
+    {
+      "service": "web-collector",
+      "image": "jane-demo-catalog-web-collector:latest",
+      "image_id": "sha256:585ba22dce4bc0421a78e188194509ae8bde84b87350e7d24f2b37b3338c4b98",
+      "status": "running",
+      "health": "healthy"
+    },
+    {
+      "service": "proxy",
+      "image": "caddy:2-alpine",
+      "image_id": "sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b",
+      "status": "running",
+      "health": "healthy"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "entities": [
+    {
+      "entity_type": "classified_ad",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "listing_id": "39999975"
+        }
+      },
+      "fields": {
+        "site": "auto.ria.com",
+        "listing_id": "39999975",
+        "title": "Volkswagen Golf R 2017",
+        "url": "https://auto.ria.com/uk/auto_volkswagen_golf-r_39999975.html",
+        "price": {
+          "amount": 21500.0,
+          "currency": "USD"
+        },
+        "location": "Мукачево"
+      }
+    },
+    {
+      "entity_type": "classified_ad",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "listing_id": "40547538"
+        }
+      },
+      "fields": {
+        "site": "auto.ria.com",
+        "listing_id": "40547538",
+        "title": "Skoda Octavia 2011",
+        "url": "https://auto.ria.com/uk/auto_skoda_octavia_40547538.html",
+        "price": {
+          "amount": 6500.0,
+          "currency": "USD"
+        },
+        "location": "Чернігів"
+      }
+    }
+  ]
+}

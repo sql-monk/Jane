@@ -1,0 +1,85 @@
+{
+  "schema_version": "1",
+  "package_id": "classifieds.olx-ads",
+  "version": "1.0.0",
+  "kind": "extractor",
+  "title": "OLX: public notebook classified cards",
+  "description": "Публічні оголошення OLX з карток каталогу. Колектор завантажує оригінальний HTML через звичайний Chromium без JS; екстрактор детермінований і без мережі. Контакти не витягаються.",
+  "entry": {
+    "runtime": "python",
+    "module": "jane_classifieds_olx.main",
+    "callable": "extract"
+  },
+  "input": {
+    "accepts": [
+      "material"
+    ],
+    "media_types": [
+      "text/html"
+    ],
+    "content_kinds": [
+      "page"
+    ]
+  },
+  "params_schema": "schemas/params.schema.json",
+  "output": {
+    "entities": [
+      {
+        "entity_type": "classified_ad",
+        "schema": "schemas/ad.schema.json",
+        "key_fields": [
+          "site",
+          "listing_id"
+        ]
+      }
+    ]
+  },
+  "dependencies": {
+    "runtime_profile": "python-extractor@1",
+    "python": []
+  },
+  "access": {
+    "network": "none"
+  },
+  "tests": [
+    {
+      "name": "public-notebooks-real-cards",
+      "input": {
+        "file": "tests/public-notebooks/page.html",
+        "media_type": "text/html",
+        "url": "https://www.olx.ua/uk/elektronika/noutbuki-i-aksesuary/noutbuki/"
+      },
+      "expected_status": "success",
+      "expected": "tests/public-notebooks/expected.json",
+      "compare": "subset",
+      "origin": "human"
+    },
+    {
+      "name": "no-product-cards",
+      "input": {
+        "file": "tests/no-cards/page.html",
+        "media_type": "text/html",
+        "url": "https://www.olx.ua/uk/"
+      },
+      "expected_status": "empty",
+      "origin": "human"
+    }
+  ],
+  "provenance": {
+    "created_by": "llm",
+    "authors": [
+      "Codex"
+    ],
+    "created_at": "2026-10-11T00:00:00Z",
+    "change_summary": "Public OLX cards: directly present title, listing identity, canonical URL, currency price and location."
+  },
+  "bindings_hint": {
+    "source_kinds": [
+      "web"
+    ],
+    "domains": [
+      "www.olx.ua",
+      "olx.ua"
+    ]
+  }
+}

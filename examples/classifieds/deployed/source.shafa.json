@@ -1,0 +1,32 @@
+{
+  "source_id": "classified-shafa",
+  "kind": "web",
+  "title": "Shafa — публічні оголошення головної сторінки",
+  "description": "Публічні оголошення https://shafa.ua/uk/; ліміти у examples/classifieds/sites.json.",
+  "locator": {
+    "url": "https://shafa.ua/uk/"
+  },
+  "collector_rules": {
+    "package_id": "classifieds.shafa-rules",
+    "version": "1.0.1",
+    "digest": "sha256:1d4788e6cffa86cbe5052479e4bc3c13d6ab65185ce8f962bbc035bc7ccd296c"
+  },
+  "limits": {
+    "rate": {
+      "requests_per_second_per_host": 0.5,
+      "min_delay_ms_per_host": 2000,
+      "respect_crawl_delay": true
+    },
+    "concurrency": {
+      "max_parallel_fetches_per_host": 1
+    }
+  },
+  "forward_unknown_to_llm": false,
+  "expected_entity_types": [
+    "classified_ad"
+  ],
+  "labels": {
+    "group": "classifieds",
+    "site": "shafa"
+  }
+}

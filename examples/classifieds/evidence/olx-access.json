@@ -1,0 +1,16 @@
+{
+  "requested_url": "https://www.olx.ua/uk/elektronika/noutbuki-i-aksesuary/noutbuki/",
+  "final_url": "https://www.olx.ua/uk/elektronika/noutbuki-i-aksesuary/noutbuki/",
+  "http_status": 200,
+  "transport": "Chromium through existing EgressProxy CONNECT with JS disabled",
+  "user_agent": "JaneBot/1.0",
+  "fetched_at": "2026-10-11T04:01:08+00:00",
+  "sha256": "a384a38a8bb3c2746206de7e49a14b7cf30d04d0f0f62e47b35ce9503a9ed173",
+  "bytes": 3704300,
+  "html_cards": 52,
+  "extracted_entities": 52,
+  "fixture_derivation": "First two exact l-card HTML subtrees; style and svg elements removed to keep public listing structures compact. No synthesized ads.",
+  "direct_http_probe": "httpx/urllib received CloudFront 403 before document; ordinary Chromium original response returned 200 without CAPTCHA or stealth.",
+  "robots_url": "https://www.olx.ua/robots.txt",
+  "robots_browser_status": 200
+}

@@ -62,6 +62,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "transport": { "type": "string", "enum": ["http", "browser"], "default": "http", "description": "Транспорт початкового GET-запиту: http — звичайний HTTP-клієнт; browser — мережевий стек Chromium через контрольований egress proxy. Для browser повертаються оригінальні байти відповіді, JavaScript під час завантаження вимкнено; render_js окремо визначає потребу рендерингу. Межі, robots.txt, переадресації, ліміти, тайм-аути та перевірки вихідних адрес залишаються обов'язковими. Потрібна збірка Web Collector з Chromium; за відсутності підтримки — not_implemented. POST та автентифіковані запити через цей транспорт не підтримуються." },
             "user_agent": { "type": "string", "maxLength": 300 },
             "headers": {
               "description": "Додаткові несекретні заголовки. Автентифікація до сайту — лише через connection_id.",

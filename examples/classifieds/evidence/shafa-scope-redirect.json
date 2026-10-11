@@ -1,0 +1,30 @@
+{
+  "collection_id": "job_701a4ba0e639433fa67180cec2077b1f",
+  "collection_created_at": "2026-10-11T04:50:49Z",
+  "collection_finished_at": "2026-10-11T04:50:52Z",
+  "observed_error": {
+    "code": "out_of_scope",
+    "message": "redirect to https://shafa.ua/: path outside path_prefixes",
+    "url": "https://shafa.ua/uk/"
+  },
+  "errors_api_status": 200,
+  "fetched": 0,
+  "emitted": 0,
+  "skipped_out_of_scope": 1,
+  "skipped_robots": 0,
+  "not_modified": 0,
+  "mode": "full",
+  "fix": {
+    "rules_package": "classifieds.shafa-rules",
+    "version": "1.0.1",
+    "allowed_exact_homepages": ["https://shafa.ua/", "https://shafa.ua/uk/"],
+    "max_pages_per_run": 1,
+    "robots_mode": "respect"
+  },
+  "read_only_followup_gets": [
+    {"url": "https://shafa.ua/uk/", "final_url": "https://shafa.ua/uk/", "status": 200, "bytes": 182403, "cards": 22},
+    {"url": "https://shafa.ua/", "final_url": "https://shafa.ua/uk/", "status": 200, "bytes": 189504, "cards": 24}
+  ],
+  "followup_transport": "urllib from running collector container, User-Agent JaneBot/1.0",
+  "verification_scope": "Observed collector error confirmed through its read-only SQLite state and GET collections/errors API; rule update not yet verified end-to-end."
+}

@@ -1,5 +1,5 @@
 // LLM providers, model aliases, budgets and cost accounting (ТЗ §8, llm.v1). Credentials only via connection_id.
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../app/context";
@@ -84,6 +84,7 @@ function Providers() {
   const [editing, setEditing] = useState<{ text: string; etag: string | null; isNew: boolean } | null>(null);
   const [baseline, setBaseline] = useState("");
   const [openError, setOpenError] = useState<unknown>(null);
+  const loadEpoch = useRef(0);
   const [propertyIssues, setPropertyIssues] = useState<Record<string, string>>({});
   const reportPropertyIssue = useCallback(
     (key: string, message: string) =>
@@ -97,7 +98,9 @@ function Providers() {
     [],
   );
   const load = async (id: string | null) => {
+    const epoch = ++loadEpoch.current;
     setOpenError(null);
+    setPropertyIssues({});
     if (!id) {
       const text = toJsonText(NEW_PROVIDER);
       setBaseline(text);
@@ -107,11 +110,12 @@ function Providers() {
       const result = await unwrapWithEtag(
         api.llm.GET("/v1/providers/{provider_id}", { params: { path: { provider_id: id } } }),
       );
+      if (epoch !== loadEpoch.current) return;
       const text = toJsonText(result.data);
       setBaseline(text);
       setEditing({ text, etag: result.etag, isNew: false });
     } catch (error) {
-      setOpenError(error);
+      if (epoch === loadEpoch.current) setOpenError(error);
     }
   };
   const check = editing ? checkJson(editing.text) : null;
@@ -144,7 +148,9 @@ function Providers() {
       return true;
     },
   });
-  const open = (id: string | null) => guard.confirmChange(() => void load(id));
+  const open = (id: string | null) => {
+    if (!save.isPending) guard.confirmChange(() => void load(id));
+  };
   const update = (patch: Partial<Provider>) => {
     if (editing && provider) {
       const next = { ...provider, ...patch };
@@ -156,7 +162,7 @@ function Providers() {
     <Section
       title="Провайдери"
       actions={
-        <button type="button" className="btn" onClick={() => void open(null)}>
+        <button type="button" className="btn" disabled={save.isPending} onClick={() => void open(null)}>
           Новий провайдер
         </button>
       }
@@ -177,7 +183,12 @@ function Providers() {
           {
             header: "Провайдер",
             cell: (p) => (
-              <button type="button" className="link" onClick={() => void open(p.provider_id)}>
+              <button
+                type="button"
+                className="link"
+                disabled={save.isPending}
+                onClick={() => void open(p.provider_id)}
+              >
                 {p.provider_id}
               </button>
             ),
@@ -280,7 +291,16 @@ function Providers() {
             >
               Зберегти провайдера
             </button>
-            <button type="button" className="btn" onClick={() => guard.confirmChange(() => setEditing(null))}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() =>
+                guard.confirmChange(() => {
+                  loadEpoch.current += 1;
+                  setEditing(null);
+                })
+              }
+            >
               Скасувати
             </button>
           </div>

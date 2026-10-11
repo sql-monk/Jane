@@ -302,36 +302,44 @@ export function Field({
 }) {
   const id = useId();
   let controlId: string | undefined;
-  const controls = Children.map(children, (child) => {
-    if (
-      !isValidElement(child) ||
-      typeof child.type !== "string" ||
-      !["input", "select", "textarea"].includes(child.type)
-    )
-      return child;
-    const control = child as ReactElement<{
-      id?: string;
-      "aria-describedby"?: string;
-      "aria-invalid"?: boolean;
-    }>;
-    const assignedId = control.props.id ?? id;
-    controlId ??= assignedId;
-    return cloneElement(control, {
-      id: assignedId,
-      ...(hint || error
-        ? {
-            "aria-describedby": [
-              control.props["aria-describedby"],
-              hint ? `${id}-hint` : null,
-              error ? `${id}-error` : null,
-            ]
-              .filter(Boolean)
-              .join(" "),
-          }
-        : {}),
-      ...(error ? { "aria-invalid": true } : {}),
+  let controlCount = 0;
+  const decorate = (nodes: ReactNode): ReactNode =>
+    Children.map(nodes, (child) => {
+      if (
+        !isValidElement(child) ||
+        typeof child.type !== "string" ||
+        !["input", "select", "textarea"].includes(child.type)
+      )
+        return isValidElement(child) && typeof child.type === "string"
+          ? cloneElement(child as ReactElement<{ children?: ReactNode }>, {
+              children: decorate((child.props as { children?: ReactNode }).children),
+            })
+          : child;
+      const control = child as ReactElement<{
+        id?: string;
+        "aria-describedby"?: string;
+        "aria-invalid"?: boolean;
+      }>;
+      const assignedId = control.props.id ?? (controlCount ? `${id}-${controlCount}` : id);
+      controlCount += 1;
+      controlId ??= assignedId;
+      return cloneElement(control, {
+        id: assignedId,
+        ...(hint || error
+          ? {
+              "aria-describedby": [
+                control.props["aria-describedby"],
+                hint ? `${id}-hint` : null,
+                error ? `${id}-error` : null,
+              ]
+                .filter(Boolean)
+                .join(" "),
+            }
+          : {}),
+        ...(error ? { "aria-invalid": true } : {}),
+      });
     });
-  });
+  const controls = decorate(children);
   return (
     <div className="field">
       {controlId ? (

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import threading
 import time
@@ -223,6 +224,98 @@ async def test_browser_transport_unavailable_is_explicit() -> None:
         assert failure.value.code == "not_implemented"
     finally:
         await renderer.aclose()
+
+
+async def test_browser_transport_page_pool_timeout_starts_no_resources(
+    browser_site: tuple[str, Counter[str]], caplog: pytest.LogCaptureFixture
+) -> None:
+    base, requests = browser_site
+    renderer = Renderer(RenderOptions(enabled=False), EgressPolicy(), max_pages=2)
+    limits = ServiceLimits()
+    timeouts = limits.timeouts.model_copy(update={"request_timeout_ms": 40})
+    await renderer._pages.acquire()
+    await renderer._pages.acquire()
+    try:
+        with pytest.raises(httpx.ReadTimeout, match="browser page pool timeout"):
+            await asyncio.wait_for(
+                renderer.fetch(
+                    base + "/document?private=value",
+                    headers={},
+                    max_bytes=100,
+                    limits=limits,
+                    timeouts=timeouts,
+                ),
+                1,
+            )
+        assert renderer._browser is None and renderer._playwright is None
+        assert requests == {}
+        [record] = [r for r in caplog.records if r.message == "browser page pool timeout"]
+        assert record.host == "127.0.0.1" and record.request_timeout_ms == 40
+        assert "private=value" not in caplog.text
+        assert renderer._pages.locked()
+    finally:
+        renderer._pages.release()
+        renderer._pages.release()
+        await renderer.aclose()
+
+
+async def test_browser_transport_page_pool_cancellation_does_not_consume_a_slot() -> None:
+    renderer = Renderer(RenderOptions(enabled=False), EgressPolicy(), max_pages=1)
+    await renderer._pages.acquire()
+    pending = asyncio.create_task(
+        renderer.fetch("https://example.test/", headers={}, max_bytes=100, limits=ServiceLimits())
+    )
+    try:
+        await asyncio.sleep(0)
+        assert not pending.done()
+        pending.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await pending
+        assert renderer._browser is None and renderer._playwright is None
+    finally:
+        renderer._pages.release()
+    try:
+        # The next real call reaches the disabled-browser check instead of waiting for a leaked slot.
+        with pytest.raises(FetchError) as failure:
+            await asyncio.wait_for(
+                renderer.fetch("https://example.test/", headers={}, max_bytes=100, limits=ServiceLimits()),
+                1,
+            )
+        assert failure.value.code == "not_implemented"
+    finally:
+        await renderer.aclose()
+
+
+@pytest.mark.usefixtures("chromium")
+async def test_browser_transport_page_pool_recovers_for_a_real_fetch(
+    browser_site: tuple[str, Counter[str]],
+) -> None:
+    base, requests = browser_site
+    renderer = Renderer(RenderOptions(), EgressPolicy(), max_pages=2)
+    limits = ServiceLimits()
+    timeouts = limits.timeouts.model_copy(update={"request_timeout_ms": 40})
+    await renderer._pages.acquire()
+    await renderer._pages.acquire()
+    try:
+        with pytest.raises(httpx.ReadTimeout, match="browser page pool timeout"):
+            await asyncio.wait_for(
+                renderer.fetch(
+                    base + "/document", headers={}, max_bytes=1000, limits=limits, timeouts=timeouts
+                ),
+                1,
+            )
+        assert requests == {}
+    finally:
+        renderer._pages.release()
+    try:
+        status, _, body, truncated, _ = await renderer.fetch(
+            base + "/document", headers={}, max_bytes=1000, limits=limits
+        )
+        assert status == 200 and body == DOCUMENT_BODY and not truncated
+    finally:
+        renderer._pages.release()
+        await renderer.aclose()
+    assert requests == {"/document": 1}
 
 
 @pytest.mark.usefixtures("chromium")

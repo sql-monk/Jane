@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "catalog.prostor-catalog-rules",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "kind": "collector-rules",
-  "title": "prostor.ua: full scan of three categories",
-  "description": "Правила Web Collector для повного каталогу prostor.ua: усі сторінки пагінації (?p=N, посилання «Наступна») категорій «Зволоження і живлення» (догляд за обличчям), «Засоби для прання» і «Шампуні» та картки всіх товарів із них (/ua/product/). robots.txt дотримується; ліміти — у джерелі й завданні.",
+  "title": "prostor.ua: entire Ukrainian product assortment from sitemaps",
+  "description": "Повний асортимент: косметика, парфумерія, догляд, гігієна, побутова хімія та всі інші товарні розділи. 9 339 унікальних українських товарних URL у sitemap станом на 11.10.2026. Усі товарні URL із повних sitemap, без обмеження категорій; incremental-черга продовжується між запусками, повторні відвідування карток оновлюють ціну, наявність і властивості. Ліміти визначаються джерелом і завданням; robots.txt дотримується.",
   "tags": [
     "catalog",
     "prostor",
@@ -17,11 +17,20 @@
   },
   "tests": [],
   "provenance": {
-    "created_by": "human",
+    "created_by": "llm",
     "authors": [
-      "Claude (examples/sites: prostor)"
+      "Claude (examples/sites: prostor)",
+      "Codex: full assortment catalog configuration"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Category listings with pagination plus every product card of three prostor.ua categories."
+    "created_at": "2026-10-11T03:57:25.355305Z",
+    "change_summary": "Replace three-category listing discovery with complete Ukrainian product sitemaps and periodic resumable product-card refresh. Reproducible Git LF bytes: normalize CRLF to LF without behavior changes.",
+    "based_on": {
+      "package_id": "catalog.prostor-catalog-rules",
+      "version": "1.1.0"
+    },
+    "llm": {
+      "model": "Codex",
+      "reason": "improvement"
+    }
   }
 }

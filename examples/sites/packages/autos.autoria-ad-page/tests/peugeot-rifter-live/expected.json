@@ -1,0 +1,143 @@
+{
+  "entities": [
+    {
+      "entity_type": "ad_car",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "40359418",
+        "url": "https://auto.ria.com/uk/auto_peugeot_rifter_40359418.html",
+        "title": "Peugeot Rifter 2020",
+        "price": 17100.0,
+        "currency": "USD",
+        "make": "Peugeot",
+        "model": "Rifter",
+        "year": 2020,
+        "price_usd": 17100.0,
+        "price_uah": 769500.0,
+        "mileage_km": 57000,
+        "transmission": "Ручна / Механіка",
+        "fuel": "Дизель",
+        "engine_l": 1.56,
+        "body_type": "Мінівен",
+        "drive": "Передній",
+        "color": "Білий",
+        "region": "Івано-Франківська обл.",
+        "city": "Городенка",
+        "condition": "used",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/peugeot_rifter__657660667fx.webp",
+        "status": "active",
+        "doors": 5,
+        "seats": 5,
+        "generation": "I покоління",
+        "modification": "1.6 HDi MT (92 к.с.) L2",
+        "trim": "Allure",
+        "power_hp": 92.0,
+        "modification_power_hp": 92.0,
+        "power_kw": 68.0,
+        "emission_standard": "Євро-5",
+        "technical_state": "Професійно відремонтовані пошкодження",
+        "paint_condition": "Професійно виправлені сліди використання",
+        "inspection_ready": true,
+        "condition_options": [
+          "Гаражне зберігання",
+          "Сервісна книжка",
+          "Перший власник",
+          "Перша реєстрація"
+        ],
+        "fuel_consumption_l_per_100km": {
+          "city": 7.0,
+          "highway": 4.8,
+          "combined": 6.0
+        },
+        "equipment": {
+          "comfort": [
+            "Бортовий комп'ютер",
+            "Датчик дощу",
+            "Тоновані вікна",
+            "Складане заднє сидіння",
+            "Третій задній підголівник",
+            "Оздоблення керма шкірою",
+            "Оздоблення шкірою важеля КПП",
+            "Передній центральний підлокітник",
+            "Розетка 12V",
+            "Мультифункціональне кермо",
+            "Електропривід дзеркал",
+            "Підкурювач і попільничка"
+          ],
+          "safety": [
+            "Центральний замок",
+            "Антиблокувальна система (ABS)",
+            "Система стабілізації (ESP)",
+            "Розподіл гальмівних зусиль (BAS, EBD)",
+            "Система кріплення IsoFix",
+            "Блокування замків задніх дверей"
+          ],
+          "multimedia": [
+            "Навігаційна система",
+            "Мультимедіа система з LCD-екраном",
+            "Bluetooth",
+            "USB",
+            "Android Auto",
+            "CarPlay"
+          ],
+          "headlights": [
+            "Галогенні"
+          ],
+          "interior_materials": [
+            "Тканина"
+          ],
+          "interior_color": [
+            "Темний"
+          ],
+          "seat_adjustment": [
+            "Ручне регулювання передніх сидінь"
+          ],
+          "heated_seats": [
+            "Передні сидіння"
+          ],
+          "electric_windows": [
+            "Передні та задні"
+          ],
+          "climate_control": [
+            "Клімат-контроль 2-зонний"
+          ],
+          "power_steering": [
+            "Електро"
+          ],
+          "steering_adjustment": [
+            "По висоті та по вильоту"
+          ],
+          "spare_wheel": [
+            "Повнорозмірне"
+          ],
+          "lighting": [
+            "Датчик світла",
+            "Денні ходові вогні",
+            "Протитуманні фари"
+          ],
+          "body_and_interior": [
+            "Довга база",
+            "Кузов MAXI",
+            "Захист картера"
+          ],
+          "parking_assistance": [
+            "Парктронік задній"
+          ],
+          "airbags": [
+            "Водія",
+            "Пасажира",
+            "Бічні задні"
+          ]
+        }
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "40359418"
+        }
+      }
+    }
+  ]
+}

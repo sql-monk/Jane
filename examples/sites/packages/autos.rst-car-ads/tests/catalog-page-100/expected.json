@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "rst.ua",
         "ad_id": "15486928",
@@ -32,7 +32,7 @@
       }
     },
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "rst.ua",
         "ad_id": "15486964",
@@ -63,7 +63,7 @@
       }
     },
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "rst.ua",
         "ad_id": "15487142",

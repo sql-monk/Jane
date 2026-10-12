@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "classified_ad",
+      "entity_type": "ad_goods",
       "key": {
         "scope": "local",
         "natural": {
@@ -21,7 +21,7 @@
       }
     },
     {
-      "entity_type": "classified_ad",
+      "entity_type": "ad_goods",
       "key": {
         "scope": "local",
         "natural": {

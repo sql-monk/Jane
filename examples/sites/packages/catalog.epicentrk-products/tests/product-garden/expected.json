@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "product",
+      "entity_type": "product_garden",
       "fields": {
         "shop": "epicentrk.ua",
         "product_id": "liika-sadova-lemira-10-l",

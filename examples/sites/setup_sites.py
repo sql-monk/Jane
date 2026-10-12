@@ -6,12 +6,17 @@ Every site is one declarative file ``sites/<site>.json``::
       "site": "makeup", "group": "catalog", "title": "...", "url": "https://...",
       "sources": [<source.schema.json documents>],
       "tasks": [<task-config.schema.json documents>],
-      "verify": {"<source_id>": {"<entity_type>": {"min": 50, "required": ["title", "price"]}}}
+      "verify": {"<source_id>": {"<entity_type or glob>": {"min": 50, "required": ["title", "price"]}}}
     }
 
 A package reference is written as the string ``"@pkg:<package_id>"`` and resolves to ``{package_id, version,
 digest}`` of the package directory (``packages/``, ``../shops/packages`` or the storage packages); the digest is
 that of the registry's canonical archive. Connection ids are those of ``../documents/connections.json``.
+RAW goes to ``jane.storage-files`` / ``raw-files``, entities to ``jane.storage-mongodb`` / ``results-mongo``
+(a MongoDB collection per entity type). A ``verify`` key with ``*`` (``product_*``) stands for every entity
+type the site's extractors declare that matches it: a catalog writes ``product_<group>`` types chosen by the
+extractor from the shop's category table (``CATEGORY_TYPES`` in each extractor of the site, the same table in
+the card and the price extractor).
 
     uv run --all-packages python examples/sites/setup_sites.py check [site ...]
     uv run --all-packages python examples/sites/setup_sites.py apply --project <p> [site ...] [--run]
@@ -28,13 +33,15 @@ package's entity schema; the summary goes to ``.jane/sites-<project>.json``.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import sys
 import time
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from fnmatch import fnmatchcase
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from jsonschema import Draft202012Validator
 
@@ -45,9 +52,39 @@ import jane_examples as ex  # noqa: E402 - examples/jane_examples.py: contract-v
 
 SITES = HERE / "sites"
 PACKAGE_ROOTS = (HERE / "packages", HERE.parent / "shops" / "packages")
-STORAGE = ("jane.storage-files", "jane.storage-postgresql")
+CONNECTIONS = HERE.parent / "documents" / "connections.json"
+RESULTS_PACKAGE = "jane.storage-mongodb"  # entities: a MongoDB collection per entity type
+RESULTS_CONNECTION = "results-mongo"
+STORAGE = ("jane.storage-files", RESULTS_PACKAGE)
 REF = "@pkg:"
 DUMMY_DIGEST = "sha256:" + "0" * 64
+# A catalog extractor chooses product_<group> by the shop's category table; every extractor of one catalog
+# site carries the same table and the same lookup (the price task must write the type the card task wrote).
+CATEGORY_TABLE = "CATEGORY_TYPES"
+CATEGORY_OTHER = "OTHER_TYPE"
+CATEGORY_LOOKUP = ("APOSTROPHES", "_section", "TYPES_BY_PREFIX", "_mapped_type")
+# Product types of the taxonomy (docs/delivery/mongo-entities.md, docs/reference/entity-types.md).
+PRODUCT_TYPES = frozenset(
+    {
+        "product_food",
+        "product_beauty",
+        "product_household",
+        "product_book",
+        "product_kids",
+        "product_electronics",
+        "product_appliance",
+        "product_tools",
+        "product_garden",
+        "product_home",
+        "product_clothing",
+        "product_auto",
+        "product_pet",
+        "product_sport",
+        "product_office",
+        "product_health",
+        "product_other",
+    }
+)
 
 
 def site_files(names: Sequence[str] = ()) -> list[Path]:
@@ -108,6 +145,148 @@ def local_ref(directory: Path) -> dict[str, str]:
     }
 
 
+def stage_package(stage: Mapping[str, Any]) -> str | None:
+    handler = stage.get("handler")
+    return handler[len(REF) :] if isinstance(handler, str) and handler.startswith(REF) else None
+
+
+def manifest_of(dirs: Mapping[str, Path], package_id: str) -> dict[str, Any]:
+    return cast(dict[str, Any], ex.read_json(dirs[package_id] / "jane-package.json"))
+
+
+def declared_types(dirs: Mapping[str, Path], package_ids: Iterable[str]) -> set[str]:
+    """Entity types the packages declare in ``output.entities`` (the runtime rejects any other)."""
+    return {
+        str(e["entity_type"])
+        for pid in package_ids
+        if pid in dirs
+        for e in (manifest_of(dirs, pid).get("output") or {}).get("entities", [])
+    }
+
+
+def source_extractors(site: Mapping[str, Any], dirs: Mapping[str, Path], source_id: str) -> list[str]:
+    """Extractor packages of the site's tasks that read ``source_id``, in the order of the tasks."""
+    found: dict[str, None] = {}
+    for task in site.get("tasks", []):
+        if task.get("input", {}).get("source_id") != source_id:
+            continue
+        for stage in task.get("stages", []):
+            pid = stage_package(stage)
+            if pid is not None and pid in dirs and manifest_of(dirs, pid)["kind"] == "extractor":
+                found[pid] = None
+    return list(found)
+
+
+def verify_types(key: str, declared: Iterable[str]) -> list[str]:
+    """A ``verify`` key: one entity type, or a glob (``product_*``) over the types the extractors declare."""
+    if any(ch in key for ch in "*?["):
+        return sorted(t for t in declared if fnmatchcase(t, key))
+    return [key]
+
+
+def results_connection(site: Mapping[str, Any], source_id: str) -> str:
+    """``connections.target`` of the entity storage stage of the source's tasks."""
+    for task in site.get("tasks", []):
+        if task.get("input", {}).get("source_id") != source_id:
+            continue
+        for stage in task.get("stages", []):
+            target = (stage.get("connections") or {}).get("target")
+            if stage_package(stage) == RESULTS_PACKAGE and target:
+                return str(target)
+    return RESULTS_CONNECTION
+
+
+def category_code(directory: Path) -> dict[str, Any] | None:
+    """Category table, default type and lookup functions of an extractor's module, read from its syntax tree
+    (nothing is imported); ``None`` when the module has no table."""
+    entry = ex.read_json(directory / "jane-package.json").get("entry") or {}
+    relative = Path(*str(entry.get("module", "")).split(".")).with_suffix(".py")
+    source = next(
+        (root / relative for root in (directory / "src", directory) if (root / relative).is_file()), None
+    )
+    if source is None:
+        return None
+    found: dict[str, Any] = {}
+    for node in ast.parse(source.read_text(encoding="utf-8")).body:
+        if isinstance(node, ast.Assign | ast.AnnAssign) and node.value is not None:
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                if isinstance(target, ast.Name) and target.id in (CATEGORY_TABLE, CATEGORY_OTHER):
+                    found[target.id] = ast.literal_eval(node.value)
+                elif isinstance(target, ast.Name) and target.id in CATEGORY_LOOKUP:
+                    found[target.id] = ast.dump(node.value)
+        elif isinstance(node, ast.FunctionDef) and node.name in CATEGORY_LOOKUP:
+            found[node.name] = ast.dump(node)
+    return found if CATEGORY_TABLE in found else None
+
+
+def category_problems(name: str, site: Mapping[str, Any], dirs: Mapping[str, Path]) -> list[str]:
+    """A catalog site: its extractors carry one and the same category table and lookup, yield only taxonomy
+    types and declare exactly what they can yield; every source expects exactly the declared types."""
+    if site.get("group") != "catalog":
+        return []
+    problems: list[str] = []
+    reference: tuple[str, dict[str, Any]] | None = None
+    for source in site.get("sources", []):
+        source_id = str(source.get("source_id"))
+        extractors = source_extractors(site, dirs, source_id)
+        for pid in extractors:
+            code = category_code(dirs[pid])
+            if code is None:
+                problems.append(f"{name}: {pid}: no {CATEGORY_TABLE} table in the entry module")
+                continue
+            missing = [n for n in (CATEGORY_OTHER, *CATEGORY_LOOKUP) if n not in code]
+            if missing:
+                problems.append(f"{name}: {pid}: the category lookup lacks {missing}")
+            table: dict[tuple[str, ...], str] = code[CATEGORY_TABLE]
+            other = code.get(CATEGORY_OTHER)
+            yielded = set(table.values())
+            unknown = sorted((yielded | {str(other)}) - PRODUCT_TYPES)
+            if unknown:
+                problems.append(f"{name}: {pid}: types outside the taxonomy: {unknown}")
+            declared = declared_types(dirs, [pid])
+            if not yielded <= declared or not declared <= yielded | {other}:
+                problems.append(
+                    f"{name}: {pid}: output.entities {sorted(declared)} must cover the table types "
+                    f"{sorted(yielded)} (and may add {other})"
+                )
+            if reference is None:
+                reference = (pid, code)
+            elif code != reference[1]:
+                problems.append(f"{name}: {pid}: category table or lookup differs from {reference[0]}")
+        expected = set(source.get("expected_entity_types") or [])
+        declared = declared_types(dirs, extractors)
+        if expected != declared:
+            problems.append(
+                f"{name}: source {source_id}: expected_entity_types {sorted(expected)} differ from the types "
+                f"its extractors declare {sorted(declared)}"
+            )
+    return problems
+
+
+def connection_problems(name: str, site: Mapping[str, Any], dirs: Mapping[str, Path]) -> list[str]:
+    """Every connection a stage names is in ``documents/connections.json`` with the kind the package requires."""
+    kinds = {c["connection_id"]: c["kind"] for c in ex.read_json(CONNECTIONS)["connections"]}
+    problems: list[str] = []
+    for task in site.get("tasks", []):
+        for stage in task.get("stages", []):
+            pid = stage_package(stage)
+            required = (
+                {r["name"]: r["kind"] for r in manifest_of(dirs, pid).get("required_connections", [])}
+                if pid is not None and pid in dirs
+                else {}
+            )
+            for slot, connection_id in (stage.get("connections") or {}).items():
+                where = f"{name}: task {task.get('task_id')} stage {stage.get('stage_id')}"
+                if connection_id not in kinds:
+                    problems.append(f"{where}: connection {connection_id} is not in {CONNECTIONS.name}")
+                elif slot in required and required[slot] != kinds[connection_id]:
+                    problems.append(
+                        f"{where}: {pid} needs a {required[slot]} connection, {connection_id} is {kinds[connection_id]}"
+                    )
+    return problems
+
+
 def check_site(path: Path, dirs: Mapping[str, Path], tested: set[str]) -> list[str]:
     from jane_extractor_sdk.testing import assert_package_tests_pass
 
@@ -138,9 +317,18 @@ def check_site(path: Path, dirs: Mapping[str, Path], tested: set[str]) -> list[s
         ]
         if task.get("input", {}).get("source_id") not in source_ids:
             problems.append(f"{name}: task {task.get('task_id')} reads a source not defined in this site")
-    for sid in site.get("verify", {}):
+    for sid, rules in site.get("verify", {}).items():
         if sid not in source_ids:
             problems.append(f"{name}: verify names unknown source {sid}")
+            continue
+        declared = declared_types(dirs, source_extractors(site, dirs, sid))
+        for key in rules:
+            types = verify_types(key, declared)
+            if not types or not set(types) <= declared:
+                problems.append(f"{name}: verify {sid}/{key}: not a type the source's extractors declare")
+    if not any(pid not in dirs for pid in used):
+        problems += connection_problems(name, site, dirs)
+        problems += category_problems(name, site, dirs)
     for pid in used:
         if pid in STORAGE or pid not in dirs or pid in tested:
             continue
@@ -155,6 +343,12 @@ def check_site(path: Path, dirs: Mapping[str, Path], tested: set[str]) -> list[s
             if (rules.get("robots") or {}).get("mode", "respect") != "respect":
                 problems.append(f"{pid}: robots.txt must be respected")
         elif manifest["kind"] == "extractor" and manifest.get("tests"):
+            declared = declared_types(dirs, [pid])
+            for case in manifest["tests"]:
+                expected = ex.read_json(d / case["expected"]) if case.get("expected") else {}
+                stray = {str(e.get("entity_type")) for e in expected.get("entities", [])} - declared
+                if stray:
+                    problems.append(f"{pid}: test {case['name']} expects undeclared types {sorted(stray)}")
             try:
                 assert_package_tests_pass(d)
             except AssertionError as exc:
@@ -357,49 +551,66 @@ def entity_schemas(dirs: Mapping[str, Path]) -> dict[str, list[dict[str, Any]]]:
     return out
 
 
-def verify_site(
-    svc: ex.Services, site: Mapping[str, Any], schemas: Mapping[str, list[dict[str, Any]]]
-) -> dict[str, Any]:
+def stored_entities(
+    svc: ex.Services, connection: str, entity_types: Iterable[str], source_id: str
+) -> list[dict[str, Any]]:
+    """Current state of every entity of ``source_id`` of these types (one collection per type in MongoDB)."""
+    items: list[dict[str, Any]] = []
+    for entity_type in entity_types:
+        items += svc.storage.pages(
+            "/v1/entities", {"connection_id": connection, "entity_type": entity_type, "scope": source_id}
+        )
+    return items
+
+
+def verify_site(svc: ex.Services, site: Mapping[str, Any], dirs: Mapping[str, Path]) -> dict[str, Any]:
     report: dict[str, Any] = {}
     for source_id, expected in site.get("verify", {}).items():
-        for entity_type, rule in expected.items():
-            items = svc.storage.pages(
-                "/v1/entities",
-                {"connection_id": "results-pg", "entity_type": entity_type, "scope": source_id},
-            )
+        extractors = source_extractors(site, dirs, source_id)
+        schemas = entity_schemas({pid: dirs[pid] for pid in extractors})
+        connection = results_connection(site, source_id)
+        for key, rule in expected.items():
+            types = verify_types(key, schemas)
+            items = stored_entities(svc, connection, types, source_id)
             required = rule.get("required", [])
             missing = {f: sum(1 for i in items if i["fields"].get(f) in (None, "", [])) for f in required}
             invalid = 0
             for item in items:
                 if not any(
-                    Draft202012Validator(s).is_valid(item["fields"]) for s in schemas.get(entity_type, [{}])
+                    Draft202012Validator(s).is_valid(item["fields"])
+                    for s in schemas.get(item["entity_type"], [{}])
                 ):
                     invalid += 1
             ok = len(items) >= rule.get("min", 1) and invalid == 0 and not any(missing.values())
-            report[f"{source_id}/{entity_type}"] = {
+            by_type: dict[str, int] = {}
+            for item in items:
+                by_type[item["entity_type"]] = by_type.get(item["entity_type"], 0) + 1
+            report[f"{source_id}/{key}"] = {
                 "ok": ok,
+                "connection_id": connection,
                 "count": len(items),
+                "by_type": dict(sorted(by_type.items())),
                 "min": rule.get("min", 1),
                 "schema_invalid": invalid,
                 "missing_required": {k: v for k, v in missing.items() if v},
                 "sample": [i["fields"] for i in items[:3]],
             }
             ex.log(
-                f"verify {source_id}/{entity_type}: {'ok' if ok else 'FAIL'} count={len(items)} "
-                f"invalid={invalid} missing={report[f'{source_id}/{entity_type}']['missing_required']}"
+                f"verify {source_id}/{key}: {'ok' if ok else 'FAIL'} count={len(items)} by_type={by_type} "
+                f"invalid={invalid} missing={report[f'{source_id}/{key}']['missing_required']}"
             )
     return report
 
 
 def cmd_verify(ns: argparse.Namespace) -> int:
-    schemas = entity_schemas(package_dirs())
+    dirs = package_dirs()
     svc = ex.Services.of_project(ns.project)
     out_path = ex.STACK_DIR / f"sites-{ns.project}.json"
     summary: dict[str, Any] = ex.read_json(out_path) if out_path.is_file() else {}
     try:
         failed = 0
         for path in site_files(ns.sites):
-            report = verify_site(svc, ex.read_json(path), schemas)
+            report = verify_site(svc, ex.read_json(path), dirs)
             summary[path.stem] = {
                 "checked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 "results": report,

@@ -10,12 +10,22 @@ price of the book the catalog task collected and keeps its other fields (TZ §6:
 deletion). A card with a price and without an old price clears ``old_price`` (the discount is over); a card
 without a price (out of stock) updates the availability only; without a status the availability is not sent.
 ``empty`` for pages without cards (a product page), ``unrecognized`` when cards are present but none has a code.
+
+The entity type is the product group of the category page (``CATEGORY_TYPES``, the same table as the book
+extractor's): the page's ``BreadcrumbList`` JSON-LD without the home page and with the page's own section is the
+``category_path`` its books show on their own pages. A page whose section is not in the table (a collection such
+as «Часто шукають» lists products of any group) or has subsections of different types is ``unrecognized`` and
+writes nothing: the price update must not create a product in another type's collection.
 """
 
 from __future__ import annotations
 
+import json
 import re
+from collections.abc import Iterator, Sequence
+from html import unescape
 from typing import Any
+from urllib.parse import urlsplit
 
 from lxml import html as lxml_html  # type: ignore[import-untyped]
 
@@ -41,8 +51,90 @@ MONEY = re.compile(r"\d+(?:[.,]\d+)?")
 SPACES = re.compile(r"[\s  ]+")
 
 
+# Catalog section (a prefix of ``category_path``) -> entity type, one MongoDB collection per type. The longest
+# prefix in the table wins; a section that is not in the table is ``OTHER_TYPE`` (seasonal and promotional
+# sections are only listed with their subsections). The card and the price extractor of the shop carry the same
+# table and lookup - a price update must name the type of the card (examples/tests/test_sites.py compares them).
+CATEGORY_TYPES: dict[tuple[str, ...], str] = {
+    ("Ігри та творчість",): "product_kids",
+    ("Книжки",): "product_book",
+    ("Кольорові олівці",): "product_office",
+    ("Настільні ігри",): "product_kids",
+    ("Рюкзаки, сумки шкільні",): "product_office",
+    ("Шкільні зошити",): "product_office",
+}
+OTHER_TYPE = "product_other"
+APOSTROPHES = str.maketrans(dict.fromkeys("\u2019\u02bc`\u00b4\u2018", "'"))
+
+
+def _section(name: str) -> str:
+    """A section name compared without case, apostrophe variants and repeated spaces."""
+    return " ".join(name.translate(APOSTROPHES).split()).casefold()
+
+
+TYPES_BY_PREFIX = {tuple(_section(n) for n in prefix): kind for prefix, kind in CATEGORY_TYPES.items()}
+
+
+def _mapped_type(path: Sequence[str]) -> str | None:
+    """Type of the longest table prefix of ``path``; ``None`` when no prefix of it is in the table."""
+    key = tuple(_section(n) for n in path)
+    for size in range(len(key), 0, -1):
+        kind = TYPES_BY_PREFIX.get(key[:size])
+        if kind is not None:
+            return kind
+    return None
+
+
+def _listing_type(path: Sequence[str]) -> str | None:
+    """Type of the products of a category page with this ``path``: the table type when no deeper section of the
+    table under the page has another type. ``None`` - it cannot be told: no table prefix (a seasonal, promotional
+    or new section may list products of any section) or subsections of the page have different types."""
+    kind = _mapped_type(path)
+    key = tuple(_section(n) for n in path)
+    deeper = {
+        t for prefix, t in TYPES_BY_PREFIX.items() if len(prefix) > len(key) and prefix[: len(key)] == key
+    }
+    return kind if kind is not None and deeper <= {kind} else None
+
+
 def _clean(value: Any) -> str:
     return " ".join(str(value).split()) if value is not None else ""
+
+
+def _ld_objects(doc: Any, ctx: Context) -> Iterator[dict[str, Any]]:
+    """Top-level JSON-LD objects of the page (lists and ``@graph`` unfolded)."""
+    for raw in doc.xpath('//script[@type="application/ld+json"]/text()'):
+        if not str(raw).strip():
+            continue
+        try:
+            data = json.loads(str(raw))
+        except ValueError:
+            ctx.log.warning("invalid JSON-LD block skipped", code="extract.bad_json_ld")
+            continue
+        for item in data if isinstance(data, list) else [data]:
+            if isinstance(item, dict):
+                graph = item.get("@graph")
+                yield from (g for g in graph if isinstance(g, dict)) if isinstance(graph, list) else [item]
+
+
+def _category_path(doc: Any, ctx: Context) -> list[str]:
+    """Names of the ``BreadcrumbList`` items after the home page; the page's own section is the last one."""
+    for obj in _ld_objects(doc, ctx):
+        kind = obj.get("@type")
+        if "BreadcrumbList" not in ([kind] if isinstance(kind, str) else kind or []):
+            continue
+        elements = [e for e in obj.get("itemListElement") or [] if isinstance(e, dict)]
+        elements.sort(key=lambda e: e["position"] if isinstance(e.get("position"), int) else 0)
+        path: list[str] = []
+        for element in elements:
+            item = element.get("item")
+            target = item.get("@id") if isinstance(item, dict) else item
+            name = item.get("name") if isinstance(item, dict) else element.get("name")
+            text = _clean(unescape(str(name))) if isinstance(name, str) else ""
+            if text and urlsplit(str(target or "")).path not in ("", "/"):  # skip the home page
+                path.append(text)
+        return path
+    return []
 
 
 def _money(card: Any, xpath: str) -> float | None:
@@ -65,11 +157,12 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
     text = ctx.text()
     if not text.strip():
         return empty()
-    cards = lxml_html.fromstring(text).xpath(CARDS)
+    doc = lxml_html.fromstring(text)
+    cards = doc.xpath(CARDS)
     if not cards:
         return empty()  # a product page or another page of the site
 
-    entities: list[EntityOut] = []
+    priced: list[tuple[dict[str, Any], list[str]]] = []
     seen: set[str] = set()
     without_code = 0
     for card in cards:
@@ -101,16 +194,28 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
             "availability": availability,
         }
         cleared = ["old_price"] if price is not None and old_price is None else []
-        entities.append(entity("product", fields, cleared=cleared, completeness="partial"))
+        priced.append((fields, cleared))
     if without_code:
         ctx.log.warning(
             f"{without_code} card(s) without a product code skipped",
             code="extract.missing_selector",
             selector=".product-code__category__text",
         )
-    if not entities:
+    if not priced:
         return unrecognized(
             "category cards without a product code or a price",
             signature="missing-selector:.product-code__category__text",
         )
+    path = _category_path(doc, ctx)
+    kind = _listing_type(path)
+    if kind is None:
+        section = " > ".join(path) or "no breadcrumbs"
+        ctx.log.warning(f"category page of an unmapped section: {section}", code="extract.unmapped_category")
+        return unrecognized(
+            f"the product type of category page {section!r} is not known: no prices are written",
+            signature=f"unmapped-category:{path[0] if path else 'none'}",
+        )
+    entities: list[EntityOut] = [
+        entity(kind, fields, cleared=cleared, completeness="partial") for fields, cleared in priced
+    ]
     return success(entities)

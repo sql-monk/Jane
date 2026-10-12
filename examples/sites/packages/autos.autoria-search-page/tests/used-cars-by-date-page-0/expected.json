@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "auto.ria.com",
         "ad_id": "40065331",
@@ -35,7 +35,7 @@
       }
     },
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "auto.ria.com",
         "ad_id": "39597444",
@@ -69,7 +69,7 @@
       }
     },
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "auto.ria.com",
         "ad_id": "40423584",
@@ -103,7 +103,7 @@
       }
     },
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "auto.ria.com",
         "ad_id": "39641387",
@@ -137,7 +137,7 @@
       }
     },
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "auto.ria.com",
         "ad_id": "40053575",
@@ -171,7 +171,7 @@
       }
     },
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "auto.ria.com",
         "ad_id": "39876571",
@@ -205,7 +205,7 @@
       }
     },
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "auto.ria.com",
         "ad_id": "39876608",
@@ -239,7 +239,7 @@
       }
     },
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "auto.ria.com",
         "ad_id": "39595672",

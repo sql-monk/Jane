@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "product",
+      "entity_type": "product_tools",
       "fields": {
         "shop": "epicentrk.ua",
         "product_id": "mplc-rubanok-elektricnij-procraft-pe-1150-1f1068d4-d051-6166-a540-bb7c0f733e59",

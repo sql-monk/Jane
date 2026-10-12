@@ -20,9 +20,19 @@ SITES = list(CONFIG["sites"])
 
 
 def references() -> dict[str, Any]:
-    ids = {"jane.storage-files", "jane.storage-postgresql"}
+    ids = {"jane.storage-files", "jane.storage-mongodb"}
     ids.update(entry[kind] for entry in CONFIG["sites"].values() for kind in ("extractor", "rules"))
     return {pid: {"package_id": pid, "version": "1.0.0", "digest": "sha256:" + "1" * 64} for pid in ids}
+
+
+# Ad taxonomy: each source covers one category, so the extractor fixes its type.
+ENTITY_TYPES = {
+    "olx": "ad_goods",
+    "auto-ria": "ad_car",
+    "dim-ria": "ad_realty",
+    "ria": "ad_goods",
+    "shafa": "ad_goods",
+}
 
 
 @pytest.mark.parametrize("site", SITES)
@@ -31,11 +41,12 @@ def test_source_and_task_match_contract_and_preserve_raw_branch(site: str) -> No
     task = setup.task_doc(site, CONFIG, references())
     assert ex.validate("source.schema.json", source) == []
     assert ex.validate("task-config.schema.json", task) == []
-    assert source["expected_entity_types"] == ["classified_ad"]
+    assert source["expected_entity_types"] == [ENTITY_TYPES[site]]
     stages = {stage["stage_id"]: stage for stage in task["stages"]}
     assert stages["store-raw"]["inputs"] == [{"from": "collect"}]
     assert stages["store-raw"]["connections"] == {"target": "raw-files"}
-    assert stages["store-ads"]["connections"] == {"target": "results-pg"}
+    assert stages["store-ads"]["handler"]["package_id"] == "jane.storage-mongodb"
+    assert stages["store-ads"]["connections"] == {"target": "results-mongo"}
     assert stages["store-ads"]["inputs"][0]["when"]["value"] == "success"
     assert task["limits"]["crawl"]["max_pages_per_run"] > 0
     assert task["schedule"]["overlap"] == "skip"
@@ -51,6 +62,26 @@ def test_disabled_site_stays_disabled_and_replacement_is_explicit() -> None:
 
 def test_real_package_fixtures_and_schemas() -> None:
     assert setup.check_packages(CONFIG, SITES) == []
+
+
+@pytest.mark.parametrize("site", SITES)
+def test_extractor_declares_and_returns_only_the_site_entity_type(site: str) -> None:
+    directory = setup.HERE / "packages" / CONFIG["sites"][site]["extractor"]
+    manifest = ex.read_json(directory / "jane-package.json")
+    assert CONFIG["sites"][site]["entity_type"] == ENTITY_TYPES[site]
+    assert [e["entity_type"] for e in manifest["output"]["entities"]] == [ENTITY_TYPES[site]]
+    assert manifest["version"].split(".")[0] == "2"
+    for case in manifest["tests"]:
+        if case["expected_status"] == "success":
+            expected = ex.read_json(directory / case["expected"])
+            assert {e["entity_type"] for e in expected["entities"]} == {ENTITY_TYPES[site]}
+
+
+def test_entity_type_of_sites_json_must_match_the_extractor() -> None:
+    changed = copy.deepcopy(CONFIG)
+    changed["sites"]["shafa"]["entity_type"] = "ad_other"
+    errors = setup.check_packages(changed, ["shafa"])
+    assert any("entity_type 'ad_other' differs" in error for error in errors)
 
 
 def fields() -> dict[str, Any]:
@@ -544,11 +575,9 @@ def deployment_neighbors() -> tuple[ex.Services, ex.Api, dict[str, Any]]:
             versions[pid]["test_reports"] = [
                 {"runner": "handler-runtime", "context": "tests", "report": runtime_report(ref, manifest)}
             ]
-    for pid in ("jane.storage-files", "jane.storage-postgresql"):
+    for pid, ref in setup.checkout_storage_refs().items():
         versions[pid] = {
-            "package_id": pid,
-            "version": "1.0.0",
-            "digest": "sha256:" + "1" * 64,
+            **ref,
             "status": "approved",
             "test_status": "passed",
             "created_at": "2026-10-11T00:00:00Z",
@@ -609,7 +638,7 @@ def deployment_neighbors() -> tuple[ex.Services, ex.Api, dict[str, Any]]:
                 json={
                     "items": [
                         {"connection": {"connection_id": cid, "kind": kind}, "executors": []}
-                        for cid, kind in (("raw-files", "filesystem"), ("results-pg", "postgresql"))
+                        for cid, kind in (("raw-files", "filesystem"), ("results-mongo", "mongodb"))
                     ],
                     "next_cursor": None,
                 },

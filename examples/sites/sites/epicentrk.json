@@ -1,14 +1,14 @@
 {
   "site": "epicentrk",
   "group": "catalog",
-  "title": "Епіцентр К (epicentrk.ua): електрорубанки, киянки, лійки — повний каталог і оновлення цін",
+  "title": "Епіцентр К і маркетплейс: весь асортимент, властивості товарів і періодичні ціни",
   "url": "https://epicentrk.ua/",
   "sources": [
     {
       "source_id": "epicentrk",
       "kind": "web",
       "title": "Епіцентр К — товари для дому, ремонту й саду",
-      "description": "epicentrk.ua (Nuxt SSR, сторінки віддаються без JS-челенджу звичайному User-Agent колектора): категорії «Електрорубанки» (електроінструмент), «Киянки» (ручний інструмент), «Лійки» (садовий інвентар), разом із товарами маркетплейсу. robots.txt дотримується (пагінація ?PAGEN_1 дозволена); не частіше 1 запиту/с, один одночасний запит до хоста.",
+      "description": "Весь асортимент: товари для дому, ремонту, саду, спорту, одяг, продукти, техніка та всі інші товарні розділи власного магазину й маркетплейсу. Discovery: обидва повні українські product sitemap, оголошені robots.txt; регіональні SEO-сторінки та мовні дублікати не збираються. Звичайний HTTP, robots.txt дотримується, не частіше одного запиту за секунду та один одночасний запит до хоста. Картки товарів містять ціни й усі доступні характеристики.",
       "locator": {
         "url": "https://epicentrk.ua/"
       },
@@ -21,11 +21,33 @@
         },
         "concurrency": {
           "max_parallel_fetches_per_host": 1
+        },
+        "crawl": {
+          "max_links_per_page": 60000,
+          "max_frontier_size": 8000000,
+          "max_material_bytes": 33554432,
+          "revisit_interval_seconds": 86400
         }
       },
       "forward_unknown_to_llm": false,
       "expected_entity_types": [
-        "product"
+        "product_appliance",
+        "product_auto",
+        "product_beauty",
+        "product_book",
+        "product_clothing",
+        "product_electronics",
+        "product_food",
+        "product_garden",
+        "product_health",
+        "product_home",
+        "product_household",
+        "product_kids",
+        "product_office",
+        "product_pet",
+        "product_sport",
+        "product_tools",
+        "product_other"
       ],
       "labels": {
         "group": "catalog",
@@ -36,8 +58,8 @@
   "tasks": [
     {
       "task_id": "catalog-epicentrk",
-      "title": "epicentrk.ua: повний каталог трьох категорій",
-      "description": "Щоночі о 03:15 за Києвом: усі сторінки пагінації категорій і картки всіх товарів → RAW у raw-files, повні картки product (completeness: full) у results-pg. Сторінки категорій теж ідуть на екстрактор (результат empty), щоб не реєструватися як невідомі матеріали.",
+      "title": "Епіцентр К і маркетплейс: весь асортимент і періодичне оновлення цін",
+      "description": "Кожні 15 хв продовжується збережена черга всіх українських товарних URL із sitemap, до 400 сторінок за запуск. Нові картки збираються до завершення первинного обходу; відомі повторно перевіряються після 24 год, фактична свіжість залежить від довжини черги. Повний обхід великого асортименту може тривати від діб до місяців; завершення визначається станом усієї черги, а не успіхом окремого запуску. Ціна, наявність і всі доступні властивості оновлюються з картки, Сутності товарів та історія змін зберігаються в MongoDB (results-mongo, колекція на тип; тип product_* — за розділом category_path картки (таблиця пакета; розділ поза таблицею — product_other)); повний HTML кожного циклу не накопичується. Ліміти черги й sitemap перевищують виміряний каталог; досягнення лімітів не є повнотою каталогу.",
       "input": {
         "source_id": "epicentrk"
       },
@@ -47,21 +69,9 @@
           "kind": "collect",
           "collector": {
             "collector": "web",
-            "mode": "full"
+            "mode": "incremental",
+            "rules": "@pkg:catalog.epicentrk-catalog-rules"
           }
-        },
-        {
-          "stage_id": "store-raw",
-          "kind": "handler",
-          "handler": "@pkg:jane.storage-files",
-          "connections": {
-            "target": "raw-files"
-          },
-          "inputs": [
-            {
-              "from": "collect"
-            }
-          ]
         },
         {
           "stage_id": "extract-products",
@@ -80,8 +90,7 @@
           "bindings": [
             {
               "sections": [
-                "products",
-                "categories"
+                "products"
               ]
             }
           ]
@@ -89,9 +98,9 @@
         {
           "stage_id": "store-products",
           "kind": "handler",
-          "handler": "@pkg:jane.storage-postgresql",
+          "handler": "@pkg:jane.storage-mongodb",
           "connections": {
-            "target": "results-pg"
+            "target": "results-mongo"
           },
           "inputs": [
             {
@@ -107,15 +116,20 @@
         }
       ],
       "schedule": {
-        "type": "cron",
-        "cron": "15 3 * * *",
+        "type": "interval",
+        "interval_seconds": 900,
         "timezone": "Europe/Kyiv",
         "overlap": "skip"
       },
       "limits": {
         "crawl": {
+          "max_links_per_page": 60000,
+          "max_frontier_size": 8000000,
+          "max_material_bytes": 33554432,
+          "revisit_interval_seconds": 86400,
           "max_depth": 40,
-          "max_pages_per_run": 2000
+          "max_pages_per_run": 400,
+          "max_bytes_per_run": 2147483648
         }
       },
       "forward_unknown_to_llm": false,
@@ -127,8 +141,8 @@
     },
     {
       "task_id": "prices-epicentrk",
-      "title": "epicentrk.ua: оновлення цін і наявності зі сторінок категорій",
-      "description": "Кожні 4 год (перший тик — 01:00 за Києвом, далі 05:00, 09:00, 13:00, 17:00, 21:00: поза нічним повним сканом о 03:15, бо збори одного джерела не можуть іти одночасно — 409 conflict колектора): лише сторінки категорій із пагінацією (правила catalog.epicentrk-price-rules, картки товарів не завантажуються) → RAW у raw-files, часткове оновлення product (price, currency, old_price, availability; completeness: partial) тих самих ключів shop + product_id.",
+      "title": "Епіцентр К і маркетплейс: ручна перевірка цін попередньої добірки",
+      "description": "Попереднє завдання для обмеженої добірки категорій залишено лише для ручної діагностики. Автоматичне оновлення цін усього асортименту виконує catalog-завдання із повними product sitemap та повторними відвідуваннями карток.",
       "input": {
         "source_id": "epicentrk"
       },
@@ -180,9 +194,9 @@
         {
           "stage_id": "store-prices",
           "kind": "handler",
-          "handler": "@pkg:jane.storage-postgresql",
+          "handler": "@pkg:jane.storage-mongodb",
           "connections": {
-            "target": "results-pg"
+            "target": "results-mongo"
           },
           "inputs": [
             {
@@ -198,9 +212,7 @@
         }
       ],
       "schedule": {
-        "type": "interval",
-        "interval_seconds": 14400,
-        "start_at": "2026-10-11T22:00:00Z",
+        "type": "manual",
         "overlap": "skip"
       },
       "limits": {
@@ -219,7 +231,7 @@
   ],
   "verify": {
     "epicentrk": {
-      "product": {
+      "product_*": {
         "min": 1000,
         "required": [
           "shop",

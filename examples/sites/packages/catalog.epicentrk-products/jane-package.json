@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "catalog.epicentrk-products",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "Epicentr K: full product cards",
-  "description": "Повна картка товару epicentrk.ua зі сторінки товару (/ua/shop/<slug>.html): назва, ціна й стара ціна (грн), наявність, бренд, категорія й шлях категорій, код товару, одиниця, рейтинг, продавець, зображення, характеристики (completeness: full). Ключ — shop + product_id (slug URL), той самий, що й у catalog.epicentrk-prices.",
+  "description": "Повна картка товару epicentrk.ua зі сторінки товару (/ua/shop/<slug>.html): назва, ціна й стара ціна (грн), наявність, бренд, категорія й шлях категорій, код товару, одиниця, рейтинг, продавець, зображення, характеристики (completeness: full). Ключ — shop + product_id (slug URL), той самий, що й у catalog.epicentrk-prices. Тип сутності — група товару за розділом category_path (таблиця CATEGORY_TYPES; найдовший префікс; розділ поза таблицею — product_other).",
   "tags": [
     "sites",
     "catalog",
@@ -31,13 +31,157 @@
   "output": {
     "entities": [
       {
-        "entity_type": "product",
+        "entity_type": "product_appliance",
         "schema": "schemas/product.schema.json",
         "key_fields": [
           "shop",
           "product_id"
         ],
-        "description": "Повна картка товару магазину"
+        "description": "Повна картка товару магазину — група «побутова техніка»"
+      },
+      {
+        "entity_type": "product_auto",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «автотовари»"
+      },
+      {
+        "entity_type": "product_beauty",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «косметика, парфуми, гігієна й догляд»"
+      },
+      {
+        "entity_type": "product_book",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «книжки»"
+      },
+      {
+        "entity_type": "product_clothing",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «одяг, взуття, аксесуари, галантерея»"
+      },
+      {
+        "entity_type": "product_electronics",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «електроніка»"
+      },
+      {
+        "entity_type": "product_food",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «продукти, напої, алкоголь»"
+      },
+      {
+        "entity_type": "product_garden",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «сад і город»"
+      },
+      {
+        "entity_type": "product_health",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «медичні товари, БАДи»"
+      },
+      {
+        "entity_type": "product_home",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «дім, інтер'єр, меблі, товари для дому»"
+      },
+      {
+        "entity_type": "product_household",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «побутова хімія»"
+      },
+      {
+        "entity_type": "product_kids",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «іграшки, дитячий транспорт, дитячі товари»"
+      },
+      {
+        "entity_type": "product_office",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «канцтовари, шкільне»"
+      },
+      {
+        "entity_type": "product_pet",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «зоотовари»"
+      },
+      {
+        "entity_type": "product_sport",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «спорт і туризм»"
+      },
+      {
+        "entity_type": "product_tools",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «інструменти, будівництво й ремонт, сантехніка, освітлення, підлога»"
+      },
+      {
+        "entity_type": "product_other",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару магазину — група «розділ поза таблицею (сезонні, збірні, нові розділи)»"
       }
     ]
   },
@@ -123,10 +267,16 @@
   "provenance": {
     "created_by": "human",
     "authors": [
-      "Claude (examples/sites)"
+      "Claude (examples/sites)",
+      "mongo-entities"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Full product cards of epicentrk.ua for the nightly catalog scan."
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: entity type product_<group> from the shop's category table (CATEGORY_TYPES) instead of product; one collection per type in jane.storage-mongodb.",
+    "based_on": {
+      "package_id": "catalog.epicentrk-products",
+      "version": "1.0.0",
+      "digest": "sha256:d9df024cb86be490cf6501b4ceb02f6ec548b574abc3b1fc241b49423df6cc88"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

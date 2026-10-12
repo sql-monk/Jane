@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "classifieds.shafa-ads",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "Shafa: public classified listing cards",
-  "description": "Публічні картки оголошень головної сторінки Shafa. Дані з HTML, мережі в екстракторі немає. Ціна лише за прямо вказаною валютою; контакти не витягаються.",
+  "description": "Публічні картки оголошень головної сторінки Shafa. Дані з HTML, мережі в екстракторі немає. Ціна лише за прямо вказаною валютою; контакти не витягаються. Тип сутності фіксований — ad_goods: Shafa — майданчик речей (одяг, взуття, аксесуари, дитячі товари, дім).",
   "entry": {
     "runtime": "python",
     "module": "jane_classifieds_shafa.main",
@@ -25,7 +25,7 @@
   "output": {
     "entities": [
       {
-        "entity_type": "classified_ad",
+        "entity_type": "ad_goods",
         "schema": "schemas/ad.schema.json",
         "key_fields": [
           "site",
@@ -68,10 +68,15 @@
   "provenance": {
     "created_by": "llm",
     "authors": [
-      "Codex"
+      "Codex",
+      "Claude (mongo-entities C3)"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Public Shafa SSR cards: preserve directly present listing identity, title, URL and current price."
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: entity type classified_ad -> ad_goods (ad taxonomy, one MongoDB collection per type); fields, key and schema unchanged.",
+    "based_on": {
+      "package_id": "classifieds.shafa-ads",
+      "version": "1.0.0"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

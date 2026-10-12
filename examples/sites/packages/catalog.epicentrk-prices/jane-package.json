@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "catalog.epicentrk-prices",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "Epicentr K: prices from category pages",
-  "description": "Ціни, старі ціни й наявність усіх товарів сторінки категорії epicentrk.ua (до 60 карток на сторінку) як часткові сутності product (completeness: partial) з тим самим ключем shop + product_id, що й повні картки catalog.epicentrk-products: оновлюють лише ціну й наявність.",
+  "description": "Ціни, старі ціни й наявність усіх товарів сторінки категорії epicentrk.ua (до 60 карток на сторінку) як часткові сутності product (completeness: partial) з тим самим ключем shop + product_id, що й повні картки catalog.epicentrk-products: оновлюють лише ціну й наявність. Тип сутності — група розділу сторінки категорії (її хлібні крихти) за тією самою таблицею CATEGORY_TYPES, що й у картці; сторінка розділу поза таблицею — unrecognized, ціни не пишуться.",
   "tags": [
     "sites",
     "catalog",
@@ -31,13 +31,148 @@
   "output": {
     "entities": [
       {
-        "entity_type": "product",
+        "entity_type": "product_appliance",
         "schema": "schemas/product.schema.json",
         "key_fields": [
           "shop",
           "product_id"
         ],
-        "description": "Ціна й наявність товару (часткове оновлення)"
+        "description": "Ціна й наявність товару (часткове оновлення) — група «побутова техніка»"
+      },
+      {
+        "entity_type": "product_auto",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «автотовари»"
+      },
+      {
+        "entity_type": "product_beauty",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «косметика, парфуми, гігієна й догляд»"
+      },
+      {
+        "entity_type": "product_book",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «книжки»"
+      },
+      {
+        "entity_type": "product_clothing",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «одяг, взуття, аксесуари, галантерея»"
+      },
+      {
+        "entity_type": "product_electronics",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «електроніка»"
+      },
+      {
+        "entity_type": "product_food",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «продукти, напої, алкоголь»"
+      },
+      {
+        "entity_type": "product_garden",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «сад і город»"
+      },
+      {
+        "entity_type": "product_health",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «медичні товари, БАДи»"
+      },
+      {
+        "entity_type": "product_home",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «дім, інтер'єр, меблі, товари для дому»"
+      },
+      {
+        "entity_type": "product_household",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «побутова хімія»"
+      },
+      {
+        "entity_type": "product_kids",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «іграшки, дитячий транспорт, дитячі товари»"
+      },
+      {
+        "entity_type": "product_office",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «канцтовари, шкільне»"
+      },
+      {
+        "entity_type": "product_pet",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «зоотовари»"
+      },
+      {
+        "entity_type": "product_sport",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «спорт і туризм»"
+      },
+      {
+        "entity_type": "product_tools",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару (часткове оновлення) — група «інструменти, будівництво й ремонт, сантехніка, освітлення, підлога»"
       }
     ]
   },
@@ -118,15 +253,31 @@
       },
       "expected_status": "unrecognized",
       "origin": "problem_sample"
+    },
+    {
+      "name": "category-of-unmapped-section-unrecognized",
+      "input": {
+        "file": "tests/category-unmapped-section/page.html",
+        "media_type": "text/html",
+        "url": "https://epicentrk.ua/ua/shop/elektrorubanki/?PAGEN_1=7"
+      },
+      "expected_status": "unrecognized",
+      "origin": "human"
     }
   ],
   "provenance": {
     "created_by": "human",
     "authors": [
-      "Claude (examples/sites)"
+      "Claude (examples/sites)",
+      "mongo-entities"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Partial price and availability updates of epicentrk.ua products from category pages."
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: entity type product_<group> from the shop's category table (CATEGORY_TYPES) instead of product; one collection per type in jane.storage-mongodb.",
+    "based_on": {
+      "package_id": "catalog.epicentrk-prices",
+      "version": "1.0.0",
+      "digest": "sha256:0aa2ccb942453887dfecc7dff010c9c9d3af39686a77edf45cc692586029462a"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

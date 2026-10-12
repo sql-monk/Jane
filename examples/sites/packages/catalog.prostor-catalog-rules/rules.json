@@ -9,26 +9,28 @@
     ],
     "path_prefixes": [
       "/ua/product/",
-      "/ua/ukhod-za-litsom/uvlazhnenie-i-pitanie/",
-      "/ua/pobutova-himija/sredstva-dlya-stirki/",
-      "/ua/volosy/shampuni/"
+      "/sitemap.xml"
+    ],
+    "include": [
+      {
+        "type": "regex",
+        "value": "^https://prostor\\.ua/ua/product/[^/?#]+/$"
+      },
+      {
+        "type": "regex",
+        "value": "^https://prostor\\.ua/sitemap\\.xml$"
+      }
     ]
   },
   "strategies": [
     {
-      "type": "listing",
-      "strategy_id": "categories",
-      "start_urls": [
-        "https://prostor.ua/ua/ukhod-za-litsom/uvlazhnenie-i-pitanie/",
-        "https://prostor.ua/ua/pobutova-himija/sredstva-dlya-stirki/",
-        "https://prostor.ua/ua/volosy/shampuni/"
+      "type": "sitemap",
+      "strategy_id": "all-products",
+      "urls": [
+        "https://prostor.ua/sitemap.xml"
       ],
-      "item_links": {
-        "value": "ol.product-items li.product-item a.product-item-link"
-      },
-      "next_page": {
-        "value": "li.pages-item-next a.next"
-      }
+      "use_robots_txt": false,
+      "use_lastmod_for_revisit": false
     }
   ],
   "robots": {
@@ -44,27 +46,16 @@
   "sections": [
     {
       "section_id": "products",
-      "title": "Картки товарів",
+      "title": "Усі українські картки товарів",
       "patterns": [
         {
-          "value": "prostor.ua/ua/product/**"
-        }
-      ]
-    },
-    {
-      "section_id": "categories",
-      "title": "Сторінки категорій (пагінація ?p=N)",
-      "patterns": [
-        {
-          "value": "prostor.ua/ua/ukhod-za-litsom/uvlazhnenie-i-pitanie/**"
-        },
-        {
-          "value": "prostor.ua/ua/pobutova-himija/sredstva-dlya-stirki/**"
-        },
-        {
-          "value": "prostor.ua/ua/volosy/shampuni/**"
+          "type": "regex",
+          "value": "^https://prostor\\.ua/ua/product/[^/?#]+/$"
         }
       ]
     }
-  ]
+  ],
+  "revisit": {
+    "mode": "interval"
+  }
 }

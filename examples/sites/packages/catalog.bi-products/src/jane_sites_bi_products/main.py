@@ -21,6 +21,11 @@ A product shown without a price (bi.ua gives ``price: 0`` to some products out o
 struck-through price clears ``old_price``. Other pages are ``empty``; a product page without a JSON-LD
 ``Product``, a category page with product cards but no ``ItemList``, and products without a code are
 ``unrecognized``. Reviews (they carry names of private persons) are not kept.
+
+The entity type is the product group of the breadcrumbs (``CATEGORY_TYPES``: the longest table prefix wins).
+A product page takes it from its own ``category_path`` (an unknown section is ``product_other``); a category
+page from its own breadcrumbs, the section of all its products, and a category page of a section that is not
+in the table is ``unrecognized`` (no partial update into another type's collection).
 """
 
 from __future__ import annotations
@@ -28,7 +33,7 @@ from __future__ import annotations
 import html
 import json
 import re
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
@@ -60,6 +65,56 @@ WEIGHT_ATTRIBUTE = "Вага"
 OLD_PRICE = "//div[contains(@class,'prodBuy')]//div[contains(@class,'priceWr')]/p[@class='old']"
 REVIEWS_COUNTER = "//li[@id='reviews']//span[contains(@class,'counter')]"
 CARD = "//a[contains(@class,'goodsItemLink')][@id]"
+
+
+# Catalog section (a prefix of ``category_path``) -> entity type, one MongoDB collection per type. The longest
+# prefix in the table wins; a section that is not in the table is ``OTHER_TYPE`` (seasonal and promotional
+# sections are only listed with their subsections). The card and the price extractor of the shop carry the same
+# table and lookup - a price update must name the type of the card (examples/tests/test_sites.py compares them).
+CATEGORY_TYPES: dict[tuple[str, ...], str] = {
+    ("Дитячий транспорт",): "product_kids",
+    ("Колекційні та ігрові фігурки",): "product_kids",
+    ("Конструктори",): "product_kids",
+    ("Машинки, роботи, трансформери",): "product_kids",
+    ("М'які та інтерактивні іграшки",): "product_kids",
+}
+OTHER_TYPE = "product_other"
+APOSTROPHES = str.maketrans(dict.fromkeys("\u2019\u02bc`\u00b4\u2018", "'"))
+
+
+def _section(name: str) -> str:
+    """A section name compared without case, apostrophe variants and repeated spaces."""
+    return " ".join(name.translate(APOSTROPHES).split()).casefold()
+
+
+TYPES_BY_PREFIX = {tuple(_section(n) for n in prefix): kind for prefix, kind in CATEGORY_TYPES.items()}
+
+
+def _mapped_type(path: Sequence[str]) -> str | None:
+    """Type of the longest table prefix of ``path``; ``None`` when no prefix of it is in the table."""
+    key = tuple(_section(n) for n in path)
+    for size in range(len(key), 0, -1):
+        kind = TYPES_BY_PREFIX.get(key[:size])
+        if kind is not None:
+            return kind
+    return None
+
+
+def _entity_type(path: Sequence[str] | None) -> str:
+    """Type of a product with this ``category_path`` (no path or an unknown section - ``OTHER_TYPE``)."""
+    return _mapped_type(path or []) or OTHER_TYPE
+
+
+def _listing_type(path: Sequence[str]) -> str | None:
+    """Type of the products of a category page with this ``path``: the table type when no deeper section of the
+    table under the page has another type. ``None`` - it cannot be told: no table prefix (a seasonal, promotional
+    or new section may list products of any section) or subsections of the page have different types."""
+    kind = _mapped_type(path)
+    key = tuple(_section(n) for n in path)
+    deeper = {
+        t for prefix, t in TYPES_BY_PREFIX.items() if len(prefix) > len(key) and prefix[: len(key)] == key
+    }
+    return kind if kind is not None and deeper <= {kind} else None
 
 
 def _text(value: Any) -> str | None:
@@ -151,8 +206,9 @@ def _image(value: Any) -> str | None:
     return value if isinstance(value, str) and value.startswith(("https://", "http://")) else None
 
 
-def _category_path(nodes: list[dict[str, Any]]) -> list[str]:
-    """Breadcrumbs between the home page and the product (the last crumb has no link)."""
+def _category_path(nodes: list[dict[str, Any]], *, current: bool = False) -> list[str]:
+    """Breadcrumbs after the home page. The last crumb has no link: the product of a product page (skipped) or
+    the category itself of a category page (kept with ``current``)."""
     for node in nodes:
         if "BreadcrumbList" not in _types(node):
             continue
@@ -165,7 +221,7 @@ def _category_path(nodes: list[dict[str, Any]]) -> list[str]:
             link = crumb.get("item")
             link = link.get("@id") if isinstance(link, dict) else link
             name = _text(crumb.get("name"))
-            if not link or link == HOME or name is None:
+            if link == HOME or name is None or (not link and not current):
                 continue
             path.append(name)
         return path
@@ -253,7 +309,8 @@ def _product_page(
     }
     full = all(fields[f] is not None for f in ("title", "price", "url"))
     cleared = ["old_price"] if price is not None and old_price is None else None
-    return success([entity("product", fields, cleared=cleared, completeness="full" if full else "partial")])
+    kind = _entity_type(path)
+    return success([entity(kind, fields, cleared=cleared, completeness="full" if full else "partial")])
 
 
 def _card_old_prices(doc: Any) -> dict[str, float]:
@@ -267,7 +324,9 @@ def _card_old_prices(doc: Any) -> dict[str, float]:
     return out
 
 
-def _category_page(item_list: dict[str, Any], doc: Any, params: dict[str, Any]) -> ExtractResult:
+def _category_page(
+    item_list: dict[str, Any], nodes: list[dict[str, Any]], doc: Any, params: dict[str, Any], ctx: Context
+) -> ExtractResult:
     products: list[dict[str, Any]] = []
     for element in item_list.get("itemListElement") or []:
         item = element.get("item", element) if isinstance(element, dict) else None
@@ -275,6 +334,15 @@ def _category_page(item_list: dict[str, Any], doc: Any, params: dict[str, Any]) 
             products.append(item)
     if not products:
         return empty()
+    path = _category_path(nodes, current=True)
+    kind = _listing_type(path)
+    if kind is None:
+        section = " > ".join(path) or "no breadcrumbs"
+        ctx.log.warning(f"category page of an unmapped section: {section}", code="extract.unmapped_category")
+        return unrecognized(
+            f"the product type of category page {section!r} is not known: no prices are written",
+            signature=f"unmapped-category:{path[0] if path else 'none'}",
+        )
     old_prices = _card_old_prices(doc)
     found: dict[str, Any] = {}
     for product in products:
@@ -294,7 +362,7 @@ def _category_page(item_list: dict[str, Any], doc: Any, params: dict[str, Any]) 
             "old_price": old_price,
         }
         cleared = ["old_price"] if price is not None and old_price is None else None
-        found[product_id] = entity("product", fields, cleared=cleared, completeness="partial")
+        found[product_id] = entity(kind, fields, cleared=cleared, completeness="partial")
     if not found:
         return unrecognized("category page products without sku", signature="missing-field:sku")
     return success(list(found.values()))
@@ -316,7 +384,7 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
         return _product_page(product, nodes, doc, page_url, params)
     item_list = next((n for n in nodes if "ItemList" in _types(n)), None)
     if item_list is not None:
-        return _category_page(item_list, doc, params) if params["listing_prices"] else empty()
+        return _category_page(item_list, nodes, doc, params, ctx) if params["listing_prices"] else empty()
     if page_url and PRODUCT_PATH.search(urlsplit(page_url).path):
         ctx.log.warning("product page without JSON-LD Product", code="extract.missing_json_ld")
         return unrecognized("product page without JSON-LD Product", signature="missing-json-ld:Product")

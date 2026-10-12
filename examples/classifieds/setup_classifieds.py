@@ -1,9 +1,9 @@
 """Відтворюване налаштування, запуск і перевірка оголошень через API запущеного Jane.
 
-Конфігурація сайтів і числові ліміти — sites.json. Нові задачі мають незалежні IDs;
-наявні підключення raw-files/results-pg повторно використовуються. Команда configure
+Конфігурація сайтів, тип сутності кожного сайту й числові ліміти — sites.json. Нові задачі мають
+незалежні IDs; наявні підключення raw-files/results-mongo повторно використовуються. Команда configure
 публікує пакети й записує реальні звіти тестів runtime перед схваленням екстракторів.
-verify звіряє кожну отриману сутність із збереженими RAW і станом PostgreSQL.
+verify звіряє кожну отриману сутність із збереженими RAW і станом у MongoDB.
 HTTP 403, порожній результат або заблокований сайт ніколи не означає успішну перевірку.
 """
 
@@ -29,6 +29,11 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import jane_examples as ex  # noqa: E402
 
+# RAW stays in files; entities (types ad_*) go to MongoDB, one collection per entity type.
+RAW_STORAGE, ENTITY_STORAGE = "jane.storage-files", "jane.storage-mongodb"
+RAW_CONNECTION, ENTITY_CONNECTION = "raw-files", "results-mongo"
+CONNECTION_KINDS = {RAW_CONNECTION: "filesystem", ENTITY_CONNECTION: "mongodb"}
+
 
 def load_sites(path: Path = HERE / "sites.json") -> dict[str, Any]:
     return dict(ex.read_json(path))
@@ -45,7 +50,7 @@ def source_doc(site: str, config: dict[str, Any], refs: dict[str, Any]) -> dict[
         "collector_rules": refs[entry["rules"]],
         "limits": config["defaults"]["source_limits"],
         "forward_unknown_to_llm": False,
-        "expected_entity_types": ["classified_ad"],
+        "expected_entity_types": [entry["entity_type"]],
         "labels": {"group": "classifieds", "site": site},
     }
 
@@ -56,15 +61,15 @@ def task_doc(site: str, config: dict[str, Any], refs: dict[str, Any]) -> dict[st
         "task_id": f"classifieds-{site}",
         "title": f"{entry['title']}: збір оголошень",
         "enabled": entry.get("enabled", True),
-        "description": "Збір → RAW у файлах → classified_ad у PostgreSQL. Публічні сторінки, обмежений обхід.",
+        "description": f"Збір → RAW у файлах → {entry['entity_type']} у MongoDB. Публічні сторінки, обмежений обхід.",
         "input": {"source_id": f"classified-{site}"},
         "stages": [
             {"stage_id": "collect", "kind": "collect", "collector": {"collector": "web", "mode": "full"}},
             {
                 "stage_id": "store-raw",
                 "kind": "handler",
-                "handler": refs["jane.storage-files"],
-                "connections": {"target": "raw-files"},
+                "handler": refs[RAW_STORAGE],
+                "connections": {"target": RAW_CONNECTION},
                 "inputs": [{"from": "collect"}],
             },
             {
@@ -81,8 +86,8 @@ def task_doc(site: str, config: dict[str, Any], refs: dict[str, Any]) -> dict[st
             {
                 "stage_id": "store-ads",
                 "kind": "handler",
-                "handler": refs["jane.storage-postgresql"],
-                "connections": {"target": "results-pg"},
+                "handler": refs[ENTITY_STORAGE],
+                "connections": {"target": ENTITY_CONNECTION},
                 "inputs": [
                     {
                         "from": "extract-ads",
@@ -141,7 +146,20 @@ def check_packages(config: dict[str, Any], sites: list[str]) -> list[str]:
                 for case in run_package_tests(directory)
                 if not case.passed
             )
-    for storage in ("jane.storage-files", "jane.storage-postgresql"):
+    for site in sites:
+        entry = config["sites"][site]
+        manifest_file = HERE / "packages" / entry["extractor"] / "jane-package.json"
+        if not manifest_file.is_file():
+            continue
+        # The extractor fixes the type; sites.json names it for the source document and verification.
+        declared = [
+            e["entity_type"] for e in ex.read_json(manifest_file).get("output", {}).get("entities", [])
+        ]
+        if declared != [entry.get("entity_type")]:
+            errors.append(
+                f"{site}: entity_type {entry.get('entity_type')!r} differs from {entry['extractor']} output {declared}"
+            )
+    for storage in (RAW_STORAGE, ENTITY_STORAGE):
         refs[storage] = {"package_id": storage, "version": "1.0.0", "digest": "sha256:" + "0" * 64}
     if not errors:
         for site in sites:
@@ -312,23 +330,39 @@ def publish_package(
     return ref, evidence
 
 
+def checkout_storage_refs() -> dict[str, dict[str, str]]:
+    """Exact storage package versions of this checkout (the MongoDB layout of 2.x differs from 1.x)."""
+    from jane_registry.archive import canonical_archive, digest_of, files_from_dir
+    from jane_storage.adapters import package_dirs
+
+    directories = package_dirs()
+    refs: dict[str, dict[str, str]] = {}
+    for pid in (RAW_STORAGE, ENTITY_STORAGE):
+        directory = Path(directories[pid])
+        refs[pid] = {
+            "package_id": pid,
+            "version": ex.read_json(directory / "jane-package.json")["version"],
+            "digest": str(digest_of(bytes(canonical_archive(files_from_dir(directory))))),
+        }
+    return refs
+
+
 def storage_refs(svc: ex.Services) -> dict[str, Any]:
-    refs = {}
     connections = {
         p["connection"]["connection_id"]: p["connection"]["kind"]
         for p in svc.orchestrator.pages("/v1/connections", {})
     }
-    for cid, kind in (("raw-files", "filesystem"), ("results-pg", "postgresql")):
+    for cid, kind in CONNECTION_KINDS.items():
         if connections.get(cid) != kind:
             raise RuntimeError(f"Required existing connection {cid} ({kind}) is unavailable")
-    for pid in ("jane.storage-files", "jane.storage-postgresql"):
-        versions = [
-            v for v in svc.registry.pages(f"/v1/packages/{pid}/versions", {}) if v["status"] == "approved"
-        ]
-        if not versions:
-            raise RuntimeError(f"{pid}: no approved storage package in registry")
-        latest = max(versions, key=lambda v: v["created_at"])
-        refs[pid] = {k: latest[k] for k in ("package_id", "version", "digest")}
+    refs = checkout_storage_refs()
+    for pid, ref in refs.items():
+        stored = svc.registry.call("GET", f"/v1/packages/{pid}/versions/{ref['version']}", ok=(200, 404))
+        version = stored.json() if stored.status_code == 200 else {}
+        if version.get("status") != "approved" or version.get("digest") != ref["digest"]:
+            raise RuntimeError(
+                f"{pid}@{ref['version']}: no approved storage package with this checkout's digest"
+            )
     return refs
 
 
@@ -796,10 +830,12 @@ def verify_site(
     task = svc.orchestrator.call("GET", f"/v1/tasks/classifieds-{site}").json()
     report["packages"] = {s["stage_id"]: s["handler"] for s in task["stages"] if "handler" in s}
     items = svc.orchestrator.pages(f"/v1/runs/{run['run_id']}/items", {"stage_id": "extract-ads"})
-    raw = svc.storage.pages("/v1/objects", {"connection_id": "raw-files", "source_id": source_id})
+    entity_type = config["sites"][site]["entity_type"]
+    raw = svc.storage.pages("/v1/objects", {"connection_id": RAW_CONNECTION, "source_id": source_id})
     raw_by_obs = {r["material"]["observation_id"]: r for r in raw if r.get("material")}
     states = svc.storage.pages(
-        "/v1/entities", {"connection_id": "results-pg", "entity_type": "classified_ad", "scope": source_id}
+        "/v1/entities",
+        {"connection_id": ENTITY_CONNECTION, "entity_type": entity_type, "scope": source_id},
     )
     states_by_key = {state["canonical_key"]: state for state in states}
     report.update(
@@ -819,6 +855,11 @@ def verify_site(
             continue
         result = runtime.call("GET", f"/v1/invocations/{item['invocation_id']}").json()
         for entity in (result.get("output") or {}).get("entities", []):
+            if entity.get("entity_type") != entity_type:
+                report["errors"].append(
+                    f"{entity['key']}: entity type {entity.get('entity_type')!r}, not {entity_type}"
+                )
+                continue
             obs = entity["observation"]["observation_id"]
             saved = raw_by_obs.get(obs)
             if not saved:
@@ -827,10 +868,10 @@ def verify_site(
             if obs not in checked_raw:
                 obj_id = saved["object"]["object_id"]
                 detail = svc.storage.call(
-                    "GET", f"/v1/objects/{obj_id}", params={"connection_id": "raw-files"}
+                    "GET", f"/v1/objects/{obj_id}", params={"connection_id": RAW_CONNECTION}
                 ).json()
                 response = svc.storage.call(
-                    "GET", f"/v1/objects/{obj_id}/content", params={"connection_id": "raw-files"}
+                    "GET", f"/v1/objects/{obj_id}/content", params={"connection_id": RAW_CONNECTION}
                 )
                 original = response.content
                 expected_sha = detail.get("material", {}).get("revision", {}).get("content_sha256")
@@ -846,7 +887,7 @@ def verify_site(
             )
             state = states_by_key.get(key)
             if state is None or any(state["fields"].get(k) != v for k, v in entity["fields"].items()):
-                report["errors"].append(f"{key}: PostgreSQL state does not match extracted fields")
+                report["errors"].append(f"{key}: MongoDB state does not match extracted fields")
                 continue
             if any(
                 (state.get("field_orders", {}).get(k) or {}).get("observation_id") != obs
@@ -854,10 +895,10 @@ def verify_site(
             ):
                 history = svc.storage.pages(
                     "/v1/entity-history",
-                    {"connection_id": "results-pg", "entity_type": "classified_ad", "key": key},
+                    {"connection_id": ENTITY_CONNECTION, "entity_type": entity_type, "key": key},
                 )
                 if not any(h["record"]["observation"]["observation_id"] == obs for h in history):
-                    report["errors"].append(f"{key}: produced observation missing in PostgreSQL history")
+                    report["errors"].append(f"{key}: produced observation missing in MongoDB history")
                     continue
             check = raw_field_check(entity["fields"], *checked_raw[obs])
             if not check["verified"]:

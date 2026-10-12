@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "rst.ua",
         "ad_id": "15426288",
@@ -32,7 +32,7 @@
       }
     },
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "rst.ua",
         "ad_id": "15324613",
@@ -63,7 +63,7 @@
       }
     },
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "rst.ua",
         "ad_id": "15346539",
@@ -94,7 +94,7 @@
       }
     },
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "rst.ua",
         "ad_id": "15477667",
@@ -125,7 +125,7 @@
       }
     },
     {
-      "entity_type": "car_ad",
+      "entity_type": "ad_car",
       "fields": {
         "site": "rst.ua",
         "ad_id": "15096256",

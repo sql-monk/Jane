@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "product",
+      "entity_type": "product_food",
       "fields": {
         "shop": "varus",
         "product_id": "2664939",

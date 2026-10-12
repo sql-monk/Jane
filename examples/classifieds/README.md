@@ -1,10 +1,10 @@
 # Збір оголошень
 
-Приклад налаштовує окреме джерело та завдання для кожного сайту в [sites.json](sites.json). Колектор передає сторінки на збереження RAW у `raw-files` та на екстракцію. Сутності `classified_ad` зберігаються в PostgreSQL через підключення `results-pg`.
+Приклад налаштовує окреме джерело та завдання для кожного сайту в [sites.json](sites.json). Колектор передає сторінки на збереження RAW у `raw-files` та на екстракцію. Оголошення зберігаються в MongoDB пакетом `jane.storage-mongodb` через підключення `results-mongo`: кожен тип оголошення — окрема колекція (`ad_goods`, `ad_car`, `ad_realty`), історія — поруч (`<тип>.history`). Записи `classified_ad`, зібрані раніше в PostgreSQL, не переносяться.
 
 ## Передумови
 
-Потрібен запущений стек Jane з Registry, Web Collector, Handler Runtime, Orchestrator і Storage та вже налаштованими підключеннями `raw-files` і `results-pg`. Поточні адреси сервісів визначаються за контейнерами Docker Compose; ключ адміністратора читається з локального `.jane/stack-<project>.json`, який не входить до Git. Це дозволяє продовжувати роботу після зміни опублікованих портів. `--use-snapshot` явно дозволяє використати адреси з локального файла, але тоді актуальність адрес не підтверджена.
+Потрібен запущений стек Jane з Registry, Web Collector, Handler Runtime, Orchestrator і Storage з MongoDB та вже налаштованими підключеннями `raw-files` і `results-mongo` (MongoDB, база `jane_results`, див. `infra/config/storage-connections.json`). У Registry мають бути затверджені `jane.storage-files` і `jane.storage-mongodb` тих версій і digest, що в checkout (`jane.storage-mongodb` — 2.0.0); інакше `configure` зупиняється. Поточні адреси сервісів визначаються за контейнерами Docker Compose; ключ адміністратора читається з локального `.jane/stack-<project>.json`, який не входить до Git. Це дозволяє продовжувати роботу після зміни опублікованих портів. `--use-snapshot` явно дозволяє використати адреси з локального файла, але тоді актуальність адрес не підтверджена.
 
 Для OLX використовується `fetch.transport: browser`: Chromium завантажує оригінальний документ без JavaScript через контрольований вихідний проксі колектора. Потрібен Web Collector із залежністю `render` і встановленим Chromium; інструкція — [Web Collector](../../services/web-collector/README.md). Перевірки `robots.txt`, області обходу, редиректів і лімітів залишаються в колекторі.
 
@@ -18,10 +18,12 @@
 
 ```powershell
 uv run --all-packages python examples/classifieds/setup_classifieds.py check
-uv run --all-packages python examples/classifieds/setup_classifieds.py configure --project jane-demo --stack-dir C:/repos/Jane/.jane --discovery-timeout 60 --output-dir examples/classifieds/deployed
-uv run --all-packages python examples/classifieds/setup_classifieds.py start --project jane-demo --stack-dir C:/repos/Jane/.jane --discovery-timeout 60 --output-dir examples/classifieds/deployed
-uv run --all-packages python examples/classifieds/setup_classifieds.py wait --project jane-demo --stack-dir C:/repos/Jane/.jane --discovery-timeout 60 --output-dir examples/classifieds/deployed
+uv run --all-packages python examples/classifieds/setup_classifieds.py configure --project jane-demo --stack-dir C:/repos/Jane/.jane --discovery-timeout 60
+uv run --all-packages python examples/classifieds/setup_classifieds.py start --project jane-demo --stack-dir C:/repos/Jane/.jane --discovery-timeout 60
+uv run --all-packages python examples/classifieds/setup_classifieds.py wait --project jane-demo --stack-dir C:/repos/Jane/.jane --discovery-timeout 60
 ```
+
+Звіти пишуться в `--output-dir`, типово `.jane/classifieds`. Каталог [deployed/](deployed/) — записи попереднього запуску (типи `classified_ad`, PostgreSQL); не вказуйте його як `--output-dir`, щоб не перезаписати.
 
 Для одного сайту додайте `--site shafa`; параметр можна повторювати. `configure` публікує архіви, звіряє хеші, запускає тести екстракторів у робочому Handler Runtime і записує звіти до Registry перед схваленням. Підключення сховищ повторно використовуються.
 
@@ -39,14 +41,26 @@ uv run --all-packages python examples/classifieds/setup_classifieds.py wait --pr
 
 ## Сутності та перевірка
 
+Тип сутності — з таксономії оголошень. Кожне джерело охоплює одну категорію (правила колектора обмежують обхід сторінками з таблиці вище), тому тип фіксований у пакеті екстрактора; `entity_type` у `sites.json` називає його для документа джерела й перевірки, а `check` звіряє його з маніфестом.
+
+| Сайт | Пакет | Тип |
+| --- | --- | --- |
+| OLX (ноутбуки) | `classifieds.olx-ads@2.0.0` | `ad_goods` |
+| AUTO.RIA | `classifieds.auto-ria-ads@2.0.0` | `ad_car` |
+| DIM.RIA | `classifieds.dim-ria-ads@2.0.0` | `ad_realty` |
+| RIA.com (телефони та смарттехніка) | `classifieds.ria-ads@2.0.0` | `ad_goods` |
+| Shafa.ua | `classifieds.shafa-ads@2.0.0` | `ad_goods` |
+
+Версії 2.0.0 змінили лише тип (`classified_ad` → `ad_*`); поля, ключ і схема ті самі. Інший розділ OLX чи RIA.com потребує нових правил і нової версії екстрактора зі своїм типом.
+
 Обов'язкові поля оголошення: `site`, `listing_id`, `title`, `url`. Природний ключ складається з `site` і `listing_id`, область ключа — джерело. Ціна, валюта й місце додаються лише за наявності відповідних даних на сторінці; відсутнє поле не означає його очищення.
 
 ```powershell
-uv run --all-packages python examples/classifieds/setup_classifieds.py verify --project jane-demo --stack-dir C:/repos/Jane/.jane --discovery-timeout 60 --output-dir examples/classifieds/deployed --site shafa
+uv run --all-packages python examples/classifieds/setup_classifieds.py verify --project jane-demo --stack-dir C:/repos/Jane/.jane --discovery-timeout 60 --site shafa
 uv run --all-packages python -m pytest examples/tests/test_classifieds.py -q
 ```
 
-Перевірка зіставляє результат конкретного запуску зі збереженим RAW та станом сутності в PostgreSQL. Вона перевіряє SHA-256 оригіналу, походження спостереження й поля оголошення. Нуль сутностей, помилка збору або розбіжність дають ненульовий код завершення.
+Перевірка зіставляє результат конкретного запуску зі збереженим RAW та станом сутності в MongoDB; тип кожної сутності має збігатися з `entity_type` сайту. Вона перевіряє SHA-256 оригіналу, походження спостереження й поля оголошення. Нуль сутностей, помилка збору або розбіжність дають ненульовий код завершення.
 
 Локальні звіти, зафіксовані версії пакетів, документи джерел і завдань та ідентифікатори запусків записуються в каталог `--output-dir`. Повні сторінки й локальні файли доступу не потрібно додавати до репозиторію. Зменшені приклади в тестах пакетів мають походження зі справжніх публічних сторінок; вони перевіряють екстрактор, а реальний збір підтверджується окремо.
 

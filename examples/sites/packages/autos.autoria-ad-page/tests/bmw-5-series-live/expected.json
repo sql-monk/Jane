@@ -1,0 +1,105 @@
+{
+  "entities": [
+    {
+      "entity_type": "ad_car",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "40541816",
+        "url": "https://auto.ria.com/uk/auto_bmw_5_series_40541816.html",
+        "title": "BMW 5 Series 2018",
+        "price": 35000.0,
+        "currency": "USD",
+        "make": "BMW",
+        "model": "5 Series",
+        "year": 2018,
+        "price_usd": 35000.0,
+        "price_uah": 1575000.0,
+        "mileage_km": 125000,
+        "transmission": "Автомат",
+        "fuel": "Бензин",
+        "engine_l": 3.0,
+        "body_type": "Седан",
+        "drive": "Задній",
+        "color": "Чорний металік",
+        "region": "Київська обл.",
+        "city": "Київ",
+        "condition": "used",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/bmw_5-series__660743313fx.webp",
+        "status": "active",
+        "doors": 4,
+        "seats": 5,
+        "generation": "G30",
+        "modification": "540i Steptronic (340 к.с.)",
+        "trim": "Sport Line",
+        "power_hp": 340.0,
+        "modification_power_hp": 340.0,
+        "inspection_ready": true,
+        "condition_options": [
+          "Гаражне зберігання"
+        ],
+        "equipment": {
+          "comfort": [
+            "Люк",
+            "Бортовий комп'ютер",
+            "Датчик дощу",
+            "Запуск двигуна з кнопки",
+            "Оздоблення керма шкірою",
+            "Система «старт-стоп»",
+            "Круїз контроль"
+          ],
+          "safety": [
+            "Антиблокувальна система (ABS)",
+            "Розподіл гальмівних зусиль (BAS, EBD)"
+          ],
+          "multimedia": [
+            "Bluetooth",
+            "Android Auto",
+            "CarPlay"
+          ],
+          "headlights": [
+            "Світлодіодні"
+          ],
+          "interior_materials": [
+            "Шкіра"
+          ],
+          "interior_color": [
+            "Коричневий"
+          ],
+          "seat_adjustment": [
+            "Ручне регулювання передніх сидінь"
+          ],
+          "heated_seats": [
+            "Передні сидіння"
+          ],
+          "seat_memory": [
+            "Передні сидіння"
+          ],
+          "electric_windows": [
+            "Передні та задні"
+          ],
+          "climate_control": [
+            "Клімат-контроль 2-зонний"
+          ],
+          "lighting": [
+            "Датчик світла",
+            "Омивач фар"
+          ],
+          "parking_assistance": [
+            "Задня камера"
+          ],
+          "airbags": [
+            "Бічні задні"
+          ]
+        }
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "40541816"
+        }
+      }
+    }
+  ]
+}

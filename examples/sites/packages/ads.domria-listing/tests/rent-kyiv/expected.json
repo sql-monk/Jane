@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "classified_ad",
+      "entity_type": "ad_realty",
       "fields": {
         "site": "dom.ria.com",
         "ad_id": "33683279",
@@ -46,7 +46,7 @@
       }
     },
     {
-      "entity_type": "classified_ad",
+      "entity_type": "ad_realty",
       "fields": {
         "site": "dom.ria.com",
         "ad_id": "35013206",
@@ -91,7 +91,7 @@
       }
     },
     {
-      "entity_type": "classified_ad",
+      "entity_type": "ad_realty",
       "fields": {
         "site": "dom.ria.com",
         "ad_id": "34147599",
@@ -137,7 +137,7 @@
       }
     },
     {
-      "entity_type": "classified_ad",
+      "entity_type": "ad_realty",
       "fields": {
         "site": "dom.ria.com",
         "ad_id": "34805085",
@@ -183,7 +183,7 @@
       }
     },
     {
-      "entity_type": "classified_ad",
+      "entity_type": "ad_realty",
       "fields": {
         "site": "dom.ria.com",
         "ad_id": "34037896",

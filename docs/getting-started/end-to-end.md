@@ -2,9 +2,7 @@
 
 Сценарій піднімає ланцюжок Jane на Docker, публікує пакети в Registry, створює джерело й два незалежні завдання та виконує їх на тестовому магазині: повний каталог товарів і перевірку цін за розкладом. Результат — RAW-сторінки у файлах і картки товарів у MongoDB (колекція `product`), де перевірка цін оновила лише ціну й наявність.
 
-Виконано 2026-10-11 на Windows 11, Docker Desktop, ревізія `48389a3`; на Linux не перевірявся. Передумови й підготовка — [початок роботи](README.md).
-
-Інструкції оновлено під сховище сутностей MongoDB (підключення `results-mongo`, пакет `jane.storage-mongodb@2.0.0`, ревізія `118707e`). Блоки виводу нижче — з перевірочного запуску 2026-10-11, коли картки писалися в PostgreSQL (`results-pg`, `jane.storage-postgresql@1.0.0`). На MongoDB сценарій ще не перевірено.
+Виконано 2026-10-12 на Windows 11, Docker Desktop, ревізія `f4eaf3f1`; на Linux не перевірявся. Передумови й підготовка — [початок роботи](README.md).
 
 ## Зміст
 
@@ -38,16 +36,17 @@ uv run --all-packages python deploy/profiles/stack.py up --project jane-doc-star
 Перший запуск збирає образи сервісів і пісочниці — кілька хвилин. Порти на `127.0.0.1` обирає Docker; у перевірочному запуску їх зафіксовано змінними `JANE_PORT_<СЕРВІС>`. Кінець виводу:
 
 ```text
-project: jane-doc-start   profile: dev-laptop   stack file: C:/repos/Jane/.claude/worktrees/docs/.jane/stack-jane-doc-start.json
+project: jane-doc-start   profile: dev-laptop   stack file: C:/repos/Jane/.jane/stack-jane-doc-start.json
   testsite           http://127.0.0.1:18904
   registry           http://127.0.0.1:18911
   storage            http://127.0.0.1:18906
   handler-runtime    http://127.0.0.1:18907
   web-collector      http://127.0.0.1:18908
   orchestrator       http://127.0.0.1:18910
+  mongodb            127.0.0.1:18912
 ```
 
-Стек складається з testsite, Registry, Storage, Handler Runtime, Web Collector, Orchestrator, а також PostgreSQL, MinIO і MongoDB як їхніх залежностей. MongoDB стартує разом зі Storage для підключення `results-mongo`, і поточна ревізія друкує ще рядок `mongodb 127.0.0.1:<порт>`; у виводі вище його немає, бо перевірочний запуск був до цієї зміни. Сервіси працюють у режимі `api_key`; ключі згенеровано в `.jane/stack-jane-doc-start.json`. Адреси без секретів показує команда:
+Стек складається з testsite, Registry, Storage, Handler Runtime, Web Collector, Orchestrator, а також PostgreSQL, MinIO і MongoDB як їхніх залежностей. MongoDB стартує разом зі Storage для підключення `results-mongo`; її адреса — останній рядок виводу. Сервіси працюють у режимі `api_key`; ключі згенеровано в `.jane/stack-jane-doc-start.json`. Адреси без секретів показує команда:
 
 ```powershell
 uv run --all-packages python deploy/profiles/stack.py env --project jane-doc-start
@@ -59,31 +58,31 @@ uv run --all-packages python deploy/profiles/stack.py env --project jane-doc-sta
 uv run --all-packages python examples/jane_examples.py demo --project jane-doc-start
 ```
 
-Сценарій тривав близько 2 хвилин 20 секунд. Вивід перевірочного запуску (час — UTC); уривок: у JSON-підсумку показано один товар із чотирьох:
+Сценарій тривав менше хвилини. Вивід перевірочного запуску (час — UTC); уривок: у JSON-підсумку показано один товар із чотирьох:
 
 ```text
-[10:07:15Z] registry: jane.storage-files@1.0.0 sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f approved
-[10:07:16Z] registry: jane.storage-postgresql@1.0.0 sha256:4765e62faa6e82fa25a863dff2ef133905bf8e9b5e0b8f0f9e6285d2a451ac3b approved
-[10:07:17Z] registry: examples.testsite-web-rules@1.0.0 sha256:db018cbb61ab3d33b74033494bb293530954279a176a34ab043de7af16e36d7d approved
-[10:07:18Z] registry: examples.testsite-catalog-extractor@1.0.0 sha256:5d5df84301dad59b47d4fc3a087de46f6cac12e01a7617579421178b125c84e2 approved
-[10:07:19Z] registry: examples.testsite-price-extractor@1.0.0 sha256:d143e1e9b7a4f3f2ea28886cc6fd37c29cb9915fce772d1a84b1ea6ea6bfa2f9 approved
-[10:07:20Z] registry: examples.telegram-rules@1.0.0 sha256:cc734c10a59bb73d2dda0fc1c1c8fdb228c56a993aa43c39eb78067d68332eba approved
-[10:07:21Z] registry: examples.telegram-event-extractor@1.0.0 sha256:37143cc4a36963d4825aac6fd7cac108f1479005af26ab24309d499859f17d55 approved
-[10:07:22Z] orchestrator: source testsite-shop -> 201
-[10:07:24Z] orchestrator: task testsite-catalog -> 201 (warnings: 0)
-[10:07:24Z] catalog: run run_01M4N6WXEM6A66WW4ZZDD0D4PK started
-[10:08:32Z] catalog: run run_01M4N6WXEM6A66WW4ZZDD0D4PK succeeded
-[10:08:33Z] orchestrator: task testsite-price-check -> 201 (warnings: 0)
-[10:08:33Z] price-check: first scheduled run at 2026-10-11T10:08:47Z
-[10:08:49Z] price-check: scheduled run run_01M4N6ZEZD7W2DXHNCT4FN2Q7J started
-[10:09:22Z] price-check: run run_01M4N6ZEZD7W2DXHNCT4FN2Q7J succeeded
+[23:58:11Z] registry: jane.storage-files@1.0.0 sha256:b87649411631a78b58f4e44e304dab362526e21861705a2e04f8a8a6d6aec12f approved
+[23:58:11Z] registry: jane.storage-mongodb@2.0.0 sha256:2307eeb9e72b59a234f812a9f8dc716b05a9ac4643e843a520dac2ba3d8faad3 approved
+[23:58:11Z] registry: examples.testsite-web-rules@1.0.0 sha256:db018cbb61ab3d33b74033494bb293530954279a176a34ab043de7af16e36d7d approved
+[23:58:11Z] registry: examples.testsite-catalog-extractor@1.0.0 sha256:5d5df84301dad59b47d4fc3a087de46f6cac12e01a7617579421178b125c84e2 approved
+[23:58:12Z] registry: examples.testsite-price-extractor@1.0.0 sha256:d143e1e9b7a4f3f2ea28886cc6fd37c29cb9915fce772d1a84b1ea6ea6bfa2f9 approved
+[23:58:12Z] registry: examples.telegram-rules@1.0.0 sha256:cc734c10a59bb73d2dda0fc1c1c8fdb228c56a993aa43c39eb78067d68332eba approved
+[23:58:12Z] registry: examples.telegram-event-extractor@1.0.0 sha256:37143cc4a36963d4825aac6fd7cac108f1479005af26ab24309d499859f17d55 approved
+[23:58:12Z] orchestrator: source testsite-shop -> 201
+[23:58:12Z] orchestrator: task testsite-catalog -> 201 (warnings: 0)
+[23:58:12Z] catalog: run run_01M4PPE51SAX3V30QGZBNW2T11 started
+[23:58:36Z] catalog: run run_01M4PPE51SAX3V30QGZBNW2T11 succeeded
+[23:58:36Z] orchestrator: task testsite-price-check -> 201 (warnings: 0)
+[23:58:36Z] price-check: first scheduled run at 2026-10-11T23:58:51Z
+[23:58:52Z] price-check: scheduled run run_01M4PPFB9168MXQ2RKPYHE7KSN started
+[23:58:56Z] price-check: run run_01M4PPFB9168MXQ2RKPYHE7KSN succeeded
 {
   "ok": true,
   "failures": [],
   "raw_objects": 23,
   "entities": 16,
-  "catalog_run": "run_01M4N6WXEM6A66WW4ZZDD0D4PK",
-  "price_check_run": "run_01M4N6ZEZD7W2DXHNCT4FN2Q7J",
+  "catalog_run": "run_01M4PPE51SAX3V30QGZBNW2T11",
+  "price_check_run": "run_01M4PPFB9168MXQ2RKPYHE7KSN",
   "partial_updates": {
     "laptop-four": {
       "completeness": "partial",
@@ -125,7 +124,7 @@ summary: .jane/examples-jane-doc-start.json
 
 - `"ok": true` — усі перевірки `verify` пройшли.
 - `raw_objects: 23` — Storage зберіг усі 23 сторінки каталогу як RAW у підключенні `raw-files`.
-- `entities: 16` — 16 карток товарів у підключенні сутностей (`results-mongo`; у перевірочному запуску — `results-pg`) з усіма полями картки.
+- `entities: 16` — 16 карток товарів у підключенні сутностей `results-mongo` з усіма полями картки. У базі `jane_results` це колекція `product` (16 документів) і її історія `product.history` (20 версій: 16 із каталогу й 4 з перевірки цін).
 - `partial_updates` — для кожного з 4 товарів перевірки цін запис має `completeness: partial` і лише поля `price`, `availability`, `sku`; поля `title`, `category`, `url` лишилися з повного каталогу, версія стану — 2.
 
 Лічильники етапів запуску каталогу з підсумку `.jane/examples-jane-doc-start.json`: `collect` — 23 матеріали, `store-raw` — 23 успішні записи, `extract-products` і `store-products` — по 16 (екстрактор отримує лише сторінки `*/product/*`). Решта 7 матеріалів — сторінки, що не є товарами, — враховано як невідомі (`unknown_materials: 7`): їм не відповідає жоден прив'язаний екстрактор, а `forward_unknown_to_llm` вимкнено, тож LLM не викликався.
@@ -151,7 +150,7 @@ key=$(python -c "import json; print(json.load(open('.jane/stack-jane-doc-start.j
 curl -s -H "Authorization: Bearer $key" "http://127.0.0.1:18906/v1/entities?connection_id=results-mongo&entity_type=product&scope=testsite-shop&limit=100"
 ```
 
-Замініть порт `18906` на адресу `storage` зі свого виводу кроку 1. Вивід PowerShell перевірочного запуску (2026-10-11, підключення `results-pg`):
+Замініть порт `18906` на адресу `storage` зі свого виводу кроку 1. Вивід PowerShell перевірочного запуску:
 
 ```text
 sku              price availability version

@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "autos.avtobazar-car-ads",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "Avtobazar InfoCar: car ads from ad cards",
-  "description": "Оголошення легкових авто «Автобазар InfoCar» (avtobazar.infocar.ua; сутність car_ad, ключ site + ad_id — та сама схема, що й у autos.autoria-* та autos.rst-*): назва, рік, ціна в у.о. (USD) і перерахунок сайту в UAH, пробіг, об'єм і паливо, КПП, привід, кузов, колір, дата оновлення, регіон, місто, марка й модель (хлібні крихти), фото, текст продавця до 500 символів, тип продавця й стан (приватне оголошення б.у.; «Стан: битий…» — damaged), статус (div#deleted «вже продано» — sold). Ім'я, телефони й QR-візитка продавця не читаються; телефони й e-mail у тексті приховуються. Інші сторінки — empty.",
+  "description": "Оголошення легкових авто «Автобазар InfoCar» (avtobazar.infocar.ua; сутність ad_car, ключ site + ad_id — та сама схема, що й у autos.autoria-* та autos.rst-*): назва, рік, ціна в у.о. (USD) і перерахунок сайту в UAH, пробіг, об'єм і паливо, КПП, привід, кузов, колір, дата оновлення, регіон, місто, марка й модель (хлібні крихти), фото, текст продавця до 500 символів, тип продавця й стан (приватне оголошення б.у.; «Стан: битий…» — damaged), статус (div#deleted «вже продано» — sold). Ім'я, телефони й QR-візитка продавця не читаються; телефони й e-mail у тексті приховуються. Інші сторінки — empty.",
   "tags": [
     "autos",
     "avtobazar",
@@ -31,8 +31,8 @@
   "output": {
     "entities": [
       {
-        "entity_type": "car_ad",
-        "schema": "schemas/car_ad.schema.json",
+        "entity_type": "ad_car",
+        "schema": "schemas/ad_car.schema.json",
         "key_fields": [
           "site",
           "ad_id"
@@ -99,12 +99,17 @@
     }
   ],
   "provenance": {
-    "created_by": "human",
+    "created_by": "llm",
     "authors": [
-      "Claude (autos agent)"
+      "Claude (autos agent)",
+      "Claude (mongo-entities C3)"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Avtobazar InfoCar car ads (replacement for avtobazar.ua, which now redirects to the news site autocentre.ua) with the shared car_ad entity."
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: entity type car_ad -> ad_car (ad taxonomy, one MongoDB collection per type); fields, key and schema unchanged.",
+    "based_on": {
+      "package_id": "autos.avtobazar-car-ads",
+      "version": "1.0.0"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

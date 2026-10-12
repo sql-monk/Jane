@@ -146,6 +146,26 @@ def test_scheduled_task_extracts_only_complete_ad_pages(site: str) -> None:
 
 
 @pytest.mark.parametrize("site", ["autoria", "rst"])
+def test_ads_are_stored_as_ad_car_in_mongodb(site: str) -> None:
+    refs = automarket.local_refs()
+    assert automarket.source_doc(site, refs)["expected_entity_types"] == ["ad_car"]
+    stages = {s["stage_id"]: s for s in automarket.task_doc(site, refs)["stages"]}
+    assert stages["store-raw"]["connections"] == {"target": "raw-files"}
+    assert stages["store-ads"]["handler"] == refs["jane.storage-mongodb"]
+    assert stages["store-ads"]["handler"]["version"].split(".")[0] == "2"
+    assert stages["store-ads"]["connections"] == {"target": "results-mongo"}
+    directory = automarket.package_dirs()[automarket.SITES[site][4]]
+    manifest = automarket.ex.read_json(directory / "jane-package.json")
+    assert [e["entity_type"] for e in manifest["output"]["entities"]] == ["ad_car"]
+
+
+def test_packages_have_one_source_with_examples_sites() -> None:
+    sites_packages = ROOT / "sites" / "packages"
+    assert all(d.parent == sites_packages for d in automarket.package_dirs().values())
+    assert not (ROOT / "automarket" / "packages").exists()
+
+
+@pytest.mark.parametrize("site", ["autoria", "rst"])
 def test_rules_classify_their_real_ad_fixtures(site: str) -> None:
     from jane_web_collector.urls import Scope, compile_patterns, patterns_match
 

@@ -1,4 +1,8 @@
-"""Public RIA.com catalog cards; each price stays attached to its advertisement."""
+"""Public RIA.com catalog cards; each price stays attached to its advertisement.
+
+The entity type is fixed (``ad_goods``): the collector rules of this source admit only the phones and smart
+devices section (``/uk/c/mobile/``). Another section needs a new version with its own type.
+"""
 
 from __future__ import annotations
 
@@ -26,6 +30,7 @@ _VOID = {
     "track",
     "wbr",
 }
+ENTITY_TYPE = "ad_goods"
 _PATH = re.compile(r"/uk/[^/]+-(\d+)\.html$")
 _PRICE = re.compile(r"^(\d[\d\s\u00a0]*(?:[.,]\d+)?)\s*(грн\.?|UAH|USD|EUR|\$|€)$", re.IGNORECASE)
 _CURRENCIES = {"грн": "UAH", "грн.": "UAH", "uah": "UAH", "usd": "USD", "$": "USD", "eur": "EUR", "€": "EUR"}
@@ -126,7 +131,7 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
     return success(
         [
             entity(
-                "classified_ad",
+                ENTITY_TYPE,
                 fields,
                 key={
                     "scope": scope,

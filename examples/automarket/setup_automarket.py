@@ -27,7 +27,16 @@ from jane_extractor_sdk.testing import run_local, run_package_tests  # noqa: E40
 from jane_kit.contracts import ContractClient  # noqa: E402
 from jane_registry.archive import canonical_archive, digest_of, files_from_dir  # noqa: E402
 
-PACKAGES = HERE / "packages"
+# One source with examples/sites: the same package_id and version must never have two different archives.
+PACKAGES = HERE.parent / "sites" / "packages"
+PACKAGE_IDS = (
+    "autos.autoria-ad-page",
+    "autos.autoria-rules",
+    "autos.autoria-search-page",
+    "autos.rst-car-ads",
+    "autos.rst-rules",
+)
+ENTITY_TYPE = "ad_car"
 SITES = {
     "autoria": (
         "autoria-cars",
@@ -38,7 +47,8 @@ SITES = {
     ),
     "rst": ("autos-rst", "ads-rst", "RST.ua", "https://rst.ua/ukr/oldcars/", "autos.rst-car-ads"),
 }
-STORAGE = ("jane.storage-files", "jane.storage-postgresql")
+STORAGE = ("jane.storage-files", "jane.storage-mongodb")
+RAW_CONNECTION, ENTITY_CONNECTION = "raw-files", "results-mongo"
 
 
 class StackApi(ex.Api):
@@ -86,11 +96,11 @@ class StackApi(ex.Api):
 
 
 def package_dirs() -> dict[str, Path]:
-    return {
-        ex.read_json(p / "jane-package.json")["package_id"]: p
-        for p in sorted(PACKAGES.iterdir())
-        if p.is_dir()
-    }
+    directories = {pid: PACKAGES / pid for pid in PACKAGE_IDS}
+    for pid, directory in directories.items():
+        if ex.read_json(directory / "jane-package.json")["package_id"] != pid:
+            raise RuntimeError(f"{directory}: manifest package_id differs from {pid}")
+    return directories
 
 
 def package_ref(directory: Path) -> dict[str, str]:
@@ -130,7 +140,7 @@ def source_doc(site: str, refs: Mapping[str, Any]) -> dict[str, Any]:
             },
             "concurrency": {"max_parallel_fetches_per_host": 1},
         },
-        "expected_entity_types": ["car_ad"],
+        "expected_entity_types": [ENTITY_TYPE],
         "forward_unknown_to_llm": False,
         "labels": {"group": "autos", "site": site, "catalog": "automarket"},
     }
@@ -144,7 +154,7 @@ def task_doc(
         "task_id": task_id,
         "enabled": True,
         "title": f"{title}: детальні оголошення кожні {interval // 3600} год",
-        "description": "Обмежений інкрементальний обхід: RAW → files, лише повні картки оголошень → car_ad у PostgreSQL.",
+        "description": f"Обмежений інкрементальний обхід: RAW → files, лише повні картки оголошень → {ENTITY_TYPE} у MongoDB.",
         "input": {"source_id": source_id},
         "stages": [
             {
@@ -156,7 +166,7 @@ def task_doc(
                 "stage_id": "store-raw",
                 "kind": "handler",
                 "handler": refs["jane.storage-files"],
-                "connections": {"target": "raw-files"},
+                "connections": {"target": RAW_CONNECTION},
                 "inputs": [{"from": "collect"}],
                 "on_failure": "fail_run",
             },
@@ -176,8 +186,8 @@ def task_doc(
             {
                 "stage_id": "store-ads",
                 "kind": "handler",
-                "handler": refs["jane.storage-postgresql"],
-                "connections": {"target": "results-pg"},
+                "handler": refs["jane.storage-mongodb"],
+                "connections": {"target": ENTITY_CONNECTION},
                 "inputs": [
                     {
                         "from": "extract-ad",
@@ -556,7 +566,8 @@ def verify_catalog(svc: ex.Services, runs: Mapping[str, str]) -> dict[str, Any]:
         ):
             raise RuntimeError(f"{site}: six-hour schedule is not active")
         entities = svc.storage.pages(
-            "/v1/entities", {"connection_id": "results-pg", "entity_type": "car_ad", "scope": source_id}
+            "/v1/entities",
+            {"connection_id": ENTITY_CONNECTION, "entity_type": ENTITY_TYPE, "scope": source_id},
         )
         manifest = ex.read_json(directories[extractor] / "jane-package.json")
         schema = Draft202012Validator(
@@ -566,7 +577,11 @@ def verify_catalog(svc: ex.Services, runs: Mapping[str, str]) -> dict[str, Any]:
         for state in entities:
             history = svc.storage.pages(
                 "/v1/entity-history",
-                {"connection_id": "results-pg", "entity_type": "car_ad", "key": state["canonical_key"]},
+                {
+                    "connection_id": ENTITY_CONNECTION,
+                    "entity_type": ENTITY_TYPE,
+                    "key": state["canonical_key"],
+                },
             )
             records = [
                 h["record"] for h in history if h["record"].get("provenance", {}).get("run_id") == runs[site]
@@ -586,7 +601,7 @@ def verify_catalog(svc: ex.Services, runs: Mapping[str, str]) -> dict[str, Any]:
                 )
         if not verified:
             raise RuntimeError(f"{site}: no entities written by verification run {runs[site]}")
-        raw = svc.storage.pages("/v1/objects", {"connection_id": "raw-files", "source_id": source_id})
+        raw = svc.storage.pages("/v1/objects", {"connection_id": RAW_CONNECTION, "source_id": source_id})
         expected_observations = {record["observation"]["observation_id"] for record in verified}
         new_raw = [
             obj for obj in raw if obj.get("material", {}).get("observation_id") in expected_observations
@@ -598,10 +613,10 @@ def verify_catalog(svc: ex.Services, runs: Mapping[str, str]) -> dict[str, Any]:
         for obj in new_raw:
             object_id = obj["object"]["object_id"]
             detail = svc.storage.call(
-                "GET", f"/v1/objects/{object_id}", params={"connection_id": "raw-files"}
+                "GET", f"/v1/objects/{object_id}", params={"connection_id": RAW_CONNECTION}
             ).json()
             original = svc.storage.call(
-                "GET", f"/v1/objects/{object_id}/content", params={"connection_id": "raw-files"}
+                "GET", f"/v1/objects/{object_id}/content", params={"connection_id": RAW_CONNECTION}
             ).content
             checksum = hashlib.sha256(original).hexdigest()
             material = detail.get("material", {})
@@ -673,7 +688,8 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="cancel only obsolete ads-autoria/ads-rst/ads-avtobazar runs before applying",
     )
-    parser.add_argument("--receipt", type=Path, default=HERE / "evidence" / "runtime.json")
+    # Local by default: evidence/runtime.json records an earlier run and stays unchanged.
+    parser.add_argument("--receipt", type=Path, default=ex.STACK_DIR / "automarket-runtime.json")
     args = parser.parse_args(argv)
     if min(args.pages, args.validation_pages, args.timeout, args.poll, args.http_timeout) <= 0:
         parser.error("page counts, timeout and poll must be positive")
@@ -706,7 +722,7 @@ def main(argv: list[str] | None = None) -> int:
                 allow_generated=args.allow_generated_packages,
                 test_retries=args.test_retries,
             )
-            for connection in ("raw-files", "results-pg"):
+            for connection in (RAW_CONNECTION, ENTITY_CONNECTION):
                 svc.orchestrator.call("GET", f"/v1/connections/{connection}")
             for site, (source_id, task_id, *_rest) in SITES.items():
                 put_config(svc.orchestrator, "sources", source_id, source_doc(site, refs))

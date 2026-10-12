@@ -12,18 +12,85 @@ special price below the regular one is ``price`` and the regular price is then `
 
 States (TZ §9): ``success`` - a product item; ``empty`` - JSON that is not a product item (an API error document);
 ``unrecognized`` - a product item without a SKU, a name or a URL key, or in stock without a price.
+
+The entity type is the product group of the card's ``category_path`` (``CATEGORY_TYPES``: the longest table
+prefix wins, an unknown section is ``product_other``); the price extractor of the shop uses the same table.
 """
 
 from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from typing import Any
 
 from jane_extractor_sdk import Context, ExtractResult, Material, empty, entity, success, unrecognized
 
 SPACES = re.compile(r"\s+")
 OWN_FIELDS = {"countrymanufacturerforsite": "country", "pim_brand_id": "brand"}
+
+
+# Catalog section (a prefix of ``category_path``) -> entity type, one MongoDB collection per type. The longest
+# prefix in the table wins; a section that is not in the table is ``OTHER_TYPE`` (seasonal and promotional
+# sections are only listed with their subsections). The card and the price extractor of the shop carry the same
+# table and lookup - a price update must name the type of the card (examples/tests/test_sites.py compares them).
+CATEGORY_TYPES: dict[tuple[str, ...], str] = {
+    ("VARUS CAFE",): "product_food",
+    ("Алкоголь",): "product_food",
+    ("Бакалія",): "product_food",
+    ("Вода, соки, напої",): "product_food",
+    ("Гігієна та догляд",): "product_beauty",
+    ("Гігієна та догляд", "Товари для здоров'я"): "product_health",
+    ("Заморожені продукти",): "product_food",
+    ("Здорове харчування та Еко товари",): "product_food",
+    ("Здорове харчування та Еко товари", "БАДи (харчові добавки)"): "product_health",
+    ("Ковбаси, сосиски, делікатеси",): "product_food",
+    ("Кондитерські вироби та солодощі",): "product_food",
+    ("Консервація та соління",): "product_food",
+    ("Молочні продукти та яйця",): "product_food",
+    ("М'ясо та напівфабрикати",): "product_food",
+    ("Побутова хімія",): "product_household",
+    ("Риба та морепродукти",): "product_food",
+    ("Сири",): "product_food",
+    ("Снеки",): "product_food",
+    ("Товари для дітей",): "product_kids",
+    ("Товари для дітей", "Шкільні товари"): "product_office",
+    ("Товари для дому",): "product_home",
+    ("Товари для дому", "Канцтовари"): "product_office",
+    ("Товари для дому", "Одяг, взуття та аксесуари"): "product_clothing",
+    ("Товари для дому", "Сад та город"): "product_garden",
+    ("Товари для дому", "Спорт та розваги"): "product_sport",
+    ("Товари для дому", "Товари для кемпінгу та відпочинку"): "product_sport",
+    ("Товари для тварин",): "product_pet",
+    ("Фрукти, овочі, горіхи",): "product_food",
+    ("Хлібобулочні вироби",): "product_food",
+    ("Чай, кава, гарячі напої",): "product_food",
+}
+OTHER_TYPE = "product_other"
+APOSTROPHES = str.maketrans(dict.fromkeys("\u2019\u02bc`\u00b4\u2018", "'"))
+
+
+def _section(name: str) -> str:
+    """A section name compared without case, apostrophe variants and repeated spaces."""
+    return " ".join(name.translate(APOSTROPHES).split()).casefold()
+
+
+TYPES_BY_PREFIX = {tuple(_section(n) for n in prefix): kind for prefix, kind in CATEGORY_TYPES.items()}
+
+
+def _mapped_type(path: Sequence[str]) -> str | None:
+    """Type of the longest table prefix of ``path``; ``None`` when no prefix of it is in the table."""
+    key = tuple(_section(n) for n in path)
+    for size in range(len(key), 0, -1):
+        kind = TYPES_BY_PREFIX.get(key[:size])
+        if kind is not None:
+            return kind
+    return None
+
+
+def _entity_type(path: Sequence[str] | None) -> str:
+    """Type of a product with this ``category_path`` (no path or an unknown section - ``OTHER_TYPE``)."""
+    return _mapped_type(path or []) or OTHER_TYPE
 
 
 def _clean(value: Any) -> str | None:
@@ -180,4 +247,4 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
         "completeness": "full",
     }
     cleared = ["old_price"] if price is not None and old_price is None else None
-    return success([entity("product", fields, cleared=cleared, completeness="full")])
+    return success([entity(_entity_type(path), fields, cleared=cleared, completeness="full")])

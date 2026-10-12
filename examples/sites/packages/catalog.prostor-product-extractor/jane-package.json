@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "catalog.prostor-product-extractor",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "prostor.ua: full product cards",
-  "description": "Повні картки товарів prostor.ua (косметика й побутова хімія) зі сторінок /ua/product/: назва, ціна й ціна до знижки, наявність, бренд, категорія й шлях категорій, артикул, зображення, об'єм/вага, рейтинг, кількість відгуків, характеристики (completeness: full). Ключ — shop + product_id (Magento product id). Відгуки покупців (імена) не читаються.",
+  "description": "Повні картки товарів prostor.ua (косметика й побутова хімія) зі сторінок /ua/product/: назва, ціна й ціна до знижки, наявність, бренд, категорія й шлях категорій, артикул, зображення, об'єм/вага, рейтинг, кількість відгуків, характеристики (completeness: full). Ключ — shop + product_id (Magento product id). Відгуки покупців (імена) не читаються. Товар без ціни з відомим статусом «немає в наявності» зберігає метадані/наявність частково; відсутність ціни не очищує попередню ціну чи знижку. Тип сутності — група товару за розділом category_path (таблиця CATEGORY_TYPES; найдовший префікс; розділ поза таблицею — product_other).",
   "tags": [
     "catalog",
     "prostor",
@@ -32,13 +32,94 @@
   "output": {
     "entities": [
       {
-        "entity_type": "product",
+        "entity_type": "product_beauty",
         "schema": "schemas/product.schema.json",
         "key_fields": [
           "shop",
           "product_id"
         ],
-        "description": "Повна картка товару prostor.ua"
+        "description": "Повна картка товару prostor.ua — група «косметика, парфуми, гігієна й догляд»"
+      },
+      {
+        "entity_type": "product_clothing",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару prostor.ua — група «одяг, взуття, аксесуари, галантерея»"
+      },
+      {
+        "entity_type": "product_food",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару prostor.ua — група «продукти, напої, алкоголь»"
+      },
+      {
+        "entity_type": "product_health",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару prostor.ua — група «медичні товари, БАДи»"
+      },
+      {
+        "entity_type": "product_home",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару prostor.ua — група «дім, інтер'єр, меблі, товари для дому»"
+      },
+      {
+        "entity_type": "product_household",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару prostor.ua — група «побутова хімія»"
+      },
+      {
+        "entity_type": "product_kids",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару prostor.ua — група «іграшки, дитячий транспорт, дитячі товари»"
+      },
+      {
+        "entity_type": "product_pet",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару prostor.ua — група «зоотовари»"
+      },
+      {
+        "entity_type": "product_sport",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару prostor.ua — група «спорт і туризм»"
+      },
+      {
+        "entity_type": "product_other",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару prostor.ua — група «розділ поза таблицею (сезонні, збірні, нові розділи)»"
       }
     ]
   },
@@ -127,15 +208,38 @@
       },
       "expected_status": "unrecognized",
       "origin": "problem_sample"
+    },
+    {
+      "name": "out-of-stock-without-price-preserves-metadata",
+      "input": {
+        "file": "tests/out-of-stock-without-price/page.html",
+        "media_type": "text/html",
+        "url": "https://prostor.ua/ua/product/sukhoy-shampun-syoss-dlya-sklonnykh-k-zhirnosti-volos-200-ml/"
+      },
+      "expected_status": "success",
+      "expected": "tests/out-of-stock-without-price/expected.json",
+      "compare": "subset",
+      "origin": "problem_sample"
     }
   ],
   "provenance": {
-    "created_by": "human",
+    "created_by": "llm",
     "authors": [
-      "Claude (examples/sites: prostor)"
+      "Claude (examples/sites: prostor)",
+      "mongo-entities"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Full product cards of prostor.ua: JSON-LD Product and BreadcrumbList, add-to-cart product id, attribute table."
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: entity type product_<group> from the shop's category table (CATEGORY_TYPES) instead of product; one collection per type in jane.storage-mongodb.",
+    "based_on": {
+      "package_id": "catalog.prostor-product-extractor",
+      "version": "1.1.1",
+      "digest": "sha256:f22a6e847a29e5148e145fd02048bc3f3bbec962061b6b8aa2976a156ce950a5"
+    },
+    "llm": {
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "reason": "improvement"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

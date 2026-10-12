@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "product",
+      "entity_type": "product_beauty",
       "fields": {
         "shop": "prostor",
         "product_id": "1723",

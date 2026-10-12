@@ -12,6 +12,12 @@ the link ``a[data-product-picture]``, the price ``[data-product-price-main]`` an
 («Немає в наявності» …). An out-of-stock tile has no price: only ``availability`` is sent and the last known
 price stays. A tile with a price and no struck-through price clears ``old_price``.
 
+The entity type is the product group of the category page (``CATEGORY_TYPES``, the same table as the card
+extractor's): the breadcrumbs of the page (``itemprop=breadcrumb``, without the home, catalog and brand-filter
+crumbs, emoji removed) are the ``category_path`` its products show on their own pages. A page whose section is
+not in the table, or has subsections of different types, is ``unrecognized`` and writes nothing: the price
+update must not create a product in another type's collection.
+
 A page without product tiles is ``empty``; tiles without product links are ``unrecognized``.
 """
 
@@ -19,6 +25,8 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
+from collections.abc import Sequence
 from typing import Any
 from urllib.parse import urljoin, urlsplit
 
@@ -27,6 +35,7 @@ from lxml import html as lxml_html  # type: ignore[import-untyped]
 from jane_extractor_sdk import Context, ExtractResult, Material, empty, entity, success, unrecognized
 
 SLUG = re.compile(r"/(?:[a-z]{2}/)?shop/([^/]+)\.html")
+NAVIGATION_PATHS = frozenset({"/", "/ua/", "/shop/", "/ua/shop/"})
 CURRENCY = re.compile(r"[A-Z]{3}")
 SCHEMA_AVAILABILITY = {
     "instock": "in_stock",
@@ -50,6 +59,68 @@ TEXT_AVAILABILITY = {
 }
 
 
+# Catalog section (a prefix of ``category_path``) -> entity type, one MongoDB collection per type. The longest
+# prefix in the table wins; a section that is not in the table is ``OTHER_TYPE`` (seasonal and promotional
+# sections are only listed with their subsections). The card and the price extractor of the shop carry the same
+# table and lookup - a price update must name the type of the card (examples/tests/test_sites.py compares them).
+CATEGORY_TYPES: dict[tuple[str, ...], str] = {
+    ("Автотовари",): "product_auto",
+    ("Будівництво та ремонт",): "product_tools",
+    ("Дитячі товари",): "product_kids",
+    ("Дім та інтер'єр",): "product_home",
+    ("Дім та інтер'єр", "Книги"): "product_book",
+    ("Електроніка",): "product_electronics",
+    ("Зоотовари",): "product_pet",
+    ("Інструменти",): "product_tools",
+    ("Краса та здоров'я",): "product_beauty",
+    ("Меблі",): "product_home",
+    ("Медичні товари",): "product_health",
+    ("Одяг, взуття, аксесуари",): "product_clothing",
+    ("Освітлення",): "product_tools",
+    ("Офіс і канцтовари",): "product_office",
+    ("Побутова техніка",): "product_appliance",
+    ("Побутова хімія",): "product_household",
+    ("Покриття для підлоги",): "product_tools",
+    ("Продукти",): "product_food",
+    ("Сад та город",): "product_garden",
+    ("Сантехніка",): "product_tools",
+    ("Спорттовари",): "product_sport",
+    ("Туристичні товари",): "product_sport",
+}
+OTHER_TYPE = "product_other"
+APOSTROPHES = str.maketrans(dict.fromkeys("\u2019\u02bc`\u00b4\u2018", "'"))
+
+
+def _section(name: str) -> str:
+    """A section name compared without case, apostrophe variants and repeated spaces."""
+    return " ".join(name.translate(APOSTROPHES).split()).casefold()
+
+
+TYPES_BY_PREFIX = {tuple(_section(n) for n in prefix): kind for prefix, kind in CATEGORY_TYPES.items()}
+
+
+def _mapped_type(path: Sequence[str]) -> str | None:
+    """Type of the longest table prefix of ``path``; ``None`` when no prefix of it is in the table."""
+    key = tuple(_section(n) for n in path)
+    for size in range(len(key), 0, -1):
+        kind = TYPES_BY_PREFIX.get(key[:size])
+        if kind is not None:
+            return kind
+    return None
+
+
+def _listing_type(path: Sequence[str]) -> str | None:
+    """Type of the products of a category page with this ``path``: the table type when no deeper section of the
+    table under the page has another type. ``None`` - it cannot be told: no table prefix (a seasonal, promotional
+    or new section may list products of any section) or subsections of the page have different types."""
+    kind = _mapped_type(path)
+    key = tuple(_section(n) for n in path)
+    deeper = {
+        t for prefix, t in TYPES_BY_PREFIX.items() if len(prefix) > len(key) and prefix[: len(key)] == key
+    }
+    return kind if kind is not None and deeper <= {kind} else None
+
+
 def _text(value: str | None) -> str:
     return " ".join((value or "").split())
 
@@ -61,6 +132,31 @@ def _number(value: str | None) -> float | None:
     except ValueError:
         return None
     return number if math.isfinite(number) and number >= 0 else None
+
+
+def _plain(value: str | None) -> str:
+    """Text without pictographs (category names carry decorative emoji)."""
+    kept = "".join(
+        ch
+        for ch in value or ""
+        if unicodedata.category(ch) not in {"So", "Cs", "Co", "Cf"} and not 0xFE00 <= ord(ch) <= 0xFE0F
+    )
+    return _text(kept)
+
+
+def _category_path(doc: Any) -> list[str]:
+    """Breadcrumbs of the category page without the home, catalog and brand-filter crumbs; the last crumb (the
+    category itself, without a link) is kept."""
+    path: list[str] = []
+    for item in doc.xpath('//*[@itemprop="breadcrumb"]//li'):
+        href = next(iter(item.xpath("./a/@href")), None)
+        link = urlsplit(str(href)).path if href else None
+        if link is not None and (link in NAVIGATION_PATHS or "/fs/" in link or "/filter/" in link):
+            continue
+        name = _plain(item.get("data-breadcrumb") or item.text_content())
+        if name:
+            path.append(name)
+    return path
 
 
 def _slug(url: str) -> str | None:
@@ -139,12 +235,18 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
         return unrecognized(
             "product tiles without product links", signature="missing-selector:a[data-product-picture]"
         )
+    path = _category_path(doc)
+    kind = _listing_type(path)
+    if kind is None:
+        section = " > ".join(path) or "no breadcrumbs"
+        ctx.log.warning(f"category page of an unmapped section: {section}", code="extract.unmapped_category")
+        return unrecognized(
+            f"the product type of category page {section!r} is not known: no prices are written",
+            signature=f"unmapped-category:{path[0] if path else 'none'}",
+        )
     skipped = len(cards) - len(found)
     if skipped:
         ctx.log.info(f"{skipped} tile(s) without a product link or repeated", code="extract.skipped_tiles")
     return success(
-        [
-            entity("product", fields, cleared=cleared, completeness="partial")
-            for fields, cleared in found.values()
-        ]
+        [entity(kind, fields, cleared=cleared, completeness="partial") for fields, cleared in found.values()]
     )

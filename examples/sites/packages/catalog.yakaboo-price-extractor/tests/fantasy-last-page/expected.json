@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "product",
+      "entity_type": "product_book",
       "fields": {
         "shop": "yakaboo",
         "product_id": "726782",
@@ -20,7 +20,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_book",
       "fields": {
         "shop": "yakaboo",
         "product_id": "690379",
@@ -39,7 +39,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_book",
       "fields": {
         "shop": "yakaboo",
         "product_id": "1502251",
@@ -60,7 +60,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_book",
       "fields": {
         "shop": "yakaboo",
         "product_id": "1500151",
@@ -76,7 +76,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_book",
       "fields": {
         "shop": "yakaboo",
         "product_id": "981890",
@@ -92,7 +92,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_book",
       "fields": {
         "shop": "yakaboo",
         "product_id": "1518126",

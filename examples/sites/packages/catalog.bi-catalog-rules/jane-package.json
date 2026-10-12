@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "catalog.bi-catalog-rules",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "kind": "collector-rules",
-  "title": "bi.ua: full catalog of kids' scooters, balance bikes and bicycles",
-  "description": "Правила Web Collector для повного каталогу bi.ua («Будинок іграшок»): категорії «Самокати», «Біговели» й «Велосипеди» — усі сторінки пагінації (наступна сторінка — посилання після поточної в блоці пагінації) і картки товарів із кожної сторінки (a.goodsItemLink). robots.txt дотримується; межі — лише ці категорії та /ukr/product/.",
+  "title": "bi.ua: entire Ukrainian product assortment from sitemaps",
+  "description": "Повний асортимент: іграшки, дитячий транспорт, творчість, книги, одяг та всі інші товарні розділи. 118 580 унікальних українських товарних URL у шести sitemap станом на 11.10.2026. Усі товарні URL із повних sitemap, без обмеження категорій; incremental-черга продовжується між запусками, повторні відвідування карток оновлюють ціну, наявність і властивості. Ліміти визначаються джерелом і завданням; robots.txt дотримується.",
   "tags": [
     "catalog",
     "bi-ua",
@@ -17,11 +17,20 @@
   },
   "tests": [],
   "provenance": {
-    "created_by": "human",
+    "created_by": "llm",
     "authors": [
-      "Claude (examples/sites: bi.ua)"
+      "Claude (examples/sites: bi.ua)",
+      "Codex: full assortment catalog configuration"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Full catalog of three kids' transport categories of bi.ua: listing pages with pagination and every product card."
+    "created_at": "2026-10-11T03:57:25.353585Z",
+    "change_summary": "Replace three-category listing discovery with complete Ukrainian product sitemaps and periodic resumable product-card refresh. Reproducible Git LF bytes: normalize CRLF to LF without behavior changes.",
+    "based_on": {
+      "package_id": "catalog.bi-catalog-rules",
+      "version": "1.1.0"
+    },
+    "llm": {
+      "model": "Codex",
+      "reason": "improvement"
+    }
   }
 }

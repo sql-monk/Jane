@@ -25,7 +25,7 @@
       },
       "forward_unknown_to_llm": false,
       "expected_entity_types": [
-        "classified_ad"
+        "ad_realty"
       ],
       "labels": {
         "group": "classifieds",
@@ -37,7 +37,7 @@
     {
       "task_id": "ads-domria",
       "title": "dom.ria.com: свіжі оголошення квартир у Києві (оренда, продаж)",
-      "description": "Щогодини: перші сторінки двох каталогів (кількість — limits.crawl.max_depth) → RAW у raw-files, повні сутності classified_ad у results-pg; ті самі ключі site + ad_id оновлюються (ціна, дата актуалізації), нові оголошення додаються.",
+      "description": "Щогодини: перші сторінки двох каталогів (кількість — limits.crawl.max_depth) → RAW у raw-files, повні сутності ad_realty у results-mongo; ті самі ключі site + ad_id оновлюються (ціна, дата актуалізації), нові оголошення додаються.",
       "input": {
         "source_id": "domria"
       },
@@ -93,9 +93,9 @@
         {
           "stage_id": "store-ads",
           "kind": "handler",
-          "handler": "@pkg:jane.storage-postgresql",
+          "handler": "@pkg:jane.storage-mongodb",
           "connections": {
-            "target": "results-pg"
+            "target": "results-mongo"
           },
           "inputs": [
             {
@@ -134,7 +134,7 @@
   ],
   "verify": {
     "domria": {
-      "classified_ad": {
+      "ad_realty": {
         "min": 80,
         "required": [
           "site",

@@ -18,13 +18,16 @@ the price task (``catalog.yakaboo-price-extractor``) show. The card is ``complet
 without a discount ``old_price`` is cleared (the discount is over). A page without a ``Product`` block is
 ``empty`` (category and other pages); a ``Product`` block without a code or a title is ``unrecognized``;
 without a price - ``unrecognized`` with the partial card. Reviews (``Review`` JSON-LD, buyers' names) are not read.
+
+The entity type is the product group of the card's ``category_path`` (``CATEGORY_TYPES``: the longest table
+prefix wins, an unknown section is ``product_other``); the price extractor of the shop uses the same table.
 """
 
 from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from html import unescape
 from typing import Any
 from urllib.parse import urljoin, urlsplit
@@ -64,6 +67,45 @@ CHAR_ROWS = (
     '//div[contains(concat(" ", normalize-space(@class), " "), " product-chars ")]'
     '//div[contains(concat(" ", normalize-space(@class), " "), " char ")]'
 )
+
+
+# Catalog section (a prefix of ``category_path``) -> entity type, one MongoDB collection per type. The longest
+# prefix in the table wins; a section that is not in the table is ``OTHER_TYPE`` (seasonal and promotional
+# sections are only listed with their subsections). The card and the price extractor of the shop carry the same
+# table and lookup - a price update must name the type of the card (examples/tests/test_sites.py compares them).
+CATEGORY_TYPES: dict[tuple[str, ...], str] = {
+    ("Ігри та творчість",): "product_kids",
+    ("Книжки",): "product_book",
+    ("Кольорові олівці",): "product_office",
+    ("Настільні ігри",): "product_kids",
+    ("Рюкзаки, сумки шкільні",): "product_office",
+    ("Шкільні зошити",): "product_office",
+}
+OTHER_TYPE = "product_other"
+APOSTROPHES = str.maketrans(dict.fromkeys("\u2019\u02bc`\u00b4\u2018", "'"))
+
+
+def _section(name: str) -> str:
+    """A section name compared without case, apostrophe variants and repeated spaces."""
+    return " ".join(name.translate(APOSTROPHES).split()).casefold()
+
+
+TYPES_BY_PREFIX = {tuple(_section(n) for n in prefix): kind for prefix, kind in CATEGORY_TYPES.items()}
+
+
+def _mapped_type(path: Sequence[str]) -> str | None:
+    """Type of the longest table prefix of ``path``; ``None`` when no prefix of it is in the table."""
+    key = tuple(_section(n) for n in path)
+    for size in range(len(key), 0, -1):
+        kind = TYPES_BY_PREFIX.get(key[:size])
+        if kind is not None:
+            return kind
+    return None
+
+
+def _entity_type(path: Sequence[str] | None) -> str:
+    """Type of a product with this ``category_path`` (no path or an unknown section - ``OTHER_TYPE``)."""
+    return _mapped_type(path or []) or OTHER_TYPE
 
 
 def _clean(value: Any) -> str:
@@ -262,7 +304,7 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
         return unrecognized(
             "product page without a price",
             signature="missing-field:price",
-            entities=[entity("product", fields, completeness="partial")],
+            entities=[entity(_entity_type(category_path), fields, completeness="partial")],
         )
     fields["completeness"] = "full"
-    return success([entity("product", fields, cleared=cleared, completeness="full")])
+    return success([entity(_entity_type(category_path), fields, cleared=cleared, completeness="full")])

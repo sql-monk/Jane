@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "classifieds.olx-ads",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "OLX: public notebook classified cards",
-  "description": "Публічні оголошення OLX з карток каталогу. Колектор завантажує оригінальний HTML через звичайний Chromium без JS; екстрактор детермінований і без мережі. Контакти не витягаються.",
+  "description": "Публічні оголошення OLX з карток каталогу. Колектор завантажує оригінальний HTML через звичайний Chromium без JS; екстрактор детермінований і без мережі. Контакти не витягаються. Тип сутності фіксований — ad_goods: правила classifieds.olx-rules обмежують збір розділом ноутбуків (/uk/elektronika/noutbuki-i-aksesuary/noutbuki/).",
   "entry": {
     "runtime": "python",
     "module": "jane_classifieds_olx.main",
@@ -25,7 +25,7 @@
   "output": {
     "entities": [
       {
-        "entity_type": "classified_ad",
+        "entity_type": "ad_goods",
         "schema": "schemas/ad.schema.json",
         "key_fields": [
           "site",
@@ -68,10 +68,15 @@
   "provenance": {
     "created_by": "llm",
     "authors": [
-      "Codex"
+      "Codex",
+      "Claude (mongo-entities C3)"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Public OLX cards: directly present title, listing identity, canonical URL, currency price and location."
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: entity type classified_ad -> ad_goods (ad taxonomy, one MongoDB collection per type); fields, key and schema unchanged.",
+    "based_on": {
+      "package_id": "classifieds.olx-ads",
+      "version": "1.0.0"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

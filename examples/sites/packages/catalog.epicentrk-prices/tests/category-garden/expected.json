@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "product",
+      "entity_type": "product_garden",
       "fields": {
         "shop": "epicentrk.ua",
         "product_id": "liika-sadova-lemira-10-l",
@@ -22,7 +22,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_garden",
       "fields": {
         "shop": "epicentrk.ua",
         "product_id": "leyka-dlya-tsvetov-mm-plast-2-5-l-dlinnyy-nosik",
@@ -43,7 +43,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_garden",
       "fields": {
         "shop": "epicentrk.ua",
         "product_id": "liika-aleana-olyvkova-1-5-l",
@@ -64,7 +64,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_garden",
       "fields": {
         "shop": "epicentrk.ua",
         "product_id": "liika-sadova-lemira-7-l",
@@ -85,7 +85,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_garden",
       "fields": {
         "shop": "epicentrk.ua",
         "product_id": "liika-sadova-spring-4-5-l",
@@ -106,7 +106,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_garden",
       "fields": {
         "shop": "epicentrk.ua",
         "product_id": "leyka-dlya-tsvetov-2-5-l-seraya",

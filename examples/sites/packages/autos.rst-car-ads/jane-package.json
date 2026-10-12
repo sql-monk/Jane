@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "autos.rst-car-ads",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "RST.ua: car ads from catalog tiles and ad cards",
-  "description": "Оголошення легкових авто rst.ua (сутність car_ad, ключ site + ad_id): плитки сторінок каталогу /ukr/oldcars/ (назва, ціна в USD і UAH, рік, об'єм, паливо, КПП, пробіг, регіон чи місто, фото; плитки нових авто автосалонів /ukr/new/ — condition new, seller_type dealer) і картки оголошень (те саме плюс місто, привід, кузов, колір, опис до 500 символів). Ті самі нормалізовані значення з обох джерел, тож каталог оновлює ціну оголошення, яке заповнила картка. Імена й телефони продавців не читаються; телефони в описі приховуються.",
+  "description": "Оголошення легкових авто rst.ua (сутність ad_car, ключ site + ad_id): плитки сторінок каталогу /ukr/oldcars/ (назва, ціна в USD і UAH, рік, об'єм, паливо, КПП, пробіг, регіон чи місто, фото; плитки нових авто автосалонів /ukr/new/ — condition new, seller_type dealer) і картки оголошень (те саме плюс місто, привід, кузов, колір, опис до 500 символів). Ті самі нормалізовані значення з обох джерел, тож каталог оновлює ціну оголошення, яке заповнила картка. Імена й телефони продавців не читаються; телефони в описі приховуються. Версія 1.1: повний опис, модифікація, сирі характеристики, всі фото, явно перелічене оснащення, видимий VIN або маска й історія реєстрації. Оснащення й історія — твердження джерела, а не незалежна перевірка. Версія 2.0: тип сутності ad_car замість car_ad (плитки каталогу й картки — той самий тип).",
   "tags": [
     "autos",
     "rst",
@@ -30,8 +30,8 @@
   "output": {
     "entities": [
       {
-        "entity_type": "car_ad",
-        "schema": "schemas/car_ad.schema.json",
+        "entity_type": "ad_car",
+        "schema": "schemas/ad_car.schema.json",
         "key_fields": [
           "site",
           "ad_id"
@@ -96,7 +96,10 @@
       "expected_status": "success",
       "expected": "tests/card-renault-kadjar/expected.json",
       "compare": "exact",
-      "origin": "human"
+      "origin": "human",
+      "params": {
+        "include_details": false
+      }
     },
     {
       "name": "card-jaguar-i-pace-electric",
@@ -108,7 +111,10 @@
       "expected_status": "success",
       "expected": "tests/card-jaguar-i-pace/expected.json",
       "compare": "exact",
-      "origin": "human"
+      "origin": "human",
+      "params": {
+        "include_details": false
+      }
     },
     {
       "name": "card-nissan-rogue-without-mileage",
@@ -120,7 +126,10 @@
       "expected_status": "success",
       "expected": "tests/card-nissan-rogue/expected.json",
       "compare": "exact",
-      "origin": "human"
+      "origin": "human",
+      "params": {
+        "include_details": false
+      }
     },
     {
       "name": "not-found-page-empty",
@@ -131,15 +140,72 @@
       },
       "expected_status": "empty",
       "origin": "human"
+    },
+    {
+      "name": "gmc-acadia-live",
+      "input": {
+        "file": "tests/gmc-acadia-live/page.html",
+        "media_type": "text/html",
+        "url": "https://rst.ua/ukr/oldcars/gmc/acadia/gmc_acadia_15481914.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/gmc-acadia-live/expected.json",
+      "compare": "subset",
+      "origin": "llm"
+    },
+    {
+      "name": "mercedes-sprinter-live",
+      "input": {
+        "file": "tests/mercedes-sprinter-live/page.html",
+        "media_type": "text/html",
+        "url": "https://rst.ua/ukr/oldcars/mercedes/sprinter/mercedes_sprinter_15307308.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/mercedes-sprinter-live/expected.json",
+      "compare": "subset",
+      "origin": "llm"
+    },
+    {
+      "name": "nissan-qashqai-live",
+      "input": {
+        "file": "tests/nissan-qashqai-live/page.html",
+        "media_type": "text/html",
+        "url": "https://rst.ua/ukr/oldcars/nissan/qashqai/nissan_qashqai_15487251.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/nissan-qashqai-live/expected.json",
+      "compare": "subset",
+      "origin": "llm"
+    },
+    {
+      "name": "card-jaguar-i-pace-electric-full",
+      "input": {
+        "file": "tests/card-jaguar-i-pace/page.html",
+        "media_type": "text/html",
+        "url": "https://rst.ua/ukr/oldcars/jaguar/i-pace/jaguar_i-pace_15478392.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/card-jaguar-i-pace/expected-full.json",
+      "compare": "subset",
+      "origin": "llm",
+      "params": {
+        "include_details": true
+      }
     }
   ],
   "provenance": {
-    "created_by": "human",
+    "created_by": "llm",
     "authors": [
-      "Claude (autos agent)"
+      "Claude (autos agent)",
+      "Codex",
+      "Claude (mongo-entities C3)"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "RST.ua car ads: catalog tiles and ad cards with the shared car_ad entity."
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: entity type car_ad -> ad_car (ad taxonomy, one MongoDB collection per type) for catalog tiles and ad cards alike; fields, key and schema unchanged. One source for examples/sites and examples/automarket.",
+    "based_on": {
+      "package_id": "autos.rst-car-ads",
+      "version": "1.1.0"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

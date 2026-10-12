@@ -1,14 +1,14 @@
 {
   "site": "prostor",
   "group": "catalog",
-  "title": "PROSTOR (prostor.ua): косметика й побутова хімія — повний каталог трьох категорій і оновлення цін",
+  "title": "PROSTOR: весь асортимент, властивості товарів і періодичні ціни",
   "url": "https://prostor.ua/",
   "sources": [
     {
       "source_id": "prostor",
       "kind": "web",
       "title": "PROSTOR — інтернет-магазин косметики й побутової хімії",
-      "description": "prostor.ua (Magento 2): категорії «Зволоження і живлення» (догляд за обличчям), «Засоби для прання», «Шампуні». robots.txt дотримується; не частіше 1 запиту/с, один одночасний запит до хоста.",
+      "description": "Весь асортимент: косметика, парфумерія, догляд, гігієна, побутова хімія та всі інші товарні розділи. Discovery: 9 339 унікальних українських товарних URL у sitemap станом на 11.10.2026. Звичайний HTTP, robots.txt дотримується, не частіше одного запиту за секунду та один одночасний запит до хоста. Картки товарів містять ціни й усі доступні характеристики.",
       "locator": {
         "url": "https://prostor.ua/"
       },
@@ -21,11 +21,26 @@
         },
         "concurrency": {
           "max_parallel_fetches_per_host": 1
+        },
+        "crawl": {
+          "max_links_per_page": 60000,
+          "max_frontier_size": 20000,
+          "max_material_bytes": 33554432,
+          "revisit_interval_seconds": 86400
         }
       },
       "forward_unknown_to_llm": false,
       "expected_entity_types": [
-        "product"
+        "product_beauty",
+        "product_clothing",
+        "product_food",
+        "product_health",
+        "product_home",
+        "product_household",
+        "product_kids",
+        "product_pet",
+        "product_sport",
+        "product_other"
       ],
       "labels": {
         "group": "catalog",
@@ -36,8 +51,8 @@
   "tasks": [
     {
       "task_id": "catalog-prostor",
-      "title": "prostor.ua: повний каталог трьох категорій",
-      "description": "Щоночі о 01:00 (Київ): усі сторінки пагінації категорій і картки всіх товарів → RAW у raw-files, повні картки product (completeness: full) у results-pg. Збір має вкладатися в ~45 хв (обмеження job колектора — 1 год).",
+      "title": "PROSTOR: весь асортимент і періодичне оновлення цін",
+      "description": "Кожні 15 хв продовжується збережена черга всіх українських товарних URL із sitemap, до 400 сторінок за запуск. Нові картки збираються до завершення первинного обходу; відомі повторно перевіряються після 24 год, фактична свіжість залежить від довжини черги. Повний обхід великого асортименту може тривати від діб до місяців; завершення визначається станом усієї черги, а не успіхом окремого запуску. Ціна, наявність і всі доступні властивості оновлюються з картки, Сутності товарів та історія змін зберігаються в MongoDB (results-mongo, колекція на тип; тип product_* — за розділом category_path картки (таблиця пакета; розділ поза таблицею — product_other)); повний HTML кожного циклу не накопичується. Ліміти черги й sitemap перевищують виміряний каталог; досягнення лімітів не є повнотою каталогу.",
       "input": {
         "source_id": "prostor"
       },
@@ -47,21 +62,9 @@
           "kind": "collect",
           "collector": {
             "collector": "web",
-            "mode": "full"
+            "mode": "incremental",
+            "rules": "@pkg:catalog.prostor-catalog-rules"
           }
-        },
-        {
-          "stage_id": "store-raw",
-          "kind": "handler",
-          "handler": "@pkg:jane.storage-files",
-          "connections": {
-            "target": "raw-files"
-          },
-          "inputs": [
-            {
-              "from": "collect"
-            }
-          ]
         },
         {
           "stage_id": "extract-products",
@@ -82,10 +85,8 @@
           ],
           "bindings": [
             {
-              "url_patterns": [
-                {
-                  "value": "prostor.ua/ua/product/**"
-                }
+              "sections": [
+                "products"
               ]
             }
           ]
@@ -93,9 +94,9 @@
         {
           "stage_id": "store-products",
           "kind": "handler",
-          "handler": "@pkg:jane.storage-postgresql",
+          "handler": "@pkg:jane.storage-mongodb",
           "connections": {
-            "target": "results-pg"
+            "target": "results-mongo"
           },
           "inputs": [
             {
@@ -111,15 +112,20 @@
         }
       ],
       "schedule": {
-        "type": "cron",
-        "cron": "0 1 * * *",
+        "type": "interval",
+        "interval_seconds": 900,
         "timezone": "Europe/Kyiv",
         "overlap": "skip"
       },
       "limits": {
         "crawl": {
-          "max_depth": 30,
-          "max_pages_per_run": 2000
+          "max_links_per_page": 60000,
+          "max_frontier_size": 20000,
+          "max_material_bytes": 33554432,
+          "revisit_interval_seconds": 86400,
+          "max_depth": 40,
+          "max_pages_per_run": 400,
+          "max_bytes_per_run": 536870912
         }
       },
       "forward_unknown_to_llm": false,
@@ -131,8 +137,8 @@
     },
     {
       "task_id": "prices-prostor",
-      "title": "prostor.ua: оновлення цін і наявності зі сторінок категорій",
-      "description": "Кожні 4 год удень (08:05, 12:05, 16:05, 20:05 за Києвом — не перетинається з нічним повним сканом: другу одночасну збірку того самого джерела колектор відхиляє 409): лише сторінки категорій (правила catalog.prostor-price-rules, картки не завантажуються) → часткове оновлення product (price, old_price, availability; completeness: partial) тих самих ключів shop + product_id.",
+      "title": "PROSTOR: ручна перевірка цін попередньої добірки",
+      "description": "Попереднє завдання для обмеженої добірки категорій залишено лише для ручної діагностики. Автоматичне оновлення цін усього асортименту виконує catalog-завдання із повними product sitemap та повторними відвідуваннями карток.",
       "input": {
         "source_id": "prostor"
       },
@@ -195,9 +201,9 @@
         {
           "stage_id": "store-prices",
           "kind": "handler",
-          "handler": "@pkg:jane.storage-postgresql",
+          "handler": "@pkg:jane.storage-mongodb",
           "connections": {
-            "target": "results-pg"
+            "target": "results-mongo"
           },
           "inputs": [
             {
@@ -213,9 +219,7 @@
         }
       ],
       "schedule": {
-        "type": "cron",
-        "cron": "5 8,12,16,20 * * *",
-        "timezone": "Europe/Kyiv",
+        "type": "manual",
         "overlap": "skip"
       },
       "limits": {
@@ -234,7 +238,7 @@
   ],
   "verify": {
     "prostor": {
-      "product": {
+      "product_*": {
         "min": 600,
         "required": [
           "shop",

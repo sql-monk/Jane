@@ -1,4 +1,4 @@
-"""AUTO.RIA (auto.ria.com) ad page ``/uk/auto_<make>_<model>_<id>.html`` -> one full ``car_ad`` entity.
+"""AUTO.RIA (auto.ria.com) ad page ``/uk/auto_<make>_<model>_<id>.html`` -> one full ``ad_car`` entity.
 
 The page is rendered on the server (no JavaScript needed) and carries two machine-readable sources:
 
@@ -15,10 +15,12 @@ The page is rendered on the server (no JavaScript needed) and carries two machin
 
 Mileage, gearbox, fuel, photo and ``url`` (the fetched URL, i.e. the search page's link) are read the same way
 as on the search results page (package ``autos.autoria-search-page``), so both packages write identical values
-into the same ``car_ad``. No seller names, phones, VIN or plate numbers are returned; phone numbers, e-mails and
+into the same ``ad_car``. No seller names, phones, VIN or plate numbers are returned; phone numbers, e-mails and
 street addresses inside the description are masked, the seller kind is omitted when the page shows no seller
 (sold or removed ad). ``empty`` for a page without an ad (neither a ``Vehicle`` nor an ad state),
 ``unrecognized`` for an ad without a price.
+
+The entity type is fixed: the package reads only passenger-car ad pages of AUTO.RIA, so every ad is ``ad_car``.
 """
 
 from __future__ import annotations
@@ -54,7 +56,36 @@ TEMPLATE_IDS = {
     "advertStatisticPublicationData",
     "sellerInfoSegment",
     "bannerStatusText",
+    "basicInfoGenerationBase",
+    "descGenerationBaseValue",
+    "descEngineEngine",
+    "descEcoStandartEcoStandart",
+    "descTechStateText",
+    "descPaintConditionValue",
+    "descStateValue",
+    "descFuelRateValue",
 }
+EQUIPMENT_IDS = {
+    "comfort": "descComfortValue",
+    "safety": "descSecurityValue",
+    "multimedia": "descMultimediaValue",
+    "headlights": "descHeadlightsValue",
+    "interior_materials": "descInteriorMaterialsValue",
+    "interior_color": "descInteriorColorsValue",
+    "seat_adjustment": "descSeatAdjustmentValue",
+    "heated_seats": "descSeatHeatedValue",
+    "seat_memory": "descMemorySeatModuleValue",
+    "electric_windows": "descWindowLifterValue",
+    "climate_control": "descConditionerTypeValue",
+    "power_steering": "descPowerSteeringValue",
+    "steering_adjustment": "descSteeringWheelAdjustmentValue",
+    "spare_wheel": "descSpareWheelValue",
+    "lighting": "descOpticsValue",
+    "body_and_interior": "descSalonValue",
+    "parking_assistance": "descParktronicValue",
+    "airbags": "descAirbagValue",
+}
+TEMPLATE_IDS.update(EQUIPMENT_IDS.values())
 
 _PINIA = re.compile(r"window\.__PINIA__\s*=\s*")
 _LD_JSON = re.compile(
@@ -75,6 +106,11 @@ _STREET = re.compile(
     re.IGNORECASE,
 )
 _SPACES = re.compile(r"\s+")
+_DOORS = re.compile(r"\b(\d+)\s+двер")
+_SEATS = re.compile(r"\b(\d+)\s+місц")
+_POWER_HP = re.compile(r"(\d+(?:[.,]\d+)?)\s*к\.\s*с\.")
+_POWER_KW = re.compile(r"(\d+(?:[.,]\d+)?)\s*кВт\b")
+_CONSUMPTION = re.compile(r"(місто|траса|змішаний)\s+(\d+(?:[.,]\d+)?)")
 
 
 def _pinia(html: str) -> dict[str, Any] | None:
@@ -194,13 +230,81 @@ def image(src: Any) -> str | None:
 
 
 def description(text: Any, limit: int) -> str | None:
-    if not isinstance(text, str):
+    if not isinstance(text, str) or limit <= 0:
         return None
     masked = _STREET.sub("[адреса]", _EMAIL.sub("[e-mail]", _PHONE.sub("[телефон]", text)))
     clean = _SPACES.sub(" ", masked).strip()
     if len(clean) > limit:
         clean = clean[: limit - 1].rstrip() + "…"
     return clean or None
+
+
+def _items(text: str) -> list[str]:
+    """Preserve site labels and order; repeated responsive layouts add no duplicate options."""
+    return list(dict.fromkeys(part.strip() for part in text.split("•") if part.strip()))
+
+
+def _power(text: str, pattern: re.Pattern[str]) -> float | None:
+    match = pattern.search(text)
+    return float(match.group(1).replace(",", ".")) if match else None
+
+
+def _details(found: Mapping[str, dict[str, Any]], ctx: Context) -> dict[str, Any]:
+    """Only structured seller/site claims: no specification inference from the model name."""
+    fields: dict[str, Any] = {}
+    characteristics = _text(found.get("descCharacteristicsValue"))
+    for field, pattern in (("doors", _DOORS), ("seats", _SEATS)):
+        if match := pattern.search(characteristics):
+            fields[field] = int(match.group(1))
+
+    generation = _items(_text(found.get("basicInfoGenerationBase")))
+    if not generation:
+        generation = [part.strip() for part in _text(found.get("descGenerationBaseValue")).split(",", 1)]
+        generation = [part for part in generation if part]
+    for name, value in zip(("generation", "modification", "trim"), generation, strict=False):
+        fields[name] = value
+
+    engine = _text(found.get("descEngineEngine"))
+    engine_hp = _power(engine, _POWER_HP)
+    modification_hp = _power(fields.get("modification", ""), _POWER_HP)
+    if engine_hp is not None or modification_hp is not None:
+        fields["power_hp"] = engine_hp if engine_hp is not None else modification_hp
+    if modification_hp is not None:
+        fields["modification_power_hp"] = modification_hp
+    if (power_kw := _power(engine, _POWER_KW)) is not None:
+        fields["power_kw"] = power_kw
+    if engine_hp is not None and modification_hp is not None and engine_hp != modification_hp:
+        ctx.log.warning(
+            f"engine detail gives {engine_hp:g} hp; modification gives {modification_hp:g} hp",
+            code="extract.conflicting_power",
+        )
+
+    for field, template_id in (
+        ("emission_standard", "descEcoStandartEcoStandart"),
+        ("technical_state", "descTechStateText"),
+        ("paint_condition", "descPaintConditionValue"),
+    ):
+        if text := _text(found.get(template_id)):
+            fields[field] = text
+    if "готовий до перевірки на сто" in _text(found.get("descTechStateValue")).casefold():
+        fields["inspection_ready"] = True
+    if options := _items(_text(found.get("descStateValue"))):
+        fields["condition_options"] = options
+
+    consumption = {
+        {"місто": "city", "траса": "highway", "змішаний": "combined"}[label]: float(value.replace(",", "."))
+        for label, value in _CONSUMPTION.findall(_text(found.get("descFuelRateValue")))
+    }
+    if consumption:
+        fields["fuel_consumption_l_per_100km"] = consumption
+    equipment = {
+        category: options
+        for category, template_id in EQUIPMENT_IDS.items()
+        if (options := _items(_text(found.get(template_id))))
+    }
+    if equipment:
+        fields["equipment"] = equipment
+    return fields
 
 
 def _geo(text: str) -> tuple[str | None, str | None]:
@@ -327,4 +431,5 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
     )
     fields["status"] = _status(offers, ad, _text(found.get("bannerStatusText")))
     fields["description"] = description(vehicle.get("description"), int(params["description_max_chars"]))
-    return success([entity("car_ad", fields, completeness="full")])
+    fields.update(_details(found, ctx))
+    return success([entity("ad_car", fields, completeness="full")])

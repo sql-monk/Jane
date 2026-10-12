@@ -1,4 +1,4 @@
-"""Car ads of RST.ua (``car_ad``): tiles of the used-car catalog pages and the ad cards.
+"""Car ads of RST.ua (``ad_car``): tiles of the used-car catalog pages and the ad cards.
 
 * **Catalog page** (``/ukr/oldcars/``, ``/ukr/oldcars/N.html``): every ``article.car-i`` tile is an ad - title
   (make, model, trim), price in USD with the UAH equivalent, year, engine volume, fuel and gearbox, mileage,
@@ -7,8 +7,9 @@
 * **Ad card** (``/ukr/oldcars/<make>/<model>/<slug>_<id>.html``, ``div#car-p-i``): the same fields plus the
   city, drive, body type, colour and the description. Similar ads shown on a card are not extracted from it.
 
-Both kinds give the same key (``site`` + ``ad_id``) and the same normalized values, so a catalog run updates
-the price of the ad a card run filled in. Fuel, gearbox, drive and body type are normalized to short English
+Both kinds give the same entity type (fixed ``ad_car``: the read site sections hold car ads only), the same key
+(``site`` + ``ad_id``) and the same normalized values, so a catalog run updates the price of the ad a card run
+filled in. Fuel, gearbox, drive and body type are normalized to short English
 codes; the gearbox only to ``manual``/``automatic`` because a catalog tile does not tell more. The seller's name
 and phone are never read; phone numbers and e-mails in the description are hidden. Pages are windows-1251: the charset of
 the material is used, else the ``<meta charset>`` of the page.
@@ -69,6 +70,8 @@ BODY = {
     "ліфтбек": "liftback",
     "фургон": "van",
     "мікроавтобус": "minibus",
+    "мікробус пасажир": "minibus",
+    "мікробус вантаж": "van",
 }
 TRANSLIT = str.maketrans(
     {
@@ -188,6 +191,112 @@ def _description(text: str, limit: int) -> str | None:
     return value
 
 
+def _details(doc: Any, card: Any, params: dict[str, Any]) -> dict[str, Any]:
+    """Preserve observed detail text; equipment/history are source claims, not verification."""
+    fields: dict[str, Any] = {}
+    specs = {
+        item.get("title"): _clean(" ".join(item.itertext()))
+        for item in card.xpath(".//li[@title]")
+        if _clean(" ".join(item.itertext()))
+    }
+    battery = _first(
+        card.xpath(".//li[i[contains(concat(' ', normalize-space(@class), ' '), ' ri-en-bf ')]]")
+    )
+    driving_range = _first(
+        card.xpath(".//li[i[contains(concat(' ', normalize-space(@class), ' '), ' ri-en-b ')]]")
+    )
+    for label, node in [("Батарея", battery), ("Запас ходу", driving_range)]:
+        if node is not None:
+            specs[label] = _clean(" ".join(node.itertext()))
+    if specs:
+        fields["raw_specs"] = specs
+    trim = _clean(" ".join(card.xpath(".//h2/i[contains(@class, 'fs-3')]/text()")))
+    if trim:
+        fields["trim"] = trim
+
+    description = _first(doc.xpath("//div[@id='oc-item-desc']/p"))
+    if description is not None:
+        raw = description.text_content()
+        full = _description(raw, int(params.get("full_description_max_chars", 12000)))
+        if full:
+            fields["description_full"] = full
+            vin = re.search(r"\bVIN\s*[:\-]?\s*([A-HJ-NPR-Z0-9]{17})\b", full, re.IGNORECASE)
+            if vin:
+                fields["vin"] = vin.group(1).upper()
+            # Only a named, explicitly listed equipment section is interpreted as a list.
+            parts = [_clean(part) for part in re.split(r"[•\n\r]+", full) if _clean(part)]
+            equipment: list[str] = []
+            active = False
+            for part in parts:
+                if re.match(
+                    r"^(?:оснащення|обладнання|комплектація|оснащение|оборудование|комплектация)\b",
+                    part,
+                    re.IGNORECASE,
+                ):
+                    active = True
+                    continue
+                if active and re.match(
+                    r"^(?:стан|состояние|історія|история|контакти|контакты|ціна|цена|обслуговування)\b",
+                    part,
+                    re.IGNORECASE,
+                ):
+                    break
+                if active:
+                    equipment.append(part)
+            equipment = list(dict.fromkeys(equipment))[: int(params.get("equipment_max_items", 100))]
+            if equipment:
+                fields["equipment"] = equipment
+
+    gallery = _first(doc.xpath("//div[@id='car-p-photo']"))
+    if gallery is not None:
+        template = gallery.get("data-url", "")
+        photos = []
+        if "{0}" in template:
+            for index in gallery.get("data-i", "").split(","):
+                if index.strip().isdigit():
+                    photo = _image(template.replace("{0}", index.strip()))
+                    if photo:
+                        photos.append(photo)
+        else:
+            photos = [url for src in gallery.xpath(".//img/@src") if (url := _image(src))]
+        photos = list(dict.fromkeys(photos))[: int(params.get("photos_max_items", 100))]
+        if photos:
+            fields["photos"] = photos
+            fields["image"] = photos[0]
+
+    visible_vin = _first(doc.xpath("//p[@title='VIN-код']/span"))
+    if visible_vin is not None:
+        value = _clean(visible_vin.text_content())
+        if re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", value, re.IGNORECASE):
+            fields["vin"] = value.upper()
+        elif value:
+            fields["vin_masked"] = value
+    history = [
+        _clean(" ".join(item.itertext()))
+        for item in doc.xpath(
+            "//div[contains(concat(' ', normalize-space(@class), ' '), ' car-p-inf ')]/div/p[not(@title)]"
+        )
+    ]
+    history = list(dict.fromkeys(value for value in history if value))
+    if history:
+        fields["registration_history"] = history
+
+    engine = _first(card.xpath(".//li[@title='двигун']"))
+    if engine is not None and engine.xpath(
+        "./i[contains(concat(' ', normalize-space(@class), ' '), ' ri-en-e ')]"
+    ):
+        engine_text = _clean(" ".join(engine.itertext()))
+        for name, pattern, source_text in [
+            ("power_kw", r"(\d+(?:[.,]\d+)?)\s*кВт(?!\s*(?:[·*/]|год))", engine_text),
+            ("battery_kwh", r"(\d+(?:[.,]\d+)?)\s*кВт\s*[·*/]?\s*год", specs.get("Батарея", engine_text)),
+            ("range_km", r"(\d+(?:[.,]\d+)?)\s*км", specs.get("Запас ходу", engine_text)),
+        ]:
+            match = re.search(pattern, source_text, re.IGNORECASE)
+            if match:
+                fields[name] = float(match.group(1).replace(",", "."))
+    return fields
+
+
 def _image(src: str | None) -> str | None:
     if not src:
         return None
@@ -300,7 +409,7 @@ class _Unrecognized(Exception):
         self.reason, self.signature = reason, signature
 
 
-def _card(doc: Any, card: Any, page_url: str, limit: int) -> dict[str, Any]:
+def _card(doc: Any, card: Any, page_url: str, limit: int, params: dict[str, Any]) -> dict[str, Any]:
     head = _first(card.xpath(".//div[starts-with(@id, 'i-')]"))
     ad_id = (head.get("id", "")[2:] if head is not None else "").strip()
     if head is None or not ad_id.isdigit():
@@ -368,6 +477,8 @@ def _card(doc: Any, card: Any, page_url: str, limit: int) -> dict[str, Any]:
     text = _first(doc.xpath("//div[@id='oc-item-desc']/p"))
     if text is not None:
         fields["description"] = _description(text.text_content(), limit)
+    if params.get("include_details", True):
+        fields.update(_details(doc, card, params))
     return fields
 
 
@@ -382,7 +493,7 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
     card = _first(doc.xpath("//div[@id='car-p-i']"))
     if card is not None:
         try:
-            return success([entity("car_ad", _card(doc, card, page_url, limit))])
+            return success([entity("ad_car", _card(doc, card, page_url, limit, params))])
         except _Unrecognized as exc:
             ctx.log.warning(exc.reason, code="extract.missing_selector", selector=exc.signature)
             return unrecognized(exc.reason, signature=exc.signature)
@@ -393,4 +504,4 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
             ads.setdefault(fields["ad_id"], fields)
     if not ads:
         return empty()
-    return success([entity("car_ad", fields) for fields in ads.values()])
+    return success([entity("ad_car", fields) for fields in ads.values()])

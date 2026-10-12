@@ -1,5 +1,8 @@
 """Validate stored catalogs and save a dated, reproducible snapshot without credentials.
 
+Products are read from the entity storage of the site's tasks (``results-mongo``): every ``product_*`` type the
+site's extractors declare, a MongoDB collection each; ``status.json`` counts them per type.
+
 The count of stored products is not proof of a completed site scan. Collector checkpoints,
 budget stops and discovery truncation are reported separately from entity validation.
 """
@@ -23,26 +26,36 @@ import setup_sites as sites  # noqa: E402
 
 import jane_examples as ex  # noqa: E402
 
+PRODUCT_PREFIX = "product_"  # catalog types: product_<group> of the shop's category table
+
 
 def snapshot_site(
     svc: ex.Services, config: dict[str, Any], dirs: dict[str, Path]
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    used = {pid: dirs[pid] for pid in sites.refs_in(config) if pid in dirs}
-    schemas = sites.entity_schemas(used).get("product", [])
-    validators = [Draft202012Validator(s, format_checker=FormatChecker()) for s in schemas]
+    """Every stored product of each source: all ``product_*`` types its extractors declare (one MongoDB
+    collection per type), checked against the schema of its own type."""
     counts: dict[str, Any] = {}
     snapshots: dict[str, Any] = {}
     for source in config["sources"]:
         source_id = source["source_id"]
-        entities = svc.storage.pages(
-            "/v1/entities", {"connection_id": "results-pg", "entity_type": "product", "scope": source_id}
-        )
+        extractors = sites.source_extractors(config, dirs, source_id)
+        schemas = sites.entity_schemas({pid: dirs[pid] for pid in extractors})
+        validators = {
+            kind: [Draft202012Validator(s, format_checker=FormatChecker()) for s in found]
+            for kind, found in schemas.items()
+            if kind.startswith(PRODUCT_PREFIX)
+        }
+        connection = sites.results_connection(config, source_id)
+        entities = sites.stored_entities(svc, connection, sorted(validators), source_id)
         invalid: list[str] = []
         priced = 0
         attributes: set[str] = set()
+        by_type: dict[str, int] = {}
         for record in entities:
             fields = record["fields"]
-            if not validators or not any(v.is_valid(fields) for v in validators):
+            kind = record["entity_type"]
+            by_type[kind] = by_type.get(kind, 0) + 1
+            if not any(v.is_valid(fields) for v in validators.get(kind, [])):
                 invalid.append(str(fields.get("product_id", "unknown")))
             amount = fields.get("price")
             if amount is not None:
@@ -61,11 +74,12 @@ def snapshot_site(
             if key:
                 history = svc.storage.pages(
                     "/v1/entity-history",
-                    {"connection_id": "results-pg", "entity_type": "product", "key": key},
+                    {"connection_id": connection, "entity_type": record["entity_type"], "key": key},
                 )
                 histories.append(
                     {
                         "product_id": record["fields"].get("product_id"),
+                        "entity_type": record["entity_type"],
                         "observations": len(history),
                         "received_at": [h.get("received_at") for h in history[-3:]],
                         "prices": [
@@ -74,7 +88,9 @@ def snapshot_site(
                     }
                 )
         source_counts = {
+            "connection_id": connection,
             "stored_products": len(entities),
+            "products_by_type": dict(sorted(by_type.items())),
             "priced_products": priced,
             "schema_invalid": len(set(invalid)),
             "invalid_examples": sorted(set(invalid))[:10],

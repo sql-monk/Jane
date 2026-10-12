@@ -21,7 +21,7 @@
       },
       "forward_unknown_to_llm": false,
       "expected_entity_types": [
-        "car_ad"
+        "ad_car"
       ],
       "labels": {
         "group": "autos",
@@ -33,7 +33,7 @@
     {
       "task_id": "ads-rst",
       "title": "RST.ua: оголошення легкових авто щогодини",
-      "description": "Щогодини: перші 5 сторінок каталогу повністю (ціни й статус оголошень із плиток) + картки нових оголошень і раз на добу — вже відомих (revisit interval). RAW — у files, car_ad (ключ site + ad_id) — у PostgreSQL; повторний запуск оновлює ті самі оголошення.",
+      "description": "Щогодини: перші 5 сторінок каталогу повністю (ціни й статус оголошень із плиток) + картки нових оголошень і раз на добу — вже відомих (revisit interval). RAW — у files, ad_car (ключ site + ad_id) — у MongoDB (results-mongo); повторний запуск оновлює ті самі оголошення.",
       "input": {
         "source_id": "autos-rst"
       },
@@ -77,9 +77,9 @@
         {
           "stage_id": "store-ads",
           "kind": "handler",
-          "handler": "@pkg:jane.storage-postgresql",
+          "handler": "@pkg:jane.storage-mongodb",
           "connections": {
-            "target": "results-pg"
+            "target": "results-mongo"
           },
           "inputs": [
             {
@@ -115,7 +115,7 @@
   ],
   "verify": {
     "autos-rst": {
-      "car_ad": {
+      "ad_car": {
         "min": 60,
         "required": [
           "site",

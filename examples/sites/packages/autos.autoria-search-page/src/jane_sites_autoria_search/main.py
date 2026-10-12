@@ -1,4 +1,4 @@
-"""AUTO.RIA (auto.ria.com) search results page ``/uk/search/?...`` -> a partial ``car_ad`` per listed ad.
+"""AUTO.RIA (auto.ria.com) search results page ``/uk/search/?...`` -> a partial ``ad_car`` per listed ad.
 
 The search page is rendered on the server; its results are in the page state ``window.__PINIA__ = {...}``
 (Vue/Pinia server state) at ``list.lists.items.items``: templates of type ``AdvertisementCardTemplate`` (also
@@ -9,10 +9,13 @@ the "VIN checked" badge and the "sold" badge.
 
 The page does not show the seller's own price currency (an ad priced in EUR is listed in USD and UAH), so the
 entity is a partial update (``completeness: partial``) without ``price``/``currency``: the full ad comes from the
-ad page (package ``autos.autoria-ad-page``, same ``car_ad`` key ``site`` + ``ad_id``). Re-reading the search
+ad page (package ``autos.autoria-ad-page``, same ``ad_car`` key ``site`` + ``ad_id``). Re-reading the search
 pages every run refreshes the converted prices, mileage and status of the listed ads. Mileage, gearbox and fuel
 are parsed from the same texts as on the ad page, so both packages write identical values. ``empty`` for a page
 without search results.
+
+The entity type is fixed to ``ad_car``, the type of the ad page package: the search covers passenger cars only
+(``category=1``), so a partial update always lands on the same entity as the full card.
 """
 
 from __future__ import annotations
@@ -170,4 +173,4 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
         found.setdefault(fields["ad_id"], fields)
     if not found:
         return empty()
-    return success([entity("car_ad", fields, completeness="partial") for fields in found.values()])
+    return success([entity("ad_car", fields, completeness="partial") for fields in found.values()])

@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "classified_ad",
+      "entity_type": "ad_goods",
       "fields": {
         "site": "bon.ua",
         "ad_id": "82498931",

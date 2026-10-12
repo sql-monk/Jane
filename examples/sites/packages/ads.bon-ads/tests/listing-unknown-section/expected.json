@@ -1,0 +1,48 @@
+{
+  "entities": [
+    {
+      "entity_type": "ad_other",
+      "fields": {
+        "site": "bon.ua",
+        "ad_id": "100000001",
+        "url": "https://bon.ua/obyavlenie/viddam-knyzhky-a00001",
+        "title": "Віддам книжки",
+        "category": "Віддам безкоштовно",
+        "price": 0.0,
+        "currency": "UAH",
+        "city": "Київ",
+        "published_at": "2026-10-10"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "bon.ua",
+          "ad_id": "100000001"
+        }
+      }
+    },
+    {
+      "entity_type": "ad_other",
+      "fields": {
+        "site": "bon.ua",
+        "ad_id": "100000002",
+        "url": "https://bon.ua/obyavlenie/vazony-a00002",
+        "title": "Вазони для кімнатних рослин",
+        "category": "Віддам безкоштовно",
+        "price": 50.0,
+        "currency": "UAH",
+        "city": "Львів",
+        "published_at": "2026-10-09"
+      },
+      "completeness": "partial",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "bon.ua",
+          "ad_id": "100000002"
+        }
+      }
+    }
+  ]
+}

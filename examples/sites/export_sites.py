@@ -2,12 +2,15 @@
 
     uv run --all-packages python examples/sites/export_sites.py --project <p> [--out DIR] [--history TYPE ...]
 
-One file per entity type (``product.csv``, ``car_ad.csv``, ``classified_ad.csv``, ``article.csv``, ``post.csv``,
-``news_item.csv``, ``news_event.csv`` …) with the current state of every entity: the source (``scope``), the
-key, ``updated_at``, ``version`` and the fields (nested values as JSON). ``news_event_sources.csv`` groups the
-analysed news by ``event_key``: how many items and which sources describe each event. ``--history product``
-also writes ``product_history.csv`` - every stored observation of every product (price changes over time).
-CSV is UTF-8 with a BOM so that Excel opens Cyrillic text correctly. Default output: ``.jane/sites-export-<p>/``.
+Entities are read from ``results-mongo`` (MongoDB, a collection per entity type). One file per stored entity
+type (``product_food.csv``, ``product_book.csv`` …, ``ad_car.csv``, ``ad_realty.csv``, ``ad_goods.csv``,
+``article.csv``, ``post.csv``, ``news_item.csv``, ``news_event.csv`` …) with the current state of every entity:
+the source (``scope``), the key, ``updated_at``, ``version`` and the fields (nested values as JSON). The types
+come from the Storage catalog (``GET /v1/entity-types``); an adapter without it - every type the packages of
+the sites declare. ``news_event_sources.csv`` groups the analysed news by ``event_key``: how many items and
+which sources describe each event. ``--history 'product_*'`` (a type or a glob) also writes
+``<type>_history.csv`` - every stored observation of every product (price changes over time). CSV is UTF-8
+with a BOM so that Excel opens Cyrillic text correctly. Default output: ``.jane/sites-export-<p>/``.
 """
 
 from __future__ import annotations
@@ -23,21 +26,13 @@ from typing import Any
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
+sys.path.insert(0, str(HERE))
+
+import setup_sites as sites  # noqa: E402
 
 import jane_examples as ex  # noqa: E402
 
-CONNECTION = "results-pg"
-TYPES = (
-    "product",
-    "offer",
-    "car_ad",
-    "classified_ad",
-    "article",
-    "post",
-    "news_item",
-    "news_event",
-    "news_mention",
-)
+CONNECTION = sites.RESULTS_CONNECTION
 
 
 def cell(value: Any) -> Any:
@@ -113,18 +108,38 @@ def event_rows(
         }
 
 
+def stored_types(svc: ex.Services, connection: str) -> list[str]:
+    """Entity types stored in ``connection`` (the Storage catalog); without the catalog (501 from an adapter
+    that does not list types) - every type the packages of the sites declare."""
+    probe = svc.storage.call(
+        "GET", "/v1/entity-types", ok=(200, 501), params={"connection_id": connection, "limit": 1}
+    )
+    if probe.status_code == 501:
+        return sorted(sites.entity_schemas(sites.package_dirs()))
+    return sorted(
+        str(item["entity_type"])
+        for item in svc.storage.pages("/v1/entity-types", {"connection_id": connection})
+        if item.get("entity_count")
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--project", required=True)
     ap.add_argument("--out", type=Path)
-    ap.add_argument("--history", action="append", default=[], help="entity type whose full history to export")
+    ap.add_argument(
+        "--history",
+        action="append",
+        default=[],
+        help="entity type or glob (product_*) whose history to export",
+    )
     ns = ap.parse_args(argv)
     out: Path = ns.out or ex.STACK_DIR / f"sites-export-{ns.project}"
     out.mkdir(parents=True, exist_ok=True)
     svc = ex.Services.of_project(ns.project)
     try:
         states: dict[str, list[dict[str, Any]]] = {}
-        for entity_type in TYPES:
+        for entity_type in stored_types(svc, CONNECTION):
             items = svc.storage.pages(
                 "/v1/entities", {"connection_id": CONNECTION, "entity_type": entity_type}
             )
@@ -132,7 +147,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 continue
             states[entity_type] = items
             write_csv(out / f"{entity_type}.csv", state_rows(items), ("source", "updated_at", "version"))
-        for entity_type in ns.history:
+        wanted = sorted({t for pattern in ns.history for t in sites.verify_types(pattern, states)})
+        for entity_type in wanted:
             write_csv(
                 out / f"{entity_type}_history.csv",
                 history_rows(svc, entity_type, states.get(entity_type, [])),

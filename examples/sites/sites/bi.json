@@ -1,14 +1,14 @@
 {
   "site": "bi",
   "group": "catalog",
-  "title": "bi.ua «Будинок іграшок»: самокати, біговели, велосипеди — каталог і ціни",
+  "title": "bi.ua Будинок іграшок: весь асортимент, властивості товарів і періодичні ціни",
   "url": "https://bi.ua/",
   "sources": [
     {
       "source_id": "bi-ua",
       "kind": "web",
       "title": "bi.ua — Будинок іграшок",
-      "description": "Інтернет-магазин дитячих товарів bi.ua: категорії «Самокати», «Біговели», «Велосипеди». Запасний сайт замість masterzoo.ua (частина запитів masterzoo.ua отримує JS-перевірку на бота).",
+      "description": "Весь асортимент: іграшки, дитячий транспорт, творчість, книги, одяг та всі інші товарні розділи. Discovery: 118 580 унікальних українських товарних URL у шести sitemap станом на 11.10.2026. Звичайний HTTP, robots.txt дотримується, не частіше одного запиту за секунду та один одночасний запит до хоста. Картки товарів містять ціни й усі доступні характеристики.",
       "locator": {
         "url": "https://bi.ua/"
       },
@@ -21,11 +21,18 @@
         },
         "concurrency": {
           "max_parallel_fetches_per_host": 1
+        },
+        "crawl": {
+          "max_links_per_page": 60000,
+          "max_frontier_size": 200000,
+          "max_material_bytes": 33554432,
+          "revisit_interval_seconds": 86400
         }
       },
       "forward_unknown_to_llm": false,
       "expected_entity_types": [
-        "product"
+        "product_kids",
+        "product_other"
       ],
       "change_policy": {
         "llm_versions": "manual_approval"
@@ -39,8 +46,8 @@
   "tasks": [
     {
       "task_id": "catalog-bi",
-      "title": "bi.ua: повний каталог (самокати, біговели, велосипеди)",
-      "description": "Щодня о 05:00 (Київ): усі сторінки пагінації трьох категорій і всі картки товарів (~950 сторінок, ~16 хв при 1 запиті/с; ліміт 1500 сторінок) → RAW у files, повні картки товарів (completeness: full) у PostgreSQL. Сторінки категорій тут — лише навігація.",
+      "title": "bi.ua Будинок іграшок: весь асортимент і періодичне оновлення цін",
+      "description": "Кожні 15 хв продовжується збережена черга всіх українських товарних URL із sitemap, до 400 сторінок за запуск. Нові картки збираються до завершення первинного обходу; відомі повторно перевіряються після 24 год, фактична свіжість залежить від довжини черги. Повний обхід великого асортименту може тривати від діб до місяців; завершення визначається станом усієї черги, а не успіхом окремого запуску. Ціна, наявність і всі доступні властивості оновлюються з картки, Сутності товарів та історія змін зберігаються в MongoDB (results-mongo, колекція на тип; тип product_* — за розділом category_path картки (таблиця пакета; розділ поза таблицею — product_other)); повний HTML кожного циклу не накопичується. Ліміти черги й sitemap перевищують виміряний каталог; досягнення лімітів не є повнотою каталогу.",
       "input": {
         "source_id": "bi-ua"
       },
@@ -51,21 +58,8 @@
           "collector": {
             "collector": "web",
             "rules": "@pkg:catalog.bi-catalog-rules",
-            "mode": "full"
+            "mode": "incremental"
           }
-        },
-        {
-          "stage_id": "store-raw",
-          "kind": "handler",
-          "handler": "@pkg:jane.storage-files",
-          "connections": {
-            "target": "raw-files"
-          },
-          "inputs": [
-            {
-              "from": "collect"
-            }
-          ]
         },
         {
           "stage_id": "extract-products",
@@ -87,7 +81,6 @@
           "bindings": [
             {
               "sections": [
-                "categories",
                 "products"
               ]
             }
@@ -96,9 +89,9 @@
         {
           "stage_id": "store-products",
           "kind": "handler",
-          "handler": "@pkg:jane.storage-postgresql",
+          "handler": "@pkg:jane.storage-mongodb",
           "connections": {
-            "target": "results-pg"
+            "target": "results-mongo"
           },
           "inputs": [
             {
@@ -114,15 +107,20 @@
         }
       ],
       "schedule": {
-        "type": "cron",
-        "cron": "0 5 * * *",
+        "type": "interval",
+        "interval_seconds": 900,
         "timezone": "Europe/Kyiv",
         "overlap": "skip"
       },
       "limits": {
         "crawl": {
+          "max_links_per_page": 60000,
+          "max_frontier_size": 200000,
+          "max_material_bytes": 33554432,
+          "revisit_interval_seconds": 86400,
           "max_depth": 40,
-          "max_pages_per_run": 1500
+          "max_pages_per_run": 400,
+          "max_bytes_per_run": 536870912
         }
       },
       "forward_unknown_to_llm": false,
@@ -134,8 +132,8 @@
     },
     {
       "task_id": "prices-bi",
-      "title": "bi.ua: ціни й наявність зі сторінок категорій",
-      "description": "О 08:45, 12:45, 16:45, 20:45 (Київ; не перетинається з повним скануванням о 05:00 — колектор відмовляє другій одночасній збірці джерела): лише сторінки категорій (без карток товарів) → RAW у files, часткове оновлення price, currency, availability, old_price тих самих товарів (completeness: partial).",
+      "title": "bi.ua Будинок іграшок: ручна перевірка цін попередньої добірки",
+      "description": "Попереднє завдання для обмеженої добірки категорій залишено лише для ручної діагностики. Автоматичне оновлення цін усього асортименту виконує catalog-завдання із повними product sitemap та повторними відвідуваннями карток.",
       "input": {
         "source_id": "bi-ua"
       },
@@ -191,9 +189,9 @@
         {
           "stage_id": "store-products",
           "kind": "handler",
-          "handler": "@pkg:jane.storage-postgresql",
+          "handler": "@pkg:jane.storage-mongodb",
           "connections": {
-            "target": "results-pg"
+            "target": "results-mongo"
           },
           "inputs": [
             {
@@ -209,9 +207,7 @@
         }
       ],
       "schedule": {
-        "type": "cron",
-        "cron": "45 8,12,16,20 * * *",
-        "timezone": "Europe/Kyiv",
+        "type": "manual",
         "overlap": "skip"
       },
       "limits": {
@@ -230,7 +226,7 @@
   ],
   "verify": {
     "bi-ua": {
-      "product": {
+      "product_*": {
         "min": 700,
         "required": [
           "shop",

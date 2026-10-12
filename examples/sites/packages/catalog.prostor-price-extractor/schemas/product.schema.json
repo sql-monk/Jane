@@ -5,9 +5,11 @@
   "additionalProperties": false,
   "required": [
     "shop",
-    "product_id",
-    "price",
-    "currency"
+    "product_id"
+  ],
+  "anyOf": [
+    {"required": ["price", "currency"]},
+    {"required": ["availability"], "properties": {"availability": {"const": "out_of_stock"}}}
   ],
   "properties": {
     "shop": {

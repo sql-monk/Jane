@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "classifieds.dim-ria-ads",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "DIM.RIA — public property advertisements",
-  "description": "Публічні картки нерухомості зі стану каталогу; без контактів продавця та приватних адрес.",
+  "description": "Публічні картки нерухомості зі стану каталогу; без контактів продавця та приватних адрес. Тип сутності фіксований — ad_realty: DIM.RIA містить лише нерухомість.",
   "entry": {
     "runtime": "python",
     "module": "jane_classifieds_dimria.main",
@@ -25,8 +25,8 @@
   "output": {
     "entities": [
       {
-        "entity_type": "classified_ad",
-        "schema": "schemas/classified_ad.schema.json",
+        "entity_type": "ad_realty",
+        "schema": "schemas/ad.schema.json",
         "key_fields": [
           "site",
           "listing_id"
@@ -90,14 +90,15 @@
   "provenance": {
     "created_by": "llm",
     "authors": [
-      "Codex"
+      "Codex",
+      "Claude (mongo-entities C3)"
     ],
-    "created_at": "2026-10-11T06:45:39Z",
-    "change_summary": "Narrow currencyId fallback to integer IDs; retain USD/EUR/UAH mappings, omit price when currency evidence is missing or unsupported, and add regression derivatives of the real catalog fixture.",
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: entity type classified_ad -> ad_realty (ad taxonomy, one MongoDB collection per type); fields, key and schema unchanged.",
     "based_on": {
       "package_id": "classifieds.dim-ria-ads",
-      "version": "1.0.0",
-      "digest": "sha256:fc6c0ea61841f8d45491b5adac18389a40b9593f754885d05ed193b120830481"
+      "version": "1.0.1",
+      "digest": "sha256:d4128ad311f314e52ad1257e7fec77c47f3d23a0c39aaf7582739ffe841d950d"
     }
   },
   "bindings_hint": {

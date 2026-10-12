@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "product",
+      "entity_type": "product_book",
       "fields": {
         "shop": "yakaboo",
         "product_id": "1518265",

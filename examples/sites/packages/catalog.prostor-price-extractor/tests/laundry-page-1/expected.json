@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "58519",
@@ -20,7 +20,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "43383",
@@ -39,7 +39,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "18711",
@@ -60,7 +60,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "43397",
@@ -79,7 +79,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "58380",
@@ -98,7 +98,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "61695",
@@ -119,7 +119,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "66789",
@@ -138,7 +138,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "58521",
@@ -157,7 +157,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "43377",
@@ -176,7 +176,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "59293",
@@ -195,7 +195,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "53398",
@@ -214,7 +214,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "41636",
@@ -233,7 +233,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "58359",
@@ -252,7 +252,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "53397",
@@ -271,7 +271,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "58728",
@@ -290,7 +290,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "24948",
@@ -311,7 +311,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "63913",
@@ -330,7 +330,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "66794",
@@ -349,7 +349,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "43396",
@@ -368,7 +368,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "22668",
@@ -387,7 +387,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "63914",
@@ -406,7 +406,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "18553",
@@ -427,7 +427,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "43401",
@@ -446,7 +446,7 @@
       }
     },
     {
-      "entity_type": "product",
+      "entity_type": "product_household",
       "fields": {
         "shop": "prostor",
         "product_id": "58376",

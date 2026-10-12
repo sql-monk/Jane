@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "classified_ad (оголошення сайту оголошень)",
+  "title": "Оголошення сайту оголошень (ad_goods, ad_realty, ad_car, ad_other)",
   "description": "Публічні поля оголошення. Без імен, телефонів і точних адрес приватних осіб.",
   "type": "object",
   "additionalProperties": false,

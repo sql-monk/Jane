@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ad_car (оголошення про продаж легкового авто)",
+  "description": "Оголошення автобазару (та сама схема ad_car, що й у autos.autoria-*): ціна продавця, перерахунок сайту в USD/UAH, характеристики, регіон, статус. Без імен і телефонів продавців. Пробіг — у км, об'єм — у літрах, ціни — числа.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "site",
+    "ad_id",
+    "url",
+    "title",
+    "price",
+    "currency"
+  ],
+  "properties": {
+    "site": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Хост сайту без www, наприклад rst.ua"
+    },
+    "ad_id": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "description": "Номер оголошення на сайті"
+    },
+    "url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Назва оголошення, як на сайті (марка, модель, модифікація)"
+    },
+    "price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Ціна продавця у валюті currency"
+    },
+    "currency": {
+      "type": "string",
+      "enum": [
+        "USD",
+        "UAH",
+        "EUR"
+      ]
+    },
+    "make": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "year": {
+      "type": "integer",
+      "minimum": 1900,
+      "maximum": 2100
+    },
+    "price_usd": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Ціна, перерахована сайтом у USD"
+    },
+    "price_uah": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Ціна, перерахована сайтом у UAH"
+    },
+    "mileage_km": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fuel": {
+      "type": "string",
+      "minLength": 1,
+      "description": "petrol, diesel, gas, petrol_gas, hybrid, electric (інакше — текст сайту в нижньому регістрі)"
+    },
+    "transmission": {
+      "type": "string",
+      "minLength": 1,
+      "description": "manual, automatic, robot, cvt (інакше — текст сайту в нижньому регістрі)"
+    },
+    "engine_l": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "body_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "sedan, hatchback, wagon, suv, crossover, minivan, coupe, convertible, pickup, liftback, van, minibus (інакше — текст сайту в нижньому регістрі)"
+    },
+    "drive": {
+      "type": "string",
+      "minLength": 1,
+      "description": "front, rear, awd"
+    },
+    "color": {
+      "type": "string",
+      "minLength": 1
+    },
+    "region": {
+      "type": "string",
+      "minLength": 1
+    },
+    "city": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seller_type": {
+      "type": "string",
+      "enum": [
+        "private",
+        "dealer",
+        "unknown"
+      ]
+    },
+    "vin_checked": {
+      "type": "boolean",
+      "description": "Сайт перевірив VIN-код за державними даними"
+    },
+    "condition": {
+      "type": "string",
+      "enum": [
+        "used",
+        "new",
+        "damaged"
+      ]
+    },
+    "published_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}",
+      "description": "Дата створення оголошення (ISO 8601)"
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}"
+    },
+    "image": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "sold",
+        "unknown"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Опис продавця до 500 символів: стиснуті пробіли, приховані телефони й e-mail"
+    }
+  }
+}

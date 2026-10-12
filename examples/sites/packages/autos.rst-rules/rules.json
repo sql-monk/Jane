@@ -58,5 +58,14 @@
   ],
   "dedup": {
     "use_link_rel_canonical": false
-  }
+  },
+  "priorities": [
+    {
+      "pattern": {
+        "type": "regex",
+        "value": "^https://rst\\.ua/ukr/oldcars/[^/]+/[^/]+/[^/]+_\\d+\\.html$"
+      },
+      "priority": 50
+    }
+  ]
 }

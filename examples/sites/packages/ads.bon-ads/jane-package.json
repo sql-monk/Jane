@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "ads.bon-ads",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "BON.ua: classified ads from ad cards and category pages",
-  "description": "Оголошення BON.ua (колишній besplatka.ua). Картка /obyavlenie/… → повна сутність classified_ad (номер, назва, ціна, валюта, шлях категорії, місто, область, район, дата розміщення, тип продавця, стан, параметри, фото, опис ≤ description_max_chars); сторінка категорії → часткові сутності тих самих ключів (назва, ціна, місто, дата) для щогодинного оновлення. Без персональних даних: ім'я продавця, профіль і координати не зберігаються, телефони й e-mail в описі маскуються.",
+  "description": "Оголошення BON.ua (колишній besplatka.ua). Тип сутності — за розділом верхнього рівня сайту (таблиця SECTIONS у коді: slug розділу, інакше назва): речі — ad_goods, «Нерухомість» — ad_realty, «Транспорт» — ad_car, решта й невідомі розділи — ad_other. Картка /obyavlenie/… → повна сутність (номер, назва, ціна, валюта, шлях категорії, місто, область, район, дата розміщення, тип продавця, стан, параметри, фото, опис ≤ description_max_chars); сторінка категорії → часткові сутності тих самих ключів і того самого типу (назва, ціна, місто, дата) для щогодинного оновлення; сторінка категорії без розділу верхнього рівня — unrecognized. Без персональних даних: ім'я продавця, профіль і координати не зберігаються, телефони й e-mail в описі маскуються.",
   "tags": [
     "ads",
     "classifieds",
@@ -30,13 +30,40 @@
   "output": {
     "entities": [
       {
-        "entity_type": "classified_ad",
-        "schema": "schemas/classified_ad.schema.json",
+        "entity_type": "ad_goods",
+        "schema": "schemas/ad.schema.json",
         "key_fields": [
           "site",
           "ad_id"
         ],
-        "description": "Оголошення (картка — повна сутність, сторінка категорії — часткове оновлення)"
+        "description": "Оголошення про речі: електроніка й побутова техніка, дім і дача, одяг, дитячі товари, будівництво, спорт, хобі, обладнання, запчастини (картка — повна сутність, сторінка категорії — часткове оновлення)"
+      },
+      {
+        "entity_type": "ad_realty",
+        "schema": "schemas/ad.schema.json",
+        "key_fields": [
+          "site",
+          "ad_id"
+        ],
+        "description": "Оголошення розділу «Нерухомість» (картка — повна сутність, сторінка категорії — часткове оновлення)"
+      },
+      {
+        "entity_type": "ad_car",
+        "schema": "schemas/ad.schema.json",
+        "key_fields": [
+          "site",
+          "ad_id"
+        ],
+        "description": "Оголошення розділу «Транспорт» (картка — повна сутність, сторінка категорії — часткове оновлення)"
+      },
+      {
+        "entity_type": "ad_other",
+        "schema": "schemas/ad.schema.json",
+        "key_fields": [
+          "site",
+          "ad_id"
+        ],
+        "description": "Робота, резюме, послуги, тварини й рослини та розділи, яких немає в таблиці (картка — повна сутність, сторінка категорії — часткове оновлення)"
       }
     ]
   },
@@ -99,6 +126,28 @@
       "origin": "human"
     },
     {
+      "name": "category-page-unknown-section",
+      "input": {
+        "file": "tests/listing-unknown-section/page.html",
+        "media_type": "text/html",
+        "url": "https://bon.ua/otdam-darom"
+      },
+      "expected_status": "success",
+      "expected": "tests/listing-unknown-section/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "category-page-without-section",
+      "input": {
+        "file": "tests/listing-no-section/page.html",
+        "media_type": "text/html",
+        "url": "https://bon.ua/electronika-i-bitovaya-tehnika/page/2"
+      },
+      "expected_status": "unrecognized",
+      "origin": "human"
+    },
+    {
       "name": "home-page-empty",
       "input": {
         "file": "tests/home-page/page.html",
@@ -112,10 +161,16 @@
   "provenance": {
     "created_by": "human",
     "authors": [
-      "Claude (examples/sites: classifieds)"
+      "Claude (examples/sites: classifieds)",
+      "mongo-entities"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Classified ads of BON.ua: complete entities from ad cards, partial refresh from category pages. 1.0.1: typing only (lxml import annotated for mypy), same behaviour."
+    "created_at": "2026-10-12T00:00:00Z",
+    "based_on": {
+      "package_id": "ads.bon-ads",
+      "version": "1.0.1",
+      "digest": "sha256:d4e886645c16dcc7919744744ffca1e76600a7f2395a114e67366456f87aea4d"
+    },
+    "change_summary": "2.0.0: entity type by the top-level section of the site instead of classified_ad - ad_goods, ad_realty (Нерухомість), ad_car (Транспорт), ad_other (jobs, services, animals and unknown sections); a card and a category page of one ad get the same type. A category page listing ads without its top-level section is unrecognized. Schema file renamed to schemas/ad.schema.json, fields unchanged."
   },
   "bindings_hint": {
     "source_kinds": [

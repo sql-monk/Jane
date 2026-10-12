@@ -1,4 +1,4 @@
-"""Car ads of Avtobazar InfoCar (``avtobazar.infocar.ua``): passenger car ad cards -> ``car_ad``.
+"""Car ads of Avtobazar InfoCar (``avtobazar.infocar.ua``): passenger car ad cards -> ``ad_car``.
 
 A card (``/car/<region>/<city>/<make>/<model>/<body>-<year>-<id>.html``) gives the title (``h1``), the year,
 the price in "у.о." (US dollars) with the site's UAH conversion (``abbr#priceabbr`` title), the mileage, the
@@ -7,10 +7,10 @@ model (breadcrumbs), the main photo and the seller's text (``p#text``: the free 
 sections; the "Стан" section tells a damaged car). "Приватне оголошення про продаж б.у. автомобіля" in the
 page description means a private seller and a used car. ``div#deleted`` marks an ad that is no longer active:
 "вже продано" - ``sold``, otherwise ``unknown``. Other pages (category pages, lorries, motorbikes) are
-``empty``.
+``empty``, so the entity type is fixed: every extracted ad is ``ad_car``.
 
 The seller's name, phone images and QR card (``#author``) are never read; phone numbers and e-mails in the text
-are hidden. Fuel, gearbox, drive and body type are normalized to the short English codes of the ``car_ad``
+are hidden. Fuel, gearbox, drive and body type are normalized to the short English codes of the ``ad_car``
 schema. Pages are windows-1251: the charset of the material is used, else the ``<meta charset>`` of the page.
 """
 
@@ -274,4 +274,4 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
         if state & DAMAGED:
             fields["condition"] = "damaged"
         fields["description"] = _masked(free, int(params.get("description_max_chars", 500)))
-    return success([entity("car_ad", fields)])
+    return success([entity("ad_car", fields)])

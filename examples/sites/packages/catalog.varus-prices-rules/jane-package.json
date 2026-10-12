@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "catalog.varus-prices-rules",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "collector-rules",
-  "title": "varus.ua: prices and availability of four categories via the site's catalog API",
-  "description": "Правила Web Collector для оновлення цін VARUS (varus.ua): ті самі категорії («Йогурти», «Макаронні вироби», «Соки та нектари», «Засоби для миття посуду») і той самий API (POST https://varus.ua/api/graphql), але короткий запит — лише SKU, urlKey, регіональні ціни й наявність; кожен товар — JSON-матеріал з тим самим URL, що й у правилах каталогу. robots.txt дотримується; ліміти — у джерелі й завданні.",
+  "title": "varus.ua: full assortment with GraphQL pagination",
+  "description": "Увесь асортимент через публічне API сайту: автоматичний обхід дерева категорій від головної ID 2, включно з усіма брендами. Кожна категорія пагінується products(page: $page) без aliases і фіксованих останніх сторінок; повторні URL після серверного clamp завершують її пагінацію. Поділ за дочірніми категоріями та брендами обходить обмеження 10 000 результатів глобальної категорії. attributes(keys: []) повертає всі властивості; ціни регіону 0 без вибору магазину. Кожен товар також несе свої категорії (primaryCategory, categories): з них catalog.varus-price-extractor 2.x визначає тип сутності product_*, як картка.",
   "tags": [
     "catalog",
     "varus",
@@ -17,11 +17,22 @@
   },
   "tests": [],
   "provenance": {
-    "created_by": "human",
+    "created_by": "llm",
     "authors": [
-      "Claude (examples/sites: varus)"
+      "Claude (examples/sites: varus)",
+      "mongo-entities"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Short catalog API query (SKU, prices, availability) of the four varus.ua categories."
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: the product query also requests primaryCategory and categories - catalog.varus-price-extractor 2.x needs them to name the entity type of the card (items of 1.x carry no categories).",
+    "based_on": {
+      "package_id": "catalog.varus-prices-rules",
+      "version": "1.1.1",
+      "digest": "sha256:f35f59e258bb29dfedd6d131c3a7923f211328a0452ccc12c886e022f6fc896c"
+    },
+    "llm": {
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "reason": "improvement"
+    }
   }
 }

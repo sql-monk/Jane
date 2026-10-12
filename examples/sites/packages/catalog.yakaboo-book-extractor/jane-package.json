@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "catalog.yakaboo-book-extractor",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "yakaboo.ua: full book cards",
-  "description": "Повні картки книжок yakaboo.ua зі сторінок товарів: назва, ціна й ціна до знижки, наявність (статус сторінки: в наявності / доставка від постачальника / очікується / немає), видавництво, категорія й шлях категорій (хлібні крихти), зображення, код товару, ISBN (barcode), рейтинг і кількість відгуків, характеристики (автор, мова, рік, сторінки, обкладинка, формат…) — completeness: full. Ключ — shop + product_id (код товару, той самий, що в картках сторінок розділів). Відгуки покупців (імена) не читаються.",
+  "description": "Повні картки книжок yakaboo.ua зі сторінок товарів: назва, ціна й ціна до знижки, наявність (статус сторінки: в наявності / доставка від постачальника / очікується / немає), видавництво, категорія й шлях категорій (хлібні крихти), зображення, код товару, ISBN (barcode), рейтинг і кількість відгуків, характеристики (автор, мова, рік, сторінки, обкладинка, формат…) — completeness: full. Ключ — shop + product_id (код товару, той самий, що в картках сторінок розділів). Відгуки покупців (імена) не читаються. Тип сутності — група товару за розділом category_path (таблиця CATEGORY_TYPES; найдовший префікс; розділ поза таблицею — product_other).",
   "tags": [
     "catalog",
     "yakaboo",
@@ -31,13 +31,40 @@
   "output": {
     "entities": [
       {
-        "entity_type": "product",
+        "entity_type": "product_book",
         "schema": "schemas/product.schema.json",
         "key_fields": [
           "shop",
           "product_id"
         ],
-        "description": "Повна картка книжки yakaboo.ua"
+        "description": "Повна картка книжки yakaboo.ua — група «книжки»"
+      },
+      {
+        "entity_type": "product_kids",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка книжки yakaboo.ua — група «іграшки, дитячий транспорт, дитячі товари»"
+      },
+      {
+        "entity_type": "product_office",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка книжки yakaboo.ua — група «канцтовари, шкільне»"
+      },
+      {
+        "entity_type": "product_other",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка книжки yakaboo.ua — група «розділ поза таблицею (сезонні, збірні, нові розділи)»"
       }
     ]
   },
@@ -123,10 +150,16 @@
   "provenance": {
     "created_by": "human",
     "authors": [
-      "Claude (examples/sites: yakaboo)"
+      "Claude (examples/sites: yakaboo)",
+      "mongo-entities"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Full book cards of yakaboo.ua product pages for the nightly catalog task."
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: entity type product_<group> from the shop's category table (CATEGORY_TYPES) instead of product; one collection per type in jane.storage-mongodb.",
+    "based_on": {
+      "package_id": "catalog.yakaboo-book-extractor",
+      "version": "1.0.0",
+      "digest": "sha256:45e28c4a8b57b12979f1ce5f2aacbe105687b9faf1d043cbd56405e1ccc26b6d"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

@@ -1,4 +1,8 @@
-"""Extract directly present public OLX cards from original category HTML."""
+"""Extract directly present public OLX cards from original category HTML.
+
+The entity type is fixed (``ad_goods``): the collector rules of this source admit only the notebooks category
+(``/uk/elektronika/noutbuki-i-aksesuary/noutbuki/``). Another category needs a new version with its own type.
+"""
 
 from __future__ import annotations
 
@@ -28,6 +32,7 @@ VOID = frozenset(
         "wbr",
     }
 )
+ENTITY_TYPE = "ad_goods"
 LISTING_ID = re.compile(r"-ID([A-Za-z0-9]+)\.html$")
 PRICE = re.compile(r"^([\d\s\u00a0\u202f]+(?:[.,]\d{1,2})?)\s*(грн\.?|UAH|USD|EUR|\$|€)$", re.I)
 CURRENCIES = {"грн": "UAH", "грн.": "UAH", "uah": "UAH", "usd": "USD", "$": "USD", "eur": "EUR", "€": "EUR"}
@@ -144,7 +149,7 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
     return success(
         [
             entity(
-                "classified_ad",
+                ENTITY_TYPE,
                 fields,
                 key={"scope": scope, "natural": {"site": "olx", "listing_id": fields["listing_id"]}},
             )

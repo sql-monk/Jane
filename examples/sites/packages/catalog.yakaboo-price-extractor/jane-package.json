@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "catalog.yakaboo-price-extractor",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "yakaboo.ua: prices from category pages",
-  "description": "Оновлення цін yakaboo.ua зі сторінок розділів: з кожної картки книжки (div.category-card) — ціна, ціна до знижки й наявність (completeness: partial). Ключ — shop + product_id (код товару), той самий, що в повній картці catalog.yakaboo-book-extractor: сховище оновлює лише ці поля й зберігає решту. Картка без знижки очищує old_price; картка без ціни (немає в наявності) оновлює лише наявність.",
+  "description": "Оновлення цін yakaboo.ua зі сторінок розділів: з кожної картки книжки (div.category-card) — ціна, ціна до знижки й наявність (completeness: partial). Ключ — shop + product_id (код товару), той самий, що в повній картці catalog.yakaboo-book-extractor: сховище оновлює лише ці поля й зберігає решту. Картка без знижки очищує old_price; картка без ціни (немає в наявності) оновлює лише наявність. Тип сутності — група розділу сторінки категорії (її хлібні крихти) за тією самою таблицею CATEGORY_TYPES, що й у картці; сторінка розділу поза таблицею — unrecognized, ціни не пишуться.",
   "tags": [
     "catalog",
     "yakaboo",
@@ -31,13 +31,31 @@
   "output": {
     "entities": [
       {
-        "entity_type": "product",
+        "entity_type": "product_book",
         "schema": "schemas/product.schema.json",
         "key_fields": [
           "shop",
           "product_id"
         ],
-        "description": "Ціна й наявність книжки yakaboo.ua (часткове оновлення)"
+        "description": "Ціна й наявність книжки yakaboo.ua (часткове оновлення) — група «книжки»"
+      },
+      {
+        "entity_type": "product_kids",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність книжки yakaboo.ua (часткове оновлення) — група «іграшки, дитячий транспорт, дитячі товари»"
+      },
+      {
+        "entity_type": "product_office",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність книжки yakaboo.ua (часткове оновлення) — група «канцтовари, шкільне»"
       }
     ]
   },
@@ -94,15 +112,31 @@
       },
       "expected_status": "unrecognized",
       "origin": "human"
+    },
+    {
+      "name": "collection-section-unrecognized",
+      "input": {
+        "file": "tests/collection-section/page.html",
+        "media_type": "text/html",
+        "url": "https://www.yakaboo.ua/ua/knigi/hudozhestvennaja-literatura/fjentezi/ukrains-ke-fentezi.html?p=8"
+      },
+      "expected_status": "unrecognized",
+      "origin": "human"
     }
   ],
   "provenance": {
     "created_by": "human",
     "authors": [
-      "Claude (examples/sites: yakaboo)"
+      "Claude (examples/sites: yakaboo)",
+      "mongo-entities"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Prices and availability of yakaboo.ua category cards for the price task every 4 hours."
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: entity type product_<group> from the shop's category table (CATEGORY_TYPES) instead of product; one collection per type in jane.storage-mongodb.",
+    "based_on": {
+      "package_id": "catalog.yakaboo-price-extractor",
+      "version": "1.0.0",
+      "digest": "sha256:e0c8456969ede4aefccb874af31e88864078b802152ef82455696daa8dae4b34"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

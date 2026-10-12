@@ -25,7 +25,7 @@
       },
       "forward_unknown_to_llm": false,
       "expected_entity_types": [
-        "classified_ad"
+        "ad_goods"
       ],
       "labels": {
         "group": "classifieds",
@@ -37,7 +37,7 @@
     {
       "task_id": "ads-bon",
       "title": "bon.ua: свіжі оголошення двох категорій",
-      "description": "Щогодини: перші сторінки категорій (кількість — limits.crawl.max_depth) і нові картки (incremental, revisit interval) → RAW у raw-files; картка — повна сутність classified_ad, сторінка категорії — часткове оновлення тих самих ключів site + ad_id (назва, ціна, місто, дата) у results-pg.",
+      "description": "Щогодини: перші сторінки категорій (кількість — limits.crawl.max_depth) і нові картки (incremental, revisit interval) → RAW у raw-files; картка — повна сутність ad_goods (тип — за розділом верхнього рівня; обидві категорії — речі), сторінка категорії — часткове оновлення тих самих ключів site + ad_id того самого типу (назва, ціна, місто, дата) у results-mongo.",
       "input": {
         "source_id": "bon"
       },
@@ -96,9 +96,9 @@
         {
           "stage_id": "store-ads",
           "kind": "handler",
-          "handler": "@pkg:jane.storage-postgresql",
+          "handler": "@pkg:jane.storage-mongodb",
           "connections": {
-            "target": "results-pg"
+            "target": "results-mongo"
           },
           "inputs": [
             {
@@ -138,7 +138,7 @@
   ],
   "verify": {
     "bon": {
-      "classified_ad": {
+      "ad_goods": {
         "min": 100,
         "required": [
           "site",

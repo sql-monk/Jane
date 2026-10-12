@@ -2,7 +2,7 @@
 
 Довідник типів сутностей (`entity_type`), які пишуть пакети прикладів Jane: таксономія товарів і оголошень, правила вибору типу й колекції MongoDB, у які потрапляє кожен тип. Чому тип обирає екстрактор, а не сховище, пояснює [ADR-0011](../adr/0011-data-placement.md).
 
-Актуально для ревізії `118707e` (2026-10-12) і пакета `jane.storage-mongodb@2.0.0`. Переведення прикладів на ці типи ще триває ([план](../delivery/mongo-entities.md)).
+Актуально для пакета `jane.storage-mongodb@2.0.0` і пакетів прикладів версій 2.0.0 (2026-10-12, [план](../delivery/mongo-entities.md)).
 
 ## Зміст
 
@@ -27,19 +27,19 @@
 | `product_food` | продукти, напої, алкоголь | varus, epicentrk, prostor |
 | `product_beauty` | косметика, парфуми, гігієна й догляд | prostor, varus, epicentrk |
 | `product_household` | побутова хімія | varus, epicentrk, prostor |
-| `product_book` | книжки | yakaboo |
-| `product_kids` | іграшки, дитячий транспорт, дитячі товари | bi-ua, epicentrk, varus |
+| `product_book` | книжки | yakaboo, epicentrk |
+| `product_kids` | іграшки, дитячий транспорт, дитячі товари, настільні ігри | bi-ua, epicentrk, varus, prostor, yakaboo |
 | `product_electronics` | електроніка, ноутбуки | shops (5 магазинів), epicentrk |
 | `product_appliance` | побутова техніка | epicentrk |
 | `product_tools` | інструменти, будівництво й ремонт, сантехніка, освітлення, підлога | epicentrk |
-| `product_garden` | сад і город | epicentrk |
+| `product_garden` | сад і город | epicentrk, varus |
 | `product_home` | дім, інтер'єр, меблі, товари для дому | epicentrk, varus, prostor |
-| `product_clothing` | одяг, взуття, аксесуари, галантерея | epicentrk, prostor |
+| `product_clothing` | одяг, взуття, аксесуари, галантерея | epicentrk, prostor, varus |
 | `product_auto` | автотовари | epicentrk |
-| `product_pet` | зоотовари | epicentrk, varus |
-| `product_sport` | спорт і туризм | epicentrk |
-| `product_office` | канцтовари, шкільне | epicentrk, yakaboo |
-| `product_health` | медичні товари | epicentrk, prostor |
+| `product_pet` | зоотовари | epicentrk, varus, prostor |
+| `product_sport` | спорт і туризм | epicentrk, prostor, varus |
+| `product_office` | канцтовари, шкільне | epicentrk, yakaboo, varus |
+| `product_health` | медичні товари, БАДи | epicentrk, prostor, varus |
 | `product_other` | сезонні розділи, «Несортовані», решта | — |
 | `ad_car` | авто | autoria, rst, avtobazar, classified-auto-ria |
 | `ad_realty` | нерухомість | domria, classified-dim-ria |
@@ -84,13 +84,36 @@
 
 ## Відповідність розділів сайтів
 
-Таблиці відповідності «розділ сайту → тип» зберігаються в пакетах сайтів, а не в Storage:
+Таблиці «розділ сайту → тип» зберігаються в пакетах сайтів, а не в Storage. Розділ шукається за найдовшим префіксом `category_path` (без урахування регістру, варіантів апострофа й зайвих пробілів); розділ поза таблицею дає `*_other`. Таблиця однакова в екстракторі картки й екстракторі цін одного сайту — це перевіряє `examples/tests/test_sites.py`.
 
-| Де | Що там |
+| Де | Як задано тип |
 |---|---|
-| `examples/sites/packages/catalog.*` | екстрактори карток і цін каталогів bi-ua, epicentrk, prostor, varus, yakaboo |
-| `examples/sites/packages/{ads,autos}.*` | екстрактори оголошень сайтів |
-| `examples/classifieds/packages`, `examples/automarket/packages` | екстрактори оголошень classifieds і automarket |
-| документи завдань `examples/shops` | фіксований тип `product_electronics` у параметрі етапу |
+| `examples/sites/packages/catalog.*` | таблиця `CATEGORY_TYPES` в екстракторах карток і цін bi-ua, epicentrk, prostor, varus, yakaboo |
+| `examples/sites/packages/ads.bon-ads` | таблиця розділів верхнього рівня bon.ua |
+| `examples/sites/packages/ads.domria-listing`, `autos.*`, `examples/classifieds/packages` | фіксований тип пакета: джерело охоплює одну категорію |
+| `examples/shops/packages` | обов'язковий параметр етапу `entity_type`; завдання ноутбуків — `product_electronics` |
 
-Таблиці по сайтах буде додано сюди, коли пакети сайтів переведуть на нові типи.
+### Каталоги
+
+| Сайт | Розділ → тип |
+|---|---|
+| bi-ua | Дитячий транспорт; Колекційні та ігрові фігурки; Конструктори; Машинки, роботи, трансформери; М'які та інтерактивні іграшки → `product_kids` |
+| epicentrk | Автотовари → `product_auto`; Будівництво та ремонт, Інструменти, Освітлення, Покриття для підлоги, Сантехніка → `product_tools`; Дитячі товари → `product_kids`; Дім та інтер'єр, Меблі → `product_home` (Дім та інтер'єр › Книги → `product_book`); Електроніка → `product_electronics`; Зоотовари → `product_pet`; Краса та здоров'я → `product_beauty`; Медичні товари → `product_health`; Одяг, взуття, аксесуари → `product_clothing`; Офіс і канцтовари → `product_office`; Побутова техніка → `product_appliance`; Побутова хімія → `product_household`; Продукти → `product_food`; Сад та город → `product_garden`; Спорттовари, Туристичні товари → `product_sport`; Товари для бізнесу → `product_other` |
+| prostor | Волосся, Косметика, Обличчя, Парфуми, Тіло → `product_beauty`; Галантерея → `product_clothing`; Дім → `product_home` (› Зоотовари → `product_pet`, › Продукти → `product_food`, › Спортивні товари → `product_sport`); Дітям → `product_kids`; Здоров`я → `product_health`; Побутова хімія → `product_household`; Продукти → `product_food`; Чоловікам — лише підрозділи (› Спідня білизна, › Чоловічі шкарпетки → `product_clothing`; › Чоловічі засоби для стайлінгу → `product_beauty`); Великдень › Кондитерський декор → `product_food`; Святий Миколай › Дитяча косметика → `product_beauty`; решта сезонних і збірних розділів → `product_other` |
+| varus | продуктові розділи, зокрема VARUS CAFE і Алкоголь → `product_food` (Здорове харчування та Еко товари › БАДи → `product_health`); Гігієна та догляд → `product_beauty` (› Товари для здоров'я → `product_health`); Побутова хімія → `product_household`; Товари для дітей → `product_kids` (› Шкільні товари → `product_office`); Товари для дому → `product_home` (› Канцтовари → `product_office`, › Одяг, взуття та аксесуари → `product_clothing`, › Сад та город → `product_garden`, › Спорт та розваги, › Товари для кемпінгу та відпочинку → `product_sport`); Товари для тварин → `product_pet`; Головна, Тютюнові вироби → `product_other` |
+| yakaboo | Книжки → `product_book`; Ігри та творчість, Настільні ігри → `product_kids`; Кольорові олівці, Рюкзаки, сумки шкільні, Шкільні зошити → `product_office`; Супутні товари, Часто шукають → `product_other` |
+
+Таблиця bi-ua містить лише п'ять розділів, які траплялися в зібраних даних; товари інших розділів повного асортименту bi.ua отримують `product_other`, доки таблицю не розширять.
+
+Екстрактори цін bi-ua, epicentrk, prostor і yakaboo беруть тип із хлібних крихт сторінки категорії й повертають `unrecognized`, якщо розділ не в таблиці або глибший підрозділ має інший тип. Екстрактор цін VARUS визначає тип за категоріями самого товару тією самою функцією, що й картка. Залишковий ризик: товар, який трапився на сторінці іншого розділу, ніж у хлібних крихтах його картки (наприклад, подарунковий набір у сезонному розділі), отримає ціну в колекції розділу сторінки.
+
+### Оголошення
+
+| Джерело | Тип |
+|---|---|
+| bon.ua | Нерухомість → `ad_realty`; Транспорт → `ad_car`; Електроніка, побутова техніка; Дім та Дача; Одяг, взуття, аксесуари; Дитячий світ; Запчастини для транспорту; Будівництво та ремонт; Спорт, відпочинок; Хобі, музика, мистецтво; Краса та здоров'я; Обладнання → `ad_goods`; Робота, Резюме, Послуги, Тварини та рослини → `ad_other`. Сторінка категорії без розділу верхнього рівня → `unrecognized` |
+| dom.ria.com (domria), classified-dim-ria | `ad_realty` |
+| AUTO.RIA (картки й пошук), RST.ua, Avtobazar InfoCar, classified-auto-ria | `ad_car` |
+| classified-olx (ноутбуки), classified-ria (мобільні), classified-shafa | `ad_goods` |
+
+В одній колекції можуть лежати сутності різних пакетів з різними ключами: наприклад, `ad_car` отримує оголошення autos.* (ключ `site` + `ad_id`) і classifieds.auto-ria-ads (ключ `site` + `listing_id`), тож одне оголошення AUTO.RIA з двох джерел — дві сутності з різними `scope`.

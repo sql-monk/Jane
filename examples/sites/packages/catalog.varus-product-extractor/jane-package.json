@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "catalog.varus-product-extractor",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "varus.ua: full product cards from the catalog API",
-  "description": "Повні картки товарів супермаркету VARUS (varus.ua) з елементів каталожного API сайту (GraphQL, той самий запит, що й сторінки категорій; кожен товар — окремий JSON-матеріал стратегії api_feed): назва, ціна й ціна без акції (регіональні ціни для відвідувача без вибраного магазину), наявність, бренд, категорія й шлях категорій, зображення, одиниця, вага/об'єм, країна виробництва, характеристики (completeness: full). Ключ — shop + product_id (SKU). Товар без ціни (немає в наявності) не надсилає price — лишається остання відома.",
+  "description": "Повні картки всього асортименту з публічного GraphQL API, головна категорія та динамічне дерево категорій. Усі властивості товару через attributes(keys: []), ціни регіону 0, базові й акційні ціни, одиниця продажу, вага, обʼєм, країна та шлях категорій. Реальні контрольні приклади: овочі, вагові фрукти, випічка, молочні товари, напої й побутова хімія. Ціна відсутня у наявного товару — unrecognized. Тип сутності — група товару за розділом category_path (таблиця CATEGORY_TYPES; найдовший префікс; розділ поза таблицею — product_other).",
   "tags": [
     "catalog",
     "varus",
@@ -31,13 +31,112 @@
   "output": {
     "entities": [
       {
-        "entity_type": "product",
+        "entity_type": "product_beauty",
         "schema": "schemas/product.schema.json",
         "key_fields": [
           "shop",
           "product_id"
         ],
-        "description": "Повна картка товару varus.ua"
+        "description": "Повна картка товару varus.ua — група «косметика, парфуми, гігієна й догляд»"
+      },
+      {
+        "entity_type": "product_clothing",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару varus.ua — група «одяг, взуття, аксесуари, галантерея»"
+      },
+      {
+        "entity_type": "product_food",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару varus.ua — група «продукти, напої, алкоголь»"
+      },
+      {
+        "entity_type": "product_garden",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару varus.ua — група «сад і город»"
+      },
+      {
+        "entity_type": "product_health",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару varus.ua — група «медичні товари, БАДи»"
+      },
+      {
+        "entity_type": "product_home",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару varus.ua — група «дім, інтер'єр, меблі, товари для дому»"
+      },
+      {
+        "entity_type": "product_household",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару varus.ua — група «побутова хімія»"
+      },
+      {
+        "entity_type": "product_kids",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару varus.ua — група «іграшки, дитячий транспорт, дитячі товари»"
+      },
+      {
+        "entity_type": "product_office",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару varus.ua — група «канцтовари, шкільне»"
+      },
+      {
+        "entity_type": "product_pet",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару varus.ua — група «зоотовари»"
+      },
+      {
+        "entity_type": "product_sport",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару varus.ua — група «спорт і туризм»"
+      },
+      {
+        "entity_type": "product_other",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Повна картка товару varus.ua — група «розділ поза таблицею (сезонні, збірні, нові розділи)»"
       }
     ]
   },
@@ -116,15 +215,72 @@
       },
       "expected_status": "unrecognized",
       "origin": "human"
+    },
+    {
+      "name": "whole-assortment-fresh-vegetables",
+      "input": {
+        "file": "tests/whole-assortment-fresh-vegetables/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/tomat-green-agro-cherry-time-90-h"
+      },
+      "expected_status": "success",
+      "expected": "tests/whole-assortment-fresh-vegetables/expected.json",
+      "compare": "subset",
+      "origin": "llm"
+    },
+    {
+      "name": "whole-assortment-weighted-fruit",
+      "input": {
+        "file": "tests/whole-assortment-weighted-fruit/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/yabluko-baia-marisa-vahove"
+      },
+      "expected_status": "success",
+      "expected": "tests/whole-assortment-weighted-fruit/expected.json",
+      "compare": "subset",
+      "origin": "llm"
+    },
+    {
+      "name": "whole-assortment-bakery-sale",
+      "input": {
+        "file": "tests/whole-assortment-bakery-sale/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/prianyk-khlibodar-na-khodu-na-medu-30-h"
+      },
+      "expected_status": "success",
+      "expected": "tests/whole-assortment-bakery-sale/expected.json",
+      "compare": "subset",
+      "origin": "llm"
+    },
+    {
+      "name": "in-stock-without-price",
+      "input": {
+        "file": "tests/in-stock-without-price/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/tomat-green-agro-cherry-time-90-h"
+      },
+      "expected_status": "unrecognized",
+      "origin": "problem_sample"
     }
   ],
   "provenance": {
-    "created_by": "human",
+    "created_by": "llm",
     "authors": [
-      "Claude (examples/sites: varus)"
+      "Claude (examples/sites: varus)",
+      "mongo-entities"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Full product cards of varus.ua from the items of the site's catalog API."
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: entity type product_<group> from the shop's category table (CATEGORY_TYPES) instead of product; one collection per type in jane.storage-mongodb.",
+    "based_on": {
+      "package_id": "catalog.varus-product-extractor",
+      "version": "1.1.1",
+      "digest": "sha256:e47e379d2f4a6f3a43e7384be3d892725782cc9b654cddc013674c375a924cb6"
+    },
+    "llm": {
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "reason": "improvement"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

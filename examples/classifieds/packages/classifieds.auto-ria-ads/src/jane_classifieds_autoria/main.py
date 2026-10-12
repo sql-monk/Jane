@@ -2,6 +2,7 @@
 
 The USD price is the amount displayed in the catalog, which the site may convert
 from the seller's currency. It is never inferred from a different advertisement.
+The entity type is fixed (``ad_car``): the AUTO.RIA catalog lists vehicles only.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from urllib.parse import urljoin, urlsplit
 
 from jane_extractor_sdk import Context, ExtractResult, Material, empty, entity, success, unrecognized
 
+ENTITY_TYPE = "ad_car"
 _STATE = re.compile(r"window\.__PINIA__\s*=\s*")
 _AD_PATH = re.compile(r"/uk/auto_[^/]*_(\d+)\.html$")
 
@@ -111,7 +113,7 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
     return success(
         [
             entity(
-                "classified_ad",
+                ENTITY_TYPE,
                 fields,
                 key={
                     "scope": scope,

@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "ads.domria-listing",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "DIM.RIA: classified ads from catalog pages",
-  "description": "Оголошення DIM.RIA (dom.ria.com) зі сторінок каталогу (оренда й продаж квартир): стан сторінки window.__INITIAL_STATE__ → classified_ad (ціна, валюта, площа, кімнати, поверх, район, дати публікації й актуалізації). Картки не потрібні. Без персональних даних: продавець, телефони, вулиця, номери будинку й квартири, координати й вільний опис не зберігаються.",
+  "description": "Оголошення DIM.RIA (dom.ria.com) зі сторінок каталогу (оренда й продаж квартир): стан сторінки window.__INITIAL_STATE__ → ad_realty (ціна, валюта, площа, кімнати, поверх, район, дати публікації й актуалізації). Картки не потрібні. Без персональних даних: продавець, телефони, вулиця, номери будинку й квартири, координати й вільний опис не зберігаються.",
   "tags": [
     "ads",
     "classifieds",
@@ -30,8 +30,8 @@
   "output": {
     "entities": [
       {
-        "entity_type": "classified_ad",
-        "schema": "schemas/classified_ad.schema.json",
+        "entity_type": "ad_realty",
+        "schema": "schemas/ad.schema.json",
         "key_fields": [
           "site",
           "ad_id"
@@ -88,10 +88,16 @@
   "provenance": {
     "created_by": "human",
     "authors": [
-      "Claude (examples/sites: classifieds)"
+      "Claude (examples/sites: classifieds)",
+      "mongo-entities"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Classified ads of DIM.RIA catalog pages (rent and sale of flats in Kyiv) from the server-rendered page state. 1.0.1: typing only (dateutil import annotated for mypy), same behaviour."
+    "created_at": "2026-10-12T00:00:00Z",
+    "based_on": {
+      "package_id": "ads.domria-listing",
+      "version": "1.0.1",
+      "digest": "sha256:f56a83001574389d8592f69991bcf7f4a2c189d7092a8a661eb92c688a2600be"
+    },
+    "change_summary": "2.0.0: entity type ad_realty instead of classified_ad (DIM.RIA lists real estate only). Schema file renamed to schemas/ad.schema.json, fields unchanged."
   },
   "bindings_hint": {
     "source_kinds": [

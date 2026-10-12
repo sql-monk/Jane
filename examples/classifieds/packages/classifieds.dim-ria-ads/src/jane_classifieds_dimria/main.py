@@ -1,4 +1,7 @@
-"""DIM.RIA catalog advertisements from its public server-rendered page state."""
+"""DIM.RIA catalog advertisements from its public server-rendered page state.
+
+The entity type is fixed (``ad_realty``): DIM.RIA lists real estate only.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +13,7 @@ from urllib.parse import urljoin, urlsplit
 
 from jane_extractor_sdk import Context, ExtractResult, Material, empty, entity, success, unrecognized
 
+ENTITY_TYPE = "ad_realty"
 _STATE = re.compile(r"window\.__INITIAL_STATE__\s*=\s*")
 _AD_PATH = re.compile(r"/uk/realty-[^/]+-(\d+)\.html$")
 _CURRENCIES = {"$": "USD", "€": "EUR", "грн": "UAH"}
@@ -91,7 +95,7 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
     return success(
         [
             entity(
-                "classified_ad",
+                ENTITY_TYPE,
                 fields,
                 key={
                     "scope": scope,

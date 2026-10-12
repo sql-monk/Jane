@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "catalog.varus-price-extractor",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "varus.ua: price and availability from the catalog API",
-  "description": "Часткове оновлення товарів VARUS (varus.ua) з елементів каталожного API сайту (короткий запит: SKU, регіональні ціни, наявність): лише shop, product_id, price, currency, old_price, availability (completeness: partial) — інші поля повної картки не затираються. Товар без ціни оновлює лише availability.",
+  "description": "Часткове оновлення товарів VARUS (varus.ua) з елементів каталожного API сайту (короткий запит: SKU, регіональні ціни, наявність): лише shop, product_id, price, currency, old_price, availability (completeness: partial) — інші поля повної картки не затираються. Товар без ціни оновлює лише availability. Тип сутності — група товару за категоріями елемента API (primaryCategory, categories) і тією самою таблицею CATEGORY_TYPES, що й у картці; елемент без категорій — unrecognized.",
   "tags": [
     "catalog",
     "varus",
@@ -31,13 +31,112 @@
   "output": {
     "entities": [
       {
-        "entity_type": "product",
+        "entity_type": "product_beauty",
         "schema": "schemas/product.schema.json",
         "key_fields": [
           "shop",
           "product_id"
         ],
-        "description": "Ціна й наявність товару varus.ua (часткове оновлення)"
+        "description": "Ціна й наявність товару varus.ua (часткове оновлення) — група «косметика, парфуми, гігієна й догляд»"
+      },
+      {
+        "entity_type": "product_clothing",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару varus.ua (часткове оновлення) — група «одяг, взуття, аксесуари, галантерея»"
+      },
+      {
+        "entity_type": "product_food",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару varus.ua (часткове оновлення) — група «продукти, напої, алкоголь»"
+      },
+      {
+        "entity_type": "product_garden",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару varus.ua (часткове оновлення) — група «сад і город»"
+      },
+      {
+        "entity_type": "product_health",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару varus.ua (часткове оновлення) — група «медичні товари, БАДи»"
+      },
+      {
+        "entity_type": "product_home",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару varus.ua (часткове оновлення) — група «дім, інтер'єр, меблі, товари для дому»"
+      },
+      {
+        "entity_type": "product_household",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару varus.ua (часткове оновлення) — група «побутова хімія»"
+      },
+      {
+        "entity_type": "product_kids",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару varus.ua (часткове оновлення) — група «іграшки, дитячий транспорт, дитячі товари»"
+      },
+      {
+        "entity_type": "product_office",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару varus.ua (часткове оновлення) — група «канцтовари, шкільне»"
+      },
+      {
+        "entity_type": "product_pet",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару varus.ua (часткове оновлення) — група «зоотовари»"
+      },
+      {
+        "entity_type": "product_sport",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару varus.ua (часткове оновлення) — група «спорт і туризм»"
+      },
+      {
+        "entity_type": "product_other",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Ціна й наявність товару varus.ua (часткове оновлення) — група «розділ поза таблицею (сезонні, збірні, нові розділи)»"
       }
     ]
   },
@@ -104,15 +203,31 @@
       },
       "expected_status": "unrecognized",
       "origin": "human"
+    },
+    {
+      "name": "item-without-categories-unrecognized",
+      "input": {
+        "file": "tests/item-without-categories/item.json",
+        "media_type": "application/json",
+        "url": "https://varus.ua/api/yogurt-1-5-persik-yagotinskiy-ppl-750g"
+      },
+      "expected_status": "unrecognized",
+      "origin": "human"
     }
   ],
   "provenance": {
     "created_by": "human",
     "authors": [
-      "Claude (examples/sites: varus)"
+      "Claude (examples/sites: varus)",
+      "mongo-entities"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Partial price and availability updates of varus.ua products."
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: entity type product_<group> from the shop's category table (CATEGORY_TYPES) instead of product; one collection per type in jane.storage-mongodb.",
+    "based_on": {
+      "package_id": "catalog.varus-price-extractor",
+      "version": "1.0.0",
+      "digest": "sha256:8f3f7663a485d0c73f4e6d7c5e110d639c508d43c521f602f742d51fcc30e946"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

@@ -7,8 +7,13 @@ attribute table ``#product-attribute-specs-table``. The entity key is ``shop`` +
 Magento product id the category pages show in ``li.product-item[data-id]``, so the price task updates the
 same entities. Customer reviews (names of private persons) are not read.
 
-States (TZ §9): ``success`` - a product card (``completeness: full``); ``empty`` - not a product page (category,
-information pages); ``unrecognized`` - a product page without the product id, title or price.
+States (TZ §9): ``success`` - a priced product card (``completeness: full``), or the known metadata of an
+out-of-stock product without a price (``completeness: partial``); ``empty`` - not a product page. A missing
+id or title is ``unrecognized``; an in-stock/unknown product missing its price is ``unrecognized`` with its
+partial metadata. An absent price never clears the last observed price or discount in storage.
+
+The entity type is the product group of the card's ``category_path`` (``CATEGORY_TYPES``: the longest table
+prefix wins, an unknown section is ``product_other``); the price extractor of the shop uses the same table.
 """
 
 from __future__ import annotations
@@ -16,6 +21,7 @@ from __future__ import annotations
 import html
 import json
 import re
+from collections.abc import Sequence
 from html.parser import HTMLParser
 from typing import Any
 
@@ -35,6 +41,58 @@ AVAILABILITY = {
 VOLUME_LABELS = ("об'єм", "обʼєм", "об’єм", "вага", "маса")
 AMOUNT = re.compile(r"^\s*(\d+(?:[.,]\d+)?)\s*([^\d\s].*?)\s*$")
 FORM_ID = "product_addtocart_form"
+
+
+# Catalog section (a prefix of ``category_path``) -> entity type, one MongoDB collection per type. The longest
+# prefix in the table wins; a section that is not in the table is ``OTHER_TYPE`` (seasonal and promotional
+# sections are only listed with their subsections). The card and the price extractor of the shop carry the same
+# table and lookup - a price update must name the type of the card (examples/tests/test_sites.py compares them).
+CATEGORY_TYPES: dict[tuple[str, ...], str] = {
+    ("Великдень", "Кондитерський декор"): "product_food",
+    ("Волосся",): "product_beauty",
+    ("Галантерея",): "product_clothing",
+    ("Дім",): "product_home",
+    ("Дім", "Зоотовари"): "product_pet",
+    ("Дім", "Продукти"): "product_food",
+    ("Дім", "Спортивні товари"): "product_sport",
+    ("Дітям",): "product_kids",
+    ("Здоров`я",): "product_health",
+    ("Косметика",): "product_beauty",
+    ("Обличчя",): "product_beauty",
+    ("Парфуми",): "product_beauty",
+    ("Побутова хімія",): "product_household",
+    ("Продукти",): "product_food",
+    ("Святий Миколай", "Дитяча косметика"): "product_beauty",
+    ("Тіло",): "product_beauty",
+    ("Чоловікам", "Спідня білизна"): "product_clothing",
+    ("Чоловікам", "Чоловічі засоби для стайлінгу"): "product_beauty",
+    ("Чоловікам", "Чоловічі шкарпетки"): "product_clothing",
+}
+OTHER_TYPE = "product_other"
+APOSTROPHES = str.maketrans(dict.fromkeys("\u2019\u02bc`\u00b4\u2018", "'"))
+
+
+def _section(name: str) -> str:
+    """A section name compared without case, apostrophe variants and repeated spaces."""
+    return " ".join(name.translate(APOSTROPHES).split()).casefold()
+
+
+TYPES_BY_PREFIX = {tuple(_section(n) for n in prefix): kind for prefix, kind in CATEGORY_TYPES.items()}
+
+
+def _mapped_type(path: Sequence[str]) -> str | None:
+    """Type of the longest table prefix of ``path``; ``None`` when no prefix of it is in the table."""
+    key = tuple(_section(n) for n in path)
+    for size in range(len(key), 0, -1):
+        kind = TYPES_BY_PREFIX.get(key[:size])
+        if kind is not None:
+            return kind
+    return None
+
+
+def _entity_type(path: Sequence[str] | None) -> str:
+    """Type of a product with this ``category_path`` (no path or an unknown section - ``OTHER_TYPE``)."""
+    return _mapped_type(path or []) or OTHER_TYPE
 
 
 def _clean(value: Any) -> str | None:
@@ -262,9 +320,19 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
     if not fields["title"]:
         return unrecognized("product page without a title", signature="missing-field:title")
     if price is None:
+        fields["completeness"] = "partial"
+        fields.pop("currency")
+        partial = entity(_entity_type(category_path), fields, completeness="partial")
+        if fields["availability"] == "out_of_stock":
+            return success([partial])
         ctx.log.warning("price not found", code="extract.missing_selector", selector="offers.price")
-        return unrecognized("product page without a price", signature="missing-field:offers.price")
-    return success([entity("product", fields, cleared=cleared, completeness="full")])
+        return unrecognized(
+            "product page without a price",
+            signature="missing-field:offers.price",
+            entities=[partial],
+        )
+    kind = _entity_type(category_path)
+    return success([entity(kind, fields, cleared=cleared, completeness="full")])
 
 
 def _count(value: Any) -> int | None:

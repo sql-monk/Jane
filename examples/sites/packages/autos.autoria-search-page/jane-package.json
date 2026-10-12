@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "autos.autoria-search-page",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "extractor",
-  "title": "AUTO.RIA: search results page -> car_ad (partial)",
-  "description": "Оголошення зі сторінки результатів пошуку auto.ria.com (/uk/search/?...): серверний стан window.__PINIA__ (list.lists.items) - id, посилання, назва й рік, ціни в USD/UAH, пробіг, паливо й об'єм, коробка, тип кузова, перевірка VIN, статус (продано). Часткове оновлення того самого car_ad, що й autos.autoria-ad-page: ціну у валюті продавця сторінка пошуку не показує.",
+  "title": "AUTO.RIA: search results page -> ad_car (partial)",
+  "description": "Оголошення зі сторінки результатів пошуку auto.ria.com (/uk/search/?...): серверний стан window.__PINIA__ (list.lists.items) - id, посилання, назва й рік, ціни в USD/UAH, пробіг, паливо й об'єм, коробка, тип кузова, перевірка VIN, статус (продано). Часткове оновлення того самого ad_car, що й autos.autoria-ad-page (той самий тип і ключ): ціну у валюті продавця сторінка пошуку не показує.",
   "tags": [
     "autos",
     "autoria",
@@ -30,8 +30,8 @@
   "output": {
     "entities": [
       {
-        "entity_type": "car_ad",
-        "schema": "schemas/car_ad.schema.json",
+        "entity_type": "ad_car",
+        "schema": "schemas/ad_car.schema.json",
         "key_fields": [
           "site",
           "ad_id"
@@ -84,12 +84,17 @@
     }
   ],
   "provenance": {
-    "created_by": "human",
+    "created_by": "llm",
     "authors": [
-      "Claude (subagent: examples/sites autoria)"
+      "Claude (subagent: examples/sites autoria)",
+      "Claude (mongo-entities C3)"
     ],
-    "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "AUTO.RIA car ads: partial car_ad updates from search results pages (window.__PINIA__)."
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: entity type car_ad -> ad_car (ad taxonomy, one MongoDB collection per type), the same type as autos.autoria-ad-page; fields, key and schema unchanged.",
+    "based_on": {
+      "package_id": "autos.autoria-search-page",
+      "version": "1.0.0"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

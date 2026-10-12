@@ -3,8 +3,8 @@
 A catalog page (``/uk/arenda-kvartir/kiev/``, ``?page=N``) is rendered on the server together with the page
 state ``window.__INITIAL_STATE__``; ``catalog.realtyForCatalog`` holds the ads of the page (20 plus promoted
 ones) with every field of the ad card, so the cards themselves are not fetched. Each ad becomes a complete
-``classified_ad`` keyed by the site and ``realty_id``; newbuild promo blocks of the list (no ``realty_id``) are
-skipped.
+``ad_realty`` (DIM.RIA lists real estate only, so the type is fixed) keyed by the site and ``realty_id``;
+newbuild promo blocks of the list (no ``realty_id``) are skipped.
 
 No personal data: the seller (name, phones, avatar, user id), the street, house and flat numbers, the
 coordinates and the free-text description (owners write addresses and phones there) are left out.
@@ -24,6 +24,7 @@ from dateutil.zoneinfo import get_zonefile_instance  # type: ignore[import-untyp
 from jane_extractor_sdk import Context, ExtractResult, Material, empty, entity, success, unrecognized
 
 SITE = "dom.ria.com"
+ENTITY_TYPE = "ad_realty"  # the only type of output.entities: the site lists real estate only
 BASE_URL = "https://dom.ria.com/uk/"
 PHOTO_BASE = "https://cdn.riastatic.com/photos/"
 STATE_MARK = "window.__INITIAL_STATE__="
@@ -207,4 +208,4 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
         ctx.log.warning(f"{skipped} ad(s) without an id, a URL or a price", code="extract.missing_field")
     if not found:
         return unrecognized("catalog ads without an id, a URL or a price", signature="domria:missing-fields")
-    return success([entity("classified_ad", f, completeness="full") for f in found.values()])
+    return success([entity(ENTITY_TYPE, f, completeness="full") for f in found.values()])

@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "product",
+      "entity_type": "product_kids",
       "fields": {
         "shop": "bi.ua",
         "product_id": "593738",

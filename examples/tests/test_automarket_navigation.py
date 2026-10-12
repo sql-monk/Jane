@@ -31,7 +31,7 @@ EXAMPLES = Path(__file__).resolve().parents[1]
 REPO = EXAMPLES.parent
 FIXTURE = EXAMPLES / "automarket/evidence/fixtures/rst-index.html"
 METADATA = FIXTURE.with_suffix(".json")
-RULES = EXAMPLES / "automarket/packages/autos.rst-rules/rules.json"
+RULES = EXAMPLES / "sites/packages/autos.rst-rules/rules.json"
 
 
 def _resolve(source: dict[str, Any] | None, request: dict[str, Any] | None) -> ResolvedLimits[ServiceLimits]:

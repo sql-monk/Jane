@@ -22,11 +22,11 @@ regexTarget = "match"
 regexes = ['''^delivery_key"?\s*[:=]\s*"?(?:[0-9a-f]{64}|[0-9a-f]{32})"?\s*$''']
 paths = ['''^contracts/''', '''^docs/reference/api/''', '''^docs/components/[^/]+/reference/api/''']
 
-# These eight VARUS fixtures contain public product URL slugs in the urlKey field.
+# These nine VARUS fixtures contain public product URL slugs in the urlKey field.
 # generic-api-key matches the Key suffix of urlKey; the exact reviewed values are not credentials.
 # AND requires an exact fixture path and an exact public slug; other fields/values remain scanned.
 [[allowlists]]
-description = "VARUS exact public urlKey slugs in eight reviewed offline fixtures"
+description = "VARUS exact public urlKey slugs in nine reviewed offline fixtures"
 targetRules = ["generic-api-key"]
 condition = "AND"
 regexTarget = "secret"
@@ -39,6 +39,7 @@ regexes = [
   '''^yogurt\-1\-5\-persik\-yagotinskiy\-ppl\-750g$''',
 ]
 paths = [
+  '''^examples/sites/packages/catalog\.varus\-price\-extractor/tests/item\-without\-categories/item\.json$''',
   '''^examples/sites/packages/catalog\.varus\-price\-extractor/tests/item\-without\-prices/item\.json$''',
   '''^examples/sites/packages/catalog\.varus\-price\-extractor/tests/pasta\-regular\-price/item\.json$''',
   '''^examples/sites/packages/catalog\.varus\-price\-extractor/tests/yogurt\-sale/item\.json$''',

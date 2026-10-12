@@ -21,7 +21,7 @@
       ],
       "item_links": {
         "type": "css",
-        "value": "a.product-card[href]"
+        "value": "a.product-card[href*='/uk/auto_'][href$='.html']"
       },
       "page_param": {
         "name": "page",
@@ -64,5 +64,15 @@
   },
   "revisit": {
     "mode": "interval"
+  },
+  "limits": {
+    "rate": {
+      "requests_per_second_per_host": 1,
+      "min_delay_ms_per_host": 1000,
+      "burst_per_host": 1
+    },
+    "concurrency": {
+      "max_parallel_fetches_per_host": 1
+    }
   }
 }

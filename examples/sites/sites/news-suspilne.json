@@ -38,7 +38,7 @@
     {
       "task_id": "news-suspilne",
       "title": "Суспільне Новини: нові статті кожні 15 хвилин",
-      "description": "Кожні 15 хв (пропуск, якщо попередній запуск ще йде): стрічка → нові сторінки статей (mode: incremental) → RAW у raw-files → news.articles (лише HTML) → article у results-pg (ключ — канонічний URL; оновлена стаття оновлює ту саму сутність).",
+      "description": "Кожні 15 хв (пропуск, якщо попередній запуск ще йде): стрічка → нові сторінки статей (mode: incremental) → RAW у raw-files → news.articles (лише HTML) → article у results-mongo (ключ — канонічний URL; оновлена стаття оновлює ту саму сутність).",
       "input": {
         "source_id": "news-suspilne"
       },
@@ -82,9 +82,9 @@
         {
           "stage_id": "store-articles",
           "kind": "handler",
-          "handler": "@pkg:jane.storage-postgresql",
+          "handler": "@pkg:jane.storage-mongodb",
           "connections": {
-            "target": "results-pg"
+            "target": "results-mongo"
           },
           "inputs": [
             {

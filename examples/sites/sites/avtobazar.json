@@ -21,7 +21,7 @@
       },
       "forward_unknown_to_llm": false,
       "expected_entity_types": [
-        "car_ad"
+        "ad_car"
       ],
       "labels": {
         "group": "autos",
@@ -33,7 +33,7 @@
     {
       "task_id": "ads-avtobazar",
       "title": "Автобазар InfoCar: оголошення легкових авто щогодини",
-      "description": "Щогодини: RSS-стрічка (≈300 останніх оголошень усіх категорій) читається повністю; картки легкових авто — нові, оновлені (pubDate новіший за попереднє завантаження) і раз на добу решта зі стрічки (revisit interval). RAW — у files, car_ad (ключ site + ad_id) — у PostgreSQL; повторний запуск оновлює ті самі оголошення.",
+      "description": "Щогодини: RSS-стрічка (≈300 останніх оголошень усіх категорій) читається повністю; картки легкових авто — нові, оновлені (pubDate новіший за попереднє завантаження) і раз на добу решта зі стрічки (revisit interval). RAW — у files, ad_car (ключ site + ad_id) — у MongoDB (results-mongo); повторний запуск оновлює ті самі оголошення.",
       "input": {
         "source_id": "autos-avtobazar"
       },
@@ -77,9 +77,9 @@
         {
           "stage_id": "store-ads",
           "kind": "handler",
-          "handler": "@pkg:jane.storage-postgresql",
+          "handler": "@pkg:jane.storage-mongodb",
           "connections": {
-            "target": "results-pg"
+            "target": "results-mongo"
           },
           "inputs": [
             {
@@ -115,7 +115,7 @@
   ],
   "verify": {
     "autos-avtobazar": {
-      "car_ad": {
+      "ad_car": {
         "min": 100,
         "required": [
           "site",

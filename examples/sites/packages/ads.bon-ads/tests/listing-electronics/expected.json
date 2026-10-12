@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "classified_ad",
+      "entity_type": "ad_goods",
       "fields": {
         "site": "bon.ua",
         "ad_id": "98730528",
@@ -23,7 +23,7 @@
       }
     },
     {
-      "entity_type": "classified_ad",
+      "entity_type": "ad_goods",
       "fields": {
         "site": "bon.ua",
         "ad_id": "46574404",
@@ -43,7 +43,7 @@
       }
     },
     {
-      "entity_type": "classified_ad",
+      "entity_type": "ad_goods",
       "fields": {
         "site": "bon.ua",
         "ad_id": "102666438",
@@ -65,7 +65,7 @@
       }
     },
     {
-      "entity_type": "classified_ad",
+      "entity_type": "ad_goods",
       "fields": {
         "site": "bon.ua",
         "ad_id": "102669014",
@@ -87,7 +87,7 @@
       }
     },
     {
-      "entity_type": "classified_ad",
+      "entity_type": "ad_goods",
       "fields": {
         "site": "bon.ua",
         "ad_id": "102668995",
@@ -109,7 +109,7 @@
       }
     },
     {
-      "entity_type": "classified_ad",
+      "entity_type": "ad_goods",
       "fields": {
         "site": "bon.ua",
         "ad_id": "101818142",

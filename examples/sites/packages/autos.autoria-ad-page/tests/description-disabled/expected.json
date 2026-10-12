@@ -1,0 +1,51 @@
+{
+  "entities": [
+    {
+      "entity_type": "ad_car",
+      "fields": {
+        "site": "auto.ria.com",
+        "ad_id": "40065331",
+        "url": "https://auto.ria.com/uk/auto_bmw_x5_40065331.html",
+        "title": "BMW X5 2016",
+        "price": 23900.0,
+        "currency": "USD",
+        "make": "BMW",
+        "model": "X5",
+        "year": 2016,
+        "price_usd": 23900.0,
+        "price_uah": 1075500.0,
+        "mileage_km": 165000,
+        "transmission": "Автомат",
+        "fuel": "Бензин",
+        "engine_l": 2.98,
+        "body_type": "Позашляховик / Кросовер",
+        "drive": "Повний",
+        "color": "Білий",
+        "region": "Кіровоградська обл.",
+        "city": "Кропивницький (Кіровоград)",
+        "seller_type": "private",
+        "condition": "used",
+        "published_at": "2026-10-11",
+        "image": "https://cdn0.riastatic.com/photosnew/auto/photo/bmw_x5__647758418fx.webp",
+        "status": "active",
+        "doors": 5,
+        "seats": 5,
+        "inspection_ready": true
+      },
+      "completeness": "full",
+      "key": {
+        "scope": "local",
+        "natural": {
+          "site": "auto.ria.com",
+          "ad_id": "40065331"
+        }
+      },
+      "observation": {
+        "observation_id": "obs_local_caf04e7f1bece697bf4795e6",
+        "observed_at": "2026-10-11T03:59:34Z",
+        "material_id": "web:a03535582550425903135a3df1f06409",
+        "content_sha256": "caf04e7f1bece697bf4795e61bf2a0029d206678eebef05a6f541fbbf802b875"
+      }
+    }
+  ]
+}

@@ -1,4 +1,8 @@
-"""Extract public SSR product cards without requesting individual listing pages."""
+"""Extract public SSR product cards without requesting individual listing pages.
+
+The entity type is fixed (``ad_goods``): Shafa is a marketplace of things (clothing, shoes, accessories, kids'
+and home goods).
+"""
 
 from __future__ import annotations
 
@@ -28,6 +32,7 @@ VOID = frozenset(
         "wbr",
     }
 )
+ENTITY_TYPE = "ad_goods"
 LISTING_ID = re.compile(r"/(\d+)-[^/]+$")
 PRICE = re.compile(r"^([\d\s\u00a0\u202f]+(?:[.,]\d{1,2})?)\s*(грн\.?|UAH|USD|EUR|\$|€)$", re.I)
 CURRENCIES = {"грн": "UAH", "грн.": "UAH", "uah": "UAH", "usd": "USD", "$": "USD", "eur": "EUR", "€": "EUR"}
@@ -122,7 +127,7 @@ def extract(material: Material, params: dict[str, Any], ctx: Context) -> Extract
     return success(
         [
             entity(
-                "classified_ad",
+                ENTITY_TYPE,
                 fields,
                 key={"scope": scope, "natural": {"site": "shafa", "listing_id": fields["listing_id"]}},
             )

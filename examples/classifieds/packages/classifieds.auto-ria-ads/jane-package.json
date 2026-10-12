@@ -1,10 +1,10 @@
 {
   "schema_version": "1",
   "package_id": "classifieds.auto-ria-ads",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "kind": "extractor",
   "title": "AUTO.RIA — public car advertisements",
-  "description": "Публічні картки автомобілів зі стану Pinia; ціна USD — показана каталогом конвертація, не валюта продавця.",
+  "description": "Публічні картки автомобілів зі стану Pinia; ціна USD — показана каталогом конвертація, не валюта продавця. Тип сутності фіксований — ad_car: каталог AUTO.RIA містить лише транспорт.",
   "entry": {
     "runtime": "python",
     "module": "jane_classifieds_autoria.main",
@@ -25,8 +25,8 @@
   "output": {
     "entities": [
       {
-        "entity_type": "classified_ad",
-        "schema": "schemas/classified_ad.schema.json",
+        "entity_type": "ad_car",
+        "schema": "schemas/ad.schema.json",
         "key_fields": [
           "site",
           "listing_id"
@@ -66,10 +66,15 @@
   "provenance": {
     "created_by": "llm",
     "authors": [
-      "Codex"
+      "Codex",
+      "Claude (mongo-entities C3)"
     ],
-    "created_at": "2026-10-11T03:59:16.069696Z",
-    "change_summary": "Site-specific extraction of public catalog cards; compact success fixtures copied from live HTML, without personal contacts."
+    "created_at": "2026-10-12T00:00:00Z",
+    "change_summary": "2.0.0: entity type classified_ad -> ad_car (ad taxonomy, one MongoDB collection per type); fields, key and schema unchanged.",
+    "based_on": {
+      "package_id": "classifieds.auto-ria-ads",
+      "version": "1.0.0"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

@@ -3,8 +3,11 @@
     uv run --all-packages python examples/sites/verify_prices.py --project jane-demo
 
 Select an existing priced product with attributes, fetch a new material, invoke the published catalog
-extractor, then send only its observed price fields to the published PostgreSQL storage handler. The
-projection retains the extractor's key, observation and provenance; it never clears omitted metadata.
+extractor, then send only its observed price fields to the published MongoDB storage handler
+(``jane.storage-mongodb``, connection of the catalog task). Products are read from every ``product_*`` type the
+catalog extractor declares (a collection per type); the fresh observation must carry the stored product's
+type. The projection retains the extractor's key, type, observation and provenance; it never clears omitted
+metadata.
 No source/task configuration or primary collector state is modified. VARUS uses a separate bounded
 API-feed state because its product data is provided by the public GraphQL endpoint.
 """
@@ -23,6 +26,9 @@ from typing import Any, cast
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
+sys.path.insert(0, str(HERE))
+import setup_sites as sites  # noqa: E402
+
 import jane_examples as ex  # noqa: E402 - shared, contract-validating example client
 
 SHOPS = ("bi", "epicentrk", "prostor", "varus", "yakaboo")
@@ -38,6 +44,10 @@ def amount_valid(value: Any) -> bool:
 
 def identity(record: dict[str, Any]) -> str:
     return json.dumps(record["key"], sort_keys=True, separators=(",", ":"))
+
+
+def typed(record: dict[str, Any]) -> tuple[str, str]:
+    return str(record["entity_type"]), identity(record)
 
 
 def invoke(api: ex.Api, body: dict[str, Any], timeout_s: float) -> dict[str, Any]:
@@ -64,32 +74,42 @@ def invoke(api: ex.Api, body: dict[str, Any], timeout_s: float) -> dict[str, Any
     return result
 
 
-def current(storage: ex.Api, connection: str, key: str) -> dict[str, Any]:
+def current(storage: ex.Api, connection: str, entity_type: str, key: str) -> dict[str, Any]:
     page = storage.call(
-        "GET", "/v1/entities", params={"connection_id": connection, "entity_type": "product", "key": key}
+        "GET", "/v1/entities", params={"connection_id": connection, "entity_type": entity_type, "key": key}
     ).json()
     if len(page["items"]) != 1:
         raise RuntimeError(f"existing product disappeared: {key}")
     return cast(dict[str, Any], page["items"][0])
 
 
-def history(storage: ex.Api, connection: str, key: str) -> list[dict[str, Any]]:
+def history(storage: ex.Api, connection: str, entity_type: str, key: str) -> list[dict[str, Any]]:
     return storage.pages(
-        "/v1/entity-history", {"connection_id": connection, "entity_type": "product", "key": key}
+        "/v1/entity-history", {"connection_id": connection, "entity_type": entity_type, "key": key}
     )
 
 
-def candidates(storage: ex.Api, source_id: str, connection: str, limit: int) -> list[dict[str, Any]]:
-    page = storage.call(
-        "GET",
-        "/v1/entities",
-        params={"connection_id": connection, "entity_type": "product", "scope": source_id, "limit": limit},
-    ).json()
-    records = [
-        record
-        for record in page["items"]
-        if amount_valid(record["fields"].get("price")) and record["fields"].get("attributes")
-    ]
+def candidates(
+    storage: ex.Api, source_id: str, connection: str, entity_types: list[str], limit: int
+) -> list[dict[str, Any]]:
+    """Priced products with attributes: one bounded page of every product type (collection) of the source."""
+    records: list[dict[str, Any]] = []
+    for entity_type in entity_types:
+        page = storage.call(
+            "GET",
+            "/v1/entities",
+            params={
+                "connection_id": connection,
+                "entity_type": entity_type,
+                "scope": source_id,
+                "limit": limit,
+            },
+        ).json()
+        records += [
+            record
+            for record in page["items"]
+            if amount_valid(record["fields"].get("price")) and record["fields"].get("attributes")
+        ]
     # Prefer an old discount so an ended discount can be checked when the source actually confirms it.
     return sorted(records, key=lambda record: not bool(record["fields"].get("old_price")))
 
@@ -186,15 +206,20 @@ def verify_one(
         stage
         for stage in task["stages"]
         if stage.get("stage_id", "").startswith("store-")
-        and stage.get("handler", {}).get("package_id") == "jane.storage-postgresql"
+        and stage.get("handler", {}).get("package_id") == sites.RESULTS_PACKAGE
     )
     connection = store_stage["connections"]["target"]
-    records = candidates(svc.storage, source_id, connection, ns.candidate_limit)
+    types = sorted(
+        t
+        for t in sites.declared_types(sites.package_dirs(), [extract_stage["handler"]["package_id"]])
+        if t.startswith("product_")
+    )
+    records = candidates(svc.storage, source_id, connection, types, ns.candidate_limit)
     if not records:
         raise RuntimeError(
             f"{source_id}: no existing priced product with attributes in the bounded candidate page"
         )
-    by_identity = {identity(record): record for record in records}
+    by_identity = {typed(record): record for record in records}
     material_and_result = None
     selected = None
     attempts: list[str] = []
@@ -225,8 +250,8 @@ def verify_one(
                     continue
                 result = extract(material)
                 for entity in result.get("output", {}).get("entities", []):
-                    if identity(entity) in by_identity and amount_valid(entity["fields"].get("price")):
-                        selected = by_identity[identity(entity)]
+                    if typed(entity) in by_identity and amount_valid(entity["fields"].get("price")):
+                        selected = by_identity[typed(entity)]
                         material_and_result = (material, result, entity)
                         break
                 if selected:
@@ -253,7 +278,7 @@ def verify_one(
                     (
                         item
                         for item in result.get("output", {}).get("entities", [])
-                        if identity(item) == identity(record) and amount_valid(item["fields"].get("price"))
+                        if typed(item) == typed(record) and amount_valid(item["fields"].get("price"))
                     ),
                     None,
                 )
@@ -261,15 +286,16 @@ def verify_one(
                     selected = record
                     material_and_result = (material, result, entity)
                     break
-                attempts.append(f"{url}: no matching priced output")
+                attempts.append(f"{url}: no priced output with the key and type {record['entity_type']}")
             except (RuntimeError, TimeoutError) as exc:
                 attempts.append(f"{url}: {exc}")
     if selected is None or material_and_result is None:
         raise RuntimeError(f"{source_id}: no freshly observed existing priced product; {attempts}")
     material, extraction, entity = material_and_result
     key = selected["canonical_key"]
-    before = current(svc.storage, connection, key)
-    before_history = history(svc.storage, connection, key)
+    entity_type = str(selected["entity_type"])
+    before = current(svc.storage, connection, entity_type, key)
+    before_history = history(svc.storage, connection, entity_type, key)
     partial = copy.deepcopy(entity)
     partial["fields"] = {field: value for field, value in entity["fields"].items() if field in PRICE_FIELDS}
     partial["cleared"] = [field for field in entity.get("cleared", []) if field == "old_price"]
@@ -288,8 +314,8 @@ def verify_one(
         },
         ns.timeout_s,
     )
-    after = current(svc.storage, connection, key)
-    after_history = history(svc.storage, connection, key)
+    after = current(svc.storage, connection, entity_type, key)
+    after_history = history(svc.storage, connection, entity_type, key)
     observation_id = partial["observation"]["observation_id"]
     delivered = [
         entry for entry in after_history if entry["record"]["observation"]["observation_id"] == observation_id
@@ -312,6 +338,8 @@ def verify_one(
         "passed": all(checks.values()),
         "checks": checks,
         "source_id": source_id,
+        "connection_id": connection,
+        "entity_type": entity_type,
         "canonical_key": key,
         "url": entity["fields"].get("url") or material.get("locator", {}).get("url"),
         "extractor": extraction["handler"],

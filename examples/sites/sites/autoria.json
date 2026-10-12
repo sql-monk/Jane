@@ -25,7 +25,7 @@
       },
       "forward_unknown_to_llm": false,
       "expected_entity_types": [
-        "car_ad"
+        "ad_car"
       ],
       "change_policy": {
         "llm_versions": "manual_approval"
@@ -41,7 +41,7 @@
     {
       "task_id": "ads-autoria",
       "title": "AUTO.RIA: свіжі оголошення легкових авто щогодини",
-      "description": "Перші сторінки пошуку вживаних легкових авто за датою додавання (кількість - crawl.max_depth) читаються повністю в кожному запуску й оновлюють ціни/статус перелічених оголошень; сторінки оголошень завантажуються інкрементально (нові - одразу, відомі - не частіше за crawl.revisit_interval_seconds). RAW -> raw-files, car_ad -> results-pg.",
+      "description": "Перші сторінки пошуку вживаних легкових авто за датою додавання (кількість - crawl.max_depth) читаються повністю в кожному запуску й оновлюють ціни/статус перелічених оголошень; сторінки оголошень завантажуються інкрементально (нові - одразу, відомі - не частіше за crawl.revisit_interval_seconds). RAW -> raw-files, ad_car -> results-mongo (MongoDB).",
       "input": {
         "source_id": "autoria-cars"
       },
@@ -114,9 +114,9 @@
         {
           "stage_id": "store-ads",
           "kind": "handler",
-          "handler": "@pkg:jane.storage-postgresql",
+          "handler": "@pkg:jane.storage-mongodb",
           "connections": {
-            "target": "results-pg"
+            "target": "results-mongo"
           },
           "inputs": [
             {
@@ -165,7 +165,7 @@
   ],
   "verify": {
     "autoria-cars": {
-      "car_ad": {
+      "ad_car": {
         "min": 60,
         "required": [
           "site",

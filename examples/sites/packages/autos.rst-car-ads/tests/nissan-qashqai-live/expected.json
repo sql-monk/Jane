@@ -1,0 +1,17 @@
+{
+  "entities": [{
+    "entity_type": "ad_car",
+    "key": {"scope": "local", "natural": {"site": "rst.ua", "ad_id": "15487251"}},
+    "fields": {
+      "site": "rst.ua", "ad_id": "15487251",
+      "url": "https://rst.ua/ukr/oldcars/nissan/qashqai/nissan_qashqai_15487251.html",
+      "title": "NISSAN Qashqai", "make": "NISSAN", "model": "Qashqai",
+      "price": 6950, "currency": "USD", "price_uah": 313100,
+      "year": 2007, "mileage_km": 255000, "engine_l": 2.0,
+      "fuel": "petrol_gas", "transmission": "manual", "drive": "front",
+      "body_type": "suv", "color": "чорний", "city": "Охтирка",
+      "region": "Сумська область",
+      "raw_specs": {"двигун": "2.0 • Газ/Бензин", "КПП": "Механіка • Передній пр.", "кузов": "Позашляховик Чорний"}
+    }
+  }]
+}

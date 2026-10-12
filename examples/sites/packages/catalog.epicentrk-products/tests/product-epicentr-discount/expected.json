@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "entity_type": "product",
+      "entity_type": "product_tools",
       "fields": {
         "shop": "epicentrk.ua",
         "product_id": "elektrorubanok-zenit-zr-780-841510",

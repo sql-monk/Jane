@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "package_id": "news.articles",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "extractor",
   "title": "News: articles of news sites with full text",
   "description": "Статті новинних сайтів: заголовок, дати публікації й оновлення (RFC 3339, UTC), автор, рубрика, лід, мова, теги, зображення й повний чистий текст (без меню, реклами, підписів до фото й «читайте також»). Метадані — зі schema.org JSON-LD (NewsArticle/Article), og:/article: meta; текст — з контейнера статті за таблицею сайтів (Українська правда, Укрінформ, Суспільне, УНІАН, LIGA, Радіо Свобода, Zaxid.net, NV) або params.sites, для невідомого сайту — JSON-LD articleBody. Сторінка без розмітки статті й стаття за пейволом — empty.",
@@ -176,7 +176,12 @@
       "Claude (news sites agent)"
     ],
     "created_at": "2026-10-11T00:00:00Z",
-    "change_summary": "Shared article extractor for eight Ukrainian news sites: JSON-LD/meta metadata and the full clean text of the article container."
+    "change_summary": "1.0.1: the same code as 1.0.0 with LF line endings in the test pages; 1.0.0 was published with CRLF test pages. Shared article extractor for eight Ukrainian news sites: JSON-LD/meta metadata and the full clean text of the article container.",
+    "based_on": {
+      "package_id": "news.articles",
+      "version": "1.0.0",
+      "digest": "sha256:d52ba4d1f2af06c4d372eb4e81d05903dc370f0d613d787d756708c13bf76968"
+    }
   },
   "bindings_hint": {
     "source_kinds": [

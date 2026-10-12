@@ -17,7 +17,15 @@ from botocore.config import Config  # type: ignore[import-untyped]
 from pymongo import MongoClient
 
 from jane_e2e.clients import JaneClient
-from jane_e2e.orchestration import TESTSITE, create_source, create_task, m1_task, start_run, wait_run
+from jane_e2e.orchestration import (
+    TESTSITE,
+    create_source,
+    create_task,
+    m1_task,
+    start_run,
+    storage_version,
+    wait_run,
+)
 from jane_e2e.stack import E2EStack
 from jane_e2e.steps import collector_fetch, extract, store
 from jane_e2e.verify import entities, history, objects_by_source, raw_bytes
@@ -260,12 +268,12 @@ def test_s_m2_08_all_storage_adapters_via_task_revision(
         before = copy.deepcopy(task)
         for stage in task["stages"]:
             if stage["stage_id"] in {"store-raw", "store-products"}:
-                stage["handler"]["package_id"] = package
+                stage["handler"] = {"package_id": package, "version": storage_version(package)}
                 stage["connections"]["target"] = connection
         # Collector input, extractor and its digest, images, bindings, and every other field stay fixed.
         for old, new in zip(before["stages"], task["stages"], strict=True):
             if old["stage_id"] in {"store-raw", "store-products"}:
-                old["handler"]["package_id"] = package
+                old["handler"] = {"package_id": package, "version": storage_version(package)}
                 old["connections"]["target"] = connection
             assert old == new
         updated = orch.put(f"/v1/tasks/{task_id}", json=task, headers={"If-Match": current.headers["etag"]})

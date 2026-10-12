@@ -6,6 +6,7 @@ RAW of every page into files, extraction by a local package (bound to product UR
 
 from __future__ import annotations
 
+import functools
 import json
 import time
 import uuid
@@ -25,6 +26,7 @@ __all__ = [
     "m1_task",
     "put_connections",
     "start_run",
+    "storage_version",
     "wait_run",
 ]
 
@@ -36,6 +38,17 @@ TERMINAL = frozenset({"succeeded", "failed", "cancelled"})
 # truth for stages (ADR-0006) and pushes them to storage (PUT /v1/connections/{id}).
 CONNECTIONS_FILE = Path(__file__).resolve().parents[1] / "config" / "storage-connections.json"
 CONNECTIONS: list[dict[str, Any]] = json.loads(CONNECTIONS_FILE.read_text(encoding="utf-8"))["connections"]
+STORAGE_ADAPTERS = Path(__file__).resolve().parents[3] / "services" / "storage" / "adapters"
+
+
+@functools.cache
+def storage_version(package_id: str) -> str:
+    """Version of a storage package built into the storage image (its adapter's package manifest)."""
+    for manifest in STORAGE_ADAPTERS.glob("*/src/*/package/jane-package.json"):
+        doc = json.loads(manifest.read_text(encoding="utf-8"))
+        if doc["package_id"] == package_id:
+            return str(doc["version"])
+    raise KeyError(f"no built-in storage package {package_id}")
 
 
 def _key() -> str:
@@ -100,7 +113,7 @@ def m1_task(
             {
                 "stage_id": "store-raw",
                 "kind": "handler",
-                "handler": {"package_id": raw_package, "version": "1.0.0"},
+                "handler": {"package_id": raw_package, "version": storage_version(raw_package)},
                 "connections": {"target": raw_connection},
                 "inputs": [{"from": "collect"}],
             },
@@ -119,7 +132,7 @@ def m1_task(
             {
                 "stage_id": "store-products",
                 "kind": "handler",
-                "handler": {"package_id": entities_package, "version": "1.0.0"},
+                "handler": {"package_id": entities_package, "version": storage_version(entities_package)},
                 "connections": {"target": entities_connection},
                 "inputs": [
                     {

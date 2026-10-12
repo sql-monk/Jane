@@ -10,6 +10,7 @@ from typing import Any
 
 from jane_e2e.clients import JaneClient
 from jane_e2e.materials import delivery_key
+from jane_e2e.orchestration import storage_version
 from jane_extractor_sdk.package import build_archive
 
 __all__ = [
@@ -105,7 +106,7 @@ def store(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Write through the storage handler; returns (request body, HandlerResult)."""
     body = {
-        "handler": {"package_id": package_id, "version": "1.0.0"},
+        "handler": {"package_id": package_id, "version": storage_version(package_id)},
         "connections": {"target": connection},
         "inputs": inputs,
         "context": {"trace": {"run_id": f"run_{run_id}", "stage_id": stage_id}},

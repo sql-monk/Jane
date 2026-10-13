@@ -38,7 +38,7 @@
 | `product_auto` | автотовари | epicentrk |
 | `product_pet` | зоотовари | epicentrk, varus, prostor |
 | `product_sport` | спорт і туризм | epicentrk, prostor, varus |
-| `product_office` | канцтовари, шкільне | epicentrk, yakaboo, varus |
+| `product_office` | канцтовари, шкільне | epicentrk, yakaboo, varus, bi-ua |
 | `product_health` | медичні товари, БАДи | epicentrk, prostor, varus |
 | `product_other` | сезонні розділи, «Несортовані», решта | — |
 | `ad_car` | авто | autoria, rst, avtobazar, classified-auto-ria |
@@ -97,13 +97,11 @@
 
 | Сайт | Розділ → тип |
 |---|---|
-| bi-ua | Дитячий транспорт; Колекційні та ігрові фігурки; Конструктори; Машинки, роботи, трансформери; М'які та інтерактивні іграшки → `product_kids` |
+| bi-ua | Дитячий транспорт; Колекційні та ігрові фігурки; Конструктори; Машинки, роботи, трансформери; М'які та інтерактивні іграшки; Для активного відпочинку; Настільні ігри та пазли; Сюжетно-рольові набори; Творчість і розвиток → `product_kids`; Товари для школи → `product_office`; Подарунки → `product_other` |
 | epicentrk | Автотовари → `product_auto`; Будівництво та ремонт, Інструменти, Освітлення, Покриття для підлоги, Сантехніка → `product_tools`; Дитячі товари → `product_kids`; Дім та інтер'єр, Меблі → `product_home` (Дім та інтер'єр › Книги → `product_book`); Електроніка → `product_electronics`; Зоотовари → `product_pet`; Краса та здоров'я → `product_beauty`; Медичні товари → `product_health`; Одяг, взуття, аксесуари → `product_clothing`; Офіс і канцтовари → `product_office`; Побутова техніка → `product_appliance`; Побутова хімія → `product_household`; Продукти → `product_food`; Сад та город → `product_garden`; Спорттовари, Туристичні товари → `product_sport`; Товари для бізнесу → `product_other` |
 | prostor | Волосся, Косметика, Обличчя, Парфуми, Тіло → `product_beauty`; Галантерея → `product_clothing`; Дім → `product_home` (› Зоотовари → `product_pet`, › Продукти → `product_food`, › Спортивні товари → `product_sport`); Дітям → `product_kids`; Здоров`я → `product_health`; Побутова хімія → `product_household`; Продукти → `product_food`; Чоловікам — лише підрозділи (› Спідня білизна, › Чоловічі шкарпетки → `product_clothing`; › Чоловічі засоби для стайлінгу → `product_beauty`); Великдень › Кондитерський декор → `product_food`; Святий Миколай › Дитяча косметика → `product_beauty`; решта сезонних і збірних розділів → `product_other` |
 | varus | продуктові розділи, зокрема VARUS CAFE і Алкоголь → `product_food` (Здорове харчування та Еко товари › БАДи → `product_health`); Гігієна та догляд → `product_beauty` (› Товари для здоров'я → `product_health`); Побутова хімія → `product_household`; Товари для дітей → `product_kids` (› Шкільні товари → `product_office`); Товари для дому → `product_home` (› Канцтовари → `product_office`, › Одяг, взуття та аксесуари → `product_clothing`, › Сад та город → `product_garden`, › Спорт та розваги, › Товари для кемпінгу та відпочинку → `product_sport`); Товари для тварин → `product_pet`; Головна, Тютюнові вироби → `product_other` |
 | yakaboo | Книжки → `product_book`; Ігри та творчість, Настільні ігри → `product_kids`; Кольорові олівці, Рюкзаки, сумки шкільні, Шкільні зошити → `product_office`; Супутні товари, Часто шукають → `product_other` |
-
-Таблиця bi-ua містить лише п'ять розділів, які траплялися в зібраних даних; товари інших розділів повного асортименту bi.ua отримують `product_other`, доки таблицю не розширять.
 
 Екстрактори цін bi-ua, epicentrk, prostor і yakaboo беруть тип із хлібних крихт сторінки категорії й повертають `unrecognized`, якщо розділ не в таблиці або глибший підрозділ має інший тип. Екстрактор цін VARUS визначає тип за категоріями самого товару тією самою функцією, що й картка. Залишковий ризик: товар, який трапився на сторінці іншого розділу, ніж у хлібних крихтах його картки (наприклад, подарунковий набір у сезонному розділі), отримає ціну в колекції розділу сторінки.
 

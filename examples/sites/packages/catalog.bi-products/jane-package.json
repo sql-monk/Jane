@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "package_id": "catalog.bi-products",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "kind": "extractor",
   "title": "bi.ua: product cards and category prices",
   "description": "Товари bi.ua («Будинок іграшок») зі schema.org JSON-LD: сторінка товару — повна картка (назва, ціна, стара ціна, наявність, бренд, артикул, категорії, зображення, рейтинг, характеристики, вага; completeness: full); сторінка категорії — часткове оновлення ціни, старої ціни й наявності кожного товару (completeness: partial). Ключ — магазин + код товару. Тип сутності — група товару за хлібними крихтами (таблиця CATEGORY_TYPES, найдовший префікс): сторінка товару — за власним category_path (розділ поза таблицею — product_other), сторінка категорії — за розділом самої сторінки (розділ поза таблицею чи сторінка без крихт — unrecognized, ціни не пишуться).",
@@ -34,6 +34,15 @@
     "entities": [
       {
         "entity_type": "product_kids",
+        "schema": "schemas/product.schema.json",
+        "key_fields": [
+          "shop",
+          "product_id"
+        ],
+        "description": "Товар магазину: повна картка або часткове оновлення ціни — група «іграшки, дитячий транспорт, дитячі товари»"
+      },
+      {
+        "entity_type": "product_office",
         "schema": "schemas/product.schema.json",
         "key_fields": [
           "shop",
@@ -83,6 +92,18 @@
       },
       "expected_status": "success",
       "expected": "tests/product-nixor/expected.json",
+      "compare": "exact",
+      "origin": "human"
+    },
+    {
+      "name": "product-school-section-office",
+      "input": {
+        "file": "tests/product-school-section/page.html",
+        "media_type": "text/html",
+        "url": "https://bi.ua/ukr/product/samokat-nixor-sports-professional-na01081.html"
+      },
+      "expected_status": "success",
+      "expected": "tests/product-school-section/expected.json",
       "compare": "exact",
       "origin": "human"
     },
@@ -184,12 +205,12 @@
       "Claude (examples/sites: bi.ua)",
       "mongo-entities"
     ],
-    "created_at": "2026-10-12T00:00:00Z",
-    "change_summary": "2.0.0: entity type product_<group> from the shop's category table (CATEGORY_TYPES) instead of product; one collection per type in jane.storage-mongodb.",
+    "created_at": "2026-10-13T00:00:00Z",
+    "change_summary": "2.0.1: the full bi.ua assortment's top-level sections in CATEGORY_TYPES (Для активного відпочинку, Настільні ігри та пазли, Сюжетно-рольові набори, Творчість і розвиток -> product_kids; Товари для школи -> product_office; Подарунки -> product_other); 2.0.0 knew five sections and wrote the rest of the catalog to product_other. 2.0.0: entity type product_<group> from the shop's category table (CATEGORY_TYPES) instead of product; one collection per type in jane.storage-mongodb.",
     "based_on": {
       "package_id": "catalog.bi-products",
-      "version": "1.0.0",
-      "digest": "sha256:57eeb82bd90fcb9aec0b21a6db40c6a964d989aacd0307b8d897ed5a4a582f79"
+      "version": "2.0.0",
+      "digest": "sha256:b5690a4bb3cc6621e1c72dc57387886917ffea29675c2fe1dcbf5a8f980d1f8a"
     }
   },
   "bindings_hint": {

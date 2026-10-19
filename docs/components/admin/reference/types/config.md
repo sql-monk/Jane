@@ -7,7 +7,7 @@
 ### Функція `parseConfig`
 
 ```typescript
-function parseConfig(raw: unknown): import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/config").AdminConfig
+function parseConfig(raw: unknown): import("C:/repos/Jane/web/admin/src/config").AdminConfig
 ```
 
 Merges a raw config document over the defaults, rejecting malformed values instead of trusting them.
@@ -17,7 +17,7 @@ Merges a raw config document over the defaults, rejecting malformed values inste
 ### Функція `loadConfig`
 
 ```typescript
-function loadConfig(fetchImpl?: { (input: RequestInfo | URL, init?: RequestInit | undefined): Promise<Response>; (input: string | Request | URL, init?: RequestInit | undefined): Promise<Response>; }): Promise<import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/config").AdminConfig>
+function loadConfig(fetchImpl?: { (input: RequestInfo | URL, init?: RequestInit | undefined): Promise<Response>; (input: string | Request | URL, init?: RequestInit | undefined): Promise<Response>; }): Promise<import("C:/repos/Jane/web/admin/src/config").AdminConfig>
 ```
 
 Код: [config.ts:153](../../../../../web/admin/src/config.ts#L153).
@@ -25,7 +25,7 @@ function loadConfig(fetchImpl?: { (input: RequestInfo | URL, init?: RequestInit 
 ### Функція `serviceBaseUrl`
 
 ```typescript
-function serviceBaseUrl(config: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/config").AdminConfig, service: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/config").ServiceKey | { executor: string; }): string
+function serviceBaseUrl(config: import("C:/repos/Jane/web/admin/src/config").AdminConfig, service: import("C:/repos/Jane/web/admin/src/config").ServiceKey | { executor: string; }): string
 ```
 
 Код: [config.ts:159](../../../../../web/admin/src/config.ts#L159).

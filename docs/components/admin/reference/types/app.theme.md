@@ -17,7 +17,7 @@ Called before rendering, including the login page. Storage is optional in restri
 ### Функція `setTheme`
 
 ```typescript
-function setTheme(value: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/app/theme").ThemePreference): void
+function setTheme(value: import("C:/repos/Jane/web/admin/src/app/theme").ThemePreference): void
 ```
 
 Код: [theme.ts:37](../../../../../web/admin/src/app/theme.ts#L37).
@@ -25,7 +25,7 @@ function setTheme(value: import("C:/repos/Jane/.claude/worktrees/merge/web/admin
 ### Функція `useTheme`
 
 ```typescript
-function useTheme(): { preference: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/app/theme").ThemePreference; theme: "dark" | "light"; setTheme: (value: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/app/theme").ThemePreference) => void; }
+function useTheme(): { preference: import("C:/repos/Jane/web/admin/src/app/theme").ThemePreference; theme: "dark" | "light"; setTheme: (value: import("C:/repos/Jane/web/admin/src/app/theme").ThemePreference) => void; }
 ```
 
 Код: [theme.ts:67](../../../../../web/admin/src/app/theme.ts#L67).

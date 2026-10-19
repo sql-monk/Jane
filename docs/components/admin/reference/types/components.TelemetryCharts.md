@@ -15,7 +15,7 @@ function TimeSeriesChart({ history, metric, }: { history: { service: string; ins
 ### Компонент `TelemetryCharts`
 
 ```typescript
-function TelemetryCharts({ module, compact, }: { module: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/modules").ModuleDefinition; compact?: boolean; }): React.JSX.Element
+function TelemetryCharts({ module, compact, }: { module: import("C:/repos/Jane/web/admin/src/lib/modules").ModuleDefinition; compact?: boolean; }): React.JSX.Element
 ```
 
 Код: [TelemetryCharts.tsx:123](../../../../../web/admin/src/components/TelemetryCharts.tsx#L123).

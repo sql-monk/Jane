@@ -7,7 +7,7 @@
 ### Функція `resultsHref`
 
 ```typescript
-function resultsHref(context?: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/results-context").ResultsContext): string
+function resultsHref(context?: import("C:/repos/Jane/web/admin/src/lib/results-context").ResultsContext): string
 ```
 
 Only storage API filters are accepted. A source/task/run identifier never implies key.scope.

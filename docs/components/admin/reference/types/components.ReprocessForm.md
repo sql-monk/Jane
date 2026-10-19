@@ -7,7 +7,7 @@
 ### Компонент `ReprocessForm`
 
 ```typescript
-function ReprocessForm({ taskId, storageConnectionId, materialIds, objectIds, stored, }: { taskId?: string; storageConnectionId?: string; materialIds?: string[]; objectIds?: string[]; stored?: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/components/ReprocessForm").StoredSelection; }): React.JSX.Element
+function ReprocessForm({ taskId, storageConnectionId, materialIds, objectIds, stored, }: { taskId?: string; storageConnectionId?: string; materialIds?: string[]; objectIds?: string[]; stored?: import("C:/repos/Jane/web/admin/src/components/ReprocessForm").StoredSelection; }): React.JSX.Element
 ```
 
 Код: [ReprocessForm.tsx:36](../../../../../web/admin/src/components/ReprocessForm.tsx#L36).

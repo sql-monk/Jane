@@ -7,7 +7,7 @@
 ### Компонент `EntityPicker`
 
 ```typescript
-function EntityPicker({ label, value, onChange, options, required, loading, error, validationError, }: { label: string; value: string; onChange: (value: string) => void; options: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/components/EntityPicker").EntityOption[]; required?: boolean; loading?: boolean; error?: unknown; validationError?: string | undefined; }): React.JSX.Element
+function EntityPicker({ label, value, onChange, options, required, loading, error, validationError, }: { label: string; value: string; onChange: (value: string) => void; options: import("C:/repos/Jane/web/admin/src/components/EntityPicker").EntityOption[]; required?: boolean; loading?: boolean; error?: unknown; validationError?: string | undefined; }): React.JSX.Element
 ```
 
 Searchable known entities; the identifier stays explicit and round-trips unchanged.

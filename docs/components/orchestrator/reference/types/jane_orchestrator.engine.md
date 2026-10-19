@@ -121,7 +121,7 @@ def sync_connections(self, worker: str) -> int: ...
 |---|---|
 | Вид | клас |
 | Модуль | `jane_orchestrator.engine` |
-| Код | [engine.py:1683](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1683) |
+| Код | [engine.py:1690](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1690) |
 
 ```python
 class Worker: ...
@@ -135,7 +135,7 @@ A thread that repeatedly claims and processes work (feeds first, then items, sch
 def __init__(self, engine: Engine, name: str, *, scheduler: bool = True) -> None: ...
 ```
 
-Код: [engine.py:1686](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1686).
+Код: [engine.py:1693](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1693).
 
 #### Метод `Worker.start`
 
@@ -143,7 +143,7 @@ def __init__(self, engine: Engine, name: str, *, scheduler: bool = True) -> None
 def start(self) -> None: ...
 ```
 
-Код: [engine.py:1694](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1694).
+Код: [engine.py:1701](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1701).
 
 #### Метод `Worker.stop`
 
@@ -151,7 +151,7 @@ def start(self) -> None: ...
 def stop(self, timeout: float | None = None) -> None: ...
 ```
 
-Код: [engine.py:1697](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1697).
+Код: [engine.py:1704](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1704).
 
 #### Метод `Worker.step`
 
@@ -161,4 +161,4 @@ def step(self) -> bool: ...
 
 One unit of work; ``False`` when there was nothing to do.
 
-Код: [engine.py:1701](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1701).
+Код: [engine.py:1708](../../../../../services/orchestrator/src/jane_orchestrator/engine.py#L1708).

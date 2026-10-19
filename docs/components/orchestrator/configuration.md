@@ -92,6 +92,7 @@
 | `handler_kinds` | `handler`, `llm` | Типи пакетів (`kind` з Registry): `storage`, `extractor`, `transform`, `llm` |
 | `default` | `handler`, `llm` | `true` — виконавець за замовчуванням для інших пакетів |
 | `connections` | `handler` | `false` — виконавець не приймає підключень (рівнозначно `sync_connections: false`) |
+| `connection_kinds` | `collector`, `handler`, `llm` | Види підключень (`kind`), які синхронізуються з виконавцем, наприклад `["http"]` для Web Collector; без поля — усі види |
 
 Приклад для локальних процесів (з [quickstart](quickstart.md)):
 
@@ -106,7 +107,7 @@
 ]
 ```
 
-Повний набір для dev-стеку — у [compose.local.example.yaml](../../../infra/compose.local.example.yaml). Web Collector приймає лише підключення типу `http`; якщо підключення іншого типу надсилається йому, синхронізація стає `failed` — тому в прикладі вона вимкнена.
+Повний набір для dev-стеку — у [compose.local.example.yaml](../../../infra/compose.local.example.yaml). Колектори приймають лише свої види підключень (Web Collector — `http`, Telegram Collector — `telegram_account`) і відповідають `422` на інші, тому в dev-стеку їм задано `connection_kinds`: підключення інших видів їм не надсилаються, а копія, надіслана раніше (зокрема після зміни `kind`), видаляється під час наступного збереження підключення. У прикладі вище синхронізацію Web Collector вимкнено повністю.
 
 ## Ліміти завдань
 

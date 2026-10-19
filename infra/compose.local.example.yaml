@@ -39,7 +39,7 @@ services:
     environment:
       JANE_ORCHESTRATOR_EXECUTORS: >-
         [{"executor": "web-collector", "role": "collector", "base_url": "http://web-collector:8101",
-          "capabilities": {"collector": "web"}},
+          "capabilities": {"collector": "web", "connection_kinds": ["http"]}},
          {"executor": "handler-runtime", "role": "handler", "base_url": "http://handler-runtime:8000",
           "capabilities": {"handler_kinds": ["extractor", "transform"], "default": true}},
          {"executor": "storage", "role": "handler", "base_url": "http://storage:8000",
@@ -47,9 +47,9 @@ services:
          {"executor": "storage-read", "role": "storage_read", "base_url": "http://storage:8000",
           "sync_connections": false},
          {"executor": "registry", "role": "registry", "base_url": "http://registry:8000"},
-         {"executor": "llm", "role": "llm", "base_url": "http://llm:8110", "capabilities": {"handler_kinds": ["llm"]}},
+         {"executor": "llm", "role": "llm", "base_url": "http://llm:8110", "capabilities": {"handler_kinds": ["llm"], "connection_kinds": ["llm_provider"]}},
          {"executor": "telegram-collector", "role": "collector", "base_url": "http://telegram-collector:8102",
-          "capabilities": {"collector": "telegram"}},
+          "capabilities": {"collector": "telegram", "connection_kinds": ["telegram_account"]}},
          {"executor": "assistant", "role": "assistant", "base_url": "http://assistant:8000"}]
   llm:
     environment:

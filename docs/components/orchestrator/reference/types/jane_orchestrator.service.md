@@ -320,7 +320,7 @@ def delete_connection(self, connection_id: str, actor: str) -> None: ...
 
 Винятки в коді методу: `NotFound`, `Conflict`.
 
-Код: [service.py:949](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L949).
+Код: [service.py:962](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L962).
 
 #### Метод `Admin.get_platform_limits`
 
@@ -328,7 +328,7 @@ def delete_connection(self, connection_id: str, actor: str) -> None: ...
 def get_platform_limits(self) -> tuple[dict[str, Any], int]: ...
 ```
 
-Код: [service.py:980](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L980).
+Код: [service.py:993](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L993).
 
 #### Метод `Admin.put_platform_limits`
 
@@ -341,7 +341,7 @@ def put_platform_limits(
 ) -> tuple[dict[str, Any], int]: ...
 ```
 
-Код: [service.py:984](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L984).
+Код: [service.py:997](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L997).
 
 #### Метод `Admin.effective_limits`
 
@@ -356,7 +356,7 @@ def effective_limits(
 
 Винятки в коді методу: `ValidationFailed`, `NotFound`.
 
-Код: [service.py:1007](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L1007).
+Код: [service.py:1020](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L1020).
 
 #### Метод `Admin.list_executors`
 
@@ -364,7 +364,7 @@ def effective_limits(
 def list_executors(self) -> list[dict[str, Any]]: ...
 ```
 
-Код: [service.py:1042](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L1042).
+Код: [service.py:1055](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L1055).
 
 #### Метод `Admin.list_audit`
 
@@ -380,7 +380,7 @@ def list_audit(
 ) -> tuple[list[dict[str, Any]], str | None]: ...
 ```
 
-Код: [service.py:1056](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L1056).
+Код: [service.py:1069](../../../../../services/orchestrator/src/jane_orchestrator/service.py#L1069).
 
 ### Клас `PreconditionFailed`
 

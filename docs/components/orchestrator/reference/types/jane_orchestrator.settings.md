@@ -46,7 +46,7 @@ A service the orchestrator calls (``orchestrator.v1`` ``Executor``).
 | `executor` | `str` | — | читання й запис |  |
 | `role` | `Literal['collector', 'handler', 'storage_read', 'registry', 'llm', 'assistant']` | — | читання й запис |  |
 | `base_url` | `str` | — | читання й запис |  |
-| `capabilities` | `dict[str, Any]` | `Field(default_factory=dict)` | читання й запис | ``collector: web`` for collectors; ``handler_kinds: [...]`` and ``packages: ["jane.storage-*"]`` (globs of package ids routed to this executor) for handlers; ``default: true`` marks the fallback handler executor. |
+| `capabilities` | `dict[str, Any]` | `Field(default_factory=dict)` | читання й запис | ``collector: web`` for collectors; ``handler_kinds: [...]`` and ``packages: ["jane.storage-*"]`` (globs of package ids routed to this executor) for handlers; ``default: true`` marks the fallback handler executor; ``connection_kinds: [...]`` limits the synced connections to these ``kind`` values (absent: every kind). |
 | `sync_connections` | `bool \| None` | `None` | читання й запис | Push the connections registry to this executor (``PUT /v1/connections/{id}``). Default: true for collectors, handlers and llm. |
 | `token_ref` | `str \| None` | `None` | читання й запис | Secret reference (``env:VAR`` / ``file:/path``, ADR-0006) of the bearer token for this executor; without it the orchestrator's own ``service_token_ref`` is used (ADR-0005 §5). |
 | `token` | `SecretStr \| None` | `None` | читання й запис | Bearer token in plain text - deprecated (logged as a warning at start), use ``token_ref``. After :meth:`Settings.all_executors` it holds the resolved token (``SecretStr``: never in reprs, logs or the API). |
@@ -60,6 +60,16 @@ A service the orchestrator calls (``orchestrator.v1`` ``Executor``).
 |---|---|---|
 | `model_config` | `ConfigDict(extra='forbid')` |  |
 
+#### Метод `ExecutorConfig.accepts_connection`
+
+```python
+def accepts_connection(self, kind: str) -> bool: ...
+```
+
+Whether a connection of ``kind`` is pushed to this executor: :attr:`syncs_connections` and, when ``capabilities.connection_kinds`` is set, ``kind`` is listed there (a collector rejects other kinds with 422, so pushing them would only produce failed syncs).
+
+Код: [settings.py:74](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L74).
+
 ### Клас `Queue`
 
 | Властивість | Значення |
@@ -67,7 +77,7 @@ A service the orchestrator calls (``orchestrator.v1`` ``Executor``).
 | Вид | клас |
 | Модуль | `jane_orchestrator.settings` |
 | Успадкування | `Limits` |
-| Код | [settings.py:74](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L74) |
+| Код | [settings.py:84](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L84) |
 
 ```python
 class Queue(Limits): ...
@@ -87,7 +97,7 @@ class Queue(Limits): ...
 | Вид | клас |
 | Модуль | `jane_orchestrator.settings` |
 | Успадкування | `Limits` |
-| Код | [settings.py:79](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L79) |
+| Код | [settings.py:89](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L89) |
 
 ```python
 class Concurrency(Limits): ...
@@ -107,7 +117,7 @@ class Concurrency(Limits): ...
 | Вид | клас |
 | Модуль | `jane_orchestrator.settings` |
 | Успадкування | `Limits` |
-| Код | [settings.py:84](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L84) |
+| Код | [settings.py:94](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L94) |
 
 ```python
 class Timeouts(Limits): ...
@@ -129,7 +139,7 @@ class Timeouts(Limits): ...
 | Вид | клас |
 | Модуль | `jane_orchestrator.settings` |
 | Успадкування | `Limits` |
-| Код | [settings.py:91](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L91) |
+| Код | [settings.py:101](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L101) |
 
 ```python
 class Transfer(Limits): ...
@@ -148,7 +158,7 @@ class Transfer(Limits): ...
 | Вид | клас |
 | Модуль | `jane_orchestrator.settings` |
 | Успадкування | `Limits` |
-| Код | [settings.py:95](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L95) |
+| Код | [settings.py:105](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L105) |
 
 ```python
 class ContractDefaults(Limits): ...
@@ -173,7 +183,7 @@ Fallback values of contract limits the orchestrator consumes (level ``platform``
 | Вид | клас |
 | Модуль | `jane_orchestrator.settings` |
 | Успадкування | `Limits` |
-| Код | [settings.py:108](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L108) |
+| Код | [settings.py:118](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L118) |
 
 ```python
 class EngineLimits(Limits): ...
@@ -221,7 +231,7 @@ Internal knobs of the queue engine (not part of ``limits.schema.json``).
 | Вид | клас |
 | Модуль | `jane_orchestrator.settings` |
 | Успадкування | `Limits` |
-| Код | [settings.py:185](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L185) |
+| Код | [settings.py:195](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L195) |
 
 ```python
 class ServiceLimits(Limits): ...
@@ -244,7 +254,7 @@ class ServiceLimits(Limits): ...
 | Вид | модель Pydantic |
 | Модуль | `jane_orchestrator.settings` |
 | Успадкування | `JaneSettings` |
-| Код | [settings.py:194](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L194) |
+| Код | [settings.py:204](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L204) |
 
 ```python
 class Settings(JaneSettings): ...
@@ -280,7 +290,7 @@ def executor_configs(self) -> list[ExecutorConfig]: ...
 
 Executors as configured (tokens not resolved).
 
-Код: [settings.py:215](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L215).
+Код: [settings.py:225](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L225).
 
 #### Метод `Settings.all_executors`
 
@@ -290,7 +300,7 @@ def all_executors(self) -> list[ExecutorConfig]: ...
 
 Executors with ``token`` = the bearer token to send: ``token_ref``, else the deprecated plain ``token``, else ``service_token_ref``. An unresolvable reference raises (the service must not start).
 
-Код: [settings.py:223](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L223).
+Код: [settings.py:233](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L233).
 
 ## Функції
 
@@ -307,7 +317,7 @@ Defaults &lt;- ``JANE_ORCHESTRATOR_LIMITS__*`` env &lt;- ``extra``.
 
 The platform limits *file* (``JANE_ORCHESTRATOR_LIMITS_FILE``, ``PlatformLimits``) seeds the platform document in the DB instead (see :mod:`jane_orchestrator.limits`), because it has the contract shape.
 
-Код: [settings.py:245](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L245).
+Код: [settings.py:255](../../../../../services/orchestrator/src/jane_orchestrator/settings.py#L255).
 
 ## Константи й змінні модуля
 

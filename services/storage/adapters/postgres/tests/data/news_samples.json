@@ -1,0 +1,177 @@
+{
+  "_comment": "Snapshots of the four news types as stored in results-mongo on 2026-10-12 (public news; article text shortened).",
+  "article": {
+    "entity_type": "article",
+    "key": {
+      "scope": "news-suspilne",
+      "natural": {
+        "url": "https://suspilne.media/culture/1425203-radiodiktant-nacionalnoi-ednosti-2026-suspilne-ogolosilo-avtora-ta-citciv/"
+      }
+    },
+    "fields": {
+      "url": "https://suspilne.media/culture/1425203-radiodiktant-nacionalnoi-ednosti-2026-suspilne-ogolosilo-avtora-ta-citciv/",
+      "lead": "Радіодиктант у 2026 році читатиме вчитель Артур Пройдаков та співачка Даша Астафʼєва, текст диктанту напише письменник та військовий Артур Дронь",
+      "site": "suspilne.media",
+      "tags": ["Радіодиктант", "Українське Радіо"],
+      "text": "Автором тексту для Радіодиктанту національної єдності у 2026 році став письменник та ветеран російсько-української війни Артур Дронь.\n\nВсеукраїнський радіодиктант відбудеться у вівторок, 27 жовтня, в День української писемності та мови.",
+      "image": "https://cdn4.suspilne.media/images/generated/automatic-og/v1/bd/bd38650a35994521a37e3209ed3ad1889cbe754b5b21c760de672e5aeb3db69a.jpg",
+      "title": "Радіодиктант національної єдності – 2026: Суспільне оголосило автора та читців",
+      "author": "Суспільне Культура",
+      "section": "Культура",
+      "language": "uk",
+      "modified_at": "2026-10-12T10:29:55Z",
+      "published_at": "2026-10-12T10:22:42Z"
+    }
+  },
+  "post": {
+    "entity_type": "post",
+    "key": {
+      "scope": "tgweb-hromadske-ua",
+      "natural": {"channel": "hromadske_ua", "message_id": 89322}
+    },
+    "fields": {
+      "url": "https://t.me/hromadske_ua/89322",
+      "text": "✍️ Зеленський підписав укази про введення нових санкцій проти рф. Під обмеження потрапили причетні до виробництва російських балістичних ракет, тіньових фінансових схем та колаборанти.\n\nХто ще потрапив під санкції — читайте у новині",
+      "links": [
+        "https://hromadske.ua/viyna/272349-vid-inzeneriv-iskanderiv-ta-tsyrkoniv-do-kryptobirz-ukrayina-zaprovadyla-novyy-paket-sanktsiy-proty-rf",
+        "https://send.monobank.ua/jar/6BYQbrQcUx?utm_source=socmed&utm_medium=tg&utm_campaign=button"
+      ],
+      "title": "✍️ Зеленський підписав укази про введення нових санкцій проти рф. Під обмеження потрапили причетні до виробництва російських балістичних ракет, тіньових фінансових схем та колаборанти.",
+      "views": 17100,
+      "edited": true,
+      "channel": "hromadske_ua",
+      "has_media": false,
+      "message_id": 89322,
+      "published_at": "2026-10-11T20:59:28Z"
+    }
+  },
+  "news_article": {
+    "entity_type": "news_article",
+    "key": {
+      "scope": "news-web-pravda",
+      "natural": {"url": "https://www.pravda.com.ua/news/2026/10/12/8057588/"}
+    },
+    "fields": {
+      "url": "https://www.pravda.com.ua/news/2026/10/12/8057588/",
+      "event": {
+        "summary": "12 жовтня внаслідок атаки російських безпілотників у Києві постраждали троє людей; уламки впали на приватний будинок у Дарницькому районі та поблизу будинків у Солом'янському районі.",
+        "evidence": [
+          {
+            "quote": "У столиці 12 жовтня внаслідок атаки російських безпілотників постраждали троє людей",
+            "reason": "Подія стосується атаки на Київ, але без одного названого об'єкта, тож ідентичність загальна.",
+            "attribution": "author"
+          }
+        ],
+        "canonical": {"country": "Ukraine", "location": "Kyiv"},
+        "identity_confidence": 0.35,
+        "identity_specificity": "broad"
+      },
+      "region": "ukraine",
+      "topics": ["атака безпілотників", "війна в Україні", "цивільні постраждалі", "Київ"],
+      "summary": "12 жовтня внаслідок атаки російських безпілотників у Києві постраждали троє людей. Уламки впали на приватний будинок у Дарницькому районі та на відкриту територію біля приватних будинків у Солом'янському районі. На обидва місця вирушили екстрені служби. Про кількість постраждалих повідомив мер Києва Віталій Кличко.",
+      "entities": [
+        {
+          "name": "Віталій Кличко",
+          "role": "mentioned",
+          "type": "person",
+          "attitude": "neutral",
+          "evidence": [
+            {
+              "quote": "мер Києва Віталій Кличко",
+              "reason": "Названо як джерело інформації про кількість постраждалих; авторського оцінного ставлення немає.",
+              "attribution": "author"
+            }
+          ],
+          "canonical_name": "Vitali Klitschko",
+          "factual_impact": "unknown",
+          "attitude_confidence": 0.9
+        },
+        {
+          "name": "Київ",
+          "role": "object",
+          "type": "place",
+          "attitude": "neutral",
+          "evidence": [
+            {
+              "quote": "У столиці 12 жовтня внаслідок атаки російських безпілотників постраждали троє людей",
+              "reason": "Місце події, названо нейтрально.",
+              "attribution": "author"
+            }
+          ],
+          "canonical_name": "Kyiv",
+          "factual_impact": "harmful",
+          "attitude_confidence": 0.9
+        },
+        {
+          "name": "російських",
+          "role": "mentioned",
+          "type": "country",
+          "attitude": "neutral",
+          "evidence": [
+            {
+              "quote": "атаки російських безпілотників",
+              "reason": "Названо як сторону, чиї безпілотники атакували; оцінки автора немає.",
+              "attribution": "author"
+            }
+          ],
+          "canonical_name": "Russia",
+          "factual_impact": "unknown",
+          "attitude_confidence": 0.8
+        }
+      ],
+      "headline": "У Києві через атаку російських дронів постраждали троє людей",
+      "locations": ["Київ", "Дарницький район", "Солом'янський район"],
+      "sentiment": {
+        "label": "neutral",
+        "evidence": [
+          {
+            "quote": "У столиці 12 жовтня внаслідок атаки російських безпілотників постраждали троє людей",
+            "reason": "Нейтральний фактичний виклад події без оцінної риторики автора.",
+            "attribution": "author"
+          }
+        ],
+        "confidence": 0.85,
+        "explanation": "Автор викладає факти про наслідки атаки без оцінних формулювань. Пряма мова належить Кличку і не є авторською оцінкою."
+      },
+      "source_id": "news-web-pravda",
+      "transport": "rss_article",
+      "fetched_at": "2026-10-12T10:32:59Z",
+      "material_id": "web:188f95cf434a15a95549553fe846ca5f",
+      "source_kind": "web",
+      "source_name": "Українська правда",
+      "published_at": "2026-10-12T13:25:00+03:00",
+      "content_sha256": "0bf622c8cfd78ac3f3f0a5bf16a93e0ca734a1d16138e1df62f5aa0d6dd072b1",
+      "event_grouping": {
+        "method": "exact_canonical_identity",
+        "reason": "low_identity_confidence",
+        "status": "ungrouped"
+      },
+      "reporting_kind": "news",
+      "source_language": "uk",
+      "analysis_language": "uk",
+      "headline_ukrainian": "У Києві через атаку російських дронів постраждали троє людей",
+      "evidence_validation": "verified"
+    }
+  },
+  "news_event": {
+    "entity_type": "news_event",
+    "key": {
+      "scope": "news-events",
+      "natural": {"event_id": "news-event-0bdb293049bcaf057eaa60a75c6141a8"}
+    },
+    "fields": {
+      "summary": "Навчальний літак пакистанської армії PAC MFI-17 Mushshak розбився біля міста Nawan Killi у провінції Белуджистан на південному заході Пакистану; загинули обидва пілоти. Військові назвали причиною технічну несправність.",
+      "event_id": "news-event-0bdb293049bcaf057eaa60a75c6141a8",
+      "canonical": {
+        "date": "2026-10-12",
+        "action": "crash",
+        "object": "PAC MFI-17 Mushshak",
+        "country": "Pakistan",
+        "location": "Nawan Killi"
+      },
+      "identity_kind": "incident",
+      "grouping_method": "exact_canonical_identity",
+      "identity_confidence": 0.8
+    }
+  }
+}

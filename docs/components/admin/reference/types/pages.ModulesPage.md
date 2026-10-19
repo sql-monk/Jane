@@ -7,7 +7,7 @@
 ### Компонент `ModuleCard`
 
 ```typescript
-function ModuleCard({ module }: { module: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/modules").ModuleDefinition; }): React.JSX.Element
+function ModuleCard({ module }: { module: import("C:/repos/Jane/web/admin/src/lib/modules").ModuleDefinition; }): React.JSX.Element
 ```
 
 Код: [ModulesPage.tsx:45](../../../../../web/admin/src/pages/ModulesPage.tsx#L45).

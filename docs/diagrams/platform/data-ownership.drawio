@@ -92,26 +92,29 @@
           <mxGeometry y="52" width="290" height="22" as="geometry"/>
         </mxCell>
         <mxCell id="o_st" value="Storage — сховища за підключеннями" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#D5E8D4,#1F3D29);swimlaneFillColor=none;strokeColor=light-dark(#82B366,#7DBE6A);strokeWidth=1.5;" vertex="1" parent="1">
-          <mxGeometry x="420" y="400" width="300" height="100" as="geometry"/>
+          <mxGeometry x="420" y="400" width="300" height="122" as="geometry"/>
         </mxCell>
         <mxCell id="o_st_r0" value="RAW-об'єкти: файли, MinIO, S3" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_st">
           <mxGeometry y="30" width="300" height="22" as="geometry"/>
         </mxCell>
-        <mxCell id="o_st_r1" value="сутності й історія: MongoDB" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_st">
+        <mxCell id="o_st_r1" value="новини й історія: PostgreSQL, схема news" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_st">
           <mxGeometry y="52" width="300" height="22" as="geometry"/>
         </mxCell>
-        <mxCell id="o_st_r2" value="записи доставок (delivery_key)" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_st">
+        <mxCell id="o_st_r1m" value="інші сутності й історія: MongoDB" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_st">
           <mxGeometry y="74" width="300" height="22" as="geometry"/>
         </mxCell>
-        <mxCell id="ext" value="Цільові сховища користувача:&#10;типово MongoDB і файли;&#10;також PostgreSQL, SQL Server, MinIO, S3" style="rounded=0;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
-          <mxGeometry x="760" y="410" width="290" height="70" as="geometry"/>
+        <mxCell id="o_st_r2" value="записи доставок (delivery_key)" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=8;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);strokeColor=none;fillColor=none;" vertex="1" parent="o_st">
+          <mxGeometry y="96" width="300" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="ext" value="Цільові сховища користувача:&#10;типово MongoDB і файли,&#10;новини — PostgreSQL (results-news);&#10;також SQL Server, MinIO, S3" style="rounded=0;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="760" y="421" width="290" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="a1" value="storage.v1:&#10;читання RAW" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="o_orch" target="o_st">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="251" y="210"/>
               <mxPoint x="385" y="210"/>
-              <mxPoint x="385" y="430"/>
+              <mxPoint x="385" y="436.6"/>
             </Array>
           </mxGeometry>
         </mxCell>
@@ -121,26 +124,26 @@
         <mxCell id="a3" value="запис" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;dashed=1;dashPattern=2 3;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);fontColor=light-dark(#424A53,#C9D1D9);fontSize=12;fontFamily=Helvetica;labelBackgroundColor=light-dark(#FFFFFF,#0D1117);exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="o_st" target="ext">
           <mxGeometry relative="1" as="geometry"></mxGeometry>
         </mxCell>
-        <mxCell id="note" value="Кожен прямокутник — власне сховище модуля. Спільної бази немає: дані іншого модуля доступні лише через його API.&#10;Orchestrator зберігає лише ідентифікатори матеріалів і результатів, а не їхній вміст. Admin UI власних даних не має.&#10;Розміщення: стан сервісів — PostgreSQL, сутності з пакетів — MongoDB (колекція на тип), байти — файли, MinIO або S3 (ADR-0011)." style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);" vertex="1" parent="1">
-          <mxGeometry x="20" y="520" width="1030" height="62" as="geometry"/>
+        <mxCell id="note" value="Кожен прямокутник — власне сховище модуля. Спільної бази немає: дані іншого модуля доступні лише через його API.&#10;Orchestrator зберігає лише ідентифікатори матеріалів і результатів, а не їхній вміст. Admin UI власних даних не має.&#10;Розміщення: стан сервісів — PostgreSQL, сутності з пакетів — MongoDB (колекція на тип), байти — файли, MinIO або S3 (ADR-0011).&#10;Новини (article, post, news_article, news_event) — реляційна схема news у PostgreSQL, підключення results-news (ADR-0012)." style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);" vertex="1" parent="1">
+          <mxGeometry x="20" y="542" width="1030" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="lg0" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="20" y="608" as="sourcePoint"/>
-            <mxPoint x="70" y="608" as="targetPoint"/>
+            <mxPoint x="20" y="648" as="sourcePoint"/>
+            <mxPoint x="70" y="648" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
         <mxCell id="lt0" value="читання через API" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);" vertex="1" parent="1">
-          <mxGeometry x="78" y="598" width="130" height="20" as="geometry"/>
+          <mxGeometry x="78" y="638" width="130" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="lg1" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;dashed=1;dashPattern=2 3;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="228" y="608" as="sourcePoint"/>
-            <mxPoint x="278" y="608" as="targetPoint"/>
+            <mxPoint x="228" y="648" as="sourcePoint"/>
+            <mxPoint x="278" y="648" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
         <mxCell id="lt1" value="запис у зовнішнє сховище" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);" vertex="1" parent="1">
-          <mxGeometry x="286" y="598" width="180" height="20" as="geometry"/>
+          <mxGeometry x="286" y="638" width="180" height="20" as="geometry"/>
         </mxCell>
       </root>
     </mxGraphModel>

@@ -28,6 +28,10 @@
 | [`jane_storage.settings`](jane_storage.settings.md) | 9 | 1 | Settings and limits of the service. Every limit has a safe default documented in README.md. |
 | [`jane_storage_files`](jane_storage_files.md) | 1 | 1 | Filesystem adapter of the Jane storage handler (``kind: filesystem``). |
 | [`jane_storage_postgres`](jane_storage_postgres.md) | 1 | 1 | PostgreSQL adapter of the Jane storage handler (``kind: postgresql``, asyncpg). |
+| [`jane_storage_postgres.news_layout`](jane_storage_postgres.news_layout.md) | 0 | 4 | Relational layout ``news`` of the PostgreSQL adapter (connection parameter ``params.layout = "news"``). |
+| [`jane_storage_postgres.news_layout.__main__`](jane_storage_postgres.news_layout.__main__.md) | 0 | 1 | CLI of the ``news`` layout: ``python -m jane_storage_postgres.news_layout rebuild --schema news …``. |
+| [`jane_storage_postgres.news_layout.ddl`](jane_storage_postgres.news_layout.ddl.md) | 0 | 1 | DDL of the ``news`` layout: numbered migrations over ``<schema>``. |
+| [`jane_storage_postgres.news_layout.mapping`](jane_storage_postgres.news_layout.mapping.md) | 4 | 4 | Pure mapping of an entity snapshot to the rows of the ``news`` layout (no database). |
 | [`jane_storage_sqlserver`](jane_storage_sqlserver.md) | 1 | 1 | SQL Server adapter of the Jane storage handler (``kind: sqlserver``, pymssql / FreeTDS). |
 | [`jane_storage_mongodb`](jane_storage_mongodb.md) | 1 | 1 | MongoDB adapter of the Jane storage handler (``kind: mongodb``, PyMongo ``AsyncMongoClient``). |
 | [`jane_storage_minio`](jane_storage_minio.md) | 1 | 1 | MinIO adapter of the Jane storage handler (``kind: minio``). |
@@ -67,12 +71,15 @@
 | [`DependencyNotAllowed`](jane_storage.packages.md#клас-dependencynotallowed) | виняток | `jane_storage.packages` |
 | [`digest_mismatch`](jane_storage.registry_packages.md#функція-digest_mismatch) | функція | `jane_storage.registry_packages` |
 | [`dumps`](jane_storage.codec.md#функція-dumps) | функція | `jane_storage.codec` |
+| [`ensure_layout`](jane_storage_postgres.news_layout.md#функція-ensure_layout) | функція | `jane_storage_postgres.news_layout` |
 | [`entities_format`](jane_storage.formats.md#функція-entities_format) | функція | `jane_storage.formats` |
 | [`entity_ack`](jane_storage.codec.md#функція-entity_ack) | функція | `jane_storage.codec` |
 | [`entity_delivery_key`](jane_storage.keys.md#функція-entity_delivery_key) | функція | `jane_storage.keys` |
 | [`entity_state`](jane_storage.app.md#функція-entity_state) | функція | `jane_storage.app` |
+| [`EntityRows`](jane_storage_postgres.news_layout.mapping.md#клас-entityrows) | dataclass (незмінний) | `jane_storage_postgres.news_layout.mapping` |
 | [`event_from_json`](jane_storage.codec.md#функція-event_from_json) | функція | `jane_storage.codec` |
 | [`event_to_json`](jane_storage.codec.md#функція-event_to_json) | функція | `jane_storage.codec` |
+| [`EvidenceRow`](jane_storage_postgres.news_layout.mapping.md#клас-evidencerow) | dataclass (незмінний) | `jane_storage_postgres.news_layout.mapping` |
 | [`extension_for`](jane_storage.formats.md#функція-extension_for) | функція | `jane_storage.formats` |
 | [`FilesystemAdapter`](jane_storage_files.md#клас-filesystemadapter) | клас | `jane_storage_files` |
 | [`format_ts`](jane_storage.codec.md#функція-format_ts) | функція | `jane_storage.codec` |
@@ -83,14 +90,19 @@
 | [`Invocations`](jane_storage.settings.md#клас-invocations) | клас | `jane_storage.settings` |
 | [`key_digest`](jane_storage.keys.md#функція-key_digest) | функція | `jane_storage.keys` |
 | [`KindAddresses`](jane_storage.policy.md#клас-kindaddresses) | dataclass (незмінний) | `jane_storage.policy` |
+| [`latest_version`](jane_storage_postgres.news_layout.md#функція-latest_version) | функція | `jane_storage_postgres.news_layout` |
 | [`load_package`](jane_storage.packages.md#функція-load_package) | функція | `jane_storage.packages` |
 | [`loads`](jane_storage.codec.md#функція-loads) | функція | `jane_storage.codec` |
 | [`main`](jane_storage.__main__.md#функція-main) | функція | `jane_storage.__main__` |
 | [`main`](jane_storage.packages.md#функція-main) | функція | `jane_storage.packages` |
+| [`main`](jane_storage_postgres.news_layout.__main__.md#функція-main) | функція | `jane_storage_postgres.news_layout.__main__` |
 | [`manifest_test_cases`](jane_storage.app.md#функція-manifest_test_cases) | функція | `jane_storage.app` |
+| [`map_snapshot`](jane_storage_postgres.news_layout.mapping.md#функція-map_snapshot) | функція | `jane_storage_postgres.news_layout.mapping` |
 | [`material_metadata`](jane_storage.formats.md#функція-material_metadata) | функція | `jane_storage.formats` |
+| [`MentionRow`](jane_storage_postgres.news_layout.mapping.md#клас-mentionrow) | dataclass (незмінний) | `jane_storage_postgres.news_layout.mapping` |
 | [`merge`](jane_storage.merge.md#функція-merge) | функція | `jane_storage.merge` |
 | [`MergeResult`](jane_storage.merge.md#клас-mergeresult) | dataclass (незмінний) | `jane_storage.merge` |
+| [`migrations_table_sql`](jane_storage_postgres.news_layout.ddl.md#функція-migrations_table_sql) | функція | `jane_storage_postgres.news_layout.ddl` |
 | [`MinioAdapter`](jane_storage_minio.md#клас-minioadapter) | клас | `jane_storage_minio` |
 | [`MongoAdapter`](jane_storage_mongodb.md#клас-mongoadapter) | клас | `jane_storage_mongodb` |
 | [`network_addresses`](jane_storage.policy.md#функція-network_addresses) | функція | `jane_storage.policy` |
@@ -115,12 +127,16 @@
 | [`PackageCatalog`](jane_storage.packages.md#клас-packagecatalog) | клас | `jane_storage.packages` |
 | [`PackageLimits`](jane_storage.settings.md#клас-packagelimits) | клас | `jane_storage.settings` |
 | [`PackageSource`](jane_storage.handler.md#клас-packagesource) | протокол | `jane_storage.handler` |
+| [`parse_date`](jane_storage_postgres.news_layout.mapping.md#функція-parse_date) | функція | `jane_storage_postgres.news_layout.mapping` |
+| [`parse_time`](jane_storage_postgres.news_layout.mapping.md#функція-parse_time) | функція | `jane_storage_postgres.news_layout.mapping` |
+| [`parse_timestamp`](jane_storage_postgres.news_layout.mapping.md#функція-parse_timestamp) | функція | `jane_storage_postgres.news_layout.mapping` |
 | [`parse_ts`](jane_storage.codec.md#функція-parse_ts) | функція | `jane_storage.codec` |
 | [`PostgresAdapter`](jane_storage_postgres.md#клас-postgresadapter) | клас | `jane_storage_postgres` |
 | [`Prepared`](jane_storage.handler.md#клас-prepared) | dataclass | `jane_storage.handler` |
 | [`publish`](jane_storage.packages.md#функція-publish) | функція | `jane_storage.packages` |
 | [`PublishOutcome`](jane_storage.packages.md#клас-publishoutcome) | dataclass (незмінний) | `jane_storage.packages` |
 | [`raw_format`](jane_storage.formats.md#функція-raw_format) | функція | `jane_storage.formats` |
+| [`rebuild`](jane_storage_postgres.news_layout.md#функція-rebuild) | функція | `jane_storage_postgres.news_layout` |
 | [`redact`](jane_storage.policy.md#функція-redact) | функція | `jane_storage.policy` |
 | [`RegistryPackages`](jane_storage.registry_packages.md#клас-registrypackages) | клас | `jane_storage.registry_packages` |
 | [`resolve_service_limits`](jane_storage.settings.md#функція-resolve_service_limits) | функція | `jane_storage.settings` |
@@ -133,6 +149,7 @@
 | [`Settings`](jane_storage.settings.md#клас-settings) | модель Pydantic | `jane_storage.settings` |
 | [`snapshot_from_json`](jane_storage.codec.md#функція-snapshot_from_json) | функція | `jane_storage.codec` |
 | [`snapshot_to_json`](jane_storage.codec.md#функція-snapshot_to_json) | функція | `jane_storage.codec` |
+| [`SourceRow`](jane_storage_postgres.news_layout.mapping.md#клас-sourcerow) | dataclass (незмінний) | `jane_storage_postgres.news_layout.mapping` |
 | [`SqlServerAdapter`](jane_storage_sqlserver.md#клас-sqlserveradapter) | клас | `jane_storage_sqlserver` |
 | [`StorageEngine`](jane_storage.engine.md#клас-storageengine) | клас | `jane_storage.engine` |
 | [`StorageHandler`](jane_storage.handler.md#клас-storagehandler) | клас | `jane_storage.handler` |
@@ -144,3 +161,4 @@
 | [`UnknownAdapter`](jane_storage.adapters.md#клас-unknownadapter) | виняток | `jane_storage.adapters` |
 | [`utcnow`](jane_storage.codec.md#функція-utcnow) | функція | `jane_storage.codec` |
 | [`validate_record`](jane_storage.merge.md#функція-validate_record) | функція | `jane_storage.merge` |
+| [`write_projection`](jane_storage_postgres.news_layout.md#функція-write_projection) | функція | `jane_storage_postgres.news_layout` |

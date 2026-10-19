@@ -19,7 +19,7 @@ BrowserRouter-compatible protection for route changes, history and local editor 
 ### Функція `useUnsavedChanges`
 
 ```typescript
-function useUnsavedChanges(options: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/components/UnsavedChanges").UnsavedChangesOptions): { confirmChange: (action: () => void) => void; markSaved: () => void | undefined; }
+function useUnsavedChanges(options: import("C:/repos/Jane/web/admin/src/components/UnsavedChanges").UnsavedChangesOptions): { confirmChange: (action: () => void) => void; markSaved: () => void | undefined; }
 ```
 
 Код: [UnsavedChanges.tsx:241](../../../../../web/admin/src/components/UnsavedChanges.tsx#L241).

@@ -64,13 +64,30 @@ class PostgresTarget(CompatTarget):
             await con.close()
 
 
+class NewsLayoutTarget(PostgresTarget):
+    """The same storage with the relational layout ``news`` (``params.layout``)."""
+
+    def _conn(self, port: int, cid: str) -> ResolvedConnection:
+        conn = super()._conn(port, cid)
+        return ResolvedConnection(
+            connection_id=conn.connection_id,
+            kind=conn.kind,
+            params={**conn.params, "layout": "news"},
+            secrets=conn.secrets,
+        )
+
+
+def _stack() -> StackInfo:
+    stack = load_stack()
+    if stack is None or "postgres" not in stack.services:
+        pytest.skip("dev stack with postgres is not running (just up postgres)")
+    return stack
+
+
 class TestPostgresCompat(AdapterCompatSuite):
     @pytest.fixture
     def compat_target(self) -> CompatTarget:
-        stack = load_stack()
-        if stack is None or "postgres" not in stack.services:
-            pytest.skip("dev stack with postgres is not running (just up postgres)")
-        return PostgresTarget(stack)
+        return PostgresTarget(_stack())
 
     async def test_discovery_search_and_entity_statistics(self, env: Any) -> None:
         from jane_storage.compat.suite import raw_object, record
@@ -115,3 +132,11 @@ class TestPostgresCompat(AdapterCompatSuite):
             {"entity_type": "article", "entity_count": 1},
             {"entity_type": "product", "entity_count": 3},
         ]
+
+
+class TestPostgresCompatNewsLayout(TestPostgresCompat):
+    """C-01…C-16 (and discovery) with ``layout = "news"``: the projection does not change the protocol."""
+
+    @pytest.fixture
+    def compat_target(self) -> CompatTarget:
+        return NewsLayoutTarget(_stack())

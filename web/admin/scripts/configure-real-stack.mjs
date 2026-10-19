@@ -22,7 +22,7 @@ const executors = [
     executor: "web-collector",
     role: "collector",
     base_url: "http://web-collector:8101",
-    capabilities: { collector: "web" },
+    capabilities: { collector: "web", connection_kinds: ["http"] },
   },
   {
     executor: "handler-runtime",
@@ -44,7 +44,7 @@ const executors = [
   },
   { executor: "registry", role: "registry", base_url: "http://registry:8000" },
   // LLM stages (packages of kind `llm`, e.g. page triage of unknown materials) run in the LLM gateway.
-  { executor: "llm", role: "llm", base_url: "http://llm:8110", capabilities: { handler_kinds: ["llm"] } },
+  { executor: "llm", role: "llm", base_url: "http://llm:8110", capabilities: { handler_kinds: ["llm"], connection_kinds: ["llm_provider"] } },
   { executor: "assistant", role: "assistant", base_url: "http://assistant:8000" },
 ];
 // Model aliases of the source assistant on the TEST stack only. The real-mode specs point them at a

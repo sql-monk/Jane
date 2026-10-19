@@ -74,6 +74,7 @@
 | `schema` | `public` | Схема; `^[a-z_][a-z0-9_]{0,62}$` |
 | `table_prefix` | `jane_` | Префікс таблиць; `^[a-z_][a-z0-9_]{0,30}$` або порожній |
 | `sslmode` | `prefer` | Режим TLS asyncpg; `disable` вимикає TLS |
+| `layout` | не задано | Реляційна розкладка поверх таблиць рушія; підтримується лише `news` ([розкладка news](#розкладка-news)). Лише параметр підключення: з розкладкою етап не може перевизначити `schema` чи `table_prefix`. Невідоме значення — неповторювана помилка `open` |
 
 Секрети: `username`, `password`. Користувачу потрібні права створити схему (якщо її немає) і таблиці або вже створені таблиці.
 
@@ -94,6 +95,59 @@
 Атомарність: `commit_entity` — одна транзакція: `INSERT … ON CONFLICT DO NOTHING` у доставки (нічого не вставлено → `DUPLICATE`), CAS знімка (`UPDATE … WHERE version = $expected` або `INSERT … ON CONFLICT DO NOTHING` для нової сутності; нічого не змінено → `CONFLICT`) і вставка в історію. `ensure_schema` ідемпотентний і серіалізований advisory-блокуванням.
 
 Помилки з'єднання, тайм-аути, `SerializationError`, `DeadlockDetectedError` — повторювані; помилки автентифікації — ні.
+
+### Розкладка news
+
+Параметр підключення `layout: "news"` вмикає реляційну проєкцію новин у тій самій схемі (дизайн — [news-pg.md](../../delivery/news-pg.md), код — [news_layout](../../../services/storage/adapters/postgres/src/jane_storage_postgres/news_layout/__init__.py)). Підключення `results-news` dev-стеку: схема `news`, `layout: "news"`, решта як у `results-pg` ([конфігурація](configuration.md#підключення)). Потрібен PostgreSQL 15 або новіший (`UNIQUE NULLS NOT DISTINCT`).
+
+- **Джерело істини — таблиці рушія.** `<prefix>entities`, `<prefix>entity_history`, `<prefix>deliveries` і `<prefix>objects` працюють як без розкладки: злиття, CAS, доставки, `/v1/entities`, пошук і статистика їх не помічають. Реляційні таблиці — модель для SQL-споживачів; стан із них не відновлюється, бо перетворення типів втрачає оригінальний рядок (наприклад, `+03:00` у часі).
+- **Коли пишеться.** Усередині транзакції `commit_entity`, після успішного CAS і вставки в історію, для типів `article`, `post`, `news_article`, `news_event`. `DUPLICATE` і `CONFLICT` проєкцію не змінюють. Будь-яка помилка проєкції відкочує весь коміт, тож проєкція завжди відповідає стану. Інші типи, наприклад `product`, пишуться лише в таблиці рушія.
+- **Міграції.** Нумеровані міграції розкладки застосовує `ensure_schema` у своїй транзакції під тим самим advisory-блокуванням і додатковим блокуванням схеми; застосовані версії — у `<schema>.jane_layout_migrations (layout, version, applied_at)`. Схему з новішою версією, ніж знає адаптер, він відхиляє неповторюваною помилкою.
+- **Імена таблиць** — без `table_prefix`: схема `news` окрема, а суфікси таблиць рушія (`entities`, `entity_history`, `deliveries`, `objects`) з назвами проєкції не збігаються за жодного префікса. Розкладка одна на схему: `layout` береться лише з підключення, а якщо етап перевизначає `schema` чи `table_prefix` підключення з розкладкою іншим значенням, `open` повертає неповторювану помилку. Інакше етап писав би в ту саму проєкцію з інших таблиць рушія, а перебудова з таблиць підключення втратила б ці сутності. Для іншого простору імен потрібне окреме підключення.
+
+| Таблиця | Вміст |
+|---|---|
+| `source` | `source_id` (= `key.scope`) PK, `kind`, `name`, `site`, `channel`, `first_seen_at`, `last_seen_at` |
+| `tag`, `topic` | `tag_id` / `topic_id` (identity), `name` UNIQUE |
+| `named_entity` | `named_entity_id`, `canonical_name`, `entity_kind`; UNIQUE NULLS NOT DISTINCT `(canonical_name, entity_kind)` |
+| `article` | `article_id`, `canonical_key` UNIQUE, `source_id` → `source`, `url`, `site`, `title`, `lead`, `body` (поле `text`), `author`, `section`, `language`, `image`, `published_at`, `modified_at`; UNIQUE `(source_id, url)` |
+| `article_tag` | `(article_id, position)` PK, `tag_id` → `tag` |
+| `post` | `post_id`, `canonical_key`, `source_id`, `channel`, `message_id`, `url`, `title`, `body`, `views`, `forwarded_from`, `has_media`, `edited`, `published_at`; UNIQUE `(source_id, channel, message_id)` |
+| `post_link` | `(post_id, position)` PK, `url` |
+| `news_event` | `news_event_id`, `canonical_key`, `scope`, `event_id`, `summary`, `identity_kind`, `grouping_method`, `identity_confidence`, `event_date`, `event_time`, `primary_actor`, `action`, `object`, `location`, `country`; UNIQUE `(scope, event_id)` |
+| `news_article` | `news_article_id`, `canonical_key`, `source_id`, `url`, `material_id`, `content_sha256`, `headline`, `headline_ukrainian`, `summary`, `source_language`, `analysis_language`, `reporting_kind`, `region`, `transport`, `published_at`, `fetched_at`, `edited_at`, `evidence_validation`, `event_id` (без FK), `grouping_status`/`_method`/`_reason`, `sentiment_label`/`_confidence`/`_explanation`; UNIQUE `(source_id, url)` |
+| `news_article_event` | 1:1 з `news_article`: що стаття каже про подію (`summary`, `identity_*`, `event_date`, `event_time`, `primary_actor`, `action`, `object`, `location`, `country`, `date_resolution_*`) |
+| `news_article_topic`, `news_article_location` | `(news_article_id, position)` PK; `topic_id` → `topic` / `name` |
+| `news_article_mention` | `mention_id`, `news_article_id`, `position` (UNIQUE разом), `named_entity_id` → `named_entity`, `name`, `role`, `attitude`, `attitude_confidence`, `factual_impact` |
+| `evidence` | `evidence_id`, `news_article_id`, `subject` (`event` / `event_time` / `sentiment` / `mention`), `mention_id` (для `mention`), `position`, `quote`, `reason`, `attribution` |
+
+Кожна таблиця сутності має також `version`, `updated_at` і `extra jsonb`. Дочірні таблиці посилаються на батьківську з `ON DELETE CASCADE`. Індекси: `published_at`, `(source_id, published_at)`, `url` у таблицях сутностей; `event_id` у `news_article` і `news_event`; `event_date`; зовнішні ключі дочірніх таблиць; `post_link.url`, `news_article_location.name`. Пошук за `named_entity.canonical_name` обслуговує унікальний індекс, де ця колонка перша. Подання: `news_article_with_event` (`news_article` LEFT JOIN `news_event` за `event_id`, колонки події з префіксом `event_`) і `article_analysis` (`article` JOIN `news_article` за `url`).
+
+Правила проєкції:
+
+- батьківський рядок — upsert за `canonical_key` (сурогатний id не змінюється); дочірні рядки щоразу видаляються й вставляються заново;
+- довідники — `INSERT … ON CONFLICT DO NOTHING` у сталому порядку й пошук id; без гонок під READ COMMITTED і без блокування рядка довідника до кінця транзакції;
+- `source` створюється до батьківського рядка, а оновлюється останнім кроком. Атрибути (`article` дає `kind=web` і `site`, `post` — `kind=telegram` і `channel`, `news_article` — `source_kind` і `source_name`) задає найновіший за `updated_at` знімок: знімок, не старший за `last_seen_at`, перезаписує ті атрибути, що має, а старіший лише заповнює порожні. `NULL` не затирає збережене значення. `first_seen_at`/`last_seen_at` лише розширюються за `updated_at` знімка. Вирази читають заблокований рядок, тож коміти, що завершилися не в порядку годинника, дають той самий результат;
+- поле, якого немає у знімку (також очищене), дає `NULL`;
+- невідоме поле (на верхньому рівні чи всередині відомого об'єкта) і значення, що не лягає в тип колонки (число в текстовій колонці, нерозбірний час), потрапляють в `extra` за шляхом поля: `published_at`, `event.canonical.foo`, `tags[2]`, `entities[0].evidence[1].page`; колонка тоді `NULL`. Елемент списку, що не дає рядка, теж іде в `extra`, а `position` решти — початковий індекс;
+- час — строгий RFC 3339 зі зсувом → `timestamptz` (понад 6 знаків дробу — лише нулі); `event_date` → `date`; `event_time` (`HH:MM` або `HH:MM:SS`) → `time`.
+
+Перебудова очищає проєкцію (`TRUNCATE … RESTART IDENTITY`) і заново розкладає всі знімки чотирьох типів з `<prefix>entities` в одній транзакції, курсором у порядку `(updated_at, entity_type, canonical_key)`, тобто в тому порядку, в якому жива проєкція бачила їх востаннє. `first_seen_at`/`last_seen_at` доповнюються з історії (`received_at` версії дорівнює `updated_at` її знімка). Одночасні коміти чекають на таблицях проєкції й після перебудови розкладають свої новіші знімки.
+
+Результат збігається з живою проєкцією тих самих записів, крім трьох відмінностей:
+
+- сурогатні id нові;
+- рядки довідників, на які ніщо не посилається, зникають;
+- атрибут `source` (`name`, `kind`, `site`, `channel`), який мала лише попередня версія якоїсь сутності, а її поточний знімок цього поля вже не має (очищене або не того типу), наживо зберігає старе значення. Після перебудови він береться з найновішого поточного знімка, що його має, або стає `NULL`: перебудова бачить лише поточні знімки.
+
+Запуск:
+
+```powershell
+$env:PGPASSWORD = "<пароль>"   # або --password-env <ЗМІННА>; у командному рядку пароля немає
+uv run python -m jane_storage_postgres.news_layout rebuild --host <host> --port 5432 --database jane_storage_results --user <user> --schema news
+```
+
+Інші параметри: `--table-prefix` (типово `jane_`), `--sslmode` (типово `prefer` або `PGSSLMODE`), `--batch-size` (знімків за запит, типово 500), `--command-timeout-ms`. Без аргументів беруться `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`. Результат — JSON із кількістю знімків за типами. З коду: `PostgresAdapter.rebuild_layout()` або `news_layout.rebuild(con, schema=…, table_prefix=…)`.
 
 ## sqlserver
 

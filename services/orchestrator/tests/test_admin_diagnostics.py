@@ -179,6 +179,52 @@ def test_connection_unsupported_is_distinct_from_failed_sync(
 
 
 @pytest.mark.integration
+def test_connection_of_another_kind_is_not_pushed_to_a_collector(
+    make_client: Any, neighbours: Neighbours
+) -> None:
+    executors = neighbours.executors()
+    for e in executors:
+        if e["executor"] == "web-collector":
+            e["capabilities"] = {**e["capabilities"], "connection_kinds": ["http"]}
+    neighbours.executors = lambda: deepcopy(executors)  # type: ignore[method-assign]
+    client = make_client()
+
+    def synced(view: dict[str, Any]) -> dict[str, str]:
+        return {e["executor"]: e["sync_status"] for e in view["executors"]}
+
+    body = {"connection_id": "site-auth", "kind": "http", "params": {"auth_scheme": "bearer"}}
+    first = client.put("/v1/connections/site-auth", json=body)
+    assert first.status_code == 200
+    view = wait_until(
+        lambda: (
+            (v := client.get("/v1/connections/site-auth").json())
+            and synced(v).get("web-collector") == "synced"
+            and v
+        )
+    )
+    assert "site-auth" in neighbours.collector.connections
+
+    # The kind changes: the collector no longer takes it, its copy is removed and no failed sync is shown.
+    changed = client.put(
+        "/v1/connections/site-auth",
+        json={"connection_id": "site-auth", "kind": "postgresql", "params": {"host": "postgres"}},
+        headers={"If-Match": first.headers["etag"]},
+    )
+    assert changed.status_code == 200
+    view = wait_until(
+        lambda: (
+            (v := client.get("/v1/connections/site-auth").json())
+            and "web-collector" not in synced(v)
+            and synced(v).get("storage") == "synced"
+            and v
+        )
+    )
+    assert "site-auth" not in neighbours.collector.connections
+    assert all(e["sync_status"] != "failed" for e in view["executors"])
+    assert view["unsupported_executors"] == []
+
+
+@pytest.mark.integration
 def test_failed_handler_retains_failure_kind_trace_and_exact_group_filter(
     make_client: Any, neighbours: Neighbours, db_dsn: str
 ) -> None:

@@ -7,7 +7,7 @@
 ### Функція `createApiClients`
 
 ```typescript
-function createApiClients(config: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/config").AdminConfig, hooks: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/api/client").AuthHooks): import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/api/client").ApiClients
+function createApiClients(config: import("C:/repos/Jane/web/admin/src/config").AdminConfig, hooks: import("C:/repos/Jane/web/admin/src/api/client").AuthHooks): import("C:/repos/Jane/web/admin/src/api/client").ApiClients
 ```
 
 Код: [client.ts:52](../../../../../web/admin/src/api/client.ts#L52).

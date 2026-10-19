@@ -13,7 +13,17 @@ Tables in ``<schema>`` with ``<table_prefix>`` (default ``jane_``):
 inserted → ``DUPLICATE``), compare-and-swap of the snapshot (``UPDATE … WHERE version = $expected`` or
 ``INSERT … ON CONFLICT DO NOTHING`` for a new entity; nothing changed → ``CONFLICT``) and the history
 insert — all or nothing. Connection parameters: ``host``, ``port``, ``database``, ``schema``,
-``sslmode``; secrets ``username``, ``password`` (resolved by the core).
+``table_prefix``, ``sslmode``, ``layout``; secrets ``username``, ``password`` (resolved by the core).
+
+Relational layout (``params.layout``, absent by default): with ``"news"`` the adapter also keeps the
+normalized tables of :mod:`jane_storage_postgres.news_layout` in the same schema. ``ensure_schema`` applies
+the layout's numbered migrations under the same advisory lock, and ``commit_entity`` lays the snapshot of an
+``article``, ``post``, ``news_article`` or ``news_event`` out in the same transaction, only after a successful
+compare-and-swap (``DUPLICATE`` and ``CONFLICT`` leave the projection untouched). A projection error rolls
+the whole commit back, so the projection always matches the state; other types use the engine tables only.
+The layout comes from the connection only. An unknown layout, or a stage that overrides ``schema`` /
+``table_prefix`` of a connection with a layout (it would share one projection per schema), is a
+non-retryable ``AdapterError`` in ``open``.
 """
 
 # ruff: noqa: S608 - table names are built only from identifiers validated by _IDENT/_PREFIX; values are bound
@@ -46,7 +56,12 @@ from jane_contracts.storage_adapter import (
 from jane_storage.codec import entity_ack, order_from_json, order_to_json, parse_ts, utcnow
 from jane_storage.keys import object_id_for
 
-__all__ = ["DEFAULT_OPTIONS", "PostgresAdapter", "package_dir"]
+from . import news_layout
+
+__all__ = ["DEFAULT_OPTIONS", "LAYOUTS", "PostgresAdapter", "package_dir"]
+
+LAYOUTS: frozenset[str] = frozenset({news_layout.LAYOUT})
+"""Supported values of the connection parameter ``layout``."""
 
 DEFAULT_OPTIONS: dict[str, int] = {
     "pool_min_size": 1,
@@ -116,6 +131,12 @@ class PostgresAdapter:
         self._pool: asyncpg.Pool | None = None
         self._schema = "public"
         self._prefix = "jane_"
+        self._layout: str | None = None
+
+    @property
+    def layout(self) -> str | None:
+        """Relational layout of the opened connection (``params.layout``); ``None`` — engine tables only."""
+        return self._layout
 
     # ------------------------------------------------------------------ helpers
     def _t(self, name: str) -> str:
@@ -148,7 +169,25 @@ class PostgresAdapter:
         prefix = str(options.get("table_prefix", params.get("table_prefix", "jane_")))
         if not _IDENT.match(schema) or not _PREFIX.match(prefix):
             raise AdapterError(f"invalid schema {schema!r} or table_prefix {prefix!r}", retryable=False)
-        self._schema, self._prefix = schema, prefix
+        layout = params.get("layout")  # a property of the connection only: stages cannot switch it
+        if layout is not None and (not isinstance(layout, str) or layout not in LAYOUTS):
+            raise AdapterError(
+                f"unknown layout {layout!r}; supported: {', '.join(sorted(LAYOUTS))} (or no layout)",
+                retryable=False,
+            )
+        if layout is not None:
+            # One projection per schema: a stage that moved the engine tables (schema / table_prefix params of the
+            # package) would write into the same projection, and a rebuild from the connection's tables would
+            # then drop those entities from it.
+            own = (str(params.get("schema") or "public"), str(params.get("table_prefix", "jane_")))
+            if (schema, prefix) != own:
+                raise AdapterError(
+                    f"connection {connection.connection_id!r} has layout {layout!r}: the stage may not override "
+                    f"schema/table_prefix ({schema!r}/{prefix!r} instead of the connection's {own[0]!r}/{own[1]!r}); "
+                    "use a separate connection",
+                    retryable=False,
+                )
+        self._schema, self._prefix, self._layout = schema, prefix, layout
         ssl = params.get("sslmode", "prefer")
         try:
             self._pool = await asyncpg.create_pool(
@@ -232,6 +271,21 @@ class PostgresAdapter:
                 CREATE INDEX IF NOT EXISTS "{self._prefix}objects_stored"
                     ON {self._t("objects")} (stored_at, object_id);
                 """
+            )
+            if self._layout == news_layout.LAYOUT:
+                await news_layout.ensure_layout(con, self._schema)
+
+    async def rebuild_layout(
+        self, *, batch_size: int = news_layout.DEFAULT_REBUILD_BATCH_SIZE
+    ) -> dict[str, int]:
+        """Clear the relational projection and lay every stored snapshot out again (:func:`news_layout.rebuild`)."""
+        if self._layout != news_layout.LAYOUT:
+            raise AdapterError(
+                f"connection has no relational layout (layout={self._layout!r})", retryable=False
+            )
+        async with self._con() as con:
+            return await news_layout.rebuild(
+                con, schema=self._schema, table_prefix=self._prefix, batch_size=batch_size
             )
 
     # ------------------------------------------------------------------ objects
@@ -430,6 +484,8 @@ class PostgresAdapter:
                     list(event.applied_fields),
                     list(event.stale_fields),
                 )
+                if self._layout is not None:
+                    await self._project(con, new)
         except _Outcome as rolled_back:
             return CommitResult(
                 rolled_back.outcome, await self.read_entity(new.entity_type, new.canonical_key)
@@ -441,6 +497,19 @@ class PostgresAdapter:
                 )
             _fail(exc)
         return CommitResult(CommitOutcome.COMMITTED, new)
+
+    async def _project(self, con: asyncpg.Connection, new: EntitySnapshot) -> None:
+        """Relational projection inside the commit transaction; any failure rolls the commit back."""
+        try:
+            await news_layout.write_projection(con, self._schema, new)
+        except (AdapterError, asyncpg.PostgresError, asyncpg.InterfaceError, OSError, TimeoutError):
+            raise
+        except Exception as exc:  # a mapping defect must not leave a half-written commit or escape untyped
+            raise AdapterError(
+                f"postgresql: layout {self._layout!r}: projection of {new.entity_type} "
+                f"{new.canonical_key!r} failed: {type(exc).__name__}: {exc}",
+                retryable=False,
+            ) from exc
 
     async def list_entities(
         self,

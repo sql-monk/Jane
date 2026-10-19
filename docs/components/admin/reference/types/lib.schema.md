@@ -7,7 +7,7 @@
 ### Функція `schemaIssueLabel`
 
 ```typescript
-function schemaIssueLabel(issue: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/schema").SchemaIssue): string
+function schemaIssueLabel(issue: import("C:/repos/Jane/web/admin/src/lib/schema").SchemaIssue): string
 ```
 
 Код: [schema.ts:96](../../../../../web/admin/src/lib/schema.ts#L96).
@@ -15,7 +15,7 @@ function schemaIssueLabel(issue: import("C:/repos/Jane/.claude/worktrees/merge/w
 ### Функція `validateAgainst`
 
 ```typescript
-function validateAgainst(ref: string, value: unknown): import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/schema").SchemaIssue[]
+function validateAgainst(ref: string, value: unknown): import("C:/repos/Jane/web/admin/src/lib/schema").SchemaIssue[]
 ```
 
 Код: [schema.ts:101](../../../../../web/admin/src/lib/schema.ts#L101).

@@ -169,3 +169,17 @@ def test_only_executors_with_managed_connections_are_synced() -> None:
     assert cfg(role="handler", capabilities={"connections": False}, sync_connections=True).syncs_connections
     assert cfg(role="llm", capabilities={"connections": True}).syncs_connections
     assert not cfg(role="registry").syncs_connections
+
+
+def test_connection_kinds_limit_what_is_synced() -> None:
+    def cfg(**kw: Any) -> ExecutorConfig:
+        return ExecutorConfig.model_validate({"executor": "x", "base_url": "http://x", **kw})
+
+    web = cfg(role="collector", capabilities={"collector": "web", "connection_kinds": ["http"]})
+    assert web.accepts_connection("http")
+    assert not web.accepts_connection("postgresql")
+    assert cfg(role="handler").accepts_connection("postgresql")  # no connection_kinds: every kind
+    assert not cfg(role="registry").accepts_connection("http")
+    assert not cfg(
+        role="collector", capabilities={"connection_kinds": ["http"]}, sync_connections=False
+    ).accepts_connection("http")

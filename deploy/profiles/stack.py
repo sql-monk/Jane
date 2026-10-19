@@ -85,7 +85,7 @@ EXECUTORS: dict[str, list[dict[str, Any]]] = {
             "executor": "web-collector",
             "role": "collector",
             "base_url": "http://web-collector:8101",
-            "capabilities": {"collector": "web"},
+            "capabilities": {"collector": "web", "connection_kinds": ["http"]},
             "sync_connections": False,
         }
     ],
@@ -94,7 +94,7 @@ EXECUTORS: dict[str, list[dict[str, Any]]] = {
             "executor": "telegram-collector",
             "role": "collector",
             "base_url": "http://telegram-collector:8102",
-            "capabilities": {"collector": "telegram"},
+            "capabilities": {"collector": "telegram", "connection_kinds": ["telegram_account"]},
             # telegram_account connections are pushed only for the real backend (recorded needs none).
             "sync_connections": False,
         }

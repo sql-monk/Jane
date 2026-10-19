@@ -1605,12 +1605,19 @@ class Engine:
             cfg = self.core.executors.configs.get(row["executor"])
             status, message, diagnostic = "synced", None, None
             unused = False
+            op = row["op"]
+            if (
+                cfg is not None
+                and doc_row is not None
+                and not cfg.accepts_connection(str(doc_row["doc"]["kind"]))
+            ):
+                op = "delete"  # a put queued before connection_kinds excluded this kind: clean up instead
             if cfg is None:
                 status, message = "failed", "executor is no longer configured"
                 diagnostic = problem("upstream_unavailable", "Executor is no longer configured", 503)
             else:
                 try:
-                    if row["op"] == "delete":
+                    if op == "delete":
                         self.core.executors.call(
                             cfg,
                             "DELETE",
@@ -1656,7 +1663,7 @@ class Engine:
                         "DELETE FROM connection_unsupported WHERE connection_id = %s AND executor = %s",
                         (row["connection_id"], row["executor"]),
                     )
-                if unused or (row["op"] == "delete" and status == "synced"):
+                if unused or (op == "delete" and status == "synced"):
                     conn.execute(
                         "DELETE FROM connection_sync WHERE connection_id = %s AND executor = %s AND lease_owner = %s",
                         (row["connection_id"], row["executor"], worker),

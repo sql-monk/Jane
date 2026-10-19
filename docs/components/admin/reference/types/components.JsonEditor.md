@@ -19,7 +19,7 @@ JSON editor validated against a contract JSON Schema (early feedback; the servic
 ### Функція `checkJson`
 
 ```typescript
-function checkJson(text: string, schema?: string | undefined): import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/components/JsonEditor").JsonCheck
+function checkJson(text: string, schema?: string | undefined): import("C:/repos/Jane/web/admin/src/components/JsonEditor").JsonCheck
 ```
 
 Код: [JsonEditor.tsx:12](../../../../../web/admin/src/components/JsonEditor.tsx#L12).

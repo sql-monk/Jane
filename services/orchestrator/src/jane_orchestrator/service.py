@@ -921,7 +921,20 @@ class Admin:
                     (connection_id, Jsonb(dict(doc))),
                 ).fetchone()
             for cfg in self.core.executors.configs.values():
-                if cfg.syncs_connections:
+                if cfg.syncs_connections and not cfg.accepts_connection(doc["kind"]):
+                    # Not this executor's kind (e.g. a postgresql connection for a collector): drop a copy
+                    # pushed before (kind changed) or a failed sync left from before the filter.
+                    conn.execute(
+                        "DELETE FROM connection_unsupported WHERE connection_id = %s AND executor = %s",
+                        (connection_id, cfg.executor),
+                    )
+                    conn.execute(
+                        "UPDATE connection_sync SET op = 'delete', status = 'pending', attempts = 0,"
+                        " available_at = now(), message = NULL, error = NULL"
+                        " WHERE connection_id = %s AND executor = %s",
+                        (connection_id, cfg.executor),
+                    )
+                elif cfg.syncs_connections:
                     conn.execute(
                         "DELETE FROM connection_unsupported WHERE connection_id = %s AND executor = %s",
                         (connection_id, cfg.executor),

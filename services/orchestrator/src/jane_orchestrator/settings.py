@@ -43,7 +43,8 @@ class ExecutorConfig(BaseModel):
     capabilities: dict[str, Any] = Field(default_factory=dict)
     """``collector: web`` for collectors; ``handler_kinds: [...]`` and ``packages: ["jane.storage-*"]``
     (globs of package ids routed to this executor) for handlers; ``default: true`` marks the fallback
-    handler executor."""
+    handler executor; ``connection_kinds: [...]`` limits the synced connections to these ``kind`` values
+    (absent: every kind)."""
     sync_connections: bool | None = None
     """Push the connections registry to this executor (``PUT /v1/connections/{id}``). Default: true for
     collectors, handlers and llm."""
@@ -69,6 +70,15 @@ class ExecutorConfig(BaseModel):
         if self.capabilities.get("connections") is False:
             return False
         return self.role in {"collector", "handler", "llm"}
+
+    def accepts_connection(self, kind: str) -> bool:
+        """Whether a connection of ``kind`` is pushed to this executor: :attr:`syncs_connections` and, when
+        ``capabilities.connection_kinds`` is set, ``kind`` is listed there (a collector rejects other kinds
+        with 422, so pushing them would only produce failed syncs)."""
+        if not self.syncs_connections:
+            return False
+        kinds = self.capabilities.get("connection_kinds")
+        return kinds is None or kind in kinds
 
 
 class Queue(Limits):

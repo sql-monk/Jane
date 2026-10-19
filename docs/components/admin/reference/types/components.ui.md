@@ -65,7 +65,7 @@ function KeyValue({ rows }: { rows: [string, React.ReactNode][]; }): React.JSX.E
 ### Компонент `Table`
 
 ```typescript
-function Table<T>({ rows, columns, rowKey, empty, label, loading, error, }: { rows: readonly T[]; columns: readonly import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/components/ui").Column<T>[]; rowKey: (row: T, index: number) => string; empty?: string; label?: string; loading?: boolean; error?: unknown; }): React.JSX.Element | null
+function Table<T>({ rows, columns, rowKey, empty, label, loading, error, }: { rows: readonly T[]; columns: readonly import("C:/repos/Jane/web/admin/src/components/ui").Column<T>[]; rowKey: (row: T, index: number) => string; empty?: string; label?: string; loading?: boolean; error?: unknown; }): React.JSX.Element | null
 ```
 
 Код: [ui.tsx:202](../../../../../web/admin/src/components/ui.tsx#L202).

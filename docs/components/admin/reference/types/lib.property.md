@@ -7,7 +7,7 @@
 ### Функція `jsonType`
 
 ```typescript
-function jsonType(value: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/property").JsonValue): import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/property").JsonType
+function jsonType(value: import("C:/repos/Jane/web/admin/src/lib/property").JsonValue): import("C:/repos/Jane/web/admin/src/lib/property").JsonType
 ```
 
 Код: [property.ts:5](../../../../../web/admin/src/lib/property.ts#L5).
@@ -15,7 +15,7 @@ function jsonType(value: import("C:/repos/Jane/.claude/worktrees/merge/web/admin
 ### Функція `emptyValue`
 
 ```typescript
-function emptyValue(type: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/property").JsonType): import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/property").JsonValue
+function emptyValue(type: import("C:/repos/Jane/web/admin/src/lib/property").JsonType): import("C:/repos/Jane/web/admin/src/lib/property").JsonValue
 ```
 
 Код: [property.ts:8](../../../../../web/admin/src/lib/property.ts#L8).
@@ -23,7 +23,7 @@ function emptyValue(type: import("C:/repos/Jane/.claude/worktrees/merge/web/admi
 ### Функція `renameField`
 
 ```typescript
-function renameField(value: Record<string, import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/property").JsonValue>, from: string, to: string): { [k: string]: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/property").JsonValue; }
+function renameField(value: Record<string, import("C:/repos/Jane/web/admin/src/lib/property").JsonValue>, from: string, to: string): { [k: string]: import("C:/repos/Jane/web/admin/src/lib/property").JsonValue; }
 ```
 
 Код: [property.ts:11](../../../../../web/admin/src/lib/property.ts#L11).
@@ -31,7 +31,7 @@ function renameField(value: Record<string, import("C:/repos/Jane/.claude/worktre
 ### Функція `moveItem`
 
 ```typescript
-function moveItem(value: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/property").JsonValue[], index: number, delta: number): import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/property").JsonValue[]
+function moveItem(value: import("C:/repos/Jane/web/admin/src/lib/property").JsonValue[], index: number, delta: number): import("C:/repos/Jane/web/admin/src/lib/property").JsonValue[]
 ```
 
 Код: [property.ts:15](../../../../../web/admin/src/lib/property.ts#L15).

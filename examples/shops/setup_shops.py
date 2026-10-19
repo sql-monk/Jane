@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -46,23 +47,26 @@ STORAGE = (RAW[0], RESULTS[0])
 CONNECTIONS = HERE.parent / "documents" / "connections.json"
 
 
-def package_dirs(packages: Path = PACKAGES) -> dict[str, Path]:
+def package_dirs(packages: Path = PACKAGES, storage: Sequence[str] = STORAGE) -> dict[str, Path]:
     from jane_storage.adapters import package_dirs as storage_dirs
 
     dirs = {ex.read_json(p / "jane-package.json")["package_id"]: p for p in sorted(packages.iterdir())}
     for root in storage_dirs().values():
         pid = ex.read_json(Path(root) / "jane-package.json")["package_id"]
-        if pid in STORAGE:
+        if pid in storage:
             dirs[pid] = Path(root)
     return dirs
 
 
-def publish(svc: ex.Services, packages: Path = PACKAGES) -> dict[str, dict[str, str]]:
-    """Publish, check and approve every package of ``packages`` and the storage packages; their references."""
+def publish(
+    svc: ex.Services, packages: Path = PACKAGES, storage: Sequence[str] = STORAGE
+) -> dict[str, dict[str, str]]:
+    """Publish, check and approve every package of ``packages`` and the built-in storage packages ``storage``;
+    their references."""
     from jane_registry.archive import canonical_archive, digest_of, files_from_dir
 
     refs: dict[str, dict[str, str]] = {}
-    for pid, directory in package_dirs(packages).items():
+    for pid, directory in package_dirs(packages, storage).items():
         manifest = ex.read_json(directory / "jane-package.json")
         archive = bytes(canonical_archive(files_from_dir(directory)))
         digest = str(digest_of(archive))

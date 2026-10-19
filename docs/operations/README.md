@@ -50,7 +50,7 @@
 | Telegram Collector | том `telegram-collector-data` (`state.db`) | курсори каналів, буфер, job |
 | Storage | цільові сховища підключень: MongoDB `jane_results`, том `storage-data` | бізнес-результати користувача: сутності, історія, RAW, записи доставок |
 
-Storage не має власної бази стану: бізнес-результати живуть у сховищах, на які вказують підключення. У dev-стеку сутності прикладів лежать у MongoDB, у базі `jane_results` (`results-mongo`), RAW — у файлах тому `storage-data` (`raw-files`). База PostgreSQL `jane_storage_results` (`results-pg`) лишається для завдань, які зберігають сутності в PostgreSQL. Ці дані належать користувачеві, їх резервують засобами відповідного сховища — [резервування](backup-restore.md#mongodb-сутності-з-пакетів). Правило розміщення даних — [ADR-0011](../adr/0011-data-placement.md).
+Storage не має власної бази стану: бізнес-результати живуть у сховищах, на які вказують підключення. У dev-стеку сутності прикладів лежать у MongoDB, у базі `jane_results` (`results-mongo`), RAW — у файлах тому `storage-data` (`raw-files`). База PostgreSQL `jane_storage_results` (`results-pg`) лишається для завдань, які зберігають сутності в PostgreSQL. Новини й дописи з 2026-10-19 лежать у схемі `news` тієї самої бази (`results-news`, [ADR-0012](../adr/0012-news-relational-postgresql.md)). Ці дані належать користувачеві, їх резервують засобами відповідного сховища — [резервування](backup-restore.md#mongodb-сутності-з-пакетів). Правило розміщення даних — [ADR-0011](../adr/0011-data-placement.md).
 
 ![Власність даних у dev-стеку: сервіси, бази й томи](../diagrams/operations/data-ownership.light.png#gh-light-mode-only)
 ![Власність даних у dev-стеку: сервіси, бази й томи](../diagrams/operations/data-ownership.dark.png#gh-dark-mode-only)

@@ -32,6 +32,7 @@
       "forward_unknown_to_llm": false,
       "expected_entity_types": [
         "product_kids",
+        "product_office",
         "product_other"
       ],
       "change_policy": {

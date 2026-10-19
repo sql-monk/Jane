@@ -8,7 +8,9 @@ Tables in ``<schema>`` with ``<table_prefix>`` (default ``jane_``):
 
 | Table | Content | |---|---| | ``<p>entities`` | current state: ``(entity_type, canonical_key)`` PK, ``fields``/``field_orders``/``cleared_fields`` jsonb, ``version`` | | ``<p>entity_history`` | one row per accepted update (also stale): PK ``(entity_type, canonical_key, version)`` | | ``<p>deliveries`` | ``delivery_key`` PK + acknowledged writes (jsonb) — kept forever (ADR-0008) | | ``<p>objects`` | RAW / result documents: bytes in ``content`` (bytea), media type, sha256, Material metadata |
 
-``commit_entity`` is one transaction: ``INSERT … ON CONFLICT DO NOTHING`` into deliveries (nothing inserted → ``DUPLICATE``), compare-and-swap of the snapshot (``UPDATE … WHERE version = $expected`` or ``INSERT … ON CONFLICT DO NOTHING`` for a new entity; nothing changed → ``CONFLICT``) and the history insert — all or nothing. Connection parameters: ``host``, ``port``, ``database``, ``schema``, ``sslmode``; secrets ``username``, ``password`` (resolved by the core).
+``commit_entity`` is one transaction: ``INSERT … ON CONFLICT DO NOTHING`` into deliveries (nothing inserted → ``DUPLICATE``), compare-and-swap of the snapshot (``UPDATE … WHERE version = $expected`` or ``INSERT … ON CONFLICT DO NOTHING`` for a new entity; nothing changed → ``CONFLICT``) and the history insert — all or nothing. Connection parameters: ``host``, ``port``, ``database``, ``schema``, ``table_prefix``, ``sslmode``, ``layout``; secrets ``username``, ``password`` (resolved by the core).
+
+Relational layout (``params.layout``, absent by default): with ``"news"`` the adapter also keeps the normalized tables of :mod:`jane_storage_postgres.news_layout` in the same schema. ``ensure_schema`` applies the layout's numbered migrations under the same advisory lock, and ``commit_entity`` lays the snapshot of an ``article``, ``post``, ``news_article`` or ``news_event`` out in the same transaction, only after a successful compare-and-swap (``DUPLICATE`` and ``CONFLICT`` leave the projection untouched). A projection error rolls the whole commit back, so the projection always matches the state; other types use the engine tables only. The layout comes from the connection only. An unknown layout, or a stage that overrides ``schema`` / ``table_prefix`` of a connection with a layout (it would share one projection per schema), is a non-retryable ``AdapterError`` in ``open``.
 
 ## Класи
 
@@ -18,7 +20,7 @@ Tables in ``<schema>`` with ``<table_prefix>`` (default ``jane_``):
 |---|---|
 | Вид | клас |
 | Модуль | `jane_storage_postgres` |
-| Код | [__init__.py:111](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L111) |
+| Код | [__init__.py:126](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L126) |
 
 ```python
 class PostgresAdapter: ...
@@ -30,6 +32,7 @@ class PostgresAdapter: ...
 |---|---|---|---|---|
 | `kind` | `ClassVar[str]` | `'postgresql'` | читання |  |
 | `capabilities` | `ClassVar[frozenset[str]]` | `frozenset({'objects', 'entities', 'history'})` | читання |  |
+| `layout` | `str \| None` | — | читання (властивість) | Relational layout of the opened connection (``params.layout``); ``None`` — engine tables only. |
 | `pool` | `asyncpg.Pool` | — | читання (властивість) |  |
 
 #### Конструктор `PostgresAdapter.__init__`
@@ -38,7 +41,7 @@ class PostgresAdapter: ...
 def __init__(self) -> None: ...
 ```
 
-Код: [__init__.py:115](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L115).
+Код: [__init__.py:130](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L130).
 
 #### Метод `PostgresAdapter.open`
 
@@ -48,7 +51,7 @@ async def open(self, connection: ResolvedConnection, options: Mapping[str, Any])
 
 Винятки в коді методу: `AdapterError`.
 
-Код: [__init__.py:139](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L139).
+Код: [__init__.py:160](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L160).
 
 #### Метод `PostgresAdapter.close`
 
@@ -56,7 +59,7 @@ async def open(self, connection: ResolvedConnection, options: Mapping[str, Any])
 async def close(self) -> None: ...
 ```
 
-Код: [__init__.py:170](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L170).
+Код: [__init__.py:209](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L209).
 
 #### Метод `PostgresAdapter.health`
 
@@ -64,7 +67,7 @@ async def close(self) -> None: ...
 async def health(self) -> bool: ...
 ```
 
-Код: [__init__.py:175](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L175).
+Код: [__init__.py:214](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L214).
 
 #### Метод `PostgresAdapter.ensure_schema`
 
@@ -72,7 +75,23 @@ async def health(self) -> bool: ...
 async def ensure_schema(self, entity_types: Sequence[str]) -> None: ...
 ```
 
-Код: [__init__.py:182](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L182).
+Код: [__init__.py:221](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L221).
+
+#### Метод `PostgresAdapter.rebuild_layout`
+
+```python
+async def rebuild_layout(
+    self,
+    *,
+    batch_size: int = news_layout.DEFAULT_REBUILD_BATCH_SIZE,
+) -> dict[str, int]: ...
+```
+
+Clear the relational projection and lay every stored snapshot out again (:func:`news_layout.rebuild`).
+
+Винятки в коді методу: `AdapterError`.
+
+Код: [__init__.py:278](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L278).
 
 #### Метод `PostgresAdapter.put_object`
 
@@ -82,7 +101,7 @@ async def put_object(self, obj: RawObject) -> ObjectRecord: ...
 
 Винятки в коді методу: `AdapterError`.
 
-Код: [__init__.py:252](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L252).
+Код: [__init__.py:306](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L306).
 
 #### Метод `PostgresAdapter.get_object`
 
@@ -90,7 +109,7 @@ async def put_object(self, obj: RawObject) -> ObjectRecord: ...
 async def get_object(self, object_id: str) -> ObjectRecord | None: ...
 ```
 
-Код: [__init__.py:294](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L294).
+Код: [__init__.py:348](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L348).
 
 #### Метод `PostgresAdapter.read_object_content`
 
@@ -100,7 +119,7 @@ async def read_object_content(self, object_id: str) -> bytes: ...
 
 Винятки в коді методу: `AdapterError`.
 
-Код: [__init__.py:301](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L301).
+Код: [__init__.py:355](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L355).
 
 #### Метод `PostgresAdapter.list_objects`
 
@@ -117,7 +136,7 @@ async def list_objects(
 ) -> tuple[Sequence[ObjectRecord], str | None]: ...
 ```
 
-Код: [__init__.py:310](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L310).
+Код: [__init__.py:364](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L364).
 
 #### Метод `PostgresAdapter.read_entity`
 
@@ -125,7 +144,7 @@ async def list_objects(
 async def read_entity(self, entity_type: str, canonical_key: str) -> EntitySnapshot | None: ...
 ```
 
-Код: [__init__.py:365](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L365).
+Код: [__init__.py:419](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L419).
 
 #### Метод `PostgresAdapter.commit_entity`
 
@@ -139,7 +158,7 @@ async def commit_entity(
 ) -> CommitResult: ...
 ```
 
-Код: [__init__.py:375](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L375).
+Код: [__init__.py:429](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L429).
 
 #### Метод `PostgresAdapter.list_entities`
 
@@ -155,7 +174,7 @@ async def list_entities(
 ) -> tuple[Sequence[EntitySnapshot], str | None]: ...
 ```
 
-Код: [__init__.py:445](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L445).
+Код: [__init__.py:514](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L514).
 
 #### Метод `PostgresAdapter.search_entities`
 
@@ -172,7 +191,7 @@ async def search_entities(
 ) -> tuple[Sequence[EntitySnapshot], str | None]: ...
 ```
 
-Код: [__init__.py:458](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L458).
+Код: [__init__.py:527](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L527).
 
 #### Метод `PostgresAdapter.list_entity_types`
 
@@ -186,7 +205,7 @@ async def list_entity_types(
 ) -> tuple[Sequence[Mapping[str, Any]], str | None]: ...
 ```
 
-Код: [__init__.py:472](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L472).
+Код: [__init__.py:541](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L541).
 
 #### Метод `PostgresAdapter.object_statistics`
 
@@ -194,7 +213,7 @@ async def list_entity_types(
 async def object_statistics(self) -> dict[str, int]: ...
 ```
 
-Код: [__init__.py:491](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L491).
+Код: [__init__.py:560](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L560).
 
 #### Метод `PostgresAdapter.entity_statistics`
 
@@ -202,7 +221,7 @@ async def object_statistics(self) -> dict[str, int]: ...
 async def entity_statistics(self) -> dict[str, Any]: ...
 ```
 
-Код: [__init__.py:498](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L498).
+Код: [__init__.py:567](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L567).
 
 #### Метод `PostgresAdapter.list_history`
 
@@ -217,7 +236,7 @@ async def list_history(
 ) -> tuple[Sequence[HistoryEvent], str | None]: ...
 ```
 
-Код: [__init__.py:548](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L548).
+Код: [__init__.py:617](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L617).
 
 #### Метод `PostgresAdapter.get_delivery`
 
@@ -225,7 +244,7 @@ async def list_history(
 async def get_delivery(self, delivery_key: str) -> DeliveryRecord | None: ...
 ```
 
-Код: [__init__.py:579](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L579).
+Код: [__init__.py:648](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L648).
 
 #### Метод `PostgresAdapter.record_delivery`
 
@@ -233,7 +252,7 @@ async def get_delivery(self, delivery_key: str) -> DeliveryRecord | None: ...
 async def record_delivery(self, record: DeliveryRecord) -> bool: ...
 ```
 
-Код: [__init__.py:591](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L591).
+Код: [__init__.py:660](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L660).
 
 ## Функції
 
@@ -245,10 +264,11 @@ def package_dir() -> Path: ...
 
 Directory of the ``jane.storage-postgresql`` storage package (entry point ``jane.storage.packages``).
 
-Код: [__init__.py:76](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L76).
+Код: [__init__.py:91](../../../../../services/storage/adapters/postgres/src/jane_storage_postgres/__init__.py#L91).
 
 ## Константи й змінні модуля
 
 | Назва | Тип | Значення | Опис |
 |---|---|---|---|
 | `DEFAULT_OPTIONS` | `dict[str, int]` | `{'pool_min_size': 1, 'pool_max_size': 10, 'connect_timeout_ms': 10000, 'command_` | Safe defaults; overridden by connection params or adapter options (service config ``adapters.*``). |
+| `LAYOUTS` | `frozenset[str]` | `frozenset({news_layout.LAYOUT})` | Supported values of the connection parameter ``layout``. |

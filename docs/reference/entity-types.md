@@ -1,8 +1,8 @@
 # Типи сутностей
 
-Довідник типів сутностей (`entity_type`), які пишуть пакети прикладів Jane: таксономія товарів і оголошень, правила вибору типу й колекції MongoDB, у які потрапляє кожен тип. Чому тип обирає екстрактор, а не сховище, пояснює [ADR-0011](../adr/0011-data-placement.md).
+Довідник типів сутностей (`entity_type`), які пишуть пакети прикладів Jane: таксономія товарів і оголошень, правила вибору типу й сховища, у які потрапляє кожен тип. Чому тип обирає екстрактор, а не сховище, пояснює [ADR-0011](../adr/0011-data-placement.md). Чому новини й дописи лежать у PostgreSQL, пояснює [ADR-0012](../adr/0012-news-relational-postgresql.md).
 
-Актуально для пакета `jane.storage-mongodb@2.0.0` і пакетів прикладів версій 2.0.0 (2026-10-12, [план](../delivery/mongo-entities.md)).
+Актуально для пакетів `jane.storage-mongodb@2.0.0`, `jane.storage-postgresql@1.0.0` і пакетів прикладів версій 2.0.0 (2026-10-12, [план](../delivery/mongo-entities.md); новини — 2026-10-19, [дизайн](../delivery/news-pg.md)).
 
 ## Зміст
 
@@ -10,6 +10,7 @@
 - [Таксономія](#таксономія)
 - [Правила вибору типу](#правила-вибору-типу)
 - [Колекції MongoDB](#колекції-mongodb)
+- [Новини в PostgreSQL](#новини-в-postgresql)
 - [Відповідність розділів сайтів](#відповідність-розділів-сайтів)
 
 ## Формат типу
@@ -38,7 +39,7 @@
 | `product_auto` | автотовари | epicentrk |
 | `product_pet` | зоотовари | epicentrk, varus, prostor |
 | `product_sport` | спорт і туризм | epicentrk, prostor, varus |
-| `product_office` | канцтовари, шкільне | epicentrk, yakaboo, varus |
+| `product_office` | канцтовари, шкільне | epicentrk, yakaboo, varus, bi-ua |
 | `product_health` | медичні товари, БАДи | epicentrk, prostor, varus |
 | `product_other` | сезонні розділи, «Несортовані», решта | — |
 | `ad_car` | авто | autoria, rst, avtobazar, classified-auto-ria |
@@ -48,14 +49,16 @@
 
 Типи, які таксономія не змінює:
 
-| Тип | Що це |
-|---|---|
-| `product` | товар тестового магазину (`examples/packages`, приймальний сценарій ТЗ §12) |
-| `event` | подія з Telegram-прикладу (`examples/packages`) |
-| `article` | стаття новинного сайту або публічної сторінки Telegram-каналу |
-| `news_article` | нормалізована й проаналізована новина (`examples/news`) |
-| `news_event` | подія, виділена з новини (`examples/news`) |
-| `post` | допис Telegram-каналу (`examples/channels`, `examples/sites`) |
+| Тип | Що це | Сховище |
+|---|---|---|
+| `product` | товар тестового магазину (`examples/packages`, приймальний сценарій ТЗ §12) | MongoDB, `results-mongo` |
+| `event` | подія з Telegram-прикладу (`examples/packages`) | MongoDB, `results-mongo` |
+| `article` | стаття новинного сайту або публічної сторінки Telegram-каналу | PostgreSQL, `results-news` |
+| `news_article` | нормалізована й проаналізована новина (`examples/news`) | PostgreSQL, `results-news` |
+| `news_event` | подія, виділена з новини (`examples/news`) | PostgreSQL, `results-news` |
+| `post` | допис Telegram-каналу (`examples/channels`, `examples/sites`) | PostgreSQL, `results-news` |
+
+Товари й оголошення таксономії (`product_*`, `ad_*`) зберігаються в MongoDB, `results-mongo`.
 
 ## Правила вибору типу
 
@@ -82,6 +85,19 @@
 
 Каталог типів сховища показує `GET /v1/entity-types?connection_id=results-mongo`. У ньому лише типи, для яких уже збережено сутності, з точною кількістю. Сторінка «Результати» Admin UI будує з нього картки типів.
 
+Колекції `article`, `post`, `news_article` і `news_event` у `jane_results` містять новини, зібрані до 2026-10-19. Нові записи цих типів у MongoDB не надходять.
+
+## Новини в PostgreSQL
+
+Новини й дописи (`article`, `post`, `news_article`, `news_event`) з 2026-10-19 пише адаптер `jane.storage-postgresql@1.0.0` через підключення `results-news`: база `jane_storage_results`, схема `news`, параметр підключення `layout: news` ([ADR-0012](../adr/0012-news-relational-postgresql.md)).
+
+| Що | Де |
+|---|---|
+| Стан рушія: актуальний стан, історія, доставки, об'єкти | загальні таблиці адаптера в схемі `news` (`jane_entities`, `jane_entity_history`, `jane_deliveries`, `jane_objects`) |
+| Реляційна модель для SQL | таблиці `article`, `post`, `news_article`, `news_event`, довідники `source`, `tag`, `topic`, `named_entity` і дочірні таблиці; подання `news_article_with_event`, `article_analysis` |
+
+Обидві частини оновлюються в одній транзакції. Невідомі поля й значення, що не перетворюються в тип колонки, лежать у колонці `extra`. Перелік колонок і правила проєкції — [дизайн](../delivery/news-pg.md#3-реляційна-схема-news). Каталог типів — `GET /v1/entity-types?connection_id=results-news`.
+
 ## Відповідність розділів сайтів
 
 Таблиці «розділ сайту → тип» зберігаються в пакетах сайтів, а не в Storage. Розділ шукається за найдовшим префіксом `category_path` (без урахування регістру, варіантів апострофа й зайвих пробілів); розділ поза таблицею дає `*_other`. Таблиця однакова в екстракторі картки й екстракторі цін одного сайту — це перевіряє `examples/tests/test_sites.py`.
@@ -97,13 +113,11 @@
 
 | Сайт | Розділ → тип |
 |---|---|
-| bi-ua | Дитячий транспорт; Колекційні та ігрові фігурки; Конструктори; Машинки, роботи, трансформери; М'які та інтерактивні іграшки → `product_kids` |
+| bi-ua | Дитячий транспорт; Колекційні та ігрові фігурки; Конструктори; Машинки, роботи, трансформери; М'які та інтерактивні іграшки; Для активного відпочинку; Настільні ігри та пазли; Сюжетно-рольові набори; Творчість і розвиток → `product_kids`; Товари для школи → `product_office`; Подарунки → `product_other` |
 | epicentrk | Автотовари → `product_auto`; Будівництво та ремонт, Інструменти, Освітлення, Покриття для підлоги, Сантехніка → `product_tools`; Дитячі товари → `product_kids`; Дім та інтер'єр, Меблі → `product_home` (Дім та інтер'єр › Книги → `product_book`); Електроніка → `product_electronics`; Зоотовари → `product_pet`; Краса та здоров'я → `product_beauty`; Медичні товари → `product_health`; Одяг, взуття, аксесуари → `product_clothing`; Офіс і канцтовари → `product_office`; Побутова техніка → `product_appliance`; Побутова хімія → `product_household`; Продукти → `product_food`; Сад та город → `product_garden`; Спорттовари, Туристичні товари → `product_sport`; Товари для бізнесу → `product_other` |
 | prostor | Волосся, Косметика, Обличчя, Парфуми, Тіло → `product_beauty`; Галантерея → `product_clothing`; Дім → `product_home` (› Зоотовари → `product_pet`, › Продукти → `product_food`, › Спортивні товари → `product_sport`); Дітям → `product_kids`; Здоров`я → `product_health`; Побутова хімія → `product_household`; Продукти → `product_food`; Чоловікам — лише підрозділи (› Спідня білизна, › Чоловічі шкарпетки → `product_clothing`; › Чоловічі засоби для стайлінгу → `product_beauty`); Великдень › Кондитерський декор → `product_food`; Святий Миколай › Дитяча косметика → `product_beauty`; решта сезонних і збірних розділів → `product_other` |
 | varus | продуктові розділи, зокрема VARUS CAFE і Алкоголь → `product_food` (Здорове харчування та Еко товари › БАДи → `product_health`); Гігієна та догляд → `product_beauty` (› Товари для здоров'я → `product_health`); Побутова хімія → `product_household`; Товари для дітей → `product_kids` (› Шкільні товари → `product_office`); Товари для дому → `product_home` (› Канцтовари → `product_office`, › Одяг, взуття та аксесуари → `product_clothing`, › Сад та город → `product_garden`, › Спорт та розваги, › Товари для кемпінгу та відпочинку → `product_sport`); Товари для тварин → `product_pet`; Головна, Тютюнові вироби → `product_other` |
 | yakaboo | Книжки → `product_book`; Ігри та творчість, Настільні ігри → `product_kids`; Кольорові олівці, Рюкзаки, сумки шкільні, Шкільні зошити → `product_office`; Супутні товари, Часто шукають → `product_other` |
-
-Таблиця bi-ua містить лише п'ять розділів, які траплялися в зібраних даних; товари інших розділів повного асортименту bi.ua отримують `product_other`, доки таблицю не розширять.
 
 Екстрактори цін bi-ua, epicentrk, prostor і yakaboo беруть тип із хлібних крихт сторінки категорії й повертають `unrecognized`, якщо розділ не в таблиці або глибший підрозділ має інший тип. Екстрактор цін VARUS визначає тип за категоріями самого товару тією самою функцією, що й картка. Залишковий ризик: товар, який трапився на сторінці іншого розділу, ніж у хлібних крихтах його картки (наприклад, подарунковий набір у сезонному розділі), отримає ціну в колекції розділу сторінки.
 

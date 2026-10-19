@@ -7,7 +7,7 @@
 ### Функція `modules`
 
 ```typescript
-function modules(config: import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/config").AdminConfig): import("C:/repos/Jane/.claude/worktrees/merge/web/admin/src/lib/modules").ModuleDefinition[]
+function modules(config: import("C:/repos/Jane/web/admin/src/config").AdminConfig): import("C:/repos/Jane/web/admin/src/lib/modules").ModuleDefinition[]
 ```
 
 Код: [modules.ts:15](../../../../../web/admin/src/lib/modules.ts#L15).

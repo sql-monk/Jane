@@ -77,6 +77,12 @@ CATEGORY_TYPES: dict[tuple[str, ...], str] = {
     ("Конструктори",): "product_kids",
     ("Машинки, роботи, трансформери",): "product_kids",
     ("М'які та інтерактивні іграшки",): "product_kids",
+    ("Для активного відпочинку",): "product_kids",
+    ("Настільні ігри та пазли",): "product_kids",
+    ("Сюжетно-рольові набори",): "product_kids",
+    ("Творчість і розвиток",): "product_kids",
+    ("Товари для школи",): "product_office",
+    ("Подарунки",): "product_other",
 }
 OTHER_TYPE = "product_other"
 APOSTROPHES = str.maketrans(dict.fromkeys("\u2019\u02bc`\u00b4\u2018", "'"))

@@ -453,7 +453,7 @@ class Validation:
         )
         stored = self.invoke(
             "storage",
-            ex.RESULTS_PACKAGE,
+            ex.NEWS_RESULTS_PACKAGE,
             [
                 {
                     "kind": "entities",
@@ -464,7 +464,7 @@ class Validation:
             ],
             item,
             "store-news",
-            connections={"target": ex.RESULTS_CONNECTION},
+            connections={"target": ex.NEWS_RESULTS_CONNECTION},
         )
         expected = {
             entity["fields"]["url"]
@@ -475,7 +475,7 @@ class Validation:
             self.apis["storage_read"],
             "/v1/entities",
             {
-                "connection_id": ex.RESULTS_CONNECTION,
+                "connection_id": ex.NEWS_RESULTS_CONNECTION,
                 "entity_type": "news_article",
                 "scope": item["source_id"],
             },
@@ -643,7 +643,11 @@ class Validation:
             records = self.pages(
                 self.apis["storage_read"],
                 "/v1/entities",
-                {"connection_id": ex.RESULTS_CONNECTION, "entity_type": "news_article", "scope": source_id},
+                {
+                    "connection_id": ex.NEWS_RESULTS_CONNECTION,
+                    "entity_type": "news_article",
+                    "scope": source_id,
+                },
             )
             current = {
                 record["fields"]["url"]: record["fields"]
@@ -687,7 +691,11 @@ class Validation:
             records = self.pages(
                 self.apis["storage_read"],
                 "/v1/entities",
-                {"connection_id": ex.RESULTS_CONNECTION, "entity_type": "news_event", "scope": "news-events"},
+                {
+                    "connection_id": ex.NEWS_RESULTS_CONNECTION,
+                    "entity_type": "news_event",
+                    "scope": "news-events",
+                },
             )
             stored_events = [
                 {

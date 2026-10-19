@@ -138,6 +138,13 @@ Dev-стек ([infra/compose.yaml](../../../infra/compose.yaml)) задає `AUT
       "secret_refs": { "username": "env:JANE_SECRET_DEV_PG_USER", "password": "env:JANE_SECRET_DEV_PG_PASSWORD" }
     },
     {
+      "connection_id": "results-news",
+      "kind": "postgresql",
+      "title": "News results (PostgreSQL, relational)",
+      "params": { "host": "postgres", "port": 5432, "database": "jane_storage_results", "schema": "news", "sslmode": "disable", "layout": "news" },
+      "secret_refs": { "username": "env:JANE_SECRET_DEV_PG_USER", "password": "env:JANE_SECRET_DEV_PG_PASSWORD" }
+    },
+    {
       "connection_id": "results-mongo",
       "kind": "mongodb",
       "title": "Development results (MongoDB)",
@@ -148,7 +155,7 @@ Dev-стек ([infra/compose.yaml](../../../infra/compose.yaml)) задає `AUT
 }
 ```
 
-У прикладах RAW пишеться в `raw-files`, а сутності — у `results-mongo`, колекція на тип ([ADR-0011](../../adr/0011-data-placement.md)). `results-pg` лишається для завдань, які зберігають сутності в PostgreSQL. Секрети `JANE_SECRET_DEV_*` і призначення кожного підключення описано в [infra/README.md](../../../infra/README.md#підключення-storage).
+У прикладах RAW пишеться в `raw-files`, а сутності — у `results-mongo`, колекція на тип ([ADR-0011](../../adr/0011-data-placement.md)). `results-pg` лишається для завдань, які зберігають сутності в PostgreSQL. `results-news` — та сама база, схема `news` і параметр `layout: "news"`: новини (`article`, `post`, `news_article`, `news_event`) додатково розкладаються в реляційні таблиці ([розкладка news](adapters.md#розкладка-news)). Секрети `JANE_SECRET_DEV_*` і призначення кожного підключення описано в [infra/README.md](../../../infra/README.md#підключення-storage).
 
 Значення в `params`, схожі на секрет (імена на кшталт `password`, `token`, `api_key`; рядки з ключем AWS, приватним ключем або `user:pass@` в URL), відхиляються з `422 secret_detected`. Параметри `params` кожного адаптера — [адаптери](adapters.md).
 

@@ -60,6 +60,12 @@ RESULTS_PACKAGE = "jane.storage-mongodb"
 STORAGE_PACKAGES = ("jane.storage-files", RESULTS_PACKAGE)
 RAW_CONNECTION = "raw-files"
 RESULTS_CONNECTION = "results-mongo"
+# News and posts -> PostgreSQL: the relational layout "news" of the postgresql adapter (schema news, ADR-0012);
+# products, ads and the demo type event stay in MongoDB
+NEWS_ENTITY_TYPES = frozenset({"article", "post", "news_article", "news_event"})
+NEWS_RESULTS_PACKAGE = "jane.storage-postgresql"
+NEWS_STORAGE_PACKAGES = ("jane.storage-files", NEWS_RESULTS_PACKAGE)
+NEWS_RESULTS_CONNECTION = "results-news"
 SOURCE_DOC = "source.testsite-shop.json"
 CATALOG_DOC = "task.testsite-catalog.json"
 PRICE_DOC = "task.testsite-price-check.json"

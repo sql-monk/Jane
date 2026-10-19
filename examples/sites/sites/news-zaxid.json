@@ -38,7 +38,7 @@
     {
       "task_id": "news-zaxid",
       "title": "Zaxid.net: нові статті кожні 15 хвилин",
-      "description": "Кожні 15 хв (пропуск, якщо попередній запуск ще йде): стрічка → нові сторінки статей (mode: incremental) → RAW у raw-files → news.articles (лише HTML) → article у results-mongo (ключ — канонічний URL; оновлена стаття оновлює ту саму сутність).",
+      "description": "Кожні 15 хв (пропуск, якщо попередній запуск ще йде): стрічка → нові сторінки статей (mode: incremental) → RAW у raw-files → news.articles (лише HTML) → article у results-news (PostgreSQL, схема news; ключ — канонічний URL; оновлена стаття оновлює ту саму сутність).",
       "input": {
         "source_id": "news-zaxid"
       },
@@ -82,9 +82,9 @@
         {
           "stage_id": "store-articles",
           "kind": "handler",
-          "handler": "@pkg:jane.storage-mongodb",
+          "handler": "@pkg:jane.storage-postgresql",
           "connections": {
-            "target": "results-mongo"
+            "target": "results-news"
           },
           "inputs": [
             {

@@ -24,6 +24,7 @@
 | Кеш ідемпотентності, job, результати викликів | Handler Runtime | база `jane_handler_runtime` | `pg_dump` (за потреби) |
 | Стан обходу, буфер, курсори | Web Collector, Telegram Collector | томи `web-collector-data`, `telegram-collector-data` | архів тому при зупиненому сервісі |
 | Сутності прикладів та їхня історія | користувач (пише Storage) | MongoDB, база `jane_results` (підключення `results-mongo`) | `mongodump` — [MongoDB](#mongodb-сутності-з-пакетів) |
+| Новини й дописи (`article`, `post`, `news_article`, `news_event`) та їхня історія | користувач (пише Storage) | PostgreSQL, база `jane_storage_results`, схема `news` (підключення `results-news`, [ADR-0012](../adr/0012-news-relational-postgresql.md)) | `pg_dump` бази `jane_storage_results` |
 | RAW-сторінки | користувач (пише Storage) | том `storage-data` (підключення `raw-files`) | архів тому при зупиненому Storage |
 | Сутності в PostgreSQL та інших цільових сховищах | користувач (пише Storage) | база `jane_storage_results` (підключення `results-pg`), сховища користувача | `pg_dump` або засоби сховища |
 | Облікові дані стеку | оператор | `.jane/stack-<проєкт>.json` | копія файлу в захищеному місці |
@@ -141,7 +142,7 @@ docker volume rm jane-doc-ops_postgres-data jane-doc-ops_minio-data
 
 ## MongoDB: сутності з пакетів
 
-Сутності прикладів лежать у базі `jane_results` контейнера `mongodb`, кожен тип — в окремій колекції ([типи сутностей](../reference/entity-types.md)). Копія логічна: `mongodump` виконується в контейнері стеку від імені кореневого користувача. Ім'я й пароль контейнер уже має в змінних `MONGO_INITDB_ROOT_USERNAME` і `MONGO_INITDB_ROOT_PASSWORD`, тож пароль не потрапляє в командний рядок хоста. Одинарні лапки не дають оболонці хоста підставити ці змінні.
+Сутності прикладів, крім новин і дописів, лежать у базі `jane_results` контейнера `mongodb`, кожен тип — в окремій колекції ([типи сутностей](../reference/entity-types.md)). Новини, зібрані до 2026-10-19, теж лишаються в цій базі. Копія логічна: `mongodump` виконується в контейнері стеку від імені кореневого користувача. Ім'я й пароль контейнер уже має в змінних `MONGO_INITDB_ROOT_USERNAME` і `MONGO_INITDB_ROOT_PASSWORD`, тож пароль не потрапляє в командний рядок хоста. Одинарні лапки не дають оболонці хоста підставити ці змінні.
 
 Перевірено 2026-10-12 на окремому контейнері `mongo:8.0` (mongodump 100.18.0) з тестовими колекціями в розкладці адаптера: `product_book`, `product_book.history`, `product_food`, `_deliveries`. Сценарій перевірки: копія, видалення контейнера з томом, новий контейнер із тим самим паролем, відновлення. Назва контейнера в командах — за схемою стеку `<проєкт>-mongodb-1`.
 

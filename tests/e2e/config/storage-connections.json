@@ -14,6 +14,13 @@
       "secret_refs": { "username": "env:JANE_SECRET_E2E_STORAGE_RESULTS_USER", "password": "env:JANE_SECRET_E2E_STORAGE_RESULTS_PASSWORD" }
     },
     {
+      "connection_id": "results-news",
+      "kind": "postgresql",
+      "title": "e2e: news in the stack PostgreSQL (relational layout news)",
+      "params": { "host": "postgres", "port": 5432, "database": "jane_storage_results", "schema": "news", "sslmode": "disable", "layout": "news" },
+      "secret_refs": { "username": "env:JANE_SECRET_E2E_STORAGE_RESULTS_USER", "password": "env:JANE_SECRET_E2E_STORAGE_RESULTS_PASSWORD" }
+    },
+    {
       "connection_id": "results-mongo",
       "kind": "mongodb",
       "title": "e2e: entities in the stack MongoDB",

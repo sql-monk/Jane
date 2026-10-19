@@ -2,8 +2,9 @@
 
     uv run --all-packages python examples/sites/export_sites.py --project <p> [--out DIR] [--history TYPE ...]
 
-Entities are read from ``results-mongo`` (MongoDB, a collection per entity type). One file per stored entity
-type (``product_food.csv``, ``product_book.csv`` …, ``ad_car.csv``, ``ad_realty.csv``, ``ad_goods.csv``,
+Entities are read from ``results-mongo`` (MongoDB, a collection per entity type), news and posts
+(``article``, ``post``, ``news_article``, ``news_event``) from ``results-news`` (PostgreSQL, ADR-0012). One
+file per stored entity type (``product_food.csv``, ``product_book.csv`` …, ``ad_car.csv``, ``ad_realty.csv``, ``ad_goods.csv``,
 ``article.csv``, ``post.csv``, ``news_item.csv``, ``news_event.csv`` …) with the current state of every entity:
 the source (``scope``), the key, ``updated_at``, ``version`` and the fields (nested values as JSON). The types
 come from the Storage catalog (``GET /v1/entity-types``); an adapter without it - every type the packages of
@@ -33,6 +34,13 @@ import setup_sites as sites  # noqa: E402
 import jane_examples as ex  # noqa: E402
 
 CONNECTION = sites.RESULTS_CONNECTION
+NEWS_CONNECTION = sites.NEWS_RESULTS_CONNECTION
+
+
+def connection_of(entity_type: str) -> str:
+    """The connection that stores ``entity_type``: news and posts ``results-news``, every other type
+    ``results-mongo`` (news collected there before the switch stays and is not exported)."""
+    return NEWS_CONNECTION if entity_type in ex.NEWS_ENTITY_TYPES else CONNECTION
 
 
 def cell(value: Any) -> Any:
@@ -76,7 +84,8 @@ def history_rows(
         if not key:
             continue
         for entry in svc.storage.pages(
-            "/v1/entity-history", {"connection_id": CONNECTION, "entity_type": entity_type, "key": key}
+            "/v1/entity-history",
+            {"connection_id": connection_of(entity_type), "entity_type": entity_type, "key": key},
         ):
             record = entry["record"]
             yield {
@@ -139,9 +148,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     svc = ex.Services.of_project(ns.project)
     try:
         states: dict[str, list[dict[str, Any]]] = {}
-        for entity_type in stored_types(svc, CONNECTION):
+        types = {
+            entity_type
+            for connection in (CONNECTION, NEWS_CONNECTION)
+            for entity_type in stored_types(svc, connection)
+            if connection_of(entity_type) == connection
+        }
+        for entity_type in sorted(types):
             items = svc.storage.pages(
-                "/v1/entities", {"connection_id": CONNECTION, "entity_type": entity_type}
+                "/v1/entities", {"connection_id": connection_of(entity_type), "entity_type": entity_type}
             )
             if not items:
                 continue

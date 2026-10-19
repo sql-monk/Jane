@@ -34,7 +34,7 @@
     {
       "task_id": "tgweb-babel",
       "title": "Telegram @babel: пости кожні 15 хв",
-      "description": "Сторінка t.me/s каналу → RAW у files, пости (post) у MongoDB (results-mongo). Кожен запуск читає сторінку повністю: нові пости додаються, наявні (той самий channel + message_id) оновлюються — перегляди, редагування.",
+      "description": "Сторінка t.me/s каналу → RAW у files, пости (post) у PostgreSQL (results-news, схема news). Кожен запуск читає сторінку повністю: нові пости додаються, наявні (той самий channel + message_id) оновлюються — перегляди, редагування.",
       "input": {
         "source_id": "tgweb-babel"
       },
@@ -78,9 +78,9 @@
         {
           "stage_id": "store-posts",
           "kind": "handler",
-          "handler": "@pkg:jane.storage-mongodb",
+          "handler": "@pkg:jane.storage-postgresql",
           "connections": {
-            "target": "results-mongo"
+            "target": "results-news"
           },
           "inputs": [
             {

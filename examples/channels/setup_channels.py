@@ -66,7 +66,7 @@ def task_doc(channel: str, refs: dict[str, dict[str, str]]) -> dict[str, Any]:
     return {
         "task_id": f"posts-{channel.lower().replace('_', '-')}",
         "title": f"Пости @{channel}",
-        "description": "Повідомлення каналу → RAW у files, пости (post) у MongoDB.",
+        "description": "Повідомлення каналу → RAW у files, пости (post) у PostgreSQL (results-news).",
         "input": {"source_id": f"tg-{channel.lower().replace('_', '-')}"},
         "stages": [
             {
@@ -90,8 +90,8 @@ def task_doc(channel: str, refs: dict[str, dict[str, str]]) -> dict[str, Any]:
             {
                 "stage_id": "store-posts",
                 "kind": "handler",
-                "handler": refs[ex.RESULTS_PACKAGE],
-                "connections": {"target": ex.RESULTS_CONNECTION},
+                "handler": refs[ex.NEWS_RESULTS_PACKAGE],
+                "connections": {"target": ex.NEWS_RESULTS_CONNECTION},
                 "inputs": [
                     {
                         "from": "extract-posts",
@@ -122,7 +122,7 @@ def main(argv: list[str] | None = None) -> int:
         write_rules(channel, ns.since)
     svc = ex.Services.of_project(ns.project)
     try:
-        refs = publish(svc, PACKAGES)
+        refs = publish(svc, PACKAGES, ex.NEWS_STORAGE_PACKAGES)
         orch = svc.orchestrator
         for conn in ex.read_json(HERE.parent / "documents" / "connections.json")["connections"]:
             orch.call("PUT", f"/v1/connections/{conn['connection_id']}", ok=(200, 201), json=conn)
@@ -176,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
             posts = svc.storage.pages(
                 "/v1/entities",
                 {
-                    "connection_id": ex.RESULTS_CONNECTION,
+                    "connection_id": ex.NEWS_RESULTS_CONNECTION,
                     "entity_type": "post",
                     "scope": f"tg-{channel.lower().replace('_', '-')}",
                 },

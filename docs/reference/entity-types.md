@@ -1,8 +1,8 @@
 # Типи сутностей
 
-Довідник типів сутностей (`entity_type`), які пишуть пакети прикладів Jane: таксономія товарів і оголошень, правила вибору типу й колекції MongoDB, у які потрапляє кожен тип. Чому тип обирає екстрактор, а не сховище, пояснює [ADR-0011](../adr/0011-data-placement.md).
+Довідник типів сутностей (`entity_type`), які пишуть пакети прикладів Jane: таксономія товарів і оголошень, правила вибору типу й сховища, у які потрапляє кожен тип. Чому тип обирає екстрактор, а не сховище, пояснює [ADR-0011](../adr/0011-data-placement.md). Чому новини й дописи лежать у PostgreSQL, пояснює [ADR-0012](../adr/0012-news-relational-postgresql.md).
 
-Актуально для пакета `jane.storage-mongodb@2.0.0` і пакетів прикладів версій 2.0.0 (2026-10-12, [план](../delivery/mongo-entities.md)).
+Актуально для пакетів `jane.storage-mongodb@2.0.0`, `jane.storage-postgresql@1.0.0` і пакетів прикладів версій 2.0.0 (2026-10-12, [план](../delivery/mongo-entities.md); новини — 2026-10-19, [дизайн](../delivery/news-pg.md)).
 
 ## Зміст
 
@@ -10,6 +10,7 @@
 - [Таксономія](#таксономія)
 - [Правила вибору типу](#правила-вибору-типу)
 - [Колекції MongoDB](#колекції-mongodb)
+- [Новини в PostgreSQL](#новини-в-postgresql)
 - [Відповідність розділів сайтів](#відповідність-розділів-сайтів)
 
 ## Формат типу
@@ -48,14 +49,16 @@
 
 Типи, які таксономія не змінює:
 
-| Тип | Що це |
-|---|---|
-| `product` | товар тестового магазину (`examples/packages`, приймальний сценарій ТЗ §12) |
-| `event` | подія з Telegram-прикладу (`examples/packages`) |
-| `article` | стаття новинного сайту або публічної сторінки Telegram-каналу |
-| `news_article` | нормалізована й проаналізована новина (`examples/news`) |
-| `news_event` | подія, виділена з новини (`examples/news`) |
-| `post` | допис Telegram-каналу (`examples/channels`, `examples/sites`) |
+| Тип | Що це | Сховище |
+|---|---|---|
+| `product` | товар тестового магазину (`examples/packages`, приймальний сценарій ТЗ §12) | MongoDB, `results-mongo` |
+| `event` | подія з Telegram-прикладу (`examples/packages`) | MongoDB, `results-mongo` |
+| `article` | стаття новинного сайту або публічної сторінки Telegram-каналу | PostgreSQL, `results-news` |
+| `news_article` | нормалізована й проаналізована новина (`examples/news`) | PostgreSQL, `results-news` |
+| `news_event` | подія, виділена з новини (`examples/news`) | PostgreSQL, `results-news` |
+| `post` | допис Telegram-каналу (`examples/channels`, `examples/sites`) | PostgreSQL, `results-news` |
+
+Товари й оголошення таксономії (`product_*`, `ad_*`) зберігаються в MongoDB, `results-mongo`.
 
 ## Правила вибору типу
 
@@ -81,6 +84,19 @@
 `entity_type` не починається з `_` і не містить крапки, тому колекції типів не перетинаються ні зі службовими, ні з колекціями історії. Тип `system` потребує непорожнього префікса: MongoDB резервує імена `system.*`. Індекси, атомарність, каталог, пошук і статистика описані в розділі [адаптери: mongodb](../components/storage/adapters.md#mongodb).
 
 Каталог типів сховища показує `GET /v1/entity-types?connection_id=results-mongo`. У ньому лише типи, для яких уже збережено сутності, з точною кількістю. Сторінка «Результати» Admin UI будує з нього картки типів.
+
+Колекції `article`, `post`, `news_article` і `news_event` у `jane_results` містять новини, зібрані до 2026-10-19. Нові записи цих типів у MongoDB не надходять.
+
+## Новини в PostgreSQL
+
+Новини й дописи (`article`, `post`, `news_article`, `news_event`) з 2026-10-19 пише адаптер `jane.storage-postgresql@1.0.0` через підключення `results-news`: база `jane_storage_results`, схема `news`, параметр підключення `layout: news` ([ADR-0012](../adr/0012-news-relational-postgresql.md)).
+
+| Що | Де |
+|---|---|
+| Стан рушія: актуальний стан, історія, доставки, об'єкти | загальні таблиці адаптера в схемі `news` (`jane_entities`, `jane_entity_history`, `jane_deliveries`, `jane_objects`) |
+| Реляційна модель для SQL | таблиці `article`, `post`, `news_article`, `news_event`, довідники `source`, `tag`, `topic`, `named_entity` і дочірні таблиці; подання `news_article_with_event`, `article_analysis` |
+
+Обидві частини оновлюються в одній транзакції. Невідомі поля й значення, що не перетворюються в тип колонки, лежать у колонці `extra`. Перелік колонок і правила проєкції — [дизайн](../delivery/news-pg.md#3-реляційна-схема-news). Каталог типів — `GET /v1/entity-types?connection_id=results-news`.
 
 ## Відповідність розділів сайтів
 

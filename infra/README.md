@@ -159,9 +159,11 @@ just down -v --project jane-second
 |---|---|---|---|
 | `raw-files` | `filesystem` | том `storage-data` | — |
 | `results-pg` | `postgresql` | база `jane_storage_results` у `postgres` | `JANE_SECRET_DEV_PG_USER` (роль `jane_storage_results`), `JANE_SECRET_DEV_PG_PASSWORD` (`JANE_PG_STORAGE_RESULTS_PASSWORD`) |
+| `results-news` | `postgresql` | схема `news` бази `jane_storage_results` у `postgres`, розкладка `layout: news` | ті самі, що в `results-pg` |
 | `results-mongo` | `mongodb` | база `jane_results` у `mongodb`, `auth_source: admin` | `JANE_SECRET_DEV_MONGO_USER` (`JANE_MONGO_USER`), `JANE_SECRET_DEV_MONGO_PASSWORD` (`JANE_MONGO_PASSWORD`) |
 
 - `results-mongo` — для сутностей, поля яких задає пакет ([план](../docs/delivery/mongo-entities.md)): колекція на тип сутності, префікс колекцій — типовий для адаптера. Storage під'єднується користувачем MongoDB стеку (`jane`), окремого користувача для Storage немає.
+- `results-news` — для новин і дописів (`article`, `post`, `news_article`, `news_event`): адаптер `postgresql` у розкладці `news` сам створює схему `news` і реляційні таблиці ([ADR-0012](../docs/adr/0012-news-relational-postgresql.md)); провізіонер і `compose.yaml` для цього не змінюються.
 - `storage` залежить від `mongodb` у `compose.yaml`, тому `just up storage` і `stack.py up` запускають MongoDB разом зі Storage; адреса й облікові дані MongoDB — у файлі стеку (`just env` → `JANE_STACK_MONGODB_*`).
 - Файл лише засіває підключення під час старту Storage. Щоб завдання могли їх використовувати, ті самі документи реєструють в Orchestrator (`PUT /v1/connections/{id}`), який синхронізує їх із виконавцями.
 

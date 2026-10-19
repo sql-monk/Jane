@@ -13,10 +13,11 @@ A package reference is written as the string ``"@pkg:<package_id>"`` and resolve
 digest}`` of the package directory (``packages/``, ``../shops/packages`` or the storage packages); the digest is
 that of the registry's canonical archive. Connection ids are those of ``../documents/connections.json``.
 RAW goes to ``jane.storage-files`` / ``raw-files``, entities to ``jane.storage-mongodb`` / ``results-mongo``
-(a MongoDB collection per entity type). A ``verify`` key with ``*`` (``product_*``) stands for every entity
-type the site's extractors declare that matches it: a catalog writes ``product_<group>`` types chosen by the
-extractor from the shop's category table (``CATEGORY_TYPES`` in each extractor of the site, the same table in
-the card and the price extractor).
+(a MongoDB collection per entity type), news and posts (``article``, ``post``) to ``jane.storage-postgresql`` /
+``results-news`` (the relational layout ``news`` of PostgreSQL, ADR-0012). A ``verify`` key with ``*``
+(``product_*``) stands for every entity type the site's extractors declare that matches it: a catalog writes
+``product_<group>`` types chosen by the extractor from the shop's category table (``CATEGORY_TYPES`` in each
+extractor of the site, the same table in the card and the price extractor).
 
     uv run --all-packages python examples/sites/setup_sites.py check [site ...]
     uv run --all-packages python examples/sites/setup_sites.py apply --project <p> [site ...] [--run]
@@ -55,7 +56,10 @@ PACKAGE_ROOTS = (HERE / "packages", HERE.parent / "shops" / "packages")
 CONNECTIONS = HERE.parent / "documents" / "connections.json"
 RESULTS_PACKAGE = "jane.storage-mongodb"  # entities: a MongoDB collection per entity type
 RESULTS_CONNECTION = "results-mongo"
-STORAGE = ("jane.storage-files", RESULTS_PACKAGE)
+NEWS_RESULTS_PACKAGE = ex.NEWS_RESULTS_PACKAGE  # news and posts: relational tables of PostgreSQL schema news
+NEWS_RESULTS_CONNECTION = ex.NEWS_RESULTS_CONNECTION
+ENTITY_STORES = (RESULTS_PACKAGE, NEWS_RESULTS_PACKAGE)
+STORAGE = ("jane.storage-files", *ENTITY_STORES)
 REF = "@pkg:"
 DUMMY_DIGEST = "sha256:" + "0" * 64
 # A catalog extractor chooses product_<group> by the shop's category table; every extractor of one catalog
@@ -191,7 +195,7 @@ def results_connection(site: Mapping[str, Any], source_id: str) -> str:
             continue
         for stage in task.get("stages", []):
             target = (stage.get("connections") or {}).get("target")
-            if stage_package(stage) == RESULTS_PACKAGE and target:
+            if stage_package(stage) in ENTITY_STORES and target:
                 return str(target)
     return RESULTS_CONNECTION
 

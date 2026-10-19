@@ -155,20 +155,21 @@ class _Refs(dict[str, dict[str, str]]):
         return {"package_id": package_id, "version": "1.0.0", "digest": "sha256:" + "0" * 64}
 
 
-def test_raw_goes_to_files_and_entities_to_mongodb_through_results_mongo() -> None:
-    """Entity types stay; only the store changes: the documents and the news/channels task builders."""
-    sys.path.insert(0, str(ex.EXAMPLES / "news"))
-    sys.path.insert(0, str(ex.EXAMPLES / "channels"))
-    import setup_channels
-    import setup_news
-
+def test_connections_are_those_of_the_dev_stack_and_results_news_is_relational_postgresql() -> None:
+    """RAW -> files, news and posts -> PostgreSQL ``results-news`` (layout ``news``, ADR-0012), every other
+    entity type -> MongoDB ``results-mongo``; the documents name the connections of the dev stack's Storage."""
     connections = {
         c["connection_id"]: c for c in ex.read_json(ex.DOCUMENTS_DIR / ex.CONNECTIONS_DOC)["connections"]
     }
-    assert set(connections) == {ex.RAW_CONNECTION, ex.RESULTS_CONNECTION}
+    assert set(connections) == {ex.RAW_CONNECTION, ex.RESULTS_CONNECTION, ex.NEWS_RESULTS_CONNECTION}
     manifest = ex.read_json(ex.package_dir(ex.RESULTS_PACKAGE) / "jane-package.json")
     assert [c["kind"] for c in manifest["required_connections"]] == ["mongodb"]
     assert connections[ex.RESULTS_CONNECTION]["kind"] == "mongodb"
+    manifest = ex.read_json(ex.package_dir(ex.NEWS_RESULTS_PACKAGE) / "jane-package.json")
+    assert [c["kind"] for c in manifest["required_connections"]] == ["postgresql"]
+    news = connections[ex.NEWS_RESULTS_CONNECTION]
+    assert news["kind"] == "postgresql"
+    assert (news["params"]["schema"], news["params"]["layout"]) == ("news", "news")
     # the same connections as the dev stack's Storage configuration
     stack = {
         c["connection_id"]: c
@@ -177,20 +178,76 @@ def test_raw_goes_to_files_and_entities_to_mongodb_through_results_mongo() -> No
     for connection_id, conn in connections.items():
         fields = ("kind", "params", "secret_refs")
         assert {k: conn.get(k) for k in fields} == {k: stack[connection_id].get(k) for k in fields}
+    # results-news is the database of results-pg (server, database, role); only the schema and the layout differ
+    results_pg = stack["results-pg"]
+    assert news["secret_refs"] == results_pg["secret_refs"]
+    assert {k: v for k, v in news["params"].items() if k not in ("schema", "layout")} == {
+        k: v for k, v in results_pg["params"].items() if k != "schema"
+    }
+
+
+def _declared_types(manifest: dict[str, Any]) -> set[str]:
+    return {str(e["entity_type"]) for e in (manifest.get("output") or {}).get("entities", [])}
+
+
+def test_news_stages_store_in_results_news_and_no_other_store_changes() -> None:
+    """Every entity storage stage of the examples (documents, news and channel task builders, site files): the
+    types its input stages declare decide the store. ``article``, ``post``, ``news_article``, ``news_event`` ->
+    ``jane.storage-postgresql`` / ``results-news``, never ``results-mongo``; products, ads and the demo ``event``
+    -> ``jane.storage-mongodb`` / ``results-mongo``; RAW -> ``jane.storage-files`` / ``raw-files``."""
+    sys.path.insert(0, str(ex.EXAMPLES / "news"))
+    sys.path.insert(0, str(ex.EXAMPLES / "channels"))
+    sys.path.insert(0, str(ex.EXAMPLES / "sites"))
+    import setup_channels
+    import setup_news
+    import setup_sites
+
+    dirs: dict[str, Path] = {**setup_sites.package_dirs(), **setup_news.package_dirs()}
+    dirs.update({pid: ex.package_dir(pid) for pid in ex.LOCAL_PACKAGES})
+    dirs[setup_channels.EXTRACTOR] = setup_channels.PACKAGES / setup_channels.EXTRACTOR
+    manifests = {pid: ex.read_json(d / "jane-package.json") for pid, d in dirs.items()}
 
     refs = _Refs()
     tasks = [ex.read_json(ex.DOCUMENTS_DIR / name) for name in (ex.CATALOG_DOC, ex.PRICE_DOC, ex.TG_TASK_DOC)]
-    tasks += [setup_news.task_doc(item, refs) for item in setup_news.sources()]
-    tasks += [setup_channels.task_doc(channel, refs) for channel in setup_channels.DEFAULT_CHANNELS]
-    for task in tasks:
-        stores = {
-            s["handler"]["package_id"]: s["connections"]["target"]
-            for s in task["stages"]
-            if str((s.get("handler") or {}).get("package_id", "")).startswith("jane.storage-")
-        }
-        assert set(stores) <= set(ex.STORAGE_PACKAGES), (task["task_id"], stores)
-        assert stores.get(ex.RESULTS_PACKAGE) == ex.RESULTS_CONNECTION, (task["task_id"], stores)
-        assert stores.get("jane.storage-files", ex.RAW_CONNECTION) == ex.RAW_CONNECTION, task["task_id"]
+    news_tasks = [setup_news.task_doc(item, refs) for item in setup_news.sources()]
+    news_tasks += [setup_channels.task_doc(channel, refs) for channel in setup_channels.DEFAULT_CHANNELS]
+    for path in setup_sites.site_files():
+        site = ex.read_json(path)
+        site_tasks = [setup_sites.resolve(task, refs) for task in site["tasks"]]
+        (news_tasks if site["group"] in ("news", "telegram") else tasks).extend(site_tasks)
+    assert len(news_tasks) == 12 + 5 + 8 + 8  # examples/news, channels, sites news-* and tg-*
+
+    news_stores: dict[str, int] = {}
+    for task in [*tasks, *news_tasks]:
+        stages = {s["stage_id"]: s for s in task["stages"]}
+        stores = 0
+        for stage in task["stages"]:
+            package_id = str((stage.get("handler") or {}).get("package_id", ""))
+            if not package_id.startswith("jane.storage-"):
+                continue
+            where = (task["task_id"], stage["stage_id"])
+            target = stage["connections"]["target"]
+            if package_id == "jane.storage-files":
+                assert target == ex.RAW_CONNECTION, where
+                continue
+            stores += 1
+            types = set[str]().union(
+                *(
+                    _declared_types(manifests[stages[i["from"]]["handler"]["package_id"]])
+                    for i in stage["inputs"]
+                    if isinstance(stages[i["from"]].get("handler"), dict)
+                )
+            )
+            assert types, where
+            if types & ex.NEWS_ENTITY_TYPES:
+                assert types <= ex.NEWS_ENTITY_TYPES, (where, types)
+                assert target != ex.RESULTS_CONNECTION, where
+                assert (package_id, target) == (ex.NEWS_RESULTS_PACKAGE, ex.NEWS_RESULTS_CONNECTION), where
+                news_stores[task["task_id"]] = news_stores.get(task["task_id"], 0) + 1
+            else:
+                assert (package_id, target) == (ex.RESULTS_PACKAGE, ex.RESULTS_CONNECTION), (where, types)
+        assert stores, task["task_id"]
+    assert news_stores == {task["task_id"]: 1 for task in news_tasks}
 
 
 def test_documents_hold_no_secret_values() -> None:

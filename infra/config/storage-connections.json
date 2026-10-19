@@ -14,6 +14,13 @@
       "secret_refs": { "username": "env:JANE_SECRET_DEV_PG_USER", "password": "env:JANE_SECRET_DEV_PG_PASSWORD" }
     },
     {
+      "connection_id": "results-news",
+      "kind": "postgresql",
+      "title": "News results (PostgreSQL, relational)",
+      "params": { "host": "postgres", "port": 5432, "database": "jane_storage_results", "schema": "news", "sslmode": "disable", "layout": "news" },
+      "secret_refs": { "username": "env:JANE_SECRET_DEV_PG_USER", "password": "env:JANE_SECRET_DEV_PG_PASSWORD" }
+    },
+    {
       "connection_id": "results-mongo",
       "kind": "mongodb",
       "title": "Development results (MongoDB)",

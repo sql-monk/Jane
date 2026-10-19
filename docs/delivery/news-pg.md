@@ -195,6 +195,61 @@
 
 **Не зроблено:** діаграми `docs/diagrams/platform/dev-stack.drawio` і `operations/data-ownership.drawio` ще кажуть «сутності → mongodb».
 
+### Розгортання на `jane-demo`, 2026-10-19
+
+**Перезапуск Docker Desktop (не пов'язаний із цією зміною)**
+- О 04:27:41 UTC Docker Desktop перезапустився, і контейнери стенду завершилися з кодом 255; сама піднялася лише MongoDB.
+- Наявні контейнери запущено `docker start` з дозволу людини.
+- Після перезапуску в хоста нові порти: PostgreSQL 60758, MinIO 60761/60760, тестовий сайт 60769, Telegram Collector 60772. У `.jane/stack-jane-demo.json` лишилися старі значення (55086/54502, 55087, 55099, 55104).
+
+**CI**
+- Ревізія `cf9b8c6a`.
+- Ручний повний прогін `workflow_dispatch` [39201447162](https://github.com/sql-monk/Jane/actions/runs/39201447162): 14/14 success, зокрема `limits`, `stack`, `e2e`.
+- `e2e` push-прогону 39199875821 скасовано через ручний прогін на тому самому ref.
+
+**Розгортання**
+- Команда `scripts/deploy_admin_review.py apply --strategy recover` з тимчасового detached-worktree на `cf9b8c6a`. У основному checkout був новіший локальний коміт діаграм, а скрипт вимагає `HEAD` == SHA перевіреного CI.
+- Резервні копії пропущено за вказівкою людини: обгортка в scratchpad замінювала лише `Deploy.backup_data`, решта кроків скрипта не змінювалася.
+- Спершу пробували `drain`, але перервали ще до зупинки сервісів: `catalog-varus` робив повний обхід уже 4,5 год (6 152 матеріали). Усі 47 призупинених розкладів відновлено функцією самого скрипта й перевірено через API: вимкнених 0.
+- Результат: `deployed: true`, `writers_updated: 2`, `samples_preserved: 1`. Storage, Orchestrator і воркер automarket працюють на образах `admin-cf9b8c6a…-1ad645a6`. Квитанція — `.jane/backups/admin-cf9b8c6a…-1ad645a6/receipt.json`.
+
+**Перенесення**
+- З хоста скрипт падав із `TimeoutError` підключення: Docker Desktop відкриває одне нове з'єднання з PostgreSQL за 1–1,5 с, а 16 паралельних виходять за `connect_timeout` 10 с.
+- Тому скрипт запущено всередині мережі стенду, Python-середовищем контейнера `storage`: `docker cp` у `/tmp`, далі `--pg-host postgres --pg-port 5432 --mongo-host mongodb --mongo-port 27017`. Облікові дані брались зі змінних `JANE_SECRET_DEV_*` контейнера.
+- Прогін 1: 4 731 ключ, 21 937 подій (`written` 21 901, `stale` 10, `duplicate` 26 від перерваного запуску з хоста), невдалих 0, 126 с, `result: OK`.
+
+**Перемикання**
+- `setup_sites.py apply --project jane-demo` для 8 `news-*` і 8 `tg-*`, потім `setup_news.py apply --stack-file .jane/stack-jane-demo.json` для 12 завдань. Параметри завдань попередньо звірено з розгорнутими: відрізнялися лише етап збереження й опис.
+- Тепер 28 завдань пишуть у `results-news`, 24 інші — у `results-mongo`.
+- `results-news` синхронізоване зі Storage (`synced`). Колектори й LLM повертають `422`, як і для `results-mongo`.
+
+**Хвіст і звірка**
+- Прогін 2: усі 21 937 подій дали `duplicate`, тобто між першим прогоном і перемиканням у Mongo нічого не надійшло.
+- `--verify`:
+  - усі 4 731 ключ `ok`; `mismatch`, `missing` і `changed_after` — 0;
+  - проєкція збігається зі станом за `(canonical_key, version)`: `article` 2 980, `post` 1 090, `news_article` 635, `news_event` 26.
+
+**Реляційні таблиці після перенесення**
+
+| Таблиця | Рядків |
+|---|---|
+| `source` | 28 (web 16, telegram 12) |
+| `tag` | 1 966 |
+| `article_tag` | 8 641 |
+| `post_link` | 1 157 |
+| `topic` | 1 715 |
+| `news_article_topic` | 2 476 |
+| `news_article_location` | 1 416 |
+| `named_entity` | 1 513 |
+| `news_article_mention` | 2 515 |
+| `evidence` | 4 059 |
+
+Жодна стаття не має значень в `extra`.
+
+**Живий запис**
+- Перша стаття від розкладу записалася в `results-news` о 06:19:58 UTC, разом із рядком проєкції тієї ж версії.
+- Новинні типи в Mongo востаннє оновлено о 06:07 UTC, тобто до перемикання. Товари й далі пишуться в Mongo.
+
 ### Незалежне рев'ю
 
 Вердикт — «прийнято із зауваженнями». Виправлено:

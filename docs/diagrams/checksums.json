@@ -130,9 +130,9 @@
     "dark": "15ba36c8e9a0e3055c4ea682c20ef1212079a2eb054dd723ff007740c616dec0"
   },
   "operations/data-ownership": {
-    "drawio": "35f1abf82670d15ce2dcc9ff906abf32f392b76506279c88baee0291db7f92e7",
-    "light": "048168393ee3b21501a09623b1fdb6e07ca249a13c6810649f9ce19ba80609aa",
-    "dark": "bf18347be690b374c29651f2fd0d525e943d50e27ad8882f02e8b7f5712285b7"
+    "drawio": "ca10caed7cd70b776dbb05fa699e1223e696fcf084317e8c3bc9cb1b64c979fa",
+    "light": "116d9de4e39914ef4cb881231f7ebb8860efdcbd85f94b3a08e651142abf2495",
+    "dark": "24ebb68cda01ef8e4f78ba6e8c82209c47e35422192170e359189d7b21beebf1"
   },
   "operations/service-upgrade": {
     "drawio": "305d0d7cb7367b22b52863381282596763b805ffa6e4c5ae2a6f34bc82f5e8d3",
@@ -185,14 +185,14 @@
     "dark": "7b41ad7be477d4fa48b6db12a8aa8df352bf33f0a6310645e5c2f3175c984808"
   },
   "platform/data-ownership": {
-    "drawio": "910390c2a876802f3d7ad191e71979d4021422c72bee40aec0751e82bea9a3a4",
-    "light": "df32a418ace98aab75b299a2056b3f72895c289d3237896493882170cbef89a3",
-    "dark": "348346fe778c8b10ae37fe46a4d16f629cad775636eac6a306b79c6f8f0834ba"
+    "drawio": "1fb24c8f242b4472eaba5e01248bae87557f8e525eb46f3937edfadcf5de68ef",
+    "light": "c3b7f958af60045d2235ea627d8759b843d29b192fd7e672549f3d554bb26ba6",
+    "dark": "1a3a1c5aa172f2b2264501fcc29a12e31f5975a340c8c2c641efab1d879fdeb7"
   },
   "platform/dev-stack": {
-    "drawio": "0ecd432f5926e732c59e5c9be79079bd09bc17f6a9d4305f03bec48a6ab1e93a",
-    "light": "6edb4af6c4fa603cfa86507be5b8344b6ee2ffc450a5e5fdd0599a70431a45c5",
-    "dark": "00c721d9fdde0bf54d028216405388adbed6bb9146235e4a54ea9e87c67f6536"
+    "drawio": "4d9a1789d9a9907b94cbd886631cbbb3a2d4a975b48923bc2e285cd453556b3b",
+    "light": "aed1161589eabd90c6c06138b38ead690f7629c7925005e885ec612860a413de",
+    "dark": "9b2ac4f9a8a3e8c42c70111212745a507b2e78fd336a8e76d2e369c23609307a"
   },
   "platform/run-sequence": {
     "drawio": "ff62dea3722670457463aacb9d705cd72d1028f3a7910e5fc944801df6cccc46",

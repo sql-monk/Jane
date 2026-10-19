@@ -49,8 +49,8 @@
         <mxCell id="sock" value="сокет Docker хоста:&#10;пісочниці екстракторів" style="rounded=0;whiteSpace=wrap;html=0;fontSize=13;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
           <mxGeometry x="720" y="380" width="200" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="pg" value="postgres: база на сервіс&#10;jane_orchestrator, jane_registry,&#10;jane_llm, jane_assistant,&#10;jane_handler_runtime,&#10;jane_storage_results" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
-          <mxGeometry x="320" y="400" width="260" height="120" as="geometry"/>
+        <mxCell id="pg" value="postgres: база на сервіс&#10;jane_orchestrator, jane_registry,&#10;jane_llm, jane_assistant,&#10;jane_handler_runtime,&#10;jane_storage_results: схема news —&#10;новини storage (results-news)" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="320" y="400" width="260" height="140" as="geometry"/>
         </mxCell>
         <mxCell id="vstorage" value="том storage-data&#10;запис: storage&#10;читання: handler-runtime, llm" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
           <mxGeometry x="600" y="460" width="230" height="80" as="geometry"/>
@@ -61,8 +61,8 @@
         <mxCell id="opt" value="опційно: sqlserver, s3&#10;як цільові сховища Storage" style="rounded=0;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
           <mxGeometry x="40" y="300" width="220" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="mongo" value="mongodb: база jane_results&#10;сутності storage (results-mongo)" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
-          <mxGeometry x="40" y="490" width="220" height="64" as="geometry"/>
+        <mxCell id="mongo" value="mongodb: база jane_results&#10;інші сутності storage&#10;(results-mongo)" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;whiteSpace=wrap;html=0;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);fillColor=light-dark(#FFFFFF,#161B22);strokeColor=light-dark(#666666,#8B949E);strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="40" y="490" width="220" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="d1" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="proxy" target="orchestrator">
           <mxGeometry relative="1" as="geometry"></mxGeometry>
@@ -100,26 +100,26 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="note" value="Кожен сервіс підключається до postgres власною роллю й базою (лінію показано лише для orchestrator).&#10;proxy передає /api/&lt;сервіс&gt;/ відповідному сервісу (лінію показано лише до orchestrator).&#10;storage стартує разом із mongodb: сутності пише в mongodb (results-mongo), RAW — у том storage-data (raw-files)." style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);" vertex="1" parent="1">
-          <mxGeometry x="20" y="620" width="920" height="62" as="geometry"/>
+        <mxCell id="note" value="Кожен сервіс підключається до postgres власною роллю й базою (лінію показано лише для orchestrator).&#10;proxy передає /api/&lt;сервіс&gt;/ відповідному сервісу (лінію показано лише до orchestrator).&#10;storage стартує разом із mongodb. Новини (article, post, news_article, news_event) пише в postgres: база jane_storage_results,&#10;схема news (results-news, ADR-0012); інші сутності — у mongodb (results-mongo); RAW — у том storage-data (raw-files)." style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);" vertex="1" parent="1">
+          <mxGeometry x="20" y="620" width="920" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="lg0" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="20" y="708" as="sourcePoint"/>
-            <mxPoint x="70" y="708" as="targetPoint"/>
+            <mxPoint x="20" y="726" as="sourcePoint"/>
+            <mxPoint x="70" y="726" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
         <mxCell id="lt0" value="HTTP-виклик" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);" vertex="1" parent="1">
-          <mxGeometry x="78" y="698" width="90" height="20" as="geometry"/>
+          <mxGeometry x="78" y="716" width="90" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="lg1" value="" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;endSize=7;dashed=1;dashPattern=2 3;strokeWidth=1.5;strokeColor=light-dark(#424A53,#C9D1D9);" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="188" y="708" as="sourcePoint"/>
-            <mxPoint x="238" y="708" as="targetPoint"/>
+            <mxPoint x="188" y="726" as="sourcePoint"/>
+            <mxPoint x="238" y="726" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
         <mxCell id="lt1" value="дані, том або зовнішній ресурс" style="text;html=0;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;fontColor=light-dark(#1A1A1A,#E6EDF3);" vertex="1" parent="1">
-          <mxGeometry x="246" y="698" width="220" height="20" as="geometry"/>
+          <mxGeometry x="246" y="716" width="220" height="20" as="geometry"/>
         </mxCell>
       </root>
     </mxGraphModel>
